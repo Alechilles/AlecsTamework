@@ -9,7 +9,7 @@ A modular taming framework for Hytale. Add follow/hold, defend, and sleep behavi
 - Designed to be reused across mods
 
 ## Quick Start
-1. Add the dependency in your `manifest.json`:
+1. Add the dependency in your `manifest.json` (and set **Alec's Tamework!** as a required dependency when uploading your mod on CurseForge):
 
 ```json
 "Dependencies": {
@@ -17,6 +17,8 @@ A modular taming framework for Hytale. Add follow/hold, defend, and sleep behavi
 },
 "IncludesAssetPack": true
 ```
+
+Note on asset pack load order: Hytale loads asset packs alphabetically by folder name, so your mod's folder must come after `.Alec's Tamework!`. The `manifest.json` name does not affect load order (only the folder name does), which is why the leading `.` exists on the Tamework folder.
 
 2. Copy one of the example templates:
 - `Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json`
@@ -27,6 +29,8 @@ A modular taming framework for Hytale. Add follow/hold, defend, and sleep behavi
 - `Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Simple.json`
 
 4. Add translations in `Server/Languages/en-US/server.lang`.
+
+5. If you want testers/players to spawn the NPCs easily, add spawner items (or reuse existing spawner items) that point at your NPC role.
 
 ## Documentation
 - [Home](https://github.com/Alechilles/AlecsTamework/wiki)
