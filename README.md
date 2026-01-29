@@ -1,4 +1,4 @@
-# Alec's Tamework!
+<img width="400" height="400" alt="Alec&#39;sTamework400Transparent" src="https://github.com/user-attachments/assets/251cbac2-26ea-4daf-b552-30594e96f8da" />
 
 A modular taming framework for Hytale. Add follow/hold, defend, and sleep behaviors to NPCs using reusable components and templates.
 
