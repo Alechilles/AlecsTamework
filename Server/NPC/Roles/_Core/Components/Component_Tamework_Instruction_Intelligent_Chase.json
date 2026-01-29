@@ -1,0 +1,310 @@
+{
+  "Class": "Instruction",
+  "Parameters": {
+    "ViewRange": {
+      "Value": 15,
+      "Description": "View range"
+    },
+    "HearingRange": {
+      "Value": 8,
+      "Description": "Hearing range"
+    },
+    "RelativeSpeed": {
+      "Value": 0.8,
+      "Description": "Relative speed"
+    },
+    "StopDistance": {
+      "Value": 1.5,
+      "Description": "How far to stop from target"
+    },
+    "SlowDownDistance": {
+      "Value": 3,
+      "Description": "How far from target to start slowing down"
+    },
+    "AvoidGroup": {
+      "Value": [
+        "Self"
+      ],
+      "Description": "NPC group to try and navigate around"
+    }
+  },
+  "Content": {
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Or",
+          "Sensors": [
+            {
+              "$Comment": "Modified sight test",
+              "Type": "Target",
+              "Range": {
+                "Compute": "ViewRange"
+              },
+              "Filters": [
+                {
+                  "Type": "LineOfSight"
+                }
+              ]
+            },
+            {
+              "$Comment": "Modified hearing test",
+              "Type": "Mob",
+              "OnlyLockedTarget": true,
+              "GetPlayers": true,
+              "GetNPCs": true,
+              "Range": {
+                "Compute": "HearingRange"
+              },
+              "Filters": [
+                {
+                  "Type": "Not",
+                  "Filter": {
+                    "Type": "MovementState",
+                    "State": "Crouching"
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "$Comment": "Update the last known NPC position from the above tests",
+            "Type": "StorePosition",
+            "Slot": "LastSeen"
+          },
+          {
+            "Type": "OverrideAttitude",
+            "Attitude": "Hostile",
+            "Duration": 120
+          }
+        ]
+      },
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Nav",
+          "NavStates": [
+            "Defer"
+          ]
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": [
+              5,
+              5
+            ]
+          },
+          {
+            "Type": "ResetInstructions"
+          }
+        ]
+      },
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Nav",
+          "NavStates": [
+            "At_Goal"
+          ]
+        },
+        "Instructions": [
+          {
+            "$Comment": "At goal, but not at the last seen target position",
+            "Sensor": {
+              "Type": "ReadPosition",
+              "Slot": "LastSeen",
+              "Range": {
+                "Compute": "ViewRange"
+              },
+              "MinRange": {
+                "Compute": "StopDistance + 0.5"
+              }
+            },
+            "Instructions": [
+              {
+                "$Comment": "Cheat a little if the target is quite close",
+                "Continue": true,
+                "Sensor": {
+                  "Type": "Target",
+                  "Range": 5
+                },
+                "Actions": [
+                  {
+                    "Type": "StorePosition",
+                    "Slot": "LastSeen"
+                  }
+                ]
+              },
+              {
+                "Sensor": {
+                  "Type": "Any"
+                },
+                "Actions": [
+                  {
+                    "Type": "RecomputePath"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "At goal and also at the last seen target position - cheat again",
+            "Sensor": {
+              "Type": "Target",
+              "Range": 5,
+              "AutoUnlockTarget": true
+            },
+            "Actions": [
+              {
+                "Type": "StorePosition",
+                "Slot": "LastSeen"
+              },
+              {
+                "Type": "RecomputePath"
+              }
+            ]
+          },
+          {
+            "$Comment": "Target is gone",
+            "Sensor": {
+              "Type": "Any"
+            },
+            "Actions": [
+              {
+                "Type": "ResetInstructions"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Nav",
+              "NavStates": [
+                "Defer"
+              ],
+              "ThrottleDuration": 5
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Or",
+                "Sensors": [
+                  {
+                    "$Comment": "Modified sight test",
+                    "Type": "Target",
+                    "Range": {
+                      "Compute": "ViewRange"
+                    },
+                    "Filters": [
+                      {
+                        "Type": "LineOfSight"
+                      }
+                    ]
+                  },
+                  {
+                    "$Comment": "Modified hearing test",
+                    "Type": "Mob",
+                    "OnlyLockedTarget": true,
+                    "GetPlayers": true,
+                    "GetNPCs": true,
+                    "Range": {
+                      "Compute": "HearingRange"
+                    },
+                    "Filters": [
+                      {
+                        "Type": "Not",
+                        "Filter": {
+                          "Type": "MovementState",
+                          "State": "Crouching"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ResetInstructions"
+          }
+        ]
+      },
+      {
+        "$TODO": "This may need to go",
+        "Sensor": {
+          "Type": "Mob",
+          "Range": 1.5,
+          "ExcludeOwnType": false,
+          "LockOnTarget": false,
+          "Filters": [
+            {
+              "Type": "NPCGroup",
+              "IncludeGroups": {
+                "Compute": "AvoidGroup"
+              }
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "Wander",
+          "MinHeadingChange": 89,
+          "MaxHeadingChange": 91
+        }
+      },
+      {
+        "Sensor": {
+          "Type": "ReadPosition",
+          "Slot": "LastSeen",
+          "Range": {
+            "Compute": "ViewRange"
+          }
+        },
+        "BodyMotion": {
+          "Type": "Seek",
+          "SlowDownDistance": {
+            "Compute": "SlowDownDistance"
+          },
+          "StopDistance": {
+            "Compute": "StopDistance"
+          },
+          "RelativeSpeed": {
+            "Compute": "RelativeSpeed"
+          },
+          "RecomputeDistance": 0
+        }
+      },
+      {
+        "Sensor": {
+          "Type": "Not",
+          "Sensor": {
+            "Type": "ReadPosition",
+            "Slot": "LastSeen",
+            "Range": {
+              "Compute": "ViewRange"
+            }
+          }
+        },
+        "Actions": [
+          {
+            "Type": "ResetInstructions"
+          }
+        ]
+      }
+    ]
+  },
+  "Type": "Component"
+}

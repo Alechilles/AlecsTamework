@@ -1,0 +1,1158 @@
+{
+  "$Comment": "Example template that demonstrates how to use all Tamework components. Copy and customize for your own NPCs.",
+    "Debug": "DisplayState, DisplayTarget",
+  "StartState": "Hold",
+  "DefaultSubState": "Default",
+  "Type": "Abstract",
+  "Parameters": {
+    "Appearance": {
+      "Value": "Sheep",
+      "Description": "Model to be used. Replace with your NPC model ID."
+    },
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.Tamework_Example.name",
+      "Description": "Translation key for NPC name display."
+    },
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to store the owner/master."
+    },
+    "FollowDefaultSpotRange": {
+      "Value": 5,
+      "Description": "Range used for the initial close-range spot check."
+    },
+    "FollowLockOnRange": {
+      "Value": 15,
+      "Description": "Range used to lock onto the master target."
+    },
+    "FollowSeekSlowDownDistance": {
+      "Value": 5,
+      "Description": "How far from the master to start slowing down when seeking."
+    },
+    "FollowSeekStopDistance": {
+      "Value": 3,
+      "Description": "How far from the master to stop when seeking."
+    },
+    "FollowSeekRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative speed used when seeking the master."
+    },
+    "FollowScanRange": {
+      "Value": 10,
+      "Description": "Range used for scan checks while circling."
+    },
+    "FollowMaintainDistanceRange": {
+      "Value": [
+        1,
+        4
+      ],
+      "Description": "Desired distance range while maintaining distance from the master."
+    },
+    "FollowStrafingDurationRange": {
+      "Value": [
+        1,
+        1
+      ],
+      "Description": "Strafing duration range while circling the master."
+    },
+    "FollowStrafingFrequencyRange": {
+      "Value": [
+        2,
+        2
+      ],
+      "Description": "Strafing frequency range while circling the master."
+    },
+    "FollowMoveThreshold": {
+      "Value": 0.2,
+      "Description": "Movement threshold used during maintain-distance behavior."
+    },
+    "FollowRelativeForwardsSpeed": {
+      "Value": 1,
+      "Description": "Forward speed used during maintain-distance behavior."
+    },
+    "FollowRelativeBackwardsSpeed": {
+      "Value": 1,
+      "Description": "Backward speed used during maintain-distance behavior."
+    },
+    "FollowMaintainTimeoutRange": {
+      "Value": [
+        2,
+        2
+      ],
+      "Description": "Timeout range before returning to the default follow state."
+    },
+    "FollowSpinPreDelayRange": {
+      "Value": [
+        1,
+        1
+      ],
+      "Description": "Delay before playing the idle animation in the spin state."
+    },
+    "FollowSpinAnimation": {
+      "Value": "Idle",
+      "Description": "Animation played during the spin state."
+    },
+    "FollowSpinIdleDurationRange": {
+      "Value": [
+        2.55,
+        2.55
+      ],
+      "Description": "Duration to hold the idle animation in the spin state."
+    },
+    "MaxSpeed": {
+      "Value": 6,
+      "Description": "Maximum walking speed for this NPC."
+    },
+    "MaxHealth": {
+      "Value": 50,
+      "Description": "Max health for the NPC."
+    },
+    "KnockbackScale": {
+      "Value": 0.5,
+      "Description": "Scale factor for knockback."
+    },
+    "RunThreshold": {
+      "Value": 0.55,
+      "Description": "At what ratio NPC switches to run animation."
+    },
+    "MaxRotationSpeed": {
+      "Value": 360,
+      "Description": "Maximum rotation speed, in degrees per second."
+    },
+    "ClimbHeight": {
+      "Value": 1,
+      "Description": "Maximum climb height, in blocks."
+    },
+    "MinJumpHeight": {
+      "Value": 0.8,
+      "Description": "The minimum jump height."
+    },
+    "AscentAnimationType": {
+      "Value": "Walk",
+      "Description": "Animation when climbing up. Options: Walk, Jump, Climb, Fly, Idle."
+    },
+    "ClimbSpeedMult": {
+      "Value": 0,
+      "Description": "Climb speed multiplier (const + mult * walkspeed^pow)."
+    },
+    "ClimbSpeedPow": {
+      "Value": 1,
+      "Description": "Climb speed power (const + mult * walkspeed^pow)."
+    },
+    "ClimbSpeedConst": {
+      "Value": 5,
+      "Description": "Climb speed constant (const + mult * walkspeed^pow)."
+    },
+    "DescendSpeedCompensation": {
+      "Value": 0.9,
+      "Description": "Factor to compensate forward speed reduction while moving downwards."
+    },
+    "DescendFlatness": {
+      "Value": 0.7,
+      "Description": "Relative scale how fast NPC moves forward while climbing down."
+    },
+    "DescentSteepness": {
+      "Value": 1.4,
+      "Description": "The relative steepness of the descent."
+    },
+    "DescentBlending": {
+      "Value": 1.8,
+      "Description": "Blending of the descent pattern. 0 is linear, higher values more curved."
+    },
+    "WanderRadius": {
+      "Value": 8,
+      "Description": "General wander radius."
+    },
+    "AttitudeGroup": {
+      "Value": "Livestock",
+      "Description": "Attitude group for this NPC."
+    },
+    "DefaultPlayerAttitude": {
+      "Value": "Neutral",
+      "Description": "Default attitude towards players."
+    },
+    "ViewRange": {
+      "Value": 24,
+      "Description": "The range from which the target will be seen. If zero, sight will be disabled."
+    },
+    "ViewSector": {
+      "Value": 120,
+      "Description": "The view sector within which the target needs to be to be seen."
+    },
+    "HearingRange": {
+      "Value": 12,
+      "Description": "The range from which the target will be heard. If zero, hearing will be disabled."
+    },
+    "CanHear": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs that would wake this NPC."
+    },
+    "ReactToNPCs": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs when deciding to sleep."
+    },
+    "AbsoluteDetectionRange": {
+      "Value": 4,
+      "Description": "The range at which a target is guaranteed to be detected. If zero, absolute detection will be disabled."
+    },
+    "FleeRange": {
+      "Value": 15,
+      "Description": "How far to try and get away when fleeing."
+    },
+    "ThreatenAnimation": {
+      "Value": "",
+      "Description": "Optional animation to play before initiating combat."
+    },
+    "ThreatenDelayRange": {
+      "Value": [
+        2,
+        4
+      ],
+      "Description": "Delay before the threaten animation is played."
+    },
+    "DropList": {
+      "Value": "Empty",
+      "Description": "Drop list for this NPC."
+    },
+    "AlertedRange": {
+      "Value": 28,
+      "Description": "Range to search for threats while defending."
+    },
+    "HardLeashDistance": {
+      "Value": 30,
+      "Description": "Absolute maximum distance from the leash position while defending."
+    },
+    "LeashDistance": {
+      "Value": 20,
+      "Description": "Range after which the NPC will start to return to its spawn point."
+    },
+    "LeashMinPlayerDistance": {
+      "Value": 4,
+      "Description": "Minimum distance from the player before the NPC will consider giving up the chase."
+    },
+    "LeashTimer": {
+      "Value": [
+        3,
+        5
+      ],
+      "Description": "How long the NPC must be too far from leash before giving up."
+    },
+    "LeashRelativeSpeed": {
+      "Value": 0.6,
+      "Description": "Relative speed when returning to leash position."
+    },
+    "ConfusedTimeRange": {
+      "Value": [
+        1,
+        2
+      ],
+      "Description": "How long to act confused after losing a target."
+    },
+    "SearchTimeRange": {
+      "Value": [
+        5,
+        8
+      ],
+      "Description": "How long to search for a lost target before giving up."
+    },
+    "Chase": {
+      "Value": true,
+      "Description": "Whether the NPC will chase its target during combat."
+    },
+    "Attack": {
+      "Value": "Root_NPC_Attack_Melee",
+      "Description": "Attack interaction to use in defend/combat."
+    },
+    "AttackDistance": {
+      "Value": 3,
+      "Description": "Attack distance."
+    },
+    "AttackPauseRange": {
+      "Value": [
+        2,
+        3
+      ],
+      "Description": "Minimum time range between attacks."
+    },
+    "CombatAttackPreDelay": {
+      "Value": [
+        0.3,
+        0.3
+      ],
+      "Description": "Delay before attacking once in range."
+    },
+    "CombatAttackPostDelay": {
+      "Value": [
+        0.4,
+        0.4
+      ],
+      "Description": "Delay after attacking."
+    },
+    "CombatBackOffAfterAttack": {
+      "Value": true,
+      "Description": "Whether to back off after attacking."
+    },
+    "CombatBackOffDistanceRange": {
+      "Value": [
+        3,
+        5
+      ],
+      "Description": "Back-off distance after attacking."
+    },
+    "CombatBackOffDurationRange": {
+      "Value": [
+        2,
+        3
+      ],
+      "Description": "How long to back off after attacking."
+    },
+    "BlockAbility": {
+      "Value": "",
+      "Description": "Optional block interaction when backing away. Leave empty to disable."
+    },
+    "BlockProbability": {
+      "Value": 50,
+      "Description": "Chance to block while backing away if BlockAbility is set."
+    },
+    "CombatStrafingDurationRange": {
+      "Value": [
+        1,
+        1
+      ],
+      "Description": "Strafing duration range in combat."
+    },
+    "CombatStrafingFrequencyRange": {
+      "Value": [
+        2,
+        2
+      ],
+      "Description": "Strafing frequency range in combat."
+    },
+    "CombatBehaviorDistance": {
+      "Value": 5,
+      "Description": "Distance within which to switch to combat movement."
+    },
+    "CombatMovingRelativeSpeed": {
+      "Value": 0.6,
+      "Description": "Relative speed for combat movement."
+    },
+    "CombatStrafeWeight": {
+      "Value": 10,
+      "Description": "Weight for combat strafing behavior."
+    },
+    "CombatDirectWeight": {
+      "Value": 10,
+      "Description": "Weight for direct combat behavior."
+    },
+    "CombatAlwaysMovingWeight": {
+      "Value": 10,
+      "Description": "Weight for always-moving combat behavior."
+    },
+    "CombatRelativeTurnSpeed": {
+      "Value": 1.5,
+      "Description": "Turn speed modifier in combat."
+    },
+    "ChaseRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative chasing speed when pursuing a target."
+    },
+    "AdditionalCombatBehaviorMacroElement": {
+      "Value": "Component_Instruction_Null",
+      "Description": "Optional macro element for supplying bespoke combat movement behavior."
+    },
+    "BlockStepDetectionBlockSet": {
+      "Value": "",
+      "Description": "Optional blockset that this NPC will passively detect steps on."
+    },
+    "BlockStepDetectionRange": {
+      "Value": 30,
+      "Description": "Detection range for the block step detection."
+    },
+    "BlockStepDetectionIncludePlayers": {
+      "Value": true,
+      "Description": "Whether block steps from players will be detected."
+    },
+    "BlockStepDetectionIncludeNPCs": {
+      "Value": false,
+      "Description": "Whether block steps from NPCs will be detected."
+    },
+    "BlockStepDetectionRelativeSpeed": {
+      "Value": 0.75,
+      "Description": "Relative motion speed when investigating a stepped block."
+    },
+    "BlockStepDetectionIgnoreGroups": {
+      "Value": [
+        "Self"
+      ],
+      "Description": "NPC groups whose steps will be ignored."
+    },
+    "DayTimePeriod": {
+      "Value": [
+        6.01,
+        17.99
+      ],
+      "Description": "Hour range considered daytime."
+    },
+    "DayTimeNapWeight": {
+      "Value": 2,
+      "Description": "Weight for daytime naps. Set to 0 to disable naps."
+    },
+    "DayTimeNapTimeRange": {
+      "Value": [
+        10,
+        30
+      ],
+      "Description": "Duration range for daytime naps."
+    },
+    "TimidDuringDay": {
+      "Value": false,
+      "Description": "Whether this NPC is more timid during the day."
+    },
+    "AlwaysSleepAtNight": {
+      "Value": true,
+      "Description": "Whether this NPC always sleeps through the whole night."
+    },
+    "DayFlavorAnimation": {
+      "Value": "Idle",
+      "Description": "Daytime flavor animation. Empty to disable."
+    },
+    "DayFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the daytime flavor animation."
+    },
+    "DayFlavorAnimationLength": {
+      "Value": [
+        15,
+        30
+      ],
+      "Description": "How long to play the daytime flavor animation."
+    },
+    "NightFlavorAnimation": {
+      "Value": "Idle",
+      "Description": "Nighttime flavor animation. Empty to disable."
+    },
+    "NightFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the night flavor animation."
+    },
+    "NightFlavorAnimationLength": {
+      "Value": [
+        3,
+        5
+      ],
+      "Description": "How long to play the night flavor animation."
+    },
+    "WakeupAttitudes": {
+      "Value": [
+        "Hostile"
+      ],
+      "Description": "Attitudes that should wake this NPC while sleeping."
+    },
+    "FlockArray": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "NPCGroup array for flock behavior (used by sleep wakeups)."
+    },
+    "SpawnerEmptyItemID": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Item IDs that can pick up this NPC (empty spawner)."
+    },
+    "SpawnerItemID": {
+      "Value": "",
+      "Description": "Filled spawner item granted when picking up."
+    },
+    "FoodItemIDs": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Food items accepted for feeding."
+    },
+    "Weapons": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Weapons to equip in hotbar."
+    },
+    "InteractSoundHold": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when switching to Hold."
+    },
+    "InteractSoundFollow": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when switching to Follow."
+    },
+    "InteractSoundDefend": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when switching to Defend."
+    },
+    "InteractSoundFeed": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when feeding."
+    },
+    "InteractSoundPickUp": {
+      "Value": "SFX_Tamework_Poof",
+      "Description": "Sound to play when picking up."
+    },
+    "DisableDamageGroups": {
+      "Value": [
+        "Self"
+      ],
+      "Description": "Groups not to take damage from."
+    },
+    "IsMemory": {
+      "Value": false,
+      "Description": "Defines if the NPC is a memory."
+    },
+    "MemoriesCategory": {
+      "Value": "Mammal",
+      "Description": "Defines the category of the memory."
+    },
+    "MemoriesNameOverride": {
+      "Value": "",
+      "Description": "Overrides the memory name if set."
+    },
+    "BreathesInWater": {
+      "Value": true,
+      "Description": "Whether this NPC can breathe underwater."
+    }
+  },
+  "MotionControllerList": [
+    {
+      "$Comment": "Minimal walk controller for the example. Replace with your own as needed.",
+      "Type": "Walk",
+      "MaxWalkSpeed": {
+        "Compute": "MaxSpeed"
+      },
+      "Gravity": 15,
+      "RunThreshold": {
+        "Compute": "RunThreshold"
+      },
+      "RunThresholdRange": 0.05,
+      "MaxFallSpeed": 15,
+      "MinJumpHeight": {
+        "Compute": "MinJumpHeight"
+      },
+      "MaxRotationSpeed": {
+        "Compute": "MaxRotationSpeed"
+      },
+      "Acceleration": 100,
+      "DescentAnimationType": "Fall",
+      "DescentSteepness": {
+        "Compute": "DescentSteepness"
+      },
+      "DescentBlending": {
+        "Compute": "DescentBlending"
+      },
+      "JumpDescentSteepness": 8,
+      "MaxClimbHeight": {
+        "Compute": "ClimbHeight"
+      },
+      "AscentAnimationType": {
+        "Compute": "AscentAnimationType"
+      },
+      "ClimbSpeedMult": {
+        "Compute": "ClimbSpeedMult"
+      },
+      "ClimbSpeedPow": {
+        "Compute": "ClimbSpeedPow"
+      },
+      "ClimbSpeedConst": {
+        "Compute": "ClimbSpeedConst"
+      },
+      "DescendSpeedCompensation": {
+        "Compute": "DescendSpeedCompensation"
+      },
+      "DescendFlatness": {
+        "Compute": "DescendFlatness"
+      }
+    }
+  ],
+  "MaxHealth": {
+    "Compute": "MaxHealth"
+  },
+  "Appearance": {
+    "Compute": "Appearance"
+  },
+  "DefaultPlayerAttitude": {
+    "Compute": "DefaultPlayerAttitude"
+  },
+  "DefaultNPCAttitude": "Ignore",
+  "AttitudeGroup": {
+    "Compute": "AttitudeGroup"
+  },
+  "IsMemory": {
+    "Compute": "IsMemory"
+  },
+  "MemoriesCategory": {
+    "Compute": "MemoriesCategory"
+  },
+  "MemoriesNameOverride": {
+    "Compute": "MemoriesNameOverride"
+  },
+  "BreathesInWater": {
+    "Compute": "BreathesInWater"
+  },
+  "DropList": {
+    "Compute": "DropList"
+  },
+  "HotbarItems": {
+    "Compute": "Weapons"
+  },
+  "DisableDamageGroups": {
+    "Compute": "DisableDamageGroups"
+  },
+  "FlockSpawnTypes": {
+    "Compute": "FlockArray"
+  },
+  "FlockAllowedNPC": {
+    "Compute": "FlockArray"
+  },
+  "ApplySeparation": true,
+  "SeparationDistance": 0.5,
+  "SeparationWeight": 1.2,
+  "SeparationDistanceTarget": 1.5,
+  "SeparationNearRadiusTarget": 3,
+  "SeparationFarRadiusTarget": 8,
+  "KnockbackScale": {
+    "Compute": "KnockbackScale"
+  },
+  "StateTransitions": [
+    {
+      "$Comment": "Play sleep animation when entering Sleep from Idle/Hold. If your NPC uses looping sit/lie animations, add an extra transition that plays a stand-up animation when leaving that state.",
+      "States": [
+        {
+          "From": [
+            "Idle",
+            "Hold"
+          ],
+          "To": [
+            "Sleep"
+          ]
+        }
+      ],
+      "Actions": {
+        "Reference": "Component_ActionList_Sleep"
+      }
+    },
+    {
+      "$Comment": "Play wake animation when leaving Sleep.",
+      "States": [
+        {
+          "From": [
+            "Sleep"
+          ],
+          "To": [
+            "Idle",
+            "Hold",
+            "Defend"
+          ]
+        }
+      ],
+      "Actions": {
+        "Reference": "Component_ActionList_Wake"
+      }
+    },
+    {
+      "$Comment": "Clear any looping status animation when leaving Hold/Sleep so locomotion can play.",
+      "States": [
+        {
+          "From": [
+            "Hold",
+            "Sleep"
+          ],
+          "To": [
+            "Idle",
+            "Defend"
+          ]
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "PlayAnimation",
+          "Slot": "Status"
+        }
+      ]
+    }
+  ],
+  "Instructions": [
+    {
+      "$Comment": "Default follow/idle behavior using Tamework component.",
+      "Sensor": {
+        "Type": "State",
+        "State": "Idle"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_IdleFollow",
+          "Modify": {
+            "MasterTargetSlot": {
+              "Compute": "MasterTargetSlot"
+            },
+            "FollowDefaultSpotRange": {
+              "Compute": "FollowDefaultSpotRange"
+            },
+            "FollowLockOnRange": {
+              "Compute": "FollowLockOnRange"
+            },
+            "FollowSeekSlowDownDistance": {
+              "Compute": "FollowSeekSlowDownDistance"
+            },
+            "FollowSeekStopDistance": {
+              "Compute": "FollowSeekStopDistance"
+            },
+            "FollowSeekRelativeSpeed": {
+              "Compute": "FollowSeekRelativeSpeed"
+            },
+            "FollowScanRange": {
+              "Compute": "FollowScanRange"
+            },
+            "FollowMaintainDistanceRange": {
+              "Compute": "FollowMaintainDistanceRange"
+            },
+            "FollowStrafingDurationRange": {
+              "Compute": "FollowStrafingDurationRange"
+            },
+            "FollowStrafingFrequencyRange": {
+              "Compute": "FollowStrafingFrequencyRange"
+            },
+            "FollowMoveThreshold": {
+              "Compute": "FollowMoveThreshold"
+            },
+            "FollowRelativeForwardsSpeed": {
+              "Compute": "FollowRelativeForwardsSpeed"
+            },
+            "FollowRelativeBackwardsSpeed": {
+              "Compute": "FollowRelativeBackwardsSpeed"
+            },
+            "FollowMaintainTimeoutRange": {
+              "Compute": "FollowMaintainTimeoutRange"
+            },
+            "FollowSpinPreDelayRange": {
+              "Compute": "FollowSpinPreDelayRange"
+            },
+            "FollowSpinAnimation": {
+              "Compute": "FollowSpinAnimation"
+            },
+            "FollowSpinIdleDurationRange": {
+              "Compute": "FollowSpinIdleDurationRange"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "Hold (stay) behavior using Tamework component.",
+      "Sensor": {
+        "Type": "State",
+        "State": "Hold"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Hold",
+          "Modify": {
+            "_ExportStates": [
+              "Sleep"
+            ],
+            "DayFlavorAnimation": {
+              "Compute": "DayFlavorAnimation"
+            },
+            "DayFlavorAnimationAfter": {
+              "Compute": "DayFlavorAnimationAfter"
+            },
+            "DayFlavorAnimationLength": {
+              "Compute": "DayFlavorAnimationLength"
+            },
+            "DayTimePeriod": {
+              "Compute": "DayTimePeriod"
+            },
+            "NightFlavorAnimation": {
+              "Compute": "NightFlavorAnimation"
+            },
+            "NightFlavorAnimationAfter": {
+              "Compute": "NightFlavorAnimationAfter"
+            },
+            "NightFlavorAnimationLength": {
+              "Compute": "NightFlavorAnimationLength"
+            },
+            "DayTimeNapWeight": {
+              "Compute": "DayTimeNapWeight"
+            },
+            "AlwaysSleepAtNight": {
+              "Compute": "AlwaysSleepAtNight"
+            },
+            "CanHear": {
+              "Compute": "CanHear"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            },
+            "ReactToNPCs": {
+              "Compute": "ReactToNPCs"
+            },
+            "Attitudes": {
+              "Compute": "WakeupAttitudes"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "Defend state using Tamework component (includes intelligent chase).",
+      "Sensor": {
+        "Type": "State",
+        "State": "Defend"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Defend",
+          "Modify": {
+            "HardLeashDistance": {
+              "Compute": "HardLeashDistance"
+            },
+            "AlertedRange": {
+              "Compute": "AlertedRange"
+            },
+            "ViewSector": {
+              "Compute": "ViewSector"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            },
+            "AbsoluteDetectionRange": {
+              "Compute": "AbsoluteDetectionRange"
+            },
+            "ViewRange": {
+              "Compute": "ViewRange"
+            },
+            "Attack": {
+              "Compute": "Attack"
+            },
+            "AttackDistance": {
+              "Compute": "AttackDistance"
+            },
+            "AttackPauseRange": {
+              "Compute": "AttackPauseRange"
+            },
+            "CombatAttackPreDelay": {
+              "Compute": "CombatAttackPreDelay"
+            },
+            "CombatAttackPostDelay": {
+              "Compute": "CombatAttackPostDelay"
+            },
+            "CombatBackOffAfterAttack": {
+              "Compute": "CombatBackOffAfterAttack"
+            },
+            "CombatBackOffDistanceRange": {
+              "Compute": "CombatBackOffDistanceRange"
+            },
+            "CombatBackOffDurationRange": {
+              "Compute": "CombatBackOffDurationRange"
+            },
+            "BlockAbility": {
+              "Compute": "BlockAbility"
+            },
+            "BlockProbability": {
+              "Compute": "BlockProbability"
+            },
+            "CombatStrafingDurationRange": {
+              "Compute": "CombatStrafingDurationRange"
+            },
+            "CombatStrafingFrequencyRange": {
+              "Compute": "CombatStrafingFrequencyRange"
+            },
+            "CombatBehaviorDistance": {
+              "Compute": "CombatBehaviorDistance"
+            },
+            "CombatMovingRelativeSpeed": {
+              "Compute": "CombatMovingRelativeSpeed"
+            },
+            "CombatStrafeWeight": {
+              "Compute": "CombatStrafeWeight"
+            },
+            "CombatDirectWeight": {
+              "Compute": "CombatDirectWeight"
+            },
+            "CombatAlwaysMovingWeight": {
+              "Compute": "CombatAlwaysMovingWeight"
+            },
+            "CombatRelativeTurnSpeed": {
+              "Compute": "CombatRelativeTurnSpeed"
+            },
+            "ChaseRelativeSpeed": {
+              "Compute": "ChaseRelativeSpeed"
+            },
+            "AdditionalCombatBehaviorMacroElement": {
+              "Compute": "AdditionalCombatBehaviorMacroElement"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "Sleep behavior using Tamework component.",
+      "Sensor": {
+        "Type": "State",
+        "State": "Sleep"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Sleep",
+          "Modify": {
+            "_ExportStates": [
+              "Defend",
+              "Defend",
+              "Hold",
+              "Hold",
+              "Hold"
+            ],
+            "DayTimePeriod": {
+              "Compute": "DayTimePeriod"
+            },
+            "DayTimeNapWeight": {
+              "Compute": "DayTimeNapWeight"
+            },
+            "DayTimeNapTimeRange": {
+              "Compute": "DayTimeNapTimeRange"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            },
+            "Attitudes": {
+              "Compute": "WakeupAttitudes"
+            },
+            "FlockArray": {
+              "Compute": "FlockArray"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "InteractionInstruction": {
+    "$Comment": "Example interaction flow: pickup, feed, toggle hold/follow/defend.",
+    "Instructions": [
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any"
+        },
+        "Actions": [
+          {
+            "Type": "SetInteractable",
+            "Interactable": true
+          }
+        ]
+      },
+      {
+        "Sensor": {
+          "Type": "HasInteracted"
+        },
+        "Instructions": [
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Any"
+            },
+            "Actions": [
+              {
+                "Type": "LockOnInteractionTarget",
+                "TargetSlot": {
+                  "Compute": "MasterTargetSlot"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Pick up with an empty spawner item.",
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "SpawnerEmptyItemID"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Despawn"
+              },
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "RemoveHeldItem"
+              },
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "Add",
+                "Item": {
+                  "Compute": "SpawnerItemID"
+                }
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.1,
+                  0
+                ],
+                "ParticleSystem": "Poof_Small"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundPickUp"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Feed with a valid food item.",
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "FoodItemIDs"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "RemoveHeldItem",
+                "Count": 1
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.6,
+                  0
+                ],
+                "ParticleSystem": "Hearts"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFeed"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "If in Defend, switch to Hold.",
+            "Sensor": {
+              "Type": "State",
+              "State": "Defend"
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Hold"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.8,
+                  0
+                ],
+                "ParticleSystem": "Hold"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundHold"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "If in Hold/Sleep, switch to Idle (follow).",
+            "Sensor": {
+              "Type": "Or",
+              "Sensors": [
+                {
+                  "Type": "State",
+                  "State": "Hold"
+                },
+                {
+                  "Type": "State",
+                  "State": "Sleep"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Idle.Default"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.8,
+                  0
+                ],
+                "ParticleSystem": "Follow"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFollow"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "If in Idle, switch to Defend.",
+            "Instructions": [
+              {
+                "Sensor": {
+                  "Type": "State",
+                  "State": "Idle"
+                },
+                "Actions": [
+                  {
+                    "Type": "State",
+                    "State": "Defend.Default"
+                  },
+                  {
+                    "Type": "SpawnParticles",
+                    "Offset": [
+                      0,
+                      0.8,
+                      0
+                    ],
+                    "ParticleSystem": "Defend"
+                  },
+                  {
+                    "Type": "PlaySound",
+                    "SoundEventId": {
+                      "Compute": "InteractSoundDefend"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "NameTranslationKey": {
+    "Compute": "NameTranslationKey"
+  }
+}

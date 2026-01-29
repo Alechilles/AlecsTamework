@@ -1,0 +1,45 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Parameters": {
+    "DayTimeNapTimeRange": {
+      "Value": [
+        10,
+        30
+      ],
+      "Description": "How long a daytime nap should last."
+    }
+  },
+  "Content": {
+    "$Comment": "Start nap timer for short sleeps.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "TimerStart",
+            "Name": "NapTimer",
+            "StartValueRange": {
+              "Compute": "DayTimeNapTimeRange"
+            },
+            "RestartValueRange": {
+              "Compute": "DayTimeNapTimeRange"
+            }
+          },
+          {
+            "Type": "TimerRestart",
+            "Name": "NapTimer"
+          }
+        ]
+      }
+    ]
+  }
+}
