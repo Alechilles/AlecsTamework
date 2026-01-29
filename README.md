@@ -29,13 +29,12 @@ A modular taming framework for Hytale. Add follow/hold, defend, and sleep behavi
 4. Add translations in `Server/Languages/en-US/server.lang`.
 
 ## Documentation
-Wiki pages are in `docs/wiki/`:
-- Home
-- Quick-Start
-- Components
-- Templates
-- Interactions-and-Items
-- Troubleshooting
+- [Home](https://github.com/Alechilles/AlecsTamework/wiki)
+- [Quick-Start](https://github.com/Alechilles/AlecsTamework/wiki/Quick-Start)
+- [Components](https://github.com/Alechilles/AlecsTamework/wiki/Components)
+- [Templates](https://github.com/Alechilles/AlecsTamework/wiki/Templates)
+- [Interactions-and-Items](https://github.com/Alechilles/AlecsTamework/wiki/Interactions-and-Items)
+- [Troubleshooting](https://github.com/Alechilles/AlecsTamework/wiki/Troubleshooting)
 
 ## License
 See `LICENSE.txt`.
