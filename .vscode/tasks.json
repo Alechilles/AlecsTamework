@@ -1,0 +1,96 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Maven: Clean",
+      "type": "shell",
+      "command": "./mvnw",
+      "args": [
+        "clean"
+      ],
+      "windows": {
+        "command": ".\\mvnw.cmd",
+        "args": [
+          "clean"
+        ]
+      },
+      "group": "build",
+      "problemMatcher": "$maven"
+    },
+    {
+      "label": "Maven: Package",
+      "type": "shell",
+      "command": "./mvnw",
+      "args": [
+        "package"
+      ],
+      "windows": {
+        "command": ".\\mvnw.cmd",
+        "args": [
+          "package"
+        ]
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "problemMatcher": "$maven"
+    },
+    {
+      "label": "Maven: Clean Package",
+      "type": "shell",
+      "command": "./mvnw",
+      "args": [
+        "clean",
+        "package"
+      ],
+      "windows": {
+        "command": ".\\mvnw.cmd",
+        "args": [
+          "clean",
+          "package"
+        ]
+      },
+      "group": "build",
+      "problemMatcher": "$maven"
+    },
+    {
+      "label": "Maven: Install Plugin",
+      "type": "shell",
+      "command": "./mvnw",
+      "args": [
+        "package",
+        "-Pinstall-plugin"
+      ],
+      "windows": {
+        "command": ".\\mvnw.cmd",
+        "args": [
+          "package",
+          "-Pinstall-plugin"
+        ]
+      },
+      "group": "build",
+      "problemMatcher": "$maven",
+      "detail": "Builds and copies plugin to Hytale Server/mods folder"
+    },
+    {
+      "label": "Maven: Run Server",
+      "type": "shell",
+      "command": "./mvnw",
+      "args": [
+        "package",
+        "-Prun-server"
+      ],
+      "windows": {
+        "command": ".\\mvnw.cmd",
+        "args": [
+          "package",
+          "-Prun-server"
+        ]
+      },
+      "group": "build",
+      "problemMatcher": "$maven",
+      "detail": "Builds, installs plugin, and starts Hytale server"
+    }
+  ]
+}

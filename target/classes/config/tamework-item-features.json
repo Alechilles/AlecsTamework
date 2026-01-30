@@ -1,0 +1,14 @@
+{
+  "$Comment": "Item feature toggles for the Tamework plugin.",
+  "Items": {
+    "Spawner_Tamework_Example": {
+      "Spawner": true,
+      "CaptureClearsOwner": true,
+      "SpawnAssignsOwner": true,
+      "OwnerRestricted": true,
+      "Whistle": false,
+      "WhistleRadius": 64,
+      "SpawnerRoleId": "Mob_Tamework_Example"
+    }
+  }
+}

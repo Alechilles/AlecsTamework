@@ -1,0 +1,4 @@
+npcRoles.Tamework_Example.name=Tamework Example
+npcRoles.Tamework_Example_Simple.name=Tamework Example (Simple)
+items.Spawner_Tamework_Example.name=Tamework Example Spawner
+items.Spawner_Tamework_Example.description=Spawns the Tamework example NPC.

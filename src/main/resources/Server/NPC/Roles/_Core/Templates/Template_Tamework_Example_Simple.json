@@ -1,0 +1,566 @@
+{
+  "$Comment": "Simplified example template showing the minimum required wiring to use all Tamework components.",
+  "StartState": "Hold",
+  "DefaultSubState": "Default",
+  "Type": "Abstract",
+  "Parameters": {
+    "Appearance": {
+      "Value": "Sheep",
+      "Description": "Model to be used. Replace with your NPC model ID."
+    },
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.Tamework_Example_Simple.name",
+      "Description": "Translation key for NPC name display."
+    },
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to store the owner/master."
+    },
+    "MaxSpeed": {
+      "Value": 6,
+      "Description": "Maximum walking speed for this NPC."
+    },
+    "MaxHealth": {
+      "Value": 20,
+      "Description": "Max health for the NPC."
+    },
+    "RunThreshold": {
+      "Value": 0.55,
+      "Description": "At what ratio NPC switches to run animation."
+    },
+    "MaxRotationSpeed": {
+      "Value": 360,
+      "Description": "Maximum rotation speed, in degrees per second."
+    },
+    "ClimbHeight": {
+      "Value": 1,
+      "Description": "Maximum climb height, in blocks."
+    },
+    "MinJumpHeight": {
+      "Value": 0.8,
+      "Description": "The minimum jump height."
+    },
+    "ViewRange": {
+      "Value": 16,
+      "Description": "The range from which the target will be seen."
+    },
+    "ViewSector": {
+      "Value": 120,
+      "Description": "The view sector within which the target needs to be to be seen."
+    },
+    "HearingRange": {
+      "Value": 10,
+      "Description": "The range from which the target will be heard."
+    },
+    "AbsoluteDetectionRange": {
+      "Value": 3,
+      "Description": "The range at which a target is guaranteed to be detected."
+    },
+    "AlertedRange": {
+      "Value": 28,
+      "Description": "Range to search for threats while defending."
+    },
+    "HardLeashDistance": {
+      "Value": 30,
+      "Description": "Absolute maximum distance from the leash position while defending."
+    },
+    "Attack": {
+      "Value": "Root_NPC_Attack_Melee",
+      "Description": "Attack interaction to use in defend/combat."
+    },
+    "AttackDistance": {
+      "Value": 2.5,
+      "Description": "Attack distance."
+    },
+    "DayTimePeriod": {
+      "Value": [
+        6.01,
+        17.99
+      ],
+      "Description": "Hour range considered daytime."
+    },
+    "DayTimeNapWeight": {
+      "Value": 1,
+      "Description": "Weight for daytime naps. Set to 0 to disable naps."
+    },
+    "DayTimeNapTimeRange": {
+      "Value": [
+        10,
+        20
+      ],
+      "Description": "Duration range for daytime naps."
+    },
+    "AlwaysSleepAtNight": {
+      "Value": true,
+      "Description": "Whether this NPC always sleeps through the whole night."
+    },
+    "DayFlavorAnimation": {
+      "Value": "Idle",
+      "Description": "Daytime flavor animation. Empty to disable."
+    },
+    "NightFlavorAnimation": {
+      "Value": "Idle",
+      "Description": "Nighttime flavor animation. Empty to disable."
+    },
+    "FlockArray": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "NPCGroup array for flock behavior (used by sleep wakeups)."
+    },
+    "SpawnerEmptyItemID": {
+      "Value": [
+        "Spawner_Tamework_Example"
+      ],
+      "TypeHint": "String",
+      "Description": "Item IDs that can pick up this NPC (empty spawner)."
+    },
+    "SpawnerItemID": {
+      "Value": "*Spawner_Tamework_Example_State_Filled",
+      "Description": "Filled spawner item granted when picking up."
+    },
+    "FoodItemIDs": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "Food items accepted for feeding."
+    },
+    "InteractSoundHold": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when switching to Hold."
+    },
+    "InteractSoundFollow": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when switching to Follow."
+    },
+    "InteractSoundDefend": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when switching to Defend."
+    },
+    "InteractSoundFeed": {
+      "Value": "SFX_Torch_Swing_Right_Local",
+      "Description": "Sound to play when feeding."
+    },
+    "InteractSoundPickUp": {
+      "Value": "SFX_Tamework_Poof",
+      "Description": "Sound to play when picking up."
+    }
+  },
+  "MotionControllerList": [
+    {
+      "Type": "Walk",
+      "MaxWalkSpeed": {
+        "Compute": "MaxSpeed"
+      },
+      "Gravity": 15,
+      "RunThreshold": {
+        "Compute": "RunThreshold"
+      },
+      "RunThresholdRange": 0.05,
+      "MaxFallSpeed": 15,
+      "MinJumpHeight": {
+        "Compute": "MinJumpHeight"
+      },
+      "MaxRotationSpeed": {
+        "Compute": "MaxRotationSpeed"
+      },
+      "Acceleration": 100,
+      "DescentAnimationType": "Fall",
+      "DescentSteepness": 2.5,
+      "DescentBlending": 1,
+      "JumpDescentSteepness": 8,
+      "MaxClimbHeight": {
+        "Compute": "ClimbHeight"
+      }
+    }
+  ],
+  "MaxHealth": {
+    "Compute": "MaxHealth"
+  },
+  "Appearance": {
+    "Compute": "Appearance"
+  },
+  "DefaultPlayerAttitude": "Neutral",
+  "DefaultNPCAttitude": "Ignore",
+  "StateTransitions": [
+    {
+      "States": [
+        {
+          "From": [
+            "Idle",
+            "Hold"
+          ],
+          "To": [
+            "Sleep"
+          ]
+        }
+      ],
+      "Actions": {
+        "Reference": "Component_ActionList_Sleep"
+      }
+    },
+    {
+      "States": [
+        {
+          "From": [
+            "Sleep"
+          ],
+          "To": [
+            "Idle",
+            "Hold",
+            "Defend"
+          ]
+        }
+      ],
+      "Actions": {
+        "Reference": "Component_ActionList_Wake"
+      }
+    }
+  ],
+  "Instructions": [
+    {
+      "Sensor": {
+        "Type": "State",
+        "State": "Idle"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_IdleFollow",
+          "Modify": {
+            "MasterTargetSlot": {
+              "Compute": "MasterTargetSlot"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Sensor": {
+        "Type": "State",
+        "State": "Hold"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Hold",
+          "Modify": {
+            "_ExportStates": [
+              "Sleep"
+            ],
+            "DayFlavorAnimation": {
+              "Compute": "DayFlavorAnimation"
+            },
+            "DayTimePeriod": {
+              "Compute": "DayTimePeriod"
+            },
+            "NightFlavorAnimation": {
+              "Compute": "NightFlavorAnimation"
+            },
+            "DayTimeNapWeight": {
+              "Compute": "DayTimeNapWeight"
+            },
+            "AlwaysSleepAtNight": {
+              "Compute": "AlwaysSleepAtNight"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Sensor": {
+        "Type": "State",
+        "State": "Defend"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Defend",
+          "Modify": {
+            "HardLeashDistance": {
+              "Compute": "HardLeashDistance"
+            },
+            "AlertedRange": {
+              "Compute": "AlertedRange"
+            },
+            "ViewSector": {
+              "Compute": "ViewSector"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            },
+            "AbsoluteDetectionRange": {
+              "Compute": "AbsoluteDetectionRange"
+            },
+            "ViewRange": {
+              "Compute": "ViewRange"
+            },
+            "Attack": {
+              "Compute": "Attack"
+            },
+            "AttackDistance": {
+              "Compute": "AttackDistance"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "Sensor": {
+        "Type": "State",
+        "State": "Sleep"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Sleep",
+          "Modify": {
+            "_ExportStates": [
+              "Defend",
+              "Defend",
+              "Hold",
+              "Hold",
+              "Hold"
+            ],
+            "DayTimePeriod": {
+              "Compute": "DayTimePeriod"
+            },
+            "DayTimeNapWeight": {
+              "Compute": "DayTimeNapWeight"
+            },
+            "DayTimeNapTimeRange": {
+              "Compute": "DayTimeNapTimeRange"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            },
+            "FlockArray": {
+              "Compute": "FlockArray"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "InteractionInstruction": {
+    "Instructions": [
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any"
+        },
+        "Actions": [
+          {
+            "Type": "SetInteractable",
+            "Interactable": true
+          }
+        ]
+      },
+      {
+        "Sensor": {
+          "Type": "HasInteracted"
+        },
+        "Instructions": [
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Any"
+            },
+            "Actions": [
+              {
+                "Type": "LockOnInteractionTarget",
+                "TargetSlot": {
+                  "Compute": "MasterTargetSlot"
+                }
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "SpawnerEmptyItemID"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Despawn"
+              },
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "RemoveHeldItem"
+              },
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "Add",
+                "Item": {
+                  "Compute": "SpawnerItemID"
+                }
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.1,
+                  0
+                ],
+                "ParticleSystem": "Poof_Small"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundPickUp"
+                }
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              },
+              "Filters": [
+                {
+                  "Type": "ItemInHand",
+                  "Items": {
+                    "Compute": "FoodItemIDs"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "RemoveHeldItem",
+                "Count": 1
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.6,
+                  0
+                ],
+                "ParticleSystem": "Hearts"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFeed"
+                }
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "State",
+              "State": "Defend"
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Hold"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.8,
+                  0
+                ],
+                "ParticleSystem": "Hold"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundHold"
+                }
+              }
+            ]
+          },
+          {
+            "Sensor": {
+              "Type": "Or",
+              "Sensors": [
+                {
+                  "Type": "State",
+                  "State": "Hold"
+                },
+                {
+                  "Type": "State",
+                  "State": "Sleep"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Idle.Default"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.8,
+                  0
+                ],
+                "ParticleSystem": "Follow"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFollow"
+                }
+              }
+            ]
+          },
+          {
+            "Instructions": [
+              {
+                "Sensor": {
+                  "Type": "State",
+                  "State": "Idle"
+                },
+                "Actions": [
+                  {
+                    "Type": "State",
+                    "State": "Defend.Default"
+                  },
+                  {
+                    "Type": "SpawnParticles",
+                    "Offset": [
+                      0,
+                      0.8,
+                      0
+                    ],
+                    "ParticleSystem": "Defend"
+                  },
+                  {
+                    "Type": "PlaySound",
+                    "SoundEventId": {
+                      "Compute": "InteractSoundDefend"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "NameTranslationKey": {
+    "Compute": "NameTranslationKey"
+  }
+}

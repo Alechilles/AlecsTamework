@@ -1,0 +1,7 @@
+Manifest-Version: 1.0
+Created-By: Maven JAR Plugin 3.4.2
+Build-Jdk-Spec: 25
+Plugin-Group: com.alechilles
+Plugin-Name: alecstamework
+Plugin-Version: 1.1.0
+

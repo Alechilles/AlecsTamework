@@ -1,6 +1,0 @@
-npcRoles.Tamework_Example.name=Tamework Example
-npcRoles.Tamework_Example_Simple.name=Tamework Example (Simple)
-items.Spawner_Tamework_Example.name=Tamework Example Spawner
-items.Spawner_Tamework_Example.description=Spawns the Tamework example NPC.
-items.Spawner_Tamework_Example_Empty.name=Tamework Example Collar
-items.Spawner_Tamework_Example_Empty.description=Use on the example NPC to pick it up.

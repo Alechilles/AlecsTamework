@@ -1,0 +1,101 @@
+{
+  "$Comment": "Spawner item that captures/spawns the example Tamework NPC. Base is empty; Filled state spawns.",
+  "TranslationProperties": {
+    "Name": "server.items.Spawner_Tamework_Example.name",
+    "Description": "server.items.Spawner_Tamework_Example.description"
+  },
+  "Quality": "Common",
+  "PlayerAnimationsId": "Item",
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "Simple",
+          "RunTime": 0.1,
+          "Effects": {
+            "ItemAnimationId": "Interact",
+            "WaitForAnimationToFinish": true
+          }
+        }
+      ]
+    }
+  },
+  "Model": "Items/Tools/Collar.blockymodel",
+  "Texture": "Items/Tools/Collar_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Deco_Dog_Collar.png",
+  "IconProperties": {
+    "Scale": 0.85,
+    "Translation": [
+      11.5,
+      8.5
+    ],
+    "Rotation": [
+      0,
+      215,
+      317.435
+    ]
+  },
+  "MaxStack": 1,
+  "State": {
+    "Filled": {
+      "Variant": true,
+      "TranslationProperties": {
+        "Name": "server.items.Spawner_Tamework_Example.name",
+        "Description": "server.items.Spawner_Tamework_Example.description"
+      },
+      "Interactions": {
+        "Primary": {
+          "Interactions": [
+            {
+              "Type": "Serial",
+              "Interactions": [
+                {
+                  "Type": "Simple",
+                  "RunTime": 0.1,
+                  "Effects": {
+                    "Particles": [
+                      {
+                        "SystemId": "Poof_Small",
+                        "PositionOffset": {
+                          "X": 0,
+                          "Y": 0,
+                          "Z": 0
+                        },
+                        "TargetEntityPart": "Self",
+                        "DetachedFromModel": false
+                      }
+                    ],
+                    "WorldSoundEventId": "SFX_Tamework_Poof"
+                  }
+                },
+                {
+                  "Type": "ModifyInventory",
+                  "AdjustHeldItemQuantity": -1,
+                  "ItemToAdd": {
+                    "Id": "Spawner_Tamework_Example"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      },
+      "Model": "Items/Consumables/Food/Egg.blockymodel",
+      "Texture": "Items/Consumables/Food/Egg_White_Texture.png",
+      "Icon": "Icons/ItemsGenerated/Food_Egg_White.png",
+      "IconProperties": {
+        "Rotation": [
+          22.5,
+          45,
+          22.5
+        ],
+        "Scale": 0.7,
+        "Translation": [
+          0,
+          -5.4
+        ]
+      },
+      "MaxStack": 1
+    }
+  }
+}
