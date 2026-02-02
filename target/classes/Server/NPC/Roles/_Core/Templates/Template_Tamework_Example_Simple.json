@@ -602,7 +602,7 @@
                   0.6,
                   0
                 ],
-                "ParticleSystem": "Hearts"
+                "ParticleSystem": "Pet_Heal"
               },
               {
                 "Type": "PlaySound",

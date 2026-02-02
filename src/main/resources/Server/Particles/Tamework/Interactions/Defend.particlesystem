@@ -1,0 +1,13 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Defend",
+      "PositionOffset": {
+        "X": 0,
+        "Y": 0.4,
+        "Z": 0
+      }
+    }
+  ],
+  "LifeSpan": 1.0
+}

@@ -1,0 +1,123 @@
+{
+  "EmitOffset": {
+    "X": {
+      "Min": 0,
+      "Max": 0
+    },
+    "Y": {
+      "Min": 0,
+      "Max": 0
+    },
+    "Z": {
+      "Min": 0,
+      "Max": 0
+    }
+  },
+  "ParticleRotationInfluence": "Billboard",
+  "LightInfluence": 0.8,
+  "MaxConcurrentParticles": 1,
+  "ParticleLifeSpan": {
+    "Min": 1,
+    "Max": 1
+  },
+  "SpawnRate": {
+    "Min": 5,
+    "Max": 10
+  },
+  "ParticleRotateWithSpawner": false,
+  "Attractors": [
+    {
+      "Position": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "LinearAcceleration": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "Radius": 1,
+      "DampingMultiplier": {
+        "X": 0,
+        "Y": 0.9,
+        "Z": 0
+      }
+    }
+  ],
+  "Particle": {
+    "Texture": "Particles/Tamework/Hold.png",
+    "FrameSize": {
+      "Width": 64,
+      "Height": 64
+    },
+    "ScaleRatioConstraint": "OneToOne",
+    "UVOption": "None",
+    "Animation": {
+      "0": {
+        "FrameIndex": {
+          "Min": 0,
+          "Max": 0
+        },
+        "Opacity": 1,
+        "Scale": {
+          "X": {
+            "Min": 1,
+            "Max": 1
+          }
+        },
+        "Color": "#c9a928",
+        "Rotation": {
+          "Z": {
+            "Min": 0,
+            "Max": 0
+          }
+        }
+      },
+      "10": {
+        "Scale": {
+          "X": {
+            "Min": 3,
+            "Max": 5
+          }
+        }
+      },
+      "100": {
+        "Opacity": 1,
+        "Scale": {
+          "X": {
+            "Min": 1,
+            "Max": 1
+          }
+        },
+        "Color": "#c9a928"
+      }
+    },
+    "InitialAnimationFrame": {
+      "Rotation": {
+        "Z": {
+          "Min": -10,
+          "Max": 10
+        }
+      },
+      "Scale": {
+        "X": {
+          "Min": 0.05,
+          "Max": 0.05
+        }
+      },
+      "Opacity": 1,
+      "Color": "#ffe82c",
+      "FrameIndex": {
+        "Min": 0,
+        "Max": 0
+      }
+    }
+  },
+  "RenderMode": "Erosion",
+  "SpawnBurst": false,
+  "TrailSpawnerRotationMultiplier": 1.0,
+  "LinearFiltering": true,
+  "TrailSpawnerPositionMultiplier": 1.0
+}
+
