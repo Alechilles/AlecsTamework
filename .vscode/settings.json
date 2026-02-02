@@ -1,0 +1,18 @@
+{
+  "java.configuration.updateBuildConfiguration": "automatic",
+  "java.project.referencedLibraries": [
+    "C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest/Server/HytaleServer.jar"
+  ],
+  "editor.formatOnSave": true,
+  "java.compile.nullAnalysis.mode": "disabled",
+  "java.import.maven.enabled": true,
+  "java.configuration.maven.userSettings": "",
+  "java.jdt.ls.java.home": "C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot",
+  "java.configuration.runtimes": [
+    {
+      "name": "JavaSE-25",
+      "path": "C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot",
+      "default": true
+    }
+  ]
+}

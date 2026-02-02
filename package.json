@@ -1,0 +1,10 @@
+{
+  "name": "alecstamework-hytale-mod",
+  "private": true,
+  "scripts": {
+    "build": "mvnw.cmd package",
+    "clean": "mvnw.cmd clean",
+    "install-plugin": "mvnw.cmd package -Pinstall-plugin",
+    "run-server": "mvnw.cmd package -Prun-server"
+  }
+}

@@ -1,0 +1,435 @@
+{
+  "$Comment": "Handles the Hold state for a Cat NPC, playing idle animations based on time of day.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Parameters": {
+    "DayFlavorAnimation": {
+      "Value": "Idle",
+      "Description": "A flavor animation to play during the day. Ignored if null or empty."
+    },
+    "DayFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the daytime flavor animation."
+    },
+    "DayFlavorAnimationLength": {
+      "Value": [
+        15,
+        30
+      ],
+      "Description": "How long to play the daytime flavor animation."
+    },
+    "DayTimePeriod": {
+      "Value": [
+        6.01,
+        17.99
+      ],
+      "Description": "The hour range considered to be daytime for this NPC."
+    },
+    "NightFlavorAnimation": {
+      "Value": "",
+      "Description": "A flavor animation to play at night. Ignored if null or empty."
+    },
+    "NightFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the night flavor animation."
+    },
+    "NightFlavorAnimationLength": {
+      "Value": [
+        3,
+        5
+      ],
+      "Description": "How long to play the night flavor animation."
+    },
+    "_ImportStates": [
+      "GoSleep"
+    ],
+    "AlwaysSleepAtNight": {
+      "Value": true,
+      "Description": "Whether this NPC always sleeps through the whole night."
+    },
+    "DayTimeNapWeight": {
+      "Value": 2,
+      "Description": "Weight used to determine if the NPC should have a short nap during the day. Set to 0 to disable."
+    },
+    "CanHear": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs that would wake this NPC."
+    },
+    "HearingRange": {
+      "Value": 8,
+      "Description": "Range used to detect nearby NPCs that would wake this NPC."
+    },
+    "ReactToNPCs": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs when deciding to sleep."
+    },
+    "Attitudes": {
+      "Value": [
+        "Hostile",
+        "Neutral"
+      ],
+      "Description": "Attitudes that would wake this NPC."
+    }
+  },
+  "Content": {
+    "$Comment": "Hold State: Cat will sit still and sometimes play idle animations.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Clear combat target when entering Hold.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          }
+        ]
+      },
+      {
+        "Continue": true,
+        "BodyMotion": {
+          "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "Execute daytime idle behaviors.",
+        "Type": "Random",
+        "ExecuteFor": [
+          30,
+          60
+        ],
+        "Sensor": {
+          "Type": "Time",
+          "Period": {
+            "Compute": "DayTimePeriod"
+          },
+          "CheckDay": true
+        },
+        "Instructions": [
+          {
+            "$Comment": "Play a daytime flavor animation (with optional follow-up).",
+            "Enabled": {
+              "Compute": "!isEmpty(DayFlavorAnimation) && !isEmpty(DayFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "DayFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "DayFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status"
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "DayFlavorAnimationAfter"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": [
+                      1,
+                      1
+                    ]
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status"
+                  },
+                  {
+                    "Type": "ResetInstructions"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Play a daytime flavor animation.",
+            "Enabled": {
+              "Compute": "!isEmpty(DayFlavorAnimation) && isEmpty(DayFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "DayFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "DayFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status"
+                  },
+                  {
+                    "Type": "ResetInstructions"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Nap.",
+            "Enabled": {
+              "Compute": "DayTimeNapWeight > 0"
+            },
+          "Weight": {
+            "Compute": "DayTimeNapWeight"
+          },
+          "Sensor": {
+            "Type": "Not",
+            "Sensor": {
+              "Reference": "Component_Sensor_Sound_By_Attitude",
+              "Modify": {
+                "Enabled": {
+                  "Compute": "CanHear"
+                },
+                "HearingRange": {
+                  "Compute": "HearingRange"
+                },
+                "GetNPCs": {
+                  "Compute": "ReactToNPCs"
+                },
+                "Attitudes": {
+                  "Compute": "Attitudes"
+                }
+              }
+            }
+          },
+          "Instructions": [
+            {
+              "Actions": [
+                {
+                  "Type": "ParentState",
+                    "State": "GoSleep"
+                  },
+                  {
+                    "Type": "SpawnParticles",
+                    "Offset": [
+                      0,
+                      0,
+                      -0.5
+                    ],
+                    "ParticleSystem": "Sleepy"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "Enabled": {
+          "Compute": "AlwaysSleepAtNight"
+        },
+        "Sensor": {
+          "Type": "Not",
+          "Sensor": {
+            "Reference": "Component_Sensor_Sound_By_Attitude",
+            "Modify": {
+              "Enabled": {
+                "Compute": "CanHear"
+              },
+              "HearingRange": {
+                "Compute": "HearingRange"
+              },
+              "GetNPCs": {
+                "Compute": "ReactToNPCs"
+              },
+              "Attitudes": {
+                "Compute": "Attitudes"
+              }
+            }
+          }
+        },
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": [
+              2,
+              4
+            ],
+            "Action": {
+              "Type": "Sequence",
+              "Actions": [
+                {
+                  "Type": "ParentState",
+                  "State": "GoSleep"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Execute nighttime idle behaviors if we're an NPC that doesn't always sleep at night.",
+        "Type": "Random",
+        "ExecuteFor": [
+          15,
+          20
+        ],
+        "Instructions": [
+          {
+            "$Comment": "Play a night-time flavor animation (with optional follow-up).",
+            "Enabled": {
+              "Compute": "!isEmpty(NightFlavorAnimation) && !isEmpty(NightFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "NightFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "NightFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status"
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "NightFlavorAnimationAfter"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": [
+                      1,
+                      1
+                    ]
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status"
+                  },
+                  {
+                    "Type": "ResetInstructions"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Play a night-time flavor animation.",
+            "Enabled": {
+              "Compute": "!isEmpty(NightFlavorAnimation) && isEmpty(NightFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "NightFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "NightFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status"
+                  },
+                  {
+                    "Type": "ResetInstructions"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Very low chance of sleeping at night since they'll stay asleep all night then.",
+            "Weight": 1,
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Reference": "Component_Sensor_Sound_By_Attitude",
+                "Modify": {
+                  "Enabled": {
+                    "Compute": "CanHear"
+                  },
+                  "HearingRange": {
+                    "Compute": "HearingRange"
+                  },
+                  "GetNPCs": {
+                    "Compute": "ReactToNPCs"
+                  },
+                  "Attitudes": {
+                    "Compute": "Attitudes"
+                  }
+                }
+              }
+            },
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": [
+                  2,
+                  4
+                ],
+                "Action": {
+                  "Type": "Sequence",
+                  "Actions": [
+                    {
+                      "Type": "ParentState",
+                      "State": "GoSleep"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

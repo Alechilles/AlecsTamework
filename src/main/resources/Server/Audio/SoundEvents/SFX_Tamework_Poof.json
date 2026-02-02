@@ -1,0 +1,25 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/NPC/Tamework/Tamework_Poof.ogg"
+      ],
+      "RandomSettings": {
+        "MinPitch": -1.8240371213405997,
+        "MinVolume": -6,
+        "MaxPitch": 2.6500422849992202,
+        "MaxVolume": 0
+      },
+      "Probability": 100,
+      "Volume": -1,
+      "Looping": false
+    }
+  ],
+  "MaxInstance": 5,
+  "Volume": -3.2,
+  "PreventSoundInterruption": false,
+  "AudioCategory": "AudioCat_NPC_Tamework",
+  "Parent": "SFX_Attn_Moderate",
+  "MaxDistance": 16,
+  "Pitch": 0
+}

@@ -1,0 +1,23 @@
+{
+    "Group": "Alechilles",
+    "Name": "Alec's Tamework!",
+    "Version": "1.1.0",
+    "Description": "A modular taming framework for Hytale!",
+    "Authors": [
+        {
+            "Name": "Alec (Alechilles)",
+            "Email": "",
+            "Url": "https://www.curseforge.com/members/alechilles/projects",
+            "Discord": "alechilles"
+        }
+    ],
+    "Website": "",
+    "Main": "com.alechilles.alecstamework.Tamework",
+    "ServerVersion": "*",
+    "Dependencies": {},
+    "OptionalDependencies": {},
+    "LoadBefore": {},
+    "DisabledByDefault": false,
+    "IncludesAssetPack": true,
+    "SubPlugins": []
+}

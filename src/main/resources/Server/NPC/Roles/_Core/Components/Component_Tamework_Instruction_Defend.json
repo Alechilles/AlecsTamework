@@ -1,0 +1,718 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "DefaultState": ".Default",
+  "Parameters": {
+    "HardLeashDistance": {
+      "Value": 30,
+      "Description": "An absolute maximum from the the leash position the NPC can go before turning back."
+    },
+    "AlertedRange": {
+      "Value": 28,
+      "Description": "Range to search for threats while defending."
+    },
+    "ViewSector": {
+      "Value": 120,
+      "Description": "The view sector within which the target needs to be to be seen."
+    },
+    "HearingRange": {
+      "Value": 12,
+      "Description": "The range from which the target will be heard. If zero, hearing will be disabled."
+    },
+    "AbsoluteDetectionRange": {
+      "Value": 4,
+      "Description": "The range at which a target is guaranteed to be detected. If zero, absolute detection will be disabled."
+    },
+    "ViewRange": {
+      "Value": 24,
+      "Description": "The range from which the target will be seen. If zero, sight will be disabled."
+    },
+    "Attack": {
+      "Value": "Root_NPC_Attack_Melee",
+      "Description": "The attack to use."
+    },
+    "AttackDistance": {
+      "Value": 3,
+      "Description": "The distance to attack from."
+    },
+    "AttackPauseRange": {
+      "Value": [
+        2,
+        3
+      ],
+      "Description": "The range for absolute minimum time before an NPC can execute a second attack."
+    },
+    "CombatAttackPreDelay": {
+      "Value": [
+        0.3,
+        0.3
+      ],
+      "Description": "The time delay range before the NPC performs an attack, provided it's in attack range."
+    },
+    "CombatAttackPostDelay": {
+      "Value": [
+        0.4,
+        0.4
+      ],
+      "Description": "The time delay range after the NPC performs an attack, provided it's in attack range."
+    },
+    "CombatBackOffAfterAttack": {
+      "Value": true,
+      "Description": "Whether to back off after performing an attack."
+    },
+    "CombatBackOffDistanceRange": {
+      "Value": [
+        3,
+        5
+      ],
+      "Description": "How far to back off after performing an attack. Max should be lower than the CombatBehaviorDistance."
+    },
+    "CombatBackOffDurationRange": {
+      "Value": [
+        2,
+        3
+      ],
+      "Description": "How long to back off for after performing an attack."
+    },
+    "BlockAbility": {
+      "Value": "",
+      "Description": "The interaction to use for blocking when backing away. Set to empty to disable blocking."
+    },
+    "BlockProbability": {
+      "Value": 50,
+      "Description": "The probability this NPC will block when backing away if a BlockAbility is set."
+    },
+    "CombatStrafingDurationRange": {
+      "Value": [
+        1,
+        1
+      ],
+      "Description": "How long to strafe for when in the combat strafing movement behavior. Only applies if CombatStrafeWeight is greater than 0."
+    },
+    "CombatStrafingFrequencyRange": {
+      "Value": [
+        2,
+        2
+      ],
+      "Description": "How frequently to strafe when in the combat strafing movement behavior. Only applies if CombatStrafeWeight is greater than 0."
+    },
+    "CombatBehaviorDistance": {
+      "Value": 5,
+      "Description": "The distance within which to switch from smart chasing to combat-oriented movement behavior."
+    },
+    "CombatMovingRelativeSpeed": {
+      "Value": 0.6,
+      "Description": "Relative speed to use during combat specific movement (e.g. to achieve slower strafing)."
+    },
+    "CombatStrafeWeight": {
+      "Value": 10,
+      "Description": "Weight for the combat strafing movement behavior. Set to 0 to disable."
+    },
+    "CombatDirectWeight": {
+      "Value": 10,
+      "Description": "Weight for the direct combat movement behavior (i.e. just going straight at the target, maintaining a close distance and attacking. Set to 0 to disable."
+    },
+    "CombatAlwaysMovingWeight": {
+      "Value": 10,
+      "Description": "Weight for the combat movement behavior where the npcs will always chharge at you,put 0 to disable."
+    },
+    "CombatRelativeTurnSpeed": {
+      "Value": 1.5,
+      "Description": "Modifier that decides turn speed difference in combat."
+    },
+    "ChaseRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative chasing speed when pursuing a target."
+    },
+    "AdditionalCombatBehaviorMacroElement": {
+      "Value": "Component_Instruction_Null",
+      "Description": "An optional macro element for supplying more bespoke combat movement behavior. Weight for the behavior must be internally defined in the macro element."
+    }
+  },
+  "Content": {
+    "$Comment": "Defend State: Cat will defend itself against nearby threats.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "If too far from the player, break off and return.",
+        "Sensor": {
+          "Type": "Not",
+          "Sensor": {
+            "Type": "Player",
+            "Range": {
+              "Compute": "HardLeashDistance"
+            }
+          }
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "If a combat target is already locked, enter combat.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Target",
+              "TargetSlot": "LockedTarget",
+              "Range": {
+                "Compute": "AlertedRange"
+              },
+              "Filters": [
+                {
+                  "Type": "Attitude",
+                  "Attitudes": [
+                    "Hostile"
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Combat"
+          }
+        ]
+      },
+      {
+        "$Comment": "Engage nearby mobs while defending.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": "LockedTarget"
+              }
+            },
+            {
+              "Reference": "Component_Sensor_Standard_Detection",
+              "Modify": {
+                "ViewRange": {
+                  "Compute": "AlertedRange"
+                },
+                "ViewSector": {
+                  "Compute": "ViewSector"
+                },
+                "HearingRange": {
+                  "Compute": "HearingRange"
+                },
+                "AbsoluteDetectionRange": {
+                  "Compute": "AbsoluteDetectionRange"
+                },
+                "Attitudes": [
+                  "Hostile"
+                ],
+                "ExcludeGroups": [
+                  "Self"
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Combat"
+          }
+        ]
+      },
+      {
+        "$Comment": "Trigger alerted particles when a target is acquired.",
+        "Enabled": true,
+        "Continue": true,
+        "Sensor": {
+          "Type": "Target",
+          "TargetSlot": "LockedTarget",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "SpawnParticles",
+            "ParticleSystem": "Alerted",
+            "Offset": [
+              0,
+              0.8,
+              0
+            ]
+          }
+        ]
+      },
+      {
+        "$Comment": "If there is no combat target, follow the player while defending (keep follow and combat targets separate).",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": "LockedTarget",
+                "Range": {
+                  "Compute": "AlertedRange"
+                }
+              }
+            },
+            {
+              "Type": "Player",
+              "Range": 30,
+              "LockOnTarget": true,
+              "LockedTargetSlot": "MasterTarget"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ],
+        "BodyMotion": {
+          "Type": "Seek",
+          "UsePathfinder": true,
+          "SlowDownDistance": 5,
+          "StopDistance": 3,
+          "RelativeSpeed": 1
+        }
+      },
+      {
+        "$Comment": "While in Defend.Default with no target, stay near the player.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Default"
+        },
+        "Instructions": [
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Player",
+              "Range": 30,
+              "LockOnTarget": true,
+              "LockedTargetSlot": "MasterTarget"
+            },
+            "BodyMotion": {
+              "Type": "Seek",
+              "UsePathfinder": true,
+              "SlowDownDistance": 5,
+              "StopDistance": 3,
+              "RelativeSpeed": 1
+            }
+          },
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": "MasterTarget"
+            },
+            "BodyMotion": {
+              "Type": "Teleport"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Combat behavior while defending.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".Combat"
+        },
+        "Instructions": [
+          {
+            "$Comment": "Always watch the target.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": "LockedTarget",
+              "Range": {
+                "Compute": "ViewRange"
+              },
+              "Filters": [
+                {
+                  "Type": "LineOfSight"
+                }
+              ]
+            },
+            "HeadMotion": {
+              "Type": "Watch"
+            }
+          },
+          {
+            "$Comment": "Chase until in attack range.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": "LockedTarget"
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "Target",
+                    "TargetSlot": "LockedTarget",
+                    "Range": {
+                      "Compute": "AttackDistance"
+                    },
+                    "Filters": [
+                      {
+                        "Type": "LineOfSight"
+                      }
+                    ]
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "IsBackingAway"
+                  }
+                }
+              ]
+            },
+            "Instructions": [
+              {
+                "Reference": "Component_Tamework_Instruction_Intelligent_Chase",
+                "Modify": {
+                  "ViewRange": {
+                    "Compute": "AlertedRange"
+                  },
+                  "HearingRange": {
+                    "Compute": "HearingRange"
+                  },
+                  "RelativeSpeed": {
+                    "Compute": "ChaseRelativeSpeed"
+                  },
+                  "SlowDownDistance": {
+                    "Compute": "AttackDistance"
+                  },
+                  "StopDistance": {
+                    "Compute": "AttackDistance * 0.6"
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Attack when in range with line of sight.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": "LockedTarget",
+              "Range": {
+                "Compute": "AttackDistance"
+              },
+              "Filters": [
+                {
+                  "Type": "LineOfSight"
+                },
+                {
+                  "Type": "Attitude",
+                  "Attitudes": [
+                    "Hostile"
+                  ]
+                }
+              ]
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "CombatAttackPreDelay"
+                }
+              },
+              {
+                "Type": "Attack",
+                "Attack": {
+                  "Compute": "Attack"
+                },
+                "AttackPauseRange": {
+                  "Compute": "AttackPauseRange"
+                }
+              },
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "CombatAttackPostDelay"
+                }
+              },
+              {
+                "Type": "TimerStart",
+                "Name": "Combat_Back_Off",
+                "StartValueRange": {
+                  "Compute": "CombatBackOffDurationRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "CombatBackOffDurationRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "Combat_Back_Off"
+              }
+            ],
+            "HeadMotion": {
+              "Type": "Aim",
+              "RelativeTurnSpeed": {
+                "Compute": "CombatRelativeTurnSpeed"
+              }
+            }
+          },
+          {
+            "Reference": "Component_Instruction_Combat_Back_Off",
+            "Modify": {
+              "TimerName": "Combat_Back_Off",
+              "CombatBackOffAfterAttack": {
+                "Compute": "CombatBackOffAfterAttack"
+              },
+              "CombatBackOffDistanceRange": {
+                "Compute": "CombatBackOffDistanceRange"
+              },
+              "CombatBackOffDurationRange": {
+                "Compute": "CombatBackOffDurationRange"
+              },
+              "BlockAbility": {
+                "Compute": "BlockAbility"
+              },
+              "BlockProbability": {
+                "Compute": "BlockProbability"
+              },
+              "CombatStrafingDurationRange": {
+                "Compute": "CombatStrafingDurationRange"
+              },
+              "CombatStrafingFrequencyRange": {
+                "Compute": "CombatStrafingFrequencyRange"
+              },
+              "CombatBehaviorDistance": {
+                "Compute": "CombatBehaviorDistance"
+              },
+              "CombatMovingRelativeSpeed": {
+                "Compute": "CombatMovingRelativeSpeed"
+              }
+            }
+          },
+          {
+            "$Comment": "Execute combat-oriented movement.",
+            "Type": "Random",
+            "ExecuteFor": [
+              5,
+              5
+            ],
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": "LockedTarget",
+              "Range": {
+                "Compute": "CombatBehaviorDistance"
+              }
+            },
+            "Instructions": [
+              {
+                "$Comment": "Strafe around the target while fighting.",
+                "Enabled": {
+                  "Compute": "CombatStrafeWeight > 0"
+                },
+                "Weight": {
+                  "Compute": "CombatStrafeWeight"
+                },
+                "Sensor": {
+                  "Type": "Target",
+                  "TargetSlot": "LockedTarget",
+                  "Range": {
+                    "Compute": "CombatBehaviorDistance"
+                  }
+                },
+                "BodyMotion": {
+                  "Type": "MaintainDistance",
+                  "DesiredDistanceRange": {
+                    "Compute": "makeRange(AttackDistance - 1)"
+                  },
+                  "StrafingDurationRange": {
+                    "Compute": "CombatStrafingDurationRange"
+                  },
+                  "StrafingFrequencyRange": {
+                    "Compute": "CombatStrafingFrequencyRange"
+                  },
+                  "RelativeForwardsSpeed": {
+                    "Compute": "CombatMovingRelativeSpeed"
+                  }
+                },
+                "HeadMotion": {
+                  "Type": "Watch"
+                }
+              },
+              {
+                "$Comment": "Attack the target without strafing.",
+                "Enabled": {
+                  "Compute": "CombatDirectWeight > 0"
+                },
+                "Weight": {
+                  "Compute": "CombatDirectWeight"
+                },
+                "Sensor": {
+                  "Type": "Target",
+                  "TargetSlot": "LockedTarget",
+                  "Range": {
+                    "Compute": "CombatBehaviorDistance"
+                  }
+                },
+                "BodyMotion": {
+                  "Type": "MaintainDistance",
+                  "DesiredDistanceRange": {
+                    "Compute": "makeRange(AttackDistance - 1)"
+                  },
+                  "StrafingDurationRange": [
+                    0,
+                    0
+                  ],
+                  "RelativeForwardsSpeed": {
+                    "Compute": "ChaseRelativeSpeed"
+                  }
+                },
+                "HeadMotion": {
+                  "Type": "Watch"
+                }
+              },
+              {
+                "$Comment": "Attack the target without strafing.",
+                "Enabled": {
+                  "Compute": "CombatAlwaysMovingWeight > 0"
+                },
+                "Weight": {
+                  "Compute": "CombatAlwaysMovingWeight"
+                },
+                "Sensor": {
+                  "Type": "Target",
+                  "TargetSlot": "LockedTarget",
+                  "Range": {
+                    "Compute": "CombatBehaviorDistance"
+                  }
+                },
+                "HeadMotion": {
+                  "Type": "Aim",
+                  "RelativeTurnSpeed": {
+                    "Compute": "CombatRelativeTurnSpeed"
+                  }
+                },
+                "BodyMotion": {
+                  "Type": "Seek",
+                  "RelativeSpeed": {
+                    "Compute": "ChaseRelativeSpeed"
+                  },
+                  "StopDistance": {
+                    "Compute": "AttackDistance * 0.8"
+                  },
+                  "SlowDownDistance": {
+                    "Compute": "AttackDistance"
+                  }
+                }
+              },
+              {
+                "Reference": {
+                  "Compute": "AdditionalCombatBehaviorMacroElement"
+                },
+                "Interfaces": [
+                  "Hytale.Instruction.Null",
+                  "Hytale.Instruction.CombatBehavior"
+                ],
+                "Modify": {
+                  "_InterfaceParameters": {
+                    "Hytale.Instruction.CombatBehavior": {
+                      "CombatBehaviorDistance": {
+                        "Compute": "CombatBehaviorDistance"
+                      },
+                      "ChaseRelativeSpeed": {
+                        "Compute": "ChaseRelativeSpeed"
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "If target lost or non-hostile, return to Default.",
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Reference": "Component_Sensor_Lost_Target_Detection",
+                    "Modify": {
+                      "ViewRange": {
+                        "Compute": "AlertedRange"
+                      },
+                      "ViewSector": {
+                        "Compute": "ViewSector"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "AbsoluteDetectionRange": {
+                        "Compute": "AbsoluteDetectionRange"
+                      },
+                      "TargetSlot": "LockedTarget"
+                    }
+                  },
+                  {
+                    "Type": "Target",
+                    "TargetSlot": "LockedTarget",
+                    "Filters": [
+                      {
+                        "Type": "Attitude",
+                        "Attitudes": [
+                          "Hostile"
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            },
+            "Actions": [
+              {
+                "Type": "ReleaseTarget",
+                "TargetSlot": "LockedTarget"
+              },
+              {
+                "Type": "State",
+                "State": ".Default"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+
