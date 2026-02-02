@@ -1,48 +1,49 @@
 package com.alechilles.alecstamework;
 
-import com.alechilles.alecstamework.commands.TameworkCommandRoot;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.logging.Level;
 
+import javax.annotation.Nonnull;
+
+import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.ItemFeatureConfigLoader;
-import com.alechilles.alecstamework.config.ModItemFeatureConfigDiscovery;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.ModItemFeatureConfigDiscovery;
+import com.alechilles.alecstamework.config.TameworkSettings;
+import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
+import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
+import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
-import com.hypixel.hytale.server.core.plugin.JavaPlugin;
-import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
-import java.util.logging.Level;
-import javax.annotation.Nonnull;
-import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
-import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
-import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyInteract;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
-import com.hypixel.hytale.server.npc.instructions.Sensor;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
+import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.plugin.event.PluginSetupEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.util.Config;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderFactory;
 import com.hypixel.hytale.server.npc.instructions.Action;
-import com.alechilles.alecstamework.config.TameworkSettings;
-import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
-import com.hypixel.hytale.server.core.util.Config;
-import java.nio.file.Path;
-import java.nio.file.Files;
-import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.npc.instructions.Sensor;
 
 /**
- * Main entry point for the .Alec's Tamework! plugin.
+ * Main entry point for the Alec's Tamework! plugin.
  */
 public class Tamework extends JavaPlugin {
 
