@@ -1,0 +1,11 @@
+package com.alechilles.alecstamework.commands;
+
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
+
+public final class TameworkCommandRoot extends AbstractCommandCollection {
+    public TameworkCommandRoot() {
+        super("tw", "Tamework commands.");
+        addSubCommand(new TameworkSetOwnerCommand());
+        addSubCommand(new TameworkGetOwnerCommand());
+    }
+}

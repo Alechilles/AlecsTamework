@@ -47,35 +47,11 @@
         "Primary": {
           "Interactions": [
             {
-              "Type": "Serial",
-              "Interactions": [
-                {
-                  "Type": "Simple",
-                  "RunTime": 0.1,
-                  "Effects": {
-                    "Particles": [
-                      {
-                        "SystemId": "Poof_Small",
-                        "PositionOffset": {
-                          "X": 0,
-                          "Y": 0,
-                          "Z": 0
-                        },
-                        "TargetEntityPart": "Self",
-                        "DetachedFromModel": false
-                      }
-                    ],
-                    "WorldSoundEventId": "SFX_Tamework_Poof"
-                  }
-                },
-                {
-                  "Type": "ModifyInventory",
-                  "AdjustHeldItemQuantity": -1,
-                  "ItemToAdd": {
-                    "Id": "Spawner_Tamework_Example"
-                  }
-                }
-              ]
+              "Type": "TameworkSpawn",
+              "SpawnerRoleId": "Mob_Tamework_Example",
+              "EmptyItemId": "Spawner_Tamework_Example",
+              "SpawnAssignsOwner": true,
+              "AllowUncaptured": false
             }
           ]
         }

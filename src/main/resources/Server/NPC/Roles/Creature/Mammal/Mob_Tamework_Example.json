@@ -3,7 +3,7 @@
   "Type": "Variant",
   "Reference": "Template_Tamework_Example",
   "Modify": {
-    "Appearance": "Sheep",
+    "Appearance": "Tamework_Example",
     "NameTranslationKey": "server.npcRoles.Tamework_Example.name",
     "MasterTargetSlot": "MasterTarget",
     "FollowDefaultSpotRange": 5,
@@ -168,7 +168,6 @@
     "SpawnerEmptyItemID": [
       "Spawner_Tamework_Example"
     ],
-    "SpawnerItemID": "*Spawner_Tamework_Example_State_Filled",
     "FoodItemIDs": [
       "Plant_Fruit_Apple"
     ],
@@ -188,7 +187,7 @@
   },
   "Parameters": {
     "NameTranslationKey": {
-      "Value": "server.npcRoles.Tamework_Example.name",
+      "Value": "server.npcRoles.Mob_Tamework_Example.name",
       "Description": "Translation key for NPC name display."
     }
   }

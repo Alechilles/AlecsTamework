@@ -81,6 +81,11 @@ public final class ItemFeatureConfigLoader {
             ItemFeatureConfig base = registry.get(itemId);
             ItemFeatureConfig config = parseItemConfig(itemObj, base);
             registry.register(itemId, config);
+            logger.at(Level.INFO).log(
+                    "Loaded item feature config: item=" + itemId
+                            + " ownerRestricted=" + config.isOwnerRestricted()
+                            + " source=" + sourceLabel
+            );
             loaded++;
         }
         return loaded;

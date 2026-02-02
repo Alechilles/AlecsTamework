@@ -8,7 +8,8 @@
       "OwnerRestricted": true,
       "Whistle": false,
       "WhistleRadius": 64,
-      "SpawnerRoleId": "Mob_Tamework_Example"
+      "SpawnerRoleId": "Mob_Tamework_Example",
+      "SpawnerFilledItemId": "*Spawner_Tamework_Example_State_Filled"
     }
   }
 }

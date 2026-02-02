@@ -32,6 +32,7 @@
     </dependencies>
 
     <build>
+        <finalName>Alec's Tamework! v${project.version}</finalName>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -79,6 +80,7 @@
         <profile>
             <id>run-server</id>
             <build>
+        <finalName>Alec's Tamework! v${project.version}</finalName>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>
@@ -141,6 +143,7 @@
         <profile>
             <id>install-plugin</id>
             <build>
+        <finalName>Alec's Tamework! v${project.version}</finalName>
                 <plugins>
                     <plugin>
                         <groupId>org.apache.maven.plugins</groupId>

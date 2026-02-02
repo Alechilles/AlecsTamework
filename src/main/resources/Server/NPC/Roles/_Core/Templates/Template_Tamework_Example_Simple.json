@@ -1,11 +1,12 @@
 {
   "$Comment": "Simplified example template showing the minimum required wiring to use all Tamework components.",
+  "Debug": "DisplayState, DisplayTarget",
   "StartState": "Hold",
   "DefaultSubState": "Default",
   "Type": "Abstract",
   "Parameters": {
     "Appearance": {
-      "Value": "Sheep",
+      "Value": "Mob_Tamework_Example",
       "Description": "Model to be used. Replace with your NPC model ID."
     },
     "NameTranslationKey": {
@@ -113,10 +114,6 @@
       ],
       "TypeHint": "String",
       "Description": "Item IDs that can pick up this NPC (empty spawner)."
-    },
-    "SpawnerItemID": {
-      "Value": "*Spawner_Tamework_Example_State_Filled",
-      "Description": "Filled spawner item granted when picking up."
     },
     "FoodItemIDs": {
       "Value": [
@@ -342,6 +339,7 @@
     }
   ],
   "InteractionInstruction": {
+    "$Comment": "Example interaction flow: pickup, feed, toggle hold/follow/defend.",
     "Instructions": [
       {
         "Continue": true,
@@ -375,36 +373,71 @@
             ]
           },
           {
+            "$Comment": "Non-owner interaction warning",
             "Sensor": {
-              "Type": "Target",
-              "TargetSlot": {
-                "Compute": "MasterTargetSlot"
-              },
-              "Filters": [
+              "Type": "And",
+              "Sensors": [
                 {
-                  "Type": "ItemInHand",
-                  "Items": {
-                    "Compute": "SpawnerEmptyItemID"
+                  "Type": "TameworkHasOwner"
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkIsOwner"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "Target",
+                    "TargetSlot": {
+                      "Compute": "MasterTargetSlot"
+                    },
+                    "Filters": [
+                      {
+                        "Type": "ItemInHand",
+                        "Items": {
+                          "Compute": "SpawnerEmptyItemID"
+                        }
+                      }
+                    ]
                   }
                 }
               ]
             },
             "Actions": [
               {
-                "Type": "Despawn"
-              },
-              {
-                "Type": "Inventory",
-                "UseTarget": true,
-                "Operation": "RemoveHeldItem"
-              },
-              {
-                "Type": "Inventory",
-                "UseTarget": true,
-                "Operation": "Add",
-                "Item": {
-                  "Compute": "SpawnerItemID"
+                "Type": "TameworkDenyInteract"
+              }
+            ]
+          },
+          {
+            "$Comment": "Owner capture with empty spawner",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "TameworkIsOwner"
                 }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkCaptureOwner"
               },
               {
                 "Type": "SpawnParticles",
@@ -424,17 +457,134 @@
             ]
           },
           {
+            "$Comment": "Block non-owner capture",
             "Sensor": {
-              "Type": "Target",
-              "TargetSlot": {
-                "Compute": "MasterTargetSlot"
-              },
-              "Filters": [
+              "Type": "And",
+              "Sensors": [
                 {
-                  "Type": "ItemInHand",
-                  "Items": {
-                    "Compute": "FoodItemIDs"
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "TameworkHasOwner"
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkIsOwner"
                   }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkCaptureStranger"
+              }
+            ]
+          },
+          {
+            "$Comment": "Wild capture with empty spawner",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkHasOwner"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkCaptureWild"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.1,
+                  0
+                ],
+                "ParticleSystem": "Poof_Small"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundPickUp"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Owner interaction marks tamed (one-time)",
+            "Continue": true,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkIsTamed"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkSetTamed",
+                "Value": true
+              }
+            ]
+          },
+          {
+            "$Comment": "Feed with a valid food item.",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "FoodItemIDs"
+                      }
+                    }
+                  ]
                 }
               ]
             },
@@ -463,9 +613,18 @@
             ]
           },
           {
+            "$Comment": "If in Defend, switch to Hold.",
             "Sensor": {
-              "Type": "State",
-              "State": "Defend"
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "State",
+                  "State": "Defend"
+                }
+              ]
             },
             "Actions": [
               {
@@ -490,16 +649,25 @@
             ]
           },
           {
+            "$Comment": "If in Hold/Sleep, switch to Idle (follow).",
             "Sensor": {
-              "Type": "Or",
+              "Type": "And",
               "Sensors": [
                 {
-                  "Type": "State",
-                  "State": "Hold"
+                  "Type": "TameworkIsOwner"
                 },
                 {
-                  "Type": "State",
-                  "State": "Sleep"
+                  "Type": "Or",
+                  "Sensors": [
+                    {
+                      "Type": "State",
+                      "State": "Hold"
+                    },
+                    {
+                      "Type": "State",
+                      "State": "Sleep"
+                    }
+                  ]
                 }
               ]
             },
@@ -526,11 +694,20 @@
             ]
           },
           {
+            "$Comment": "If in Idle, switch to Defend.",
             "Instructions": [
               {
                 "Sensor": {
-                  "Type": "State",
-                  "State": "Idle"
+                  "Type": "And",
+                  "Sensors": [
+                    {
+                      "Type": "TameworkIsOwner"
+                    },
+                    {
+                      "Type": "State",
+                      "State": "Idle"
+                    }
+                  ]
                 },
                 "Actions": [
                   {

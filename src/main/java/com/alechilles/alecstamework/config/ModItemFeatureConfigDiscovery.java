@@ -16,24 +16,26 @@ import java.util.zip.ZipFile;
 
 public final class ModItemFeatureConfigDiscovery {
     public static final String MOD_CONFIG_PATH = "Server/Tamework/Tamework_Items_Config.json";
-    public static final String OVERRIDE_CONFIG_PATH = "config/Tamework_Items_Config_Override.json";
+    public static final String OVERRIDE_CONFIG_FILE = "Tamework_Items_Config_Override.json";
 
     private ModItemFeatureConfigDiscovery() {
     }
 
     public static int loadAll(ItemFeatureConfigLoader loader,
                               ItemFeatureRegistry registry,
-                              HytaleLogger logger) {
+                              HytaleLogger logger,
+                              Path dataDirectory) {
         int loaded = 0;
-        loaded += loadFromModsDirectory(loader, registry, logger);
-        loaded += loadFromOverrideFile(loader, registry, logger);
+        loaded += loadFromModsDirectory(loader, registry, logger, dataDirectory);
+        loaded += loadFromOverrideFile(loader, registry, logger, dataDirectory);
         return loaded;
     }
 
     private static int loadFromOverrideFile(ItemFeatureConfigLoader loader,
                                             ItemFeatureRegistry registry,
-                                            HytaleLogger logger) {
-        Path overridePath = Path.of(OVERRIDE_CONFIG_PATH);
+                                            HytaleLogger logger,
+                                            Path dataDirectory) {
+        Path overridePath = resolveOverridePath(dataDirectory);
         if (!Files.exists(overridePath)) {
             return 0;
         }
@@ -51,12 +53,14 @@ public final class ModItemFeatureConfigDiscovery {
 
     private static int loadFromModsDirectory(ItemFeatureConfigLoader loader,
                                              ItemFeatureRegistry registry,
-                                             HytaleLogger logger) {
-        Path modsDir = resolveModsDirectory();
+                                             HytaleLogger logger,
+                                             Path dataDirectory) {
+        Path modsDir = resolveModsDirectory(dataDirectory);
         if (modsDir == null) {
             logger.at(Level.INFO).log("No mods directory found for Tamework config discovery.");
             return 0;
         }
+        logger.at(Level.INFO).log("Tamework config discovery scanning mods dir: " + modsDir);
         int loaded = 0;
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(modsDir)) {
             for (Path modPath : stream) {
@@ -121,12 +125,40 @@ public final class ModItemFeatureConfigDiscovery {
         return name.endsWith(".jar") || name.endsWith(".zip");
     }
 
-    private static Path resolveModsDirectory() {
+    private static Path resolveOverridePath(Path dataDirectory) {
+        Path serverRoot = resolveServerRoot(dataDirectory);
+        if (serverRoot == null) {
+            return Path.of("Tamework", OVERRIDE_CONFIG_FILE);
+        }
+        return serverRoot.resolve("Tamework").resolve(OVERRIDE_CONFIG_FILE);
+    }
+
+    private static Path resolveServerRoot(Path dataDirectory) {
+        Path modsDir = resolveModsDirectory(dataDirectory);
+        if (modsDir != null) {
+            Path parent = modsDir.getParent();
+            if (parent != null) {
+                return parent.toAbsolutePath().normalize();
+            }
+        }
+        return Path.of(".").toAbsolutePath().normalize();
+    }
+
+    private static Path resolveModsDirectory(Path dataDirectory) {
         List<Path> candidates = new ArrayList<>();
+        if (dataDirectory != null) {
+            Path parent = dataDirectory.toAbsolutePath().normalize().getParent();
+            if (parent != null) {
+                candidates.add(parent);
+            }
+        }
         candidates.add(Path.of("mods"));
         candidates.add(Path.of("Server", "mods"));
         candidates.add(Path.of("..", "mods"));
         for (Path candidate : candidates) {
+            if (candidate == null) {
+                continue;
+            }
             if (Files.isDirectory(candidate)) {
                 return candidate.toAbsolutePath().normalize();
             }

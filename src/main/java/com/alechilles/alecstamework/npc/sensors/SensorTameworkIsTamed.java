@@ -1,0 +1,33 @@
+package com.alechilles.alecstamework.npc.sensors;
+
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
+import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import javax.annotation.Nonnull;
+
+public final class SensorTameworkIsTamed extends com.hypixel.hytale.server.npc.corecomponents.SensorBase {
+    public SensorTameworkIsTamed(@Nonnull BuilderSensorTameworkIsTamed builder, @Nonnull BuilderSupport support) {
+        super(builder);
+    }
+
+    @Override
+    public boolean matches(@Nonnull Ref<EntityStore> ref, @Nonnull Role role, double dt, @Nonnull Store<EntityStore> store) {
+        com.hypixel.hytale.component.ComponentType<EntityStore, TameworkTamedComponent> type =
+                TameworkTamedComponent.getComponentType();
+        if (type == null) {
+            return false;
+        }
+        TameworkTamedComponent component = store.getComponent(ref, type);
+        return component != null && component.isTamed();
+    }
+
+    @Override
+    public InfoProvider getSensorInfo() {
+        return null;
+    }
+}
