@@ -43,4 +43,31 @@ public final class OwnerMessageUtil {
                         + " a pet that does not belong to you."
         ));
     }
+
+    public static void sendUntamed(Player player, String npcName) {
+        sendUntamed(player, npcName, null);
+    }
+
+    public static void sendUntamed(Player player, String npcName, String foodList) {
+        if (player == null) {
+            return;
+        }
+        UUID playerUuid = player.getUuid();
+        if (playerUuid == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long last = LAST_SENT.get(playerUuid);
+        if (last != null && now - last < COOLDOWN_MS) {
+            return;
+        }
+        LAST_SENT.put(playerUuid, now);
+
+        String resolvedNpc = npcName != null && !npcName.isBlank() ? npcName : "pet";
+        String message = "You must tame that " + resolvedNpc + " before capturing it.";
+        if (foodList != null && !foodList.isBlank()) {
+            message += " Try feeding: " + foodList + ".";
+        }
+        player.sendMessage(Message.raw(message));
+    }
 }

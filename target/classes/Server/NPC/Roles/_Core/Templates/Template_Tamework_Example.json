@@ -997,6 +997,104 @@
             ]
           },
           {
+            "$Comment": "Wild feed to tame (set owner + tamed).",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkHasOwner"
+                  }
+                },
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "FoodItemIDs"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "RemoveHeldItem",
+                "Count": 1
+              },
+              {
+                "Type": "TameworkSetOwner"
+              },
+              {
+                "Type": "TameworkSetTamed",
+                "Value": true
+              },
+              {
+                "Type": "State",
+                "State": "Idle.Default"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.8,
+                  0
+                ],
+                "ParticleSystem": "Pet_Heal"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFeed"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Capture blocked until tamed.",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkIsTamed"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkDenyCaptureUntamed",
+                "FoodItemIDs": {
+                  "Compute": "FoodItemIDs"
+                }
+              }
+            ]
+          },
+          {
             "$Comment": "Owner capture with empty spawner",
             "Sensor": {
               "Type": "And",
@@ -1017,6 +1115,9 @@
                 },
                 {
                   "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "TameworkIsTamed"
                 }
               ]
             },
@@ -1068,6 +1169,9 @@
                   "Sensor": {
                     "Type": "TameworkIsOwner"
                   }
+                },
+                {
+                  "Type": "TameworkIsTamed"
                 }
               ]
             },
@@ -1101,6 +1205,9 @@
                   "Sensor": {
                     "Type": "TameworkHasOwner"
                   }
+                },
+                {
+                  "Type": "TameworkIsTamed"
                 }
               ]
             },
@@ -1122,30 +1229,6 @@
                 "SoundEventId": {
                   "Compute": "InteractSoundPickUp"
                 }
-              }
-            ]
-          },
-          {
-            "$Comment": "Owner interaction marks tamed (one-time)",
-            "Continue": true,
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "TameworkIsOwner"
-                },
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "TameworkIsTamed"
-                  }
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "TameworkSetTamed",
-                "Value": true
               }
             ]
           },
@@ -1184,7 +1267,7 @@
                 "Type": "SpawnParticles",
                 "Offset": [
                   0,
-                  0.6,
+                  0.8,
                   0
                 ],
                 "ParticleSystem": "Pet_Heal"
@@ -1220,8 +1303,8 @@
                 "Type": "SpawnParticles",
                 "Offset": [
                   0,
-                  0.8,
-                  0
+                  1.2,
+                  -0.6
                 ],
                 "ParticleSystem": "Hold"
               },
@@ -1265,8 +1348,8 @@
                 "Type": "SpawnParticles",
                 "Offset": [
                   0,
-                  0.8,
-                  0
+                  1.2,
+                  -0.6
                 ],
                 "ParticleSystem": "Follow"
               },
@@ -1303,8 +1386,8 @@
                     "Type": "SpawnParticles",
                     "Offset": [
                       0,
-                      0.8,
-                      0
+                      1.2,
+                      -0.6
                     ],
                     "ParticleSystem": "Defend"
                   },

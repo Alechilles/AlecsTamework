@@ -13,7 +13,7 @@
     ],
     "Website": "",
     "Main": "com.alechilles.alecstamework.Tamework",
-    "ServerVersion": "*",
+    "ServerVersion": "",
     "Dependencies": {},
     "OptionalDependencies": {},
     "LoadBefore": {},

@@ -2,6 +2,8 @@ package com.alechilles.alecstamework;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
@@ -21,6 +23,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwne
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyInteract;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCaptureUntamed;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -73,10 +76,13 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
 
-        Path modsDir = resolveModsDirectory(getDataDirectory());
-        Path settingsDir = modsDir != null ? modsDir.resolve(SETTINGS_DIR_NAME) : getDataDirectory();
+        Path globalModsDir = resolveGlobalModsDirectory(getDataDirectory());
+        Path saveModsDir = resolveSaveModsDirectory(getDataDirectory());
+        Path settingsDir = saveModsDir != null
+                ? saveModsDir.resolve(SETTINGS_DIR_NAME)
+                : (globalModsDir != null ? globalModsDir.resolve(SETTINGS_DIR_NAME) : getDataDirectory());
         Path serverRoot = resolveServerRoot(getDataDirectory());
-        Path overrideDir = serverRoot != null ? serverRoot.resolve("Tamework") : null;
+        Path overrideDir = (saveModsDir == null && serverRoot != null) ? serverRoot.resolve("Tamework") : null;
         settingsConfig = new Config<>(settingsDir, "tamework-settings", TameworkSettings.CODEC);
         settings = loadSettings(settingsConfig, settingsDir, overrideDir);
 
@@ -144,13 +150,13 @@ public class Tamework extends JavaPlugin {
     @Override
     protected void start() {
         // Called when the plugin is enabled
-        getLogger().at(Level.INFO).log(".Alec's Tamework! has been enabled!");
+        getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
     }
 
     @Override
     protected void shutdown() {
         // Called when the plugin is disabled
-        getLogger().at(Level.INFO).log(".Alec's Tamework! has been disabled!");
+        getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
 
 
@@ -211,7 +217,7 @@ public class Tamework extends JavaPlugin {
     }
 
     private Path resolveServerRoot(Path dataDirectory) {
-        Path modsDir = resolveModsDirectory(dataDirectory);
+        Path modsDir = resolveModsDirectoryLegacy(dataDirectory);
         if (modsDir != null) {
             Path parent = modsDir.getParent();
             if (parent != null) {
@@ -221,8 +227,59 @@ public class Tamework extends JavaPlugin {
         return Path.of(".").toAbsolutePath().normalize();
     }
 
-    private Path resolveModsDirectory(Path dataDirectory) {
-        java.util.List<Path> candidates = new java.util.ArrayList<>();
+    private Path resolveGlobalModsDirectory(Path dataDirectory) {
+        Path userDataRoot = findUserDataRoot(dataDirectory);
+        if (userDataRoot != null) {
+            Path modsDir = userDataRoot.resolve("Mods");
+            if (Files.isDirectory(modsDir)) {
+                return modsDir.toAbsolutePath().normalize();
+            }
+        }
+        return resolveModsDirectoryLegacy(dataDirectory);
+    }
+
+    private Path resolveSaveModsDirectory(Path dataDirectory) {
+        if (dataDirectory == null) {
+            return null;
+        }
+        Path current = dataDirectory.toAbsolutePath().normalize();
+        while (current != null) {
+            Path parent = current.getParent();
+            if (parent != null) {
+                Path parentName = parent.getFileName();
+                if (parentName != null && "mods".equalsIgnoreCase(parentName.toString())) {
+                    Path worldDir = parent.getParent();
+                    Path savesDir = worldDir != null ? worldDir.getParent() : null;
+                    if (savesDir != null) {
+                        Path savesName = savesDir.getFileName();
+                        if (savesName != null && "saves".equalsIgnoreCase(savesName.toString())) {
+                            return parent.toAbsolutePath().normalize();
+                        }
+                    }
+                }
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private Path findUserDataRoot(Path dataDirectory) {
+        if (dataDirectory == null) {
+            return null;
+        }
+        Path current = dataDirectory.toAbsolutePath().normalize();
+        while (current != null) {
+            Path name = current.getFileName();
+            if (name != null && "userdata".equalsIgnoreCase(name.toString())) {
+                return current;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private Path resolveModsDirectoryLegacy(Path dataDirectory) {
+        List<Path> candidates = new ArrayList<>();
         if (dataDirectory != null) {
             Path parent = dataDirectory.toAbsolutePath().normalize().getParent();
             if (parent != null) {
@@ -297,6 +354,7 @@ public class Tamework extends JavaPlugin {
             actionFactory.add(BuilderActionTameworkCaptureStranger.BUILDER_ID, BuilderActionTameworkCaptureStranger::new);
             actionFactory.add(BuilderActionTameworkCaptureWild.BUILDER_ID, BuilderActionTameworkCaptureWild::new);
             actionFactory.add(BuilderActionTameworkDenyInteract.BUILDER_ID, BuilderActionTameworkDenyInteract::new);
+            actionFactory.add(BuilderActionTameworkDenyCaptureUntamed.BUILDER_ID, BuilderActionTameworkDenyCaptureUntamed::new);
             actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
             actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);
         }
@@ -327,9 +385,3 @@ public class Tamework extends JavaPlugin {
         }
     }
 }
-
-
-
-
-
-

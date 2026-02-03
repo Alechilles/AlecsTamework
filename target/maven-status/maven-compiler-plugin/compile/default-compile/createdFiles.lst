@@ -9,6 +9,7 @@ com\alechilles\alecstamework\damage\OwnerDamageFilterSystem.class
 com\alechilles\alecstamework\npc\actions\ActionTameworkSetTamed.class
 com\alechilles\alecstamework\npc\actions\BuilderActionTameworkCaptureWild.class
 com\alechilles\alecstamework\config\ItemFeatureRegistry.class
+com\alechilles\alecstamework\npc\actions\ActionTameworkDenyCaptureUntamed.class
 com\alechilles\alecstamework\config\ItemFeatureConfig$SpawnerIconOverride.class
 com\alechilles\alecstamework\items\SpawnerFeatureHandler$1.class
 com\alechilles\alecstamework\commands\TameworkCommandTargeting$Candidate.class
@@ -22,6 +23,7 @@ com\alechilles\alecstamework\items\SpawnerFeatureHandler$CaptureInfo.class
 com\alechilles\alecstamework\npc\actions\ActionTameworkSetOwner.class
 com\alechilles\alecstamework\npc\actions\ActionTameworkCaptureWild.class
 com\alechilles\alecstamework\config\TameworkSettings.class
+com\alechilles\alecstamework\npc\actions\BuilderActionTameworkDenyCaptureUntamed.class
 com\alechilles\alecstamework\commands\TameworkCommandTargeting$BestCandidate.class
 com\alechilles\alecstamework\npc\actions\ActionTameworkCaptureOwner.class
 com\alechilles\alecstamework\commands\TameworkSetOwnerCommand.class
@@ -39,6 +41,7 @@ com\alechilles\alecstamework\npc\actions\ActionTameworkDenyInteract.class
 com\alechilles\alecstamework\npc\actions\TameworkActionBase.class
 com\alechilles\alecstamework\config\ItemFeatureConfigLoader.class
 com\alechilles\alecstamework\npc\actions\BuilderActionTameworkCaptureOwner.class
+com\alechilles\alecstamework\ownership\OwnerNameUtil.class
 com\alechilles\alecstamework\commands\TameworkCommandTargeting.class
 com\alechilles\alecstamework\npc\sensors\TameworkSensorBase.class
 com\alechilles\alecstamework\npc\sensors\builders\BuilderSensorTameworkHasOwner.class

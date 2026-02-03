@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -585,13 +586,13 @@ public final class SpawnerFeatureHandler {
                         ownerPlayer = store.getComponent(playerRef, Player.getComponentType());
                     }
                     if (ownerPlayer != null && ownerUuid.equals(ownerPlayer.getUuid())) {
-                        ownerName = ownerPlayer.getDisplayName();
+                        ownerName = OwnerNameUtil.resolve(ownerPlayer);
                     } else {
                         Ref<EntityStore> ownerRef = world.getEntityRef(ownerUuid);
                         if (ownerRef != null) {
                             Player resolvedOwner = store.getComponent(ownerRef, Player.getComponentType());
                             if (resolvedOwner != null) {
-                                ownerName = resolvedOwner.getDisplayName();
+                                ownerName = OwnerNameUtil.resolve(resolvedOwner);
                             }
                         }
                     }

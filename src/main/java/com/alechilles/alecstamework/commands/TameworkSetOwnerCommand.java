@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -47,7 +48,7 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
 
         String ownerName = null;
         if (newOwner != null && newOwner.equals(player.getUuid())) {
-            ownerName = player.getDisplayName();
+            ownerName = OwnerNameUtil.resolve(player);
         }
 
         ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();

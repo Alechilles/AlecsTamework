@@ -18,12 +18,14 @@ C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\ActionTameworkCaptureOwner.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\ActionTameworkCaptureStranger.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\ActionTameworkCaptureWild.java
+C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\ActionTameworkDenyCaptureUntamed.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\ActionTameworkDenyInteract.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\ActionTameworkSetOwner.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\ActionTameworkSetTamed.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\BuilderActionTameworkCaptureOwner.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\BuilderActionTameworkCaptureStranger.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\BuilderActionTameworkCaptureWild.java
+C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\BuilderActionTameworkDenyCaptureUntamed.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\BuilderActionTameworkDenyInteract.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\BuilderActionTameworkSetOwner.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\actions\BuilderActionTameworkSetTamed.java
@@ -40,4 +42,5 @@ C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\sensors\SensorTameworkIsTamed.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\npc\sensors\TameworkSensorBase.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\ownership\OwnerMessageUtil.java
+C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\ownership\OwnerNameUtil.java
 C:\Users\22ale\AppData\Roaming\Hytale\UserData\Mods\alecstamework\src\main\java\com\alechilles\alecstamework\Tamework.java

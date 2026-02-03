@@ -24,19 +24,21 @@ public final class ModLanguageDiscovery {
     public static int loadAll(TranslationRegistry registry,
                               HytaleLogger logger,
                               Path dataDirectory) {
+        List<Path> modsDirs = resolveModsDirectories(dataDirectory);
+        if (modsDirs.isEmpty()) {
+            logger.at(Level.INFO).log("No mods directory found for language discovery.");
+            return 0;
+        }
         int loaded = 0;
-        loaded += loadFromModsDirectory(registry, logger, dataDirectory);
+        for (Path modsDir : modsDirs) {
+            loaded += loadFromModsDirectory(registry, logger, modsDir);
+        }
         return loaded;
     }
 
     private static int loadFromModsDirectory(TranslationRegistry registry,
                                              HytaleLogger logger,
-                                             Path dataDirectory) {
-        Path modsDir = resolveModsDirectory(dataDirectory);
-        if (modsDir == null) {
-            logger.at(Level.INFO).log("No mods directory found for language discovery.");
-            return 0;
-        }
+                                             Path modsDir) {
         logger.at(Level.INFO).log("Tamework language discovery scanning mods dir: " + modsDir);
         int loaded = 0;
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(modsDir)) {
@@ -125,7 +127,77 @@ public final class ModLanguageDiscovery {
         return name.endsWith(".jar") || name.endsWith(".zip");
     }
 
-    private static Path resolveModsDirectory(Path dataDirectory) {
+    private static List<Path> resolveModsDirectories(Path dataDirectory) {
+        List<Path> modsDirs = new ArrayList<>();
+        Path globalModsDir = resolveGlobalModsDirectory(dataDirectory);
+        if (globalModsDir != null) {
+            modsDirs.add(globalModsDir);
+        }
+        Path saveModsDir = resolveSaveModsDirectory(dataDirectory);
+        if (saveModsDir != null && (globalModsDir == null || !saveModsDir.equals(globalModsDir))) {
+            modsDirs.add(saveModsDir);
+        }
+        if (modsDirs.isEmpty()) {
+            Path legacy = resolveModsDirectoryLegacy(dataDirectory);
+            if (legacy != null) {
+                modsDirs.add(legacy);
+            }
+        }
+        return modsDirs;
+    }
+
+    private static Path resolveGlobalModsDirectory(Path dataDirectory) {
+        Path userDataRoot = findUserDataRoot(dataDirectory);
+        if (userDataRoot != null) {
+            Path modsDir = userDataRoot.resolve("Mods");
+            if (Files.isDirectory(modsDir)) {
+                return modsDir.toAbsolutePath().normalize();
+            }
+        }
+        return resolveModsDirectoryLegacy(dataDirectory);
+    }
+
+    private static Path resolveSaveModsDirectory(Path dataDirectory) {
+        if (dataDirectory == null) {
+            return null;
+        }
+        Path current = dataDirectory.toAbsolutePath().normalize();
+        while (current != null) {
+            Path parent = current.getParent();
+            if (parent != null) {
+                Path parentName = parent.getFileName();
+                if (parentName != null && "mods".equalsIgnoreCase(parentName.toString())) {
+                    Path worldDir = parent.getParent();
+                    Path savesDir = worldDir != null ? worldDir.getParent() : null;
+                    if (savesDir != null) {
+                        Path savesName = savesDir.getFileName();
+                        if (savesName != null && "saves".equalsIgnoreCase(savesName.toString())) {
+                            return parent.toAbsolutePath().normalize();
+                        }
+                    }
+                }
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private static Path findUserDataRoot(Path dataDirectory) {
+        if (dataDirectory == null) {
+            return null;
+        }
+        Path current = dataDirectory.toAbsolutePath().normalize();
+        while (current != null) {
+            Path name = current.getFileName();
+            if (name != null && "userdata".equalsIgnoreCase(name.toString())) {
+                return current;
+            }
+            current = current.getParent();
+        }
+        return null;
+    }
+
+    private static Path resolveModsDirectoryLegacy(Path dataDirectory) {
         List<Path> candidates = new ArrayList<>();
         if (dataDirectory != null) {
             Path parent = dataDirectory.toAbsolutePath().normalize().getParent();
