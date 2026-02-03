@@ -69,5 +69,5 @@ Current options:
 - [Item-Config](https://github.com/Alechilles/AlecsTamework/wiki/Item-Config)
 - [Troubleshooting](https://github.com/Alechilles/AlecsTamework/wiki/Troubleshooting)
 
-## License
-See `LICENSE.txt`.
+## <a id="issue-reporting">Issue Reporting</a>
+If you've run into a bug or any kind of issue, please [submit a new issue](https://github.com/Alechilles/AlecsTamework/issues) on my GitHub repo. As much information as you can possibly provide is highly appreciated!
