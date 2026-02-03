@@ -1,10 +1,20 @@
-docs/wiki/Components.md
-docs/wiki/Home.md
-docs/wiki/Interactions-and-Items.md
-docs/wiki/Quick-Start.md
-docs/wiki/Templates.md
-docs/wiki/Troubleshooting.md
-docs/wiki/Plugin-Plan.md
-docs/wiki/Item-Config.md
-docs/wiki/Actions-and-Sensors.md
-target/original-Alec's Tamework! v1.1.0.jar
+# Build artifacts
+target/
+*.jar
+*.zip
+*.log
+*.log.lck
+
+# IDE/editor
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc generated
+*.tmp
+*.bak
+*.cache
