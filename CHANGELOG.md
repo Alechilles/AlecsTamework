@@ -1,0 +1,27 @@
+# Changelog
+
+All notable changes to **Alec's Tamework!** will be documented in this file.
+
+## 1.1.0 - Core Systems Update - 2026-02-03
+### Added
+- Owner + Tamed components for NPCs, plus new actions/sensors (set owner, set tamed, owner/stranger/wild capture routing).
+- Deny capture while untamed action with optional food list hint (resolves item display names when available).
+- Per-mod item config discovery via `Server/Tamework/Tamework_Items_Config.json`.
+- Save-world local overrides for item configs (created empty by default).
+- Localization discovery that scans both global Mods and save-world mods.
+- Owner utility messaging for denied interactions and untamed capture.
+- Assets zip build step for standalone asset distribution (contents of resources + LICENSE.txt).
+
+### Changed
+- Tamework example templates updated to match the new capture/tame flow (feed to tame, capture only when tamed).
+- Settings/config resolution prefers save-world mods when present, with fallback to global mods.
+- Owner name resolution now prefers display name, then username, with UUID fallback.
+- `/tw getowner` now prints owner name + UUID when available.
+
+### Fixed
+- Mod discovery null-path issues when running in save-world contexts.
+- Missing owner names (messages and getowner previously only showed UUIDs).
+
+### Notes
+- `config/tamework-item-features.json` remains a plugin default and is excluded from the assets zip.
+- Local override configs are intentionally created empty so new items/functions from mod updates are not masked.
