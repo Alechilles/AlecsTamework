@@ -14,6 +14,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 
+/**
+ * Loads item feature configs into the registry.
+ */
 public final class ItemFeatureConfigLoader {
     public int loadFromResource(String resourcePath,
                                 ItemFeatureRegistry registry,

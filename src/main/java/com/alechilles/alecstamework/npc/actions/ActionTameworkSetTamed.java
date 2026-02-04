@@ -9,6 +9,9 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
+/**
+ * Sets the NPC tamed flag to a specific value.
+ */
 public final class ActionTameworkSetTamed extends TameworkActionBase {
     private final boolean tamedValue;
 

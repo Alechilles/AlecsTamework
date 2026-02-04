@@ -10,6 +10,9 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import javax.annotation.Nonnull;
 
+/**
+ * Sensor that matches when an NPC is tamed.
+ */
 public final class SensorTameworkIsTamed extends com.hypixel.hytale.server.npc.corecomponents.SensorBase {
     public SensorTameworkIsTamed(@Nonnull BuilderSensorTameworkIsTamed builder, @Nonnull BuilderSupport support) {
         super(builder);

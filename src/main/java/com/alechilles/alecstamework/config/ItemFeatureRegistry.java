@@ -5,6 +5,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Registry for item feature configs, including defaults and overrides.
+ */
 public final class ItemFeatureRegistry {
     private final Map<String, ItemFeatureConfig> configsByItemId = new HashMap<>();
 

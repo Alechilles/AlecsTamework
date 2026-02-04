@@ -15,6 +15,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
+/**
+ * Command to set or clear owner on the targeted NPC.
+ */
 public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
     public TameworkSetOwnerCommand() {
         super("setowner", "Set owner of the NPC you are looking at.");

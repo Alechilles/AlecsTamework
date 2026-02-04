@@ -11,6 +11,9 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
+/**
+ * Sets owner component data based on the interacting player.
+ */
 public final class ActionTameworkSetOwner extends TameworkActionBase {
     public ActionTameworkSetOwner(BuilderActionTameworkSetOwner builder, BuilderSupport support) {
         super(builder);

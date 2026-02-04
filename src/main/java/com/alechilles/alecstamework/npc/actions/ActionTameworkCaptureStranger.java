@@ -12,6 +12,9 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
 
+/**
+ * Handles capture attempts by non-owners and denies if restricted.
+ */
 public final class ActionTameworkCaptureStranger extends TameworkActionBase {
     public ActionTameworkCaptureStranger(BuilderActionTameworkCaptureStranger builder, BuilderSupport support) {
         super(builder);

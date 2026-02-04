@@ -15,6 +15,9 @@ import java.util.logging.Level;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+/**
+ * Discovers and loads language files from mods and per-world overrides.
+ */
 public final class ModLanguageDiscovery {
     private static final String LANGUAGE_PATH = "Server/Languages/en-US/server.lang";
 

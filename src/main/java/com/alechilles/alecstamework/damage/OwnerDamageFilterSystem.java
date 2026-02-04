@@ -16,6 +16,9 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.function.BooleanSupplier;
 
+/**
+ * Cancels damage based on owner/tamework protection settings.
+ */
 public final class OwnerDamageFilterSystem extends DamageEventSystem {
     @Override
     public SystemGroup<EntityStore> getGroup() {

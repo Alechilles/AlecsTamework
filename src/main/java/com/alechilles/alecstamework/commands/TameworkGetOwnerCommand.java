@@ -15,6 +15,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
+/**
+ * Command to display owner info for the targeted NPC.
+ */
 public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
     public TameworkGetOwnerCommand() {
         super("getowner", "Get owner of the NPC you are looking at.");

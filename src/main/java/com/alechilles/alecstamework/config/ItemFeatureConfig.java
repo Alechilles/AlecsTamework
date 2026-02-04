@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * Per-item configuration for spawn/capture behaviors.
+ */
 public final class ItemFeatureConfig {
     private final boolean spawnerEnabled;
     private final boolean whistleEnabled;

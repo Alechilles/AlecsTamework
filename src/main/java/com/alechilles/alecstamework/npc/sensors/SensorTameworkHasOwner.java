@@ -10,6 +10,9 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
+/**
+ * Sensor that matches when an NPC has any owner.
+ */
 public class SensorTameworkHasOwner extends TameworkSensorBase {
     public SensorTameworkHasOwner(@Nonnull BuilderSensorTameworkHasOwner builder, @Nonnull BuilderSupport support) {
         super(builder);

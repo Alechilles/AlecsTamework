@@ -5,6 +5,9 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Formats and rate-limits owner-related chat messages.
+ */
 public final class OwnerMessageUtil {
     private static final long COOLDOWN_MS = 1000L;
     private static final ConcurrentHashMap<UUID, Long> LAST_SENT = new ConcurrentHashMap<>();

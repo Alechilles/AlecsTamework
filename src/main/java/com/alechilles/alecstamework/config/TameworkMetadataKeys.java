@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.config;
 
+/**
+ * Centralized metadata keys stored on spawner items.
+ */
 public final class TameworkMetadataKeys {
     public static final String CAPTURED = "Tamework.Captured";
     public static final String TARGET_UUID = "Tamework.TargetUuid";

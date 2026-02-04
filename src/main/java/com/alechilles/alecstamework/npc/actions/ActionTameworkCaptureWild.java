@@ -13,6 +13,9 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
 
+/**
+ * Captures untamed or wild NPCs when allowed by config.
+ */
 public final class ActionTameworkCaptureWild extends TameworkActionBase {
     public ActionTameworkCaptureWild(BuilderActionTameworkCaptureWild builder, BuilderSupport support) {
         super(builder);

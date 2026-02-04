@@ -8,6 +8,9 @@ import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
+/**
+ * Component that stores the tamed flag on NPCs.
+ */
 public final class TameworkTamedComponent implements Component<EntityStore> {
     public static final String TAMED_TAG = "Tamed";
 

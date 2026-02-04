@@ -11,6 +11,9 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
+/**
+ * Sensor that matches when the interacting player is the owner.
+ */
 public class SensorTameworkIsOwner extends TameworkSensorBase {
     public SensorTameworkIsOwner(@Nonnull BuilderSensorTameworkIsOwner builder, @Nonnull BuilderSupport support) {
         super(builder);

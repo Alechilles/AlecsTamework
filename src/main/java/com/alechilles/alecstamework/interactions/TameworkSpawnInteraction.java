@@ -18,6 +18,9 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Sim
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 
+/**
+ * Custom interaction handler used by spawner items.
+ */
 public class TameworkSpawnInteraction extends SimpleInstantInteraction {
 
     public static final BuilderCodec<TameworkSpawnInteraction> CODEC = BuilderCodec.builder(

@@ -13,6 +13,9 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
 
+/**
+ * Captures NPCs when the interacting player is the owner.
+ */
 public final class ActionTameworkCaptureOwner extends TameworkActionBase {
     public ActionTameworkCaptureOwner(BuilderActionTameworkCaptureOwner builder, BuilderSupport support) {
         super(builder);

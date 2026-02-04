@@ -10,6 +10,9 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
 
+/**
+ * Blocks owner-restricted interactions and emits a message.
+ */
 public final class ActionTameworkDenyInteract extends TameworkActionBase {
     public ActionTameworkDenyInteract(BuilderActionTameworkDenyInteract builder, BuilderSupport support) {
         super(builder);

@@ -46,6 +46,9 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
+/**
+ * Capture/spawn logic for spawner items, including metadata and attachments.
+ */
 public final class SpawnerFeatureHandler {
     private static final double SPAWN_OFFSET_Y = 0.5;
     private static final double SPAWN_FORWARD_DISTANCE = 1.5;

@@ -6,6 +6,9 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.asset.builder.holder.StringArrayHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.StringArrayNoEmptyStringsValidator;
 
+/**
+ * Builder for ActionTameworkDenyCaptureUntamed.
+ */
 public final class BuilderActionTameworkDenyCaptureUntamed extends TameworkActionBuilderBase {
     public static final String BUILDER_ID = "TameworkDenyCaptureUntamed";
 

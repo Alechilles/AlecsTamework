@@ -4,6 +4,9 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.simple.BooleanCodec;
 
+/**
+ * Settings model and codec for tamework-settings.json.
+ */
 public final class TameworkSettings {
     public static final String BLOCK_OWNER_DAMAGE_TAG = "BlockOwnerDamage";
     public static final String BLOCK_ALL_PLAYER_DAMAGE_IF_OWNED_TAG = "BlockAllPlayerDamageIfOwned";

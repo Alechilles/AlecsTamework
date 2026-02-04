@@ -2,6 +2,9 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 
+/**
+ * Builder for ActionTameworkCaptureStranger.
+ */
 public final class BuilderActionTameworkCaptureStranger extends TameworkActionBuilderBase {
     public static final String BUILDER_ID = "TameworkCaptureStranger";
 

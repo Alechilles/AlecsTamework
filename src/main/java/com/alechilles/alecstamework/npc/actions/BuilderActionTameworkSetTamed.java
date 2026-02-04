@@ -4,6 +4,9 @@ import com.google.gson.JsonElement;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderDescriptorState;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 
+/**
+ * Builder for ActionTameworkSetTamed.
+ */
 public final class BuilderActionTameworkSetTamed extends TameworkActionBuilderBase {
     public static final String BUILDER_ID = "TameworkSetTamed";
     private boolean value;

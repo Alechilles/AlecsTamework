@@ -72,10 +72,13 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void setup() {
+        // Registry for item-level feature configs and spawn/capture behaviors.
         itemFeatureRegistry = new ItemFeatureRegistry();
+        // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
 
+        // Resolve settings paths and optional server-level overrides.
         Path globalModsDir = resolveGlobalModsDirectory(getDataDirectory());
         Path saveModsDir = resolveSaveModsDirectory(getDataDirectory());
         Path settingsDir = saveModsDir != null
@@ -87,6 +90,7 @@ public class Tamework extends JavaPlugin {
         settings = loadSettings(settingsConfig, settingsDir, overrideDir);
 
 
+        // Register components that persist owner and tamed state on NPCs.
         ownerComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkOwnerComponent.class,
                 "TameworkOwner",
@@ -99,12 +103,14 @@ public class Tamework extends JavaPlugin {
                 TameworkTamedComponent.CODEC
         );
 
+        // Damage event is needed for owner damage filtering; avoid double-registration.
         try {
             getEntityStoreRegistry().registerEntityEventType(Damage.class);
         } catch (IllegalArgumentException ex) {
             getLogger().at(Level.INFO).log("Damage event type already registered; skipping registration.");
         }
 
+        // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(
                 new OwnerDamageFilterSystem(
                         () -> settings != null && settings.isBlockOwnerDamage(),
@@ -114,6 +120,7 @@ public class Tamework extends JavaPlugin {
                 )
         );
 
+        // Load item feature configs from bundled defaults and mod overrides.
         ItemFeatureConfigLoader loader = new ItemFeatureConfigLoader();
         int loaded = 0;
         loaded += loader.loadFromResource(
@@ -123,16 +130,20 @@ public class Tamework extends JavaPlugin {
         );
         loaded += ModItemFeatureConfigDiscovery.loadAll(loader, itemFeatureRegistry, getLogger(), getDataDirectory());
 
+        // Load translation entries from mods so messages can be localized.
         translationRegistry = new TranslationRegistry();
         int langLoaded = ModLanguageDiscovery.loadAll(translationRegistry, getLogger(), getDataDirectory());
         getLogger().at(Level.INFO).log("Tamework language entries loaded: " + langLoaded);
 
+        // Core handler for capture/spawn flows.
         spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry);
 
+        // Register /tw commands if the server supports it.
         if (getCommandRegistry() != null) {
             getCommandRegistry().registerCommand(new TameworkCommandRoot());
         }
 
+        // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
         getEventRegistry().registerGlobal(
@@ -144,6 +155,7 @@ public class Tamework extends JavaPlugin {
                         + " (total: " + itemFeatureRegistry.snapshot().size() + ")"
         );
 
+        // Register custom NPC action/sensor builders once NPCPlugin is available.
         registerNpcActionsIfReady();
     }
 
@@ -172,6 +184,7 @@ public class Tamework extends JavaPlugin {
         return translationRegistry;
     }
 
+    // Load settings with optional server override, then persist defaults if missing.
     private TameworkSettings loadSettings(Config<TameworkSettings> config, Path settingsDir, Path overrideDir) {
         if (settingsDir != null) {
             try {
@@ -216,6 +229,7 @@ public class Tamework extends JavaPlugin {
         return loaded;
     }
 
+    // Best-effort server root discovery for server-level overrides.
     private Path resolveServerRoot(Path dataDirectory) {
         Path modsDir = resolveModsDirectoryLegacy(dataDirectory);
         if (modsDir != null) {
@@ -227,6 +241,7 @@ public class Tamework extends JavaPlugin {
         return Path.of(".").toAbsolutePath().normalize();
     }
 
+    // Resolve the global UserData/Mods directory if available.
     private Path resolveGlobalModsDirectory(Path dataDirectory) {
         Path userDataRoot = findUserDataRoot(dataDirectory);
         if (userDataRoot != null) {
@@ -238,6 +253,7 @@ public class Tamework extends JavaPlugin {
         return resolveModsDirectoryLegacy(dataDirectory);
     }
 
+    // If running from a save, return <Saves>/<World>/mods.
     private Path resolveSaveModsDirectory(Path dataDirectory) {
         if (dataDirectory == null) {
             return null;
@@ -263,6 +279,7 @@ public class Tamework extends JavaPlugin {
         return null;
     }
 
+    // Walk up the path to locate the UserData root.
     private Path findUserDataRoot(Path dataDirectory) {
         if (dataDirectory == null) {
             return null;
@@ -278,6 +295,7 @@ public class Tamework extends JavaPlugin {
         return null;
     }
 
+    // Legacy fallback for mods directory discovery in dev environments.
     private Path resolveModsDirectoryLegacy(Path dataDirectory) {
         List<Path> candidates = new ArrayList<>();
         if (dataDirectory != null) {
@@ -312,6 +330,7 @@ public class Tamework extends JavaPlugin {
         return tamedComponentType;
     }
 
+    // NPC action/sensor builders must be registered after NPCPlugin is ready.
     private void registerNpcActionsIfReady() {
         if (npcActionsRegistered) {
             return;
@@ -331,6 +350,7 @@ public class Tamework extends JavaPlugin {
         }
     }
 
+    // Called when plugins are set up; used to detect NPCPlugin availability.
     private void onPluginSetup(PluginSetupEvent event) {
         if (npcActionsRegistered) {
             return;
@@ -341,6 +361,7 @@ public class Tamework extends JavaPlugin {
         }
     }
 
+    // Register custom action/sensor builders and trigger NPC validation.
     private void registerNpcActions(NPCPlugin npcPlugin) {
         if (npcActionsRegistered || npcPlugin == null) {
             return;

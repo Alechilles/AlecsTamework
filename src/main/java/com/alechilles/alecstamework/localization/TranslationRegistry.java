@@ -3,6 +3,9 @@ package com.alechilles.alecstamework.localization;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+/**
+ * Caches translation entries loaded from mods and overrides.
+ */
 public final class TranslationRegistry {
     private final ConcurrentHashMap<String, String> entries = new ConcurrentHashMap<>();
 

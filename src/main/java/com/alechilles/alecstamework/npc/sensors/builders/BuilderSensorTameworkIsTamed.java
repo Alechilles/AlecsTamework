@@ -5,6 +5,9 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.instructions.Sensor;
 import javax.annotation.Nonnull;
 
+/**
+ * Builder for SensorTameworkIsTamed.
+ */
 public final class BuilderSensorTameworkIsTamed extends TameworkSensorBuilderBase {
     public static final String BUILDER_ID = "TameworkIsTamed";
 

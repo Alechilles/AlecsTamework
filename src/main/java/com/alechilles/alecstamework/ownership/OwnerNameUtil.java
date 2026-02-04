@@ -3,6 +3,9 @@ package com.alechilles.alecstamework.ownership;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 
+/**
+ * Resolves player display names for owner storage and messaging.
+ */
 public final class OwnerNameUtil {
     private OwnerNameUtil() {
     }

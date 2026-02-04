@@ -12,6 +12,9 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
+/**
+ * Blocks capture when an NPC is untamed and optionally lists required foods.
+ */
 public final class ActionTameworkDenyCaptureUntamed extends TameworkActionBase {
     private final String[] foodItemIds;
 

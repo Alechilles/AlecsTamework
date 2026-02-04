@@ -22,6 +22,9 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 import java.util.logging.Level;
 
+/**
+ * Blocks interactions with owned NPCs and notifies the player.
+ */
 public final class OwnerInteractionListener {
     private final TranslationRegistry translationRegistry;
     private final HytaleLogger logger;

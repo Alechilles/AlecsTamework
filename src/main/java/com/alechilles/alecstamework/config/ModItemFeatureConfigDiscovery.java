@@ -16,6 +16,9 @@ import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
+/**
+ * Finds mod and per-world config files and loads them.
+ */
 public final class ModItemFeatureConfigDiscovery {
     public static final String MOD_CONFIG_PATH = "Server/Tamework/Tamework_Items_Config.json";
     public static final String LOCAL_CONFIG_FILENAME = "Tamework_Items_Config.json";
