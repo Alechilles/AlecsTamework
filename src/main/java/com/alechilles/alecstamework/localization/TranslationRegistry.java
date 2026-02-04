@@ -16,6 +16,7 @@ public final class TranslationRegistry {
         entries.put(key, value);
     }
 
+    // Simple in-memory lookup for merged language entries.
     public String get(String key) {
         if (key == null || key.isBlank()) {
             return null;

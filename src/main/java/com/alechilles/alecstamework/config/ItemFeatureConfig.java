@@ -84,6 +84,8 @@ public final class ItemFeatureConfig {
     }
 
     public static final class SpawnerIconOverride {
+        // Attachment keys must match the NPC attachment map for a given capture.
+
         private final Map<String, String> attachments;
         private final String icon;
 
@@ -167,6 +169,7 @@ public final class ItemFeatureConfig {
             return this;
         }
 
+        // Overrides are matched by attachment key/value pairs.
         public Builder spawnerIconOverrides(List<SpawnerIconOverride> spawnerIconOverrides) {
             if (spawnerIconOverrides == null || spawnerIconOverrides.isEmpty()) {
                 this.spawnerIconOverrides = Collections.emptyList();

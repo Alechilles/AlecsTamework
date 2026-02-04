@@ -252,6 +252,7 @@ public final class SpawnerFeatureHandler {
     }
 
     // Adjust spawn position to avoid spawning inside blocks directly in front of the player.
+    // Find a nearby clear space in front of the player for safe spawning.
     private Vector3d resolveSafeSpawnPosition(World world, Vector3d desired, Vector3f forward) {
         if (world == null || desired == null) {
             return desired;
@@ -311,6 +312,7 @@ public final class SpawnerFeatureHandler {
                              ItemStack itemStack,
                              Entity targetEntity,
                              ItemFeatureConfig config) {
+        // Build capture metadata and apply it to the held spawner item.
         Ref<EntityStore> targetRef = targetEntity != null ? targetEntity.getReference() : null;
         CaptureInfo captureInfo = buildCaptureInfo(player, targetRef);
         String attachmentsJson = captureInfo.attachmentsJson;
@@ -375,6 +377,7 @@ public final class SpawnerFeatureHandler {
                              int targetEntityId,
                              ItemFeatureConfig config,
                              int hotbarSlot) {
+        // Packet-based capture; resolve the target entity from its ID.
         Ref<EntityStore> targetRef = resolveEntityRef(player, targetEntityId, null);
         CaptureInfo captureInfo = buildCaptureInfo(player, targetRef);
         String attachmentsJson = captureInfo.attachmentsJson;
@@ -476,12 +479,14 @@ public final class SpawnerFeatureHandler {
                 : new Vector3f(0, 0, 0);
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
         Vector3f headRot = headRotation != null ? headRotation.getRotation() : null;
+        // Use head rotation so spawn offsets follow where the player is looking.
         float yaw = headRot != null ? headRot.getYaw() : rotation.getYaw();
         Vector3f forward = new Vector3f(Vector3f.FORWARD);
         forward.rotateY(yaw);
         forward.normalize();
         position.add(forward.x * SPAWN_FORWARD_DISTANCE, 0, forward.z * SPAWN_FORWARD_DISTANCE);
         position.add(0, SPAWN_OFFSET_Y, 0);
+        // Nudge to a nearby safe space to avoid spawning inside blocks.
         position = resolveSafeSpawnPosition(world, position, forward);
 
         int roleIndex = NPCPlugin.get().getIndex(roleId);
@@ -747,6 +752,7 @@ public final class SpawnerFeatureHandler {
     }
 
     // Writes CapturedNPCMetadata (role/name/icon) onto the spawner item.
+    // Persist capture info (role, icon, attachments, optional name) onto the item.
     private ItemStack applyCapturedMetadata(ItemStack updated, CaptureInfo captureInfo, String fullItemIcon) {
         if (updated == null || captureInfo == null) {
             return updated;
@@ -784,6 +790,7 @@ public final class SpawnerFeatureHandler {
     }
 
     // Resolve icon overrides based on captured attachments (falls back to default icon).
+    // Resolve a per-attachment icon override or fall back to default.
     private String resolveFullItemIcon(ItemFeatureConfig config, String attachmentsJson, String itemId) {
         ItemFeatureConfig resolved = resolveIconConfig(config);
         if (resolved == null) {
@@ -1034,6 +1041,7 @@ public final class SpawnerFeatureHandler {
         return hotbar.getItemStack((short) slot);
     }
 
+    // Update the active hotbar slot and push inventory changes to the client.
     private boolean updateHeldItem(Player player, ItemStack updated) {
         if (player == null) {
             return false;
@@ -1056,6 +1064,7 @@ public final class SpawnerFeatureHandler {
 
 
 
+    // Update a specific hotbar slot when the packet provides the slot index.
     private boolean updateHotbarSlot(Player player, int slot, ItemStack updated) {
         if (player == null) {
             return false;

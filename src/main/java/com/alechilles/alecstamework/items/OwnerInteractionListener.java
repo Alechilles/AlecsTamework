@@ -69,6 +69,7 @@ public final class OwnerInteractionListener {
                 }
             }
         }
+        // Skip restriction when there is no owner or the player is the owner.
         if (ownerUuid == null || ownerUuid.equals(player.getUuid())) {
             return;
         }
@@ -119,6 +120,7 @@ public final class OwnerInteractionListener {
 
         // Determine whether this is a capture attempt or a generic interaction.
         String verb = "interact with";
+        // Decide which verb to show based on whether the held item is a spawner.
         Inventory inventory = player.getInventory();
         if (inventory != null) {
             ItemStack active = inventory.getActiveHotbarItem();

@@ -25,6 +25,7 @@ public final class ItemFeatureRegistry {
         if (config != null) {
             return config;
         }
+        // Normalize state variants ("*_State_*" or "*" prefix) back to base item IDs.
         String normalized = normalizeStateItemId(itemId);
         if (normalized != null && !normalized.equals(itemId)) {
             return configsByItemId.get(normalized);
@@ -49,6 +50,7 @@ public final class ItemFeatureRegistry {
     }
 
     public void registerDefaults() {
+        // Built-in example item so the framework works out-of-the-box.
         register(
                 TameworkIds.ITEM_SPAWNER_EXAMPLE,
                 ItemFeatureConfig.builder()

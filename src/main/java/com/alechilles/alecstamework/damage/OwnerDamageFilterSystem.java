@@ -59,6 +59,7 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         if (damage == null || damage.isCancelled()) {
             return;
         }
+        // Fast path if all protections are disabled.
         if (!blockOwnerDamage.getAsBoolean()
                 && !blockAllPlayerDamageIfOwned.getAsBoolean()
                 && !invulnerableIfOwned.getAsBoolean()) {
@@ -70,14 +71,17 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         if (type == null) {
             return;
         }
+        // Only apply filters to owned NPCs.
         TameworkOwnerComponent owner = chunk.getComponent(index, type);
         if (owner == null || owner.getOwnerId() == null) {
             return;
         }
+        // Optional full invulnerability for owned pets.
         if (invulnerableIfOwned.getAsBoolean()) {
             cancelDamage(damage);
             return;
         }
+        // Owner-based rules only apply to player-sourced damage.
         Damage.Source source = damage.getSource();
         if (!(source instanceof Damage.EntitySource)) {
             return;
@@ -90,6 +94,7 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         if (player == null) {
             return;
         }
+        // Optionally block all player damage against owned pets.
         if (blockAllPlayerDamageIfOwned.getAsBoolean()) {
             cancelDamage(damage);
             return;

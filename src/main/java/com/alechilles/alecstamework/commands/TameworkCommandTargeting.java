@@ -67,6 +67,7 @@ final class TameworkCommandTargeting {
                 if (dot < MIN_DOT) {
                     continue;
                 }
+                // Favor NPCs that are both close and centered in view.
                 double score = dot / dist;
                 if (score > best.score) {
                     best.score = score;

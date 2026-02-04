@@ -12,6 +12,7 @@ public final class TameworkSettings {
     public static final String BLOCK_ALL_PLAYER_DAMAGE_IF_OWNED_TAG = "BlockAllPlayerDamageIfOwned";
     public static final String INVULNERABLE_IF_OWNED_TAG = "InvulnerableIfOwned";
 
+    // Codec maps JSON keys to settings fields.
     public static final BuilderCodec<TameworkSettings> CODEC = BuilderCodec.builder(
             TameworkSettings.class,
             TameworkSettings::new
@@ -29,6 +30,7 @@ public final class TameworkSettings {
             TameworkSettings::isInvulnerableIfOwned
     ).add().build();
 
+    // Defaults align with the shipped tamework-settings.json.
     private boolean blockOwnerDamage = true;
     private boolean blockAllPlayerDamageIfOwned = false;
     private boolean invulnerableIfOwned = false;

@@ -14,6 +14,7 @@ public final class OwnerNameUtil {
         if (player == null) {
             return null;
         }
+        // Prefer display name, then fall back to account username.
         String displayName = normalize(player.getDisplayName());
         if (displayName != null) {
             return displayName;

@@ -95,6 +95,7 @@ public final class ItemFeatureConfigLoader {
     }
 
     private ItemFeatureConfig parseItemConfig(JsonObject obj, ItemFeatureConfig base) {
+        // Start with existing config values so overrides can be partial.
         boolean spawnerEnabled = base != null && base.isSpawnerEnabled();
         boolean whistleEnabled = base != null && base.isWhistleEnabled();
         boolean captureClearsOwner = base != null && base.isCaptureClearsOwner();

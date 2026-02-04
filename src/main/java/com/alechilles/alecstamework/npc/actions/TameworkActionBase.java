@@ -20,11 +20,15 @@ import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.UUID;
 
+/**
+ * Shared helpers for Tamework NPC actions.
+ */
 public abstract class TameworkActionBase extends ActionBase {
     protected TameworkActionBase(BuilderActionBase builder) {
         super(builder);
     }
 
+    // Prefer the role's interaction target, then fall back to the info provider.
     protected Player resolveInteractionPlayer(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
         if (role != null && role.getStateSupport() != null) {
             Ref<EntityStore> target = role.getStateSupport().getInteractionIterationTarget();
@@ -50,6 +54,7 @@ public abstract class TameworkActionBase extends ActionBase {
         return null;
     }
 
+    // Returns the active hotbar item if present.
     protected ItemStack getActiveItem(Player player) {
         if (player == null) {
             return null;
@@ -72,6 +77,7 @@ public abstract class TameworkActionBase extends ActionBase {
         return player.getUuid();
     }
 
+    // Reads owner UUID from the component if available.
     protected UUID resolveOwnerUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid()) {
             return null;
@@ -83,6 +89,7 @@ public abstract class TameworkActionBase extends ActionBase {
         return null;
     }
 
+    // Reads owner display name from the component if available.
     protected String resolveOwnerName(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid()) {
             return null;
@@ -94,6 +101,7 @@ public abstract class TameworkActionBase extends ActionBase {
         return null;
     }
 
+    // Resolve the NPC entity component from the ref.
     protected NPCEntity resolveNpcEntity(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid()) {
             return null;
@@ -101,6 +109,7 @@ public abstract class TameworkActionBase extends ActionBase {
         return store.getComponent(npcRef, NPCEntity.getComponentType());
     }
 
+    // Resolve a player-facing NPC name with translation fallbacks.
     protected String resolveNpcName(NPCEntity npc) {
         if (npc == null) {
             return null;
@@ -144,6 +153,7 @@ public abstract class TameworkActionBase extends ActionBase {
         return null;
     }
 
+    // Empty spawners are identified by having a filled-item target configured.
     protected boolean isEmptySpawnerItem(ItemFeatureConfig config) {
         if (config == null) {
             return false;
@@ -152,6 +162,7 @@ public abstract class TameworkActionBase extends ActionBase {
         return filledId != null && !filledId.isBlank();
     }
 
+    // Resolve spawner config only when the item is a valid spawner.
     protected ItemFeatureConfig resolveSpawnerConfig(ItemStack itemStack) {
         if (itemStack == null || itemStack.isEmpty()) {
             return null;

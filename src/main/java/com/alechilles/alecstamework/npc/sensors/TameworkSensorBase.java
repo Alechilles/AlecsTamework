@@ -13,11 +13,15 @@ import com.hypixel.hytale.server.npc.role.Role;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 
+/**
+ * Shared helpers for Tamework sensors.
+ */
 public abstract class TameworkSensorBase extends SensorBase {
     protected TameworkSensorBase(@Nonnull BuilderSensorBase builder) {
         super(builder);
     }
 
+    // Prefer the current interaction target; fall back to info-provider targets.
     protected Player resolveInteractionPlayer(Role role, Store<EntityStore> store) {
         if (role == null || role.getStateSupport() == null) {
             return null;
@@ -29,6 +33,7 @@ public abstract class TameworkSensorBase extends SensorBase {
         return store.getComponent(target, Player.getComponentType());
     }
 
+    // Reads the owner UUID from the component, if present.
     protected UUID resolveOwnerUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid()) {
             return null;

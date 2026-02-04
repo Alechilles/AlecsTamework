@@ -96,6 +96,7 @@ public class TameworkSpawnInteraction extends SimpleInstantInteraction {
             return;
         }
         ItemStack heldItem = context.getHeldItem();
+        // Only spawn when the player is holding a valid spawner item.
         if (heldItem == null || heldItem.isEmpty()) {
             context.getState().state = InteractionState.Failed;
             return;

@@ -27,6 +27,7 @@ public final class ModLanguageDiscovery {
     public static int loadAll(TranslationRegistry registry,
                               HytaleLogger logger,
                               Path dataDirectory) {
+        // Load from global mods first, then per-world mods.
         List<Path> modsDirs = resolveModsDirectories(dataDirectory);
         if (modsDirs.isEmpty()) {
             logger.at(Level.INFO).log("No mods directory found for language discovery.");
@@ -104,6 +105,7 @@ public final class ModLanguageDiscovery {
         int loaded = 0;
         try (BufferedReader buffered = new BufferedReader(reader)) {
             String line;
+            // Skip blank lines and comments; parse key=value pairs.
             while ((line = buffered.readLine()) != null) {
                 String trimmed = line.trim();
                 if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("//")) {
@@ -135,6 +137,7 @@ public final class ModLanguageDiscovery {
     }
 
     private static List<Path> resolveModsDirectories(Path dataDirectory) {
+        // Prefer global mods, then per-world overrides, then legacy locations.
         List<Path> modsDirs = new ArrayList<>();
         Path globalModsDir = resolveGlobalModsDirectory(dataDirectory);
         if (globalModsDir != null) {

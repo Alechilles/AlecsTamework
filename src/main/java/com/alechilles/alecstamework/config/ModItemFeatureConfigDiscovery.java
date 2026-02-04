@@ -36,6 +36,7 @@ public final class ModItemFeatureConfigDiscovery {
         int loaded = 0;
         Path globalModsDir = resolveGlobalModsDirectory(dataDirectory);
         Path saveModsDir = resolveSaveModsDirectory(dataDirectory);
+        // Global mods supply defaults; save mods supply per-world overrides.
         if (globalModsDir != null) {
             loaded += loadFromModsDirectory(loader, registry, logger, globalModsDir, MOD_CONFIG_PATH);
             if (saveModsDir != null && !globalModsDir.equals(saveModsDir)) {
@@ -43,6 +44,7 @@ public final class ModItemFeatureConfigDiscovery {
             }
         }
         if (saveModsDir != null && (globalModsDir == null || !saveModsDir.equals(globalModsDir))) {
+            // Load per-world overrides from the save mods directory.
             loaded += loadFromModsDirectory(loader, registry, logger, saveModsDir, LOCAL_CONFIG_FILENAME);
         }
         if (globalModsDir == null && saveModsDir == null) {
@@ -62,6 +64,7 @@ public final class ModItemFeatureConfigDiscovery {
                                             HytaleLogger logger,
                                             Path dataDirectory) {
         Path overridePath = resolveOverridePath(dataDirectory);
+        // Optional single override file for quick iteration.
         if (!Files.exists(overridePath)) {
             return 0;
         }
@@ -153,6 +156,7 @@ public final class ModItemFeatureConfigDiscovery {
         return name.endsWith(".jar") || name.endsWith(".zip");
     }
 
+    // Global override file for quick experimentation (not per-world).
     private static Path resolveOverridePath(Path dataDirectory) {
         Path serverRoot = resolveServerRoot(dataDirectory);
         if (serverRoot == null) {
@@ -172,6 +176,7 @@ public final class ModItemFeatureConfigDiscovery {
         return Path.of(".").toAbsolutePath().normalize();
     }
 
+    // Resolve the global UserData/Mods folder (client + server share this path).
     private static Path resolveGlobalModsDirectory(Path dataDirectory) {
         Path userDataRoot = findUserDataRoot(dataDirectory);
         if (userDataRoot != null) {
@@ -188,6 +193,7 @@ public final class ModItemFeatureConfigDiscovery {
             return null;
         }
         Path current = dataDirectory.toAbsolutePath().normalize();
+        // Walk up to find .../Saves/<World>/mods for per-world configs.
         while (current != null) {
             Path parent = current.getParent();
             if (parent != null) {
@@ -227,6 +233,7 @@ public final class ModItemFeatureConfigDiscovery {
         if (saveModsDir == null) {
             return;
         }
+        // Seed empty per-world override files so defaults remain intact.
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(globalModsDir)) {
             for (Path modPath : stream) {
                 if (Files.isDirectory(modPath)) {
@@ -241,6 +248,7 @@ public final class ModItemFeatureConfigDiscovery {
         }
     }
 
+    // Create an empty per-world override so defaults remain authoritative.
     private static void ensureEmptyLocalOverrideFromFolder(Path modPath, Path saveModsDir, HytaleLogger logger) {
         Path configPath = modPath.resolve(MOD_CONFIG_PATH);
         if (!Files.exists(configPath)) {
@@ -267,6 +275,7 @@ public final class ModItemFeatureConfigDiscovery {
         }
     }
 
+    // Same as above, but for packaged mods (.jar/.zip).
     private static void ensureEmptyLocalOverrideFromArchive(Path modArchive, Path saveModsDir, HytaleLogger logger) {
         try (ZipFile zipFile = new ZipFile(modArchive.toFile())) {
             ZipEntry entry = zipFile.getEntry(MOD_CONFIG_PATH);
@@ -290,6 +299,7 @@ public final class ModItemFeatureConfigDiscovery {
         }
     }
 
+    // Read the manifest Name to map save override directories to the display name.
     private static String resolveModNameFromFolder(Path modPath) {
         Path manifestPath = modPath.resolve(MANIFEST_PATH);
         if (!Files.exists(manifestPath)) {
@@ -303,6 +313,7 @@ public final class ModItemFeatureConfigDiscovery {
         }
     }
 
+    // Read the manifest Name from inside packaged mods.
     private static String resolveModNameFromArchive(ZipFile zipFile, Path modArchive) {
         try {
             ZipEntry entry = zipFile.getEntry(MANIFEST_PATH);
@@ -318,6 +329,7 @@ public final class ModItemFeatureConfigDiscovery {
         }
     }
 
+    // Minimal JSON Name extraction to avoid pulling in full manifest parsing here.
     private static String extractNameFromManifest(String manifestJson) {
         if (manifestJson == null) {
             return null;
@@ -339,6 +351,7 @@ public final class ModItemFeatureConfigDiscovery {
         return name;
     }
 
+    // Legacy mods discovery for older server layouts and unit tests.
     private static Path resolveModsDirectoryLegacy(Path dataDirectory) {
         List<Path> candidates = new ArrayList<>();
         if (dataDirectory != null) {

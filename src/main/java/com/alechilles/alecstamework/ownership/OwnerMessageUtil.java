@@ -28,12 +28,14 @@ public final class OwnerMessageUtil {
             return;
         }
         long now = System.currentTimeMillis();
+        // Rate-limit to avoid spamming chat during rapid interactions.
         Long last = LAST_SENT.get(playerUuid);
         if (last != null && now - last < COOLDOWN_MS) {
             return;
         }
         LAST_SENT.put(playerUuid, now);
 
+        // Resolve a human-friendly NPC/owner label for messaging.
         String resolvedNpc = npcName != null && !npcName.isBlank() ? npcName : "pet";
         String resolvedOwner = ownerName != null && !ownerName.isBlank()
                 ? ownerName
@@ -66,6 +68,7 @@ public final class OwnerMessageUtil {
         }
         LAST_SENT.put(playerUuid, now);
 
+        // Keep the base message short; optionally append allowed foods.
         String resolvedNpc = npcName != null && !npcName.isBlank() ? npcName : "pet";
         String message = "You must tame that " + resolvedNpc + " before capturing it.";
         if (foodList != null && !foodList.isBlank()) {
