@@ -50,6 +50,7 @@ import java.util.logging.Level;
  * Capture/spawn logic for spawner items, including metadata and attachments.
  */
 public final class SpawnerFeatureHandler {
+
     private static final double SPAWN_OFFSET_Y = 0.5;
     private static final double SPAWN_FORWARD_DISTANCE = 1.5;
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
@@ -79,6 +80,7 @@ public final class SpawnerFeatureHandler {
         this.registry = registry;
     }
 
+    // Entry point for in-world item interaction; decides capture vs spawn.
     public void handle(PlayerInteractEvent event, ItemFeatureConfig config) {
         if (!config.isSpawnerEnabled()) {
             return;
@@ -107,6 +109,7 @@ public final class SpawnerFeatureHandler {
         spawnFromItem(event.getPlayer(), itemStack, config, null, null);
     }
 
+    // Entry point for packet-driven interactions; validates slot/item then forwards to capture/spawn.
     public void handlePacket(Player player,
                              String itemId,
                              int activeHotbarSlot,
@@ -171,6 +174,7 @@ public final class SpawnerFeatureHandler {
 
         spawnFromItem(player, itemStack, activeConfig, activeHotbarSlot, null);
     }
+    // Used by TameworkSpawnInteraction: builds a minimal config to spawn from the held item.
     public boolean spawnFromItemInteraction(Player player,
                                             ItemStack itemStack,
                                             String roleId,
@@ -185,6 +189,7 @@ public final class SpawnerFeatureHandler {
                 .build();
         return spawnFromItem(player, itemStack, config, null, emptyItemId);
     }
+    // Called by NPC action chains to capture an NPC into the held spawner item.
     public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
         if (player == null || targetRef == null || itemStack == null || config == null) {
             return false;
@@ -246,6 +251,7 @@ public final class SpawnerFeatureHandler {
         return true;
     }
 
+    // Adjust spawn position to avoid spawning inside blocks directly in front of the player.
     private Vector3d resolveSafeSpawnPosition(World world, Vector3d desired, Vector3f forward) {
         if (world == null || desired == null) {
             return desired;
@@ -426,6 +432,7 @@ public final class SpawnerFeatureHandler {
         );
     }
 
+    // Spawns an NPC from captured item metadata, applying attachments/owner/tamed state.
     private boolean spawnFromItem(Player player,
                                   ItemStack itemStack,
                                   ItemFeatureConfig config,
@@ -676,6 +683,7 @@ public final class SpawnerFeatureHandler {
     }
 
 
+    // Collect attachments, role/name keys, and icon overrides from the target NPC.
     private CaptureInfo buildCaptureInfo(Player player, Ref<EntityStore> targetRef) {
         if (player == null || targetRef == null || !targetRef.isValid()) {
             return new CaptureInfo(null, null, null, null);
@@ -738,6 +746,7 @@ public final class SpawnerFeatureHandler {
         return modelComponent.getModel().getModelAssetId();
     }
 
+    // Writes CapturedNPCMetadata (role/name/icon) onto the spawner item.
     private ItemStack applyCapturedMetadata(ItemStack updated, CaptureInfo captureInfo, String fullItemIcon) {
         if (updated == null || captureInfo == null) {
             return updated;
@@ -774,6 +783,7 @@ public final class SpawnerFeatureHandler {
         return filledConfig != null ? filledConfig : config;
     }
 
+    // Resolve icon overrides based on captured attachments (falls back to default icon).
     private String resolveFullItemIcon(ItemFeatureConfig config, String attachmentsJson, String itemId) {
         ItemFeatureConfig resolved = resolveIconConfig(config);
         if (resolved == null) {
@@ -875,6 +885,7 @@ public final class SpawnerFeatureHandler {
         );
     }
 
+    // Removes captured metadata and resets the item to its empty state.
     private ItemStack clearCapturedMetadata(ItemStack stack) {
         if (stack == null) {
             return null;

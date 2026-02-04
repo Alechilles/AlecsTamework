@@ -19,6 +19,7 @@ import javax.annotation.Nonnull;
  * Command to set or clear owner on the targeted NPC.
  */
 public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
+
     public TameworkSetOwnerCommand() {
         super("setowner", "Set owner of the NPC you are looking at.");
         setAllowsExtraArguments(true);
@@ -36,6 +37,7 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
             return;
         }
 
+        // Default: set owner to the executing player when no argument is provided.
         String raw = getFirstArg(commandContext);
         UUID newOwner = parseOwner(raw, player.getUuid());
         if (newOwner == null && raw != null && !raw.isBlank() && !isClear(raw)) {
@@ -51,6 +53,7 @@ public final class TameworkSetOwnerCommand extends AbstractPlayerCommand {
 
         String ownerName = null;
         if (newOwner != null && newOwner.equals(player.getUuid())) {
+            // Only resolve a name for self; external UUIDs remain anonymous.
             ownerName = OwnerNameUtil.resolve(player);
         }
 

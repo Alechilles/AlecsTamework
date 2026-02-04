@@ -23,6 +23,7 @@ import javax.annotation.Nonnull;
  */
 public class TameworkSpawnInteraction extends SimpleInstantInteraction {
 
+
     public static final BuilderCodec<TameworkSpawnInteraction> CODEC = BuilderCodec.builder(
             TameworkSpawnInteraction.class,
             TameworkSpawnInteraction::new,
@@ -79,6 +80,7 @@ public class TameworkSpawnInteraction extends SimpleInstantInteraction {
     }
 
     @Override
+    // Runs spawn logic on the store command buffer to avoid illegal store writes.
     protected void firstRun(@Nonnull InteractionType type,
             @Nonnull InteractionContext context,
             @Nonnull CooldownHandler cooldownHandler) {
@@ -109,6 +111,7 @@ public class TameworkSpawnInteraction extends SimpleInstantInteraction {
             return;
         }
 
+        // Defer to store thread for safe entity creation.
         commandBuffer.run(store -> handler.spawnFromItemInteraction(
                 player,
                 heldItem,

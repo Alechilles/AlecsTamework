@@ -16,6 +16,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
  * Blocks capture when an NPC is untamed and optionally lists required foods.
  */
 public final class ActionTameworkDenyCaptureUntamed extends TameworkActionBase {
+
     private final String[] foodItemIds;
 
     public ActionTameworkDenyCaptureUntamed(BuilderActionTameworkDenyCaptureUntamed builder, BuilderSupport support) {
@@ -42,6 +43,7 @@ public final class ActionTameworkDenyCaptureUntamed extends TameworkActionBase {
         if (player == null) {
             return false;
         }
+        // Provide a helpful list of valid foods if configured.
         String npcName = resolveNpcName(resolveNpcEntity(npcRef, store));
         String foodList = resolveFoodList(player);
         if (foodList != null && !foodList.isBlank()) {
@@ -66,6 +68,7 @@ public final class ActionTameworkDenyCaptureUntamed extends TameworkActionBase {
         if (language == null || language.isBlank()) {
             language = "en-US";
         }
+        // Try: item translation key -> i18n -> fallback registry keys -> raw ID.
         StringBuilder builder = new StringBuilder();
         for (String itemId : foodItemIds) {
             if (itemId == null || itemId.isBlank()) {

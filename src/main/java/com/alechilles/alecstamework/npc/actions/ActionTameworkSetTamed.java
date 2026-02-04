@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
  * Sets the NPC tamed flag to a specific value.
  */
 public final class ActionTameworkSetTamed extends TameworkActionBase {
+
     private final boolean tamedValue;
 
     public ActionTameworkSetTamed(BuilderActionTameworkSetTamed builder, BuilderSupport support) {
@@ -42,6 +43,7 @@ public final class ActionTameworkSetTamed extends TameworkActionBase {
         if (type == null) {
             return false;
         }
+        // Persist the tamed flag so sensors and rules can react to it.
         store.putComponent(npcRef, type, new TameworkTamedComponent(tamedValue));
         return true;
     }

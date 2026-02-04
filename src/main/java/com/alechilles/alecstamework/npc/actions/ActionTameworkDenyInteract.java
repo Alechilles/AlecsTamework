@@ -14,6 +14,7 @@ import java.util.UUID;
  * Blocks owner-restricted interactions and emits a message.
  */
 public final class ActionTameworkDenyInteract extends TameworkActionBase {
+
     public ActionTameworkDenyInteract(BuilderActionTameworkDenyInteract builder, BuilderSupport support) {
         super(builder);
     }
@@ -24,6 +25,7 @@ public final class ActionTameworkDenyInteract extends TameworkActionBase {
                               InfoProvider infoProvider,
                               double dt,
                               Store<EntityStore> store) {
+        // Block interactions when an owner exists and the player is not the owner.
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
             return false;
@@ -39,6 +41,7 @@ public final class ActionTameworkDenyInteract extends TameworkActionBase {
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
+        // Send a denial message and consume the interaction.
         if (!canExecute(npcRef, role, infoProvider, dt, store)) {
             return false;
         }

@@ -17,6 +17,7 @@ import java.util.UUID;
  * Captures untamed or wild NPCs when allowed by config.
  */
 public final class ActionTameworkCaptureWild extends TameworkActionBase {
+
     public ActionTameworkCaptureWild(BuilderActionTameworkCaptureWild builder, BuilderSupport support) {
         super(builder);
     }
@@ -27,6 +28,7 @@ public final class ActionTameworkCaptureWild extends TameworkActionBase {
                               InfoProvider infoProvider,
                               double dt,
                               Store<EntityStore> store) {
+        // Only allow capture with an empty spawner when no owner is set.
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
             return false;
@@ -46,6 +48,7 @@ public final class ActionTameworkCaptureWild extends TameworkActionBase {
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
+        // Re-check ownership and delegate to the spawner handler.
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
             return false;

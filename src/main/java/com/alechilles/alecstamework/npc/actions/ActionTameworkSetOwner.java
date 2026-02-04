@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
  * Sets owner component data based on the interacting player.
  */
 public final class ActionTameworkSetOwner extends TameworkActionBase {
+
     public ActionTameworkSetOwner(BuilderActionTameworkSetOwner builder, BuilderSupport support) {
         super(builder);
     }
@@ -45,6 +46,7 @@ public final class ActionTameworkSetOwner extends TameworkActionBase {
         if (type == null) {
             return false;
         }
+        // Store owner UUID and a best-effort display name on the NPC.
         String ownerName = OwnerNameUtil.resolve(player);
         store.putComponent(npcRef, type, new TameworkOwnerComponent(player.getUuid(), ownerName));
         return true;

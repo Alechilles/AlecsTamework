@@ -17,6 +17,7 @@ import java.util.UUID;
  * Captures NPCs when the interacting player is the owner.
  */
 public final class ActionTameworkCaptureOwner extends TameworkActionBase {
+
     public ActionTameworkCaptureOwner(BuilderActionTameworkCaptureOwner builder, BuilderSupport support) {
         super(builder);
     }
@@ -27,6 +28,7 @@ public final class ActionTameworkCaptureOwner extends TameworkActionBase {
                               InfoProvider infoProvider,
                               double dt,
                               Store<EntityStore> store) {
+        // Only allow capture with an empty spawner and a matching owner.
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
             return false;
@@ -47,6 +49,7 @@ public final class ActionTameworkCaptureOwner extends TameworkActionBase {
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
+        // Re-validate ownership and then delegate to the spawner handler.
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
             return false;

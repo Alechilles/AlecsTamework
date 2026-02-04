@@ -19,6 +19,7 @@ import javax.annotation.Nonnull;
  * Command to display owner info for the targeted NPC.
  */
 public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
+
     public TameworkGetOwnerCommand() {
         super("getowner", "Get owner of the NPC you are looking at.");
         setAllowsExtraArguments(true);
@@ -47,6 +48,7 @@ public final class TameworkGetOwnerCommand extends AbstractPlayerCommand {
             }
         }
 
+        // Fall back to the live player entity if the stored name is missing.
         if ((ownerName == null || ownerName.isBlank()) && ownerUuid != null) {
             Ref<EntityStore> ownerRef = world.getEntityRef(ownerUuid);
             if (ownerRef != null && ownerRef.isValid()) {

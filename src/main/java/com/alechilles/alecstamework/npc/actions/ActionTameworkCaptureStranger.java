@@ -16,6 +16,7 @@ import java.util.UUID;
  * Handles capture attempts by non-owners and denies if restricted.
  */
 public final class ActionTameworkCaptureStranger extends TameworkActionBase {
+
     public ActionTameworkCaptureStranger(BuilderActionTameworkCaptureStranger builder, BuilderSupport support) {
         super(builder);
     }
@@ -26,6 +27,7 @@ public final class ActionTameworkCaptureStranger extends TameworkActionBase {
                               InfoProvider infoProvider,
                               double dt,
                               Store<EntityStore> store) {
+        // Require empty spawner and a different owner before denying capture.
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
             return false;
