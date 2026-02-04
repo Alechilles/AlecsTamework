@@ -131,7 +131,7 @@ public final class ModItemFeatureConfigDiscovery {
             }
             try (InputStream stream = zipFile.getInputStream(entry);
                  Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                String label = modArchive.getFileName() + "!" + configPath;
+                String label = (modArchive.getFileName() != null ? modArchive.getFileName().toString() : modArchive.toString()) + "!" + configPath;
                 int loaded = loader.loadFromReader(reader, registry, logger, label);
                 if (loaded > 0) {
                     logger.at(Level.INFO).log("Loaded Tamework config from archive: " + label);
@@ -144,7 +144,11 @@ public final class ModItemFeatureConfigDiscovery {
         }
     }
 
+    // Match .jar/.zip mod archives; guard against null file names.
     private static boolean isArchive(Path path) {
+        if (path == null || path.getFileName() == null) {
+            return false;
+        }
         String name = path.getFileName().toString().toLowerCase();
         return name.endsWith(".jar") || name.endsWith(".zip");
     }
@@ -242,6 +246,7 @@ public final class ModItemFeatureConfigDiscovery {
         if (!Files.exists(configPath)) {
             return;
         }
+        // Prefer manifest Name for per-world overrides.
         String modName = resolveModNameFromFolder(modPath);
         if (modName == null || modName.isEmpty()) {
             modName = modPath.getFileName().toString();

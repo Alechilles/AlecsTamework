@@ -20,7 +20,11 @@ final class TameworkCommandTargeting {
     private TameworkCommandTargeting() {
     }
 
+    // Finds the closest NPC in the player's view cone within MAX_DISTANCE.
     static Candidate findTargetNpc(Store<EntityStore> store, Ref<EntityStore> playerRef) {
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            return null;
+        }
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
             return null;
@@ -31,6 +35,7 @@ final class TameworkCommandTargeting {
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
         Vector3f headRot = headRotation != null ? headRotation.getRotation() : rotation;
 
+        // Forward vector uses head rotation so targeting matches the camera.
         Vector3f forward = new Vector3f(Vector3f.FORWARD);
         forward.rotateY(headRot.getYaw());
         forward.rotateX(headRot.getPitch());
@@ -39,6 +44,7 @@ final class TameworkCommandTargeting {
 
         BestCandidate best = new BestCandidate();
 
+        // Scan NPCs and score by view alignment and distance.
         store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
             int size = chunk.size();
             for (int i = 0; i < size; i++) {

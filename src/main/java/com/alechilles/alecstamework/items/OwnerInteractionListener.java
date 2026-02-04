@@ -34,6 +34,7 @@ public final class OwnerInteractionListener {
         this.logger = logger;
     }
 
+    // Enforce owner-only interactions for NPCs with an owner component.
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event == null) {
             return;
@@ -73,6 +74,7 @@ public final class OwnerInteractionListener {
         }
 
         NPCEntity npc = (NPCEntity) target;
+        // Resolve NPC display name with a best-effort fallback chain.
         String npcName = null;
         String displayName = npc.getLegacyDisplayName();
         if (displayName != null && !displayName.isBlank()) {
@@ -115,6 +117,7 @@ public final class OwnerInteractionListener {
             }
         }
 
+        // Determine whether this is a capture attempt or a generic interaction.
         String verb = "interact with";
         Inventory inventory = player.getInventory();
         if (inventory != null) {

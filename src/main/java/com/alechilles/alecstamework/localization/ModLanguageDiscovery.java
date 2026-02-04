@@ -87,7 +87,7 @@ public final class ModLanguageDiscovery {
             }
             try (InputStream stream = zipFile.getInputStream(entry);
                  Reader reader = new InputStreamReader(stream, StandardCharsets.UTF_8)) {
-                String label = modArchive.getFileName() + "!" + LANGUAGE_PATH;
+                String label = (modArchive.getFileName() != null ? modArchive.getFileName().toString() : modArchive.toString()) + "!" + LANGUAGE_PATH;
                 int loaded = loadFromReader(registry, reader);
                 if (loaded > 0) {
                     logger.at(Level.INFO).log("Loaded Tamework language entries from archive: " + label);
@@ -125,7 +125,11 @@ public final class ModLanguageDiscovery {
         return loaded;
     }
 
+    // Match .jar/.zip mod archives; guard against null file names.
     private static boolean isArchive(Path path) {
+        if (path == null || path.getFileName() == null) {
+            return false;
+        }
         String name = path.getFileName().toString().toLowerCase();
         return name.endsWith(".jar") || name.endsWith(".zip");
     }
