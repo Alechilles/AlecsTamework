@@ -65,7 +65,7 @@
           },
           "Instructions": [
             {
-              "Reference": "Component_Tamework_Instruction_Follow",
+              "Reference": "Component_Tamework_Instruction_Follow_Simple",
               "Modify": {
                 "MasterTargetSlot": {
                   "Compute": "MasterTargetSlot"
