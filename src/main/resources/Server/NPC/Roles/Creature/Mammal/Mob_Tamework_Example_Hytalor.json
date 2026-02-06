@@ -1,0 +1,52 @@
+{
+  "$Comment": "Example NPC role that is patched with Hytalor.",
+  "Type": "Variant",
+  "Reference": "Template_Tamework_Example_Hytalor",
+  "Modify": {
+    "Appearance": "Tamework_Example",
+    "IsMountable": true,
+    "MountAnchorX": 0,
+    "MountAnchorY": 0.8,
+    "MountAnchorZ": 0.3,
+    "MountMovementConfig": "Mount",
+    "IsHarvestable": true,
+    "ProduceItem": "Ingredient_Poop",
+    "HarvestDropList": "Drop_Sheep_Harvest",
+    "HarvestInteractionContext": "Shear",
+    "HarvestParticles": "Sheep_Wool_Shear",
+    "HarvestSound": "SFX_Sheep_Sheared",
+    "InteractParticleOffset": [
+      0,
+      1.2,
+      -0.7
+    ],
+    "AttitudeGroup": "Prey",
+    "FlockArray": [
+      "Mouflon",
+      "Mouflon_Lamb"
+    ],
+    "LovedItems": [
+      "Plant_Fruit_Apple"
+    ],
+    "DropList": "Drop_Mouflon",
+    "MaxHealth": 81,
+    "ViewRange": 15,
+    "GreetAnimation": "Bleat",
+    "ChanceToTurnFriendly": 30,
+    "ChanceToTurnFriendlyWithAttractiveItem": 50,
+    "WeightGreet": 30,
+    "WeightFollowItem": 20,
+    "WeightFollow": 10,
+    "WeightIgnore": 20,
+    "IsMemory": true,
+    "NameTranslationKey": {
+      "Compute": "NameTranslationKey"
+    }
+  },
+  "Parameters": {
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.Mob_Tamework_Example_Hytalor.name",
+      "Description": "Translation key for NPC name display"
+    }
+  }
+}

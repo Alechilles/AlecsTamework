@@ -1,0 +1,130 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "DefaultState": ".Default",
+  "Parameters": {
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to track the owner/master."
+    },
+    "FollowDefaultSpotRange": {
+      "Value": 5,
+      "Description": "Range used for the initial close-range spot check."
+    },
+    "FollowLockOnRange": {
+      "Value": 15,
+      "Description": "Range used to lock onto the master target."
+    },
+    "FollowSeekSlowDownDistance": {
+      "Value": 5,
+      "Description": "How far from the master to start slowing down when seeking."
+    },
+    "FollowSeekStopDistance": {
+      "Value": 3,
+      "Description": "How far from the master to stop when seeking."
+    },
+    "FollowSeekRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative speed used when seeking the master."
+    },
+    "FollowScanRange": {
+      "Value": 10,
+      "Description": "Range used for scan checks while circling."
+    },
+    "FollowMaintainDistanceRange": {
+      "Value": [
+        1,
+        4
+      ],
+      "Description": "Desired distance range while maintaining distance from the master."
+    },
+    "FollowStrafingDurationRange": {
+      "Value": [
+        1,
+        1
+      ],
+      "Description": "Strafing duration range while circling the master."
+    },
+    "FollowStrafingFrequencyRange": {
+      "Value": [
+        2,
+        2
+      ],
+      "Description": "Strafing frequency range while circling the master."
+    },
+    "FollowMoveThreshold": {
+      "Value": 0.2,
+      "Description": "Movement threshold used during maintain-distance behavior."
+    },
+    "FollowRelativeForwardsSpeed": {
+      "Value": 1,
+      "Description": "Forward speed used during maintain-distance behavior."
+    },
+    "FollowRelativeBackwardsSpeed": {
+      "Value": 1,
+      "Description": "Backward speed used during maintain-distance behavior."
+    },
+    "FollowMaintainTimeoutRange": {
+      "Value": [
+        2,
+        2
+      ],
+      "Description": "Timeout range before returning to the default follow state."
+    },
+    "FollowSpinPreDelayRange": {
+      "Value": [
+        1,
+        1
+      ],
+      "Description": "Delay before playing the idle animation in the spin state."
+    },
+    "FollowSpinAnimation": {
+      "Value": "Idle",
+      "Description": "Animation played during the spin state."
+    },
+    "FollowSpinIdleDurationRange": {
+      "Value": [
+        2.55,
+        2.55
+      ],
+      "Description": "Duration to hold the idle animation in the spin state."
+    }
+  },
+  "Content": {
+    "$Comment": "Default Follow State: Seek the master target using a simple target-based loop.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "Sensor": {
+          "Type": "State",
+          "State": ".Default"
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
+            },
+            "BodyMotion": {
+              "Type": "Seek",
+              "SlowDownDistance": {
+                "Compute": "FollowSeekSlowDownDistance"
+              },
+              "StopDistance": {
+                "Compute": "FollowSeekStopDistance"
+              },
+              "RelativeSpeed": {
+                "Compute": "FollowSeekRelativeSpeed"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

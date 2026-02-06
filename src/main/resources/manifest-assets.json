@@ -1,0 +1,19 @@
+{
+  "Group": "Alechilles",
+  "Name": "Alec's Tamework! (Assets)",
+  "Version": "1.1.0",
+  "Description": "Asset pack for Alec's Tamework!",
+  "Authors": [
+    {
+      "Name": "Alec (Alechilles)",
+      "Email": "",
+      "Url": "https://www.curseforge.com/members/alechilles/projects",
+      "Discord": "alechilles"
+    }
+  ],
+  "Website": "",
+  "ServerVersion": "*",
+  "Dependencies": {},
+  "OptionalDependencies": {},
+  "DisabledByDefault": false
+}
