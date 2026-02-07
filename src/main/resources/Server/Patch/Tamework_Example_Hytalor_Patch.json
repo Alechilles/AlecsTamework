@@ -1,0 +1,1187 @@
+{
+  "_BaseAssetPath": "Server/NPC/Roles/_Core/Templates/Template_Tamework_Example_Hytalor.json",
+  "Parameters": {
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to store the owner/master."
+    },
+    "SpawnerEmptyItemID": {
+      "Value": [
+        "Spawner_Tamework_Example"
+      ],
+      "TypeHint": "String",
+      "Description": "Item IDs that can pick up this NPC (empty spawner)."
+    },
+    "LovedItems": {
+      "Value": [
+        ""
+      ],
+      "TypeHint": "String",
+      "Description": "Food items accepted for feeding/taming."
+    },
+    "InteractSoundHold": {
+      "Value": "SFX_Creative_Play_Selection_Widget",
+      "Description": "Sound to play when switching to Hold."
+    },
+    "InteractSoundFollow": {
+      "Value": "SFX_Creative_Play_Selection_Widget",
+      "Description": "Sound to play when switching to Follow."
+    },
+    "InteractSoundIdle": {
+      "Value": "SFX_Creative_Play_Selection_Widget",
+      "Description": "Sound to play when switching to Idle."
+    },
+    "InteractSoundFeed": {
+      "Value": "SFX_Fen_Stalker_Eat",
+      "Description": "Sound to play when feeding/taming."
+    },
+    "InteractSoundPickUp": {
+      "Value": "SFX_Tamework_Poof",
+      "Description": "Sound to play when picking up."
+    },
+    "InteractParticleOffset": {
+      "Value": [
+        0,
+        0.5,
+        0
+      ]
+    }
+  },
+  "Instructions": [
+    {
+      "_op": "merge",
+      "_findAll": "$[?(@.Instructions && @.Instructions[?(@.Sensor && @.Sensor.Type=='State' && @.Sensor.State=='Idle')])]",
+      "Instructions": [
+        {
+          "_op": "upsert",
+          "_find": {
+            "$Comment": "Tamework: State Follow"
+          },
+          "$Comment": "Tamework: State Follow",
+          "Continue": true,
+          "Sensor": {
+            "Type": "State",
+            "State": "Follow"
+          },
+          "Instructions": [
+            {
+              "Reference": "Component_Tamework_Instruction_Follow_Simple_TP",
+              "Modify": {
+                "MasterTargetSlot": {
+                  "Compute": "MasterTargetSlot"
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "_op": "upsert",
+      "Sensor": {
+        "Type": "State",
+        "State": "Hold"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Hold",
+          "Modify": {
+            "_ExportStates": [
+              "Sleep"
+            ],
+            "DayFlavorAnimation": {
+              "Compute": "DayFlavorAnimation"
+            },
+            "DayTimePeriod": {
+              "Compute": "DayTimePeriod"
+            },
+            "DayTimeNapWeight": {
+              "Compute": "DayTimeNapWeight"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            }
+          }
+        }
+      ],
+      "_find": {
+        "$Comment": "Tamework: State Hold"
+      },
+      "$Comment": "Tamework: State Hold",
+      "Continue": true
+    },
+    {
+      "_op": "merge",
+      "_findAll": "$[?(@.Instructions && @.Instructions[?(@.Sensor && @.Sensor.Type=='State' && @.Sensor.State=='Idle')])]",
+      "Instructions": [
+        {
+          "_op": "merge",
+          "_findAll": "$[?(@.Sensor && @.Sensor.Type=='State' && @.Sensor.State=='Idle')]",
+          "Instructions": [
+            {
+              "_op": "replace",
+              "_findAll": "$[?(@.$Comment == 'Switch to flee state if any flock member engages a target TODO switch to attack if you are very close and can attack? otherwise flee.')]",
+              "$Comment": "Switch to flee state if any flock member engages a target TODO switch to attack if you are very close and can attack? otherwise flee.",
+              "Enabled": {
+                "Compute": "!isEmptyStringArray(FlockArray)"
+              },
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  },
+                  {
+                    "Type": "Beacon",
+                    "Message": "Flock_Attack",
+                    "TargetSlot": "LockedTarget",
+                    "Range": {
+                      "Compute": "HearingRange"
+                    }
+                  }
+                ]
+              },
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Alerted"
+                }
+              ]
+            },
+            {
+              "_op": "replace",
+              "_findAll": "$[?(@.$Comment == 'Check if there are any potential things that can alert the NPC')]",
+              "$Comment": "Check if there are any potential things that can alert the NPC",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  },
+                  {
+                    "Reference": "Component_Sensor_Standard_Detection",
+                    "Modify": {
+                      "ViewRange": {
+                        "Compute": "ViewRange"
+                      },
+                      "ViewSector": {
+                        "Compute": "ViewSector"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "AbsoluteDetectionRange": {
+                        "Compute": "AbsoluteDetectionRange"
+                      },
+                      "Attitudes": [
+                        "Hostile",
+                        "Neutral",
+                        "Friendly"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Alerted"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_op": "merge",
+          "_findAll": "$[?(@.Sensor && @.Sensor.Type=='State' && @.Sensor.State=='ReturnHome')]",
+          "Instructions": [
+            {
+              "_op": "replace",
+              "_findAll": "$[?(@.$Comment == 'Switch to flee state if any flock member engages a target TODO switch to attack if you are very close and can attack? otherwise flee.')]",
+              "$Comment": "Switch to flee state if any flock member engages a target TODO switch to attack if you are very close and can attack? otherwise flee.",
+              "Enabled": {
+                "Compute": "!isEmptyStringArray(FlockArray)"
+              },
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  },
+                  {
+                    "Type": "Beacon",
+                    "Message": "Flock_Attack",
+                    "TargetSlot": "LockedTarget",
+                    "Range": {
+                      "Compute": "HearingRange"
+                    }
+                  }
+                ]
+              },
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Alerted"
+                }
+              ]
+            },
+            {
+              "_op": "replace",
+              "_findAll": "$[?(@.$Comment == 'Check if there are any potential things that can alert the NPC')]",
+              "$Comment": "Check if there are any potential things that can alert the NPC",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  },
+                  {
+                    "Reference": "Component_Sensor_Standard_Detection",
+                    "Modify": {
+                      "ViewRange": {
+                        "Compute": "ViewRange"
+                      },
+                      "ViewSector": {
+                        "Compute": "ViewSector"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "AbsoluteDetectionRange": {
+                        "Compute": "AbsoluteDetectionRange"
+                      },
+                      "Attitudes": [
+                        "Hostile",
+                        "Neutral",
+                        "Friendly"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Alerted"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_op": "merge",
+          "_findAll": "$[?(@.Sensor && @.Sensor.Type=='State' && @.Sensor.State=='Sleep')]",
+          "Instructions": [
+            {
+              "_op": "replace",
+              "_findAll": "$[?(@.$Comment == 'Wake up if an enemy attacks a flock member.')]",
+              "$Comment": "Wake up if an enemy attacks a flock member.",
+              "Enabled": {
+                "Compute": "!isEmptyStringArray(FlockArray)"
+              },
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  },
+                  {
+                    "Type": "Beacon",
+                    "Message": "Flock_Attack",
+                    "TargetSlot": "LockedTarget"
+                  }
+                ]
+              },
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Alerted"
+                }
+              ]
+            },
+            {
+              "_op": "merge",
+              "_findAll": "$[?(@.$Comment == 'Just a little nap.')]",
+              "Instructions": [
+                {
+                  "_op": "upsert",
+                  "_find": {
+                    "$Comment": "Tamework: Wild sleep (tamed nap)"
+                  },
+                  "_index": 1,
+                  "$Comment": "Tamework: Wild sleep (tamed nap)",
+                  "Reference": "Component_Instruction_Wild_Sleep_State",
+                  "Sensor": {
+                    "Type": "TameworkIsTamed"
+                  },
+                  "Modify": {
+                    "_ExportStates": [
+                      "Panic",
+                      "Panic",
+                      "Idle",
+                      "Idle"
+                    ],
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "Attitudes": [
+                      "Hostile",
+                      "Neutral"
+                    ],
+                    "WakeupSensor": "Component_Sensor_Timed_Nap"
+                  }
+                },
+                {
+                  "_op": "replace",
+                  "_findAll": "$[?(@.$Comment == 'Tamework: Wild sleep (tamed nap)')]",
+                  "$Comment": "Tamework: Wild sleep (tamed nap)",
+                  "Reference": "Component_Instruction_Wild_Sleep_State",
+                  "Sensor": {
+                    "Type": "TameworkIsTamed"
+                  },
+                  "Modify": {
+                    "_ExportStates": [
+                      "Panic",
+                      "Panic",
+                      "Idle",
+                      "Idle"
+                    ],
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "Attitudes": [
+                      "Hostile",
+                      "Neutral"
+                    ],
+                    "WakeupSensor": "Component_Sensor_Timed_Nap"
+                  }
+                },
+                {
+                  "_op": "merge",
+                  "_findAll": "$[?(@.Reference=='Component_Instruction_Wild_Sleep_State' && @.Modify && @.Modify.WakeupSensor=='Component_Sensor_Timed_Nap' && !@.$Comment)]",
+                  "Sensor": {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  }
+                }
+              ]
+            },
+            {
+              "_op": "merge",
+              "_findAll": "$[?(@.$Comment == 'Night-time sleep.')]",
+              "Instructions": [
+                {
+                  "_op": "upsert",
+                  "_find": {
+                    "$Comment": "Tamework: Wild sleep (tamed night)"
+                  },
+                  "_index": 0,
+                  "$Comment": "Tamework: Wild sleep (tamed night)",
+                  "Reference": "Component_Instruction_Wild_Sleep_State",
+                  "Sensor": {
+                    "Type": "TameworkIsTamed"
+                  },
+                  "Modify": {
+                    "_ExportStates": [
+                      "Panic",
+                      "Panic",
+                      "Idle",
+                      "Idle"
+                    ],
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "Attitudes": [
+                      "Hostile",
+                      "Neutral"
+                    ],
+                    "DayTimePeriod": {
+                      "Compute": "DayTimePeriod"
+                    }
+                  }
+                },
+                {
+                  "_op": "replace",
+                  "_findAll": "$[?(@.$Comment == 'Tamework: Wild sleep (tamed night)')]",
+                  "$Comment": "Tamework: Wild sleep (tamed night)",
+                  "Reference": "Component_Instruction_Wild_Sleep_State",
+                  "Sensor": {
+                    "Type": "TameworkIsTamed"
+                  },
+                  "Modify": {
+                    "_ExportStates": [
+                      "Panic",
+                      "Panic",
+                      "Idle",
+                      "Idle"
+                    ],
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "Attitudes": [
+                      "Hostile",
+                      "Neutral"
+                    ],
+                    "DayTimePeriod": {
+                      "Compute": "DayTimePeriod"
+                    }
+                  }
+                },
+                {
+                  "_op": "merge",
+                  "_findAll": "$[?(@.Reference=='Component_Instruction_Wild_Sleep_State' && @.Modify && @.Modify.DayTimePeriod && !@.$Comment)]",
+                  "Sensor": {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "_op": "merge",
+          "_findAll": "$[?(@.Sensor && @.Sensor.Type=='State' && @.Sensor.State=='Curious')]",
+          "Instructions": [
+            {
+              "_op": "replace",
+              "_findAll": "$[?(@.$Comment == 'Check if there are any potential threats nearby and flee. TODO: add more tirggers to flee')]",
+              "$Comment": "Check if there are any potential threats nearby and flee. TODO: add more tirggers to flee",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "Not",
+                    "Sensor": {
+                      "Type": "TameworkIsTamed"
+                    }
+                  },
+                  {
+                    "Reference": "Component_Sensor_Standard_Detection",
+                    "Modify": {
+                      "ViewRange": {
+                        "Compute": "ViewRange"
+                      },
+                      "ViewSector": {
+                        "Compute": "ViewSector"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "AbsoluteDetectionRange": {
+                        "Compute": "AbsoluteDetectionRange"
+                      },
+                      "Attitudes": [
+                        "Hostile"
+                      ]
+                    }
+                  }
+                ]
+              },
+              "Actions": [
+                {
+                  "Type": "State",
+                  "State": "Flee.Switch"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "InteractionInstruction": {
+    "Enabled": {
+      "Compute": "true"
+    },
+    "Instructions": [
+      {
+        "_op": "upsert",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any"
+        },
+        "Actions": [
+          {
+            "Type": "SetInteractable",
+            "Interactable": true
+          }
+        ],
+        "_index": 0,
+        "_find": {
+          "$Comment": "Tamework: SetInteractable"
+        },
+        "$Comment": "Tamework: SetInteractable"
+      },
+      {
+        "_op": "upsert",
+        "Sensor": {
+          "Type": "HasInteracted"
+        },
+        "_index": 1,
+        "Instructions": [
+          {
+            "Continue": true,
+            "Sensor": {
+              "Type": "Any"
+            },
+            "Actions": [
+              {
+                "Type": "LockOnInteractionTarget",
+                "TargetSlot": {
+                  "Compute": "MasterTargetSlot"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Mount when crouching (tamed + owner)",
+            "ActionsBlocking": true,
+            "Enabled": {
+              "Compute": "IsMountable"
+            },
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsTamed"
+                },
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "Target",
+                  "Filters": [
+                    {
+                      "Type": "MovementState",
+                      "State": "CROUCHING"
+                    }
+                  ],
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Mount",
+                "AnchorX": {
+                  "Compute": "MountAnchorX"
+                },
+                "AnchorY": {
+                  "Compute": "MountAnchorY"
+                },
+                "AnchorZ": {
+                  "Compute": "MountAnchorZ"
+                },
+                "MovementConfig": {
+                  "Compute": "MountMovementConfig"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Non-owner interaction warning",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkHasOwner"
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkIsOwner"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "Target",
+                    "TargetSlot": {
+                      "Compute": "MasterTargetSlot"
+                    },
+                    "Filters": [
+                      {
+                        "Type": "ItemInHand",
+                        "Items": {
+                          "Compute": "SpawnerEmptyItemID"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkDenyInteract"
+              }
+            ]
+          },
+          {
+            "$Comment": "Wild feed to tame (set owner + tamed).",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkHasOwner"
+                  }
+                },
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "LovedItems"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "RemoveHeldItem",
+                "Count": 1
+              },
+              {
+                "Type": "TameworkSetOwner"
+              },
+              {
+                "Type": "TameworkSetTamed",
+                "Value": true
+              },
+              {
+                "Type": "State",
+                "State": "Follow"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.8,
+                  0
+                ],
+                "ParticleSystem": "Pet_Heal"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFeed"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Capture blocked until tamed.",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkIsTamed"
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkDenyCaptureUntamed",
+                "FoodItemIDs": {
+                  "Compute": "LovedItems"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Owner capture with empty spawner",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "TameworkIsTamed"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkCaptureOwner"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.1,
+                  0
+                ],
+                "ParticleSystem": "Poof_Small"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundPickUp"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Block non-owner capture",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "TameworkHasOwner"
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkIsOwner"
+                  }
+                },
+                {
+                  "Type": "TameworkIsTamed"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkCaptureStranger"
+              }
+            ]
+          },
+          {
+            "$Comment": "Wild capture with empty spawner",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "SpawnerEmptyItemID"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "TameworkHasOwner"
+                  }
+                },
+                {
+                  "Type": "TameworkIsTamed"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkCaptureWild"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  0.1,
+                  0
+                ],
+                "ParticleSystem": "Poof_Small"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundPickUp"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Feed with a valid food item (owner only).",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "TameworkIsTamed"
+                },
+                {
+                  "Type": "Target",
+                  "TargetSlot": {
+                    "Compute": "MasterTargetSlot"
+                  },
+                  "Filters": [
+                    {
+                      "Type": "ItemInHand",
+                      "Items": {
+                        "Compute": "LovedItems"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Inventory",
+                "UseTarget": true,
+                "Operation": "RemoveHeldItem",
+                "Count": 1
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": [
+                  0,
+                  1.2,
+                  -0.6
+                ],
+                "ParticleSystem": "Pet_Heal"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFeed"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "If in Follow, switch to Hold.",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "TameworkIsTamed"
+                },
+                {
+                  "Type": "State",
+                  "State": "Follow"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Hold"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": {
+                  "Compute": "InteractParticleOffset"
+                },
+                "ParticleSystem": "Hold"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundHold"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "If in Hold/Sleep, switch back to default behavior.",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "TameworkIsTamed"
+                },
+                {
+                  "Type": "Or",
+                  "Sensors": [
+                    {
+                      "Type": "State",
+                      "State": "Hold"
+                    },
+                    {
+                      "Type": "State",
+                      "State": "Sleep"
+                    }
+                  ]
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Idle"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": {
+                  "Compute": "InteractParticleOffset"
+                },
+                "ParticleSystem": "Graze"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundIdle"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "If in Idle, switch to Follow.",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "TameworkIsOwner"
+                },
+                {
+                  "Type": "TameworkIsTamed"
+                },
+                {
+                  "Type": "State",
+                  "State": "Idle"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Follow"
+              },
+              {
+                "Type": "SpawnParticles",
+                "Offset": {
+                  "Compute": "InteractParticleOffset"
+                },
+                "ParticleSystem": "Follow"
+              },
+              {
+                "Type": "PlaySound",
+                "SoundEventId": {
+                  "Compute": "InteractSoundFollow"
+                }
+              }
+            ]
+          }
+        ],
+        "_find": {
+          "$Comment": "Tamework: HasInteracted"
+        },
+        "$Comment": "Tamework: HasInteracted"
+      },
+      {
+        "_op": "replace",
+        "_findAll": "$[?(@.Enabled && @.Enabled.Compute=='IsHarvestable')]",
+        "Enabled": {
+          "Compute": "IsHarvestable"
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "$Comment": "Check the negative first so we can exit early and avoid the rest of the logic",
+              "Type": "Not",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "Alarm",
+                    "Name": "Harvest_Ready",
+                    "State": "Unset"
+                  },
+                  {
+                    "Type": "CanInteract",
+                    "Attitudes": {
+                      "Compute": "HarvestRequiredAttitudes"
+                    }
+                  }
+                ]
+              }
+            },
+            "Actions": [
+              {
+                "Type": "SetInteractable",
+                "Interactable": true,
+                "ShowPrompt": false
+              }
+            ]
+          },
+          {
+            "$Comment": "Allow contextual interactions (shearing) but hide F key prompt",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Any"
+            },
+            "Actions": [
+              {
+                "Type": "SetInteractable",
+                "Interactable": true,
+                "ShowPrompt": false
+              }
+            ]
+          },
+          {
+            "$Comment": "Harvest action triggered by left-click with appropriate tool",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Enabled": {
+                    "Compute": "!isEmpty(HarvestInteractionContext)"
+                  },
+                  "Type": "InteractionContext",
+                  "Context": {
+                    "Compute": "HarvestInteractionContext"
+                  }
+                },
+                {
+                  "Type": "Alarm",
+                  "Name": "Harvest_Ready",
+                  "State": "Unset"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "$Harvest"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "_op": "replace",
+        "_findAll": "$[?(@.Enabled && @.Enabled.Compute=='IsMountable')]",
+        "Enabled": {
+          "Compute": "false"
+        },
+        "Instructions": []
+      }
+    ]
+  },
+  "StateTransitions": [
+    {
+      "$Comment": "Allow tamework follow/hold state changes.",
+      "_op": "add",
+      "States": [
+        {
+          "From": [],
+          "To": [
+            "Follow",
+            "Hold"
+          ]
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "PlayAnimation",
+          "Slot": "Status"
+        }
+      ]
+    },
+    {
+      "$Comment": "Clear status animation when returning from follow/hold.",
+      "_op": "add",
+      "States": [
+        {
+          "From": [
+            "Follow",
+            "Hold"
+          ],
+          "To": [
+            "Idle"
+          ]
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "PlayAnimation",
+          "Slot": "Status"
+        }
+      ]
+    }
+  ]
+}

@@ -2,6 +2,13 @@
 
 All notable changes to **Alec's Tamework!** will be documented in this file.
 
+## 1.1.1 - Hytalor Example + Follow Component Split - 2026-02-06
+### Added
+- Hytalor patch example assets (Template/Mob + patch) showing non-destructive Tamework integration.
+- New follow components split: `Follow_Simple_TP` (teleport/seek), `Follow_Simple` (basic follow), and `Follow_Advanced` (old IdleFollow behavior).
+- `/tw gettamed` and `/tw settamed` commands to read/flip tamed state.
+- Mount gating for tamed/owner state with crouch-based interaction (Hytalor example).
+
 ## 1.1.0 - Core Systems Update - 2026-02-03
 ### Added
 - Owner + Tamed components for NPCs, plus new actions/sensors (set owner, set tamed, owner/stranger/wild capture routing).

@@ -1,4 +1,5 @@
 {
+  "$Comment": "Complex player following functionality",
   "Type": "Component",
   "Class": "Instruction",
   "DefaultState": ".Default",
@@ -106,7 +107,9 @@
           {
             "Sensor": {
               "Type": "Player",
-              "Range": { "Compute": "FollowDefaultSpotRange" },
+              "Range": {
+                "Compute": "FollowDefaultSpotRange"
+              },
               "Filters": [
                 {
                   "Type": "SpotsMe",
@@ -125,21 +128,33 @@
           {
             "Sensor": {
               "Type": "Player",
-              "Range": { "Compute": "FollowLockOnRange" },
+              "Range": {
+                "Compute": "FollowLockOnRange"
+              },
               "LockOnTarget": true,
-              "LockedTargetSlot": { "Compute": "MasterTargetSlot" }
+              "LockedTargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
             },
             "BodyMotion": {
               "Type": "Seek",
-              "SlowDownDistance": { "Compute": "FollowSeekSlowDownDistance" },
-              "StopDistance": { "Compute": "FollowSeekStopDistance" },
-              "RelativeSpeed": { "Compute": "FollowSeekRelativeSpeed" }
+              "SlowDownDistance": {
+                "Compute": "FollowSeekSlowDownDistance"
+              },
+              "StopDistance": {
+                "Compute": "FollowSeekStopDistance"
+              },
+              "RelativeSpeed": {
+                "Compute": "FollowSeekRelativeSpeed"
+              }
             }
           },
           {
             "Sensor": {
               "Type": "Target",
-              "TargetSlot": { "Compute": "MasterTargetSlot" }
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
             },
             "BodyMotion": {
               "Type": "Teleport"
@@ -156,7 +171,9 @@
           {
             "Sensor": {
               "Type": "Player",
-              "Range": { "Compute": "FollowScanRange" },
+              "Range": {
+                "Compute": "FollowScanRange"
+              },
               "Filters": [
                 {
                   "Type": "SpotsMe",
@@ -175,22 +192,38 @@
           {
             "Sensor": {
               "Type": "Target",
-              "TargetSlot": { "Compute": "MasterTargetSlot" }
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
             },
             "BodyMotion": {
               "Type": "MaintainDistance",
-              "DesiredDistanceRange": { "Compute": "FollowMaintainDistanceRange" },
-              "StrafingDurationRange": { "Compute": "FollowStrafingDurationRange" },
-              "StrafingFrequencyRange": { "Compute": "FollowStrafingFrequencyRange" },
-              "MoveThreshold": { "Compute": "FollowMoveThreshold" },
-              "RelativeForwardsSpeed": { "Compute": "FollowRelativeForwardsSpeed" },
-              "RelativeBackwardsSpeed": { "Compute": "FollowRelativeBackwardsSpeed" }
+              "DesiredDistanceRange": {
+                "Compute": "FollowMaintainDistanceRange"
+              },
+              "StrafingDurationRange": {
+                "Compute": "FollowStrafingDurationRange"
+              },
+              "StrafingFrequencyRange": {
+                "Compute": "FollowStrafingFrequencyRange"
+              },
+              "MoveThreshold": {
+                "Compute": "FollowMoveThreshold"
+              },
+              "RelativeForwardsSpeed": {
+                "Compute": "FollowRelativeForwardsSpeed"
+              },
+              "RelativeBackwardsSpeed": {
+                "Compute": "FollowRelativeBackwardsSpeed"
+              }
             },
             "ActionsBlocking": true,
             "Actions": [
               {
                 "Type": "Timeout",
-                "Delay": { "Compute": "FollowMaintainTimeoutRange" }
+                "Delay": {
+                  "Compute": "FollowMaintainTimeoutRange"
+                }
               },
               {
                 "Type": "State",
@@ -209,7 +242,9 @@
           {
             "Sensor": {
               "Type": "Player",
-              "Range": { "Compute": "FollowScanRange" },
+              "Range": {
+                "Compute": "FollowScanRange"
+              },
               "Filters": [
                 {
                   "Type": "Not",
@@ -231,22 +266,38 @@
           {
             "Sensor": {
               "Type": "Target",
-              "TargetSlot": { "Compute": "MasterTargetSlot" }
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
             },
             "BodyMotion": {
               "Type": "MaintainDistance",
-              "DesiredDistanceRange": { "Compute": "FollowMaintainDistanceRange" },
-              "StrafingDurationRange": { "Compute": "FollowStrafingDurationRange" },
-              "StrafingFrequencyRange": { "Compute": "FollowStrafingFrequencyRange" },
-              "MoveThreshold": { "Compute": "FollowMoveThreshold" },
-              "RelativeForwardsSpeed": { "Compute": "FollowRelativeForwardsSpeed" },
-              "RelativeBackwardsSpeed": { "Compute": "FollowRelativeBackwardsSpeed" }
+              "DesiredDistanceRange": {
+                "Compute": "FollowMaintainDistanceRange"
+              },
+              "StrafingDurationRange": {
+                "Compute": "FollowStrafingDurationRange"
+              },
+              "StrafingFrequencyRange": {
+                "Compute": "FollowStrafingFrequencyRange"
+              },
+              "MoveThreshold": {
+                "Compute": "FollowMoveThreshold"
+              },
+              "RelativeForwardsSpeed": {
+                "Compute": "FollowRelativeForwardsSpeed"
+              },
+              "RelativeBackwardsSpeed": {
+                "Compute": "FollowRelativeBackwardsSpeed"
+              }
             },
             "ActionsBlocking": true,
             "Actions": [
               {
                 "Type": "Timeout",
-                "Delay": { "Compute": "FollowMaintainTimeoutRange" }
+                "Delay": {
+                  "Compute": "FollowMaintainTimeoutRange"
+                }
               },
               {
                 "Type": "State",
@@ -265,7 +316,9 @@
           {
             "Sensor": {
               "Type": "Player",
-              "Range": { "Compute": "FollowScanRange" },
+              "Range": {
+                "Compute": "FollowScanRange"
+              },
               "Filters": [
                 {
                   "Type": "SpotsMe",
@@ -284,22 +337,38 @@
           {
             "Sensor": {
               "Type": "Target",
-              "TargetSlot": { "Compute": "MasterTargetSlot" }
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
             },
             "BodyMotion": {
               "Type": "MaintainDistance",
-              "DesiredDistanceRange": { "Compute": "FollowMaintainDistanceRange" },
-              "StrafingDurationRange": { "Compute": "FollowStrafingDurationRange" },
-              "StrafingFrequencyRange": { "Compute": "FollowStrafingFrequencyRange" },
-              "MoveThreshold": { "Compute": "FollowMoveThreshold" },
-              "RelativeForwardsSpeed": { "Compute": "FollowRelativeForwardsSpeed" },
-              "RelativeBackwardsSpeed": { "Compute": "FollowRelativeBackwardsSpeed" }
+              "DesiredDistanceRange": {
+                "Compute": "FollowMaintainDistanceRange"
+              },
+              "StrafingDurationRange": {
+                "Compute": "FollowStrafingDurationRange"
+              },
+              "StrafingFrequencyRange": {
+                "Compute": "FollowStrafingFrequencyRange"
+              },
+              "MoveThreshold": {
+                "Compute": "FollowMoveThreshold"
+              },
+              "RelativeForwardsSpeed": {
+                "Compute": "FollowRelativeForwardsSpeed"
+              },
+              "RelativeBackwardsSpeed": {
+                "Compute": "FollowRelativeBackwardsSpeed"
+              }
             },
             "ActionsBlocking": true,
             "Actions": [
               {
                 "Type": "Timeout",
-                "Delay": { "Compute": "FollowMaintainTimeoutRange" }
+                "Delay": {
+                  "Compute": "FollowMaintainTimeoutRange"
+                }
               },
               {
                 "Type": "State",
@@ -318,7 +387,9 @@
           {
             "Sensor": {
               "Type": "Player",
-              "Range": { "Compute": "FollowScanRange" },
+              "Range": {
+                "Compute": "FollowScanRange"
+              },
               "Filters": [
                 {
                   "Type": "SpotsMe",
@@ -337,22 +408,38 @@
           {
             "Sensor": {
               "Type": "Target",
-              "TargetSlot": { "Compute": "MasterTargetSlot" }
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
             },
             "BodyMotion": {
               "Type": "MaintainDistance",
-              "DesiredDistanceRange": { "Compute": "FollowMaintainDistanceRange" },
-              "StrafingDurationRange": { "Compute": "FollowStrafingDurationRange" },
-              "StrafingFrequencyRange": { "Compute": "FollowStrafingFrequencyRange" },
-              "MoveThreshold": { "Compute": "FollowMoveThreshold" },
-              "RelativeForwardsSpeed": { "Compute": "FollowRelativeForwardsSpeed" },
-              "RelativeBackwardsSpeed": { "Compute": "FollowRelativeBackwardsSpeed" }
+              "DesiredDistanceRange": {
+                "Compute": "FollowMaintainDistanceRange"
+              },
+              "StrafingDurationRange": {
+                "Compute": "FollowStrafingDurationRange"
+              },
+              "StrafingFrequencyRange": {
+                "Compute": "FollowStrafingFrequencyRange"
+              },
+              "MoveThreshold": {
+                "Compute": "FollowMoveThreshold"
+              },
+              "RelativeForwardsSpeed": {
+                "Compute": "FollowRelativeForwardsSpeed"
+              },
+              "RelativeBackwardsSpeed": {
+                "Compute": "FollowRelativeBackwardsSpeed"
+              }
             },
             "ActionsBlocking": true,
             "Actions": [
               {
                 "Type": "Timeout",
-                "Delay": { "Compute": "FollowMaintainTimeoutRange" }
+                "Delay": {
+                  "Compute": "FollowMaintainTimeoutRange"
+                }
               },
               {
                 "Type": "State",
@@ -373,16 +460,22 @@
             "Actions": [
               {
                 "Type": "Timeout",
-                "Delay": { "Compute": "FollowSpinPreDelayRange" }
+                "Delay": {
+                  "Compute": "FollowSpinPreDelayRange"
+                }
               },
               {
                 "Type": "PlayAnimation",
                 "Slot": "Status",
-                "Animation": { "Compute": "FollowSpinAnimation" }
+                "Animation": {
+                  "Compute": "FollowSpinAnimation"
+                }
               },
               {
                 "Type": "Timeout",
-                "Delay": { "Compute": "FollowSpinIdleDurationRange" }
+                "Delay": {
+                  "Compute": "FollowSpinIdleDurationRange"
+                }
               },
               {
                 "Type": "PlayAnimation",

@@ -6,11 +6,19 @@
         <format>zip</format>
     </formats>
     <includeBaseDirectory>false</includeBaseDirectory>
+    <files>
+        <file>
+            <source>${project.build.outputDirectory}/manifest-assets.json</source>
+            <outputDirectory>/</outputDirectory>
+            <destName>manifest.json</destName>
+        </file>
+    </files>
     <fileSets>
         <fileSet>
             <directory>src/main/resources</directory>
             <outputDirectory>/</outputDirectory>
             <excludes>
+                <exclude>manifest-assets.json</exclude>
                 <exclude>config/**</exclude>
             </excludes>
         </fileSet>
