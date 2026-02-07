@@ -8,7 +8,7 @@
     <includeBaseDirectory>false</includeBaseDirectory>
     <files>
         <file>
-            <source>src/main/resources/manifest-assets.json</source>
+            <source>${project.build.outputDirectory}/manifest-assets.json</source>
             <outputDirectory>/</outputDirectory>
             <destName>manifest.json</destName>
         </file>

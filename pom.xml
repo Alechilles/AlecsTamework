@@ -36,9 +36,19 @@
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>manifest.json</include>
+                    <include>manifest-assets.json</include>
+                </includes>
+            </resource>
+            <resource>
+                <directory>src/main/resources</directory>
                 <excludes>
                     <exclude>Common/**</exclude>
                     <exclude>Server/**</exclude>
+                    <exclude>manifest.json</exclude>
+                    <exclude>manifest-assets.json</exclude>
                 </excludes>
             </resource>
         </resources>

@@ -1,7 +1,7 @@
 {
   "Group": "Alechilles",
   "Name": "Alec's Tamework! (Assets)",
-  "Version": "1.1.1",
+  "Version": "${project.version}",
   "Description": "Asset pack for Alec's Tamework!",
   "Authors": [
     {
