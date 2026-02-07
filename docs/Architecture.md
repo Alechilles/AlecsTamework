@@ -19,6 +19,9 @@ This document is a high‑level map of how **Alec’s Tamework!** is organized a
   - Item feature configs are discovered from other mods’ `Server/Tamework` folders and can be overridden per‑world.
   - Local save overrides are intended to be additive, not replacements.
 
+- **Patch examples (Hytalor)**
+  - Non-destructive JSON patching for adding Tamework behaviors without rewriting base assets.
+
 - **Spawner integration**
   - Capture/spawn flows attach metadata to items, preserve attachments, and enforce owner/tamed rules.
 
@@ -31,6 +34,7 @@ This document is a high‑level map of how **Alec’s Tamework!** is organized a
 - Components: `src/main/java/.../npc/components`
 - Item/config handling: `src/main/java/.../config`
 - Example assets: `src/main/resources/Server/...`
+- Hytalor patch: `src/main/resources/Server/Patch/Tamework_Example_Hytalor_Patch.json`
 
 ## Versioned docs
 Public end‑user docs live in the separate wiki repo. Internal docs live here under `/docs`.

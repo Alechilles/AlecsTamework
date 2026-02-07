@@ -19,3 +19,8 @@
 - Spawn both tamework example mobs to validate actions/sensors.
 - Confirm capture + spawn preserves attachments.
 - Validate owner/tamed gating with `/tw getowner` and denial messages.
+
+## Hytalor patches
+- Hytalor writes patched output to `.../Server/mods/HytalorOverrides/`.
+- If a change seems ignored, compare the override file to your patch source to verify the patch applied.
+

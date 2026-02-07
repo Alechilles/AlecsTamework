@@ -18,6 +18,7 @@ This file is a quick map of the custom behavior surface area.
   - is tamed
 
 ## Components
+
 - **Owner component**
   - stores owner UUID and name
 - **Tamed component**
@@ -26,3 +27,9 @@ This file is a quick map of the custom behavior surface area.
 ## Notes
 - Components persist across reloads.
 - Avoid custom logic in templates when a Tamework action exists.
+
+## Commands
+- `/tw getowner` prints the owner name + UUID (when available).
+- `/tw gettamed` prints the current tamed status for the targeted NPC.
+- `/tw settamed` toggles the tamed flag on the targeted NPC.
+

@@ -31,3 +31,12 @@ During dev runs, the server references `src/main/resources` directly for faster 
 ## Output location
 - `target/` for build outputs
 - Server deploy path configured by the Maven run task
+
+## Manifest versioning
+Both the plugin manifest and the assets pack manifest are versioned from Maven:
+- `src/main/resources/manifest.json` and `manifest-assets.json` use `${project.version}`.
+- Maven resource filtering stamps the version during build.
+- The assets zip pulls the filtered manifest from `target/classes`.
+
+If you see a mismatched manifest version, re-run `clean package` to refresh the filtered resources and the assets zip.
+
