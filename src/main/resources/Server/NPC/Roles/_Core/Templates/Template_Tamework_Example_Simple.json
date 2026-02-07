@@ -222,7 +222,7 @@
       },
       "Instructions": [
         {
-          "Reference": "Component_Tamework_Instruction_IdleFollow",
+          "Reference": "Component_Tamework_Instruction_Follow_Advanced",
           "Modify": {
             "MasterTargetSlot": {
               "Compute": "MasterTargetSlot"
