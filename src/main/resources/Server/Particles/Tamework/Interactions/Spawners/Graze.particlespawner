@@ -46,7 +46,7 @@
     }
   ],
   "Particle": {
-    "Texture": "Particles/Tamework/Defend.png",
+    "Texture": "Particles/Tamework/Graze.png",
     "FrameSize": {
       "Width": 64,
       "Height": 64
@@ -66,7 +66,7 @@
             "Max": 1
           }
         },
-        "Color": "#4287f5",
+        "Color": "#207c19",
         "Rotation": {
           "Z": {
             "Min": 0,
@@ -90,7 +90,7 @@
             "Max": 1
           }
         },
-        "Color": "#4287f5"
+        "Color": "#207c19"
       }
     },
     "InitialAnimationFrame": {
@@ -107,7 +107,7 @@
         }
       },
       "Opacity": 1,
-      "Color": "#4287f5",
+      "Color": "#207c19",
       "FrameIndex": {
         "Min": 0,
         "Max": 0

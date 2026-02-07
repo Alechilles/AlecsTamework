@@ -1,0 +1,80 @@
+{
+  "$Comment": "Barebones player following functionality with teleporting when out of range",
+  "Type": "Component",
+  "Class": "Instruction",
+  "DefaultState": ".Default",
+  "Parameters": {
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to track the owner/master."
+    },
+    "FollowLockOnRange": {
+      "Value": 30,
+      "Description": "Range used to lock onto the master target."
+    },
+    "FollowSeekSlowDownDistance": {
+      "Value": 5,
+      "Description": "How far from the master to start slowing down when seeking."
+    },
+    "FollowSeekStopDistance": {
+      "Value": 3,
+      "Description": "How far from the master to stop when seeking."
+    },
+    "FollowSeekRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative speed used when seeking the master."
+    }
+  },
+  "Content": {
+    "$Comment": "Simple Follow State: Seek the master and teleport if too far away.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "Sensor": {
+          "Type": "State",
+          "State": ".Default"
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "Player",
+              "Range": {
+                "Compute": "FollowLockOnRange"
+              },
+              "LockOnTarget": true,
+              "LockedTargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
+            },
+            "BodyMotion": {
+              "Type": "Seek",
+              "SlowDownDistance": {
+                "Compute": "FollowSeekSlowDownDistance"
+              },
+              "StopDistance": {
+                "Compute": "FollowSeekStopDistance"
+              },
+              "RelativeSpeed": {
+                "Compute": "FollowSeekRelativeSpeed"
+              }
+            }
+          },
+          {
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": {
+                "Compute": "MasterTargetSlot"
+              }
+            },
+            "BodyMotion": {
+              "Type": "Teleport"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

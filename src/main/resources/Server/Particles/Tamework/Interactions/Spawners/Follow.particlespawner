@@ -66,7 +66,7 @@
             "Max": 1
           }
         },
-        "Color": "#939492",
+        "Color": "#361f09",
         "Rotation": {
           "Z": {
             "Min": 0,
@@ -90,7 +90,7 @@
             "Max": 1
           }
         },
-        "Color": "#2cad23"
+        "Color": "#361f09"
       }
     },
     "InitialAnimationFrame": {
@@ -107,7 +107,7 @@
         }
       },
       "Opacity": 1,
-      "Color": "#2cad23",
+      "Color": "#361f09",
       "FrameIndex": {
         "Min": 0,
         "Max": 0

@@ -1,7 +1,7 @@
 {
     "Group": "Alechilles",
     "Name": "Alec's Tamework!",
-    "Version": "1.1.0",
+    "Version": "${project.version}",
     "Description": "A modular taming framework for Hytale!",
     "Authors": [
         {
