@@ -6,7 +6,7 @@
 
     <groupId>com.alechilles</groupId>
     <artifactId>alecstamework</artifactId>
-    <version>1.1.0</version>
+    <version>1.1.1</version>
     <packaging>jar</packaging>
 
     <name>.Alec's Tamework!</name>
@@ -103,7 +103,7 @@
                     </execution>
                 </executions>
             </plugin>
-</plugins>
+        </plugins>
     </build>
 
     <profiles>
@@ -130,7 +130,7 @@
                                             <directory>${project.build.directory}</directory>
                                             <includes>
                                                 <include>${project.build.finalName}.jar</include>
-                                                                                            <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
+                                                <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
                                             </includes>
                                         </resource>
                                     </resources>
@@ -193,7 +193,7 @@
                                             <directory>${project.build.directory}</directory>
                                             <includes>
                                                 <include>${project.build.finalName}.jar</include>
-                                                                                            <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
+                                                <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
                                             </includes>
                                         </resource>
                                     </resources>
