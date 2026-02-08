@@ -143,6 +143,7 @@ public class Tamework extends JavaPlugin {
             getCommandRegistry().registerCommand(new TameworkCommandRoot());
         }
 
+        // Global listener to handle spawner capture/spawn interactions.
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
@@ -182,6 +183,27 @@ public class Tamework extends JavaPlugin {
 
     public TranslationRegistry getTranslationRegistry() {
         return translationRegistry;
+    }
+
+    public int reloadItemFeatureConfigs() {
+        if (itemFeatureRegistry == null) {
+            return 0;
+        }
+        itemFeatureRegistry.clear();
+        itemFeatureRegistry.registerDefaults();
+        ItemFeatureConfigLoader loader = new ItemFeatureConfigLoader();
+        int loaded = 0;
+        loaded += loader.loadFromResource(
+                ITEM_FEATURE_CONFIG_PATH,
+                itemFeatureRegistry,
+                getLogger()
+        );
+        loaded += ModItemFeatureConfigDiscovery.loadAll(loader, itemFeatureRegistry, getLogger(), getDataDirectory());
+        getLogger().at(Level.INFO).log(
+                "Reloaded Tamework item feature configs: " + loaded
+                        + " (total: " + itemFeatureRegistry.snapshot().size() + ")"
+        );
+        return loaded;
     }
 
     // Load settings with optional server override, then persist defaults if missing.

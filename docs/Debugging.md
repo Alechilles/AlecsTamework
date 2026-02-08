@@ -19,6 +19,7 @@
 - Spawn both tamework example mobs to validate actions/sensors.
 - Confirm capture + spawn preserves attachments.
 - Validate owner/tamed gating with `/tw getowner` and denial messages.
+- After editing `Tamework_Items_Config.json`, run `/tw reloadconfig` to reload item configs.
 
 ## Hytalor patches
 - Hytalor writes patched output to `.../Server/mods/HytalorOverrides/`.

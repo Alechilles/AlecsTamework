@@ -32,4 +32,5 @@ This file is a quick map of the custom behavior surface area.
 - `/tw getowner` prints the owner name + UUID (when available).
 - `/tw gettamed` prints the current tamed status for the targeted NPC.
 - `/tw settamed` toggles the tamed flag on the targeted NPC.
+- `/tw reloadconfig` reloads Tamework item feature configs from disk.
 

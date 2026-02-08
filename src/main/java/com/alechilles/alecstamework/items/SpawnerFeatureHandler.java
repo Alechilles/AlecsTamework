@@ -32,6 +32,10 @@ import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
+import com.hypixel.hytale.server.core.universe.world.SoundUtil;
+import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
+import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -81,14 +85,17 @@ public final class SpawnerFeatureHandler {
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
-    public void handle(PlayerInteractEvent event, ItemFeatureConfig config) {
-        if (!config.isSpawnerEnabled()) {
-            return;
+    public boolean handle(PlayerInteractEvent event, ItemFeatureConfig config) {
+        if (event == null) {
+            return false;
+        }
+        if (config == null || !config.isSpawnerEnabled()) {
+            return false;
         }
 
         ItemStack itemStack = event.getItemInHand();
         if (itemStack == null || itemStack.isEmpty()) {
-            return;
+            return false;
         }
 
         InteractionType action = event.getActionType();
@@ -97,16 +104,15 @@ public final class SpawnerFeatureHandler {
                     "Spawner stub: ignoring action=" + action
                             + " item=" + itemStack.getItemId()
             );
-            return;
+            return false;
         }
 
         Entity targetEntity = event.getTargetEntity();
         if (targetEntity != null) {
-            captureStub(event.getPlayer(), itemStack, targetEntity, config);
-            return;
+            return captureStub(event.getPlayer(), itemStack, targetEntity, config);
         }
 
-        spawnFromItem(event.getPlayer(), itemStack, config, null, null);
+        return spawnFromItem(event.getPlayer(), itemStack, config, null, null);
     }
 
     // Entry point for packet-driven interactions; validates slot/item then forwards to capture/spawn.
@@ -174,24 +180,133 @@ public final class SpawnerFeatureHandler {
 
         spawnFromItem(player, itemStack, activeConfig, activeHotbarSlot, null);
     }
+
+    // Used by TameworkSpawnInteraction: capture from a targeted NPC using the held spawner item.
+    public boolean captureFromItemInteraction(Player player, ItemStack itemStack, Ref<EntityStore> targetRef) {
+        if (player == null || itemStack == null || itemStack.isEmpty() || targetRef == null) {
+            return false;
+        }
+        ItemFeatureConfig config = resolveConfigForItem(itemStack);
+        if (config == null || !config.isSpawnerEnabled()) {
+            return false;
+        }
+        if (isAlreadyCaptured(itemStack)) {
+            logger.at(Level.FINE).log(
+                    "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
+            );
+            return false;
+        }
+        return captureFromNpcAction(player, targetRef, itemStack, config);
+    }
+
     // Used by TameworkSpawnInteraction: builds a minimal config to spawn from the held item.
     public boolean spawnFromItemInteraction(Player player,
                                             ItemStack itemStack,
-                                            String roleId,
-                                            String emptyItemId,
-                                            boolean spawnAssignsOwner,
-                                            boolean allowUncaptured) {
+                                            String roleIdOverride,
+                                            String emptyItemIdOverride,
+                                            Boolean spawnAssignsOwnerOverride,
+                                            Boolean allowUncapturedOverride) {
+        ItemFeatureConfig baseConfig = resolveConfigForItem(itemStack);
+        String resolvedRoleId = resolveRoleId(roleIdOverride, itemStack, baseConfig);
+        if (resolvedRoleId == null || resolvedRoleId.isBlank()) {
+            String itemId = itemStack != null ? itemStack.getItemId() : "<null>";
+            logger.at(Level.WARNING).log(
+                    "Spawner stub: missing SpawnerRoleId for item=" + itemId
+            );
+            return false;
+        }
+        boolean spawnAssignsOwner = spawnAssignsOwnerOverride != null
+                ? spawnAssignsOwnerOverride
+                : baseConfig != null && baseConfig.isSpawnAssignsOwner();
+        boolean allowUncaptured = allowUncapturedOverride != null
+                ? allowUncapturedOverride
+                : baseConfig != null && baseConfig.isSpawnerAllowUncaptured();
+
+        String spawnerParticleSystem = baseConfig != null ? baseConfig.getSpawnerParticleSystem() : null;
+        String spawnerSoundEvent = baseConfig != null ? baseConfig.getSpawnerSoundEvent() : null;
+
         ItemFeatureConfig config = ItemFeatureConfig.builder()
                 .spawnerEnabled(true)
-                .spawnerRoleId(roleId)
+                .spawnerRoleId(resolvedRoleId)
                 .spawnAssignsOwner(spawnAssignsOwner)
                 .spawnerAllowUncaptured(allowUncaptured)
+                .spawnerParticleSystem(spawnerParticleSystem)
+                .spawnerSoundEvent(spawnerSoundEvent)
                 .build();
-        return spawnFromItem(player, itemStack, config, null, emptyItemId);
+        return spawnFromItem(player, itemStack, config, null, emptyItemIdOverride);
+    }
+
+    private ItemFeatureConfig resolveConfigForItem(ItemStack itemStack) {
+        if (registry == null || itemStack == null) {
+            return null;
+        }
+        String itemId = itemStack.getItemId();
+        if (itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        ItemFeatureConfig config = registry.get(itemId);
+        if (config != null) {
+            return config;
+        }
+        String emptyItemId = resolveEmptyItemId(itemId);
+        if (emptyItemId != null && !emptyItemId.isBlank()) {
+            return registry.get(emptyItemId);
+        }
+        return null;
+    }
+
+    private String resolveRoleId(String roleIdOverride, ItemStack itemStack, ItemFeatureConfig baseConfig) {
+        if (roleIdOverride != null && !roleIdOverride.isBlank()) {
+            return roleIdOverride;
+        }
+        CapturedNPCMetadata meta = resolveCapturedMetadata(itemStack);
+        if (meta != null) {
+            int roleIndex = meta.getRoleIndex();
+            if (roleIndex >= 0) {
+                String roleName = NPCPlugin.get().getName(roleIndex);
+                if (roleName != null && !roleName.isBlank()) {
+                    return roleName;
+                }
+            }
+            String npcNameKey = meta.getNpcNameKey();
+            if (npcNameKey != null && !npcNameKey.isBlank()) {
+                return npcNameKey;
+            }
+        }
+        if (baseConfig != null) {
+            String roleId = baseConfig.getSpawnerRoleId();
+            if (roleId != null && !roleId.isBlank()) {
+                return roleId;
+            }
+        }
+        return null;
+    }
+
+    private CapturedNPCMetadata resolveCapturedMetadata(ItemStack itemStack) {
+        if (itemStack == null) {
+            return null;
+        }
+        try {
+            return itemStack.getFromMetadataOrNull(CapturedNPCMetadata.KEYED_CODEC);
+        } catch (Exception ex) {
+            logger.at(Level.FINE).withCause(ex).log(
+                    "Spawner stub: failed to read captured NPC metadata from item."
+            );
+            return null;
+        }
     }
     // Called by NPC action chains to capture an NPC into the held spawner item.
     public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
         if (player == null || targetRef == null || itemStack == null || config == null) {
+            return false;
+        }
+        if (isAlreadyCaptured(itemStack)) {
+            logger.at(Level.FINE).log(
+                    "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
+            );
+            return false;
+        }
+        if (!canCapture(player, targetRef, config)) {
             return false;
         }
         CaptureInfo captureInfo = buildCaptureInfo(player, targetRef);
@@ -207,7 +322,7 @@ public final class SpawnerFeatureHandler {
                         + " modelAssetId=" + resolveModelAssetId(player, targetRef)
                         + " attachmentsPresent=" + (attachmentsJson != null && !attachmentsJson.isBlank())
         );
-        String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId());
+        String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId(), captureInfo.npcNameKey);
 
         UUID targetUuid = resolveEntityUuid(player, targetRef);
         UUID existingOwner = resolveOwnerFromComponent(targetRef, player.getWorld());
@@ -240,6 +355,7 @@ public final class SpawnerFeatureHandler {
             logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
             return false;
         }
+        spawnCaptureParticles(player.getWorld(), targetRef, config);
         clearOwnerIfConfigured(player, config, targetRef);
         despawnNpc(player, targetRef, null);
 
@@ -307,13 +423,44 @@ public final class SpawnerFeatureHandler {
         }
         return WorldUtil.isEmptyOnlyBlock(blockType, blockId);
     }
-
-    private void captureStub(Player player,
+    private void spawnCaptureParticles(World world, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
+        if (world == null || targetRef == null || !targetRef.isValid() || config == null) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
+        if (transform == null) {
+            return;
+        }
+        Vector3d position = new Vector3d(transform.getPosition());
+        position.add(0.0, 0.2, 0.0);
+        String particleSystem = config.getSpawnerParticleSystem();
+        if (particleSystem != null && !particleSystem.isBlank()) {
+            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+        }
+        String soundEventId = config.getSpawnerSoundEvent();
+        if (soundEventId != null && !soundEventId.isBlank()) {
+            int soundIndex = SoundEvent.getAssetMap().getIndex(soundEventId);
+            if (soundIndex >= 0) {
+                SoundUtil.playSoundEvent3d(soundIndex, SoundCategory.SFX, position, store);
+            }
+        }
+    }
+    private boolean captureStub(Player player,
                              ItemStack itemStack,
                              Entity targetEntity,
                              ItemFeatureConfig config) {
         // Build capture metadata and apply it to the held spawner item.
+        if (isAlreadyCaptured(itemStack)) {
+            logger.at(Level.FINE).log(
+                    "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
+            );
+            return false;
+        }
         Ref<EntityStore> targetRef = targetEntity != null ? targetEntity.getReference() : null;
+        if (targetRef == null || !canCapture(player, targetRef, config)) {
+            return false;
+        }
         CaptureInfo captureInfo = buildCaptureInfo(player, targetRef);
         String attachmentsJson = captureInfo.attachmentsJson;
         if (attachmentsJson != null && !attachmentsJson.isBlank()) {
@@ -327,7 +474,7 @@ public final class SpawnerFeatureHandler {
                         + " modelAssetId=" + resolveModelAssetId(player, targetRef)
                         + " attachmentsPresent=" + (attachmentsJson != null && !attachmentsJson.isBlank())
         );
-        String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId());
+        String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId(), captureInfo.npcNameKey);
 
         UUID targetUuid = targetEntity.getUuid();
         UUID existingOwner = resolveOwnerFromComponent(targetRef, player.getWorld());
@@ -336,7 +483,7 @@ public final class SpawnerFeatureHandler {
                     "Spawner stub: capture denied (not owner) item=" + itemStack.getItemId()
                             + " targetUuid=" + targetUuid
             );
-            return;
+            return false;
         }
         UUID ownerToStore = null;
         if (!config.isCaptureClearsOwner()) {
@@ -358,8 +505,9 @@ public final class SpawnerFeatureHandler {
 
         if (!updateHeldItem(player, updated)) {
             logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
-            return;
+            return false;
         }
+        spawnCaptureParticles(player.getWorld(), targetRef, config);
         clearOwnerIfConfigured(player, config, targetRef);
         despawnNpc(player, targetRef, targetEntity);
 
@@ -368,17 +516,27 @@ public final class SpawnerFeatureHandler {
                         + " targetUuid=" + targetEntity.getUuid()
                         + " captureClearsOwner=" + config.isCaptureClearsOwner()
         );
+        return true;
     }
 
 
     
-    private void captureStub(Player player,
+    private boolean captureStub(Player player,
                              ItemStack itemStack,
                              int targetEntityId,
                              ItemFeatureConfig config,
                              int hotbarSlot) {
         // Packet-based capture; resolve the target entity from its ID.
+        if (isAlreadyCaptured(itemStack)) {
+            logger.at(Level.FINE).log(
+                    "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
+            );
+            return false;
+        }
         Ref<EntityStore> targetRef = resolveEntityRef(player, targetEntityId, null);
+        if (targetRef == null || !canCapture(player, targetRef, config)) {
+            return false;
+        }
         CaptureInfo captureInfo = buildCaptureInfo(player, targetRef);
         String attachmentsJson = captureInfo.attachmentsJson;
         if (attachmentsJson != null && !attachmentsJson.isBlank()) {
@@ -392,7 +550,7 @@ public final class SpawnerFeatureHandler {
                         + " modelAssetId=" + resolveModelAssetId(player, targetRef)
                         + " attachmentsPresent=" + (attachmentsJson != null && !attachmentsJson.isBlank())
         );
-        String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId());
+        String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId(), captureInfo.npcNameKey);
 
         UUID targetUuid = resolveEntityUuid(player, targetRef);
         UUID existingOwner = resolveOwnerFromComponent(targetRef, player.getWorld());
@@ -401,7 +559,7 @@ public final class SpawnerFeatureHandler {
                     "Spawner stub: capture denied (not owner) item=" + itemStack.getItemId()
                             + " targetEntityId=" + targetEntityId
             );
-            return;
+            return false;
         }
         UUID ownerToStore = null;
         if (!config.isCaptureClearsOwner()) {
@@ -423,8 +581,9 @@ public final class SpawnerFeatureHandler {
 
         if (!updateHotbarSlot(player, hotbarSlot, updated)) {
             logger.at(Level.WARNING).log("Spawner stub: failed to update hotbar item.");
-            return;
+            return false;
         }
+        spawnCaptureParticles(player.getWorld(), targetRef, config);
         clearOwnerIfConfigured(player, config, targetRef);
         despawnNpc(player, targetRef, null);
 
@@ -433,6 +592,7 @@ public final class SpawnerFeatureHandler {
                         + " targetEntityId=" + targetEntityId
                         + " captureClearsOwner=" + config.isCaptureClearsOwner()
         );
+        return true;
     }
 
     // Spawns an NPC from captured item metadata, applying attachments/owner/tamed state.
@@ -451,7 +611,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
 
-        String roleId = config.getSpawnerRoleId();
+        String roleId = resolveRoleId(null, itemStack, config);
         if (roleId == null || roleId.isBlank()) {
             logger.at(Level.WARNING).log(
                     "Spawner stub: missing SpawnerRoleId for item=" + itemStack.getItemId()
@@ -538,6 +698,7 @@ public final class SpawnerFeatureHandler {
         );
         boolean shouldBeTamed = Boolean.TRUE.equals(tamedMeta) || ownerUuid != null;
         applyTamed(npcRef, shouldBeTamed, world);
+        spawnCaptureParticles(world, npcRef, config);
 
         ItemStack emptied = clearCapturedMetadata(itemStack);
         String emptyItemId = emptyItemIdOverride != null ? emptyItemIdOverride : resolveEmptyItemId(itemStack.getItemId());
@@ -562,6 +723,135 @@ public final class SpawnerFeatureHandler {
 
 
 
+
+
+
+
+    public boolean canSpawnInteraction(ItemStack itemStack,
+                                       String roleIdOverride,
+                                       Boolean allowUncapturedOverride) {
+        if (itemStack == null || itemStack.isEmpty()) {
+            return false;
+        }
+        ItemFeatureConfig baseConfig = resolveConfigForItem(itemStack);
+        if (baseConfig == null || !baseConfig.isSpawnerEnabled()) {
+            return false;
+        }
+        boolean allowUncaptured = allowUncapturedOverride != null
+                ? allowUncapturedOverride
+                : baseConfig.isSpawnerAllowUncaptured();
+        ItemFeatureConfig config = ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerRoleId(resolveRoleId(roleIdOverride, itemStack, baseConfig))
+                .spawnerAllowUncaptured(allowUncaptured)
+                .build();
+        String roleId = config.getSpawnerRoleId();
+        if (roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        if (!isFilledItem(itemStack, config)) {
+            return false;
+        }
+        int roleIndex = NPCPlugin.get().getIndex(roleId);
+        return roleIndex >= 0;
+    }
+
+    public boolean canCaptureInteraction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack) {
+        if (itemStack == null || itemStack.isEmpty()) {
+            return false;
+        }
+        if (isAlreadyCaptured(itemStack)) {
+            return false;
+        }
+        ItemFeatureConfig config = resolveConfigForItem(itemStack);
+        if (config == null || !config.isSpawnerEnabled()) {
+            return false;
+        }
+        return canCapture(player, targetRef, config);
+    }
+
+    private boolean canCapture(Player player, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
+        if (player == null || targetRef == null || config == null) {
+            return false;
+        }
+        if (!targetRef.isValid()) {
+            return false;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            return false;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            return false;
+        }
+        String roleId = resolveRoleIdForCapture(npc);
+        if (!isRoleAllowedForCapture(config, roleId)) {
+            return false;
+        }
+        if (config.isRequireTamed() && !resolveTamedFromComponent(targetRef, world)) {
+            return false;
+        }
+        UUID ownerUuid = resolveOwnerFromComponent(targetRef, world);
+        if (ownerUuid != null && !ownerUuid.equals(player.getUuid()) && config.isOwnerRestricted()) {
+            return false;
+        }
+        return true;
+    }
+
+    private String resolveRoleIdForCapture(NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        int roleIndex = npc.getRoleIndex();
+        if (roleIndex >= 0) {
+            String name = NPCPlugin.get().getName(roleIndex);
+            if (name != null && !name.isBlank()) {
+                return name;
+            }
+        }
+        String roleName = npc.getRoleName();
+        if (roleName != null && !roleName.isBlank()) {
+            return roleName;
+        }
+        return null;
+    }
+
+    private boolean isRoleAllowedForCapture(ItemFeatureConfig config, String roleId) {
+        if (config == null) {
+            return false;
+        }
+        List<String> allowlist = config.getSpawnerRoleAllowlist();
+        if (allowlist != null && !allowlist.isEmpty()) {
+            return roleId != null && allowlist.contains(roleId);
+        }
+        String singleRole = config.getSpawnerRoleId();
+        if (singleRole != null && !singleRole.isBlank()) {
+            return roleId != null && singleRole.equals(roleId);
+        }
+        List<String> denylist = config.getSpawnerRoleDenylist();
+        if (denylist != null && !denylist.isEmpty()) {
+            return roleId == null || !denylist.contains(roleId);
+        }
+        return true;
+    }
+
+
+    private boolean isAlreadyCaptured(ItemStack itemStack) {
+        if (itemStack == null) {
+            return false;
+        }
+        String itemId = itemStack.getItemId();
+        if (itemId != null && itemId.contains("_State_")) {
+            return true;
+        }
+        Boolean captured = itemStack.getFromMetadataOrNull(
+                TameworkMetadataKeys.CAPTURED,
+                Codec.BOOLEAN
+        );
+        return Boolean.TRUE.equals(captured);
+    }
 
     private boolean isFilledItem(ItemStack itemStack, ItemFeatureConfig config) {
         if (itemStack == null || itemStack.getItemId() == null) {
@@ -688,6 +978,7 @@ public final class SpawnerFeatureHandler {
     }
 
 
+
     // Collect attachments, role/name keys, and icon overrides from the target NPC.
     private CaptureInfo buildCaptureInfo(Player player, Ref<EntityStore> targetRef) {
         if (player == null || targetRef == null || !targetRef.isValid()) {
@@ -791,14 +1082,21 @@ public final class SpawnerFeatureHandler {
 
     // Resolve icon overrides based on captured attachments (falls back to default icon).
     // Resolve a per-attachment icon override or fall back to default.
-    private String resolveFullItemIcon(ItemFeatureConfig config, String attachmentsJson, String itemId) {
+    private String resolveFullItemIcon(ItemFeatureConfig config, String attachmentsJson, String itemId, String roleId) {
         ItemFeatureConfig resolved = resolveIconConfig(config);
         if (resolved == null) {
             return null;
         }
         String defaultIcon = resolved.getSpawnerIconDefault();
+        Map<String, List<ItemFeatureConfig.SpawnerIconOverride>> overridesByRole = resolved.getSpawnerIconOverridesByRole();
+        List<ItemFeatureConfig.SpawnerIconOverride> roleOverrides = null;
+        if (roleId != null && overridesByRole != null && !overridesByRole.isEmpty()) {
+            roleOverrides = overridesByRole.get(roleId);
+        }
         List<ItemFeatureConfig.SpawnerIconOverride> overrides = resolved.getSpawnerIconOverrides();
-        if (overrides == null || overrides.isEmpty()) {
+        boolean hasRoleOverrides = roleOverrides != null && !roleOverrides.isEmpty();
+        boolean hasGlobalOverrides = overrides != null && !overrides.isEmpty();
+        if (!hasRoleOverrides && !hasGlobalOverrides) {
             return defaultIcon;
         }
         if (attachmentsJson == null || attachmentsJson.isBlank()) {
@@ -816,21 +1114,41 @@ public final class SpawnerFeatureHandler {
             return defaultIcon;
         }
 
-        for (ItemFeatureConfig.SpawnerIconOverride override : overrides) {
-            if (override == null) {
-                continue;
+        if (hasRoleOverrides) {
+            for (ItemFeatureConfig.SpawnerIconOverride override : roleOverrides) {
+                if (override == null) {
+                    continue;
+                }
+                if (matchesAttachments(override.getAttachments(), attachments)) {
+                    String icon = override.getIcon();
+                    logger.at(Level.FINE).log(
+                            "Spawner icon override (role): matched item=" + itemId
+                                    + " role=" + roleId
+                                    + " icon=" + icon
+                                    + " attachments=" + attachmentsJson
+                    );
+                    return icon;
+                }
             }
-            if (matchesAttachments(override.getAttachments(), attachments)) {
-                String icon = override.getIcon();
-                logger.at(Level.FINE).log(
-                        "Spawner icon override: matched item=" + itemId + " icon=" + icon + " attachments=" + attachmentsJson
-                );
-                return icon;
+        }
+
+        if (hasGlobalOverrides) {
+            for (ItemFeatureConfig.SpawnerIconOverride override : overrides) {
+                if (override == null) {
+                    continue;
+                }
+                if (matchesAttachments(override.getAttachments(), attachments)) {
+                    String icon = override.getIcon();
+                    logger.at(Level.FINE).log(
+                            "Spawner icon override: matched item=" + itemId + " icon=" + icon + " attachments=" + attachmentsJson
+                    );
+                    return icon;
+                }
             }
         }
 
         logger.at(Level.FINE).log(
-                "Spawner icon override: no match item=" + itemId + " attachments=" + attachmentsJson
+                "Spawner icon override: no match item=" + itemId + " role=" + roleId + " attachments=" + attachmentsJson
         );
         return defaultIcon;
     }
@@ -1083,6 +1401,16 @@ public final class SpawnerFeatureHandler {
         return true;
     }
 }
+
+
+
+
+
+
+
+
+
+
 
 
 
