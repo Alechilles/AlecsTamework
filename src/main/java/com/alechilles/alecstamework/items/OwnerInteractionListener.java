@@ -39,6 +39,9 @@ public final class OwnerInteractionListener {
         if (event == null) {
             return;
         }
+        if (event.isCancelled()) {
+            return;
+        }
         InteractionType actionType = event.getActionType();
         if (actionType != InteractionType.Use
                 && actionType != InteractionType.Primary
@@ -72,6 +75,22 @@ public final class OwnerInteractionListener {
         // Skip restriction when there is no owner or the player is the owner.
         if (ownerUuid == null || ownerUuid.equals(player.getUuid())) {
             return;
+        }
+
+        // If this is a spawner capture attempt and owner restrictions are disabled, allow it.
+        Inventory inventory = player.getInventory();
+        if (inventory != null) {
+            ItemStack active = inventory.getActiveHotbarItem();
+            if (active != null && !active.isEmpty()) {
+                Tamework instance = Tamework.getInstance();
+                ItemFeatureRegistry registry = instance != null ? instance.getItemFeatureRegistry() : null;
+                if (registry != null) {
+                    ItemFeatureConfig config = registry.get(active.getItemId());
+                    if (config != null && config.isSpawnerEnabled() && !config.isOwnerRestricted()) {
+                        return;
+                    }
+                }
+            }
         }
 
         NPCEntity npc = (NPCEntity) target;
@@ -121,9 +140,9 @@ public final class OwnerInteractionListener {
         // Determine whether this is a capture attempt or a generic interaction.
         String verb = "interact with";
         // Decide which verb to show based on whether the held item is a spawner.
-        Inventory inventory = player.getInventory();
-        if (inventory != null) {
-            ItemStack active = inventory.getActiveHotbarItem();
+        Inventory interactionInventory = player.getInventory();
+        if (interactionInventory != null) {
+            ItemStack active = interactionInventory.getActiveHotbarItem();
             if (active != null && !active.isEmpty()) {
                 Tamework instance = Tamework.getInstance();
                 ItemFeatureRegistry registry = instance != null ? instance.getItemFeatureRegistry() : null;

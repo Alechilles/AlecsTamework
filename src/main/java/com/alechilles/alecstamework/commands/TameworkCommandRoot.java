@@ -12,5 +12,6 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkGetOwnerCommand());
         addSubCommand(new TameworkGetTamedCommand());
         addSubCommand(new TameworkSetTamedCommand());
+        addSubCommand(new TameworkReloadConfigCommand());
     }
 }

@@ -49,6 +49,10 @@ public final class ItemFeatureRegistry {
         return Collections.unmodifiableMap(new HashMap<>(configsByItemId));
     }
 
+    public void clear() {
+        configsByItemId.clear();
+    }
+
     public void registerDefaults() {
         // Built-in example item so the framework works out-of-the-box.
         register(
