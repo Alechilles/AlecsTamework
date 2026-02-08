@@ -6,9 +6,11 @@
       "CaptureClearsOwner": true,
       "SpawnAssignsOwner": true,
       "OwnerRestricted": true,
-      "Whistle": false,
-      "WhistleRadius": 64,
-      "SpawnerRoleId": "Mob_Tamework_Example",
+      "SpawnerRoleAllowlist": [
+        "Cat",
+        "Cat_Pet",
+        "Mob_Tamework_Example"
+      ],
       "SpawnerFilledItemId": "*Spawner_Tamework_Example_State_Filled"
     }
   }

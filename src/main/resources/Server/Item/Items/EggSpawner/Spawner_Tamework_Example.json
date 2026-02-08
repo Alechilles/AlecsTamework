@@ -10,12 +10,7 @@
     "Primary": {
       "Interactions": [
         {
-          "Type": "Simple",
-          "RunTime": 0.1,
-          "Effects": {
-            "ItemAnimationId": "Interact",
-            "WaitForAnimationToFinish": true
-          }
+          "Type": "TameworkSpawn"
         }
       ]
     }
@@ -47,11 +42,7 @@
         "Primary": {
           "Interactions": [
             {
-              "Type": "TameworkSpawn",
-              "SpawnerRoleId": "Mob_Tamework_Example",
-              "EmptyItemId": "Spawner_Tamework_Example",
-              "SpawnAssignsOwner": true,
-              "AllowUncaptured": false
+              "Type": "TameworkSpawn"
             }
           ]
         }
