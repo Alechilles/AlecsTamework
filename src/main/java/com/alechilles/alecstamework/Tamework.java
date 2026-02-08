@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework;
 
+import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -51,9 +53,11 @@ import com.hypixel.hytale.server.npc.instructions.Sensor;
 public class Tamework extends JavaPlugin {
 
     private static Tamework instance;
-    private static final String SETTINGS_DIR_NAME = "Alec's Tamework!";
     private static final String ITEM_FEATURE_CONFIG_PATH =
-            "config/tamework-item-features.json";
+            "Server/Tamework/Tamework_Items_Config.json";
+    private static final String SETTINGS_RESOURCE_PATH =
+            "Server/Tamework/Tamework_Settings.json";
+    private static final String SETTINGS_FILENAME = "Tamework_Settings";
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private Config<TameworkSettings> settingsConfig;
@@ -79,15 +83,9 @@ public class Tamework extends JavaPlugin {
         itemFeatureRegistry.registerDefaults();
 
         // Resolve settings paths and optional server-level overrides.
-        Path globalModsDir = resolveGlobalModsDirectory(getDataDirectory());
-        Path saveModsDir = resolveSaveModsDirectory(getDataDirectory());
-        Path settingsDir = saveModsDir != null
-                ? saveModsDir.resolve(SETTINGS_DIR_NAME)
-                : (globalModsDir != null ? globalModsDir.resolve(SETTINGS_DIR_NAME) : getDataDirectory());
-        Path serverRoot = resolveServerRoot(getDataDirectory());
-        Path overrideDir = (saveModsDir == null && serverRoot != null) ? serverRoot.resolve("Tamework") : null;
-        settingsConfig = new Config<>(settingsDir, "tamework-settings", TameworkSettings.CODEC);
-        settings = loadSettings(settingsConfig, settingsDir, overrideDir);
+        Path settingsDir = getDataDirectory().resolve("Server").resolve("Tamework");
+        settingsConfig = new Config<>(settingsDir, SETTINGS_FILENAME, TameworkSettings.CODEC);
+        settings = loadSettings(settingsConfig, settingsDir);
 
 
         // Register components that persist owner and tamed state on NPCs.
@@ -206,8 +204,8 @@ public class Tamework extends JavaPlugin {
         return loaded;
     }
 
-    // Load settings with optional server override, then persist defaults if missing.
-    private TameworkSettings loadSettings(Config<TameworkSettings> config, Path settingsDir, Path overrideDir) {
+    // Load settings from Server/Tamework/Tamework_Settings.json and seed defaults if missing.
+    private TameworkSettings loadSettings(Config<TameworkSettings> config, Path settingsDir) {
         if (settingsDir != null) {
             try {
                 Files.createDirectories(settingsDir);
@@ -216,128 +214,48 @@ public class Tamework extends JavaPlugin {
                         .log("Failed to create settings directory: " + settingsDir);
             }
         }
-        if (overrideDir != null) {
-            Path overrideFile = overrideDir.resolve("tamework-settings.json");
-            if (Files.exists(overrideFile)) {
-                Config<TameworkSettings> overrideConfig = new Config<>(overrideDir, "tamework-settings", TameworkSettings.CODEC);
-                try {
-                    TameworkSettings loadedOverride = overrideConfig.load().join();
-                    if (loadedOverride != null) {
-                        getLogger().at(Level.INFO).log("Loaded tamework settings override: " + overrideFile);
-                        return loadedOverride;
-                    }
-                } catch (Exception ex) {
-                    getLogger().at(Level.WARNING).withCause(ex)
-                            .log("Failed to load tamework settings override; falling back to defaults.");
-                }
-            }
-        }
+        ensureDefaultSettingsFile(settingsDir);
         TameworkSettings loaded = null;
         try {
             loaded = config.load().join();
         } catch (Exception ex) {
             getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to load tamework-settings.json; using defaults.");
+                    .log("Failed to load Tamework_Settings.json; using defaults.");
         }
         if (loaded == null) {
             loaded = new TameworkSettings();
         }
-        try {
-            config.save().join();
-        } catch (Exception ex) {
-            getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to save tamework-settings.json.");
-        }
         return loaded;
     }
 
-    // Best-effort server root discovery for server-level overrides.
-    private Path resolveServerRoot(Path dataDirectory) {
-        Path modsDir = resolveModsDirectoryLegacy(dataDirectory);
-        if (modsDir != null) {
-            Path parent = modsDir.getParent();
-            if (parent != null) {
-                return parent.toAbsolutePath().normalize();
+    private void ensureDefaultSettingsFile(Path settingsDir) {
+        if (settingsDir == null) {
+            return;
+        }
+        Path settingsFile = settingsDir.resolve(SETTINGS_FILENAME + ".json");
+        if (Files.exists(settingsFile)) {
+            return;
+        }
+        try (InputStream stream = getClassLoader().getResourceAsStream(SETTINGS_RESOURCE_PATH)) {
+            if (stream != null) {
+                Files.copy(stream, settingsFile);
+                getLogger().at(Level.INFO).log("Seeded default Tamework settings: " + settingsFile);
+                return;
             }
+        } catch (Exception ex) {
+            getLogger().at(Level.WARNING).withCause(ex)
+                    .log("Failed to seed default Tamework settings: " + settingsFile);
         }
-        return Path.of(".").toAbsolutePath().normalize();
-    }
-
-    // Resolve the global UserData/Mods directory if available.
-    private Path resolveGlobalModsDirectory(Path dataDirectory) {
-        Path userDataRoot = findUserDataRoot(dataDirectory);
-        if (userDataRoot != null) {
-            Path modsDir = userDataRoot.resolve("Mods");
-            if (Files.isDirectory(modsDir)) {
-                return modsDir.toAbsolutePath().normalize();
-            }
+        try {
+            Files.writeString(
+                    settingsFile,
+                    "{\n  \"BlockOwnerDamage\": true,\n  \"BlockAllPlayerDamageIfOwned\": false,\n  \"InvulnerableIfOwned\": false\n}\n",
+                    StandardCharsets.UTF_8
+            );
+        } catch (Exception ex) {
+            getLogger().at(Level.WARNING).withCause(ex)
+                    .log("Failed to write fallback Tamework settings: " + settingsFile);
         }
-        return resolveModsDirectoryLegacy(dataDirectory);
-    }
-
-    // If running from a save, return <Saves>/<World>/mods.
-    private Path resolveSaveModsDirectory(Path dataDirectory) {
-        if (dataDirectory == null) {
-            return null;
-        }
-        Path current = dataDirectory.toAbsolutePath().normalize();
-        while (current != null) {
-            Path parent = current.getParent();
-            if (parent != null) {
-                Path parentName = parent.getFileName();
-                if (parentName != null && "mods".equalsIgnoreCase(parentName.toString())) {
-                    Path worldDir = parent.getParent();
-                    Path savesDir = worldDir != null ? worldDir.getParent() : null;
-                    if (savesDir != null) {
-                        Path savesName = savesDir.getFileName();
-                        if (savesName != null && "saves".equalsIgnoreCase(savesName.toString())) {
-                            return parent.toAbsolutePath().normalize();
-                        }
-                    }
-                }
-            }
-            current = current.getParent();
-        }
-        return null;
-    }
-
-    // Walk up the path to locate the UserData root.
-    private Path findUserDataRoot(Path dataDirectory) {
-        if (dataDirectory == null) {
-            return null;
-        }
-        Path current = dataDirectory.toAbsolutePath().normalize();
-        while (current != null) {
-            Path name = current.getFileName();
-            if (name != null && "userdata".equalsIgnoreCase(name.toString())) {
-                return current;
-            }
-            current = current.getParent();
-        }
-        return null;
-    }
-
-    // Legacy fallback for mods directory discovery in dev environments.
-    private Path resolveModsDirectoryLegacy(Path dataDirectory) {
-        List<Path> candidates = new ArrayList<>();
-        if (dataDirectory != null) {
-            Path parent = dataDirectory.toAbsolutePath().normalize().getParent();
-            if (parent != null) {
-                candidates.add(parent);
-            }
-        }
-        candidates.add(Path.of("mods"));
-        candidates.add(Path.of("Server", "mods"));
-        candidates.add(Path.of("..", "mods"));
-        for (Path candidate : candidates) {
-            if (candidate == null) {
-                continue;
-            }
-            if (Files.isDirectory(candidate)) {
-                return candidate.toAbsolutePath().normalize();
-            }
-        }
-        return null;
     }
 
     public SpawnerFeatureHandler getSpawnerFeatureHandler() {

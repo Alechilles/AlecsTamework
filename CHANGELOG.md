@@ -30,5 +30,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Missing owner names (messages and getowner previously only showed UUIDs).
 
 ### Notes
-- `config/tamework-item-features.json` remains a plugin default and is excluded from the assets zip.
+- Defaults now live in `Server/Tamework/Tamework_Items_Config.json` (no code-driven defaults).
 - Local override configs are intentionally created empty so new items/functions from mod updates are not masked.
+
+

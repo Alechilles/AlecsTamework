@@ -54,15 +54,7 @@ public final class ItemFeatureRegistry {
     }
 
     public void registerDefaults() {
-        // Built-in example item so the framework works out-of-the-box.
-        register(
-                TameworkIds.ITEM_SPAWNER_EXAMPLE,
-                ItemFeatureConfig.builder()
-                        .spawnerEnabled(true)
-                        .captureClearsOwner(true)
-                        .spawnAssignsOwner(true)
-                        .spawnerRoleId(TameworkIds.NPC_ROLE_TAMEWORK_EXAMPLE)
-                        .build()
-        );
+        // No code-driven defaults; all item feature configs come from JSON.
     }
 }
+

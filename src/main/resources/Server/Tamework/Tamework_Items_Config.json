@@ -6,10 +6,14 @@
       "CaptureClearsOwner": true,
       "SpawnAssignsOwner": true,
       "OwnerRestricted": true,
+      "SpawnerParticleSystem": "Poof_Small",
+      "SpawnerSoundEvent": "SFX_Tamework_Poof",
       "SpawnerRoleAllowlist": [
         "Cat",
         "Cat_Pet",
-        "Mob_Tamework_Example"
+        "Mob_Tamework_Example",
+        "Mob_Tamework_Example_Simple",
+        "Mob_Tamework_Example_Hytalor"
       ],
       "SpawnerFilledItemId": "*Spawner_Tamework_Example_State_Filled"
     }

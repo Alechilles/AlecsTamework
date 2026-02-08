@@ -1,0 +1,5 @@
+{
+  "BlockOwnerDamage": true,
+  "BlockAllPlayerDamageIfOwned": false,
+  "InvulnerableIfOwned": false
+}

@@ -5,7 +5,7 @@ import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.simple.BooleanCodec;
 
 /**
- * Settings model and codec for tamework-settings.json.
+ * Settings model and codec for Tamework_Settings.json.
  */
 public final class TameworkSettings {
     public static final String BLOCK_OWNER_DAMAGE_TAG = "BlockOwnerDamage";
@@ -30,7 +30,7 @@ public final class TameworkSettings {
             TameworkSettings::isInvulnerableIfOwned
     ).add().build();
 
-    // Defaults align with the shipped tamework-settings.json.
+    // Defaults align with the shipped Tamework_Settings.json.
     private boolean blockOwnerDamage = true;
     private boolean blockAllPlayerDamageIfOwned = false;
     private boolean invulnerableIfOwned = false;
@@ -70,3 +70,4 @@ public final class TameworkSettings {
         this.invulnerableIfOwned = invulnerableIfOwned;
     }
 }
+
