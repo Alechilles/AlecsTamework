@@ -13,7 +13,7 @@ import javax.annotation.Nonnull;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkSettings;
-import com.alechilles.alecstamework.config.assets.SpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
@@ -202,24 +202,24 @@ public class Tamework extends JavaPlugin {
             return;
         }
         getAssetRegistry().register(
-                HytaleAssetStore.builder(SpawnerConfig.class, new DefaultAssetMap<>())
+                HytaleAssetStore.builder(TwSpawnerConfig.class, new DefaultAssetMap<>())
                         .setPath("Tamework/Items/Spawners")
-                        .setCodec(SpawnerConfig.CODEC)
-                        .setKeyFunction(SpawnerConfig::getId)
+                        .setCodec(TwSpawnerConfig.CODEC)
+                        .setKeyFunction(TwSpawnerConfig::getId)
                         .build()
         );
-        getEventRegistry().register(LoadedAssetsEvent.class, SpawnerConfig.class, this::onSpawnerAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, SpawnerConfig.class, this::onSpawnerAssetsRemoved);
+        getEventRegistry().register(LoadedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsRemoved);
         spawnerAssetsRegistered = true;
     }
 
     private void onSpawnerAssetsLoaded(
-            LoadedAssetsEvent<String, SpawnerConfig, DefaultAssetMap<String, SpawnerConfig>> event) {
+            LoadedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         reloadItemFeatureConfigs();
     }
 
     private void onSpawnerAssetsRemoved(
-            RemovedAssetsEvent<String, SpawnerConfig, DefaultAssetMap<String, SpawnerConfig>> event) {
+            RemovedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         reloadItemFeatureConfigs();
     }
 
@@ -227,16 +227,20 @@ public class Tamework extends JavaPlugin {
         if (itemFeatureRegistry == null) {
             return 0;
         }
-        DefaultAssetMap<String, SpawnerConfig> assetMap = SpawnerConfig.getAssetMap();
+        DefaultAssetMap<String, TwSpawnerConfig> assetMap = TwSpawnerConfig.getAssetMap();
         if (assetMap == null) {
             return 0;
         }
         int loaded = 0;
-        for (SpawnerConfig asset : assetMap.getAssetMap().values()) {
-            if (asset == null || asset.getId() == null || asset.getId().isBlank()) {
+        for (TwSpawnerConfig asset : assetMap.getAssetMap().values()) {
+            if (asset == null) {
                 continue;
             }
-            itemFeatureRegistry.register(asset.getId(), asset.toItemFeatureConfig());
+            String emptyItemId = asset.getEmptyItemId();
+            if (emptyItemId == null || emptyItemId.isBlank()) {
+                continue;
+            }
+            itemFeatureRegistry.register(emptyItemId, asset.toItemFeatureConfig());
             loaded++;
         }
         return loaded;
@@ -384,3 +388,5 @@ public class Tamework extends JavaPlugin {
         }
     }
 }
+
+

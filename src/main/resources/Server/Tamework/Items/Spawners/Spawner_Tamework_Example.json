@@ -1,5 +1,5 @@
 {
-  "Id": "Spawner_Tamework_Example",
+  "EmptyItemId": "Spawner_Tamework_Example",
   "FilledItemId": "*Spawner_Tamework_Example_State_Filled",
   "AllowedRoles": {
     "Mode": "Allowlist",

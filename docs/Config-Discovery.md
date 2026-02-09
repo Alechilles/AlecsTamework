@@ -3,13 +3,14 @@
 This document explains how Tamework discovers spawner configs in the new asset-based system.
 
 ## Asset location
-Spawner configs are **SpawnerConfig** assets stored under:
+Spawner configs are **TwSpawnerConfig** assets stored under:
 ~~~
 <ModRoot>/Server/Tamework/Items/Spawners/*.json
 ~~~
 
-The asset Id should match the **empty spawner item ID**. Assets are loaded through the asset registry
-like any other server asset.
+TwSpawnerConfig assets are loaded through the asset registry like any other server asset.
+The **EmptyItemId** field determines which empty spawner item uses the config; the filename can be
+whatever you want.
 
 ## Overrides
 Spawner configs are standard assets. If you need to override another mod's spawner settings, use:
@@ -30,3 +31,9 @@ After editing assets on disk, run:
 /tw reloadconfig
 ~~~
 This reloads spawner config assets from disk.
+
+
+
+
+
+

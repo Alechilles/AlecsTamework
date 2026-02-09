@@ -2,9 +2,9 @@
 
 All notable changes to **Alec's Tamework!** will be documented in this file.
 
-## 1.2.0 - SpawnerConfig Assets + Capture/Spawn Overhaul - 2026-02-09
+## 1.2.0 - TwSpawnerConfig Assets + Capture/Spawn Overhaul - 2026-02-09
 ### Added
-- SpawnerConfig asset type stored under Server/Tamework/Items/Spawners for spawner item behavior.
+- TwSpawnerConfig asset type stored under Server/Tamework/Items/Spawners for spawner item behavior.
 - Capture/spawn settings split into Capture and Spawn sections with optional effects (ParticleSystem/SoundEvent) and limits (CooldownMs/MaxDistance).
 - Role-scoped icon overrides via IconOverridesByRole alongside default icon overrides.
 - Spawner items can capture/spawn using the TameworkSpawn interaction alone (no role interaction chain required), driven by spawner assets.

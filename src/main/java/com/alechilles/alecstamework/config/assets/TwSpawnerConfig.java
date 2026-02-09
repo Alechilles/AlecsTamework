@@ -25,7 +25,7 @@ import javax.annotation.Nullable;
  * Asset-backed configuration for spawner items.
  * Stored under Server/Tamework/Items/Spawners.
  */
-public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, SpawnerConfig>> {
+public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwSpawnerConfig>> {
     public enum RoleFilterMode {
         AllowAll,
         Allowlist,
@@ -196,10 +196,10 @@ public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
         .add()
         .build();
 
-    public static final AssetBuilderCodec<String, SpawnerConfig> CODEC =
+    public static final AssetBuilderCodec<String, TwSpawnerConfig> CODEC =
         AssetBuilderCodec.builder(
-                SpawnerConfig.class,
-                SpawnerConfig::new,
+                TwSpawnerConfig.class,
+                TwSpawnerConfig::new,
                 Codec.STRING,
                 (asset, id) -> asset.id = id,
                 asset -> asset.id,
@@ -207,6 +207,12 @@ public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
                 asset -> asset.data
         )
         .documentation("Spawner item configuration for Alec's Tamework!")
+        .<String>append(
+            new KeyedCodec<>("EmptyItemId", Codec.STRING),
+            (asset, value) -> asset.emptyItemId = value,
+            asset -> asset.emptyItemId
+        )
+        .add()
         .<String>append(
             new KeyedCodec<>("FilledItemId", Codec.STRING),
             (asset, value) -> asset.filledItemId = value,
@@ -251,10 +257,11 @@ public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
         .add()
         .build();
 
-    private static AssetStore<String, SpawnerConfig, DefaultAssetMap<String, SpawnerConfig>> ASSET_STORE;
+    private static AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> ASSET_STORE;
 
     private AssetExtraInfo.Data data;
     private String id;
+    private String emptyItemId;
     private AllowedRoles allowedRoles = new AllowedRoles();
     private String filledItemId;
     private String iconDefault;
@@ -263,27 +270,31 @@ public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
     private CaptureSettings capture = new CaptureSettings();
     private SpawnSettings spawn = new SpawnSettings();
 
-    public static AssetStore<String, SpawnerConfig, DefaultAssetMap<String, SpawnerConfig>> getAssetStore() {
+    public static AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
-            ASSET_STORE = AssetRegistry.getAssetStore(SpawnerConfig.class);
+            ASSET_STORE = AssetRegistry.getAssetStore(TwSpawnerConfig.class);
         }
         return ASSET_STORE;
     }
 
     @Nullable
-    public static DefaultAssetMap<String, SpawnerConfig> getAssetMap() {
-        AssetStore<String, SpawnerConfig, DefaultAssetMap<String, SpawnerConfig>> store = getAssetStore();
+    public static DefaultAssetMap<String, TwSpawnerConfig> getAssetMap() {
+        AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> store = getAssetStore();
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, SpawnerConfig>) store.getAssetMap();
+        return (DefaultAssetMap<String, TwSpawnerConfig>) store.getAssetMap();
     }
 
-    protected SpawnerConfig() {
+    protected TwSpawnerConfig() {
     }
 
     public String getId() {
         return id;
+    }
+
+    public String getEmptyItemId() {
+        return emptyItemId;
     }
 
     public ItemFeatureConfig toItemFeatureConfig() {
@@ -410,3 +421,8 @@ public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
         }
     }
 }
+
+
+
+
+
