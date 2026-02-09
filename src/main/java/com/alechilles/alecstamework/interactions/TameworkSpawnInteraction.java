@@ -31,13 +31,6 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
     )
             .documentation("Spawns a captured NPC from a Tamework spawner item.")
             .<String>appendInherited(
-                    new KeyedCodec<>("SpawnerRoleId", Codec.STRING),
-                    (interaction, value) -> interaction.spawnerRoleId = value,
-                    interaction -> interaction.spawnerRoleId,
-                    (interaction, parent) -> interaction.spawnerRoleId = parent.spawnerRoleId
-            )
-            .add()
-            .<String>appendInherited(
                     new KeyedCodec<>("EmptyItemId", Codec.STRING),
                     (interaction, value) -> interaction.emptyItemId = value,
                     interaction -> interaction.emptyItemId,
@@ -51,19 +44,10 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
                     (interaction, parent) -> interaction.spawnAssignsOwner = parent.spawnAssignsOwner
             )
             .add()
-            .<Boolean>appendInherited(
-                    new KeyedCodec<>("AllowUncaptured", Codec.BOOLEAN),
-                    (interaction, value) -> interaction.allowUncaptured = value,
-                    interaction -> interaction.allowUncaptured,
-                    (interaction, parent) -> interaction.allowUncaptured = parent.allowUncaptured
-            )
-            .add()
             .build();
 
-    private String spawnerRoleId;
     private String emptyItemId;
     private Boolean spawnAssignsOwner;
-    private Boolean allowUncaptured;
 
     protected TameworkSpawnInteraction() {
         super();
@@ -133,7 +117,7 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
             return;
         }
 
-        boolean canSpawn = handler.canSpawnInteraction(heldItem, spawnerRoleId, allowUncaptured);
+        boolean canSpawn = handler.canSpawnInteraction(heldItem);
         if (!canSpawn) {
             context.getState().state = InteractionState.Failed;
             super.tick0(true, time, type, context, cooldownHandler);
@@ -144,10 +128,8 @@ public class TameworkSpawnInteraction extends SimpleInteraction {
         commandBuffer.run(store -> handler.spawnFromItemInteraction(
                 player,
                 heldItem,
-                spawnerRoleId,
                 emptyItemId,
-                spawnAssignsOwner,
-                allowUncaptured
+                spawnAssignsOwner
         ));
         context.setHeldItem(heldItem);
         super.tick0(true, time, type, context, cooldownHandler);

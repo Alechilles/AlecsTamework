@@ -10,6 +10,8 @@ public final class TameworkMetadataKeys {
     public static final String ATTACHMENTS = "Tamework.Attachments";
     public static final String OWNER_UUID = "Tamework.OwnerUuid";
     public static final String TAMED = "Tamework.Tamed";
+    public static final String CAPTURE_COOLDOWN_UNTIL = "Tamework.CaptureCooldownUntil";
+    public static final String SPAWN_COOLDOWN_UNTIL = "Tamework.SpawnCooldownUntil";
 
     private TameworkMetadataKeys() {
     }

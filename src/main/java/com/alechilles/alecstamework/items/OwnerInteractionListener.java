@@ -86,7 +86,7 @@ public final class OwnerInteractionListener {
                 ItemFeatureRegistry registry = instance != null ? instance.getItemFeatureRegistry() : null;
                 if (registry != null) {
                     ItemFeatureConfig config = registry.get(active.getItemId());
-                    if (config != null && config.isSpawnerEnabled() && !config.isOwnerRestricted()) {
+                    if (config != null && config.isSpawnerEnabled() && !config.isCaptureOwnerRestricted()) {
                         return;
                     }
                 }

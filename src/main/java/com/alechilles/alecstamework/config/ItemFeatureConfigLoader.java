@@ -86,7 +86,8 @@ public final class ItemFeatureConfigLoader {
             registry.register(itemId, config);
             logger.at(Level.INFO).log(
                     "Loaded item feature config: item=" + itemId
-                            + " ownerRestricted=" + config.isOwnerRestricted()
+                            + " captureOwnerRestricted=" + config.isCaptureOwnerRestricted()
+                            + " spawnOwnerRestricted=" + config.isSpawnOwnerRestricted()
                             + " source=" + sourceLabel
             );
             loaded++;
@@ -98,19 +99,28 @@ public final class ItemFeatureConfigLoader {
         // Start with existing config values so overrides can be partial.
         boolean spawnerEnabled = base != null && base.isSpawnerEnabled();
         boolean whistleEnabled = base != null && base.isWhistleEnabled();
-        boolean captureClearsOwner = base != null && base.isCaptureClearsOwner();
-        boolean spawnAssignsOwner = base != null && base.isSpawnAssignsOwner();
-        boolean ownerRestricted = base != null && base.isOwnerRestricted();
-        boolean requireTamed = base == null || base.isRequireTamed();
-        boolean spawnerAllowUncaptured = base != null && base.isSpawnerAllowUncaptured();
+        boolean captureClearsOwner = base == null || base.isCaptureClearsOwner();
+        boolean captureOwnerRestricted = base == null || base.isCaptureOwnerRestricted();
+        boolean spawnAssignsOwner = base == null || base.isSpawnAssignsOwner();
+        boolean spawnOwnerRestricted = base == null || base.isSpawnOwnerRestricted();
+        boolean captureRequireTamed = base == null || base.isCaptureRequireTamed();
         int whistleRadius = base != null ? base.getWhistleRadius() : 64;
-        String spawnerRoleId = base != null ? base.getSpawnerRoleId() : null;
         List<String> spawnerRoleAllowlist = base != null ? base.getSpawnerRoleAllowlist() : List.of();
         List<String> spawnerRoleDenylist = base != null ? base.getSpawnerRoleDenylist() : List.of();
+        ItemFeatureConfig.RoleListMode spawnerRoleListMode =
+                base != null ? base.getSpawnerRoleListMode() : ItemFeatureConfig.RoleListMode.ANY;
+        Boolean captureRequireOwnerOverride = base != null ? base.getCaptureRequireOwnerOverride() : null;
+        Boolean spawnRequireOwnerOverride = base != null ? base.getSpawnRequireOwnerOverride() : null;
+        String captureParticleSystem = base != null ? base.getCaptureParticleSystem() : null;
+        String spawnParticleSystem = base != null ? base.getSpawnParticleSystem() : null;
+        String captureSoundEvent = base != null ? base.getCaptureSoundEvent() : null;
+        String spawnSoundEvent = base != null ? base.getSpawnSoundEvent() : null;
+        int captureCooldownMs = base != null ? base.getCaptureCooldownMs() : 0;
+        int spawnCooldownMs = base != null ? base.getSpawnCooldownMs() : 0;
+        double captureMaxDistance = base != null ? base.getCaptureMaxDistance() : 0.0;
+        double spawnMaxDistance = base != null ? base.getSpawnMaxDistance() : 0.0;
         String spawnerFilledItemId = base != null ? base.getSpawnerFilledItemId() : null;
         String spawnerIconDefault = base != null ? base.getSpawnerIconDefault() : null;
-        String spawnerParticleSystem = base != null ? base.getSpawnerParticleSystem() : null;
-        String spawnerSoundEvent = base != null ? base.getSpawnerSoundEvent() : null;
         List<ItemFeatureConfig.SpawnerIconOverride> spawnerIconOverrides =
                 base != null ? base.getSpawnerIconOverrides() : List.of();
         Map<String, List<ItemFeatureConfig.SpawnerIconOverride>> spawnerIconOverridesByRole =
@@ -128,43 +138,90 @@ public final class ItemFeatureConfigLoader {
         if (obj.has("SpawnAssignsOwner")) {
             spawnAssignsOwner = readBoolean(obj, "SpawnAssignsOwner", spawnAssignsOwner);
         }
-        if (obj.has("OwnerRestricted")) {
-            ownerRestricted = readBoolean(obj, "OwnerRestricted", ownerRestricted);
+        if (obj.has("CaptureOwnerRestricted")) {
+            captureOwnerRestricted = readBoolean(obj, "CaptureOwnerRestricted", captureOwnerRestricted);
         }
-        if (obj.has("RequireTamed")) {
-            requireTamed = readBoolean(obj, "RequireTamed", requireTamed);
+        if (obj.has("SpawnOwnerRestricted")) {
+            spawnOwnerRestricted = readBoolean(obj, "SpawnOwnerRestricted", spawnOwnerRestricted);
         }
-        if (obj.has("SpawnerAllowUncaptured")) {
-            spawnerAllowUncaptured = readBoolean(obj, "SpawnerAllowUncaptured", spawnerAllowUncaptured);
+        if (obj.has("CaptureRequireTamed")) {
+            captureRequireTamed = readBoolean(obj, "CaptureRequireTamed", captureRequireTamed);
+        } else if (obj.has("RequireTamed")) {
+            captureRequireTamed = readBoolean(obj, "RequireTamed", captureRequireTamed);
         }
         if (obj.has("WhistleRadius")) {
             whistleRadius = readInt(obj, "WhistleRadius", whistleRadius);
         }
-        if (obj.has("SpawnerRoleId")) {
-            spawnerRoleId = readString(obj, "SpawnerRoleId", spawnerRoleId);
-        }
-        if (obj.has("SpawnerRoleAllowlist")) {
+        if (obj.has("RoleAllowlist")) {
+            spawnerRoleAllowlist = readStringList(obj, "RoleAllowlist", spawnerRoleAllowlist);
+        } else if (obj.has("SpawnerRoleAllowlist")) {
             spawnerRoleAllowlist = readStringList(obj, "SpawnerRoleAllowlist", spawnerRoleAllowlist);
         }
-        if (obj.has("SpawnerRoleDenylist")) {
+        if (obj.has("RoleDenylist")) {
+            spawnerRoleDenylist = readStringList(obj, "RoleDenylist", spawnerRoleDenylist);
+        } else if (obj.has("SpawnerRoleDenylist")) {
             spawnerRoleDenylist = readStringList(obj, "SpawnerRoleDenylist", spawnerRoleDenylist);
         }
-        if (obj.has("SpawnerFilledItemId")) {
+
+        if (obj.has("RoleAllowlistMode")) {
+            String mode = readString(obj, "RoleAllowlistMode", null);
+            if (mode != null) {
+                spawnerRoleListMode = ItemFeatureConfig.RoleListMode.fromString(mode);
+            }
+        } else if (obj.has("SpawnerRoleAllowlistMode")) {
+            String mode = readString(obj, "SpawnerRoleAllowlistMode", null);
+            if (mode != null) {
+                spawnerRoleListMode = ItemFeatureConfig.RoleListMode.fromString(mode);
+            }
+        }
+        if (obj.has("CaptureRequireOwner")) {
+            captureRequireOwnerOverride = readOptionalBoolean(obj, "CaptureRequireOwner", captureRequireOwnerOverride);
+        }
+        if (obj.has("SpawnRequireOwner")) {
+            spawnRequireOwnerOverride = readOptionalBoolean(obj, "SpawnRequireOwner", spawnRequireOwnerOverride);
+        }
+        if (obj.has("CaptureParticleSystem")) {
+            captureParticleSystem = readString(obj, "CaptureParticleSystem", captureParticleSystem);
+        }
+        if (obj.has("SpawnParticleSystem")) {
+            spawnParticleSystem = readString(obj, "SpawnParticleSystem", spawnParticleSystem);
+        }
+        if (obj.has("CaptureSoundEvent")) {
+            captureSoundEvent = readString(obj, "CaptureSoundEvent", captureSoundEvent);
+        }
+        if (obj.has("SpawnSoundEvent")) {
+            spawnSoundEvent = readString(obj, "SpawnSoundEvent", spawnSoundEvent);
+        }
+        if (obj.has("CaptureCooldownMs")) {
+            captureCooldownMs = readInt(obj, "CaptureCooldownMs", captureCooldownMs);
+        }
+        if (obj.has("SpawnCooldownMs")) {
+            spawnCooldownMs = readInt(obj, "SpawnCooldownMs", spawnCooldownMs);
+        }
+        if (obj.has("CaptureMaxDistance")) {
+            captureMaxDistance = readDouble(obj, "CaptureMaxDistance", captureMaxDistance);
+        }
+        if (obj.has("SpawnMaxDistance")) {
+            spawnMaxDistance = readDouble(obj, "SpawnMaxDistance", spawnMaxDistance);
+        }
+        if (obj.has("FilledItemId")) {
+            spawnerFilledItemId = readString(obj, "FilledItemId", spawnerFilledItemId);
+        } else if (obj.has("SpawnerFilledItemId")) {
             spawnerFilledItemId = readString(obj, "SpawnerFilledItemId", spawnerFilledItemId);
         }
-        if (obj.has("SpawnerIconDefault")) {
+        if (obj.has("IconDefault")) {
+            spawnerIconDefault = readString(obj, "IconDefault", spawnerIconDefault);
+        } else if (obj.has("SpawnerIconDefault")) {
             spawnerIconDefault = readString(obj, "SpawnerIconDefault", spawnerIconDefault);
         }
-        if (obj.has("SpawnerParticleSystem")) {
-            spawnerParticleSystem = readString(obj, "SpawnerParticleSystem", spawnerParticleSystem);
-        }
-        if (obj.has("SpawnerSoundEvent")) {
-            spawnerSoundEvent = readString(obj, "SpawnerSoundEvent", spawnerSoundEvent);
-        }
-        if (obj.has("SpawnerIconOverrides")) {
+        if (obj.has("IconOverrides")) {
+            spawnerIconOverrides = readIconOverrides(obj, "IconOverrides", spawnerIconOverrides);
+        } else if (obj.has("SpawnerIconOverrides")) {
             spawnerIconOverrides = readIconOverrides(obj, "SpawnerIconOverrides", spawnerIconOverrides);
         }
-        if (obj.has("SpawnerIconOverridesByRole")) {
+        if (obj.has("IconOverridesByRole")) {
+            spawnerIconOverridesByRole = readIconOverridesByRole(obj, "IconOverridesByRole", spawnerIconOverridesByRole);
+        } else if (obj.has("SpawnerIconOverridesByRole")) {
             spawnerIconOverridesByRole = readIconOverridesByRole(obj, "SpawnerIconOverridesByRole", spawnerIconOverridesByRole);
         }
 
@@ -172,18 +229,26 @@ public final class ItemFeatureConfigLoader {
                 .spawnerEnabled(spawnerEnabled)
                 .whistleEnabled(whistleEnabled)
                 .captureClearsOwner(captureClearsOwner)
+                .captureRequireTamed(captureRequireTamed)
                 .spawnAssignsOwner(spawnAssignsOwner)
-                .ownerRestricted(ownerRestricted)
-                .requireTamed(requireTamed)
-                .spawnerAllowUncaptured(spawnerAllowUncaptured)
+                .captureOwnerRestricted(captureOwnerRestricted)
+                .spawnOwnerRestricted(spawnOwnerRestricted)
                 .whistleRadius(whistleRadius)
-                .spawnerRoleId(spawnerRoleId)
                 .spawnerRoleAllowlist(spawnerRoleAllowlist)
                 .spawnerRoleDenylist(spawnerRoleDenylist)
+                .spawnerRoleListMode(spawnerRoleListMode)
+                .captureRequireOwnerOverride(captureRequireOwnerOverride)
+                .spawnRequireOwnerOverride(spawnRequireOwnerOverride)
+                .captureParticleSystem(captureParticleSystem)
+                .spawnParticleSystem(spawnParticleSystem)
+                .captureSoundEvent(captureSoundEvent)
+                .spawnSoundEvent(spawnSoundEvent)
+                .captureCooldownMs(captureCooldownMs)
+                .spawnCooldownMs(spawnCooldownMs)
+                .captureMaxDistance(captureMaxDistance)
+                .spawnMaxDistance(spawnMaxDistance)
                 .spawnerFilledItemId(spawnerFilledItemId)
                 .spawnerIconDefault(spawnerIconDefault)
-                .spawnerParticleSystem(spawnerParticleSystem)
-                .spawnerSoundEvent(spawnerSoundEvent)
                 .spawnerIconOverrides(spawnerIconOverrides)
                 .spawnerIconOverridesByRole(spawnerIconOverridesByRole)
                 .build();
@@ -193,6 +258,24 @@ public final class ItemFeatureConfigLoader {
         JsonElement element = obj.get(key);
         return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isBoolean()
                 ? element.getAsBoolean()
+                : fallback;
+    }
+
+    private Boolean readOptionalBoolean(JsonObject obj, String key, Boolean fallback) {
+        JsonElement element = obj.get(key);
+        if (element == null || element.isJsonNull()) {
+            return fallback;
+        }
+        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isBoolean()) {
+            return element.getAsBoolean();
+        }
+        return fallback;
+    }
+
+    private double readDouble(JsonObject obj, String key, double fallback) {
+        JsonElement element = obj.get(key);
+        return element != null && element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()
+                ? element.getAsDouble()
                 : fallback;
     }
 

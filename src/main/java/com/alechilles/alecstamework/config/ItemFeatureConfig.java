@@ -9,21 +9,50 @@ import java.util.Objects;
  * Per-item configuration for spawn/capture behaviors.
  */
 public final class ItemFeatureConfig {
+    public enum RoleListMode {
+        ANY,
+        ALLOW,
+        DENY;
+
+        public static RoleListMode fromString(String value) {
+            if (value == null) {
+                return ANY;
+            }
+            switch (value.trim().toLowerCase()) {
+                case "allow":
+                    return ALLOW;
+                case "deny":
+                    return DENY;
+                case "any":
+                default:
+                    return ANY;
+            }
+        }
+    }
+
     private final boolean spawnerEnabled;
     private final boolean whistleEnabled;
     private final boolean captureClearsOwner;
+    private final boolean captureRequireTamed;
+    private final boolean captureOwnerRestricted;
     private final boolean spawnAssignsOwner;
-    private final boolean ownerRestricted;
-    private final boolean requireTamed;
-    private final boolean spawnerAllowUncaptured;
+    private final boolean spawnOwnerRestricted;
     private final int whistleRadius;
-    private final String spawnerRoleId;
     private final List<String> spawnerRoleAllowlist;
     private final List<String> spawnerRoleDenylist;
+    private final RoleListMode spawnerRoleListMode;
+    private final Boolean captureRequireOwnerOverride;
+    private final Boolean spawnRequireOwnerOverride;
+    private final String captureParticleSystem;
+    private final String spawnParticleSystem;
+    private final String captureSoundEvent;
+    private final String spawnSoundEvent;
+    private final int captureCooldownMs;
+    private final int spawnCooldownMs;
+    private final double captureMaxDistance;
+    private final double spawnMaxDistance;
     private final String spawnerFilledItemId;
     private final String spawnerIconDefault;
-    private final String spawnerParticleSystem;
-    private final String spawnerSoundEvent;
     private final List<SpawnerIconOverride> spawnerIconOverrides;
     private final Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole;
 
@@ -31,18 +60,26 @@ public final class ItemFeatureConfig {
         this.spawnerEnabled = builder.spawnerEnabled;
         this.whistleEnabled = builder.whistleEnabled;
         this.captureClearsOwner = builder.captureClearsOwner;
+        this.captureRequireTamed = builder.captureRequireTamed;
+        this.captureOwnerRestricted = builder.captureOwnerRestricted;
         this.spawnAssignsOwner = builder.spawnAssignsOwner;
-        this.ownerRestricted = builder.ownerRestricted;
-        this.requireTamed = builder.requireTamed;
-        this.spawnerAllowUncaptured = builder.spawnerAllowUncaptured;
+        this.spawnOwnerRestricted = builder.spawnOwnerRestricted;
         this.whistleRadius = builder.whistleRadius;
-        this.spawnerRoleId = builder.spawnerRoleId;
         this.spawnerRoleAllowlist = builder.spawnerRoleAllowlist;
         this.spawnerRoleDenylist = builder.spawnerRoleDenylist;
+        this.spawnerRoleListMode = builder.spawnerRoleListMode;
+        this.captureRequireOwnerOverride = builder.captureRequireOwnerOverride;
+        this.spawnRequireOwnerOverride = builder.spawnRequireOwnerOverride;
+        this.captureParticleSystem = builder.captureParticleSystem;
+        this.spawnParticleSystem = builder.spawnParticleSystem;
+        this.captureSoundEvent = builder.captureSoundEvent;
+        this.spawnSoundEvent = builder.spawnSoundEvent;
+        this.captureCooldownMs = builder.captureCooldownMs;
+        this.spawnCooldownMs = builder.spawnCooldownMs;
+        this.captureMaxDistance = builder.captureMaxDistance;
+        this.spawnMaxDistance = builder.spawnMaxDistance;
         this.spawnerFilledItemId = builder.spawnerFilledItemId;
         this.spawnerIconDefault = builder.spawnerIconDefault;
-        this.spawnerParticleSystem = builder.spawnerParticleSystem;
-        this.spawnerSoundEvent = builder.spawnerSoundEvent;
         this.spawnerIconOverrides = builder.spawnerIconOverrides;
         this.spawnerIconOverridesByRole = builder.spawnerIconOverridesByRole;
     }
@@ -63,28 +100,27 @@ public final class ItemFeatureConfig {
         return captureClearsOwner;
     }
 
+    public boolean isCaptureRequireTamed() {
+        return captureRequireTamed;
+    }
+
+    public boolean isCaptureOwnerRestricted() {
+        return captureOwnerRestricted;
+    }
+
     public boolean isSpawnAssignsOwner() {
         return spawnAssignsOwner;
     }
 
-    public boolean isOwnerRestricted() {
-        return ownerRestricted;
+    public boolean isSpawnOwnerRestricted() {
+        return spawnOwnerRestricted;
     }
 
-    public boolean isRequireTamed() {
-        return requireTamed;
-    }
 
-    public boolean isSpawnerAllowUncaptured() {
-        return spawnerAllowUncaptured;
-    }
+
 
     public int getWhistleRadius() {
         return whistleRadius;
-    }
-
-    public String getSpawnerRoleId() {
-        return spawnerRoleId;
     }
 
     public List<String> getSpawnerRoleAllowlist() {
@@ -95,6 +131,52 @@ public final class ItemFeatureConfig {
         return spawnerRoleDenylist;
     }
 
+    public RoleListMode getSpawnerRoleListMode() {
+        return spawnerRoleListMode;
+    }
+
+
+
+    public Boolean getCaptureRequireOwnerOverride() {
+        return captureRequireOwnerOverride;
+    }
+
+    public Boolean getSpawnRequireOwnerOverride() {
+        return spawnRequireOwnerOverride;
+    }
+
+    public String getCaptureParticleSystem() {
+        return captureParticleSystem;
+    }
+
+    public String getSpawnParticleSystem() {
+        return spawnParticleSystem;
+    }
+
+    public String getCaptureSoundEvent() {
+        return captureSoundEvent;
+    }
+
+    public String getSpawnSoundEvent() {
+        return spawnSoundEvent;
+    }
+
+    public int getCaptureCooldownMs() {
+        return captureCooldownMs;
+    }
+
+    public int getSpawnCooldownMs() {
+        return spawnCooldownMs;
+    }
+
+    public double getCaptureMaxDistance() {
+        return captureMaxDistance;
+    }
+
+    public double getSpawnMaxDistance() {
+        return spawnMaxDistance;
+    }
+
     public String getSpawnerFilledItemId() {
         return spawnerFilledItemId;
     }
@@ -103,13 +185,7 @@ public final class ItemFeatureConfig {
         return spawnerIconDefault;
     }
 
-    public String getSpawnerParticleSystem() {
-        return spawnerParticleSystem;
-    }
 
-    public String getSpawnerSoundEvent() {
-        return spawnerSoundEvent;
-    }
 
     public List<SpawnerIconOverride> getSpawnerIconOverrides() {
         return spawnerIconOverrides;
@@ -142,19 +218,27 @@ public final class ItemFeatureConfig {
     public static final class Builder {
         private boolean spawnerEnabled;
         private boolean whistleEnabled;
-        private boolean captureClearsOwner;
-        private boolean spawnAssignsOwner;
-        private boolean ownerRestricted;
-        private boolean requireTamed = true;
-        private boolean spawnerAllowUncaptured;
+        private boolean captureClearsOwner = true;
+        private boolean captureRequireTamed = true;
+        private boolean captureOwnerRestricted = true;
+        private boolean spawnAssignsOwner = true;
+        private boolean spawnOwnerRestricted = true;
         private int whistleRadius = 64;
-        private String spawnerRoleId;
         private List<String> spawnerRoleAllowlist = Collections.emptyList();
         private List<String> spawnerRoleDenylist = Collections.emptyList();
+        private RoleListMode spawnerRoleListMode = RoleListMode.ANY;
+        private Boolean captureRequireOwnerOverride;
+        private Boolean spawnRequireOwnerOverride;
+        private String captureParticleSystem;
+        private String spawnParticleSystem;
+        private String captureSoundEvent;
+        private String spawnSoundEvent;
+        private int captureCooldownMs;
+        private int spawnCooldownMs;
+        private double captureMaxDistance;
+        private double spawnMaxDistance;
         private String spawnerFilledItemId;
         private String spawnerIconDefault;
-        private String spawnerParticleSystem;
-        private String spawnerSoundEvent;
         private List<SpawnerIconOverride> spawnerIconOverrides = Collections.emptyList();
         private Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole = Collections.emptyMap();
 
@@ -176,33 +260,31 @@ public final class ItemFeatureConfig {
             return this;
         }
 
+        public Builder captureRequireTamed(boolean captureRequireTamed) {
+            this.captureRequireTamed = captureRequireTamed;
+            return this;
+        }
+
+        public Builder captureOwnerRestricted(boolean captureOwnerRestricted) {
+            this.captureOwnerRestricted = captureOwnerRestricted;
+            return this;
+        }
+
         public Builder spawnAssignsOwner(boolean spawnAssignsOwner) {
             this.spawnAssignsOwner = spawnAssignsOwner;
             return this;
         }
 
-        public Builder ownerRestricted(boolean ownerRestricted) {
-            this.ownerRestricted = ownerRestricted;
+        public Builder spawnOwnerRestricted(boolean spawnOwnerRestricted) {
+            this.spawnOwnerRestricted = spawnOwnerRestricted;
             return this;
         }
 
-        public Builder requireTamed(boolean requireTamed) {
-            this.requireTamed = requireTamed;
-            return this;
-        }
 
-        public Builder spawnerAllowUncaptured(boolean spawnerAllowUncaptured) {
-            this.spawnerAllowUncaptured = spawnerAllowUncaptured;
-            return this;
-        }
+
 
         public Builder whistleRadius(int whistleRadius) {
             this.whistleRadius = whistleRadius;
-            return this;
-        }
-
-        public Builder spawnerRoleId(String spawnerRoleId) {
-            this.spawnerRoleId = spawnerRoleId;
             return this;
         }
 
@@ -224,6 +306,64 @@ public final class ItemFeatureConfig {
             return this;
         }
 
+        public Builder spawnerRoleListMode(RoleListMode spawnerRoleListMode) {
+            this.spawnerRoleListMode = spawnerRoleListMode != null ? spawnerRoleListMode : RoleListMode.ANY;
+            return this;
+        }
+
+
+
+        public Builder captureRequireOwnerOverride(Boolean captureRequireOwnerOverride) {
+            this.captureRequireOwnerOverride = captureRequireOwnerOverride;
+            return this;
+        }
+
+        public Builder spawnRequireOwnerOverride(Boolean spawnRequireOwnerOverride) {
+            this.spawnRequireOwnerOverride = spawnRequireOwnerOverride;
+            return this;
+        }
+
+        public Builder captureParticleSystem(String captureParticleSystem) {
+            this.captureParticleSystem = captureParticleSystem;
+            return this;
+        }
+
+        public Builder spawnParticleSystem(String spawnParticleSystem) {
+            this.spawnParticleSystem = spawnParticleSystem;
+            return this;
+        }
+
+        public Builder captureSoundEvent(String captureSoundEvent) {
+            this.captureSoundEvent = captureSoundEvent;
+            return this;
+        }
+
+        public Builder spawnSoundEvent(String spawnSoundEvent) {
+            this.spawnSoundEvent = spawnSoundEvent;
+            return this;
+        }
+
+        public Builder captureCooldownMs(int captureCooldownMs) {
+            this.captureCooldownMs = captureCooldownMs;
+            return this;
+        }
+
+        public Builder spawnCooldownMs(int spawnCooldownMs) {
+            this.spawnCooldownMs = spawnCooldownMs;
+            return this;
+        }
+
+        public Builder captureMaxDistance(double captureMaxDistance) {
+            this.captureMaxDistance = captureMaxDistance;
+            return this;
+        }
+
+        public Builder spawnMaxDistance(double spawnMaxDistance) {
+            this.spawnMaxDistance = spawnMaxDistance;
+            return this;
+        }
+
+
         public Builder spawnerFilledItemId(String spawnerFilledItemId) {
             this.spawnerFilledItemId = spawnerFilledItemId;
             return this;
@@ -234,15 +374,7 @@ public final class ItemFeatureConfig {
             return this;
         }
 
-        public Builder spawnerParticleSystem(String spawnerParticleSystem) {
-            this.spawnerParticleSystem = spawnerParticleSystem;
-            return this;
-        }
 
-        public Builder spawnerSoundEvent(String spawnerSoundEvent) {
-            this.spawnerSoundEvent = spawnerSoundEvent;
-            return this;
-        }
 
         // Overrides are matched by attachment key/value pairs.
         public Builder spawnerIconOverrides(List<SpawnerIconOverride> spawnerIconOverrides) {
@@ -295,18 +427,26 @@ public final class ItemFeatureConfig {
         return spawnerEnabled == other.spawnerEnabled
                 && whistleEnabled == other.whistleEnabled
                 && captureClearsOwner == other.captureClearsOwner
+                && captureRequireTamed == other.captureRequireTamed
+                && captureOwnerRestricted == other.captureOwnerRestricted
                 && spawnAssignsOwner == other.spawnAssignsOwner
-                && ownerRestricted == other.ownerRestricted
-                && requireTamed == other.requireTamed
-                && spawnerAllowUncaptured == other.spawnerAllowUncaptured
+                && spawnOwnerRestricted == other.spawnOwnerRestricted
                 && whistleRadius == other.whistleRadius
-                && Objects.equals(spawnerRoleId, other.spawnerRoleId)
+                && spawnerRoleListMode == other.spawnerRoleListMode
+                && Objects.equals(captureRequireOwnerOverride, other.captureRequireOwnerOverride)
+                && Objects.equals(spawnRequireOwnerOverride, other.spawnRequireOwnerOverride)
+                && Objects.equals(captureParticleSystem, other.captureParticleSystem)
+                && Objects.equals(spawnParticleSystem, other.spawnParticleSystem)
+                && Objects.equals(captureSoundEvent, other.captureSoundEvent)
+                && Objects.equals(spawnSoundEvent, other.spawnSoundEvent)
+                && captureCooldownMs == other.captureCooldownMs
+                && spawnCooldownMs == other.spawnCooldownMs
+                && Double.compare(captureMaxDistance, other.captureMaxDistance) == 0
+                && Double.compare(spawnMaxDistance, other.spawnMaxDistance) == 0
                 && Objects.equals(spawnerRoleAllowlist, other.spawnerRoleAllowlist)
                 && Objects.equals(spawnerRoleDenylist, other.spawnerRoleDenylist)
                 && Objects.equals(spawnerFilledItemId, other.spawnerFilledItemId)
                 && Objects.equals(spawnerIconDefault, other.spawnerIconDefault)
-                && Objects.equals(spawnerParticleSystem, other.spawnerParticleSystem)
-                && Objects.equals(spawnerSoundEvent, other.spawnerSoundEvent)
                 && Objects.equals(spawnerIconOverrides, other.spawnerIconOverrides)
                 && Objects.equals(spawnerIconOverridesByRole, other.spawnerIconOverridesByRole);
     }
@@ -317,25 +457,31 @@ public final class ItemFeatureConfig {
                 spawnerEnabled,
                 whistleEnabled,
                 captureClearsOwner,
+                captureRequireTamed,
+                captureOwnerRestricted,
                 spawnAssignsOwner,
-                ownerRestricted,
-                requireTamed,
-                spawnerAllowUncaptured,
+                spawnOwnerRestricted,
                 whistleRadius,
-                spawnerRoleId,
+                spawnerRoleListMode,
+                captureRequireOwnerOverride,
+                spawnRequireOwnerOverride,
+                captureParticleSystem,
+                spawnParticleSystem,
+                captureSoundEvent,
+                spawnSoundEvent,
+                captureCooldownMs,
+                spawnCooldownMs,
+                captureMaxDistance,
+                spawnMaxDistance,
                 spawnerRoleAllowlist,
                 spawnerRoleDenylist,
                 spawnerFilledItemId,
                 spawnerIconDefault,
-                spawnerParticleSystem,
-                spawnerSoundEvent,
                 spawnerIconOverrides,
                 spawnerIconOverridesByRole
         );
     }
 }
-
-
 
 
 

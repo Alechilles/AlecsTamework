@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfigLoader;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.ModItemFeatureConfigDiscovery;
 import com.alechilles.alecstamework.config.TameworkSettings;
+import com.alechilles.alecstamework.config.assets.SpawnerConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
@@ -33,7 +34,11 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
+import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
+import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -66,6 +71,7 @@ public class Tamework extends JavaPlugin {
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private boolean npcActionsRegistered;
+    private boolean spawnerAssetsRegistered;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
 
@@ -81,6 +87,7 @@ public class Tamework extends JavaPlugin {
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
+        registerSpawnerItemAssets();
 
         // Resolve settings paths and optional server-level overrides.
         Path settingsDir = getDataDirectory().resolve("Server").resolve("Tamework");
@@ -127,6 +134,7 @@ public class Tamework extends JavaPlugin {
                 getLogger()
         );
         loaded += ModItemFeatureConfigDiscovery.loadAll(loader, itemFeatureRegistry, getLogger(), getDataDirectory());
+        loaded += loadSpawnerItemAssets();
 
         // Load translation entries from mods so messages can be localized.
         translationRegistry = new TranslationRegistry();
@@ -189,6 +197,7 @@ public class Tamework extends JavaPlugin {
         }
         itemFeatureRegistry.clear();
         itemFeatureRegistry.registerDefaults();
+        registerSpawnerItemAssets();
         ItemFeatureConfigLoader loader = new ItemFeatureConfigLoader();
         int loaded = 0;
         loaded += loader.loadFromResource(
@@ -197,10 +206,57 @@ public class Tamework extends JavaPlugin {
                 getLogger()
         );
         loaded += ModItemFeatureConfigDiscovery.loadAll(loader, itemFeatureRegistry, getLogger(), getDataDirectory());
+        loaded += loadSpawnerItemAssets();
         getLogger().at(Level.INFO).log(
                 "Reloaded Tamework item feature configs: " + loaded
                         + " (total: " + itemFeatureRegistry.snapshot().size() + ")"
         );
+        return loaded;
+    }
+
+
+    private void registerSpawnerItemAssets() {
+        if (spawnerAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(SpawnerConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Items/Spawners")
+                        .setCodec(SpawnerConfig.CODEC)
+                        .setKeyFunction(SpawnerConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, SpawnerConfig.class, this::onSpawnerAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, SpawnerConfig.class, this::onSpawnerAssetsRemoved);
+        spawnerAssetsRegistered = true;
+    }
+
+    private void onSpawnerAssetsLoaded(
+            LoadedAssetsEvent<String, SpawnerConfig, DefaultAssetMap<String, SpawnerConfig>> event) {
+        reloadItemFeatureConfigs();
+    }
+
+    private void onSpawnerAssetsRemoved(
+            RemovedAssetsEvent<String, SpawnerConfig, DefaultAssetMap<String, SpawnerConfig>> event) {
+        reloadItemFeatureConfigs();
+    }
+
+    private int loadSpawnerItemAssets() {
+        if (itemFeatureRegistry == null) {
+            return 0;
+        }
+        DefaultAssetMap<String, SpawnerConfig> assetMap = SpawnerConfig.getAssetMap();
+        if (assetMap == null) {
+            return 0;
+        }
+        int loaded = 0;
+        for (SpawnerConfig asset : assetMap.getAssetMap().values()) {
+            if (asset == null || asset.getId() == null || asset.getId().isBlank()) {
+                continue;
+            }
+            itemFeatureRegistry.register(asset.getId(), asset.toItemFeatureConfig());
+            loaded++;
+        }
         return loaded;
     }
 

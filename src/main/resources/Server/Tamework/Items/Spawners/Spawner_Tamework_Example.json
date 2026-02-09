@@ -1,0 +1,26 @@
+{
+  "Id": "Spawner_Tamework_Example",
+  "FilledItemId": "*Spawner_Tamework_Example_State_Filled",
+  "AllowedRoles": {
+    "Mode": "Allowlist",
+    "Allowlist": [
+      "Cat",
+      "Cat_Pet",
+      "Mob_Tamework_Example",
+      "Mob_Tamework_Example_Simple",
+      "Mob_Tamework_Example_Hytalor"
+    ]
+  },
+  "Capture": {
+    "ClearsOwner": true,
+    "OwnerRestricted": true,
+    "ParticleSystem": "Poof_Small",
+    "SoundEvent": "SFX_Tamework_Poof"
+  },
+  "Spawn": {
+    "AssignsOwner": true,
+    "OwnerRestricted": true,
+    "ParticleSystem": "Poof_Small",
+    "SoundEvent": "SFX_Tamework_Poof"
+  }
+}
