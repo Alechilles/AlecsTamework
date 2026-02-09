@@ -1,34 +1,32 @@
-# Config Discovery and Overrides
+# Spawner Config Assets
 
-This document explains how Tamework discovers item configs and how per‑world overrides work.
+This document explains how Tamework discovers spawner configs in the new asset-based system.
 
-## Mod‑level config (defaults)
-Each mod can include a default config in:
-```
-<ModRoot>/Server/Tamework/Tamework_Items_Config.json
-```
-This is the canonical config shipped with the mod.
+## Asset location
+Spawner configs are **SpawnerConfig** assets stored under:
+~~~
+<ModRoot>/Server/Tamework/Items/Spawners/*.json
+~~~
 
-## Per‑world overrides (local saves)
-Overrides are stored per‑world in:
-```
-<UserData>/Saves/<World>/mods/<ModName>/Tamework_Items_Config.json
-```
-Notes:
-- The per‑world file is auto‑created **empty** to avoid overriding future defaults.
-- The mod name is taken from the manifest (not the zip name).
-- If empty, defaults from the mod are used.
+The asset Id should match the **empty spawner item ID**. Assets are loaded through the asset registry
+like any other server asset.
+
+## Overrides
+Spawner configs are standard assets. If you need to override another mod's spawner settings, use:
+- A patch/override mod
+- A Hytalor patch that targets the spawner asset
+
+There are no per-world override files for spawner configs.
 
 ## Settings config
-Tamework settings are stored per‑world and are copied from the mod defaults if missing. The default path is:
-```
+Tamework settings are still stored per-world and are copied from the mod defaults if missing. The default path is:
+~~~
 <UserData>/Saves/<World>/mods/<ModName>/tamework-settings.json
-```
+~~~
 
-## Why this design
-- Avoids breaking updates (defaults keep working even if new items are added).
-- Allows players to override only what they need.
-
-## Common pitfalls
-- Putting overrides in `Server/Tamework` (that’s for the mod copy).
-- Using the zip name instead of the manifest name for `<ModName>`.
+## Reloading
+After editing assets on disk, run:
+~~~
+/tw reloadconfig
+~~~
+This reloads spawner config assets from disk.

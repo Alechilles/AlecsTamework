@@ -7,7 +7,7 @@ This file is a quick map of the custom behavior surface area.
   - owner/stranger/wild capture flows
   - deny capture when untamed (optional foods list)
 - Tamed state:
-  - `TameworkSetTamed` sets a boolean on the NPC
+  - TameworkSetTamed sets a boolean on the NPC
 - Owner setting:
   - owner component is set from player context
 
@@ -29,8 +29,7 @@ This file is a quick map of the custom behavior surface area.
 - Avoid custom logic in templates when a Tamework action exists.
 
 ## Commands
-- `/tw getowner` prints the owner name + UUID (when available).
-- `/tw gettamed` prints the current tamed status for the targeted NPC.
-- `/tw settamed` toggles the tamed flag on the targeted NPC.
-- `/tw reloadconfig` reloads Tamework item feature configs from disk.
-
+- /tw getowner prints the owner name + UUID (when available).
+- /tw gettamed prints the current tamed status for the targeted NPC.
+- /tw settamed toggles the tamed flag on the targeted NPC.
+- /tw reloadconfig reloads spawner config assets from disk.

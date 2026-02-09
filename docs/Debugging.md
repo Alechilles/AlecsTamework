@@ -3,11 +3,11 @@
 ## Recommended workflow
 - Test on a local server first.
 - Check server logs for builder/action errors.
-- Validate config discovery (mod defaults + per‑world overrides).
+- Validate spawner config assets are loading.
 
 ## Common log messages
 - “Builder ... does not exist” → missing action/sensor registration or asset load order.
-- “Unknown JSON attribute ...” → action builder doesn’t recognize the field name.
+- “Unknown JSON attribute ...” → action builder does not recognize the field name.
 - Owner/tamed issues → ensure components are attached and actions are firing.
 
 ## Visual debugging tips
@@ -18,10 +18,9 @@
 ## Useful checks
 - Spawn both tamework example mobs to validate actions/sensors.
 - Confirm capture + spawn preserves attachments.
-- Validate owner/tamed gating with `/tw getowner` and denial messages.
-- After editing `Tamework_Items_Config.json`, run `/tw reloadconfig` to reload item configs.
+- Validate owner/tamed gating with /tw getowner and denial messages.
+- After editing spawner configs, run /tw reloadconfig to reload spawner assets.
 
 ## Hytalor patches
-- Hytalor writes patched output to `.../Server/mods/HytalorOverrides/`.
+- Hytalor writes patched output to .../Server/mods/HytalorOverrides/.
 - If a change seems ignored, compare the override file to your patch source to verify the patch applied.
-
