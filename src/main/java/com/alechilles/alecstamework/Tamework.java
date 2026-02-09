@@ -11,9 +11,7 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
-import com.alechilles.alecstamework.config.ItemFeatureConfigLoader;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
-import com.alechilles.alecstamework.config.ModItemFeatureConfigDiscovery;
 import com.alechilles.alecstamework.config.TameworkSettings;
 import com.alechilles.alecstamework.config.assets.SpawnerConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
@@ -58,8 +56,6 @@ import com.hypixel.hytale.server.npc.instructions.Sensor;
 public class Tamework extends JavaPlugin {
 
     private static Tamework instance;
-    private static final String ITEM_FEATURE_CONFIG_PATH =
-            "Server/Tamework/Tamework_Items_Config.json";
     private static final String SETTINGS_RESOURCE_PATH =
             "Server/Tamework/Tamework_Settings.json";
     private static final String SETTINGS_FILENAME = "Tamework_Settings";
@@ -126,14 +122,7 @@ public class Tamework extends JavaPlugin {
         );
 
         // Load item feature configs from bundled defaults and mod overrides.
-        ItemFeatureConfigLoader loader = new ItemFeatureConfigLoader();
         int loaded = 0;
-        loaded += loader.loadFromResource(
-                ITEM_FEATURE_CONFIG_PATH,
-                itemFeatureRegistry,
-                getLogger()
-        );
-        loaded += ModItemFeatureConfigDiscovery.loadAll(loader, itemFeatureRegistry, getLogger(), getDataDirectory());
         loaded += loadSpawnerItemAssets();
 
         // Load translation entries from mods so messages can be localized.
@@ -198,14 +187,7 @@ public class Tamework extends JavaPlugin {
         itemFeatureRegistry.clear();
         itemFeatureRegistry.registerDefaults();
         registerSpawnerItemAssets();
-        ItemFeatureConfigLoader loader = new ItemFeatureConfigLoader();
         int loaded = 0;
-        loaded += loader.loadFromResource(
-                ITEM_FEATURE_CONFIG_PATH,
-                itemFeatureRegistry,
-                getLogger()
-        );
-        loaded += ModItemFeatureConfigDiscovery.loadAll(loader, itemFeatureRegistry, getLogger(), getDataDirectory());
         loaded += loadSpawnerItemAssets();
         getLogger().at(Level.INFO).log(
                 "Reloaded Tamework item feature configs: " + loaded
