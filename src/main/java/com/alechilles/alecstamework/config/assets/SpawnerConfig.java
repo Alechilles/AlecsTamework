@@ -289,7 +289,7 @@ public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
     public ItemFeatureConfig toItemFeatureConfig() {
         CaptureSettings captureSettings = capture != null ? capture : new CaptureSettings();
         SpawnSettings spawnSettings = spawn != null ? spawn : new SpawnSettings();
-        RoleFilterMode mode = RoleFilterMode.AllowAll;
+        RoleFilterMode mode = RoleFilterMode.Allowlist;
         String[] allowlist = ArrayUtil.EMPTY_STRING_ARRAY;
         String[] denylist = ArrayUtil.EMPTY_STRING_ARRAY;
         AllowedRoles allowed = allowedRoles;
@@ -371,7 +371,7 @@ public class SpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
     }
 
     public static final class AllowedRoles {
-        private RoleFilterMode mode = RoleFilterMode.AllowAll;
+        private RoleFilterMode mode = RoleFilterMode.Allowlist;
         private String[] allowlist = ArrayUtil.EMPTY_STRING_ARRAY;
         private String[] denylist = ArrayUtil.EMPTY_STRING_ARRAY;
     }
