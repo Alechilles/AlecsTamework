@@ -15,12 +15,16 @@
     "ClearsOwner": true,
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
-    "SoundEvent": "SFX_Tamework_Poof"
+    "SoundEvent": "SFX_Tamework_Poof",
+    "CooldownMs": 500,
+    "MaxDistance": 5
   },
   "Spawn": {
     "AssignsOwner": true,
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
-    "SoundEvent": "SFX_Tamework_Poof"
+    "SoundEvent": "SFX_Tamework_Poof",
+    "CooldownMs": 500,
+    "MaxDistance": 5
   }
 }

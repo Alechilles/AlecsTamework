@@ -31,6 +31,7 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
@@ -307,7 +308,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
 
-        Vector3d spawnPosition = resolveSpawnPosition(player);
+        Vector3d spawnPosition = resolveSpawnPosition(player, config);
         if (spawnPosition == null) {
             return false;
         }
@@ -716,7 +717,7 @@ public final class SpawnerFeatureHandler {
     }
 
 
-    private Vector3d resolveSpawnPosition(Player player) {
+        private Vector3d resolveSpawnPosition(Player player, ItemFeatureConfig config) {
         if (player == null) {
             return null;
         }
@@ -729,6 +730,15 @@ public final class SpawnerFeatureHandler {
         if (playerRef == null || !playerRef.isValid()) {
             return null;
         }
+        double maxDistance = config != null ? config.getSpawnMaxDistance() : 0;
+        double rayDistance = maxDistance > 0 ? maxDistance : SPAWN_FORWARD_DISTANCE;
+
+        Vector3d targetLocation = TargetUtil.getTargetLocation(playerRef, blockId -> isBlockingSpawnBlock(blockId), rayDistance, store);
+        if (targetLocation != null) {
+            targetLocation.y += SPAWN_OFFSET_Y;
+            return targetLocation;
+        }
+
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
             return null;
@@ -745,11 +755,24 @@ public final class SpawnerFeatureHandler {
         forward.normalize();
 
         Vector3d spawnPos = new Vector3d(transform.getPosition());
-        spawnPos.x += forward.x * SPAWN_FORWARD_DISTANCE;
-        spawnPos.y += forward.y * SPAWN_FORWARD_DISTANCE + SPAWN_OFFSET_Y;
-        spawnPos.z += forward.z * SPAWN_FORWARD_DISTANCE;
+        spawnPos.x += forward.x * rayDistance;
+        spawnPos.y += forward.y * rayDistance + SPAWN_OFFSET_Y;
+        spawnPos.z += forward.z * rayDistance;
         return spawnPos;
     }
+
+    private boolean isBlockingSpawnBlock(int blockId) {
+        if (blockId == 0) {
+            return false;
+        }
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
+        if (blockType == null || blockType == BlockType.UNKNOWN) {
+            return false;
+        }
+        return WorldUtil.isSolidOnlyBlock(blockType, 0);
+    }
+
+
 
     private Vector3f resolveSpawnRotation(Store<EntityStore> store, Ref<EntityStore> playerRef) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
