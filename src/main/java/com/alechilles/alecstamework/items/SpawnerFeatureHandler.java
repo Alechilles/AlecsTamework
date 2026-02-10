@@ -49,6 +49,7 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -59,7 +60,9 @@ import java.util.logging.Level;
 public final class SpawnerFeatureHandler {
 
     private static final double SPAWN_OFFSET_Y = 0.5;
+    private static final double SPAWN_SURFACE_OFFSET_Y = 0.01;
     private static final double SPAWN_FORWARD_DISTANCE = 1.5;
+    private static final double RAYCAST_DISTANCE_EPSILON = 0.1;
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final Gson GSON = new Gson();
     private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
@@ -716,8 +719,7 @@ public final class SpawnerFeatureHandler {
         return (dx * dx + dy * dy + dz * dz) <= maxDistSq;
     }
 
-
-        private Vector3d resolveSpawnPosition(Player player, ItemFeatureConfig config) {
+    private Vector3d resolveSpawnPosition(Player player, ItemFeatureConfig config) {
         if (player == null) {
             return null;
         }
@@ -731,13 +733,8 @@ public final class SpawnerFeatureHandler {
             return null;
         }
         double maxDistance = config != null ? config.getSpawnMaxDistance() : 0;
-        double rayDistance = maxDistance > 0 ? maxDistance : SPAWN_FORWARD_DISTANCE;
-
-        Vector3d targetLocation = TargetUtil.getTargetLocation(playerRef, blockId -> isBlockingSpawnBlock(blockId), rayDistance, store);
-        if (targetLocation != null) {
-            targetLocation.y += SPAWN_OFFSET_Y;
-            return targetLocation;
-        }
+        double spawnDistance = maxDistance > 0 ? maxDistance : SPAWN_FORWARD_DISTANCE;
+        double rayDistance = spawnDistance + RAYCAST_DISTANCE_EPSILON;
 
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
@@ -754,10 +751,54 @@ public final class SpawnerFeatureHandler {
         forward.rotateX(rotation.getPitch());
         forward.normalize();
 
+        Vector3d targetLocation = TargetUtil.getTargetLocation(
+            playerRef,
+            blockId -> isBlockingSpawnBlock(blockId),
+            rayDistance,
+            store
+        );
+        if (targetLocation != null) {
+            // Nudge the hit position back along the ray so we reliably resolve the hit block,
+            // then spawn centered on top of that block to avoid inside-block spawns.
+            double nudge = 0.01;
+            Vector3d adjusted = new Vector3d(
+                targetLocation.x - forward.x * nudge,
+                targetLocation.y - forward.y * nudge,
+                targetLocation.z - forward.z * nudge
+            );
+            int blockX = (int) Math.floor(adjusted.x);
+            int blockY = (int) Math.floor(adjusted.y);
+            int blockZ = (int) Math.floor(adjusted.z);
+            double clampedX = Math.min(Math.max(targetLocation.x, blockX + 0.001), blockX + 0.999);
+            double clampedZ = Math.min(Math.max(targetLocation.z, blockZ + 0.001), blockZ + 0.999);
+            double targetY = targetLocation.y;
+            double spawnY;
+            double snapThreshold = 0.02;
+            if (Math.abs(targetY - blockY) <= snapThreshold || Math.abs(targetY - (blockY + 1.0)) <= snapThreshold) {
+                spawnY = targetY + SPAWN_SURFACE_OFFSET_Y;
+            } else {
+                spawnY = blockY + 1.0 + SPAWN_SURFACE_OFFSET_Y;
+            }
+            Vector3d spawnPos = new Vector3d(
+                clampedX,
+                spawnY,
+                clampedZ
+            );
+            logSpawnDebug("hit", targetLocation, adjusted, spawnPos, forward, rayDistance, maxDistance, blockX, blockY, blockZ);
+            return spawnPos;
+        }
+
         Vector3d spawnPos = new Vector3d(transform.getPosition());
-        spawnPos.x += forward.x * rayDistance;
-        spawnPos.y += forward.y * rayDistance + SPAWN_OFFSET_Y;
-        spawnPos.z += forward.z * rayDistance;
+        spawnPos.x += forward.x * spawnDistance;
+        spawnPos.y += forward.y * spawnDistance + SPAWN_OFFSET_Y;
+        spawnPos.z += forward.z * spawnDistance;
+        double minY = transform.getPosition().y + SPAWN_SURFACE_OFFSET_Y;
+        if (spawnPos.y < minY) {
+            spawnPos.y = minY;
+            logSpawnDebug("fallback-clamped", null, null, spawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
+            return spawnPos;
+        }
+        logSpawnDebug("fallback", null, null, spawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
         return spawnPos;
     }
 
@@ -773,6 +814,55 @@ public final class SpawnerFeatureHandler {
     }
 
 
+
+
+
+    private void logSpawnDebug(
+            String stage,
+            Vector3d targetLocation,
+            Vector3d adjusted,
+            Vector3d spawnPos,
+            Vector3f forward,
+            double rayDistance,
+            double maxDistance,
+            int blockX,
+            int blockY,
+            int blockZ
+    ) {
+        StringBuilder message = new StringBuilder(200);
+        message.append("Spawner spawn debug [").append(stage).append("] ");
+        message.append("ray=").append(rayDistance).append(" max=").append(maxDistance).append(" ");
+        if (forward != null) {
+            message.append("forward=").append(formatVector(forward)).append(" ");
+        }
+        if (targetLocation != null) {
+            message.append("target=").append(formatVector(targetLocation)).append(" ");
+        }
+        if (adjusted != null) {
+            message.append("adjusted=").append(formatVector(adjusted)).append(" ");
+        }
+        if (blockX != -1 || blockY != -1 || blockZ != -1) {
+            message.append("block=(").append(blockX).append(",").append(blockY).append(",").append(blockZ).append(") ");
+        }
+        if (spawnPos != null) {
+            message.append("spawn=").append(formatVector(spawnPos));
+        }
+        logger.at(Level.INFO).log(message.toString());
+    }
+
+    private static String formatVector(Vector3d vector) {
+        if (vector == null) {
+            return "(null)";
+        }
+        return String.format(Locale.US, "(%.3f, %.3f, %.3f)", vector.x, vector.y, vector.z);
+    }
+
+    private static String formatVector(Vector3f vector) {
+        if (vector == null) {
+            return "(null)";
+        }
+        return String.format(Locale.US, "(%.3f, %.3f, %.3f)", vector.x, vector.y, vector.z);
+    }
 
     private Vector3f resolveSpawnRotation(Store<EntityStore> store, Ref<EntityStore> playerRef) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
@@ -1425,6 +1515,13 @@ public final class SpawnerFeatureHandler {
         return true;
     }
 }
+
+
+
+
+
+
+
 
 
 
