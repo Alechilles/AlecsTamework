@@ -877,6 +877,14 @@ public final class SpawnerFeatureHandler {
         if (headRotation != null) {
             rotation = new Vector3f(headRotation.getRotation());
         }
+        rotation.addYaw(180.0f);
+        float yaw = rotation.getYaw();
+        if (yaw >= 360.0f) {
+            yaw -= 360.0f;
+        } else if (yaw < 0.0f) {
+            yaw += 360.0f;
+        }
+        rotation.setYaw(yaw);
         return rotation;
     }
 
