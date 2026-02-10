@@ -1,7 +1,7 @@
 {
   "$Comment": "Interaction test role for Action_Tamework_Interact.",
   "Type": "Variant",
-  "Reference": "Template_Tamework_Example_Hytalor",
+  "Reference": "Template_Tamework_Interact_Test",
   "Modify": {
     "Appearance": "Tamework_Example",
     "IsMountable": false,
@@ -19,32 +19,5 @@
       "Value": "TwInteractionConfig_Interact_Test",
       "Description": "Optional override for Action_Tamework_Interact."
     }
-  },
-  "InteractionInstruction": {
-    "Enabled": true,
-    "Instructions": [
-      {
-        "Continue": true,
-        "Sensor": {
-          "Type": "Any"
-        },
-        "Actions": [
-          {
-            "Type": "SetInteractable",
-            "Interactable": true
-          }
-        ]
-      },
-      {
-        "Sensor": {
-          "Type": "HasInteracted"
-        },
-        "Actions": [
-          {
-            "Type": "TameworkInteract"
-          }
-        ]
-      }
-    ]
   }
 }
