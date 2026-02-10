@@ -339,7 +339,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         Ref<EntityStore> playerRef = player.getReference();
-        Vector3f rotation = resolveSpawnRotation(store, playerRef);
+        Vector3f rotation = resolveSpawnRotation(store, playerRef, spawnPosition);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             logger.at(Level.FINE).log("Spawner spawn: failed to spawn role=" + roleId);
@@ -864,7 +864,9 @@ public final class SpawnerFeatureHandler {
         return String.format(Locale.US, "(%.3f, %.3f, %.3f)", vector.x, vector.y, vector.z);
     }
 
-    private Vector3f resolveSpawnRotation(Store<EntityStore> store, Ref<EntityStore> playerRef) {
+    private Vector3f resolveSpawnRotation(Store<EntityStore> store,
+                                         Ref<EntityStore> playerRef,
+                                         Vector3d spawnPosition) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
             return new Vector3f();
         }
@@ -872,19 +874,22 @@ public final class SpawnerFeatureHandler {
         if (transform == null) {
             return new Vector3f();
         }
+        Vector3d playerPos = new Vector3d(transform.getPosition());
+        if (spawnPosition != null) {
+            Vector3d relative = new Vector3d(
+                playerPos.x - spawnPosition.x,
+                0.0,
+                playerPos.z - spawnPosition.z
+            );
+            if (relative.squaredLength() > 0.0001) {
+                return Vector3f.lookAt(relative);
+            }
+        }
         Vector3f rotation = new Vector3f(transform.getRotation());
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
         if (headRotation != null) {
             rotation = new Vector3f(headRotation.getRotation());
         }
-        rotation.addYaw(180.0f);
-        float yaw = rotation.getYaw();
-        if (yaw >= 360.0f) {
-            yaw -= 360.0f;
-        } else if (yaw < 0.0f) {
-            yaw += 360.0f;
-        }
-        rotation.setYaw(yaw);
         return rotation;
     }
 

@@ -1,0 +1,20 @@
+{
+  "Enabled": true,
+  "RoleIds": [
+    "Role_Tamework_Default"
+  ],
+  "Interactions": [
+    {
+      "Type": "Taming",
+      "Enabled": true
+    },
+    {
+      "Type": "Feeding",
+      "Enabled": true
+    },
+    {
+      "Type": "Harvesting",
+      "Enabled": true
+    }
+  ]
+}

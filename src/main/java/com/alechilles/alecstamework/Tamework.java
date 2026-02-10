@@ -13,6 +13,7 @@ import javax.annotation.Nonnull;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkSettings;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
@@ -25,6 +26,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStra
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCaptureUntamed;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -68,6 +70,7 @@ public class Tamework extends JavaPlugin {
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private boolean npcActionsRegistered;
     private boolean spawnerAssetsRegistered;
+    private boolean interactionAssetsRegistered;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
 
@@ -84,6 +87,7 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
         registerSpawnerItemAssets();
+        registerInteractionAssets();
 
         // Resolve settings paths and optional server-level overrides.
         Path settingsDir = getDataDirectory().resolve("Server").resolve("Tamework");
@@ -211,6 +215,20 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsRemoved);
         spawnerAssetsRegistered = true;
+    }
+
+    private void registerInteractionAssets() {
+        if (interactionAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwInteractionConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Interactions")
+                        .setCodec(TwInteractionConfig.CODEC)
+                        .setKeyFunction(TwInteractionConfig::getId)
+                        .build()
+        );
+        interactionAssetsRegistered = true;
     }
 
     private void onSpawnerAssetsLoaded(
@@ -358,6 +376,7 @@ public class Tamework extends JavaPlugin {
             actionFactory.add(BuilderActionTameworkCaptureWild.BUILDER_ID, BuilderActionTameworkCaptureWild::new);
             actionFactory.add(BuilderActionTameworkDenyInteract.BUILDER_ID, BuilderActionTameworkDenyInteract::new);
             actionFactory.add(BuilderActionTameworkDenyCaptureUntamed.BUILDER_ID, BuilderActionTameworkDenyCaptureUntamed::new);
+            actionFactory.add(BuilderActionTameworkInteract.BUILDER_ID, BuilderActionTameworkInteract::new);
             actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
             actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);
         }

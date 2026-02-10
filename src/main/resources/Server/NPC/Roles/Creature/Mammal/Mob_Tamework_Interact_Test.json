@@ -1,0 +1,50 @@
+{
+  "$Comment": "Interaction test role for Action_Tamework_Interact.",
+  "Type": "Variant",
+  "Reference": "Template_Tamework_Example_Hytalor",
+  "Modify": {
+    "Appearance": "Tamework_Example",
+    "IsMountable": false,
+    "IsHarvestable": true,
+    "HarvestDropList": "Drop_Sheep_Harvest",
+    "HarvestInteractionContext": "Shear",
+    "HarvestParticles": "Sheep_Wool_Shear",
+    "HarvestSound": "SFX_Sheep_Sheared",
+    "LovedItems": [
+      "Plant_Fruit_Apple"
+    ]
+  },
+  "Parameters": {
+    "InteractionConfigId": {
+      "Value": "TwInteractionConfig_Interact_Test",
+      "Description": "Optional override for Action_Tamework_Interact."
+    }
+  },
+  "InteractionInstruction": {
+    "Enabled": true,
+    "Instructions": [
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any"
+        },
+        "Actions": [
+          {
+            "Type": "SetInteractable",
+            "Interactable": true
+          }
+        ]
+      },
+      {
+        "Sensor": {
+          "Type": "HasInteracted"
+        },
+        "Actions": [
+          {
+            "Type": "TameworkInteract"
+          }
+        ]
+      }
+    ]
+  }
+}

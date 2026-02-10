@@ -1,0 +1,20 @@
+{
+  "Enabled": true,
+  "RoleIds": [
+    "Mob_Tamework_Interact_Test"
+  ],
+  "Interactions": [
+    {
+      "Type": "Taming",
+      "Enabled": true
+    },
+    {
+      "Type": "Feeding",
+      "Enabled": true
+    },
+    {
+      "Type": "Harvesting",
+      "Enabled": true
+    }
+  ]
+}
