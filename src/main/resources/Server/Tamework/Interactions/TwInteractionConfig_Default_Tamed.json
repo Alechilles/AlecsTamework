@@ -5,15 +5,15 @@
   ],
   "Interactions": [
     {
-      "Type": "Taming",
+      "Type": "Tame",
       "Enabled": true
     },
     {
-      "Type": "Feeding",
+      "Type": "Feed",
       "Enabled": true
     },
     {
-      "Type": "Harvesting",
+      "Type": "Harvest",
       "Enabled": true
     }
   ]

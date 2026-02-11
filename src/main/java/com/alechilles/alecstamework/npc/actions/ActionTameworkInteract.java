@@ -6,17 +6,24 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequi
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Effects;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HookEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionType;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionContextRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquippedRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HarvestInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeStep;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamOperator;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementBucket;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementGroup;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -31,6 +38,8 @@ import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
@@ -44,6 +53,7 @@ import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
@@ -65,6 +75,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private static final String DEFAULT_IS_MOUNTABLE_PARAM = "IsMountable";
     private static final String DEFAULT_HARVEST_CONTEXT_PARAM = "HarvestInteractionContext";
     private static final String DEFAULT_HARVEST_ALARM = "Harvest_Ready";
+    private static final String HEALTH_STAT_ID = "Health";
     private static final ModeStep[] DEFAULT_MODE_CYCLE = new ModeStep[] {
             new ModeStep("Hold", null, null),
             new ModeStep("Idle", null, null),
@@ -189,11 +200,32 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                                     InfoProvider infoProvider,
                                     Store<EntityStore> store,
                                     Player player) {
-        RequirementGroup requires = entry.getRequires();
-        if (requires == null) {
-            return entry.useDefaults() && checkDefaultRequirements(entry.getType(), npcRef, role, infoProvider, store, player);
+        if (entry instanceof CustomInteraction) {
+            RequirementGroup requires = ((CustomInteraction) entry).getRequires();
+            if (requires == null) {
+                return true;
+            }
+            return evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player);
         }
-        return evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player);
+        if (entry instanceof TameInteraction) {
+            return meetsTameRequirements((TameInteraction) entry, npcRef, role, infoProvider, store, player);
+        }
+        if (entry instanceof FeedInteraction) {
+            return meetsFeedRequirements((FeedInteraction) entry, npcRef, role, infoProvider, store, player);
+        }
+        if (entry instanceof HarvestInteraction) {
+            return meetsHarvestRequirements((HarvestInteraction) entry, npcRef, role, infoProvider, store, player);
+        }
+        if (entry instanceof MountInteraction) {
+            return meetsMountRequirements((MountInteraction) entry, npcRef, role, infoProvider, store, player);
+        }
+        if (entry instanceof ModeCycleInteraction) {
+            return meetsModeCycleRequirements((ModeCycleInteraction) entry, npcRef, role, infoProvider, store, player);
+        }
+        if (entry instanceof BreedInteraction) {
+            return meetsBreedRequirements((BreedInteraction) entry, npcRef, role, infoProvider, store, player);
+        }
+        return false;
     }
 
     private boolean evaluateRequirementGroup(RequirementGroup group,
@@ -391,37 +423,224 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return false;
     }
 
-    private boolean checkDefaultRequirements(InteractionType type,
+    private boolean meetsTameRequirements(TameInteraction interaction,
+                                          Ref<EntityStore> npcRef,
+                                          Role role,
+                                          InfoProvider infoProvider,
+                                          Store<EntityStore> store,
+                                          Player player) {
+        if (isTamed(npcRef, store)) {
+            return false;
+        }
+        return matchesPresetItems(
+                interaction.getUseLovedItems(),
+                interaction.getItemsInHand(),
+                interaction.getItemsParam(),
+                role,
+                player,
+                true
+        );
+    }
+
+    private boolean meetsFeedRequirements(FeedInteraction interaction,
+                                          Ref<EntityStore> npcRef,
+                                          Role role,
+                                          InfoProvider infoProvider,
+                                          Store<EntityStore> store,
+                                          Player player) {
+        if (!isTamed(npcRef, store)) {
+            return false;
+        }
+        String[] explicitItems = resolveFeedItemIds(interaction);
+        return matchesPresetItems(
+                interaction.getUseLovedItems(),
+                explicitItems,
+                interaction.getItemsParam(),
+                role,
+                player,
+                true
+        );
+    }
+
+    private boolean meetsHarvestRequirements(HarvestInteraction interaction,
                                              Ref<EntityStore> npcRef,
                                              Role role,
                                              InfoProvider infoProvider,
                                              Store<EntityStore> store,
                                              Player player) {
-        if (type == null) {
+        boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
+        boolean requireHarvestable = optionOrDefault(interaction.getRequireHarvestable(), true);
+        boolean requireAlarm = optionOrDefault(interaction.getRequireHarvestAlarmReady(), true);
+        boolean requireContext = optionOrDefault(interaction.getRequireHarvestInteractionContext(), true);
+        if (requireTamed && !isTamed(npcRef, store)) {
             return false;
         }
-        switch (type) {
-            case Taming:
-                return !isTamed(npcRef, store)
-                        && isHeldItemInList(resolveLovedItems(role), player);
-            case Feeding:
-                return isTamed(npcRef, store)
-                        && isHeldItemInList(resolveLovedItems(role), player);
-            case Harvesting:
-                return isTamed(npcRef, store)
-                        && resolveIsHarvestable(role)
-                        && isAlarmReady(npcRef, store, DEFAULT_HARVEST_ALARM)
-                        && matchesHarvestContext(npcRef, role, infoProvider, store);
-            case Mounting:
-                return isTamed(npcRef, store)
-                        && isOwner(npcRef, store, player)
-                        && resolveIsMountable(role)
-                        && isPlayerCrouching(role, infoProvider, store, player);
-            case ModeToggle:
-                return isTamed(npcRef, store) && isOwner(npcRef, store, player);
-            default:
-                return false;
+        if (requireHarvestable && !resolveIsHarvestable(role)) {
+            return false;
         }
+        if (requireAlarm && !isAlarmReady(npcRef, store, DEFAULT_HARVEST_ALARM)) {
+            return false;
+        }
+        if (requireContext && !matchesHarvestContext(npcRef, role, infoProvider, store)) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean meetsMountRequirements(MountInteraction interaction,
+                                           Ref<EntityStore> npcRef,
+                                           Role role,
+                                           InfoProvider infoProvider,
+                                           Store<EntityStore> store,
+                                           Player player) {
+        boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
+        boolean requireOwner = optionOrDefault(interaction.getRequireOwner(), true);
+        boolean requireMountable = optionOrDefault(interaction.getRequireMountable(), true);
+        boolean requireCrouching = optionOrDefault(interaction.getRequireCrouching(), true);
+        if (requireTamed && !isTamed(npcRef, store)) {
+            return false;
+        }
+        if (requireOwner && !isOwner(npcRef, store, player)) {
+            return false;
+        }
+        if (requireMountable && !resolveIsMountable(role)) {
+            return false;
+        }
+        if (requireCrouching && !isPlayerCrouching(role, infoProvider, store, player)) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean meetsModeCycleRequirements(ModeCycleInteraction interaction,
+                                               Ref<EntityStore> npcRef,
+                                               Role role,
+                                               InfoProvider infoProvider,
+                                               Store<EntityStore> store,
+                                               Player player) {
+        boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
+        boolean requireOwner = optionOrDefault(interaction.getRequireOwner(), true);
+        if (requireTamed && !isTamed(npcRef, store)) {
+            return false;
+        }
+        if (requireOwner && !isOwner(npcRef, store, player)) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean meetsBreedRequirements(BreedInteraction interaction,
+                                           Ref<EntityStore> npcRef,
+                                           Role role,
+                                           InfoProvider infoProvider,
+                                           Store<EntityStore> store,
+                                           Player player) {
+        boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
+        if (requireTamed && !isTamed(npcRef, store)) {
+            return false;
+        }
+        // Breeding logic will live in the breeding system; for now this just gates the preset.
+        return true;
+    }
+
+    private boolean matchesPresetItems(Boolean useLovedItemsFlag,
+                                       String[] explicitItems,
+                                       String paramName,
+                                       Role role,
+                                       Player player,
+                                       boolean defaultUseLovedItems) {
+        boolean useLovedItems = optionOrDefault(useLovedItemsFlag, defaultUseLovedItems);
+        boolean hasExplicitItems = explicitItems != null && explicitItems.length > 0;
+        boolean hasParam = paramName != null && !paramName.isBlank();
+        boolean requiresItems = useLovedItems || hasExplicitItems || hasParam;
+        if (!requiresItems) {
+            return true;
+        }
+        String[] resolvedItems = resolvePresetItemsInHand(useLovedItems, explicitItems, paramName, role);
+        return isHeldItemInList(resolvedItems, player);
+    }
+
+    private String[] resolvePresetItemsInHand(boolean useLovedItems,
+                                              String[] explicitItems,
+                                              String paramName,
+                                              Role role) {
+        Set<String> merged = new HashSet<>();
+        if (useLovedItems) {
+            String[] loved = resolveLovedItems(role);
+            if (loved != null) {
+                merged.addAll(Arrays.asList(loved));
+            }
+        }
+        if (explicitItems != null) {
+            for (String item : explicitItems) {
+                if (item != null && !item.isBlank()) {
+                    merged.add(item);
+                }
+            }
+        }
+        if (paramName != null && !paramName.isBlank()) {
+            String[] paramItems = getRoleStringArrayParam(role, paramName);
+            if (paramItems != null) {
+                merged.addAll(Arrays.asList(paramItems));
+            }
+        }
+        return merged.toArray(new String[0]);
+    }
+
+    private String[] resolveFeedItemIds(FeedInteraction interaction) {
+        if (interaction == null) {
+            return new String[0];
+        }
+        FeedItem[] feedItems = interaction.getItemsInHand();
+        if (feedItems == null || feedItems.length == 0) {
+            return new String[0];
+        }
+        ArrayList<String> ids = new ArrayList<>();
+        for (FeedItem feedItem : feedItems) {
+            if (feedItem == null) {
+                continue;
+            }
+            String item = feedItem.getItem();
+            if (item != null && !item.isBlank()) {
+                ids.add(item);
+            }
+        }
+        return ids.toArray(new String[0]);
+    }
+
+    private double resolveFeedHeal(FeedInteraction interaction, Role role, Player player) {
+        if (interaction == null) {
+            return 0.0;
+        }
+        double fallbackHeal = interaction.getHeal() != null ? interaction.getHeal() : 0.0;
+        String heldItemId = getHeldItemId(player);
+        if (heldItemId == null || heldItemId.isBlank()) {
+            return fallbackHeal;
+        }
+        FeedItem[] items = interaction.getItemsInHand();
+        if (items == null || items.length == 0) {
+            return fallbackHeal;
+        }
+        for (FeedItem item : items) {
+            if (item == null || item.getItem() == null) {
+                continue;
+            }
+            if (heldItemId.equalsIgnoreCase(item.getItem()) && item.getHeal() != null) {
+                return item.getHeal();
+            }
+        }
+        return fallbackHeal;
+    }
+
+    private double resolveEffectFeedHeal(Effects effects) {
+        if (effects == null || effects.getFeedHeal() == null) {
+            return 0.0;
+        }
+        return effects.getFeedHeal();
+    }
+
+    private boolean optionOrDefault(Boolean value, boolean defaultValue) {
+        return value == null ? defaultValue : value;
     }
 
     private boolean applyInteraction(InteractionEntry entry,
@@ -431,69 +650,81 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                                      InfoProvider infoProvider,
                                      Store<EntityStore> store,
                                      Player player) {
-        Effects effects = entry.getEffects();
-        if (effects == null && entry.useDefaults()) {
-            return applyDefaultEffects(entry.getType(), config, npcRef, role, infoProvider, store, player);
+        if (entry instanceof CustomInteraction) {
+            return applyCustomEffects((CustomInteraction) entry, npcRef, role, infoProvider, store, player);
         }
-        boolean applied = false;
-        if (effects != null) {
-            boolean isModeToggleType = entry.getType() == InteractionType.ModeToggle;
-            if (Boolean.TRUE.equals(effects.getStartTaming())) {
-                applied |= applyStartTaming(npcRef, store, player);
+        if (entry instanceof TameInteraction) {
+            boolean applied = applyStartTaming(npcRef, store, player);
+            TameInteraction tame = (TameInteraction) entry;
+            if (optionOrDefault(tame.getConsumeItem(), true)) {
+                consumeHeldItem(player);
             }
-            if (Boolean.TRUE.equals(effects.getApplyFeeding())) {
-                applied |= applyFeeding(npcRef, store, player);
-            }
-            if (Boolean.TRUE.equals(effects.getStartHarvest())) {
-                applied |= applyStartHarvest(npcRef, role, store);
-            }
-            if (Boolean.TRUE.equals(effects.getConsumeItem())) {
-                applied |= consumeHeldItem(player);
-            }
-            if (Boolean.TRUE.equals(effects.getMount())) {
-                logUnsupported("Mount effect not yet implemented.");
-            }
-            if (Boolean.TRUE.equals(effects.getToggleMode())
-                    || (isModeToggleType && effects.getToggleMode() == null)) {
-                applied |= applyToggleMode(entry, config, npcRef, role, store);
-            }
-            HookEffect hookEffect = effects.getTriggerNpcHook();
-            if (hookEffect != null) {
-                applied |= applyTriggerNpcHook(hookEffect, npcRef, store, player);
-            }
+            return applied;
         }
-        return applied;
-    }
-
-    private boolean applyDefaultEffects(InteractionType type,
-                                        TwInteractionConfig config,
-                                        Ref<EntityStore> npcRef,
-                                        Role role,
-                                        InfoProvider infoProvider,
-                                        Store<EntityStore> store,
-                                        Player player) {
-        if (type == null) {
+        if (entry instanceof FeedInteraction) {
+            FeedInteraction feed = (FeedInteraction) entry;
+            double healAmount = resolveFeedHeal(feed, role, player);
+            boolean applied = applyFeeding(npcRef, store, healAmount);
+            if (optionOrDefault(feed.getConsumeItem(), true)) {
+                consumeHeldItem(player);
+            }
+            return applied;
+        }
+        if (entry instanceof HarvestInteraction) {
+            return applyStartHarvest(npcRef, role, store);
+        }
+        if (entry instanceof MountInteraction) {
+            logUnsupported("Mount preset effect not yet implemented.");
             return false;
         }
-        switch (type) {
-            case Taming:
-                boolean tamed = applyStartTaming(npcRef, store, player);
-                consumeHeldItem(player);
-                return tamed;
-            case Feeding:
-                boolean fed = applyFeeding(npcRef, store, player);
-                consumeHeldItem(player);
-                return fed;
-            case Harvesting:
-                return applyStartHarvest(npcRef, role, store);
-            case Mounting:
-                logUnsupported("Mounting default effect not yet implemented.");
-                return false;
-            case ModeToggle:
-                return applyToggleMode(null, config, npcRef, role, store);
-            default:
-                return false;
+        if (entry instanceof ModeCycleInteraction) {
+            ModeCycleInteraction cycle = (ModeCycleInteraction) entry;
+            return applyToggleMode(cycle.getCycle(), npcRef, role, store);
         }
+        if (entry instanceof BreedInteraction) {
+            return applyStartBreeding(npcRef, role, store);
+        }
+        return false;
+    }
+
+    private boolean applyCustomEffects(CustomInteraction entry,
+                                       Ref<EntityStore> npcRef,
+                                       Role role,
+                                       InfoProvider infoProvider,
+                                       Store<EntityStore> store,
+                                       Player player) {
+        Effects effects = entry.getEffects();
+        if (effects == null) {
+            return false;
+        }
+        boolean applied = false;
+        if (Boolean.TRUE.equals(effects.getStartTaming())) {
+            applied |= applyStartTaming(npcRef, store, player);
+        }
+        if (Boolean.TRUE.equals(effects.getStartBreeding())) {
+            applied |= applyStartBreeding(npcRef, role, store);
+        }
+        if (Boolean.TRUE.equals(effects.getApplyFeeding())) {
+            double healAmount = resolveEffectFeedHeal(effects);
+            applied |= applyFeeding(npcRef, store, healAmount);
+        }
+        if (Boolean.TRUE.equals(effects.getStartHarvest())) {
+            applied |= applyStartHarvest(npcRef, role, store);
+        }
+        if (Boolean.TRUE.equals(effects.getConsumeItem())) {
+            applied |= consumeHeldItem(player);
+        }
+        if (Boolean.TRUE.equals(effects.getMount())) {
+            logUnsupported("Mount effect not yet implemented.");
+        }
+        if (Boolean.TRUE.equals(effects.getToggleMode())) {
+            applied |= applyToggleMode(effects.getModeCycle(), npcRef, role, store);
+        }
+        HookEffect hookEffect = effects.getTriggerNpcHook();
+        if (hookEffect != null) {
+            applied |= applyTriggerNpcHook(hookEffect, npcRef, store, player);
+        }
+        return applied;
     }
 
     private boolean applyStartTaming(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
@@ -511,8 +742,30 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return true;
     }
 
-    private boolean applyFeeding(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        // Prototype: consume item only. Hook in heal/happiness logic later.
+    private boolean applyFeeding(Ref<EntityStore> npcRef, Store<EntityStore> store, double healAmount) {
+        if (healAmount > 0) {
+            applyHeal(npcRef, store, healAmount);
+        }
+        return true;
+    }
+
+    private boolean applyHeal(Ref<EntityStore> npcRef, Store<EntityStore> store, double healAmount) {
+        if (npcRef == null || store == null || healAmount <= 0) {
+            return false;
+        }
+        ComponentType<EntityStore, EntityStatMap> type = EntityStatMap.getComponentType();
+        if (type == null) {
+            return false;
+        }
+        EntityStatMap statMap = store.getComponent(npcRef, type);
+        if (statMap == null) {
+            return false;
+        }
+        int statIndex = EntityStatType.getAssetMap().getIndex(HEALTH_STAT_ID);
+        if (statIndex < 0) {
+            return false;
+        }
+        statMap.addStatValue(statIndex, (float) healAmount);
         return true;
     }
 
@@ -529,6 +782,11 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         role.getStateSupport().setState(npcRef, "$Harvest", subState, store);
         return true;
+    }
+
+    private boolean applyStartBreeding(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+        logUnsupported("StartBreeding effect not yet implemented.");
+        return false;
     }
 
     private boolean applyTriggerNpcHook(HookEffect hookEffect,
@@ -576,8 +834,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return true;
     }
 
-    private boolean applyToggleMode(InteractionEntry entry,
-                                    TwInteractionConfig config,
+    private boolean applyToggleMode(ModeStep[] cycle,
                                     Ref<EntityStore> npcRef,
                                     Role role,
                                     Store<EntityStore> store) {
@@ -585,8 +842,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return false;
         }
         String defaultSub = resolveDefaultSubState(role);
-        ModeStep[] cycle = resolveModeCycle(entry, config);
-        ResolvedModeStep[] resolved = resolveValidModeSteps(cycle, role, defaultSub);
+        ModeStep[] resolvedCycle = (cycle == null || cycle.length == 0) ? DEFAULT_MODE_CYCLE : cycle;
+        ResolvedModeStep[] resolved = resolveValidModeSteps(resolvedCycle, role, defaultSub);
         if (resolved.length == 0) {
             logDebug("ModeToggle: no valid mode cycle states found for role " + role.getRoleName());
             return false;
@@ -610,16 +867,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         String sub = role.getStateSupport().getStateHelper().getDefaultSubState();
         return sub == null ? "" : sub;
-    }
-
-    private ModeStep[] resolveModeCycle(InteractionEntry entry, TwInteractionConfig config) {
-        if (entry != null && entry.getEffects() != null) {
-            ModeStep[] fromEffects = entry.getEffects().getModeCycle();
-            if (fromEffects != null && fromEffects.length > 0) {
-                return fromEffects;
-            }
-        }
-        return DEFAULT_MODE_CYCLE;
     }
 
     private ResolvedModeStep[] resolveValidModeSteps(ModeStep[] cycle, Role role, String defaultSub) {
@@ -755,6 +1002,17 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return false;
         }
         return Arrays.stream(items).anyMatch(itemId::equalsIgnoreCase);
+    }
+
+    private String getHeldItemId(Player player) {
+        if (player == null) {
+            return null;
+        }
+        ItemStack stack = getActiveItem(player);
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        return stack.getItemId();
     }
 
     private boolean isAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {

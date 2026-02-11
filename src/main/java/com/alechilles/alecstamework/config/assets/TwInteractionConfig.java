@@ -17,7 +17,9 @@ import com.hypixel.hytale.codec.schema.SchemaContext;
 import com.hypixel.hytale.codec.schema.config.ArraySchema;
 import com.hypixel.hytale.codec.schema.config.Schema;
 import com.hypixel.hytale.codec.schema.config.StringSchema;
+import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
+import java.util.ArrayList;
 import java.util.Arrays;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,15 +31,6 @@ import org.bson.BsonValue;
  * Stored under Server/Tamework/Interactions.
  */
 public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwInteractionConfig>> {
-    public enum InteractionType {
-        Taming,
-        Feeding,
-        Breeding,
-        Mounting,
-        Harvesting,
-        ModeToggle
-    }
-
     public enum ParamOperator {
         Equals,
         NotEquals,
@@ -52,8 +45,6 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         All
     }
 
-    private static final EnumCodec<InteractionType> INTERACTION_TYPE_CODEC =
-            new EnumCodec<>(InteractionType.class);
     private static final EnumCodec<ParamOperator> PARAM_OPERATOR_CODEC =
             new EnumCodec<>(ParamOperator.class);
     private static final EnumCodec<MatchType> MATCH_TYPE_CODEC =
@@ -61,6 +52,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     private static final InteractionEntry[] EMPTY_INTERACTIONS = new InteractionEntry[0];
     private static final ModeStep[] EMPTY_MODE_CYCLE = new ModeStep[0];
+    private static final FeedItem[] EMPTY_FEED_ITEMS = new FeedItem[0];
     private static final ItemsInHandRequirement[] EMPTY_ITEMS_IN_HAND_REQUIREMENTS = new ItemsInHandRequirement[0];
     private static final ItemsEquippedRequirement[] EMPTY_ITEMS_EQUIPPED_REQUIREMENTS = new ItemsEquippedRequirement[0];
     private static final InteractionContextRequirement[] EMPTY_CONTEXT_REQUIREMENTS = new InteractionContextRequirement[0];
@@ -137,6 +129,35 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         public Schema toSchema(@Nonnull SchemaContext context) {
             StringSchema schema = new StringSchema();
             schema.setEnum(PLAYER_MOVEMENT_STATE_ENUM);
+            return schema;
+        }
+    };
+
+    private static final Codec<String> ITEM_ASSET_CODEC = new Codec<>() {
+        @Override
+        public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return null;
+            }
+            if (bsonValue.isString()) {
+                return bsonValue.asString().getValue();
+            }
+            throw new CodecException("Expected string", bsonValue, extraInfo, null);
+        }
+
+        @Override
+        public BsonValue encode(String value, ExtraInfo extraInfo) {
+            if (value == null) {
+                return new BsonNull();
+            }
+            return Codec.STRING.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            StringSchema schema = new StringSchema();
+            schema.setHytaleAssetRef("Item");
             return schema;
         }
     };
@@ -235,6 +256,274 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public static final ArrayCodec<ModeStep> MODE_STEP_ARRAY_CODEC =
             new ArrayCodec<>(MODE_STEP_CODEC, ModeStep[]::new);
+
+    public static final BuilderCodec<InteractionEntry> INTERACTION_BASE_CODEC = BuilderCodec.abstractBuilder(
+            InteractionEntry.class
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            (entry, value) -> entry.enabled = value == null || value,
+            entry -> entry.enabled
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("CooldownSeconds", Codec.INTEGER),
+            (entry, value) -> entry.cooldownSeconds = value,
+            entry -> entry.cooldownSeconds
+        )
+        .add()
+        .build();
+
+    public static final BuilderCodec<TameInteraction> TAME_INTERACTION_CODEC = BuilderCodec.builder(
+            TameInteraction.class,
+            TameInteraction::new,
+            INTERACTION_BASE_CODEC
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("ConsumeItem", Codec.BOOLEAN),
+            (entry, value) -> entry.consumeItem = value,
+            entry -> entry.consumeItem
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("UseLovedItems", Codec.BOOLEAN),
+            (entry, value) -> entry.useLovedItems = value,
+            entry -> entry.useLovedItems
+        )
+        .add()
+        .<String[]>append(
+            new KeyedCodec<>("ItemsInHand", ITEM_ASSET_ARRAY_OR_SINGLE_CODEC),
+            (entry, value) -> entry.itemsInHand = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
+            entry -> entry.itemsInHand
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (entry, value) -> entry.itemsParam = value,
+            entry -> entry.itemsParam
+        )
+        .add()
+        .build();
+
+    public static final BuilderCodec<FeedItem> FEED_ITEM_CODEC = BuilderCodec.builder(
+            FeedItem.class,
+            FeedItem::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Item", ITEM_ASSET_CODEC),
+            (entry, value) -> entry.item = value,
+            entry -> entry.item
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Heal", Codec.DOUBLE),
+            (entry, value) -> entry.heal = value,
+            entry -> entry.heal
+        )
+        .add()
+        .build();
+
+    public static final ArrayCodec<FeedItem> FEED_ITEM_ARRAY_CODEC =
+            new ArrayCodec<>(FEED_ITEM_CODEC, FeedItem[]::new);
+
+    private static final Codec<FeedItem[]> FEED_ITEM_ARRAY_OR_SINGLE_CODEC = new Codec<>() {
+        @Override
+        public FeedItem[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return EMPTY_FEED_ITEMS;
+            }
+            if (bsonValue.isDocument()) {
+                return new FeedItem[] { FEED_ITEM_CODEC.decode(bsonValue, extraInfo) };
+            }
+            if (bsonValue.isString()) {
+                return new FeedItem[] { new FeedItem(bsonValue.asString().getValue(), null) };
+            }
+            if (bsonValue.isArray()) {
+                ArrayList<FeedItem> items = new ArrayList<>();
+                for (BsonValue value : bsonValue.asArray()) {
+                    if (value == null || Codec.isNullBsonValue(value)) {
+                        continue;
+                    }
+                    if (value.isString()) {
+                        items.add(new FeedItem(value.asString().getValue(), null));
+                        continue;
+                    }
+                    if (value.isDocument()) {
+                        items.add(FEED_ITEM_CODEC.decode(value, extraInfo));
+                        continue;
+                    }
+                    throw new CodecException("Expected feed item object or string", value, extraInfo, null);
+                }
+                return items.toArray(EMPTY_FEED_ITEMS);
+            }
+            throw new CodecException("Expected feed item object, string, or array", bsonValue, extraInfo, null);
+        }
+
+        @Override
+        public BsonValue encode(FeedItem[] value, ExtraInfo extraInfo) {
+            if (value == null) {
+                return new BsonNull();
+            }
+            return FEED_ITEM_ARRAY_CODEC.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            ArraySchema arraySchema = new ArraySchema();
+            arraySchema.setItem(FEED_ITEM_CODEC.toSchema(context));
+            return arraySchema;
+        }
+    };
+
+    public static final BuilderCodec<FeedInteraction> FEED_INTERACTION_CODEC = BuilderCodec.builder(
+            FeedInteraction.class,
+            FeedInteraction::new,
+            INTERACTION_BASE_CODEC
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("ConsumeItem", Codec.BOOLEAN),
+            (entry, value) -> entry.consumeItem = value,
+            entry -> entry.consumeItem
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("UseLovedItems", Codec.BOOLEAN),
+            (entry, value) -> entry.useLovedItems = value,
+            entry -> entry.useLovedItems
+        )
+        .add()
+        .<FeedItem[]>append(
+            new KeyedCodec<>("ItemsInHand", FEED_ITEM_ARRAY_OR_SINGLE_CODEC),
+            (entry, value) -> entry.itemsInHand = value == null ? EMPTY_FEED_ITEMS : value,
+            entry -> entry.itemsInHand
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Heal", Codec.DOUBLE),
+            (entry, value) -> entry.heal = value,
+            entry -> entry.heal
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (entry, value) -> entry.itemsParam = value,
+            entry -> entry.itemsParam
+        )
+        .add()
+        .build();
+
+    public static final BuilderCodec<HarvestInteraction> HARVEST_INTERACTION_CODEC = BuilderCodec.builder(
+            HarvestInteraction.class,
+            HarvestInteraction::new,
+            INTERACTION_BASE_CODEC
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
+            (entry, value) -> entry.requireTamed = value,
+            entry -> entry.requireTamed
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireHarvestable", Codec.BOOLEAN),
+            (entry, value) -> entry.requireHarvestable = value,
+            entry -> entry.requireHarvestable
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireHarvestAlarmReady", Codec.BOOLEAN),
+            (entry, value) -> entry.requireHarvestAlarmReady = value,
+            entry -> entry.requireHarvestAlarmReady
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireHarvestInteractionContext", Codec.BOOLEAN),
+            (entry, value) -> entry.requireHarvestInteractionContext = value,
+            entry -> entry.requireHarvestInteractionContext
+        )
+        .add()
+        .build();
+
+    public static final BuilderCodec<MountInteraction> MOUNT_INTERACTION_CODEC = BuilderCodec.builder(
+            MountInteraction.class,
+            MountInteraction::new,
+            INTERACTION_BASE_CODEC
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
+            (entry, value) -> entry.requireTamed = value,
+            entry -> entry.requireTamed
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
+            (entry, value) -> entry.requireOwner = value,
+            entry -> entry.requireOwner
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireMountable", Codec.BOOLEAN),
+            (entry, value) -> entry.requireMountable = value,
+            entry -> entry.requireMountable
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireCrouching", Codec.BOOLEAN),
+            (entry, value) -> entry.requireCrouching = value,
+            entry -> entry.requireCrouching
+        )
+        .add()
+        .build();
+
+    public static final BuilderCodec<ModeCycleInteraction> MODE_CYCLE_INTERACTION_CODEC = BuilderCodec.builder(
+            ModeCycleInteraction.class,
+            ModeCycleInteraction::new,
+            INTERACTION_BASE_CODEC
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
+            (entry, value) -> entry.requireTamed = value,
+            entry -> entry.requireTamed
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
+            (entry, value) -> entry.requireOwner = value,
+            entry -> entry.requireOwner
+        )
+        .add()
+        .<ModeStep[]>append(
+            new KeyedCodec<>("Cycle", MODE_STEP_ARRAY_CODEC),
+            (entry, value) -> entry.cycle = value == null ? EMPTY_MODE_CYCLE : value,
+            entry -> entry.cycle
+        )
+        .add()
+        .build();
+
+    public static final BuilderCodec<BreedInteraction> BREED_INTERACTION_CODEC = BuilderCodec.builder(
+            BreedInteraction.class,
+            BreedInteraction::new,
+            INTERACTION_BASE_CODEC
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
+            (entry, value) -> entry.requireTamed = value,
+            entry -> entry.requireTamed
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MinHappiness", Codec.DOUBLE),
+            (entry, value) -> entry.minHappiness = value,
+            entry -> entry.minHappiness
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("FertilityBonus", Codec.DOUBLE),
+            (entry, value) -> entry.fertilityBonus = value,
+            entry -> entry.fertilityBonus
+        )
+        .add()
+        .build();
 
     public static final BuilderCodec<ItemsInHandRequirement> ITEMS_IN_HAND_REQUIREMENT_CODEC = BuilderCodec.builder(
             ItemsInHandRequirement.class,
@@ -552,9 +841,21 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .add()
         .<Boolean>append(
+            new KeyedCodec<>("StartBreeding", Codec.BOOLEAN),
+            (effects, value) -> effects.startBreeding = value,
+            effects -> effects.startBreeding
+        )
+        .add()
+        .<Boolean>append(
             new KeyedCodec<>("ApplyFeeding", Codec.BOOLEAN),
             (effects, value) -> effects.applyFeeding = value,
             effects -> effects.applyFeeding
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("FeedHeal", Codec.DOUBLE),
+            (effects, value) -> effects.feedHeal = value,
+            effects -> effects.feedHeal
         )
         .add()
         .<Boolean>append(
@@ -613,42 +914,15 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .build();
 
-    public static final BuilderCodec<InteractionEntry> INTERACTION_CODEC = BuilderCodec.builder(
-            InteractionEntry.class,
-            InteractionEntry::new
+    public static final BuilderCodec<CustomInteraction> CUSTOM_INTERACTION_CODEC = BuilderCodec.builder(
+            CustomInteraction.class,
+            CustomInteraction::new,
+            INTERACTION_BASE_CODEC
     )
-        .<InteractionType>append(
-            new KeyedCodec<>("Type", INTERACTION_TYPE_CODEC),
-            (entry, value) -> entry.type = value,
-            entry -> entry.type
-        )
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
-            (entry, value) -> {
-                if (value != null) {
-                    entry.enabled = value;
-                }
-            },
-            entry -> entry.enabled
-        )
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("UseDefaults", Codec.BOOLEAN),
-            (entry, value) -> entry.useDefaults = value,
-            entry -> entry.useDefaults
-        )
-        .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
-        )
-        .add()
-        .<Integer>append(
-            new KeyedCodec<>("CooldownSeconds", Codec.INTEGER),
-            (entry, value) -> entry.cooldownSeconds = value,
-            entry -> entry.cooldownSeconds
         )
         .add()
         .<Effects>append(
@@ -658,6 +932,19 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .add()
         .build();
+
+    public static final StringCodecMapCodec<InteractionEntry, BuilderCodec<? extends InteractionEntry>> INTERACTION_CODEC =
+            new StringCodecMapCodec<>("Type") { };
+
+    static {
+        INTERACTION_CODEC.register("Tame", TameInteraction.class, TAME_INTERACTION_CODEC);
+        INTERACTION_CODEC.register("Feed", FeedInteraction.class, FEED_INTERACTION_CODEC);
+        INTERACTION_CODEC.register("Breed", BreedInteraction.class, BREED_INTERACTION_CODEC);
+        INTERACTION_CODEC.register("Harvest", HarvestInteraction.class, HARVEST_INTERACTION_CODEC);
+        INTERACTION_CODEC.register("Mount", MountInteraction.class, MOUNT_INTERACTION_CODEC);
+        INTERACTION_CODEC.register("ModeCycle", ModeCycleInteraction.class, MODE_CYCLE_INTERACTION_CODEC);
+        INTERACTION_CODEC.register("Custom", CustomInteraction.class, CUSTOM_INTERACTION_CODEC);
+    }
 
     public static final ArrayCodec<InteractionEntry> INTERACTION_ARRAY_CODEC =
             new ArrayCodec<>(INTERACTION_CODEC, InteractionEntry[]::new);
@@ -774,32 +1061,179 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 
-    public static final class InteractionEntry {
-        private InteractionType type;
+    public static abstract class InteractionEntry {
         private boolean enabled = true;
-        private Boolean useDefaults;
-        private RequirementGroup requires;
         private Integer cooldownSeconds;
-        private Effects effects;
-
-        public InteractionType getType() {
-            return type;
-        }
 
         public boolean isEnabled() {
             return enabled;
         }
 
-        public boolean useDefaults() {
-            return useDefaults == null || useDefaults;
+        public Integer getCooldownSeconds() {
+            return cooldownSeconds;
         }
+    }
+
+    public static final class TameInteraction extends InteractionEntry {
+        private Boolean consumeItem;
+        private Boolean useLovedItems;
+        private String[] itemsInHand = ArrayUtil.EMPTY_STRING_ARRAY;
+        private String itemsParam;
+
+        public Boolean getConsumeItem() {
+            return consumeItem;
+        }
+
+        public Boolean getUseLovedItems() {
+            return useLovedItems;
+        }
+
+        public String[] getItemsInHand() {
+            return itemsInHand == null ? ArrayUtil.EMPTY_STRING_ARRAY : itemsInHand;
+        }
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
+    }
+
+    public static final class FeedItem {
+        private String item;
+        private Double heal;
+
+        public FeedItem() {
+        }
+
+        public FeedItem(String item, Double heal) {
+            this.item = item;
+            this.heal = heal;
+        }
+
+        public String getItem() {
+            return item;
+        }
+
+        public Double getHeal() {
+            return heal;
+        }
+    }
+
+    public static final class FeedInteraction extends InteractionEntry {
+        private Boolean consumeItem;
+        private Boolean useLovedItems;
+        private FeedItem[] itemsInHand = EMPTY_FEED_ITEMS;
+        private Double heal;
+        private String itemsParam;
+
+        public Boolean getConsumeItem() {
+            return consumeItem;
+        }
+
+        public Boolean getUseLovedItems() {
+            return useLovedItems;
+        }
+
+        public FeedItem[] getItemsInHand() {
+            return itemsInHand == null ? EMPTY_FEED_ITEMS : itemsInHand;
+        }
+
+        public Double getHeal() {
+            return heal;
+        }
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
+    }
+
+    public static final class HarvestInteraction extends InteractionEntry {
+        private Boolean requireTamed;
+        private Boolean requireHarvestable;
+        private Boolean requireHarvestAlarmReady;
+        private Boolean requireHarvestInteractionContext;
+
+        public Boolean getRequireTamed() {
+            return requireTamed;
+        }
+
+        public Boolean getRequireHarvestable() {
+            return requireHarvestable;
+        }
+
+        public Boolean getRequireHarvestAlarmReady() {
+            return requireHarvestAlarmReady;
+        }
+
+        public Boolean getRequireHarvestInteractionContext() {
+            return requireHarvestInteractionContext;
+        }
+    }
+
+    public static final class MountInteraction extends InteractionEntry {
+        private Boolean requireTamed;
+        private Boolean requireOwner;
+        private Boolean requireMountable;
+        private Boolean requireCrouching;
+
+        public Boolean getRequireTamed() {
+            return requireTamed;
+        }
+
+        public Boolean getRequireOwner() {
+            return requireOwner;
+        }
+
+        public Boolean getRequireMountable() {
+            return requireMountable;
+        }
+
+        public Boolean getRequireCrouching() {
+            return requireCrouching;
+        }
+    }
+
+    public static final class ModeCycleInteraction extends InteractionEntry {
+        private Boolean requireTamed;
+        private Boolean requireOwner;
+        private ModeStep[] cycle = EMPTY_MODE_CYCLE;
+
+        public Boolean getRequireTamed() {
+            return requireTamed;
+        }
+
+        public Boolean getRequireOwner() {
+            return requireOwner;
+        }
+
+        public ModeStep[] getCycle() {
+            return cycle == null ? EMPTY_MODE_CYCLE : cycle;
+        }
+    }
+
+    public static final class BreedInteraction extends InteractionEntry {
+        private Boolean requireTamed;
+        private Double minHappiness;
+        private Double fertilityBonus;
+
+        public Boolean getRequireTamed() {
+            return requireTamed;
+        }
+
+        public Double getMinHappiness() {
+            return minHappiness;
+        }
+
+        public Double getFertilityBonus() {
+            return fertilityBonus;
+        }
+    }
+
+    public static final class CustomInteraction extends InteractionEntry {
+        private RequirementGroup requires;
+        private Effects effects;
 
         public RequirementGroup getRequires() {
             return requires;
-        }
-
-        public Integer getCooldownSeconds() {
-            return cooldownSeconds;
         }
 
         public Effects getEffects() {
@@ -1020,7 +1454,9 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public static final class Effects {
         private Boolean startTaming;
+        private Boolean startBreeding;
         private Boolean applyFeeding;
+        private Double feedHeal;
         private Boolean startHarvest;
         private Boolean mount;
         private Boolean toggleMode;
@@ -1035,8 +1471,16 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
             return startTaming;
         }
 
+        public Boolean getStartBreeding() {
+            return startBreeding;
+        }
+
         public Boolean getApplyFeeding() {
             return applyFeeding;
+        }
+
+        public Double getFeedHeal() {
+            return feedHeal;
         }
 
         public Boolean getStartHarvest() {

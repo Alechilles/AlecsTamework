@@ -166,6 +166,13 @@
       "Value": "SFX_Sheep_Sheared",
       "Description": "The sound that plays when NPC is harvested."
     },
+    "HarvestTimeout": {
+      "Value": [
+        "P1D",
+        "P1D"
+      ],
+      "Description": "The minimum time between consecutive harvests. Expressed as an ISO-8601 time period range."
+    },
     "LovedItems": {
       "Value": [
         "Plant_Fruit_Apple"
@@ -428,6 +435,13 @@
               "Type": "PlaySound",
               "SoundEventId": {
                 "Compute": "HarvestSound"
+              }
+            },
+            {
+              "Type": "SetAlarm",
+              "Name": "Harvest_Ready",
+              "DurationRange": {
+                "Compute": "HarvestTimeout"
               }
             }
           ]
