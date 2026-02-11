@@ -29,9 +29,11 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCapture
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
+import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
@@ -73,6 +75,7 @@ public class Tamework extends JavaPlugin {
     private boolean interactionAssetsRegistered;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
+    private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -106,6 +109,12 @@ public class Tamework extends JavaPlugin {
                 TameworkTamedComponent.class,
                 "TameworkTamed",
                 TameworkTamedComponent.CODEC
+        );
+
+        hookComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkHookComponent.class,
+                "TameworkHook",
+                TameworkHookComponent.CODEC
         );
 
         // Damage event is needed for owner damage filtering; avoid double-registration.
@@ -330,6 +339,10 @@ public class Tamework extends JavaPlugin {
         return tamedComponentType;
     }
 
+    public ComponentType<EntityStore, TameworkHookComponent> getHookComponentType() {
+        return hookComponentType;
+    }
+
     // NPC action/sensor builders must be registered after NPCPlugin is ready.
     private void registerNpcActionsIfReady() {
         if (npcActionsRegistered) {
@@ -389,6 +402,7 @@ public class Tamework extends JavaPlugin {
             sensorFactory.add(BuilderSensorTameworkIsOwner.BUILDER_ID, BuilderSensorTameworkIsOwner::new);
             sensorFactory.add(BuilderSensorTameworkHasOwner.BUILDER_ID, BuilderSensorTameworkHasOwner::new);
             sensorFactory.add(BuilderSensorTameworkIsTamed.BUILDER_ID, BuilderSensorTameworkIsTamed::new);
+            sensorFactory.add(BuilderSensorTameworkHook.BUILDER_ID, BuilderSensorTameworkHook::new);
         }
 
         npcActionsRegistered = true;

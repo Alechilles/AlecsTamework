@@ -6,15 +6,63 @@
   "Interactions": [
     {
       "Type": "Taming",
-      "Enabled": true
+      "Enabled": true,
+      "UseDefaults": false,
+      "Requires": {
+        "All": {
+          "LovedItems": true,
+          "IsNotTamed": true
+        }
+      },
+      "Effects": {
+        "StartTaming": true,
+        "ConsumeItem": true
+      }
     },
     {
       "Type": "Feeding",
-      "Enabled": true
+      "Enabled": true,
+      "UseDefaults": false,
+      "Requires": {
+        "All": {
+          "LovedItems": true,
+          "IsTamed": true
+        }
+      },
+      "Effects": {
+        "ApplyFeeding": true,
+        "ConsumeItem": true
+      }
     },
     {
       "Type": "Harvesting",
-      "Enabled": true
+      "Enabled": true,
+      "UseDefaults": false,
+      "Requires": {
+        "All": {
+          "IsTamed": true,
+          "IsHarvestable": true,
+          "HarvestAlarmReady": true,
+          "HarvestInteractionContext": true
+        }
+      },
+      "Effects": {
+        "StartHarvest": true
+      }
+    },
+    {
+      "Type": "ModeToggle",
+      "Enabled": true,
+      "UseDefaults": false,
+      "Requires": {
+        "All": {
+          "IsTamed": true,
+          "PlayerIsOwner": true
+        }
+      },
+      "Effects": {
+        "ToggleMode": true
+      }
     }
   ]
 }

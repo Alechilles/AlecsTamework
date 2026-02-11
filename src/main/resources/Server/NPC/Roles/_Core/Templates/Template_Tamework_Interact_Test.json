@@ -141,6 +141,41 @@
     "InteractSoundPickUp": {
       "Value": "SFX_Tamework_Poof",
       "Description": "Sound to play when picking up."
+    },
+    "IsMountable": {
+      "Value": false,
+      "Description": "Whether this NPC can be mounted."
+    },
+    "IsHarvestable": {
+      "Value": false,
+      "Description": "Whether this NPC can be 'harvested'. This includes shearing, milking, etc."
+    },
+    "HarvestInteractionContext": {
+      "Value": "",
+      "Description": "The interaction context of the harvest tool. If empty, no tool is needed to harvest the NPC."
+    },
+    "HarvestDropList": {
+      "Value": "",
+      "Description": "The drop list that's executed when the NPC is harvested."
+    },
+    "HarvestParticles": {
+      "Value": "Alerted",
+      "Description": "The particle system that is spawned when the NPC is harvested."
+    },
+    "HarvestSound": {
+      "Value": "SFX_Sheep_Sheared",
+      "Description": "The sound that plays when NPC is harvested."
+    },
+    "LovedItems": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "The list of items that are deemed very attractive."
+    },
+    "InteractionConfigId": {
+      "Value": "",
+      "Description": "Optional override for Action_Tamework_Interact."
     }
   },
   "MotionControllerList": [
@@ -215,6 +250,32 @@
     }
   ],
   "Instructions": [
+    {
+      "$Comment": "Validation-only state setters (disabled).",
+      "Enabled": false,
+      "Actions": [
+        {
+          "Type": "State",
+          "State": "Idle"
+        },
+        {
+          "Type": "State",
+          "State": "Hold"
+        },
+        {
+          "Type": "State",
+          "State": "Defend"
+        },
+        {
+          "Type": "State",
+          "State": "Sleep"
+        },
+        {
+          "Type": "State",
+          "State": "$Harvest"
+        }
+      ]
+    },
     {
       "Sensor": {
         "Type": "State",
@@ -337,10 +398,88 @@
         }
       ]
     }
+    ,
+    {
+      "$Comment": "Minimal harvest behavior for testing.",
+      "Sensor": {
+        "Type": "State",
+        "State": "$Harvest"
+      },
+      "Instructions": [
+        {
+          "Continue": true,
+          "Sensor": {
+            "Type": "Any",
+            "Once": true
+          },
+          "Actions": [
+            {
+              "Type": "SpawnParticles",
+              "Offset": [
+                0,
+                1,
+                0
+              ],
+              "ParticleSystem": {
+                "Compute": "HarvestParticles"
+              }
+            },
+            {
+              "Type": "PlaySound",
+              "SoundEventId": {
+                "Compute": "HarvestSound"
+              }
+            }
+          ]
+        },
+        {
+          "Enabled": {
+            "Compute": "!isEmpty(HarvestDropList)"
+          },
+          "Continue": true,
+          "Sensor": {
+            "Type": "Any",
+            "Once": true
+          },
+          "Actions": [
+            {
+              "Type": "DropItem",
+              "DropList": {
+                "Compute": "HarvestDropList"
+              },
+              "Distance": [
+                0.2,
+                0.5
+              ],
+              "Delay": [
+                0,
+                0
+              ],
+              "DropSector": [
+                -360,
+                360
+              ],
+              "PitchHigh": false,
+              "ThrowSpeed": 14
+            }
+          ]
+        },
+        {
+          "Actions": [
+            {
+              "Type": "State",
+              "State": "Hold"
+            }
+          ]
+        }
+      ]
+    }
   ],
   "InteractionInstruction": {
     "$Comment": "Isolated interaction flow for Action_Tamework_Interact.",
-    "Enabled": true,
+    "Enabled": {
+      "Compute": "IsMountable || IsHarvestable || !isEmptyStringArray(LovedItems)"
+    },
     "Instructions": [
       {
         "Continue": true,
@@ -360,7 +499,66 @@
         },
         "Actions": [
           {
-            "Type": "TameworkInteract"
+            "Type": "LockOnInteractionTarget",
+            "TargetSlot": {
+              "Compute": "MasterTargetSlot"
+            }
+          },
+          {
+            "Type": "TameworkInteract",
+            "ConfigId": {
+              "Compute": "InteractionConfigId"
+            },
+            "LovedItems": {
+              "Compute": "LovedItems"
+            },
+            "IsMountable": {
+              "Compute": "IsMountable"
+            },
+            "IsHarvestable": {
+              "Compute": "IsHarvestable"
+            },
+            "HarvestInteractionContext": {
+              "Compute": "HarvestInteractionContext"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Contextual (left-click) harvest trigger.",
+        "Enabled": {
+          "Compute": "!isEmpty(HarvestInteractionContext)"
+        },
+        "Sensor": {
+          "Type": "InteractionContext",
+          "Context": {
+            "Compute": "HarvestInteractionContext"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "LockOnInteractionTarget",
+            "TargetSlot": {
+              "Compute": "MasterTargetSlot"
+            }
+          },
+          {
+            "Type": "TameworkInteract",
+            "ConfigId": {
+              "Compute": "InteractionConfigId"
+            },
+            "LovedItems": {
+              "Compute": "LovedItems"
+            },
+            "IsMountable": {
+              "Compute": "IsMountable"
+            },
+            "IsHarvestable": {
+              "Compute": "IsHarvestable"
+            },
+            "HarvestInteractionContext": {
+              "Compute": "HarvestInteractionContext"
+            }
           }
         ]
       }
