@@ -13,6 +13,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInter
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HarvestInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeStep;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
@@ -32,6 +33,9 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.MovementStates;
+import com.hypixel.hytale.protocol.ComponentUpdate;
+import com.hypixel.hytale.protocol.ComponentUpdateType;
+import com.hypixel.hytale.protocol.CombatTextUpdate;
 import com.hypixel.hytale.protocol.ItemArmorSlot;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
@@ -51,6 +55,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
+import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -664,7 +669,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;
             double healAmount = resolveFeedHeal(feed, role, player);
-            boolean applied = applyFeeding(npcRef, store, healAmount);
+            boolean applied = applyFeeding(npcRef, store, healAmount, player);
             if (optionOrDefault(feed.getConsumeItem(), true)) {
                 consumeHeldItem(player);
             }
@@ -706,7 +711,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         if (Boolean.TRUE.equals(effects.getApplyFeeding())) {
             double healAmount = resolveEffectFeedHeal(effects);
-            applied |= applyFeeding(npcRef, store, healAmount);
+            applied |= applyFeeding(npcRef, store, healAmount, player);
         }
         if (Boolean.TRUE.equals(effects.getStartHarvest())) {
             applied |= applyStartHarvest(npcRef, role, store);
@@ -723,6 +728,10 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         HookEffect hookEffect = effects.getTriggerNpcHook();
         if (hookEffect != null) {
             applied |= applyTriggerNpcHook(hookEffect, npcRef, store, player);
+        }
+        FloatingTextEffect floatingText = effects.getShowFloatingText();
+        if (floatingText != null) {
+            applied |= applyFloatingText(floatingText, npcRef, store, player);
         }
         return applied;
     }
@@ -742,11 +751,83 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return true;
     }
 
-    private boolean applyFeeding(Ref<EntityStore> npcRef, Store<EntityStore> store, double healAmount) {
+    private boolean applyFeeding(Ref<EntityStore> npcRef, Store<EntityStore> store, double healAmount, Player player) {
         if (healAmount > 0) {
             applyHeal(npcRef, store, healAmount);
+            maybeShowFeedingCombatText(npcRef, store, player, healAmount);
         }
         return true;
+    }
+
+    private void maybeShowFeedingCombatText(Ref<EntityStore> npcRef,
+                                            Store<EntityStore> store,
+                                            Player player,
+                                            double healAmount) {
+        if (npcRef == null || store == null || player == null) {
+            return;
+        }
+        if (healAmount <= 0) {
+            return;
+        }
+        String text = formatHealText(healAmount);
+        if (text == null || text.isBlank()) {
+            return;
+        }
+        queueCombatText(npcRef, store, player, text);
+    }
+
+    private boolean applyFloatingText(FloatingTextEffect effect,
+                                      Ref<EntityStore> npcRef,
+                                      Store<EntityStore> store,
+                                      Player player) {
+        if (effect == null || npcRef == null || store == null || player == null) {
+            return false;
+        }
+        String message = effect.getMessage();
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+        // Size/Duration/Color are placeholders for now; CombatText uses the global UI asset.
+        return queueCombatText(npcRef, store, player, message);
+    }
+
+    private boolean queueCombatText(Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store,
+                                    Player player,
+                                    String text) {
+        if (npcRef == null || store == null || player == null || text == null || text.isBlank()) {
+            return false;
+        }
+        Ref<EntityStore> playerRef = player.getReference();
+        if (playerRef == null || !playerRef.isValid()) {
+            return false;
+        }
+        EntityTrackerSystems.EntityViewer viewer = store.getComponent(
+                playerRef,
+                EntityTrackerSystems.EntityViewer.getComponentType()
+        );
+        if (viewer == null) {
+            return false;
+        }
+        ComponentUpdate update = new ComponentUpdate();
+        update.type = ComponentUpdateType.CombatText;
+        CombatTextUpdate combatTextUpdate = new CombatTextUpdate();
+        combatTextUpdate.hitAngleDeg = 0.0f;
+        combatTextUpdate.text = text;
+        update.combatTextUpdate = combatTextUpdate;
+        viewer.queueUpdate(npcRef, update);
+        return true;
+    }
+
+    private String formatHealText(double healAmount) {
+        if (healAmount <= 0) {
+            return null;
+        }
+        double rounded = Math.round(healAmount);
+        if (Math.abs(healAmount - rounded) < 0.01) {
+            return "+" + (int) rounded + " HP";
+        }
+        return String.format(Locale.US, "+%.1f HP", healAmount);
     }
 
     private boolean applyHeal(Ref<EntityStore> npcRef, Store<EntityStore> store, double healAmount) {

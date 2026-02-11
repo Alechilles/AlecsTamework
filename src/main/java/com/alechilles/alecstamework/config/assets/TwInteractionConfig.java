@@ -830,6 +830,18 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .build();
 
+    public static final BuilderCodec<FloatingTextEffect> FLOATING_TEXT_EFFECT_CODEC = BuilderCodec.builder(
+            FloatingTextEffect.class,
+            FloatingTextEffect::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Message", Codec.STRING),
+            (effect, value) -> effect.message = value,
+            effect -> effect.message
+        )
+        .add()
+        .build();
+
     public static final BuilderCodec<Effects> EFFECTS_CODEC = BuilderCodec.builder(
             Effects.class,
             Effects::new
@@ -910,6 +922,12 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
             new KeyedCodec<>("TriggerNpcHook", HOOK_EFFECT_CODEC),
             (effects, value) -> effects.triggerNpcHook = value,
             effects -> effects.triggerNpcHook
+        )
+        .add()
+        .<FloatingTextEffect>append(
+            new KeyedCodec<>("ShowFloatingText", FLOATING_TEXT_EFFECT_CODEC),
+            (effects, value) -> effects.showFloatingText = value,
+            effects -> effects.showFloatingText
         )
         .add()
         .build();
@@ -1465,6 +1483,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         private String spawnParticles;
         private String dropItem;
         private HookEffect triggerNpcHook;
+        private FloatingTextEffect showFloatingText;
         private ModeStep[] modeCycle = EMPTY_MODE_CYCLE;
 
         public Boolean getStartTaming() {
@@ -1518,6 +1537,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         public HookEffect getTriggerNpcHook() {
             return triggerNpcHook;
         }
+
+        public FloatingTextEffect getShowFloatingText() {
+            return showFloatingText;
+        }
     }
 
     public static final class HookEffect {
@@ -1535,6 +1558,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isConsume() {
             return consume;
+        }
+    }
+
+    public static final class FloatingTextEffect {
+        private String message;
+
+        public String getMessage() {
+            return message;
         }
     }
 
