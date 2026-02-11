@@ -1,39 +1,31 @@
-# Spawner Config Assets
+# Config Discovery
 
-This document explains how Tamework discovers spawner configs in the new asset-based system.
+This document explains how Tamework discovers asset based configuration and settings.
 
-## Asset location
-Spawner configs are **TwSpawnerConfig** assets stored under:
-~~~
-<ModRoot>/Server/Tamework/Items/Spawners/*.json
-~~~
+## Asset locations
+- TwSpawnerConfig assets live under:
+  `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
+- TwInteractionConfig assets live under:
+  `<ModRoot>/Server/Tamework/Interactions/*.json`
 
-TwSpawnerConfig assets are loaded through the asset registry like any other server asset.
-The **EmptyItemId** field determines which empty spawner item uses the config; the filename can be
-whatever you want.
+Both asset types are registered with the asset registry and are available to any mod that ships assets at those paths.
 
-## Overrides
-Spawner configs are standard assets. If you need to override another mod's spawner settings, use:
-- A patch/override mod
-- A Hytalor patch that targets the spawner asset
+## Resolution and overrides
+- Asset ids are derived from the filename (standard asset behavior).
+- If multiple mods provide the same asset id, the later loaded asset wins.
+- `Action_Tamework_Interact` resolves configs in this order:
+  `ConfigId` override (if provided on the action) then first enabled config whose `RoleIds` contains the role id.
+- If multiple configs match a role id, selection order depends on asset map iteration. Avoid overlapping `RoleIds` or use `ConfigId` overrides when you need deterministic behavior.
 
-There are no per-world override files for spawner configs.
+## Settings file
+`Tamework_Settings.json` is loaded from the plugin data directory:
+`<UserData>/Mods/<ModName>/Server/Tamework/Tamework_Settings.json`
 
-## Settings config
-Tamework settings are still stored per-world and are copied from the mod defaults if missing. The default path is:
-~~~
-<UserData>/Saves/<World>/mods/<ModName>/tamework-settings.json
-~~~
+The file is seeded on first run if missing. It controls owner damage filtering:
+- `BlockOwnerDamage`
+- `BlockAllPlayerDamageIfOwned`
+- `InvulnerableIfOwned`
 
 ## Reloading
-After editing assets on disk, run:
-~~~
-/tw reloadconfig
-~~~
-This reloads spawner config assets from disk.
-
-
-
-
-
-
+- `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig -> item feature registry).
+- TwInteractionConfig assets are managed by the asset registry and do not require a manual reload command.

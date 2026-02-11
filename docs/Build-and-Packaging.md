@@ -15,17 +15,16 @@ A separate assets zip is produced on build (same output directory as the jar). I
 - `manifest.json`
 - `LICENSE.txt`
 
-The zip does **not** include `config/` unless explicitly chosen.
+The zip does not include server data files like `Tamework_Settings.json` because those are generated under the plugin data directory at runtime.
 
-## Why Two?
-This is, hopefully, a temporary solution while we wait for Hypixel to release methods for more robust load order control.
+## Why Two
+This is a temporary solution while we wait for more robust load order control.
 
-We ship a separate assets pack because assets inside a plugin jar aren’t reliably available to the client asset pipeline or to other mods early enough. When assets load before the plugin registers custom builders/components, you’ll see “builder not found” errors.
+We ship a separate assets pack because assets inside a plugin jar are not reliably available to the client asset pipeline or to other mods early enough. When assets load before the plugin registers custom builders and components, you will see builder not found errors.
 
-The standalone assets pack ensures these resources are discoverable by the client and other mods at load time.
-(Naming the pack with a leading . can help push it earlier, but it’s not a guaranteed ordering mechanism.)
+The standalone assets pack ensures these resources are discoverable by the client and other mods at load time. Naming the pack with a leading dot can help push it earlier, but it is not a guaranteed ordering mechanism.
 
-## Dev hot‑reload
+## Dev hot reload
 During dev runs, the server references `src/main/resources` directly for faster iteration.
 
 ## Output location
@@ -38,5 +37,4 @@ Both the plugin manifest and the assets pack manifest are versioned from Maven:
 - Maven resource filtering stamps the version during build.
 - The assets zip pulls the filtered manifest from `target/classes`.
 
-If you see a mismatched manifest version, re-run `clean package` to refresh the filtered resources and the assets zip.
-
+If you see a mismatched manifest version, re run `clean package` to refresh the filtered resources and the assets zip.
