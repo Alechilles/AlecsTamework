@@ -1,0 +1,16 @@
+Group #TameworkMessageRoot {
+  Anchor: (Width: 350, Height: 200);
+
+  Label #TameworkMessage {
+    Anchor: (Top: 140, Width: 350, Height: 24);
+    Style: (
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center,
+      RenderBold: true,
+      FontSize: 16,
+      TextColor: #ffffff,
+      OutlineColor: #000000(0.6)
+    );
+    Text: "";
+  }
+}

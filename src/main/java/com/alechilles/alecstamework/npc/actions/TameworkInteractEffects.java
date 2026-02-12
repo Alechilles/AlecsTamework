@@ -17,9 +17,11 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetStateEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParticlesEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StatDelta;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.ui.TameworkMessageHud;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -37,6 +39,8 @@ import com.hypixel.hytale.server.core.asset.type.item.config.container.ItemDropC
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.entities.player.hud.CustomUIHud;
+import com.hypixel.hytale.server.core.entity.entities.player.hud.HudManager;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -48,6 +52,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
 import com.hypixel.hytale.server.core.modules.physics.component.PhysicsValues;
+import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
@@ -63,6 +68,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 final class TameworkInteractEffects {
     private static final String HEALTH_STAT_ID = "Health";
@@ -72,6 +79,13 @@ final class TameworkInteractEffects {
     private static final String DEFAULT_MOUNT_ANCHOR_Z_PARAM = "MountAnchorZ";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
+    private static final long UI_MESSAGE_DURATION_MS = 1000L;
+    private static final long UI_MESSAGE_FADE_STEP_1_MS = 650L;
+    private static final long UI_MESSAGE_FADE_STEP_2_MS = 850L;
+    private static final String UI_MESSAGE_COLOR_FULL = "#ffffff";
+    private static final String UI_MESSAGE_COLOR_FADE_1 = "#ffffff(0.6)";
+    private static final String UI_MESSAGE_COLOR_FADE_2 = "#ffffff(0.25)";
+    private static final ConcurrentHashMap<UUID, Integer> UI_MESSAGE_TOKENS = new ConcurrentHashMap<>();
     private static final ModeStep[] DEFAULT_MODE_CYCLE = new ModeStep[] {
             new ModeStep("Hold", null, null),
             new ModeStep("Idle", null, null),
@@ -144,6 +158,10 @@ final class TameworkInteractEffects {
         FloatingTextEffect floatingText = effects.getShowFloatingText();
         if (floatingText != null) {
             applied |= applyFloatingText(floatingText, npcRef, store, player);
+        }
+        UiMessageEffect uiMessage = effects.getShowUiMessage();
+        if (uiMessage != null) {
+            applied |= applyUiMessage(uiMessage, player);
         }
         return applied;
     }
@@ -264,7 +282,7 @@ final class TameworkInteractEffects {
         ResolvedModeStep next = resolved[nextIndex];
         role.getStateSupport().setState(npcRef, next.state, next.subState, store);
         if (next.message != null && !next.message.isBlank()) {
-            applyMessageText(next.message, npcRef, store, player);
+            applyUiMessage(next.message, player);
             owner.logDebug("ModeToggle: message=" + next.message);
         }
         return true;
@@ -496,6 +514,95 @@ final class TameworkInteractEffects {
             return false;
         }
         return applyMessageText(effect.getMessage(), npcRef, store, player);
+    }
+
+    private boolean applyUiMessage(UiMessageEffect effect, Player player) {
+        if (effect == null) {
+            return false;
+        }
+        return applyUiMessage(effect.getMessage(), player);
+    }
+
+    private boolean applyUiMessage(String message, Player player) {
+        if (message == null || message.isBlank() || player == null) {
+            return false;
+        }
+        PlayerRef playerRef = player.getReference();
+        if (playerRef == null || !playerRef.isValid()) {
+            return false;
+        }
+        HudManager hudManager = player.getHudManager();
+        if (hudManager == null) {
+            return false;
+        }
+        UUID playerId = player.getUuid();
+        int token = UI_MESSAGE_TOKENS.merge(playerId, 1, Integer::sum);
+        TameworkMessageHud hud = resolveOrCreateMessageHud(hudManager, playerRef, message);
+        scheduleUiMessageFade(playerId, token, hudManager, hud, playerRef, UI_MESSAGE_FADE_STEP_1_MS, UI_MESSAGE_COLOR_FADE_1);
+        scheduleUiMessageFade(playerId, token, hudManager, hud, playerRef, UI_MESSAGE_FADE_STEP_2_MS, UI_MESSAGE_COLOR_FADE_2);
+        scheduleUiMessageHide(playerId, token, hudManager, hud, playerRef, UI_MESSAGE_DURATION_MS);
+        return true;
+    }
+
+    private TameworkMessageHud resolveOrCreateMessageHud(HudManager hudManager,
+                                                         PlayerRef playerRef,
+                                                         String message) {
+        CustomUIHud currentHud = hudManager.getCustomHud();
+        if (currentHud instanceof TameworkMessageHud) {
+            TameworkMessageHud messageHud = (TameworkMessageHud) currentHud;
+            messageHud.updateMessage(message, UI_MESSAGE_COLOR_FULL);
+            return messageHud;
+        }
+        TameworkMessageHud messageHud = new TameworkMessageHud(playerRef, message);
+        hudManager.setCustomHud(playerRef, messageHud);
+        return messageHud;
+    }
+
+    private void scheduleUiMessageFade(UUID playerId,
+                                       int token,
+                                       HudManager hudManager,
+                                       TameworkMessageHud hud,
+                                       PlayerRef playerRef,
+                                       long delayMs,
+                                       String color) {
+        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+            if (!isUiMessageTokenCurrent(playerId, token)) {
+                return;
+            }
+            if (!playerRef.isValid()) {
+                return;
+            }
+            if (hudManager.getCustomHud() != hud) {
+                return;
+            }
+            hud.updateColor(color);
+        }, delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    private void scheduleUiMessageHide(UUID playerId,
+                                       int token,
+                                       HudManager hudManager,
+                                       TameworkMessageHud hud,
+                                       PlayerRef playerRef,
+                                       long delayMs) {
+        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+            if (!isUiMessageTokenCurrent(playerId, token)) {
+                return;
+            }
+            if (!playerRef.isValid()) {
+                return;
+            }
+            if (hudManager.getCustomHud() != hud) {
+                return;
+            }
+            hudManager.setCustomHud(playerRef, null);
+            UI_MESSAGE_TOKENS.remove(playerId, token);
+        }, delayMs, TimeUnit.MILLISECONDS);
+    }
+
+    private boolean isUiMessageTokenCurrent(UUID playerId, int token) {
+        Integer current = UI_MESSAGE_TOKENS.get(playerId);
+        return current != null && current == token;
     }
 
     private boolean applyMessageText(String message,

@@ -688,6 +688,19 @@ public final class TwInteractionConfigCodecs {
         .add()
         .build();
 
+    public static final BuilderCodec<UiMessageEffect> UI_MESSAGE_EFFECT_CODEC = BuilderCodec.builder(
+            UiMessageEffect.class,
+            UiMessageEffect::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Message", Codec.STRING),
+            (effect, value) -> effect.message = value,
+            effect -> effect.message
+        )
+        .documentation("Message shown in the on-screen UI overlay.")
+        .add()
+        .build();
+
     public static final BuilderCodec<SpawnParticlesEffect> SPAWN_PARTICLES_EFFECT_CODEC = BuilderCodec.builder(
             SpawnParticlesEffect.class,
             SpawnParticlesEffect::new
@@ -1060,6 +1073,13 @@ public final class TwInteractionConfigCodecs {
             effects -> effects.showFloatingText
         )
         .documentation("Show floating combat text.")
+        .add()
+        .<UiMessageEffect>append(
+            new KeyedCodec<>("ShowUiMessage", UI_MESSAGE_EFFECT_CODEC),
+            (effects, value) -> effects.showUiMessage = value,
+            effects -> effects.showUiMessage
+        )
+        .documentation("Show a temporary UI message to the interacting player.")
         .add()
         .build();
 

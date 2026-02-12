@@ -87,6 +87,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final BuilderCodec<RequirementGroup> REQUIREMENT_GROUP_CODEC = TwInteractionConfigCodecs.REQUIREMENT_GROUP_CODEC;
     public static final BuilderCodec<HookEffect> HOOK_EFFECT_CODEC = TwInteractionConfigCodecs.HOOK_EFFECT_CODEC;
     public static final BuilderCodec<FloatingTextEffect> FLOATING_TEXT_EFFECT_CODEC = TwInteractionConfigCodecs.FLOATING_TEXT_EFFECT_CODEC;
+    public static final BuilderCodec<UiMessageEffect> UI_MESSAGE_EFFECT_CODEC = TwInteractionConfigCodecs.UI_MESSAGE_EFFECT_CODEC;
     public static final BuilderCodec<SpawnParticlesEffect> SPAWN_PARTICLES_EFFECT_CODEC = TwInteractionConfigCodecs.SPAWN_PARTICLES_EFFECT_CODEC;
     public static final BuilderCodec<PlaySoundEffect> PLAY_SOUND_EFFECT_CODEC = TwInteractionConfigCodecs.PLAY_SOUND_EFFECT_CODEC;
     public static final BuilderCodec<DropItemEffect> DROP_ITEM_EFFECT_CODEC = TwInteractionConfigCodecs.DROP_ITEM_EFFECT_CODEC;
@@ -597,6 +598,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         DropItemEffect dropItem;
         HookEffect triggerNpcHook;
         FloatingTextEffect showFloatingText;
+        UiMessageEffect showUiMessage;
 
         public SetTamedEffect getSetTamed() {
             return setTamed;
@@ -648,6 +650,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public FloatingTextEffect getShowFloatingText() {
             return showFloatingText;
+        }
+
+        public UiMessageEffect getShowUiMessage() {
+            return showUiMessage;
         }
     }
 
@@ -783,6 +789,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class FloatingTextEffect {
+        String message;
+
+        public String getMessage() {
+            return message;
+        }
+    }
+
+    public static final class UiMessageEffect {
         String message;
 
         public String getMessage() {
