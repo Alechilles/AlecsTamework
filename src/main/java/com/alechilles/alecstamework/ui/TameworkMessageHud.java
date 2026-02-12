@@ -6,7 +6,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import javax.annotation.Nonnull;
 
 public final class TameworkMessageHud extends CustomUIHud {
-    public static final String UI_PATH = "Custom/TameworkMessageHud.ui";
+    public static final String UI_PATH = "UI/Custom/TameworkMessageHud.ui";
     private static final String MESSAGE_TEXT_SELECTOR = "#TameworkMessage.Text";
     private static final String MESSAGE_COLOR_SELECTOR = "#TameworkMessage.Style.TextColor";
 
