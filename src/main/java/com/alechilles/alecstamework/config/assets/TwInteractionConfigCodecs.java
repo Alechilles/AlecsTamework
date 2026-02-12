@@ -1101,14 +1101,14 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.enabled = value == null || value,
             entry -> entry.enabled
         )
-        .documentation("Whether this interaction entry is enabled.")
+        .documentation("Whether this interaction entry is enabled. Default: true.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("CooldownSeconds", Codec.INTEGER),
             (entry, value) -> entry.cooldownSeconds = value,
             entry -> entry.cooldownSeconds
         )
-        .documentation("Cooldown before this entry can trigger again.")
+        .documentation("Cooldown before this entry can trigger again. Default: none.")
         .add()
         .build();
 
@@ -1122,35 +1122,35 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.useLovedItems = value,
             entry -> entry.useLovedItems
         )
-        .documentation("Allow loved items as valid tame items.")
+        .documentation("Allow loved items as valid tame items. Default: true.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("ItemsInHand", ITEM_ASSET_ARRAY_OR_SINGLE_CODEC),
             (entry, value) -> entry.itemsInHand = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             entry -> entry.itemsInHand
         )
-        .documentation("Items that can tame the NPC.")
+        .documentation("Items that can tame the NPC. Default: empty.")
         .add()
         .<String>append(
             new KeyedCodec<>("ItemsParam", Codec.STRING),
             (entry, value) -> entry.itemsParam = value,
             entry -> entry.itemsParam
         )
-        .documentation("Role param that provides items list.")
+        .documentation("Role param that provides items list. Default: none.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
         )
-        .documentation("Additional requirements to tame.")
+        .documentation("Additional requirements to tame. Default: none.")
         .add()
         .<Effects>append(
             new KeyedCodec<>("Effects", EFFECTS_CODEC),
             (entry, value) -> entry.effects = value,
             entry -> entry.effects
         )
-        .documentation("Additional effects to apply after taming.")
+        .documentation("Additional effects to apply after taming. Default: none.")
         .add()
         .build();
 
@@ -1237,42 +1237,42 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.useLovedItems = value,
             entry -> entry.useLovedItems
         )
-        .documentation("Allow loved items as valid feed items.")
+        .documentation("Allow loved items as valid feed items. Default: true.")
         .add()
         .<FeedItem[]>append(
             new KeyedCodec<>("ItemsInHand", FEED_ITEM_ARRAY_OR_SINGLE_CODEC),
             (entry, value) -> entry.itemsInHand = value == null ? EMPTY_FEED_ITEMS : value,
             entry -> entry.itemsInHand
         )
-        .documentation("Feed items with per-item heal overrides.")
+        .documentation("Feed items with per-item heal overrides. Default: empty.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Heal", Codec.DOUBLE),
             (entry, value) -> entry.heal = value,
             entry -> entry.heal
         )
-        .documentation("Default heal amount if no per-item override.")
+        .documentation("Default heal amount if no per-item override. Default: 0.")
         .add()
         .<String>append(
             new KeyedCodec<>("ItemsParam", Codec.STRING),
             (entry, value) -> entry.itemsParam = value,
             entry -> entry.itemsParam
         )
-        .documentation("Role param that provides items list.")
+        .documentation("Role param that provides items list. Default: none.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
         )
-        .documentation("Additional requirements to feed.")
+        .documentation("Additional requirements to feed. Default: none.")
         .add()
         .<Effects>append(
             new KeyedCodec<>("Effects", EFFECTS_CODEC),
             (entry, value) -> entry.effects = value,
             entry -> entry.effects
         )
-        .documentation("Additional effects to apply after feeding.")
+        .documentation("Additional effects to apply after feeding. Default: none.")
         .add()
         .build();
 
@@ -1286,42 +1286,42 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.requireTamed = value,
             entry -> entry.requireTamed
         )
-        .documentation("Require the NPC to be tamed.")
+        .documentation("Require the NPC to be tamed. Default: true.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireHarvestable", Codec.BOOLEAN),
             (entry, value) -> entry.requireHarvestable = value,
             entry -> entry.requireHarvestable
         )
-        .documentation("Require the IsHarvestable role param.")
+        .documentation("Require the IsHarvestable role param. Default: true.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireHarvestAlarmReady", Codec.BOOLEAN),
             (entry, value) -> entry.requireHarvestAlarmReady = value,
             entry -> entry.requireHarvestAlarmReady
         )
-        .documentation("Require the Harvest_Ready alarm to be ready.")
+        .documentation("Require the Harvest_Ready alarm to be ready. Default: true.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireHarvestInteractionContext", Codec.BOOLEAN),
             (entry, value) -> entry.requireHarvestInteractionContext = value,
             entry -> entry.requireHarvestInteractionContext
         )
-        .documentation("Require the HarvestInteractionContext to match.")
+        .documentation("Require the HarvestInteractionContext to match. Default: true.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
         )
-        .documentation("Additional requirements to harvest.")
+        .documentation("Additional requirements to harvest. Default: none.")
         .add()
         .<Effects>append(
             new KeyedCodec<>("Effects", EFFECTS_CODEC),
             (entry, value) -> entry.effects = value,
             entry -> entry.effects
         )
-        .documentation("Additional effects to apply after harvesting.")
+        .documentation("Additional effects to apply after harvesting. Default: none.")
         .add()
         .build();
 
@@ -1335,42 +1335,42 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.requireTamed = value,
             entry -> entry.requireTamed
         )
-        .documentation("Require the NPC to be tamed.")
+        .documentation("Require the NPC to be tamed. Default: true.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
             (entry, value) -> entry.requireOwner = value,
             entry -> entry.requireOwner
         )
-        .documentation("Require the player to be the owner.")
+        .documentation("Require the player to be the owner. Default: true.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireMountable", Codec.BOOLEAN),
             (entry, value) -> entry.requireMountable = value,
             entry -> entry.requireMountable
         )
-        .documentation("Require the IsMountable role param.")
+        .documentation("Require the IsMountable role param. Default: true.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireCrouching", Codec.BOOLEAN),
             (entry, value) -> entry.requireCrouching = value,
             entry -> entry.requireCrouching
         )
-        .documentation("Require the player to be crouching.")
+        .documentation("Require the player to be crouching. Default: true.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
         )
-        .documentation("Additional requirements to mount.")
+        .documentation("Additional requirements to mount. Default: none.")
         .add()
         .<Effects>append(
             new KeyedCodec<>("Effects", EFFECTS_CODEC),
             (entry, value) -> entry.effects = value,
             entry -> entry.effects
         )
-        .documentation("Additional effects to apply after mounting.")
+        .documentation("Additional effects to apply after mounting. Default: none.")
         .add()
         .build();
 
@@ -1384,35 +1384,35 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.requireTamed = value,
             entry -> entry.requireTamed
         )
-        .documentation("Require the NPC to be tamed.")
+        .documentation("Require the NPC to be tamed. Default: true.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
             (entry, value) -> entry.requireOwner = value,
             entry -> entry.requireOwner
         )
-        .documentation("Require the player to be the owner.")
+        .documentation("Require the player to be the owner. Default: true.")
         .add()
         .<ModeStep[]>append(
             new KeyedCodec<>("Cycle", MODE_STEP_ARRAY_CODEC),
             (entry, value) -> entry.cycle = value == null ? EMPTY_MODE_CYCLE : value,
             entry -> entry.cycle
         )
-        .documentation("Ordered mode steps to cycle through.")
+        .documentation("Ordered mode steps to cycle through. Default: empty.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
         )
-        .documentation("Additional requirements to change mode.")
+        .documentation("Additional requirements to change mode. Default: none.")
         .add()
         .<Effects>append(
             new KeyedCodec<>("Effects", EFFECTS_CODEC),
             (entry, value) -> entry.effects = value,
             entry -> entry.effects
         )
-        .documentation("Additional effects to apply after cycling.")
+        .documentation("Additional effects to apply after cycling. Default: none.")
         .add()
         .build();
 
@@ -1426,35 +1426,35 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.requireTamed = value,
             entry -> entry.requireTamed
         )
-        .documentation("Require the NPC to be tamed.")
+        .documentation("Require the NPC to be tamed. Default: true.")
         .add()
         .<Double>append(
             new KeyedCodec<>("MinHappiness", Codec.DOUBLE),
             (entry, value) -> entry.minHappiness = value,
             entry -> entry.minHappiness
         )
-        .documentation("Minimum happiness to allow breeding.")
+        .documentation("Minimum happiness to allow breeding. Default: none.")
         .add()
         .<Double>append(
             new KeyedCodec<>("FertilityBonus", Codec.DOUBLE),
             (entry, value) -> entry.fertilityBonus = value,
             entry -> entry.fertilityBonus
         )
-        .documentation("Additive fertility bonus.")
+        .documentation("Additive fertility bonus. Default: none.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
         )
-        .documentation("Additional requirements to breed.")
+        .documentation("Additional requirements to breed. Default: none.")
         .add()
         .<Effects>append(
             new KeyedCodec<>("Effects", EFFECTS_CODEC),
             (entry, value) -> entry.effects = value,
             entry -> entry.effects
         )
-        .documentation("Additional effects to apply after breeding.")
+        .documentation("Additional effects to apply after breeding. Default: none.")
         .add()
         .build();
 
@@ -1468,14 +1468,14 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.requires = value,
             entry -> entry.requires
         )
-        .documentation("Custom requirements for this interaction.")
+        .documentation("Custom requirements for this interaction. Default: none.")
         .add()
         .<Effects>append(
             new KeyedCodec<>("Effects", EFFECTS_CODEC),
             (entry, value) -> entry.effects = value,
             entry -> entry.effects
         )
-        .documentation("Effects to apply when matched.")
+        .documentation("Effects to apply when matched. Default: none.")
         .add()
         .build();
 
