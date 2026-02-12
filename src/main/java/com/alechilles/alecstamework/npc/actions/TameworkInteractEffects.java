@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ui.TameworkMessageHud;
+import com.hypixel.hytale.server.core.asset.util.ColorParseUtil;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -80,14 +81,14 @@ final class TameworkInteractEffects {
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final long UI_MESSAGE_DURATION_MS = 1200L;
-    private static final String UI_MESSAGE_COLOR_FULL = "#ffffff";
-    private static final String[] UI_MESSAGE_FADE_COLORS = new String[] {
-            "#f2f2f2",
-            "#e6e6e6",
-            "#d9d9d9",
-            "#bfbfbf",
-            "#a6a6a6",
-            "#8c8c8c"
+    private static final long UI_MESSAGE_COLOR_FULL = uiRgba("#ffffffff");
+    private static final long[] UI_MESSAGE_FADE_COLORS = new long[] {
+            uiRgba("#ffffffd9"),
+            uiRgba("#ffffffb3"),
+            uiRgba("#ffffff8c"),
+            uiRgba("#ffffff66"),
+            uiRgba("#ffffff40"),
+            uiRgba("#ffffff1a")
     };
     private static final ConcurrentHashMap<UUID, Integer> UI_MESSAGE_TOKENS = new ConcurrentHashMap<>();
     private static final ModeStep[] DEFAULT_MODE_CYCLE = new ModeStep[] {
@@ -571,7 +572,7 @@ final class TameworkInteractEffects {
             intervalMs = 1L;
         }
         for (int i = 0; i < UI_MESSAGE_FADE_COLORS.length; i++) {
-            String color = UI_MESSAGE_FADE_COLORS[i];
+            long color = UI_MESSAGE_FADE_COLORS[i];
             long delayMs = (i + 1L) * intervalMs;
             HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
                 if (!isUiMessageTokenCurrent(playerId, token)) {
@@ -586,6 +587,11 @@ final class TameworkInteractEffects {
                 hud.updateColor(color);
             }, delayMs, TimeUnit.MILLISECONDS);
         }
+    }
+
+    private static long uiRgba(String hex) {
+        int rgba = ColorParseUtil.hexAlphaStringToRGBAInt(hex);
+        return Integer.toUnsignedLong(rgba);
     }
 
     private void scheduleUiMessageHide(UUID playerId,
