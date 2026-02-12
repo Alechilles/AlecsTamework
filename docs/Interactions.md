@@ -1,57 +1,62 @@
 # Optimized Interactions (TwInteractionConfig)
 
 ## Overview
-Tamework provides an optimized interaction pipeline that replaces large NPC interaction instruction trees with a single action call. The pipeline is driven by `TwInteractionConfig` assets and executed by the `Action_Tamework_Interact` NPC action.
+Tamework replaces large NPC interaction instruction trees with a single action call. The flow is driven by `TwInteractionConfig` assets and executed by the `Action_Tamework_Interact` NPC action.
 
 ## Asset location
 `<ModRoot>/Server/Tamework/Interactions/*.json`
 
 ## Config resolution
-- If the action passes `ConfigId`, that asset id is used directly.
+- If the action passes `ConfigId`, that asset id is used.
+- Otherwise the role parameter `InteractionConfigId` is used if present.
 - Otherwise the first enabled config whose `RoleIds` contains the NPC role id is selected.
-- If multiple configs match a role, selection order depends on asset map iteration. Avoid overlapping `RoleIds` or use `ConfigId` overrides.
+
+If multiple configs match, selection order depends on asset map iteration. Avoid overlapping `RoleIds` or use `ConfigId` overrides.
 
 ## Interaction order
-Interactions are evaluated in the order listed in the `Interactions` array. The first enabled entry whose requirements pass is executed.
+`Interactions` is evaluated in order. The first enabled entry whose requirements pass is executed.
 
-## Common fields
-- `Enabled` defaults to true when omitted.
-- `CooldownSeconds` is defined on each interaction entry but is not enforced by the current implementation.
-- `Cooldowns.InteractionSeconds` exists at the config level but is not enforced by the current implementation.
+## Cooldowns
+- `CooldownSeconds` exists per entry but is not enforced yet.
+- `Cooldowns.InteractionSeconds` exists at the config level but is not enforced yet.
 
 ## Preset interactions
-Preset entries provide simple defaults with minimal configuration.
+Preset entries provide simple defaults plus optional `Requires` + `Effects` add‑ons.
 
 ### Tame
 Fields:
-- `ConsumeItem` (default true when omitted)
 - `UseLovedItems` (default true)
 - `ItemsInHand` (item id or array)
 - `ItemsParam` (role parameter name that returns string or string array)
 
 Requirements:
-- NPC must not be tamed.
+- NPC must be untamed.
 - Held item must match the resolved item list.
 
 Effects:
-- Sets `TameworkTamedComponent` true.
-- Sets `TameworkOwnerComponent` to the interacting player.
-- Consumes the held item if `ConsumeItem` is true.
+- Sets tamed true and owner to the interacting player.
+- Consumes the held item.
 
 ### Feed
 Fields:
-- `ConsumeItem` (default true)
 - `UseLovedItems` (default true)
-- `ItemsInHand` (item id or array)
+- `ItemsInHand` (string, object, or array)
+- `Heal` (global fallback)
 - `ItemsParam` (role parameter name)
+
+`ItemsInHand` entries can be:
+- `"ItemId"` (string)
+- `{ "Item": "ItemId", "Heal": 8 }`
+- or an array of either form
 
 Requirements:
 - NPC must be tamed.
 - Held item must match the resolved item list.
 
 Effects:
-- Currently a placeholder (no heal logic yet).
-- Consumes the held item if `ConsumeItem` is true.
+- Heals the NPC by the per‑item override or the global `Heal`.
+- Shows floating combat text for healing (if a player is present).
+- Consumes the held item.
 
 ### Harvest
 Fields:
@@ -62,10 +67,10 @@ Fields:
 
 Requirements:
 - Uses role parameters `IsHarvestable` and `HarvestInteractionContext`.
-- Uses the `Harvest_Ready` alarm on the NPC.
+- Uses `Harvest_Ready` alarm on the NPC.
 
 Effects:
-- Sets state `$Harvest` on the NPC. The role should handle the alarm and drops inside `$Harvest`.
+- Sets NPC state `$Harvest` (role should handle alarm/drops in that state).
 
 ### Mount
 Fields:
@@ -75,7 +80,8 @@ Fields:
 - `RequireCrouching` (default true)
 
 Effects:
-- Not yet implemented (logs a warning).
+- Attempts to mount the NPC using `NPCMountComponent`.
+- Uses role params `MountAnchorX/Y/Z` and optional `MountMovementConfig`.
 
 ### ModeCycle
 Fields:
@@ -86,9 +92,9 @@ Fields:
 `ModeStep` fields:
 - `State`
 - `SubState`
-- `Message` (currently logged only)
+- `Message` (reserved for UI)
 
-If `Cycle` is empty, the default cycle is `Hold -> Idle -> Defend`.
+If `Cycle` is empty, default cycle is `Hold -> Idle -> Defend`.
 
 ### Breed
 Fields:
@@ -97,28 +103,28 @@ Fields:
 - `FertilityBonus` (reserved)
 
 Effects:
-- Not yet implemented (logs a warning).
+- Not implemented yet (logs a warning).
 
 ## Custom interactions
-Custom entries allow full requirement and effect control:
+`Type: "Custom"` exposes full `Requires` + `Effects` control.
 
-```
+Example:
+```json
 {
   "Type": "Custom",
   "Requires": { "All": { "IsTamed": true } },
-  "Effects": { "StartHarvest": true }
+  "Effects": { "SetState": { "State": "Idle" } }
 }
 ```
 
-### Requirement structure
+## Requirements
 `Requires` contains two buckets:
-- `All`: every requirement in the bucket must pass.
-- `Any`: at least one requirement in the bucket must pass.
+- `All`: all requirements must pass.
+- `Any`: at least one requirement must pass.
 
-Array based requirements inside each bucket use any match semantics. For example, if `NpcState` contains two entries under `All`, the bucket is satisfied if either state matches. Use separate custom interactions if you need strict per entry AND logic.
+Within each requirement array, any entry can satisfy that requirement type. Empty arrays are ignored.
 
-### Basic toggle requirements
-These are simple boolean toggles:
+### Basic toggles
 - `LovedItems`
 - `IsHarvestable`
 - `IsMountable`
@@ -127,86 +133,81 @@ These are simple boolean toggles:
 - `PlayerCrouching`
 - `PlayerIsOwner`
 - `HarvestAlarmReady`
-- `HarvestInteractionContext`
+- `HarvestInteractionContext` (blank context is allowed)
 
-`HarvestInteractionContext` treats a blank context as valid (no tool required).
-
-### ItemsInHand requirement
+### ItemsInHand
 Fields:
 - `Items` (item id or array)
-- `Param` (role parameter name that returns string or string array)
+- `Param` (role parameter name)
+- `Quantity` (minimum stack size)
 
-The items list is the union of `Items` and the role parameter if provided.
-
-### ItemsEquipped requirement
+### ItemsInInventory
 Fields:
 - `Items` (item id or array)
+- `Param` (role parameter name)
+- `Quantity` (minimum total quantity)
+
+### ItemsEquipped
+Fields:
+- `Items` (optional item id or array)
 - `Slots` (slot enum or array)
 
-Slot enum values:
+Slot values:
 `Head`, `Chest`, `Hands`, `Legs`, `Armor`, `Equipped`, `Utility`, `Accessory`, `Accessories`
 
-If `Items` is empty but `Slots` are provided, the requirement checks that any item is equipped in those slots.
+If `Items` is empty but `Slots` are provided, any item in those slots passes.
 
-### Parameter requirement
+### Parameter
 Fields:
 - `Name` (role parameter name)
 - `Operator` (`Equals`, `NotEquals`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`)
 - `Match` (`Any` or `All`)
-- `Values` (string or array)
+- `Value` (string or array)
 
-Numeric comparisons are used when both the role parameter and the target value parse as numbers. Otherwise string equality is used for `Equals` and `NotEquals`.
+Numeric comparison is used if both the param and value parse as numbers; otherwise string equality is used for `Equals` and `NotEquals`.
 
-### AlarmState requirement
+### AlarmState
 Fields:
 - `Name` (alarm id)
 - `State` (`Unset`, `Active`, `Passed`)
 
 If an alarm does not exist, it is treated as `Unset`.
 
-### NpcState requirement
+### NpcState
 Fields:
 - `State`
 - `SubState`
 
-`State` may include `Primary.SubState`. If `State` is empty and `SubState` is provided, the requirement matches any state with that substate name.
+`State` may include `Primary.SubState`. If `State` is blank and `SubState` is provided, any state with that substate name matches.
 
-### PlayerMovementState requirement
+### PlayerMovementState
 Field:
-- `State`
+- `State` with values `Crouching`, `Walking`, `Running`, `Sprinting`, `Idle`, `Mounting`, `Sleeping`
 
-Allowed values:
-`Crouching`, `Walking`, `Running`, `Sprinting`, `Idle`, `Mounting`, `Sleeping`
-
-### InteractionContext requirement
+### InteractionContext
 Fields:
 - `Context`
-- `Param`
+- `Param` (role parameter name)
 
-If `Context` is blank, `Param` is resolved from the role. The context must exist and match a contextual interaction on the NPC for the current player.
+If `Context` is blank, `Param` is resolved from the role. The context must exist and match a contextual interaction on the NPC.
 
 ## Effects
-Custom effects support the following fields:
-- `StartTaming`
-- `StartBreeding` (not implemented)
-- `ApplyFeeding` (currently no heal logic)
-- `StartHarvest`
-- `Mount` (not implemented)
-- `ToggleMode`
-- `ModeCycle` (used by ToggleMode)
-- `ConsumeItem`
-- `TriggerNpcHook`
-- `PlaySound` (reserved, not implemented)
-- `SpawnParticles` (reserved, not implemented)
-- `DropItem` (reserved, not implemented)
+Effects are defined under `Effects` in any interaction type.
 
-### TriggerNpcHook
-Fields:
-- `HookId`
-- `PlayerOnly`
-- `Consume`
-
-The hook effect stores `HookId`, `PlayerId`, `PlayerName`, `HeldItemId`, and `TimestampMs` on the NPC in a `TameworkHookComponent`. Use the `TameworkHook` sensor to react to that data.
+Available effects:
+- `SetTamed` `{ "Value": true | false }`
+- `SetOwner` `{ "Source": "Player" | "None" | "Custom", "Uuid": "...", "Name": "..." }`
+- `ModifyStats` `{ "Stats": [ { "StatId": "...", "Amount": 5 } ] }`
+- `SetState` `{ "State": "...", "SubState": "..." }`
+- `RemoveItemsHand` `{ "Quantity": 1 }`
+- `RemoveItemsInventory` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
+- `AddItemInventory` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
+- `Mount` `true`
+- `PlaySound` `{ "SoundEvent": "...", "Volume": 1, "Pitch": 1, "Offset": [0,0,0], "PlayerOnly": false }`
+- `SpawnParticles` `{ "ParticleSystem": "...", "Offset": [0,0,0], "Color": "#RRGGBB", "PlayerOnly": false }`
+- `DropItem` `{ "Item": "...", "DropList": "...", "QuantityMin": 1, "QuantityMax": 1, "ThrowSpeed": 0 }`
+- `TriggerNpcHook` `{ "HookId": "...", "PlayerOnly": true, "Consume": true }`
+- `ShowFloatingText` `{ "Message": "+10 HP" }`
 
 ## Action usage in NPC roles
 Example interaction instruction snippet:
@@ -228,4 +229,4 @@ Example interaction instruction snippet:
 ]
 ```
 
-`Action_Tamework_Interact` uses role parameters by default, and the action fields above override those values when provided.
+`TameworkInteract` uses role parameters by default, and the action fields above override those values when provided.
