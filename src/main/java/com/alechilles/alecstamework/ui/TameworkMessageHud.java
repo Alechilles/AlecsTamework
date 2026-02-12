@@ -11,7 +11,7 @@ public final class TameworkMessageHud extends CustomUIHud {
     private static final String MESSAGE_COLOR_SELECTOR = "#TameworkMessage.Style.TextColor";
 
     private String message;
-    private String messageColor = "#ffffff";
+    private String messageColor = "#ffffffff";
 
     public TameworkMessageHud(@Nonnull PlayerRef playerRef, String message) {
         super(playerRef);
