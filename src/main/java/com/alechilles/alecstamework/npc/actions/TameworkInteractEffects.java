@@ -82,9 +82,9 @@ final class TameworkInteractEffects {
     private static final long UI_MESSAGE_DURATION_MS = 1000L;
     private static final long UI_MESSAGE_FADE_STEP_1_MS = 650L;
     private static final long UI_MESSAGE_FADE_STEP_2_MS = 850L;
-    private static final String UI_MESSAGE_COLOR_FULL = "#ffffffff";
-    private static final String UI_MESSAGE_COLOR_FADE_1 = "#ffffff99";
-    private static final String UI_MESSAGE_COLOR_FADE_2 = "#ffffff40";
+    private static final String UI_MESSAGE_COLOR_FULL = "#ffffff";
+    private static final String UI_MESSAGE_COLOR_FADE_1 = "#b3b3b3";
+    private static final String UI_MESSAGE_COLOR_FADE_2 = "#666666";
     private static final ConcurrentHashMap<UUID, Integer> UI_MESSAGE_TOKENS = new ConcurrentHashMap<>();
     private static final ModeStep[] DEFAULT_MODE_CYCLE = new ModeStep[] {
             new ModeStep("Hold", null, null),
