@@ -33,6 +33,7 @@ import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -372,7 +373,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (!alarm.isSet()) {
             return true;
         }
-        return alarm.hasPassed(Instant.now());
+        return alarm.hasPassed(resolveGameTime(store));
     }
 
     boolean matchesItemsInHand(ItemsInHandRequirement requirement, Role role, Player player) {
@@ -551,13 +552,14 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (alarm == null) {
             return "unset".equals(state);
         }
+        Instant now = resolveGameTime(store);
         switch (state) {
             case "unset":
                 return !alarm.isSet();
             case "passed":
-                return alarm.isSet() && alarm.hasPassed(Instant.now());
+                return alarm.isSet() && alarm.hasPassed(now);
             case "active":
-                return alarm.isSet() && !alarm.hasPassed(Instant.now());
+                return alarm.isSet() && !alarm.hasPassed(now);
             default:
                 return false;
         }
@@ -617,6 +619,17 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             anyMatched |= matched;
         }
         return anyMatched;
+    }
+
+    private Instant resolveGameTime(Store<EntityStore> store) {
+        if (store == null) {
+            return Instant.now();
+        }
+        WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
+        if (time == null) {
+            return Instant.now();
+        }
+        return time.getGameTime();
     }
 
     private boolean evaluateParamTarget(ParamOperator operator,
