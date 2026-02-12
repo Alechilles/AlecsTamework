@@ -168,8 +168,8 @@
     },
     "HarvestTimeout": {
       "Value": [
-        "P1D",
-        "P1D"
+        "PT30S",
+        "PT40S"
       ],
       "Description": "The minimum time between consecutive harvests. Expressed as an ISO-8601 time period range."
     },
@@ -404,8 +404,7 @@
           }
         }
       ]
-    }
-    ,
+    },
     {
       "$Comment": "Minimal harvest behavior for testing.",
       "Sensor": {
