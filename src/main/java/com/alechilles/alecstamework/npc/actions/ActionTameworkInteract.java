@@ -234,7 +234,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         if (entry instanceof ModeCycleInteraction) {
             ModeCycleInteraction cycle = (ModeCycleInteraction) entry;
-            boolean applied = effects.applyToggleMode(cycle.getCycle(), npcRef, role, store);
+            boolean applied = effects.applyToggleMode(cycle.getCycle(), npcRef, role, store, player);
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
         }
         if (entry instanceof BreedInteraction) {

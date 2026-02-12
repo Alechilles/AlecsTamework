@@ -244,7 +244,8 @@ final class TameworkInteractEffects {
     boolean applyToggleMode(ModeStep[] cycle,
                             Ref<EntityStore> npcRef,
                             Role role,
-                            Store<EntityStore> store) {
+                            Store<EntityStore> store,
+                            Player player) {
         if (role == null || role.getStateSupport() == null) {
             return false;
         }
@@ -263,6 +264,7 @@ final class TameworkInteractEffects {
         ResolvedModeStep next = resolved[nextIndex];
         role.getStateSupport().setState(npcRef, next.state, next.subState, store);
         if (next.message != null && !next.message.isBlank()) {
+            applyMessageText(next.message, npcRef, store, player);
             owner.logDebug("ModeToggle: message=" + next.message);
         }
         return true;
@@ -490,11 +492,20 @@ final class TameworkInteractEffects {
                                       Ref<EntityStore> npcRef,
                                       Store<EntityStore> store,
                                       Player player) {
-        if (effect == null || npcRef == null || store == null || player == null) {
+        if (effect == null) {
             return false;
         }
-        String message = effect.getMessage();
+        return applyMessageText(effect.getMessage(), npcRef, store, player);
+    }
+
+    private boolean applyMessageText(String message,
+                                     Ref<EntityStore> npcRef,
+                                     Store<EntityStore> store,
+                                     Player player) {
         if (message == null || message.isBlank()) {
+            return false;
+        }
+        if (npcRef == null || store == null || player == null) {
             return false;
         }
         // Size/Duration/Color are placeholders for now; CombatText uses the global UI asset.
