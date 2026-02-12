@@ -14,7 +14,9 @@
     "Website": "",
     "Main": "com.alechilles.alecstamework.Tamework",
     "ServerVersion": "",
-    "Dependencies": {},
+    "Dependencies": {
+        "Alechilles:Alec's Tamework! (Assets)": "*"
+    },
     "OptionalDependencies": {},
     "LoadBefore": {},
     "DisabledByDefault": false,
