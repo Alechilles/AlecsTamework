@@ -2,7 +2,7 @@ Group #TameworkMessageRoot {
   Anchor: (Width: 350, Height: 200);
   Visible: false;
 
-  Label #TameworkMessage_0 {
+  Label #TameworkMessage0 {
     Anchor: (Top: 60, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
@@ -16,7 +16,7 @@ Group #TameworkMessageRoot {
     Visible: false;
   }
 
-  Label #TameworkMessage_1 {
+  Label #TameworkMessage1 {
     Anchor: (Top: 60, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
@@ -30,7 +30,7 @@ Group #TameworkMessageRoot {
     Visible: false;
   }
 
-  Label #TameworkMessage_2 {
+  Label #TameworkMessage2 {
     Anchor: (Top: 60, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
@@ -44,7 +44,7 @@ Group #TameworkMessageRoot {
     Visible: false;
   }
 
-  Label #TameworkMessage_3 {
+  Label #TameworkMessage3 {
     Anchor: (Top: 60, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
@@ -58,7 +58,7 @@ Group #TameworkMessageRoot {
     Visible: false;
   }
 
-  Label #TameworkMessage_4 {
+  Label #TameworkMessage4 {
     Anchor: (Top: 60, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
@@ -72,7 +72,7 @@ Group #TameworkMessageRoot {
     Visible: false;
   }
 
-  Label #TameworkMessage_5 {
+  Label #TameworkMessage5 {
     Anchor: (Top: 60, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,

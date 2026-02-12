@@ -62,10 +62,10 @@ public final class TameworkMessageHud extends CustomUIHud {
     }
 
     private static String textSelector(int step) {
-        return "#TameworkMessage_" + step + ".Text";
+        return "#TameworkMessage" + step + ".Text";
     }
 
     private static String visibleSelector(int step) {
-        return "#TameworkMessage_" + step + ".Visible";
+        return "#TameworkMessage" + step + ".Visible";
     }
 }
