@@ -79,12 +79,16 @@ final class TameworkInteractEffects {
     private static final String DEFAULT_MOUNT_ANCHOR_Z_PARAM = "MountAnchorZ";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
-    private static final long UI_MESSAGE_DURATION_MS = 1000L;
-    private static final long UI_MESSAGE_FADE_STEP_1_MS = 650L;
-    private static final long UI_MESSAGE_FADE_STEP_2_MS = 850L;
+    private static final long UI_MESSAGE_DURATION_MS = 1200L;
     private static final String UI_MESSAGE_COLOR_FULL = "#ffffff";
-    private static final String UI_MESSAGE_COLOR_FADE_1 = "#b3b3b3";
-    private static final String UI_MESSAGE_COLOR_FADE_2 = "#666666";
+    private static final String[] UI_MESSAGE_FADE_COLORS = new String[] {
+            "#f2f2f2",
+            "#e6e6e6",
+            "#d9d9d9",
+            "#bfbfbf",
+            "#a6a6a6",
+            "#8c8c8c"
+    };
     private static final ConcurrentHashMap<UUID, Integer> UI_MESSAGE_TOKENS = new ConcurrentHashMap<>();
     private static final ModeStep[] DEFAULT_MODE_CYCLE = new ModeStep[] {
             new ModeStep("Hold", null, null),
@@ -538,8 +542,7 @@ final class TameworkInteractEffects {
         UUID playerId = player.getUuid();
         int token = UI_MESSAGE_TOKENS.merge(playerId, 1, Integer::sum);
         TameworkMessageHud hud = resolveOrCreateMessageHud(hudManager, playerRef, message);
-        scheduleUiMessageFade(playerId, token, hudManager, hud, playerRef, UI_MESSAGE_FADE_STEP_1_MS, UI_MESSAGE_COLOR_FADE_1);
-        scheduleUiMessageFade(playerId, token, hudManager, hud, playerRef, UI_MESSAGE_FADE_STEP_2_MS, UI_MESSAGE_COLOR_FADE_2);
+        scheduleUiMessageFadeSteps(playerId, token, hudManager, hud, playerRef);
         scheduleUiMessageHide(playerId, token, hudManager, hud, playerRef, UI_MESSAGE_DURATION_MS);
         return true;
     }
@@ -558,25 +561,31 @@ final class TameworkInteractEffects {
         return messageHud;
     }
 
-    private void scheduleUiMessageFade(UUID playerId,
-                                       int token,
-                                       HudManager hudManager,
-                                       TameworkMessageHud hud,
-                                       PlayerRef playerRef,
-                                       long delayMs,
-                                       String color) {
-        HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
-            if (!isUiMessageTokenCurrent(playerId, token)) {
-                return;
-            }
-            if (!playerRef.isValid()) {
-                return;
-            }
-            if (hudManager.getCustomHud() != hud) {
-                return;
-            }
-            hud.updateColor(color);
-        }, delayMs, TimeUnit.MILLISECONDS);
+    private void scheduleUiMessageFadeSteps(UUID playerId,
+                                            int token,
+                                            HudManager hudManager,
+                                            TameworkMessageHud hud,
+                                            PlayerRef playerRef) {
+        long intervalMs = UI_MESSAGE_DURATION_MS / (UI_MESSAGE_FADE_COLORS.length + 1L);
+        if (intervalMs <= 0L) {
+            intervalMs = 1L;
+        }
+        for (int i = 0; i < UI_MESSAGE_FADE_COLORS.length; i++) {
+            String color = UI_MESSAGE_FADE_COLORS[i];
+            long delayMs = (i + 1L) * intervalMs;
+            HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+                if (!isUiMessageTokenCurrent(playerId, token)) {
+                    return;
+                }
+                if (!playerRef.isValid()) {
+                    return;
+                }
+                if (hudManager.getCustomHud() != hud) {
+                    return;
+                }
+                hud.updateColor(color);
+            }, delayMs, TimeUnit.MILLISECONDS);
+        }
     }
 
     private void scheduleUiMessageHide(UUID playerId,
