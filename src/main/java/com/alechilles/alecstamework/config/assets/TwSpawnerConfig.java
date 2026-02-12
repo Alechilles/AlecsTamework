@@ -54,18 +54,21 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (settings, value) -> settings.mode = value,
             settings -> settings.mode
         )
+        .documentation("How to interpret allowlist/denylist for roles.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("Allowlist", Codec.STRING_ARRAY),
             (settings, value) -> settings.allowlist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.allowlist
         )
+        .documentation("Role IDs that are allowed (when Mode is Allowlist).")
         .add()
         .<String[]>append(
             new KeyedCodec<>("Denylist", Codec.STRING_ARRAY),
             (settings, value) -> settings.denylist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.denylist
         )
+        .documentation("Role IDs that are denied (when Mode is Denylist).")
         .add()
         .build();
 
@@ -77,6 +80,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (override, icon) -> override.icon = icon,
             override -> override.icon
         )
+        .documentation("Item icon asset ID override.")
         .add()
         .<Map<String, String>>append(
             new KeyedCodec<>("Attachments", MapCodec.STRING_HASH_MAP_CODEC),
@@ -85,6 +89,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
                 : attachments,
             override -> override.attachments
         )
+        .documentation("Attachment overrides for the icon.")
         .add()
         .build();
 
@@ -104,48 +109,56 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (settings, value) -> settings.clearsOwner = value,
             settings -> settings.clearsOwner
         )
+        .documentation("Clear owner data when capturing.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
             (settings, value) -> settings.requireTamed = value,
             settings -> settings.requireTamed
         )
+        .documentation("Require the target NPC to be tamed.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("OwnerRestricted", Codec.BOOLEAN),
             (settings, value) -> settings.ownerRestricted = value,
             settings -> settings.ownerRestricted
         )
+        .documentation("Restrict capture to the owner.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
             (settings, value) -> settings.requireOwner = value,
             settings -> settings.requireOwner
         )
+        .documentation("Require the NPC to have an owner set.")
         .add()
         .<String>append(
             new KeyedCodec<>("ParticleSystem", Codec.STRING),
             (settings, value) -> settings.particleSystem = value,
             settings -> settings.particleSystem
         )
+        .documentation("Particle system to play on capture.")
         .add()
         .<String>append(
             new KeyedCodec<>("SoundEvent", Codec.STRING),
             (settings, value) -> settings.soundEvent = value,
             settings -> settings.soundEvent
         )
+        .documentation("Sound event to play on capture.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("CooldownMs", Codec.INTEGER),
             (settings, value) -> settings.cooldownMs = value,
             settings -> settings.cooldownMs
         )
+        .documentation("Cooldown after capture (milliseconds).")
         .add()
         .<Double>append(
             new KeyedCodec<>("MaxDistance", Codec.DOUBLE),
             (settings, value) -> settings.maxDistance = value,
             settings -> settings.maxDistance
         )
+        .documentation("Maximum capture distance.")
         .add()
         .build();
 
@@ -157,42 +170,49 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (settings, value) -> settings.assignsOwner = value,
             settings -> settings.assignsOwner
         )
+        .documentation("Assign the interacting player as owner on spawn.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("OwnerRestricted", Codec.BOOLEAN),
             (settings, value) -> settings.ownerRestricted = value,
             settings -> settings.ownerRestricted
         )
+        .documentation("Restrict spawning to the owner.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
             (settings, value) -> settings.requireOwner = value,
             settings -> settings.requireOwner
         )
+        .documentation("Require the spawner item to have an owner.")
         .add()
         .<String>append(
             new KeyedCodec<>("ParticleSystem", Codec.STRING),
             (settings, value) -> settings.particleSystem = value,
             settings -> settings.particleSystem
         )
+        .documentation("Particle system to play on spawn.")
         .add()
         .<String>append(
             new KeyedCodec<>("SoundEvent", Codec.STRING),
             (settings, value) -> settings.soundEvent = value,
             settings -> settings.soundEvent
         )
+        .documentation("Sound event to play on spawn.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("CooldownMs", Codec.INTEGER),
             (settings, value) -> settings.cooldownMs = value,
             settings -> settings.cooldownMs
         )
+        .documentation("Cooldown after spawn (milliseconds).")
         .add()
         .<Double>append(
             new KeyedCodec<>("MaxDistance", Codec.DOUBLE),
             (settings, value) -> settings.maxDistance = value,
             settings -> settings.maxDistance
         )
+        .documentation("Maximum spawn distance.")
         .add()
         .build();
 
@@ -212,48 +232,56 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (asset, value) -> asset.emptyItemId = value,
             asset -> asset.emptyItemId
         )
+        .documentation("Item ID for the empty spawner variant.")
         .add()
         .<String>append(
             new KeyedCodec<>("FilledItemId", Codec.STRING),
             (asset, value) -> asset.filledItemId = value,
             asset -> asset.filledItemId
         )
+        .documentation("Item ID for the filled spawner variant.")
         .add()
         .<String>append(
             new KeyedCodec<>("IconDefault", Codec.STRING),
             (asset, value) -> asset.iconDefault = value,
             asset -> asset.iconDefault
         )
+        .documentation("Default icon for the spawner item.")
         .add()
         .<AllowedRoles>append(
             new KeyedCodec<>("AllowedRoles", ALLOWED_ROLES_CODEC),
             (asset, value) -> asset.allowedRoles = value == null ? new AllowedRoles() : value,
             asset -> asset.allowedRoles
         )
+        .documentation("Role restrictions for what can be captured/spawned.")
         .add()
         .<CaptureSettings>append(
             new KeyedCodec<>("Capture", CAPTURE_CODEC),
             (asset, value) -> asset.capture = value == null ? new CaptureSettings() : value,
             asset -> asset.capture
         )
+        .documentation("Capture settings for spawner items.")
         .add()
         .<SpawnSettings>append(
             new KeyedCodec<>("Spawn", SPAWN_CODEC),
             (asset, value) -> asset.spawn = value == null ? new SpawnSettings() : value,
             asset -> asset.spawn
         )
+        .documentation("Spawn settings for spawner items.")
         .add()
         .<SpawnerIconOverride[]>append(
             new KeyedCodec<>("IconOverrides", ICON_OVERRIDE_ARRAY_CODEC),
             (asset, value) -> asset.iconOverrides = value == null ? EMPTY_OVERRIDES : value,
             asset -> asset.iconOverrides
         )
+        .documentation("Icon overrides that apply to all roles.")
         .add()
         .<Map<String, SpawnerIconOverride[]>>append(
             new KeyedCodec<>("IconOverridesByRole", ICON_OVERRIDES_BY_ROLE_CODEC),
             (asset, value) -> asset.iconOverridesByRole = value == null ? Collections.emptyMap() : value,
             asset -> asset.iconOverridesByRole
         )
+        .documentation("Icon overrides keyed by role ID.")
         .add()
         .build();
 
