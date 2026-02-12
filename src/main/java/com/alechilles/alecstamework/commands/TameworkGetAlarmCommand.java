@@ -12,6 +12,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
+import java.lang.reflect.Field;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -67,8 +69,18 @@ public final class TameworkGetAlarmCommand extends AbstractPlayerCommand {
         }
 
         UUID npcUuid = npc.getUuid();
+        String remainingText = "";
+        if (alarm.isSet()) {
+            Instant alarmInstant = readAlarmInstant(alarm);
+            if (alarmInstant != null) {
+                Duration remaining = Duration.between(now, alarmInstant);
+                if (!remaining.isNegative()) {
+                    remainingText = " Remaining: " + formatDuration(remaining) + ".";
+                }
+            }
+        }
         commandContext.sender().sendMessage(Message.raw(
-                "Alarm " + alarmName + " for NPC " + npcUuid + " is " + status + "."
+                "Alarm " + alarmName + " for NPC " + npcUuid + " is " + status + "." + remainingText
         ));
     }
 
@@ -90,6 +102,43 @@ public final class TameworkGetAlarmCommand extends AbstractPlayerCommand {
     private static Instant resolveGameTime(Store<EntityStore> store) {
         WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
         return time != null ? time.getGameTime() : Instant.now();
+    }
+
+    private static Instant readAlarmInstant(Alarm alarm) {
+        try {
+            Field field = Alarm.class.getDeclaredField("alarmInstant");
+            field.setAccessible(true);
+            Object value = field.get(alarm);
+            if (value instanceof Instant) {
+                return (Instant) value;
+            }
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+        return null;
+    }
+
+    private static String formatDuration(Duration duration) {
+        long seconds = Math.max(0, duration.getSeconds());
+        long days = seconds / 86400;
+        seconds %= 86400;
+        long hours = seconds / 3600;
+        seconds %= 3600;
+        long minutes = seconds / 60;
+        seconds %= 60;
+
+        StringBuilder sb = new StringBuilder();
+        if (days > 0) {
+            sb.append(days).append("d ");
+        }
+        if (hours > 0 || days > 0) {
+            sb.append(hours).append("h ");
+        }
+        if (minutes > 0 || hours > 0 || days > 0) {
+            sb.append(minutes).append("m ");
+        }
+        sb.append(seconds).append("s");
+        return sb.toString().trim();
     }
 
     private static ParsedArgs parseArgs(CommandContext commandContext) {
