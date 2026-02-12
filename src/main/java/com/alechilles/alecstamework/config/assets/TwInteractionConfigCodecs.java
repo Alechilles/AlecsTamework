@@ -184,6 +184,40 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
+    private static final Codec<String[]> ITEM_ASSET_ARRAY_CODEC = new Codec<>() {
+        @Override
+        public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return ArrayUtil.EMPTY_STRING_ARRAY;
+            }
+            if (bsonValue.isArray()) {
+                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
+            }
+            if (bsonValue.isString()) {
+                return new String[] { bsonValue.asString().getValue() };
+            }
+            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
+        }
+
+        @Override
+        public BsonValue encode(String[] value, ExtraInfo extraInfo) {
+            if (value == null) {
+                return new BsonNull();
+            }
+            return Codec.STRING_ARRAY.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            StringSchema itemSchema = new StringSchema();
+            itemSchema.setHytaleAssetRef("Item");
+            ArraySchema arraySchema = new ArraySchema();
+            arraySchema.setItem(itemSchema);
+            return arraySchema;
+        }
+    };
+
     private static Codec<String> assetRefCodec(String assetType) {
         return new Codec<>() {
             @Override
@@ -268,7 +302,7 @@ public final class TwInteractionConfigCodecs {
         .documentation("Role param to import items from (string or string[]).")
         .add()
         .<String[]>append(
-            new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_OR_SINGLE_CODEC),
+            new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_CODEC),
             (requirement, value) -> requirement.items = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             requirement -> requirement.items
         )
@@ -298,7 +332,7 @@ public final class TwInteractionConfigCodecs {
         .documentation("Role param to import items from (string or string[]).")
         .add()
         .<String[]>append(
-            new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_OR_SINGLE_CODEC),
+            new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_CODEC),
             (requirement, value) -> requirement.items = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             requirement -> requirement.items
         )
@@ -321,7 +355,7 @@ public final class TwInteractionConfigCodecs {
             ItemsEquippedRequirement::new
     )
         .<String[]>append(
-            new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_OR_SINGLE_CODEC),
+            new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_CODEC),
             (requirement, value) -> requirement.items = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             requirement -> requirement.items
         )
