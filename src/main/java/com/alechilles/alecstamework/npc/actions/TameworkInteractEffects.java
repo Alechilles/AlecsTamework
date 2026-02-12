@@ -81,8 +81,8 @@ final class TameworkInteractEffects {
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final long UI_MESSAGE_DURATION_MS = 1200L;
-    private static final long UI_MESSAGE_COLOR_FULL = uiRgba("#ffffffff");
-    private static final long[] UI_MESSAGE_FADE_COLORS = new long[] {
+    private static final int UI_MESSAGE_COLOR_FULL = uiRgba("#ffffffff");
+    private static final int[] UI_MESSAGE_FADE_COLORS = new int[] {
             uiRgba("#ffffffd9"),
             uiRgba("#ffffffb3"),
             uiRgba("#ffffff8c"),
@@ -572,7 +572,7 @@ final class TameworkInteractEffects {
             intervalMs = 1L;
         }
         for (int i = 0; i < UI_MESSAGE_FADE_COLORS.length; i++) {
-            long color = UI_MESSAGE_FADE_COLORS[i];
+            int color = UI_MESSAGE_FADE_COLORS[i];
             long delayMs = (i + 1L) * intervalMs;
             HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
                 if (!isUiMessageTokenCurrent(playerId, token)) {
@@ -589,9 +589,8 @@ final class TameworkInteractEffects {
         }
     }
 
-    private static long uiRgba(String hex) {
-        int rgba = ColorParseUtil.hexAlphaStringToRGBAInt(hex);
-        return Integer.toUnsignedLong(rgba);
+    private static int uiRgba(String hex) {
+        return ColorParseUtil.hexAlphaStringToRGBAInt(hex);
     }
 
     private void scheduleUiMessageHide(UUID playerId,

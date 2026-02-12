@@ -10,10 +10,10 @@ public final class TameworkMessageHud extends CustomUIHud {
     private static final String ROOT_VISIBLE_SELECTOR = "#TameworkMessageRoot.Visible";
     private static final String MESSAGE_TEXT_SELECTOR = "#TameworkMessage.Text";
     private static final String MESSAGE_COLOR_SELECTOR = "#TameworkMessage.Style.TextColor";
-    private static final long DEFAULT_COLOR = 0xffffffffL;
+    private static final int DEFAULT_COLOR = 0xffffffff;
 
     private String message;
-    private long messageColor = DEFAULT_COLOR;
+    private int messageColor = DEFAULT_COLOR;
 
     public TameworkMessageHud(@Nonnull PlayerRef playerRef, String message) {
         super(playerRef);
@@ -26,23 +26,23 @@ public final class TameworkMessageHud extends CustomUIHud {
         if (message != null) {
             commandBuilder.set(MESSAGE_TEXT_SELECTOR, message);
         }
-        commandBuilder.setObject(MESSAGE_COLOR_SELECTOR, messageColor);
+        commandBuilder.set(MESSAGE_COLOR_SELECTOR, messageColor);
     }
 
-    public void updateMessage(@Nonnull String message, long color) {
+    public void updateMessage(@Nonnull String message, int color) {
         this.message = message;
         this.messageColor = color;
         UICommandBuilder builder = new UICommandBuilder();
         builder.set(ROOT_VISIBLE_SELECTOR, true);
         builder.set(MESSAGE_TEXT_SELECTOR, message);
-        builder.setObject(MESSAGE_COLOR_SELECTOR, color);
+        builder.set(MESSAGE_COLOR_SELECTOR, color);
         update(false, builder);
     }
 
-    public void updateColor(long color) {
+    public void updateColor(int color) {
         this.messageColor = color;
         UICommandBuilder builder = new UICommandBuilder();
-        builder.setObject(MESSAGE_COLOR_SELECTOR, color);
+        builder.set(MESSAGE_COLOR_SELECTOR, color);
         update(false, builder);
     }
 
