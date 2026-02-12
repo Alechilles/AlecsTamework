@@ -108,7 +108,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isPlayerCrouching()
-                && !owner.isPlayerCrouching(role, infoProvider, store, player)) {
+                && !owner.isPlayerCrouching(role, infoProvider, store)) {
             return false;
         }
         if (bucket.isPlayerIsOwner()
@@ -120,7 +120,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isHarvestInteractionContext()
-                && !owner.matchesHarvestContext(npcRef, role, infoProvider, store)) {
+                && !owner.matchesHarvestContext(role, infoProvider)) {
             return false;
         }
         if (!requireAnyMatch(bucket.getItemsInHand(),
@@ -152,7 +152,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (!requireAnyMatch(bucket.getInteractionContext(),
-                requirement -> owner.matchesInteractionContext(requirement, npcRef, role, infoProvider, store))) {
+                requirement -> owner.matchesInteractionContext(requirement, role, infoProvider))) {
             return false;
         }
         return true;
@@ -188,7 +188,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isPlayerCrouching()
-                && owner.isPlayerCrouching(role, infoProvider, store, player)) {
+                && owner.isPlayerCrouching(role, infoProvider, store)) {
             return true;
         }
         if (bucket.isPlayerIsOwner()
@@ -200,7 +200,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isHarvestInteractionContext()
-                && owner.matchesHarvestContext(npcRef, role, infoProvider, store)) {
+                && owner.matchesHarvestContext(role, infoProvider)) {
             return true;
         }
         if (anyMatch(bucket.getItemsInHand(),
@@ -232,7 +232,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (anyMatch(bucket.getInteractionContext(),
-                requirement -> owner.matchesInteractionContext(requirement, npcRef, role, infoProvider, store))) {
+                requirement -> owner.matchesInteractionContext(requirement, role, infoProvider))) {
             return true;
         }
         return false;
@@ -320,7 +320,7 @@ final class TameworkInteractRequirements {
         if (requireAlarm && !owner.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
             return false;
         }
-        if (requireContext && !owner.matchesHarvestContext(npcRef, role, infoProvider, store)) {
+        if (requireContext && !owner.matchesHarvestContext(role, infoProvider)) {
             return false;
         }
         return true;
@@ -345,7 +345,7 @@ final class TameworkInteractRequirements {
         if (requireMountable && !owner.resolveIsMountable(role)) {
             return false;
         }
-        if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store, player)) {
+        if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store)) {
             return false;
         }
         return true;

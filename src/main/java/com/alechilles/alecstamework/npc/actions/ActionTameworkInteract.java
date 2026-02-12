@@ -89,22 +89,13 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     }
 
     @Override
-    public boolean canExecute(Ref<EntityStore> npcRef,
-                              Role role,
-                              InfoProvider infoProvider,
-                              double dt,
-                              Store<EntityStore> store) {
-        return npcRef != null && npcRef.isValid();
-    }
-
-    @Override
     public boolean execute(Ref<EntityStore> npcRef,
                            Role role,
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
         logDebug("TameworkInteract: execute called.");
-        if (!canExecute(npcRef, role, infoProvider, dt, store)) {
+        if (npcRef == null || !npcRef.isValid()) {
             return false;
         }
         Player player = resolveInteractionPlayer(role, infoProvider, store);
@@ -134,7 +125,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             logDebug(buildNoMatchSummary(config, npcRef, role, infoProvider, store, player));
             return false;
         }
-        return applyInteraction(entry, config, npcRef, role, infoProvider, store, player);
+        return applyInteraction(entry, npcRef, role, infoProvider, store, player);
     }
 
     private TwInteractionConfig resolveConfig(Role role) {
@@ -182,7 +173,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     }
 
     private boolean applyInteraction(InteractionEntry entry,
-                                     TwInteractionConfig config,
                                      Ref<EntityStore> npcRef,
                                      Role role,
                                      InfoProvider infoProvider,
@@ -198,7 +188,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;
-            double healAmount = resolveFeedHeal(feed, role, player);
+            double healAmount = resolveFeedHeal(feed, player);
             boolean applied = effects.applyFeeding(npcRef, store, healAmount, player);
             consumeHeldItem(player);
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
@@ -208,7 +198,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
         }
         if (entry instanceof MountInteraction) {
-            boolean applied = effects.applyMount(npcRef, role, infoProvider, store, player);
+            boolean applied = effects.applyMount(npcRef, role, infoProvider, store);
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
         }
         if (entry instanceof ModeCycleInteraction) {
@@ -217,13 +207,13 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
         }
         if (entry instanceof BreedInteraction) {
-            boolean applied = effects.applyStartBreeding(npcRef, role, store);
+            boolean applied = effects.applyStartBreeding();
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
         }
         return false;
     }
 
-    private double resolveFeedHeal(FeedInteraction feed, Role role, Player player) {
+    private double resolveFeedHeal(FeedInteraction feed, Player player) {
         if (feed == null) {
             return 0;
         }
@@ -457,19 +447,15 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return false;
     }
 
-    boolean matchesHarvestContext(Ref<EntityStore> npcRef,
-                                          Role role,
-                                          InfoProvider infoProvider,
-                                          Store<EntityStore> store) {
+    boolean matchesHarvestContext(Role role,
+                                  InfoProvider infoProvider) {
         String context = hasHarvestContextOverride ? harvestContextOverride : getRoleStringParam(role, DEFAULT_HARVEST_CONTEXT_PARAM);
-        return matchesInteractionContext(context, npcRef, role, infoProvider, store, true);
+        return matchesInteractionContext(context, role, infoProvider, true);
     }
 
     boolean matchesInteractionContext(InteractionContextRequirement requirement,
-                                              Ref<EntityStore> npcRef,
-                                              Role role,
-                                              InfoProvider infoProvider,
-                                              Store<EntityStore> store) {
+                                      Role role,
+                                      InfoProvider infoProvider) {
         if (requirement == null) {
             return false;
         }
@@ -477,15 +463,13 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if ((context == null || context.isBlank()) && requirement.getParam() != null) {
             context = getRoleStringParam(role, requirement.getParam());
         }
-        return matchesInteractionContext(context, npcRef, role, infoProvider, store, false);
+        return matchesInteractionContext(context, role, infoProvider, false);
     }
 
     boolean matchesInteractionContext(String context,
-                                              Ref<EntityStore> npcRef,
-                                              Role role,
-                                              InfoProvider infoProvider,
-                                              Store<EntityStore> store,
-                                              boolean allowBlank) {
+                                      Role role,
+                                      InfoProvider infoProvider,
+                                      boolean allowBlank) {
         if (context == null || context.isBlank()) {
             return allowBlank;
         }
@@ -510,7 +494,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return matchesMovementState(states, requirement.getState());
     }
 
-    boolean isPlayerCrouching(Role role, InfoProvider infoProvider, Store<EntityStore> store, Player player) {
+    boolean isPlayerCrouching(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
         return matchesMovementState(statesForPlayer(role, infoProvider, store), "Crouching");
     }
 
@@ -1082,9 +1066,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         boolean hasLoved = isHeldItemInList(resolveLovedItems(role), player);
         boolean isHarvestable = resolveIsHarvestable(role);
         boolean harvestReady = isAlarmReady(npcRef, store, DEFAULT_HARVEST_ALARM);
-        boolean harvestContext = matchesHarvestContext(npcRef, role, infoProvider, store);
+        boolean harvestContext = matchesHarvestContext(role, infoProvider);
         boolean isMountable = resolveIsMountable(role);
-        boolean crouching = isPlayerCrouching(role, infoProvider, store, player);
+        boolean crouching = isPlayerCrouching(role, infoProvider, store);
         return String.format(
                 "TameworkInteract: no interactions matched (role=%s config=%s). " +
                         "tamed=%s owner=%s held=%s lovedMatch=%s isHarvestable=%s harvestReady=%s harvestContext=%s " +

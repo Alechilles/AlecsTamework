@@ -123,7 +123,7 @@ final class TameworkInteractEffects {
             applied |= applyAddItemInventory(addItemInventory, player);
         }
         if (Boolean.TRUE.equals(effects.getMount())) {
-            applied |= applyMount(npcRef, role, infoProvider, store, player);
+            applied |= applyMount(npcRef, role, infoProvider, store);
         }
         PlaySoundEffect playSound = effects.getPlaySound();
         if (playSound != null) {
@@ -189,8 +189,7 @@ final class TameworkInteractEffects {
     boolean applyMount(Ref<EntityStore> npcRef,
                        Role role,
                        InfoProvider infoProvider,
-                       Store<EntityStore> store,
-                       Player player) {
+                       Store<EntityStore> store) {
         if (npcRef == null || role == null || store == null) {
             return false;
         }
@@ -269,7 +268,7 @@ final class TameworkInteractEffects {
         return true;
     }
 
-    boolean applyStartBreeding(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+    boolean applyStartBreeding() {
         owner.logUnsupported("Breeding interaction not yet implemented.");
         return false;
     }
