@@ -30,6 +30,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 ## Commands
 - `/tw getowner` prints the owner name + UUID (when available).
 - `/tw gettamed` prints the current tamed status for the targeted NPC.
+- `/tw getalarm [AlarmName] [NpcUuid]` prints alarm status (unset/active/passed) and remaining time when set. Uses the NPC in view if no UUID is provided.
 - `/tw setowner` assigns the targeted NPC to the executing player.
 - `/tw settamed` toggles the tamed flag on the targeted NPC.
 - `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig assets).

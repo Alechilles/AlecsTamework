@@ -32,6 +32,7 @@
 - Spawn both Tamework example mobs to validate actions and sensors.
 - Confirm capture and spawn preserves attachments.
 - Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
+- Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.
 - After editing spawner configs, run `/tw reloadconfig`.
 
 ## Hytalor patches
