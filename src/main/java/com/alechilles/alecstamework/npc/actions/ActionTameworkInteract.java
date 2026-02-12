@@ -73,6 +73,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final Boolean isHarvestableOverride;
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
+    private final StdScope scopeSnapshot;
     private final TameworkInteractEffects effects;
     private final TameworkInteractRequirements requirements;
 
@@ -85,6 +86,14 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.isHarvestableOverride = builder.hasIsHarvestableOverride() ? builder.getIsHarvestable(support) : null;
         this.hasHarvestContextOverride = builder.hasHarvestInteractionContextOverride();
         this.harvestContextOverride = hasHarvestContextOverride ? builder.getHarvestInteractionContext(support) : null;
+        StdScope snapshot = null;
+        if (support != null) {
+            StdScope supportScope = support.getSensorScope();
+            if (supportScope != null) {
+                snapshot = StdScope.copyOf(supportScope);
+            }
+        }
+        this.scopeSnapshot = snapshot;
         this.effects = new TameworkInteractEffects(this);
         this.requirements = new TameworkInteractRequirements(this);
     }
@@ -933,6 +942,65 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return null;
         }
         StdScope scope = getRoleScope(role);
+        String value = getStringFromScope(scope, paramName);
+        if (value == null) {
+            value = getStringFromScope(getFallbackScope(scope), paramName);
+        }
+        return value;
+    }
+
+    String[] getRoleStringArrayParam(Role role, String paramName) {
+        if (paramName == null || paramName.isBlank()) {
+            return null;
+        }
+        StdScope scope = getRoleScope(role);
+        String[] values = getStringArrayFromScope(scope, paramName);
+        if (values == null || values.length == 0) {
+            values = getStringArrayFromScope(getFallbackScope(scope), paramName);
+        }
+        return values;
+    }
+
+    private boolean getRoleBooleanParam(Role role, String paramName) {
+        if (paramName == null || paramName.isBlank()) {
+            return false;
+        }
+        StdScope scope = getRoleScope(role);
+        Boolean value = getBooleanFromScope(scope, paramName);
+        if (value == null) {
+            value = getBooleanFromScope(getFallbackScope(scope), paramName);
+        }
+        return value != null && value;
+    }
+
+    double getRoleNumberParam(Role role, String paramName, double defaultValue) {
+        if (paramName == null || paramName.isBlank()) {
+            return defaultValue;
+        }
+        StdScope scope = getRoleScope(role);
+        Double value = getNumberFromScope(scope, paramName);
+        if (value == null) {
+            value = getNumberFromScope(getFallbackScope(scope), paramName);
+        }
+        return value != null ? value : defaultValue;
+    }
+
+    private StdScope getRoleScope(Role role) {
+        if (role == null || role.getEntitySupport() == null) {
+            return scopeSnapshot;
+        }
+        StdScope scope = role.getEntitySupport().getSensorScope();
+        return scope != null ? scope : scopeSnapshot;
+    }
+
+    private StdScope getFallbackScope(StdScope primary) {
+        if (scopeSnapshot == null || scopeSnapshot == primary) {
+            return null;
+        }
+        return scopeSnapshot;
+    }
+
+    private String getStringFromScope(StdScope scope, String paramName) {
         if (scope == null) {
             return null;
         }
@@ -942,17 +1010,10 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         } catch (IllegalStateException ignored) {
             return null;
         }
-        if (supplier == null) {
-            return null;
-        }
-        return supplier.get();
+        return supplier != null ? supplier.get() : null;
     }
 
-    String[] getRoleStringArrayParam(Role role, String paramName) {
-        if (paramName == null || paramName.isBlank()) {
-            return null;
-        }
-        StdScope scope = getRoleScope(role);
+    private String[] getStringArrayFromScope(StdScope scope, String paramName) {
         if (scope == null) {
             return null;
         }
@@ -984,45 +1045,30 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return new String[] { value };
     }
 
-    private boolean getRoleBooleanParam(Role role, String paramName) {
-        if (paramName == null || paramName.isBlank()) {
-            return false;
-        }
-        StdScope scope = getRoleScope(role);
+    private Boolean getBooleanFromScope(StdScope scope, String paramName) {
         if (scope == null) {
-            return false;
+            return null;
         }
         BooleanSupplier supplier;
         try {
             supplier = scope.getBooleanSupplier(paramName);
         } catch (IllegalStateException ignored) {
-            return false;
+            return null;
         }
-        return supplier != null && supplier.getAsBoolean();
+        return supplier != null ? supplier.getAsBoolean() : null;
     }
 
-    double getRoleNumberParam(Role role, String paramName, double defaultValue) {
-        if (paramName == null || paramName.isBlank()) {
-            return defaultValue;
-        }
-        StdScope scope = getRoleScope(role);
+    private Double getNumberFromScope(StdScope scope, String paramName) {
         if (scope == null) {
-            return defaultValue;
+            return null;
         }
         DoubleSupplier supplier;
         try {
             supplier = scope.getNumberSupplier(paramName);
         } catch (IllegalStateException ignored) {
-            return defaultValue;
-        }
-        return supplier != null ? supplier.getAsDouble() : defaultValue;
-    }
-
-    private StdScope getRoleScope(Role role) {
-        if (role == null || role.getEntitySupport() == null) {
             return null;
         }
-        return role.getEntitySupport().getSensorScope();
+        return supplier != null ? supplier.getAsDouble() : null;
     }
 
     Ref<EntityStore> resolveInteractionTarget(Role role, InfoProvider infoProvider) {
