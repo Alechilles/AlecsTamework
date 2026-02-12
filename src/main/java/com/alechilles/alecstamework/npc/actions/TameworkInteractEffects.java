@@ -595,7 +595,7 @@ final class TameworkInteractEffects {
             if (hudManager.getCustomHud() != hud) {
                 return;
             }
-            hudManager.setCustomHud(playerRef, null);
+            hud.hideMessage();
             UI_MESSAGE_TOKENS.remove(playerId, token);
         }, delayMs, TimeUnit.MILLISECONDS);
     }

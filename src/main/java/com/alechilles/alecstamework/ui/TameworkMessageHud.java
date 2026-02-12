@@ -7,6 +7,7 @@ import javax.annotation.Nonnull;
 
 public final class TameworkMessageHud extends CustomUIHud {
     public static final String UI_PATH = "TameworkMessageHud.ui";
+    private static final String ROOT_VISIBLE_SELECTOR = "#TameworkMessageRoot.Visible";
     private static final String MESSAGE_TEXT_SELECTOR = "#TameworkMessage.Text";
     private static final String MESSAGE_COLOR_SELECTOR = "#TameworkMessage.Style.TextColor";
 
@@ -33,6 +34,7 @@ public final class TameworkMessageHud extends CustomUIHud {
         this.message = message;
         this.messageColor = color;
         UICommandBuilder builder = new UICommandBuilder();
+        builder.set(ROOT_VISIBLE_SELECTOR, true);
         builder.set(MESSAGE_TEXT_SELECTOR, message);
         builder.set(MESSAGE_COLOR_SELECTOR, color);
         update(false, builder);
@@ -42,6 +44,14 @@ public final class TameworkMessageHud extends CustomUIHud {
         this.messageColor = color;
         UICommandBuilder builder = new UICommandBuilder();
         builder.set(MESSAGE_COLOR_SELECTOR, color);
+        update(false, builder);
+    }
+
+    public void hideMessage() {
+        this.message = "";
+        UICommandBuilder builder = new UICommandBuilder();
+        builder.set(MESSAGE_TEXT_SELECTOR, "");
+        builder.set(ROOT_VISIBLE_SELECTOR, false);
         update(false, builder);
     }
 }
