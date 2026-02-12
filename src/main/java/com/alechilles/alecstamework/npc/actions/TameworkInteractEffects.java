@@ -527,7 +527,7 @@ final class TameworkInteractEffects {
         if (message == null || message.isBlank() || player == null) {
             return false;
         }
-        PlayerRef playerRef = player.getReference();
+        PlayerRef playerRef = player.getPlayerRef();
         if (playerRef == null || !playerRef.isValid()) {
             return false;
         }
