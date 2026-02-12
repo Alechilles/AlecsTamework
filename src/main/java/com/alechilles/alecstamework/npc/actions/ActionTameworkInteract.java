@@ -43,7 +43,9 @@ import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
+import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import com.hypixel.hytale.server.npc.util.expression.Scope;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -73,7 +75,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final Boolean isHarvestableOverride;
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
-    private final StdScope scopeSnapshot;
+    private final StdScope globalScopeSnapshot;
+    private final StdScope execScopeSnapshot;
+    private final StdScope sensorScopeSnapshot;
     private final TameworkInteractEffects effects;
     private final TameworkInteractRequirements requirements;
 
@@ -86,14 +90,31 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.isHarvestableOverride = builder.hasIsHarvestableOverride() ? builder.getIsHarvestable(support) : null;
         this.hasHarvestContextOverride = builder.hasHarvestInteractionContextOverride();
         this.harvestContextOverride = hasHarvestContextOverride ? builder.getHarvestInteractionContext(support) : null;
-        StdScope snapshot = null;
+        StdScope globalSnapshot = null;
+        StdScope execSnapshot = null;
+        StdScope sensorSnapshot = null;
         if (support != null) {
+            Scope globalScope = support.getGlobalScope();
+            if (globalScope != null) {
+                globalSnapshot = globalScope instanceof StdScope
+                        ? StdScope.copyOf((StdScope) globalScope)
+                        : new StdScope(globalScope);
+            }
+            ExecutionContext execContext = support.getExecutionContext();
+            Scope execScope = execContext != null ? execContext.getScope() : null;
+            if (execScope != null) {
+                execSnapshot = execScope instanceof StdScope
+                        ? StdScope.copyOf((StdScope) execScope)
+                        : new StdScope(execScope);
+            }
             StdScope supportScope = support.getSensorScope();
             if (supportScope != null) {
-                snapshot = StdScope.copyOf(supportScope);
+                sensorSnapshot = StdScope.copyOf(supportScope);
             }
         }
-        this.scopeSnapshot = snapshot;
+        this.globalScopeSnapshot = globalSnapshot;
+        this.execScopeSnapshot = execSnapshot;
+        this.sensorScopeSnapshot = sensorSnapshot;
         this.effects = new TameworkInteractEffects(this);
         this.requirements = new TameworkInteractRequirements(this);
     }
@@ -941,63 +962,80 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (paramName == null || paramName.isBlank()) {
             return null;
         }
-        StdScope scope = getRoleScope(role);
-        String value = getStringFromScope(scope, paramName);
-        if (value == null) {
-            value = getStringFromScope(getFallbackScope(scope), paramName);
+        for (StdScope scope : orderedScopes(getRoleScope(role))) {
+            String value = getStringFromScope(scope, paramName);
+            if (value != null) {
+                return value;
+            }
         }
-        return value;
+        return null;
     }
 
     String[] getRoleStringArrayParam(Role role, String paramName) {
         if (paramName == null || paramName.isBlank()) {
             return null;
         }
-        StdScope scope = getRoleScope(role);
-        String[] values = getStringArrayFromScope(scope, paramName);
-        if (values == null || values.length == 0) {
-            values = getStringArrayFromScope(getFallbackScope(scope), paramName);
+        for (StdScope scope : orderedScopes(getRoleScope(role))) {
+            String[] values = getStringArrayFromScope(scope, paramName);
+            if (values != null && values.length > 0) {
+                return values;
+            }
         }
-        return values;
+        return null;
     }
 
     private boolean getRoleBooleanParam(Role role, String paramName) {
         if (paramName == null || paramName.isBlank()) {
             return false;
         }
-        StdScope scope = getRoleScope(role);
-        Boolean value = getBooleanFromScope(scope, paramName);
-        if (value == null) {
-            value = getBooleanFromScope(getFallbackScope(scope), paramName);
+        for (StdScope scope : orderedScopes(getRoleScope(role))) {
+            Boolean value = getBooleanFromScope(scope, paramName);
+            if (value != null) {
+                return value;
+            }
         }
-        return value != null && value;
+        return false;
     }
 
     double getRoleNumberParam(Role role, String paramName, double defaultValue) {
         if (paramName == null || paramName.isBlank()) {
             return defaultValue;
         }
-        StdScope scope = getRoleScope(role);
-        Double value = getNumberFromScope(scope, paramName);
-        if (value == null) {
-            value = getNumberFromScope(getFallbackScope(scope), paramName);
+        for (StdScope scope : orderedScopes(getRoleScope(role))) {
+            Double value = getNumberFromScope(scope, paramName);
+            if (value != null) {
+                return value;
+            }
         }
-        return value != null ? value : defaultValue;
+        return defaultValue;
     }
 
     private StdScope getRoleScope(Role role) {
         if (role == null || role.getEntitySupport() == null) {
-            return scopeSnapshot;
-        }
-        StdScope scope = role.getEntitySupport().getSensorScope();
-        return scope != null ? scope : scopeSnapshot;
-    }
-
-    private StdScope getFallbackScope(StdScope primary) {
-        if (scopeSnapshot == null || scopeSnapshot == primary) {
             return null;
         }
-        return scopeSnapshot;
+        return role.getEntitySupport().getSensorScope();
+    }
+
+    private StdScope[] orderedScopes(StdScope primary) {
+        StdScope[] scopes = new StdScope[4];
+        int count = 0;
+        if (primary != null) {
+            scopes[count++] = primary;
+        }
+        if (globalScopeSnapshot != null && globalScopeSnapshot != primary) {
+            scopes[count++] = globalScopeSnapshot;
+        }
+        if (execScopeSnapshot != null && execScopeSnapshot != primary) {
+            scopes[count++] = execScopeSnapshot;
+        }
+        if (sensorScopeSnapshot != null
+                && sensorScopeSnapshot != primary
+                && sensorScopeSnapshot != globalScopeSnapshot
+                && sensorScopeSnapshot != execScopeSnapshot) {
+            scopes[count++] = sensorScopeSnapshot;
+        }
+        return count == scopes.length ? scopes : Arrays.copyOf(scopes, count);
     }
 
     private String getStringFromScope(StdScope scope, String paramName) {
