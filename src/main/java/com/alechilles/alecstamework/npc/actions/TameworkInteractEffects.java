@@ -22,7 +22,6 @@ import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ui.TameworkMessageHud;
-import com.hypixel.hytale.server.core.asset.util.ColorParseUtil;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -81,15 +80,7 @@ final class TameworkInteractEffects {
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_PARAM = "MountMovementConfig";
     private static final String DEFAULT_MOUNT_MOVEMENT_CONFIG_ID = "Mount";
     private static final long UI_MESSAGE_DURATION_MS = 1200L;
-    private static final int UI_MESSAGE_COLOR_FULL = uiRgba("#ffffffff");
-    private static final int[] UI_MESSAGE_FADE_COLORS = new int[] {
-            uiRgba("#ffffffd9"),
-            uiRgba("#ffffffb3"),
-            uiRgba("#ffffff8c"),
-            uiRgba("#ffffff66"),
-            uiRgba("#ffffff40"),
-            uiRgba("#ffffff1a")
-    };
+    private static final int UI_MESSAGE_FADE_STEP_COUNT = 6;
     private static final ConcurrentHashMap<UUID, Integer> UI_MESSAGE_TOKENS = new ConcurrentHashMap<>();
     private static final ModeStep[] DEFAULT_MODE_CYCLE = new ModeStep[] {
             new ModeStep("Hold", null, null),
@@ -554,7 +545,7 @@ final class TameworkInteractEffects {
         CustomUIHud currentHud = hudManager.getCustomHud();
         if (currentHud instanceof TameworkMessageHud) {
             TameworkMessageHud messageHud = (TameworkMessageHud) currentHud;
-            messageHud.updateMessage(message, UI_MESSAGE_COLOR_FULL);
+            messageHud.updateMessage(message);
             return messageHud;
         }
         TameworkMessageHud messageHud = new TameworkMessageHud(playerRef, message);
@@ -567,13 +558,13 @@ final class TameworkInteractEffects {
                                             HudManager hudManager,
                                             TameworkMessageHud hud,
                                             PlayerRef playerRef) {
-        long intervalMs = UI_MESSAGE_DURATION_MS / (UI_MESSAGE_FADE_COLORS.length + 1L);
+        long intervalMs = UI_MESSAGE_DURATION_MS / UI_MESSAGE_FADE_STEP_COUNT;
         if (intervalMs <= 0L) {
             intervalMs = 1L;
         }
-        for (int i = 0; i < UI_MESSAGE_FADE_COLORS.length; i++) {
-            int color = UI_MESSAGE_FADE_COLORS[i];
-            long delayMs = (i + 1L) * intervalMs;
+        for (int i = 1; i < UI_MESSAGE_FADE_STEP_COUNT; i++) {
+            int step = i;
+            long delayMs = i * intervalMs;
             HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
                 if (!isUiMessageTokenCurrent(playerId, token)) {
                     return;
@@ -584,13 +575,9 @@ final class TameworkInteractEffects {
                 if (hudManager.getCustomHud() != hud) {
                     return;
                 }
-                hud.updateColor(color);
+                hud.showFadeStep(step);
             }, delayMs, TimeUnit.MILLISECONDS);
         }
-    }
-
-    private static int uiRgba(String hex) {
-        return ColorParseUtil.hexAlphaStringToRGBAInt(hex);
     }
 
     private void scheduleUiMessageHide(UUID playerId,

@@ -8,12 +8,9 @@ import javax.annotation.Nonnull;
 public final class TameworkMessageHud extends CustomUIHud {
     public static final String UI_PATH = "TameworkMessageHud.ui";
     private static final String ROOT_VISIBLE_SELECTOR = "#TameworkMessageRoot.Visible";
-    private static final String MESSAGE_TEXT_SELECTOR = "#TameworkMessage.Text";
-    private static final String MESSAGE_COLOR_SELECTOR = "#TameworkMessage.Style.TextColor";
-    private static final int DEFAULT_COLOR = 0xffffffff;
+    private static final int FADE_STEP_COUNT = 6;
 
     private String message;
-    private int messageColor = DEFAULT_COLOR;
 
     public TameworkMessageHud(@Nonnull PlayerRef playerRef, String message) {
         super(playerRef);
@@ -24,33 +21,51 @@ public final class TameworkMessageHud extends CustomUIHud {
     protected void build(@Nonnull UICommandBuilder commandBuilder) {
         commandBuilder.append(UI_PATH);
         if (message != null) {
-            commandBuilder.set(MESSAGE_TEXT_SELECTOR, message);
+            for (int i = 0; i < FADE_STEP_COUNT; i++) {
+                commandBuilder.set(textSelector(i), message);
+            }
         }
-        commandBuilder.set(MESSAGE_COLOR_SELECTOR, messageColor);
     }
 
-    public void updateMessage(@Nonnull String message, int color) {
+    public void updateMessage(@Nonnull String message) {
         this.message = message;
-        this.messageColor = color;
         UICommandBuilder builder = new UICommandBuilder();
         builder.set(ROOT_VISIBLE_SELECTOR, true);
-        builder.set(MESSAGE_TEXT_SELECTOR, message);
-        builder.set(MESSAGE_COLOR_SELECTOR, color);
+        for (int i = 0; i < FADE_STEP_COUNT; i++) {
+            builder.set(textSelector(i), message);
+            builder.set(visibleSelector(i), i == 0);
+        }
         update(false, builder);
     }
 
-    public void updateColor(int color) {
-        this.messageColor = color;
+    public void showFadeStep(int step) {
+        if (step < 0 || step >= FADE_STEP_COUNT) {
+            return;
+        }
         UICommandBuilder builder = new UICommandBuilder();
-        builder.set(MESSAGE_COLOR_SELECTOR, color);
+        builder.set(ROOT_VISIBLE_SELECTOR, true);
+        for (int i = 0; i < FADE_STEP_COUNT; i++) {
+            builder.set(visibleSelector(i), i == step);
+        }
         update(false, builder);
     }
 
     public void hideMessage() {
         this.message = "";
         UICommandBuilder builder = new UICommandBuilder();
-        builder.set(MESSAGE_TEXT_SELECTOR, "");
+        for (int i = 0; i < FADE_STEP_COUNT; i++) {
+            builder.set(textSelector(i), "");
+            builder.set(visibleSelector(i), false);
+        }
         builder.set(ROOT_VISIBLE_SELECTOR, false);
         update(false, builder);
+    }
+
+    private static String textSelector(int step) {
+        return "#TameworkMessage_" + step + ".Text";
+    }
+
+    private static String visibleSelector(int step) {
+        return "#TameworkMessage_" + step + ".Visible";
     }
 }

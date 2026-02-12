@@ -1,7 +1,8 @@
 Group #TameworkMessageRoot {
   Anchor: (Width: 350, Height: 200);
+  Visible: false;
 
-  Label #TameworkMessage {
+  Label #TameworkMessage_0 {
     Anchor: (Top: 60, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
@@ -12,5 +13,76 @@ Group #TameworkMessageRoot {
       OutlineColor: #000000(0.6)
     );
     Text: "";
+    Visible: false;
+  }
+
+  Label #TameworkMessage_1 {
+    Anchor: (Top: 60, Width: 350, Height: 24);
+    Style: (
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center,
+      RenderBold: true,
+      FontSize: 16,
+      TextColor: #ffffff(0.85),
+      OutlineColor: #000000(0.6)
+    );
+    Text: "";
+    Visible: false;
+  }
+
+  Label #TameworkMessage_2 {
+    Anchor: (Top: 60, Width: 350, Height: 24);
+    Style: (
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center,
+      RenderBold: true,
+      FontSize: 16,
+      TextColor: #ffffff(0.7),
+      OutlineColor: #000000(0.6)
+    );
+    Text: "";
+    Visible: false;
+  }
+
+  Label #TameworkMessage_3 {
+    Anchor: (Top: 60, Width: 350, Height: 24);
+    Style: (
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center,
+      RenderBold: true,
+      FontSize: 16,
+      TextColor: #ffffff(0.55),
+      OutlineColor: #000000(0.6)
+    );
+    Text: "";
+    Visible: false;
+  }
+
+  Label #TameworkMessage_4 {
+    Anchor: (Top: 60, Width: 350, Height: 24);
+    Style: (
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center,
+      RenderBold: true,
+      FontSize: 16,
+      TextColor: #ffffff(0.4),
+      OutlineColor: #000000(0.6)
+    );
+    Text: "";
+    Visible: false;
+  }
+
+  Label #TameworkMessage_5 {
+    Anchor: (Top: 60, Width: 350, Height: 24);
+    Style: (
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center,
+      RenderBold: true,
+      FontSize: 16,
+      TextColor: #ffffff(0.25),
+      OutlineColor: #000000(0.6)
+    );
+    Text: "";
+    Visible: false;
   }
 }
