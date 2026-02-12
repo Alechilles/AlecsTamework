@@ -4,7 +4,7 @@
   "Reference": "Template_Tamework_Interact_Test",
   "Modify": {
     "Appearance": "Tamework_Example",
-    "IsMountable": false,
+    "IsMountable": true,
     "IsHarvestable": true,
     "HarvestDropList": "Drop_Sheep_Harvest",
     "HarvestInteractionContext": "Shear",

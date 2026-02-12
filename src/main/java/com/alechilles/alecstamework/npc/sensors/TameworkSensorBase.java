@@ -8,7 +8,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.corecomponents.SensorBase;
 import com.hypixel.hytale.server.npc.corecomponents.builders.BuilderSensorBase;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.UUID;
 import javax.annotation.Nonnull;
