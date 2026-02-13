@@ -6,7 +6,6 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -60,17 +59,15 @@ class InteractionBehaviorTest {
         entryCooldown.setAccessible(true);
         entryCooldown.set(entry, 3);
 
-        Method resolveCooldown = ActionTameworkInteract.class.getDeclaredMethod(
-                "resolveCooldownSeconds",
-                TwInteractionConfig.class,
-                TwInteractionConfig.InteractionEntry.class
+        InteractionCooldowns cooldownsHelper = new InteractionCooldowns(
+                interact,
+                ActionTameworkInteract.DEFAULT_COOLDOWN_ALARM_PREFIX
         );
-        resolveCooldown.setAccessible(true);
-        int result = (int) resolveCooldown.invoke(interact, config, entry);
+        int result = cooldownsHelper.resolveCooldownSeconds(config, entry);
         assertEquals(3, result);
 
         entryCooldown.set(entry, null);
-        int fallback = (int) resolveCooldown.invoke(interact, config, entry);
+        int fallback = cooldownsHelper.resolveCooldownSeconds(config, entry);
         assertEquals(10, fallback);
     }
 
@@ -99,9 +96,10 @@ class InteractionBehaviorTest {
         Unsafe unsafe = getUnsafe();
         ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
         InteractionParamResolver resolver = new InteractionParamResolver(null, null, null);
-        Field paramResolverField = ActionTameworkInteract.class.getDeclaredField("paramResolver");
-        paramResolverField.setAccessible(true);
-        paramResolverField.set(interact, resolver);
+        InteractionParamAccess paramAccess = new InteractionParamAccess(resolver, false, null, null, null);
+        Field paramAccessField = ActionTameworkInteract.class.getDeclaredField("paramAccess");
+        paramAccessField.setAccessible(true);
+        paramAccessField.set(interact, paramAccess);
         Field itemRequirementsField = ActionTameworkInteract.class.getDeclaredField("itemRequirements");
         itemRequirementsField.setAccessible(true);
         itemRequirementsField.set(interact, new InteractionItemRequirementResolver(resolver));
