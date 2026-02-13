@@ -306,6 +306,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final class ModeCycleInteraction extends InteractionEntry {
         Boolean requireTamed;
         Boolean requireOwner;
+        Boolean showFloatingText;
+        Boolean showUiMessage;
         ModeStep[] cycle = EMPTY_MODE_CYCLE;
 
         public Boolean getRequireTamed() {
@@ -314,6 +316,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public Boolean getRequireOwner() {
             return requireOwner;
+        }
+
+        public boolean isShowFloatingText() {
+            return Boolean.TRUE.equals(showFloatingText);
+        }
+
+        public boolean isShowUiMessage() {
+            return Boolean.TRUE.equals(showUiMessage);
         }
 
         public ModeStep[] getCycle() {

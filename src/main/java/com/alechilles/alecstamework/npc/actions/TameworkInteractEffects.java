@@ -256,6 +256,8 @@ final class TameworkInteractEffects {
     }
 
     boolean applyToggleMode(ModeStep[] cycle,
+                            boolean showFloatingText,
+                            boolean showUiMessage,
                             Ref<EntityStore> npcRef,
                             Role role,
                             Store<EntityStore> store,
@@ -278,8 +280,16 @@ final class TameworkInteractEffects {
         ResolvedModeStep next = resolved[nextIndex];
         role.getStateSupport().setState(npcRef, next.state, next.subState, store);
         if (next.message != null && !next.message.isBlank()) {
-            applyUiMessage(next.message, player);
-            owner.logDebug("ModeToggle: message=" + next.message);
+            boolean emitted = false;
+            if (showFloatingText) {
+                emitted |= applyMessageText(next.message, npcRef, store, player);
+            }
+            if (showUiMessage) {
+                emitted |= applyUiMessage(next.message, player);
+            }
+            if (emitted) {
+                owner.logDebug("ModeToggle: message=" + next.message);
+            }
         }
         return true;
     }

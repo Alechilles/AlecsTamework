@@ -1413,6 +1413,20 @@ public final class TwInteractionConfigCodecs {
         )
         .documentation("Require the player to be the owner. Default: true.")
         .add()
+        .<Boolean>append(
+            new KeyedCodec<>("ShowFloatingText", Codec.BOOLEAN),
+            (entry, value) -> entry.showFloatingText = value,
+            entry -> entry.showFloatingText
+        )
+        .documentation("Show the mode cycle message as floating text. Default: false.")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("ShowUiMessage", Codec.BOOLEAN),
+            (entry, value) -> entry.showUiMessage = value,
+            entry -> entry.showUiMessage
+        )
+        .documentation("Show the mode cycle message as a UI message. Default: false.")
+        .add()
         .<ModeStep[]>append(
             new KeyedCodec<>("Cycle", MODE_STEP_ARRAY_CODEC),
             (entry, value) -> entry.cycle = value == null ? EMPTY_MODE_CYCLE : value,
