@@ -98,9 +98,13 @@ class InteractionBehaviorTest {
     private static ActionTameworkInteract newInteract() throws Exception {
         Unsafe unsafe = getUnsafe();
         ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
+        InteractionParamResolver resolver = new InteractionParamResolver(null, null, null);
         Field paramResolverField = ActionTameworkInteract.class.getDeclaredField("paramResolver");
         paramResolverField.setAccessible(true);
-        paramResolverField.set(interact, new InteractionParamResolver(null, null, null));
+        paramResolverField.set(interact, resolver);
+        Field itemRequirementsField = ActionTameworkInteract.class.getDeclaredField("itemRequirements");
+        itemRequirementsField.setAccessible(true);
+        itemRequirementsField.set(interact, new InteractionItemRequirementResolver(resolver));
         return interact;
     }
 

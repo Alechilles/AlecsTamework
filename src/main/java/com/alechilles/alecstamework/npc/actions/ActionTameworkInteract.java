@@ -27,12 +27,10 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.MovementStates;
-import com.hypixel.hytale.protocol.ItemArmorSlot;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -49,10 +47,7 @@ import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.server.npc.util.expression.Scope;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Set;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
@@ -79,6 +74,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
     private final InteractionParamResolver paramResolver;
+    private final InteractionItemRequirementResolver itemRequirements;
     private final TameworkInteractEffects effects;
     private final TameworkInteractRequirements requirements;
 
@@ -114,6 +110,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             }
         }
         this.paramResolver = new InteractionParamResolver(globalSnapshot, execSnapshot, sensorSnapshot);
+        this.itemRequirements = new InteractionItemRequirementResolver(paramResolver);
         this.effects = new TameworkInteractEffects(this);
         this.requirements = new TameworkInteractRequirements(this);
     }
@@ -313,22 +310,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return requiresItems;
         }
     }
-    private static final class EquippedSlotSelection {
-        private final boolean includeArmor;
-        private final boolean includeUtility;
-        private final boolean[] armorSlots;
-
-        private EquippedSlotSelection(boolean includeArmor, boolean includeUtility, boolean[] armorSlots) {
-            this.includeArmor = includeArmor;
-            this.includeUtility = includeUtility;
-            this.armorSlots = armorSlots;
-        }
-
-        private boolean hasAny() {
-            return includeArmor || includeUtility;
-        }
-    }
-
     private boolean consumeHeldItem(Player player) {
         return removeHeldItemQuantity(player, 1);
     }
@@ -361,21 +342,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return true;
     }
 
-    CombinedItemContainer resolveInventoryContainer(InteractionContextSnapshot ctx) {
-        return ctx != null ? ctx.combinedInventory : null;
-    }
-
-    CombinedItemContainer resolveInventoryContainer(Player player) {
-        if (player == null) {
-            return null;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return null;
-        }
-        return inventory.getCombinedBackpackStorageHotbar();
-    }
-
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
         if (type == null) {
@@ -391,39 +357,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         UUID ownerId = resolveOwnerUuid(npcRef, store);
         return ownerId != null && ownerId.equals(getPlayerUuid(player));
-    }
-
-    boolean isHeldItemInList(String[] items, InteractionContextSnapshot ctx) {
-        if (ctx == null || items == null || items.length == 0) {
-            return false;
-        }
-        ItemStack stack = ctx.activeItem;
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-        String itemId = stack.getItemId();
-        if (itemId == null) {
-            return false;
-        }
-        return Arrays.stream(items).anyMatch(itemId::equalsIgnoreCase);
-    }
-
-    boolean isHeldItemInList(String[] items, int quantity, InteractionContextSnapshot ctx) {
-        if (!isHeldItemInList(items, ctx)) {
-            return false;
-        }
-        ItemStack stack = ctx != null ? ctx.activeItem : null;
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-        return stack.getQuantity() >= quantity;
-    }
-
-    private int resolveRequiredQuantity(Integer quantity) {
-        if (quantity == null) {
-            return 1;
-        }
-        return Math.max(1, quantity);
     }
 
     boolean isAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
@@ -445,76 +378,19 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return alarm.hasPassed(resolveGameTime(store));
     }
 
+    // Delegates item-in-hand requirements to the shared resolver.
     boolean matchesItemsInHand(ItemsInHandRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        if (requirement == null) {
-            return false;
-        }
-        String[] items = resolveItemsInHand(requirement, role, ctx);
-        int quantity = resolveRequiredQuantity(requirement.getQuantity());
-        return isHeldItemInList(items, quantity, ctx);
+        return itemRequirements.matchesItemsInHand(requirement, role, ctx);
     }
 
+    // Delegates inventory-based requirements to the shared resolver.
     boolean matchesItemsInInventory(ItemsInInventoryRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        if (requirement == null || ctx == null) {
-            return false;
-        }
-        String[] items = resolveItemsInInventory(requirement, role, ctx);
-        if (items == null || items.length == 0) {
-            return false;
-        }
-        int quantity = resolveRequiredQuantity(requirement.getQuantity());
-        CombinedItemContainer container = resolveInventoryContainer(ctx);
-        if (container == null) {
-            return false;
-        }
-        Set<String> itemSet = normalizeItemSet(items);
-        if (itemSet.isEmpty()) {
-            return false;
-        }
-        for (String itemId : itemSet) {
-            if (itemId == null || itemId.isBlank()) {
-                continue;
-            }
-            if (countItemInContainer(container, itemId) >= quantity) {
-                return true;
-            }
-        }
-        return false;
+        return itemRequirements.matchesItemsInInventory(requirement, role, ctx);
     }
 
+    // Delegates equipped-item requirements to the shared resolver.
     boolean matchesItemsEquipped(ItemsEquippedRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        if (requirement == null || ctx == null) {
-            return false;
-        }
-        Inventory inventory = ctx.inventory;
-        if (inventory == null) {
-            return false;
-        }
-        EquippedSlotSelection selection = resolveEquippedSlots(requirement.getSlots());
-        if (!selection.hasAny()) {
-            return false;
-        }
-        String[] items = resolveItemsEquipped(requirement, role, ctx);
-        if (items == null || items.length == 0) {
-            return hasAnyItemEquipped(inventory, selection);
-        }
-        Set<String> itemSet = normalizeItemSet(items);
-        if (itemSet.isEmpty()) {
-            return false;
-        }
-        if (selection.includeArmor) {
-            ItemContainer armor = inventory.getArmor();
-            if (armor != null && containsItemInArmor(armor, selection.armorSlots, itemSet)) {
-                return true;
-            }
-        }
-        if (selection.includeUtility) {
-            ItemContainer utility = inventory.getUtility();
-            if (utility != null && containsItemInContainer(utility, itemSet)) {
-                return true;
-            }
-        }
-        return false;
+        return itemRequirements.matchesItemsEquipped(requirement, role, ctx);
     }
 
     boolean matchesHarvestContext(Role role,
@@ -807,58 +683,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return currentSubName != null && currentSubName.equalsIgnoreCase(subState);
     }
 
-    String[] resolveItemsInHand(ItemsInHandRequirement requirement,
-                                Role role,
-                                InteractionContextSnapshot ctx) {
-        if (requirement == null) {
-            return new String[0];
-        }
-        String[] paramItems = resolveItemsParam(role, ctx, requirement.getItemsParam());
-        if (paramItems != null && paramItems.length > 0) {
-            return paramItems;
-        }
-        return requirement.getItems();
-    }
-
-    String[] resolveItemsInInventory(ItemsInInventoryRequirement requirement,
-                                     Role role,
-                                     InteractionContextSnapshot ctx) {
-        if (requirement == null) {
-            return new String[0];
-        }
-        String[] paramItems = resolveItemsParam(role, ctx, requirement.getItemsParam());
-        if (paramItems != null && paramItems.length > 0) {
-            return paramItems;
-        }
-        return requirement.getItems();
-    }
-
-    String[] resolveItemsEquipped(ItemsEquippedRequirement requirement,
-                                  Role role,
-                                  InteractionContextSnapshot ctx) {
-        if (requirement == null) {
-            return new String[0];
-        }
-        String[] paramItems = resolveItemsParam(role, ctx, requirement.getItemsParam());
-        if (paramItems != null && paramItems.length > 0) {
-            return paramItems;
-        }
-        return requirement.getItems();
-    }
-
-    String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
-        String paramName = itemsParam;
-        if (paramName == null || paramName.isBlank()) {
-            return null;
-        }
-        String[] rawValues = getRoleStringArrayParam(role, ctx, paramName);
-        if (rawValues == null || rawValues.length == 0) {
-            return null;
-        }
-        String[] resolved = InteractionItemParser.parseItemIdsFromParam(rawValues);
-        return resolved != null && resolved.length > 0 ? resolved : null;
-    }
-
     ResolvedFeedItems resolveFeedItems(FeedInteraction interaction, Role role, InteractionContextSnapshot ctx) {
         if (interaction == null) {
             return new ResolvedFeedItems(new String[0], new FeedItem[0], false);
@@ -923,174 +747,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return isMountableOverride;
         }
         return getRoleBooleanParam(role, ctx, DEFAULT_IS_MOUNTABLE_PARAM);
-    }
-
-    EquippedSlotSelection resolveEquippedSlots(String[] slots) {
-        boolean[] armorSlots = new boolean[ItemArmorSlot.VALUES.length];
-        if (slots == null || slots.length == 0) {
-            Arrays.fill(armorSlots, true);
-            return new EquippedSlotSelection(true, true, armorSlots);
-        }
-        boolean includeArmor = false;
-        boolean includeUtility = false;
-        for (String slot : slots) {
-            if (slot == null || slot.isBlank()) {
-                continue;
-            }
-            String normalized = slot.trim().toLowerCase(Locale.ROOT);
-            switch (normalized) {
-                case "head":
-                    armorSlots[ItemArmorSlot.Head.ordinal()] = true;
-                    includeArmor = true;
-                    break;
-                case "chest":
-                    armorSlots[ItemArmorSlot.Chest.ordinal()] = true;
-                    includeArmor = true;
-                    break;
-                case "hands":
-                    armorSlots[ItemArmorSlot.Hands.ordinal()] = true;
-                    includeArmor = true;
-                    break;
-                case "legs":
-                    armorSlots[ItemArmorSlot.Legs.ordinal()] = true;
-                    includeArmor = true;
-                    break;
-                case "armor":
-                case "equipped":
-                    Arrays.fill(armorSlots, true);
-                    includeArmor = true;
-                    break;
-                case "utility":
-                case "accessory":
-                case "accessories":
-                    includeUtility = true;
-                    break;
-                default:
-                    break;
-            }
-        }
-        return new EquippedSlotSelection(includeArmor, includeUtility, armorSlots);
-    }
-
-    boolean containsItemInArmor(ItemContainer armor, boolean[] slots, Set<String> items) {
-        if (armor == null || slots == null || items == null || items.isEmpty()) {
-            return false;
-        }
-        int max = Math.min(slots.length, armor.getCapacity());
-        for (short i = 0; i < max; i++) {
-            if (!slots[i]) {
-                continue;
-            }
-            ItemStack stack = armor.getItemStack(i);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String itemId = stack.getItemId();
-            if (itemId != null && items.contains(itemId.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    boolean hasAnyItemEquipped(Inventory inventory, EquippedSlotSelection selection) {
-        if (inventory == null || selection == null || !selection.hasAny()) {
-            return false;
-        }
-        if (selection.includeArmor) {
-            ItemContainer armor = inventory.getArmor();
-            if (armor != null && hasAnyItemInArmor(armor, selection.armorSlots)) {
-                return true;
-            }
-        }
-        if (selection.includeUtility) {
-            ItemContainer utility = inventory.getUtility();
-            if (utility != null && hasAnyItemInContainer(utility)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    boolean hasAnyItemInArmor(ItemContainer armor, boolean[] slots) {
-        if (armor == null || slots == null) {
-            return false;
-        }
-        int max = Math.min(slots.length, armor.getCapacity());
-        for (short i = 0; i < max; i++) {
-            if (!slots[i]) {
-                continue;
-            }
-            ItemStack stack = armor.getItemStack(i);
-            if (stack != null && !stack.isEmpty()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    boolean hasAnyItemInContainer(ItemContainer container) {
-        if (container == null) {
-            return false;
-        }
-        short capacity = container.getCapacity();
-        for (short i = 0; i < capacity; i++) {
-            ItemStack stack = container.getItemStack(i);
-            if (stack != null && !stack.isEmpty()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    boolean containsItemInContainer(ItemContainer container, Set<String> items) {
-        if (container == null || items == null || items.isEmpty()) {
-            return false;
-        }
-        short capacity = container.getCapacity();
-        for (short i = 0; i < capacity; i++) {
-            ItemStack stack = container.getItemStack(i);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String itemId = stack.getItemId();
-            if (itemId != null && items.contains(itemId.toLowerCase(Locale.ROOT))) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    int countItemInContainer(CombinedItemContainer container, String itemId) {
-        if (container == null || itemId == null || itemId.isBlank()) {
-            return 0;
-        }
-        short capacity = container.getCapacity();
-        int total = 0;
-        for (short i = 0; i < capacity; i++) {
-            ItemStack stack = container.getItemStack(i);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            if (itemId.equalsIgnoreCase(stack.getItemId())) {
-                total += stack.getQuantity();
-            }
-        }
-        return total;
-    }
-
-    Set<String> normalizeItemSet(String[] items) {
-        Set<String> set = new HashSet<>();
-        if (items == null) {
-            return set;
-        }
-        for (String item : items) {
-            if (item == null || item.isBlank()) {
-                continue;
-            }
-            set.add(item.trim().toLowerCase(Locale.ROOT));
-        }
-        return set;
     }
 
     String getRoleStringParam(Role role, String paramName) {
@@ -1177,7 +833,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         String roleName = role != null ? role.getRoleName() : "<null>";
         boolean tamed = isTamed(npcRef, store);
         boolean owner = isOwner(npcRef, store, player);
-        boolean hasLoved = isHeldItemInList(resolveLovedItems(role, ctx), ctx);
+        boolean hasLoved = itemRequirements.isHeldItemInList(resolveLovedItems(role, ctx), ctx);
         boolean isHarvestable = resolveIsHarvestable(role, ctx);
         boolean harvestReady = isAlarmReady(npcRef, store, DEFAULT_HARVEST_ALARM);
         boolean harvestContext = matchesHarvestContext(role, infoProvider, ctx);
