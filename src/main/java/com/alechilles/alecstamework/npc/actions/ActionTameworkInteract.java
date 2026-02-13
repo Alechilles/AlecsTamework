@@ -67,6 +67,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     static final String DEFAULT_IS_MOUNTABLE_PARAM = "IsMountable";
     static final String DEFAULT_HARVEST_CONTEXT_PARAM = "HarvestInteractionContext";
     static final String DEFAULT_HARVEST_ALARM = "Harvest_Ready";
+    static final String DEFAULT_COOLDOWN_ALARM_PREFIX = "TameworkInteract_Cooldown";
 
     private final String configIdOverride;
     private final boolean hasLovedItemsOverride;
@@ -151,12 +152,16 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             ));
             return false;
         }
-        InteractionEntry entry = selectInteraction(config, npcRef, role, infoProvider, store, player);
-        if (entry == null) {
+        ResolvedInteraction interaction = selectInteraction(config, npcRef, role, infoProvider, store, player);
+        if (interaction == null) {
             logDebug(buildNoMatchSummary(config, npcRef, role, infoProvider, store, player));
             return false;
         }
-        return applyInteraction(entry, npcRef, role, infoProvider, store, player);
+        boolean applied = applyInteraction(interaction.entry, npcRef, role, infoProvider, store, player);
+        if (applied) {
+            applyInteractionCooldown(interaction, npcRef, store);
+        }
+        return applied;
     }
 
     private TwInteractionConfig resolveConfig(Role role) {
@@ -186,18 +191,28 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return null;
     }
 
-    private InteractionEntry selectInteraction(TwInteractionConfig config,
-                                               Ref<EntityStore> npcRef,
-                                               Role role,
-                                               InfoProvider infoProvider,
-                                               Store<EntityStore> store,
-                                               Player player) {
-        for (InteractionEntry entry : config.getInteractions()) {
+    private ResolvedInteraction selectInteraction(TwInteractionConfig config,
+                                                  Ref<EntityStore> npcRef,
+                                                  Role role,
+                                                  InfoProvider infoProvider,
+                                                  Store<EntityStore> store,
+                                                  Player player) {
+        InteractionEntry[] entries = config.getInteractions();
+        for (int index = 0; index < entries.length; index++) {
+            InteractionEntry entry = entries[index];
             if (entry == null || !entry.isEnabled()) {
                 continue;
             }
+            int cooldownSeconds = resolveCooldownSeconds(config, entry);
+            String cooldownAlarmName = cooldownSeconds > 0
+                    ? buildCooldownAlarmName(config, index)
+                    : null;
+            if (cooldownSeconds > 0
+                    && (cooldownAlarmName == null || !isAlarmReady(npcRef, store, cooldownAlarmName))) {
+                continue;
+            }
             if (requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player)) {
-                return entry;
+                return new ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
             }
         }
         return null;
@@ -1190,5 +1205,83 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 isMountable,
                 crouching
         );
+    }
+
+    private int resolveCooldownSeconds(TwInteractionConfig config, InteractionEntry entry) {
+        if (entry != null && entry.getCooldownSeconds() != null) {
+            return Math.max(0, entry.getCooldownSeconds());
+        }
+        if (config != null && config.getCooldowns() != null
+                && config.getCooldowns().getInteractionSeconds() != null) {
+            return Math.max(0, config.getCooldowns().getInteractionSeconds());
+        }
+        return 0;
+    }
+
+    private String buildCooldownAlarmName(TwInteractionConfig config, int index) {
+        String configId = config != null ? config.getId() : null;
+        String safeConfigId = sanitizeAlarmSegment(configId);
+        return DEFAULT_COOLDOWN_ALARM_PREFIX + "_" + safeConfigId + "_" + index;
+    }
+
+    private String sanitizeAlarmSegment(String value) {
+        if (value == null || value.isBlank()) {
+            return "unknown";
+        }
+        StringBuilder safe = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            if ((c >= 'a' && c <= 'z')
+                    || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9')
+                    || c == '_' || c == '-') {
+                safe.append(c);
+            } else {
+                safe.append('_');
+            }
+        }
+        return safe.toString();
+    }
+
+    private void applyInteractionCooldown(ResolvedInteraction interaction,
+                                          Ref<EntityStore> npcRef,
+                                          Store<EntityStore> store) {
+        if (interaction == null || interaction.cooldownSeconds <= 0) {
+            return;
+        }
+        if (interaction.cooldownAlarmName == null || interaction.cooldownAlarmName.isBlank()) {
+            return;
+        }
+        NPCEntity npc = resolveNpcEntity(npcRef, store);
+        if (npc == null) {
+            return;
+        }
+        AlarmStore alarmStore = npc.getAlarmStore();
+        if (alarmStore == null) {
+            return;
+        }
+        Alarm alarm = alarmStore.get(npc, interaction.cooldownAlarmName);
+        if (alarm == null) {
+            return;
+        }
+        Instant now = resolveGameTime(store);
+        alarm.set(npcRef, now.plusSeconds(interaction.cooldownSeconds), store);
+    }
+
+    private static final class ResolvedInteraction {
+        private final InteractionEntry entry;
+        private final int index;
+        private final int cooldownSeconds;
+        private final String cooldownAlarmName;
+
+        private ResolvedInteraction(InteractionEntry entry,
+                                    int index,
+                                    int cooldownSeconds,
+                                    String cooldownAlarmName) {
+            this.entry = entry;
+            this.index = index;
+            this.cooldownSeconds = cooldownSeconds;
+            this.cooldownAlarmName = cooldownAlarmName;
+        }
     }
 }
