@@ -871,10 +871,10 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         private final int cooldownSeconds;
         private final String cooldownAlarmName;
 
-        private ResolvedInteraction(InteractionEntry entry,
-                                    int index,
-                                    int cooldownSeconds,
-                                    String cooldownAlarmName) {
+        ResolvedInteraction(InteractionEntry entry,
+                            int index,
+                            int cooldownSeconds,
+                            String cooldownAlarmName) {
             this.entry = entry;
             this.index = index;
             this.cooldownSeconds = cooldownSeconds;
