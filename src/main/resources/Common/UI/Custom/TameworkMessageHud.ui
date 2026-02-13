@@ -3,12 +3,12 @@ Group #TameworkMessageRoot {
   Visible: false;
 
   Label #TameworkMessage0 {
-    Anchor: (Top: 60, Width: 350, Height: 24);
+    Anchor: (Top: -200, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
       VerticalAlignment: Center,
       RenderBold: true,
-      FontSize: 16,
+      FontSize: 28,
       TextColor: #ffffff,
       OutlineColor: #000000(0.6)
     );
@@ -17,12 +17,12 @@ Group #TameworkMessageRoot {
   }
 
   Label #TameworkMessage1 {
-    Anchor: (Top: 60, Width: 350, Height: 24);
+    Anchor: (Top: -200, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
       VerticalAlignment: Center,
       RenderBold: true,
-      FontSize: 16,
+      FontSize: 28,
       TextColor: #ffffff(0.85),
       OutlineColor: #000000(0.6)
     );
@@ -31,12 +31,12 @@ Group #TameworkMessageRoot {
   }
 
   Label #TameworkMessage2 {
-    Anchor: (Top: 60, Width: 350, Height: 24);
+    Anchor: (Top: -200, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
       VerticalAlignment: Center,
       RenderBold: true,
-      FontSize: 16,
+      FontSize: 28,
       TextColor: #ffffff(0.7),
       OutlineColor: #000000(0.6)
     );
@@ -45,12 +45,12 @@ Group #TameworkMessageRoot {
   }
 
   Label #TameworkMessage3 {
-    Anchor: (Top: 60, Width: 350, Height: 24);
+    Anchor: (Top: -200, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
       VerticalAlignment: Center,
       RenderBold: true,
-      FontSize: 16,
+      FontSize: 28,
       TextColor: #ffffff(0.55),
       OutlineColor: #000000(0.6)
     );
@@ -59,12 +59,12 @@ Group #TameworkMessageRoot {
   }
 
   Label #TameworkMessage4 {
-    Anchor: (Top: 60, Width: 350, Height: 24);
+    Anchor: (Top: -200, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
       VerticalAlignment: Center,
       RenderBold: true,
-      FontSize: 16,
+      FontSize: 28,
       TextColor: #ffffff(0.4),
       OutlineColor: #000000(0.6)
     );
@@ -73,12 +73,12 @@ Group #TameworkMessageRoot {
   }
 
   Label #TameworkMessage5 {
-    Anchor: (Top: 60, Width: 350, Height: 24);
+    Anchor: (Top: -200, Width: 350, Height: 24);
     Style: (
       HorizontalAlignment: Center,
       VerticalAlignment: Center,
       RenderBold: true,
-      FontSize: 16,
+      FontSize: 28,
       TextColor: #ffffff(0.25),
       OutlineColor: #000000(0.6)
     );

@@ -1,0 +1,25 @@
+{
+  "Group": "Alechilles",
+  "Name": "Alec's Cats!",
+  "Version": "1.4.1",
+  "Description": "Adds tamable cats to Hytale!",
+  "Authors": [
+    {
+      "Name": "Alec (Alechilles)",
+      "Email": "",
+      "Url": "https://www.curseforge.com/members/alechilles/projects",
+      "Discord": "alechilles"
+    }
+  ],
+  "Website": "",
+  "ServerVersion": "",
+  "Dependencies": {
+    "Alechilles:Alec's Tamework!": "*",
+    "Alechilles:Alec's Tamework! (Assets)": "*"
+  },
+  "OptionalDependencies": {},
+  "LoadBefore": {},
+  "DisabledByDefault": false,
+  "IncludesAssetPack": true,
+  "SubPlugins": []
+}
