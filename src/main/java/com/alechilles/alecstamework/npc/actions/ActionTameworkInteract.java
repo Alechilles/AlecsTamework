@@ -393,6 +393,16 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return itemRequirements.matchesItemsEquipped(requirement, role, ctx);
     }
 
+    // Delegates held-item matching for requirement checks.
+    boolean isHeldItemInList(String[] items, InteractionContextSnapshot ctx) {
+        return itemRequirements.isHeldItemInList(items, ctx);
+    }
+
+    // Delegates item param resolution for requirement parsing.
+    String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
+        return itemRequirements.resolveItemsParam(role, ctx, itemsParam);
+    }
+
     boolean matchesHarvestContext(Role role,
                                   InfoProvider infoProvider,
                                   InteractionContextSnapshot ctx) {
