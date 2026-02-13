@@ -184,6 +184,14 @@ final class InteractionPresentationEffects {
         return applyMessageText(effect.getMessage(), npcRef, store, player);
     }
 
+    // Shows a floating combat text message directly.
+    boolean showFloatingTextMessage(String message,
+                                    Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store,
+                                    Player player) {
+        return applyMessageText(message, npcRef, store, player);
+    }
+
     // Shows the custom UI message to the interacting player.
     boolean applyUiMessage(UiMessageEffect effect, Player player) {
         if (effect == null) {

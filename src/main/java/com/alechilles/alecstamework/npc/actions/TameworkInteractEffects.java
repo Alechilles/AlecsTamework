@@ -252,17 +252,17 @@ final class TameworkInteractEffects {
         }
         ResolvedModeStep next = resolved[nextIndex];
         role.getStateSupport().setState(npcRef, next.state, next.subState, store);
-        if (next.message != null && !next.message.isBlank()) {
-            boolean emitted = false;
-            if (showFloatingText) {
-                emitted |= applyMessageText(next.message, npcRef, store, player);
-            }
-            if (showUiMessage) {
-                emitted |= applyUiMessage(next.message, player);
-            }
-            if (emitted) {
-                owner.logDebug("ModeToggle: message=" + next.message);
-            }
+            if (next.message != null && !next.message.isBlank()) {
+                boolean emitted = false;
+                if (showFloatingText) {
+                    emitted |= presentationEffects.showFloatingTextMessage(next.message, npcRef, store, player);
+                }
+                if (showUiMessage) {
+                    emitted |= presentationEffects.applyUiMessage(next.message, player);
+                }
+                if (emitted) {
+                    owner.logDebug("ModeToggle: message=" + next.message);
+                }
         }
         return true;
     }
