@@ -574,7 +574,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (requirement == null) {
             return null;
         }
-        String paramName = firstNonBlank(requirement.getContextParam(), requirement.getParam());
+        String paramName = requirement.getContextParam();
         if (paramName == null || paramName.isBlank()) {
             return null;
         }
@@ -821,7 +821,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (requirement == null) {
             return new String[0];
         }
-        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam(), requirement.getParam());
+        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam());
         if (paramItems != null && paramItems.length > 0) {
             return paramItems;
         }
@@ -832,7 +832,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (requirement == null) {
             return new String[0];
         }
-        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam(), requirement.getParam());
+        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam());
         if (paramItems != null && paramItems.length > 0) {
             return paramItems;
         }
@@ -843,15 +843,15 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (requirement == null) {
             return new String[0];
         }
-        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam(), null);
+        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam());
         if (paramItems != null && paramItems.length > 0) {
             return paramItems;
         }
         return requirement.getItems();
     }
 
-    String[] resolveItemsParam(Role role, String itemsParam, String legacyParam) {
-        String paramName = firstNonBlank(itemsParam, legacyParam);
+    String[] resolveItemsParam(Role role, String itemsParam) {
+        String paramName = itemsParam;
         if (paramName == null || paramName.isBlank()) {
             return null;
         }

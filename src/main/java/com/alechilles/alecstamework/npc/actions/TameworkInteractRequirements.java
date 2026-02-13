@@ -395,7 +395,7 @@ final class TameworkInteractRequirements {
                                                       String[] explicitItems,
                                                       String paramName,
                                                       Role role) {
-        String[] paramItems = owner.resolveItemsParam(role, paramName, null);
+        String[] paramItems = owner.resolveItemsParam(role, paramName);
         if (hasItems(paramItems)) {
             return new ResolvedItemList(paramItems, true);
         }

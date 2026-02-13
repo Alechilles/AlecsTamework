@@ -477,16 +477,11 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public static final class ItemsInHandRequirement {
         String itemsParam;
-        String param;
         String[] items = ArrayUtil.EMPTY_STRING_ARRAY;
         Integer quantity;
 
         public String getItemsParam() {
             return itemsParam;
-        }
-
-        public String getParam() {
-            return param;
         }
 
         public String[] getItems() {
@@ -500,16 +495,11 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public static final class ItemsInInventoryRequirement {
         String itemsParam;
-        String param;
         String[] items = ArrayUtil.EMPTY_STRING_ARRAY;
         Integer quantity;
 
         public String getItemsParam() {
             return itemsParam;
-        }
-
-        public String getParam() {
-            return param;
         }
 
         public String[] getItems() {
@@ -596,7 +586,6 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final class InteractionContextRequirement {
         String context;
         String contextParam;
-        String param;
 
         public String getContext() {
             return context;
@@ -604,10 +593,6 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getContextParam() {
             return contextParam;
-        }
-
-        public String getParam() {
-            return param;
         }
     }
 
