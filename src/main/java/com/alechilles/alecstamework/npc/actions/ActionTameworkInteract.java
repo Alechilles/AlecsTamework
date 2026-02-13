@@ -213,7 +213,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             if (entry == null || !entry.isEnabled()) {
                 continue;
             }
-            if (entry.getInteractionType() != null && interactionType == null) {
+            if (entry.getInteractionType() != null
+                    && interactionType == null
+                    && entry.getInteractionType() != TwInteractionConfig.InteractionInputType.Use) {
                 logDebug(String.format(
                         "TameworkInteract: no input type recorded (required=%s role=%s config=%s).",
                         entry.getInteractionType(),
@@ -1481,7 +1483,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return true;
         }
         if (actual == null) {
-            return false;
+            return required == TwInteractionConfig.InteractionInputType.Use;
         }
         switch (required) {
             case Use:

@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.actions.InteractionInputTracker;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -20,6 +21,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.Role;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -82,6 +84,7 @@ public final class OwnerInteractionListener {
         }
         // Skip restriction when there is no owner or the player is the owner.
         if (ownerUuid == null || ownerUuid.equals(player.getUuid())) {
+            maybeTriggerAltInteraction(actionType, (NPCEntity) target, player);
             return;
         }
 
@@ -95,6 +98,7 @@ public final class OwnerInteractionListener {
                 if (registry != null) {
                     ItemFeatureConfig config = registry.get(active.getItemId());
                     if (config != null && config.isSpawnerEnabled() && !config.isCaptureOwnerRestricted()) {
+                        maybeTriggerAltInteraction(actionType, (NPCEntity) target, player);
                         return;
                     }
                 }
@@ -172,5 +176,65 @@ public final class OwnerInteractionListener {
                 "Owner restrict: denied interaction player=" + player.getDisplayName()
                         + " target=" + target.getUuid()
         );
+    }
+
+    private void maybeTriggerAltInteraction(InteractionType actionType, NPCEntity npc, Player player) {
+        if (actionType != InteractionType.Primary && actionType != InteractionType.Secondary) {
+            return;
+        }
+        if (npc == null || player == null) {
+            return;
+        }
+        Role role = npc.getRole();
+        if (role == null || role.getStateSupport() == null) {
+            return;
+        }
+        if (!roleHasInteractionType(role, actionType)) {
+            return;
+        }
+        role.getStateSupport().addInteraction(player);
+    }
+
+    private boolean roleHasInteractionType(Role role, InteractionType actionType) {
+        if (role == null || actionType == null) {
+            return false;
+        }
+        TwInteractionConfig config = resolveConfig(role);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        TwInteractionConfig.InteractionInputType required =
+                actionType == InteractionType.Primary
+                        ? TwInteractionConfig.InteractionInputType.Primary
+                        : TwInteractionConfig.InteractionInputType.Secondary;
+        for (TwInteractionConfig.InteractionEntry entry : config.getInteractions()) {
+            if (entry == null || !entry.isEnabled()) {
+                continue;
+            }
+            if (required == entry.getInteractionType()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private TwInteractionConfig resolveConfig(Role role) {
+        if (role == null) {
+            return null;
+        }
+        String roleId = role.getRoleName();
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        var assetMap = TwInteractionConfig.getAssetMap();
+        if (assetMap == null) {
+            return null;
+        }
+        for (TwInteractionConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate != null && candidate.isEnabled() && candidate.matchesRole(roleId)) {
+                return candidate;
+            }
+        }
+        return null;
     }
 }
