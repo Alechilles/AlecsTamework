@@ -210,7 +210,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                     ? buildCooldownAlarmName(config, index)
                     : null;
             if (cooldownSeconds > 0
-                    && (cooldownAlarmName == null || !isAlarmReady(npcRef, store, cooldownAlarmName))) {
+                    && (cooldownAlarmName == null || !isCooldownReady(npcRef, store, cooldownAlarmName))) {
                 continue;
             }
             if (requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player)) {
@@ -1282,8 +1282,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (alarm == null) {
             return;
         }
-        Instant now = resolveGameTime(store);
-        alarm.set(npcRef, now.plusSeconds(interaction.cooldownSeconds), store);
+        alarm.set(npcRef, Instant.now().plusSeconds(interaction.cooldownSeconds), store);
     }
 
     private static final class ResolvedInteraction {
@@ -1301,5 +1300,24 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             this.cooldownSeconds = cooldownSeconds;
             this.cooldownAlarmName = cooldownAlarmName;
         }
+    }
+
+    private boolean isCooldownReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
+        NPCEntity npc = resolveNpcEntity(npcRef, store);
+        if (npc == null || alarmName == null || alarmName.isBlank()) {
+            return false;
+        }
+        AlarmStore alarmStore = npc.getAlarmStore();
+        if (alarmStore == null) {
+            return false;
+        }
+        Alarm alarm = alarmStore.get(npc, alarmName);
+        if (alarm == null) {
+            return true;
+        }
+        if (!alarm.isSet()) {
+            return true;
+        }
+        return alarm.hasPassed(Instant.now());
     }
 }
