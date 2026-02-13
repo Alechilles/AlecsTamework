@@ -5,7 +5,6 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Effects;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HookEffect;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeStep;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModifyStatsEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.OwnerSource;
@@ -21,7 +20,6 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageE
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -32,17 +30,11 @@ import com.hypixel.hytale.protocol.Color;
 import com.hypixel.hytale.protocol.ComponentUpdate;
 import com.hypixel.hytale.protocol.ComponentUpdateType;
 import com.hypixel.hytale.protocol.SoundCategory;
-import com.hypixel.hytale.server.core.asset.type.item.config.ItemDrop;
-import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
-import com.hypixel.hytale.server.core.asset.type.item.config.container.ItemDropContainer;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
-import com.hypixel.hytale.server.core.entity.ItemUtils;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementConfig;
 import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
-import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
@@ -62,7 +54,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
-import java.util.Random;
 import java.util.UUID;
 
 final class TameworkInteractEffects {
@@ -81,9 +72,11 @@ final class TameworkInteractEffects {
 
     private final ActionTameworkInteract owner;
     private final InteractionUiMessageService uiMessageService = new InteractionUiMessageService();
+    private final InteractionInventoryEffects inventoryEffects;
 
     TameworkInteractEffects(ActionTameworkInteract owner) {
         this.owner = owner;
+        this.inventoryEffects = new InteractionInventoryEffects(owner);
     }
 
     boolean applyCustomEffects(Effects effects,
@@ -114,15 +107,15 @@ final class TameworkInteractEffects {
         }
         RemoveItemsHandEffect removeItemsHand = effects.getRemoveItemsHand();
         if (removeItemsHand != null) {
-            applied |= applyRemoveItemsHand(removeItemsHand, player);
+            applied |= inventoryEffects.applyRemoveItemsHand(removeItemsHand, player);
         }
         RemoveItemsInventoryEffect removeItemsInventory = effects.getRemoveItemsInventory();
         if (removeItemsInventory != null) {
-            applied |= applyRemoveItemsInventory(removeItemsInventory, player);
+            applied |= inventoryEffects.applyRemoveItemsInventory(removeItemsInventory, player);
         }
         AddItemInventoryEffect addItemInventory = effects.getAddItemInventory();
         if (addItemInventory != null) {
-            applied |= applyAddItemInventory(addItemInventory, player);
+            applied |= inventoryEffects.applyAddItemInventory(addItemInventory, player);
         }
         if (Boolean.TRUE.equals(effects.getMount())) {
             applied |= applyMount(npcRef, role, infoProvider, store);
@@ -137,7 +130,7 @@ final class TameworkInteractEffects {
         }
         DropItemEffect dropItem = effects.getDropItem();
         if (dropItem != null) {
-            applied |= applyDropItem(dropItem, npcRef, store);
+            applied |= inventoryEffects.applyDropItem(dropItem, npcRef, store);
         }
         HookEffect hookEffect = effects.getTriggerNpcHook();
         if (hookEffect != null) {
@@ -415,78 +408,6 @@ final class TameworkInteractEffects {
         return true;
     }
 
-    private boolean applyRemoveItemsHand(RemoveItemsHandEffect effect, Player player) {
-        if (effect == null) {
-            return false;
-        }
-        int quantity = effect.getQuantity() != null ? effect.getQuantity() : 1;
-        return owner.removeHeldItemQuantity(player, quantity);
-    }
-
-    private boolean applyRemoveItemsInventory(RemoveItemsInventoryEffect effect, Player player) {
-        if (effect == null || player == null) {
-            return false;
-        }
-        ItemQuantity[] items = effect.getItems();
-        if (items == null || items.length == 0) {
-            return false;
-        }
-        CombinedItemContainer container = owner.resolveInventoryContainer(player);
-        if (container == null) {
-            return false;
-        }
-        boolean applied = false;
-        for (ItemQuantity item : items) {
-            if (item == null || item.getItem() == null || item.getItem().isBlank()) {
-                continue;
-            }
-            int quantity = item.getQuantity() != null ? item.getQuantity() : 1;
-            if (quantity <= 0) {
-                continue;
-            }
-            ItemStackTransaction transaction = container.removeItemStack(new ItemStack(item.getItem(), quantity));
-            if (transaction != null) {
-                ItemStack remainder = transaction.getRemainder();
-                if (remainder == null || remainder.isEmpty() || remainder.getQuantity() < quantity) {
-                    applied = true;
-                }
-            }
-        }
-        return applied;
-    }
-
-    private boolean applyAddItemInventory(AddItemInventoryEffect effect, Player player) {
-        if (effect == null || player == null) {
-            return false;
-        }
-        ItemQuantity[] items = effect.getItems();
-        if (items == null || items.length == 0) {
-            return false;
-        }
-        CombinedItemContainer container = owner.resolveInventoryContainer(player);
-        if (container == null) {
-            return false;
-        }
-        boolean applied = false;
-        for (ItemQuantity item : items) {
-            if (item == null || item.getItem() == null || item.getItem().isBlank()) {
-                continue;
-            }
-            int quantity = item.getQuantity() != null ? item.getQuantity() : 1;
-            if (quantity <= 0) {
-                continue;
-            }
-            ItemStackTransaction transaction = container.addItemStack(new ItemStack(item.getItem(), quantity));
-            if (transaction != null) {
-                ItemStack remainder = transaction.getRemainder();
-                if (remainder == null || remainder.isEmpty() || remainder.getQuantity() < quantity) {
-                    applied = true;
-                }
-            }
-        }
-        return applied;
-    }
-
     private void maybeShowFeedingCombatText(Ref<EntityStore> npcRef,
                                             Store<EntityStore> store,
                                             Player player,
@@ -661,95 +582,6 @@ final class TameworkInteractEffects {
             );
         }
         return true;
-    }
-
-    private boolean applyDropItem(DropItemEffect effect,
-                                  Ref<EntityStore> npcRef,
-                                  Store<EntityStore> store) {
-        if (effect == null || npcRef == null || store == null) {
-            return false;
-        }
-        List<ItemStack> drops = resolveDropItems(effect);
-        if (drops.isEmpty()) {
-            return false;
-        }
-        float throwSpeed = effect.getThrowSpeed() != null ? effect.getThrowSpeed().floatValue() : 0.0f;
-        boolean applied = false;
-        for (ItemStack stack : drops) {
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            if (throwSpeed > 0.0f) {
-                ItemUtils.throwItem(npcRef, stack, throwSpeed, store);
-            } else {
-                ItemUtils.dropItem(npcRef, stack, store);
-            }
-            applied = true;
-        }
-        return applied;
-    }
-
-    private List<ItemStack> resolveDropItems(DropItemEffect effect) {
-        List<ItemStack> drops = new ArrayList<>();
-        if (effect == null) {
-            return drops;
-        }
-        Random random = new Random();
-        String dropListId = effect.getDropList();
-        if (dropListId != null && !dropListId.isBlank()) {
-            DefaultAssetMap<String, ItemDropList> assetMap = ItemDropList.getAssetMap();
-            ItemDropList dropList = assetMap != null ? assetMap.getAssetMap().get(dropListId) : null;
-            if (dropList == null) {
-                owner.logDebug("DropItem effect: drop list not found: " + dropListId);
-            } else {
-                ItemDropContainer container = dropList.getContainer();
-                if (container != null) {
-                    List<ItemDrop> roll = new ArrayList<>();
-                    container.populateDrops(roll, random::nextDouble, null);
-                    for (ItemDrop drop : roll) {
-                        if (drop == null || drop.getItemId() == null || drop.getItemId().isBlank()) {
-                            continue;
-                        }
-                        int quantity = drop.getRandomQuantity(random);
-                        if (quantity <= 0) {
-                            continue;
-                        }
-                        if (drop.getMetadata() != null) {
-                            drops.add(new ItemStack(drop.getItemId(), quantity, drop.getMetadata()));
-                        } else {
-                            drops.add(new ItemStack(drop.getItemId(), quantity));
-                        }
-                    }
-                }
-            }
-        }
-        if (!drops.isEmpty()) {
-            return drops;
-        }
-        String itemId = effect.getItem();
-        if (itemId == null || itemId.isBlank()) {
-            return drops;
-        }
-        int quantity = resolveDropQuantity(effect, random);
-        if (quantity > 0) {
-            drops.add(new ItemStack(itemId, quantity));
-        }
-        return drops;
-    }
-
-    private int resolveDropQuantity(DropItemEffect effect, Random random) {
-        int min = effect.getQuantityMin() != null ? effect.getQuantityMin() : 1;
-        int max = effect.getQuantityMax() != null ? effect.getQuantityMax() : min;
-        if (min < 1) {
-            min = 1;
-        }
-        if (max < min) {
-            max = min;
-        }
-        if (max == min) {
-            return min;
-        }
-        return random.nextInt(max - min + 1) + min;
     }
 
     private Vector3d resolveNpcPosition(Ref<EntityStore> npcRef,
