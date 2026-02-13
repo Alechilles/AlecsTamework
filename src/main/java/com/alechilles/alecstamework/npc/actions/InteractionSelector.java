@@ -11,10 +11,14 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
 // Selects the first matching interaction entry, respecting cooldowns and requirements.
 final class InteractionSelector {
+    private final ActionTameworkInteract owner;
     private final TameworkInteractRequirements requirements;
     private final InteractionCooldowns cooldowns;
 
-    InteractionSelector(TameworkInteractRequirements requirements, InteractionCooldowns cooldowns) {
+    InteractionSelector(ActionTameworkInteract owner,
+                        TameworkInteractRequirements requirements,
+                        InteractionCooldowns cooldowns) {
+        this.owner = owner;
         this.requirements = requirements;
         this.cooldowns = cooldowns;
     }
@@ -39,12 +43,81 @@ final class InteractionSelector {
                     : null;
             if (cooldownSeconds > 0
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
+                if (isContextualEntry(entry)) {
+                    return new ActionTameworkInteract.ResolvedInteraction(
+                            entry,
+                            index,
+                            cooldownSeconds,
+                            cooldownAlarmName,
+                            true
+                    );
+                }
                 continue;
+            }
+            if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx)) {
+                return new ActionTameworkInteract.ResolvedInteraction(
+                        entry,
+                        index,
+                        cooldownSeconds,
+                        cooldownAlarmName,
+                        true
+                );
             }
             if (requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx)) {
                 return new ActionTameworkInteract.ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
             }
         }
         return null;
+    }
+
+    // Returns true when harvest alarm cooldown blocks a contextual harvest interaction.
+    private boolean isHarvestAlarmBlocking(InteractionEntry entry,
+                                           Ref<EntityStore> npcRef,
+                                           Role role,
+                                           InfoProvider infoProvider,
+                                           Store<EntityStore> store,
+                                           InteractionContextSnapshot ctx) {
+        if (!(entry instanceof TwInteractionConfig.HarvestInteraction)) {
+            return false;
+        }
+        TwInteractionConfig.HarvestInteraction harvest = (TwInteractionConfig.HarvestInteraction) entry;
+        boolean requireContext = harvest.getRequireHarvestInteractionContext() == null
+                || harvest.getRequireHarvestInteractionContext();
+        if (!requireContext || !owner.matchesHarvestContext(role, infoProvider, ctx)) {
+            return false;
+        }
+        boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null
+                || harvest.getRequireHarvestAlarmReady();
+        return requireAlarm
+                && !owner.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM);
+    }
+
+    // Returns true when the interaction is explicitly tied to contextual input.
+    private boolean isContextualEntry(InteractionEntry entry) {
+        if (entry == null) {
+            return false;
+        }
+        if (entry instanceof TwInteractionConfig.HarvestInteraction) {
+            Boolean requireContext = ((TwInteractionConfig.HarvestInteraction) entry).getRequireHarvestInteractionContext();
+            if (requireContext == null || requireContext) {
+                return true;
+            }
+        }
+        TwInteractionConfig.RequirementGroup requires = entry.getRequires();
+        if (requires == null) {
+            return false;
+        }
+        return bucketHasContext(requires.getAll()) || bucketHasContext(requires.getAny());
+    }
+
+    // Checks if a requirement bucket includes contextual interaction requirements.
+    private boolean bucketHasContext(TwInteractionConfig.RequirementBucket bucket) {
+        if (bucket == null) {
+            return false;
+        }
+        if (bucket.isHarvestInteractionContext()) {
+            return true;
+        }
+        return bucket.getInteractionContext().length > 0;
     }
 }

@@ -110,7 +110,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.requirements = new TameworkInteractRequirements(this);
         this.executor = new InteractionExecutor(this, effects);
         this.cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
-        this.selector = new InteractionSelector(requirements, cooldowns);
+        this.selector = new InteractionSelector(this, requirements, cooldowns);
         this.diagnostics = new InteractionDiagnostics(this);
         this.matchHelpers = new InteractionMatchHelpers(this, paramAccess);
         this.paramMatcher = new InteractionParamMatcher(paramAccess);
@@ -154,6 +154,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (interaction == null) {
             maybeNotifyOwnerDenied(npcRef, store, player);
             diagnostics.logDebug(diagnostics.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
+            return false;
+        }
+        if (interaction.blockedByCooldown) {
             return false;
         }
         boolean applied = executor.applyInteraction(interaction.entry, npcRef, role, infoProvider, store, player, ctx);
@@ -487,6 +490,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         final int index;
         final int cooldownSeconds;
         final String cooldownAlarmName;
+        final boolean blockedByCooldown;
 
         ResolvedInteraction(InteractionEntry entry,
                             int index,
@@ -496,6 +500,19 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             this.index = index;
             this.cooldownSeconds = cooldownSeconds;
             this.cooldownAlarmName = cooldownAlarmName;
+            this.blockedByCooldown = false;
+        }
+
+        ResolvedInteraction(InteractionEntry entry,
+                            int index,
+                            int cooldownSeconds,
+                            String cooldownAlarmName,
+                            boolean blockedByCooldown) {
+            this.entry = entry;
+            this.index = index;
+            this.cooldownSeconds = cooldownSeconds;
+            this.cooldownAlarmName = cooldownAlarmName;
+            this.blockedByCooldown = blockedByCooldown;
         }
     }
 
