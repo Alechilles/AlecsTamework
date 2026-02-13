@@ -11,7 +11,9 @@
         "All": {
           "ItemsEquipped": [
             {
-              "Slots": "Armor"
+              "Slots": [
+                "Armor"
+              ]
             }
           ]
         }

@@ -282,8 +282,8 @@ public final class TwInteractionConfigCodecs {
             StringSchema slotSchema = new StringSchema();
             slotSchema.setEnum(EQUIPPED_SLOT_ENUM);
             ArraySchema arraySchema = new ArraySchema();
-            arraySchema.setItem(Codec.STRING.toSchema(context));
-            return Schema.anyOf(slotSchema, arraySchema);
+            arraySchema.setItem(slotSchema);
+            return arraySchema;
         }
     };
 
