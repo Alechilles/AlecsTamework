@@ -100,6 +100,9 @@ class InteractionBehaviorTest {
         Field paramAccessField = ActionTameworkInteract.class.getDeclaredField("paramAccess");
         paramAccessField.setAccessible(true);
         paramAccessField.set(interact, paramAccess);
+        Field paramMatcherField = ActionTameworkInteract.class.getDeclaredField("paramMatcher");
+        paramMatcherField.setAccessible(true);
+        paramMatcherField.set(interact, new InteractionParamMatcher(paramAccess));
         Field itemRequirementsField = ActionTameworkInteract.class.getDeclaredField("itemRequirements");
         itemRequirementsField.setAccessible(true);
         itemRequirementsField.set(interact, new InteractionItemRequirementResolver(resolver));
