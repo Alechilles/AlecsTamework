@@ -712,10 +712,10 @@ public final class ActionTameworkInteract extends TameworkActionBase {
 
     // Captures the selected interaction entry and cooldown metadata.
     static final class ResolvedInteraction {
-        private final InteractionEntry entry;
-        private final int index;
-        private final int cooldownSeconds;
-        private final String cooldownAlarmName;
+        final InteractionEntry entry;
+        final int index;
+        final int cooldownSeconds;
+        final String cooldownAlarmName;
 
         ResolvedInteraction(InteractionEntry entry,
                             int index,
