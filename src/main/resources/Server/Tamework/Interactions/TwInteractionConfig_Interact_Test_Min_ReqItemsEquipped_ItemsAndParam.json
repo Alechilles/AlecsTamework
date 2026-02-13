@@ -1,0 +1,27 @@
+{
+  "Enabled": true,
+  "RoleIds": [
+    "Mob_Tamework_Interact_Test"
+  ],
+  "Interactions": [
+    {
+      "Type": "Tame",
+      "Enabled": true,
+      "Requires": {
+        "All": {
+          "ItemsEquipped": [
+            {
+              "ItemsParam": "TestItemsEquippedParam",
+              "Items": [
+                "Plant_Fruit_Apple"
+              ],
+              "Slots": [
+                "Armor"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
