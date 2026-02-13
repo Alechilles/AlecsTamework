@@ -17,12 +17,12 @@ public final class InteractionInputTracker {
     }
 
     public static void record(Player player, Entity target, InteractionType type) {
-        if (player == null || target == null || type == null) {
+        if (player == null || type == null) {
             return;
         }
         UUID playerId = player.getUuid();
-        UUID targetId = target.getUuid();
-        if (playerId == null || targetId == null) {
+        UUID targetId = target != null ? target.getUuid() : null;
+        if (playerId == null) {
             return;
         }
         LAST_INPUT.put(playerId, new InputRecord(targetId, type, System.currentTimeMillis()));
@@ -40,11 +40,11 @@ public final class InteractionInputTracker {
         if (record == null) {
             return null;
         }
-        if (!targetId.equals(record.targetId)) {
-            return null;
-        }
         long age = System.currentTimeMillis() - record.timestampMs;
         if (age > INPUT_TTL_MS) {
+            return null;
+        }
+        if (record.targetId != null && !targetId.equals(record.targetId)) {
             return null;
         }
         return record.type;

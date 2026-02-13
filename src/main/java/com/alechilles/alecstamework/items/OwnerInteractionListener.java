@@ -50,13 +50,15 @@ public final class OwnerInteractionListener {
             return;
         }
         Entity target = event.getTargetEntity();
-        if (!(target instanceof NPCEntity)) {
-            return;
-        }
         Player player = event.getPlayer();
         if (player == null) {
             return;
         }
+        if (!(target instanceof NPCEntity)) {
+            InteractionInputTracker.record(player, null, actionType);
+            return;
+        }
+        InteractionInputTracker.record(player, target, actionType);
         UUID ownerUuid = null;
         String ownerName = null;
         boolean componentPresent = false;
