@@ -14,6 +14,9 @@ import com.hypixel.hytale.common.util.ArrayUtil;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.protocol.Color;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Locale;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
@@ -110,10 +113,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final AssetBuilderCodec<String, TwInteractionConfig> CODEC = TwInteractionConfigCodecs.CODEC;
 
     static AssetStore<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> ASSET_STORE;
+    private static final Object ROLE_CACHE_LOCK = new Object();
+    private static volatile boolean ROLE_CACHE_DIRTY = true;
+    private static volatile Map<String, TwInteractionConfig> ROLE_CACHE = Map.of();
 
     AssetExtraInfo.Data data;
     String id;
     boolean enabled = true;
+    int priority;
     String[] roleIds = ArrayUtil.EMPTY_STRING_ARRAY;
     InteractionEntry[] interactions = EMPTY_INTERACTIONS;
     Cooldowns cooldowns = new Cooldowns();
@@ -134,6 +141,60 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         return (DefaultAssetMap<String, TwInteractionConfig>) store.getAssetMap();
     }
 
+    public static void clearRoleCache() {
+        ROLE_CACHE_DIRTY = true;
+    }
+
+    @Nullable
+    public static TwInteractionConfig resolveForRole(String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        DefaultAssetMap<String, TwInteractionConfig> assetMap = getAssetMap();
+        if (assetMap == null) {
+            return null;
+        }
+        Map<String, TwInteractionConfig> cache = ROLE_CACHE;
+        if (ROLE_CACHE_DIRTY || cache == null) {
+            synchronized (ROLE_CACHE_LOCK) {
+                if (ROLE_CACHE_DIRTY || ROLE_CACHE == null) {
+                    ROLE_CACHE = buildRoleCache(assetMap);
+                    ROLE_CACHE_DIRTY = false;
+                }
+                cache = ROLE_CACHE;
+            }
+        }
+        return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+    }
+
+    private static Map<String, TwInteractionConfig> buildRoleCache(
+            DefaultAssetMap<String, TwInteractionConfig> assetMap) {
+        Map<String, TwInteractionConfig> cache = new HashMap<>();
+        if (assetMap == null) {
+            return cache;
+        }
+        for (TwInteractionConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate == null || !candidate.isEnabled()) {
+                continue;
+            }
+            String[] roles = candidate.getRoleIds();
+            if (roles == null || roles.length == 0) {
+                continue;
+            }
+            for (String role : roles) {
+                if (role == null || role.isBlank()) {
+                    continue;
+                }
+                String key = role.trim().toLowerCase(Locale.ROOT);
+                TwInteractionConfig existing = cache.get(key);
+                if (existing == null || candidate.getPriority() > existing.getPriority()) {
+                    cache.put(key, candidate);
+                }
+            }
+        }
+        return cache;
+    }
+
     protected TwInteractionConfig() {
     }
 
@@ -143,6 +204,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public boolean isEnabled() {
         return enabled;
+    }
+
+    public int getPriority() {
+        return priority;
     }
 
     public String[] getRoleIds() {

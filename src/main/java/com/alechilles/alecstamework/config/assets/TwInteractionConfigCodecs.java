@@ -1574,6 +1574,13 @@ public final class TwInteractionConfigCodecs {
         )
         .documentation("Enable or disable this interaction config.")
         .add()
+        .<Integer>append(
+            new KeyedCodec<>("Priority", Codec.INTEGER),
+            (asset, value) -> asset.priority = value == null ? 0 : value,
+            asset -> asset.priority
+        )
+        .documentation("Priority for selecting configs when multiple RoleIds match. Higher wins. Default: 0.")
+        .add()
         .<String[]>append(
             new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
             (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,

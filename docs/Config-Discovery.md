@@ -14,8 +14,8 @@ Both asset types are registered with the asset registry and are available to any
 - Asset ids are derived from the filename (standard asset behavior).
 - If multiple mods provide the same asset id, the later loaded asset wins.
 - `Action_Tamework_Interact` resolves configs in this order:
-  `ConfigId` override (if provided on the action), then the role param `InteractionConfigId` if present, then the first enabled config whose `RoleIds` contains the role id.
-- If multiple configs match a role id, selection order depends on asset map iteration. Avoid overlapping `RoleIds` or use `ConfigId` overrides when you need deterministic behavior.
+  `ConfigId` override (if provided on the action), then the role param `InteractionConfigId` if present, then the enabled config with the highest `Priority` whose `RoleIds` contains the role id.
+- `Priority` defaults to `0`. Higher values win. If multiple configs share the same priority, selection order follows asset map iteration.
 
 ## Settings file
 `Tamework_Settings.json` is loaded from the plugin data directory:

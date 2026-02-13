@@ -30,29 +30,30 @@ final class TameworkInteractRequirements {
                             Role role,
                             InfoProvider infoProvider,
                             Store<EntityStore> store,
-                            Player player) {
+                            Player player,
+                            InteractionContextSnapshot ctx) {
         RequirementGroup requires = entry.getRequires();
         if (entry instanceof CustomInteraction) {
-            return requires == null || evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player);
+            return requires == null || evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player, ctx);
         }
         boolean baseRequirementsMet = false;
         if (entry instanceof TameInteraction) {
-            baseRequirementsMet = meetsTameRequirements((TameInteraction) entry, npcRef, role, infoProvider, store, player);
+            baseRequirementsMet = meetsTameRequirements((TameInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
         } else if (entry instanceof FeedInteraction) {
-            baseRequirementsMet = meetsFeedRequirements((FeedInteraction) entry, npcRef, role, infoProvider, store, player);
+            baseRequirementsMet = meetsFeedRequirements((FeedInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
         } else if (entry instanceof HarvestInteraction) {
-            baseRequirementsMet = meetsHarvestRequirements((HarvestInteraction) entry, npcRef, role, infoProvider, store, player);
+            baseRequirementsMet = meetsHarvestRequirements((HarvestInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
         } else if (entry instanceof MountInteraction) {
-            baseRequirementsMet = meetsMountRequirements((MountInteraction) entry, npcRef, role, infoProvider, store, player);
+            baseRequirementsMet = meetsMountRequirements((MountInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
         } else if (entry instanceof ModeCycleInteraction) {
-            baseRequirementsMet = meetsModeCycleRequirements((ModeCycleInteraction) entry, npcRef, role, infoProvider, store, player);
+            baseRequirementsMet = meetsModeCycleRequirements((ModeCycleInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
         } else if (entry instanceof BreedInteraction) {
-            baseRequirementsMet = meetsBreedRequirements((BreedInteraction) entry, npcRef, role, infoProvider, store, player);
+            baseRequirementsMet = meetsBreedRequirements((BreedInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
         }
         if (!baseRequirementsMet) {
             return false;
         }
-        return requires == null || evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player);
+        return requires == null || evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player, ctx);
     }
 
     private boolean evaluateRequirementGroup(RequirementGroup group,
@@ -60,18 +61,19 @@ final class TameworkInteractRequirements {
                                              Role role,
                                              InfoProvider infoProvider,
                                              Store<EntityStore> store,
-                                             Player player) {
+                                             Player player,
+                                             InteractionContextSnapshot ctx) {
         if (group == null) {
             return false;
         }
-        if (!evaluateAllBucket(group.getAll(), npcRef, role, infoProvider, store, player)) {
+        if (!evaluateAllBucket(group.getAll(), npcRef, role, infoProvider, store, player, ctx)) {
             return false;
         }
         RequirementBucket any = group.getAny();
         if (any == null || any.isEmpty()) {
             return true;
         }
-        return evaluateAnyBucket(any, npcRef, role, infoProvider, store, player);
+        return evaluateAnyBucket(any, npcRef, role, infoProvider, store, player, ctx);
     }
 
     private boolean evaluateAllBucket(RequirementBucket bucket,
@@ -79,20 +81,21 @@ final class TameworkInteractRequirements {
                                       Role role,
                                       InfoProvider infoProvider,
                                       Store<EntityStore> store,
-                                      Player player) {
+                                      Player player,
+                                      InteractionContextSnapshot ctx) {
         if (bucket == null) {
             return true;
         }
         if (bucket.isLovedItems()
-                && !owner.isHeldItemInList(owner.resolveLovedItems(role), player)) {
+                && !owner.isHeldItemInList(owner.resolveLovedItems(role, ctx), ctx)) {
             return false;
         }
         if (bucket.isHarvestable()
-                && !owner.resolveIsHarvestable(role)) {
+                && !owner.resolveIsHarvestable(role, ctx)) {
             return false;
         }
         if (bucket.isMountable()
-                && !owner.resolveIsMountable(role)) {
+                && !owner.resolveIsMountable(role, ctx)) {
             return false;
         }
         if (bucket.isTamed()
@@ -116,19 +119,19 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isHarvestInteractionContext()
-                && !owner.matchesHarvestContext(role, infoProvider)) {
+                && !owner.matchesHarvestContext(role, infoProvider, ctx)) {
             return false;
         }
         if (!requireAnyMatch(bucket.getItemsInHand(),
-                requirement -> owner.matchesItemsInHand(requirement, role, player))) {
+                requirement -> owner.matchesItemsInHand(requirement, role, ctx))) {
             return false;
         }
         if (!requireAnyMatch(bucket.getItemsInInventory(),
-                requirement -> owner.matchesItemsInInventory(requirement, role, player))) {
+                requirement -> owner.matchesItemsInInventory(requirement, role, ctx))) {
             return false;
         }
         if (!requireAnyMatch(bucket.getItemsEquipped(),
-                requirement -> owner.matchesItemsEquipped(requirement, role, player))) {
+                requirement -> owner.matchesItemsEquipped(requirement, role, ctx))) {
             return false;
         }
         if (!requireAnyMatch(bucket.getParameter(),
@@ -136,7 +139,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (!requireAnyMatch(bucket.getAlarmState(),
-                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role))) {
+                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role, ctx))) {
             return false;
         }
         if (!requireAnyMatch(bucket.getNpcState(),
@@ -148,7 +151,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (!requireAnyMatch(bucket.getInteractionContext(),
-                requirement -> owner.matchesInteractionContext(requirement, role, infoProvider))) {
+                requirement -> owner.matchesInteractionContext(requirement, role, infoProvider, ctx))) {
             return false;
         }
         return true;
@@ -159,20 +162,21 @@ final class TameworkInteractRequirements {
                                       Role role,
                                       InfoProvider infoProvider,
                                       Store<EntityStore> store,
-                                      Player player) {
+                                      Player player,
+                                      InteractionContextSnapshot ctx) {
         if (bucket == null) {
             return false;
         }
         if (bucket.isLovedItems()
-                && owner.isHeldItemInList(owner.resolveLovedItems(role), player)) {
+                && owner.isHeldItemInList(owner.resolveLovedItems(role, ctx), ctx)) {
             return true;
         }
         if (bucket.isHarvestable()
-                && owner.resolveIsHarvestable(role)) {
+                && owner.resolveIsHarvestable(role, ctx)) {
             return true;
         }
         if (bucket.isMountable()
-                && owner.resolveIsMountable(role)) {
+                && owner.resolveIsMountable(role, ctx)) {
             return true;
         }
         if (bucket.isTamed()
@@ -196,19 +200,19 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isHarvestInteractionContext()
-                && owner.matchesHarvestContext(role, infoProvider)) {
+                && owner.matchesHarvestContext(role, infoProvider, ctx)) {
             return true;
         }
         if (anyMatch(bucket.getItemsInHand(),
-                requirement -> owner.matchesItemsInHand(requirement, role, player))) {
+                requirement -> owner.matchesItemsInHand(requirement, role, ctx))) {
             return true;
         }
         if (anyMatch(bucket.getItemsInInventory(),
-                requirement -> owner.matchesItemsInInventory(requirement, role, player))) {
+                requirement -> owner.matchesItemsInInventory(requirement, role, ctx))) {
             return true;
         }
         if (anyMatch(bucket.getItemsEquipped(),
-                requirement -> owner.matchesItemsEquipped(requirement, role, player))) {
+                requirement -> owner.matchesItemsEquipped(requirement, role, ctx))) {
             return true;
         }
         if (anyMatch(bucket.getParameter(),
@@ -216,7 +220,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (anyMatch(bucket.getAlarmState(),
-                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role))) {
+                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role, ctx))) {
             return true;
         }
         if (anyMatch(bucket.getNpcState(),
@@ -228,7 +232,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (anyMatch(bucket.getInteractionContext(),
-                requirement -> owner.matchesInteractionContext(requirement, role, infoProvider))) {
+                requirement -> owner.matchesInteractionContext(requirement, role, infoProvider, ctx))) {
             return true;
         }
         return false;
@@ -263,7 +267,8 @@ final class TameworkInteractRequirements {
                                           Role role,
                                           InfoProvider infoProvider,
                                           Store<EntityStore> store,
-                                          Player player) {
+                                          Player player,
+                                          InteractionContextSnapshot ctx) {
         if (owner.isTamed(npcRef, store)) {
             return false;
         }
@@ -273,6 +278,7 @@ final class TameworkInteractRequirements {
                 interaction.getItemsParam(),
                 role,
                 player,
+                ctx,
                 true
         );
     }
@@ -282,15 +288,16 @@ final class TameworkInteractRequirements {
                                           Role role,
                                           InfoProvider infoProvider,
                                           Store<EntityStore> store,
-                                          Player player) {
+                                          Player player,
+                                          InteractionContextSnapshot ctx) {
         if (!owner.isTamed(npcRef, store)) {
             return false;
         }
-        ActionTameworkInteract.ResolvedFeedItems resolved = owner.resolveFeedItems(interaction, role);
+        ActionTameworkInteract.ResolvedFeedItems resolved = owner.resolveFeedItems(interaction, role, ctx);
         if (resolved == null || !resolved.requiresItems()) {
             return true;
         }
-        return owner.isHeldItemInList(resolved.getItemIds(), player);
+        return owner.isHeldItemInList(resolved.getItemIds(), ctx);
     }
 
     private boolean meetsHarvestRequirements(HarvestInteraction interaction,
@@ -298,7 +305,8 @@ final class TameworkInteractRequirements {
                                              Role role,
                                              InfoProvider infoProvider,
                                              Store<EntityStore> store,
-                                             Player player) {
+                                             Player player,
+                                             InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
         boolean requireHarvestable = optionOrDefault(interaction.getRequireHarvestable(), true);
         boolean requireAlarm = optionOrDefault(interaction.getRequireHarvestAlarmReady(), true);
@@ -306,13 +314,13 @@ final class TameworkInteractRequirements {
         if (requireTamed && !owner.isTamed(npcRef, store)) {
             return false;
         }
-        if (requireHarvestable && !owner.resolveIsHarvestable(role)) {
+        if (requireHarvestable && !owner.resolveIsHarvestable(role, ctx)) {
             return false;
         }
         if (requireAlarm && !owner.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
             return false;
         }
-        if (requireContext && !owner.matchesHarvestContext(role, infoProvider)) {
+        if (requireContext && !owner.matchesHarvestContext(role, infoProvider, ctx)) {
             return false;
         }
         return true;
@@ -323,7 +331,8 @@ final class TameworkInteractRequirements {
                                            Role role,
                                            InfoProvider infoProvider,
                                            Store<EntityStore> store,
-                                           Player player) {
+                                           Player player,
+                                           InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
         boolean requireOwner = optionOrDefault(interaction.getRequireOwner(), true);
         boolean requireMountable = optionOrDefault(interaction.getRequireMountable(), true);
@@ -334,7 +343,7 @@ final class TameworkInteractRequirements {
         if (requireOwner && !owner.isOwner(npcRef, store, player)) {
             return false;
         }
-        if (requireMountable && !owner.resolveIsMountable(role)) {
+        if (requireMountable && !owner.resolveIsMountable(role, ctx)) {
             return false;
         }
         if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store)) {
@@ -348,7 +357,8 @@ final class TameworkInteractRequirements {
                                                Role role,
                                                InfoProvider infoProvider,
                                                Store<EntityStore> store,
-                                               Player player) {
+                                               Player player,
+                                               InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
         boolean requireOwner = optionOrDefault(interaction.getRequireOwner(), true);
         if (requireTamed && !owner.isTamed(npcRef, store)) {
@@ -365,7 +375,8 @@ final class TameworkInteractRequirements {
                                            Role role,
                                            InfoProvider infoProvider,
                                            Store<EntityStore> store,
-                                           Player player) {
+                                           Player player,
+                                           InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
         if (requireTamed && !owner.isTamed(npcRef, store)) {
             return false;
@@ -378,24 +389,27 @@ final class TameworkInteractRequirements {
                                        String paramName,
                                        Role role,
                                        Player player,
+                                       InteractionContextSnapshot ctx,
                                        boolean defaultUseLovedItems) {
         ResolvedItemList resolved = resolvePresetItemsInHand(
                 optionOrDefault(useLovedItemsFlag, defaultUseLovedItems),
                 explicitItems,
                 paramName,
-                role
+                role,
+                ctx
         );
         if (!resolved.requiresItems) {
             return true;
         }
-        return owner.isHeldItemInList(resolved.items, player);
+        return owner.isHeldItemInList(resolved.items, ctx);
     }
 
     private ResolvedItemList resolvePresetItemsInHand(boolean useLovedItems,
                                                       String[] explicitItems,
                                                       String paramName,
-                                                      Role role) {
-        String[] paramItems = owner.resolveItemsParam(role, paramName);
+                                                      Role role,
+                                                      InteractionContextSnapshot ctx) {
+        String[] paramItems = owner.resolveItemsParam(role, ctx, paramName);
         if (hasItems(paramItems)) {
             return new ResolvedItemList(paramItems, true);
         }
@@ -403,7 +417,7 @@ final class TameworkInteractRequirements {
             return new ResolvedItemList(explicitItems, true);
         }
         if (useLovedItems) {
-            return new ResolvedItemList(owner.resolveLovedItems(role), true);
+            return new ResolvedItemList(owner.resolveLovedItems(role, ctx), true);
         }
         return new ResolvedItemList(new String[0], false);
     }

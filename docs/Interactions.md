@@ -9,9 +9,9 @@ Tamework replaces large NPC interaction instruction trees with a single action c
 ## Config resolution
 - If the action passes `ConfigId`, that asset id is used.
 - Otherwise the role parameter `InteractionConfigId` is used if present.
-- Otherwise the first enabled config whose `RoleIds` contains the NPC role id is selected.
+- Otherwise the enabled config with the highest `Priority` whose `RoleIds` contains the NPC role id is selected.
 
-If multiple configs match, selection order depends on asset map iteration. Avoid overlapping `RoleIds` or use `ConfigId` overrides.
+`Priority` defaults to `0`; higher values win. If multiple configs share the same priority, selection order follows asset map iteration.
 
 ## Interaction order
 `Interactions` is evaluated in order. The first enabled entry whose requirements pass is executed.

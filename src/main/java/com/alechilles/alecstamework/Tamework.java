@@ -235,6 +235,8 @@ public class Tamework extends JavaPlugin {
                         .setKeyFunction(TwInteractionConfig::getId)
                         .build()
         );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsRemoved);
         interactionAssetsRegistered = true;
     }
 
@@ -246,6 +248,16 @@ public class Tamework extends JavaPlugin {
     private void onSpawnerAssetsRemoved(
             RemovedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         reloadItemFeatureConfigs();
+    }
+
+    private void onInteractionAssetsLoaded(
+            LoadedAssetsEvent<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> event) {
+        TwInteractionConfig.clearRoleCache();
+    }
+
+    private void onInteractionAssetsRemoved(
+            RemovedAssetsEvent<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> event) {
+        TwInteractionConfig.clearRoleCache();
     }
 
     private int loadSpawnerItemAssets() {
