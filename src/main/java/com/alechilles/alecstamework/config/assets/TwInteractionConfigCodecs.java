@@ -295,11 +295,18 @@ public final class TwInteractionConfigCodecs {
             ItemsInHandRequirement::new
     )
         .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (requirement, value) -> requirement.itemsParam = value,
+            requirement -> requirement.itemsParam
+        )
+        .documentation("Role param to import items from (string, string[], or JSON array string).")
+        .add()
+        .<String>append(
             new KeyedCodec<>("Param", Codec.STRING),
             (requirement, value) -> requirement.param = value,
             requirement -> requirement.param
         )
-        .documentation("Role param to import items from (string or string[]).")
+        .documentation("Legacy alias for ItemsParam.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_CODEC),
@@ -325,11 +332,18 @@ public final class TwInteractionConfigCodecs {
             ItemsInInventoryRequirement::new
     )
         .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (requirement, value) -> requirement.itemsParam = value,
+            requirement -> requirement.itemsParam
+        )
+        .documentation("Role param to import items from (string, string[], or JSON array string).")
+        .add()
+        .<String>append(
             new KeyedCodec<>("Param", Codec.STRING),
             (requirement, value) -> requirement.param = value,
             requirement -> requirement.param
         )
-        .documentation("Role param to import items from (string or string[]).")
+        .documentation("Legacy alias for ItemsParam.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_CODEC),
@@ -354,6 +368,20 @@ public final class TwInteractionConfigCodecs {
             ItemsEquippedRequirement.class,
             ItemsEquippedRequirement::new
     )
+        .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (requirement, value) -> requirement.itemsParam = value,
+            requirement -> requirement.itemsParam
+        )
+        .documentation("Role param to import items from (string, string[], or JSON array string).")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Param", Codec.STRING),
+            (requirement, value) -> requirement.itemsParam = value,
+            requirement -> requirement.itemsParam
+        )
+        .documentation("Legacy alias for ItemsParam.")
+        .add()
         .<String[]>append(
             new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_CODEC),
             (requirement, value) -> requirement.items = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
@@ -422,6 +450,20 @@ public final class TwInteractionConfigCodecs {
             AlarmRequirement.class,
             AlarmRequirement::new
     )
+        .<String>append(
+            new KeyedCodec<>("AlarmParam", Codec.STRING),
+            (requirement, value) -> requirement.alarmParam = value,
+            requirement -> requirement.alarmParam
+        )
+        .documentation("Role param that provides the alarm name.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Param", Codec.STRING),
+            (requirement, value) -> requirement.alarmParam = value,
+            requirement -> requirement.alarmParam
+        )
+        .documentation("Legacy alias for AlarmParam.")
+        .add()
         .<String>append(
             new KeyedCodec<>("Name", Codec.STRING),
             (requirement, value) -> requirement.name = value,
@@ -492,11 +534,18 @@ public final class TwInteractionConfigCodecs {
         .documentation("Interaction context name to check.")
         .add()
         .<String>append(
+            new KeyedCodec<>("ContextParam", Codec.STRING),
+            (requirement, value) -> requirement.contextParam = value,
+            requirement -> requirement.contextParam
+        )
+        .documentation("Role param that provides the interaction context.")
+        .add()
+        .<String>append(
             new KeyedCodec<>("Param", Codec.STRING),
             (requirement, value) -> requirement.param = value,
             requirement -> requirement.param
         )
-        .documentation("Role param to read context from if Context is blank.")
+        .documentation("Legacy alias for ContextParam.")
         .add()
         .build();
 
@@ -1156,7 +1205,7 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.itemsParam = value,
             entry -> entry.itemsParam
         )
-        .documentation("Role param that provides items list. Default: none.")
+        .documentation("Role param that provides items list (string, string[], or JSON array string). Default: none.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
@@ -1278,7 +1327,7 @@ public final class TwInteractionConfigCodecs {
             (entry, value) -> entry.itemsParam = value,
             entry -> entry.itemsParam
         )
-        .documentation("Role param that provides items list. Default: none.")
+        .documentation("Role param that provides items list (string, string[], or JSON array string of items/objects). Default: none.")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),

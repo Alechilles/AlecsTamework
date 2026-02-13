@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HarvestInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
@@ -17,9 +16,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
 import java.util.function.Predicate;
 
 final class TameworkInteractRequirements {
@@ -132,7 +128,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (!requireAnyMatch(bucket.getItemsEquipped(),
-                requirement -> owner.matchesItemsEquipped(requirement, player))) {
+                requirement -> owner.matchesItemsEquipped(requirement, role, player))) {
             return false;
         }
         if (!requireAnyMatch(bucket.getParameter(),
@@ -140,7 +136,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (!requireAnyMatch(bucket.getAlarmState(),
-                requirement -> owner.matchesAlarmState(requirement, npcRef, store))) {
+                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role))) {
             return false;
         }
         if (!requireAnyMatch(bucket.getNpcState(),
@@ -212,7 +208,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (anyMatch(bucket.getItemsEquipped(),
-                requirement -> owner.matchesItemsEquipped(requirement, player))) {
+                requirement -> owner.matchesItemsEquipped(requirement, role, player))) {
             return true;
         }
         if (anyMatch(bucket.getParameter(),
@@ -220,7 +216,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (anyMatch(bucket.getAlarmState(),
-                requirement -> owner.matchesAlarmState(requirement, npcRef, store))) {
+                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role))) {
             return true;
         }
         if (anyMatch(bucket.getNpcState(),
@@ -290,15 +286,11 @@ final class TameworkInteractRequirements {
         if (!owner.isTamed(npcRef, store)) {
             return false;
         }
-        String[] explicitItems = resolveFeedItemIds(interaction);
-        return matchesPresetItems(
-                interaction.getUseLovedItems(),
-                explicitItems,
-                interaction.getItemsParam(),
-                role,
-                player,
-                true
-        );
+        ActionTameworkInteract.ResolvedFeedItems resolved = owner.resolveFeedItems(interaction, role);
+        if (resolved == null || !resolved.requiresItems()) {
+            return true;
+        }
+        return owner.isHeldItemInList(resolved.getItemIds(), player);
     }
 
     private boolean meetsHarvestRequirements(HarvestInteraction interaction,
@@ -387,63 +379,55 @@ final class TameworkInteractRequirements {
                                        Role role,
                                        Player player,
                                        boolean defaultUseLovedItems) {
-        boolean useLovedItems = optionOrDefault(useLovedItemsFlag, defaultUseLovedItems);
-        boolean hasExplicitItems = explicitItems != null && explicitItems.length > 0;
-        boolean hasParam = paramName != null && !paramName.isBlank();
-        boolean requiresItems = useLovedItems || hasExplicitItems || hasParam;
-        if (!requiresItems) {
+        ResolvedItemList resolved = resolvePresetItemsInHand(
+                optionOrDefault(useLovedItemsFlag, defaultUseLovedItems),
+                explicitItems,
+                paramName,
+                role
+        );
+        if (!resolved.requiresItems) {
             return true;
         }
-        String[] resolvedItems = resolvePresetItemsInHand(useLovedItems, explicitItems, paramName, role);
-        return owner.isHeldItemInList(resolvedItems, player);
+        return owner.isHeldItemInList(resolved.items, player);
     }
 
-    private String[] resolvePresetItemsInHand(boolean useLovedItems,
-                                              String[] explicitItems,
-                                              String paramName,
-                                              Role role) {
-        Set<String> merged = new HashSet<>();
+    private ResolvedItemList resolvePresetItemsInHand(boolean useLovedItems,
+                                                      String[] explicitItems,
+                                                      String paramName,
+                                                      Role role) {
+        String[] paramItems = owner.resolveItemsParam(role, paramName, null);
+        if (hasItems(paramItems)) {
+            return new ResolvedItemList(paramItems, true);
+        }
+        if (hasItems(explicitItems)) {
+            return new ResolvedItemList(explicitItems, true);
+        }
         if (useLovedItems) {
-            String[] loved = owner.resolveLovedItems(role);
-            if (loved != null) {
-                merged.addAll(Arrays.asList(loved));
-            }
+            return new ResolvedItemList(owner.resolveLovedItems(role), true);
         }
-        if (explicitItems != null) {
-            for (String item : explicitItems) {
-                if (item != null && !item.isBlank()) {
-                    merged.add(item);
-                }
-            }
-        }
-        if (paramName != null && !paramName.isBlank()) {
-            String[] paramItems = owner.getRoleStringArrayParam(role, paramName);
-            if (paramItems != null) {
-                merged.addAll(Arrays.asList(paramItems));
-            }
-        }
-        return merged.toArray(new String[0]);
+        return new ResolvedItemList(new String[0], false);
     }
 
-    private String[] resolveFeedItemIds(FeedInteraction interaction) {
-        if (interaction == null) {
-            return new String[0];
+    private boolean hasItems(String[] items) {
+        if (items == null || items.length == 0) {
+            return false;
         }
-        FeedItem[] feedItems = interaction.getItemsInHand();
-        if (feedItems == null || feedItems.length == 0) {
-            return new String[0];
-        }
-        Set<String> ids = new HashSet<>();
-        for (FeedItem feedItem : feedItems) {
-            if (feedItem == null) {
-                continue;
-            }
-            String item = feedItem.getItem();
+        for (String item : items) {
             if (item != null && !item.isBlank()) {
-                ids.add(item);
+                return true;
             }
         }
-        return ids.toArray(new String[0]);
+        return false;
+    }
+
+    private static final class ResolvedItemList {
+        private final String[] items;
+        private final boolean requiresItems;
+
+        private ResolvedItemList(String[] items, boolean requiresItems) {
+            this.items = items == null ? new String[0] : items;
+            this.requiresItems = requiresItems;
+        }
     }
 
     private boolean optionOrDefault(Boolean value, boolean defaultValue) {

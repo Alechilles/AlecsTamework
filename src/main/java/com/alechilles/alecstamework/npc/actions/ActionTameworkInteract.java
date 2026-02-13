@@ -22,6 +22,11 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequ
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -48,6 +53,7 @@ import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.server.npc.util.expression.Scope;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Locale;
@@ -236,7 +242,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;
-            double healAmount = resolveFeedHeal(feed, player);
+            double healAmount = resolveFeedHeal(feed, role, player);
             boolean applied = effects.applyFeeding(npcRef, store, healAmount, player);
             consumeHeldItem(player);
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
@@ -269,14 +275,15 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return false;
     }
 
-    private double resolveFeedHeal(FeedInteraction feed, Player player) {
+    private double resolveFeedHeal(FeedInteraction feed, Role role, Player player) {
         if (feed == null) {
             return 0;
         }
         Double baseHeal = feed.getHeal();
         String heldItem = getHeldItemId(player);
         if (heldItem != null && !heldItem.isBlank()) {
-            FeedItem[] feedItems = feed.getItemsInHand();
+            ResolvedFeedItems resolved = resolveFeedItems(feed, role);
+            FeedItem[] feedItems = resolved != null ? resolved.getFeedItems() : null;
             if (feedItems != null) {
                 for (FeedItem feedItem : feedItems) {
                     if (feedItem == null) {
@@ -291,6 +298,30 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             }
         }
         return baseHeal != null ? baseHeal : 0;
+    }
+
+    static final class ResolvedFeedItems {
+        private final String[] itemIds;
+        private final FeedItem[] feedItems;
+        private final boolean requiresItems;
+
+        ResolvedFeedItems(String[] itemIds, FeedItem[] feedItems, boolean requiresItems) {
+            this.itemIds = itemIds == null ? new String[0] : itemIds;
+            this.feedItems = feedItems == null ? new FeedItem[0] : feedItems;
+            this.requiresItems = requiresItems;
+        }
+
+        String[] getItemIds() {
+            return itemIds;
+        }
+
+        FeedItem[] getFeedItems() {
+            return feedItems;
+        }
+
+        boolean requiresItems() {
+            return requiresItems;
+        }
     }
     private static final class EquippedSlotSelection {
         private final boolean includeArmor;
@@ -468,7 +499,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return false;
     }
 
-    boolean matchesItemsEquipped(ItemsEquippedRequirement requirement, Player player) {
+    boolean matchesItemsEquipped(ItemsEquippedRequirement requirement, Role role, Player player) {
         if (requirement == null || player == null) {
             return false;
         }
@@ -480,7 +511,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (!selection.hasAny()) {
             return false;
         }
-        String[] items = requirement.getItems();
+        String[] items = resolveItemsEquipped(requirement, role);
         if (items == null || items.length == 0) {
             return hasAnyItemEquipped(inventory, selection);
         }
@@ -515,9 +546,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (requirement == null) {
             return false;
         }
-        String context = requirement.getContext();
-        if ((context == null || context.isBlank()) && requirement.getParam() != null) {
-            context = getRoleStringParam(role, requirement.getParam());
+        String context = resolveInteractionContextParam(requirement, role);
+        if (context == null || context.isBlank()) {
+            context = requirement.getContext();
         }
         return matchesInteractionContext(context, role, infoProvider, false);
     }
@@ -537,6 +568,18 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return false;
         }
         return role.getStateSupport().hasContextualInteraction(playerRef, context);
+    }
+
+    private String resolveInteractionContextParam(InteractionContextRequirement requirement, Role role) {
+        if (requirement == null) {
+            return null;
+        }
+        String paramName = firstNonBlank(requirement.getContextParam(), requirement.getParam());
+        if (paramName == null || paramName.isBlank()) {
+            return null;
+        }
+        String context = getRoleStringParam(role, paramName);
+        return context != null && !context.isBlank() ? context : null;
     }
 
     boolean matchesMovementState(MovementStateRequirement requirement,
@@ -588,10 +631,27 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
     }
 
+    private String resolveAlarmName(AlarmRequirement requirement, Role role) {
+        if (requirement == null) {
+            return null;
+        }
+        String paramName = requirement.getAlarmParam();
+        if (paramName != null && !paramName.isBlank()) {
+            String resolved = getRoleStringParam(role, paramName);
+            if (resolved != null && !resolved.isBlank()) {
+                return resolved;
+            }
+        }
+        String name = requirement.getName();
+        return name != null && !name.isBlank() ? name : null;
+    }
+
     boolean matchesAlarmState(AlarmRequirement requirement,
-                                      Ref<EntityStore> npcRef,
-                                      Store<EntityStore> store) {
-        if (requirement == null || requirement.getName() == null || requirement.getName().isBlank()) {
+                              Ref<EntityStore> npcRef,
+                              Store<EntityStore> store,
+                              Role role) {
+        String alarmName = resolveAlarmName(requirement, role);
+        if (alarmName == null || alarmName.isBlank()) {
             return false;
         }
         NPCEntity npc = resolveNpcEntity(npcRef, store);
@@ -602,7 +662,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (alarmStore == null) {
             return false;
         }
-        Alarm alarm = alarmStore.get(npc, requirement.getName());
+        Alarm alarm = alarmStore.get(npc, alarmName);
         String state = requirement.getState() != null ? requirement.getState().trim().toLowerCase(Locale.ROOT) : "";
         if (alarm == null) {
             return "unset".equals(state);
@@ -761,22 +821,272 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (requirement == null) {
             return new String[0];
         }
-        String[] paramItems = null;
-        if (requirement.getParam() != null && !requirement.getParam().isBlank()) {
-            paramItems = getRoleStringArrayParam(role, requirement.getParam());
+        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam(), requirement.getParam());
+        if (paramItems != null && paramItems.length > 0) {
+            return paramItems;
         }
-        return mergeArrays(requirement.getItems(), paramItems);
+        return requirement.getItems();
     }
 
     String[] resolveItemsInInventory(ItemsInInventoryRequirement requirement, Role role) {
         if (requirement == null) {
             return new String[0];
         }
-        String[] paramItems = null;
-        if (requirement.getParam() != null && !requirement.getParam().isBlank()) {
-            paramItems = getRoleStringArrayParam(role, requirement.getParam());
+        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam(), requirement.getParam());
+        if (paramItems != null && paramItems.length > 0) {
+            return paramItems;
         }
-        return mergeArrays(requirement.getItems(), paramItems);
+        return requirement.getItems();
+    }
+
+    String[] resolveItemsEquipped(ItemsEquippedRequirement requirement, Role role) {
+        if (requirement == null) {
+            return new String[0];
+        }
+        String[] paramItems = resolveItemsParam(role, requirement.getItemsParam(), null);
+        if (paramItems != null && paramItems.length > 0) {
+            return paramItems;
+        }
+        return requirement.getItems();
+    }
+
+    String[] resolveItemsParam(Role role, String itemsParam, String legacyParam) {
+        String paramName = firstNonBlank(itemsParam, legacyParam);
+        if (paramName == null || paramName.isBlank()) {
+            return null;
+        }
+        String[] rawValues = getRoleStringArrayParam(role, paramName);
+        if (rawValues == null || rawValues.length == 0) {
+            return null;
+        }
+        String[] resolved = parseItemIdsFromParam(rawValues);
+        return resolved != null && resolved.length > 0 ? resolved : null;
+    }
+
+    ResolvedFeedItems resolveFeedItems(FeedInteraction interaction, Role role) {
+        if (interaction == null) {
+            return new ResolvedFeedItems(new String[0], new FeedItem[0], false);
+        }
+        FeedItem[] paramItems = resolveFeedItemsFromParam(role, interaction.getItemsParam());
+        if (paramItems != null && paramItems.length > 0) {
+            String[] paramIds = extractItemIds(paramItems);
+            if (paramIds.length > 0) {
+                return new ResolvedFeedItems(paramIds, paramItems, true);
+            }
+        }
+        FeedItem[] explicitItems = interaction.getItemsInHand();
+        String[] explicitIds = extractItemIds(explicitItems);
+        if (explicitIds.length > 0) {
+            return new ResolvedFeedItems(explicitIds, explicitItems, true);
+        }
+        boolean useLovedItems = interaction.getUseLovedItems() == null || interaction.getUseLovedItems();
+        if (useLovedItems) {
+            return new ResolvedFeedItems(resolveLovedItems(role), new FeedItem[0], true);
+        }
+        return new ResolvedFeedItems(new String[0], new FeedItem[0], false);
+    }
+
+    private FeedItem[] resolveFeedItemsFromParam(Role role, String paramName) {
+        if (paramName == null || paramName.isBlank()) {
+            return null;
+        }
+        String[] rawValues = getRoleStringArrayParam(role, paramName);
+        if (rawValues == null || rawValues.length == 0) {
+            return null;
+        }
+        if (rawValues.length == 1 && looksLikeJsonArray(rawValues[0])) {
+            FeedItem[] parsed = parseFeedItemsFromJson(rawValues[0]);
+            if (parsed != null && parsed.length > 0) {
+                return parsed;
+            }
+            return null;
+        }
+        FeedItem[] items = toFeedItems(rawValues);
+        return items != null && items.length > 0 ? items : null;
+    }
+
+    private String[] parseItemIdsFromParam(String[] rawValues) {
+        if (rawValues == null || rawValues.length == 0) {
+            return null;
+        }
+        if (rawValues.length == 1 && looksLikeJsonArray(rawValues[0])) {
+            String[] parsed = parseItemIdsFromJson(rawValues[0]);
+            if (parsed != null && parsed.length > 0) {
+                return parsed;
+            }
+            return null;
+        }
+        return filterItemIds(rawValues);
+    }
+
+    private String[] parseItemIdsFromJson(String json) {
+        if (!looksLikeJsonArray(json)) {
+            return null;
+        }
+        JsonArray array = parseJsonArray(json);
+        if (array == null) {
+            return null;
+        }
+        ArrayList<String> items = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (element == null || element.isJsonNull()) {
+                continue;
+            }
+            if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+                String value = element.getAsString();
+                if (value != null && !value.isBlank()) {
+                    items.add(value);
+                }
+                continue;
+            }
+            if (element.isJsonObject()) {
+                JsonObject obj = element.getAsJsonObject();
+                String item = firstNonBlank(getJsonString(obj, "Item"), getJsonString(obj, "item"));
+                if (item != null && !item.isBlank()) {
+                    items.add(item);
+                }
+            }
+        }
+        return items.isEmpty() ? null : items.toArray(new String[0]);
+    }
+
+    private FeedItem[] parseFeedItemsFromJson(String json) {
+        if (!looksLikeJsonArray(json)) {
+            return null;
+        }
+        JsonArray array = parseJsonArray(json);
+        if (array == null) {
+            return null;
+        }
+        ArrayList<FeedItem> items = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (element == null || element.isJsonNull()) {
+                continue;
+            }
+            if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+                String value = element.getAsString();
+                if (value != null && !value.isBlank()) {
+                    items.add(new FeedItem(value, null));
+                }
+                continue;
+            }
+            if (element.isJsonObject()) {
+                JsonObject obj = element.getAsJsonObject();
+                String item = firstNonBlank(getJsonString(obj, "Item"), getJsonString(obj, "item"));
+                if (item == null || item.isBlank()) {
+                    continue;
+                }
+                Double heal = firstNonNull(getJsonNumber(obj, "Heal"), getJsonNumber(obj, "heal"));
+                items.add(new FeedItem(item, heal));
+            }
+        }
+        return items.isEmpty() ? null : items.toArray(new FeedItem[0]);
+    }
+
+    private JsonArray parseJsonArray(String json) {
+        try {
+            JsonElement element = JsonParser.parseString(json.trim());
+            if (element != null && element.isJsonArray()) {
+                return element.getAsJsonArray();
+            }
+        } catch (JsonSyntaxException ignored) {
+        }
+        return null;
+    }
+
+    private FeedItem[] toFeedItems(String[] itemIds) {
+        if (itemIds == null || itemIds.length == 0) {
+            return new FeedItem[0];
+        }
+        ArrayList<FeedItem> items = new ArrayList<>();
+        for (String itemId : itemIds) {
+            if (itemId == null || itemId.isBlank()) {
+                continue;
+            }
+            items.add(new FeedItem(itemId, null));
+        }
+        return items.toArray(new FeedItem[0]);
+    }
+
+    private String[] extractItemIds(FeedItem[] items) {
+        if (items == null || items.length == 0) {
+            return new String[0];
+        }
+        ArrayList<String> ids = new ArrayList<>();
+        for (FeedItem item : items) {
+            if (item == null) {
+                continue;
+            }
+            String itemId = item.getItem();
+            if (itemId != null && !itemId.isBlank()) {
+                ids.add(itemId);
+            }
+        }
+        return ids.toArray(new String[0]);
+    }
+
+    private String[] filterItemIds(String[] rawValues) {
+        if (rawValues == null || rawValues.length == 0) {
+            return null;
+        }
+        ArrayList<String> items = new ArrayList<>();
+        for (String item : rawValues) {
+            if (item == null || item.isBlank()) {
+                continue;
+            }
+            items.add(item);
+        }
+        return items.isEmpty() ? null : items.toArray(new String[0]);
+    }
+
+    private String getJsonString(JsonObject object, String key) {
+        if (object == null || key == null) {
+            return null;
+        }
+        JsonElement element = object.get(key);
+        if (element == null || element.isJsonNull()) {
+            return null;
+        }
+        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+            return element.getAsString();
+        }
+        return null;
+    }
+
+    private Double getJsonNumber(JsonObject object, String key) {
+        if (object == null || key == null) {
+            return null;
+        }
+        JsonElement element = object.get(key);
+        if (element == null || element.isJsonNull()) {
+            return null;
+        }
+        if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isNumber()) {
+            return element.getAsDouble();
+        }
+        return null;
+    }
+
+    private boolean looksLikeJsonArray(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return trimmed.startsWith("[") && trimmed.endsWith("]");
+    }
+
+    private String firstNonBlank(String primary, String secondary) {
+        if (primary != null && !primary.isBlank()) {
+            return primary;
+        }
+        if (secondary != null && !secondary.isBlank()) {
+            return secondary;
+        }
+        return null;
+    }
+
+    private Double firstNonNull(Double primary, Double secondary) {
+        return primary != null ? primary : secondary;
     }
 
     String[] resolveLovedItems(Role role) {
@@ -967,20 +1277,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             set.add(item.trim().toLowerCase(Locale.ROOT));
         }
         return set;
-    }
-
-    String[] mergeArrays(String[] primary, String[] secondary) {
-        String[] first = primary == null ? new String[0] : primary;
-        String[] second = secondary == null ? new String[0] : secondary;
-        if (first.length == 0) {
-            return second;
-        }
-        if (second.length == 0) {
-            return first;
-        }
-        String[] merged = Arrays.copyOf(first, first.length + second.length);
-        System.arraycopy(second, 0, merged, first.length, second.length);
-        return merged;
     }
 
     String getRoleStringParam(Role role, String paramName) {

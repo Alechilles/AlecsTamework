@@ -476,9 +476,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class ItemsInHandRequirement {
+        String itemsParam;
         String param;
         String[] items = ArrayUtil.EMPTY_STRING_ARRAY;
         Integer quantity;
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
 
         public String getParam() {
             return param;
@@ -494,9 +499,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class ItemsInInventoryRequirement {
+        String itemsParam;
         String param;
         String[] items = ArrayUtil.EMPTY_STRING_ARRAY;
         Integer quantity;
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
 
         public String getParam() {
             return param;
@@ -512,8 +522,13 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class ItemsEquippedRequirement {
+        String itemsParam;
         String[] items = ArrayUtil.EMPTY_STRING_ARRAY;
         String[] slots = ArrayUtil.EMPTY_STRING_ARRAY;
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
 
         public String[] getItems() {
             return items == null ? ArrayUtil.EMPTY_STRING_ARRAY : items;
@@ -548,8 +563,13 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class AlarmRequirement {
+        String alarmParam;
         String name;
         String state;
+
+        public String getAlarmParam() {
+            return alarmParam;
+        }
 
         public String getName() {
             return name;
@@ -575,10 +595,15 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public static final class InteractionContextRequirement {
         String context;
+        String contextParam;
         String param;
 
         public String getContext() {
             return context;
+        }
+
+        public String getContextParam() {
+            return contextParam;
         }
 
         public String getParam() {
