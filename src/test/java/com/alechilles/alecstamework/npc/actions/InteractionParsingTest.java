@@ -52,7 +52,7 @@ class InteractionParsingTest {
     @Test
     void buildCooldownAlarmNameSanitizesId() throws Exception {
         ActionTameworkInteract interact = newInteract();
-        TwInteractionConfig config = new TwInteractionConfig();
+        TwInteractionConfig config = newInteractionConfig();
         Field idField = TwInteractionConfig.class.getDeclaredField("id");
         idField.setAccessible(true);
         idField.set(config, "My Config#1");
@@ -93,5 +93,11 @@ class InteractionParsingTest {
         field.setAccessible(true);
         Unsafe unsafe = (Unsafe) field.get(null);
         return (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
+    }
+
+    private static TwInteractionConfig newInteractionConfig() throws Exception {
+        var ctor = TwInteractionConfig.class.getDeclaredConstructor();
+        ctor.setAccessible(true);
+        return ctor.newInstance();
     }
 }
