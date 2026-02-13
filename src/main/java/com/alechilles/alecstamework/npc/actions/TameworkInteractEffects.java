@@ -15,17 +15,12 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetStateEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParticlesEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
-import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
-import java.util.UUID;
 
 final class TameworkInteractEffects {
     private final ActionTameworkInteract owner;
@@ -34,6 +29,7 @@ final class TameworkInteractEffects {
     private final InteractionStateEffects stateEffects;
     private final InteractionModeCycleEffects modeCycleEffects;
     private final InteractionMountEffects mountEffects;
+    private final InteractionHookEffects hookEffects;
 
     TameworkInteractEffects(ActionTameworkInteract owner) {
         this.owner = owner;
@@ -42,6 +38,7 @@ final class TameworkInteractEffects {
         this.stateEffects = new InteractionStateEffects();
         this.modeCycleEffects = new InteractionModeCycleEffects(owner, presentationEffects, stateEffects);
         this.mountEffects = new InteractionMountEffects(owner);
+        this.hookEffects = new InteractionHookEffects(owner);
     }
 
     boolean applyCustomEffects(Effects effects,
@@ -99,7 +96,7 @@ final class TameworkInteractEffects {
         }
         HookEffect hookEffect = effects.getTriggerNpcHook();
         if (hookEffect != null) {
-            applied |= applyTriggerNpcHook(hookEffect, npcRef, store, player);
+            applied |= hookEffects.applyTriggerNpcHook(hookEffect, npcRef, store, player);
         }
         FloatingTextEffect floatingText = effects.getShowFloatingText();
         if (floatingText != null) {
@@ -150,51 +147,6 @@ final class TameworkInteractEffects {
     boolean applyStartBreeding() {
         owner.logUnsupported("Breeding interaction not yet implemented.");
         return false;
-    }
-
-    private boolean applyTriggerNpcHook(HookEffect hookEffect,
-                                        Ref<EntityStore> npcRef,
-                                        Store<EntityStore> store,
-                                        Player player) {
-        if (hookEffect == null) {
-            return false;
-        }
-        String hookId = hookEffect.getHookId();
-        if (hookId == null || hookId.isBlank()) {
-            return false;
-        }
-        if (hookEffect.isPlayerOnly() && player == null) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkHookComponent> type = TameworkHookComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
-        UUID playerId = null;
-        String playerName = null;
-        String heldItemId = null;
-        if (player != null) {
-            playerId = player.getUuid();
-            PlayerRef ref = player.getPlayerRef();
-            if (ref != null) {
-                playerName = ref.getUsername();
-            }
-            ItemStack stack = owner.getActiveItem(player);
-            if (stack != null) {
-                heldItemId = stack.getItemId();
-            }
-        }
-        long timestampMs = System.currentTimeMillis();
-        TameworkHookComponent component = new TameworkHookComponent(
-                hookId,
-                playerId,
-                playerName,
-                heldItemId,
-                timestampMs,
-                hookEffect.isConsume()
-        );
-        store.putComponent(npcRef, type, component);
-        return true;
     }
 
 }
