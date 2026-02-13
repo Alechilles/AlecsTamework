@@ -11,6 +11,8 @@ import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
 
 // Handles cooldown calculations and alarm updates for interactions.
+// NOTE: Interaction cooldowns intentionally use wall-clock time (Instant.now),
+// while other alarms may use game time (WorldTimeResource) via InteractionAlarmHelper.
 final class InteractionCooldowns {
     private final ActionTameworkInteract owner;
     private final String alarmPrefix;

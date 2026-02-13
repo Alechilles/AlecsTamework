@@ -22,6 +22,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 
 // Applies inventory-related interaction effects and item drops.
@@ -148,7 +149,7 @@ final class InteractionInventoryEffects {
         if (effect == null) {
             return drops;
         }
-        Random random = new Random();
+        Random random = ThreadLocalRandom.current();
         String dropListId = effect.getDropList();
         if (dropListId != null && !dropListId.isBlank()) {
             DefaultAssetMap<String, ItemDropList> assetMap = ItemDropList.getAssetMap();

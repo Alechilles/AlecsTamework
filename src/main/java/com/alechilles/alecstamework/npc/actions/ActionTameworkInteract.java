@@ -16,8 +16,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.sensorinfo.EntityPositionProvider;
-import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
@@ -311,25 +309,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
 
     double getRoleNumberParam(Role role, InteractionContextSnapshot ctx, String paramName, double defaultValue) {
         return paramAccess.getRoleNumberParam(role, ctx, paramName, defaultValue);
-    }
-
-    Ref<EntityStore> resolveInteractionTarget(Role role, InfoProvider infoProvider) {
-        if (role != null && role.getStateSupport() != null) {
-            Ref<EntityStore> target = role.getStateSupport().getInteractionIterationTarget();
-            if (target != null && target.isValid()) {
-                return target;
-            }
-        }
-        if (infoProvider != null && infoProvider.hasPosition()) {
-            IPositionProvider positionProvider = infoProvider.getPositionProvider();
-            if (positionProvider instanceof EntityPositionProvider) {
-                Ref<EntityStore> target = ((EntityPositionProvider) positionProvider).getTarget();
-                if (target != null && target.isValid()) {
-                    return target;
-                }
-            }
-        }
-        return null;
     }
 
     void logUnsupported(String message) {

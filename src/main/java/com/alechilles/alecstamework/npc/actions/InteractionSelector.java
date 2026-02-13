@@ -35,7 +35,10 @@ final class InteractionSelector {
                                                                   Store<EntityStore> store,
                                                                   Player player,
                                                                   InteractionContextSnapshot ctx) {
-        InteractionEntry[] entries = config.getInteractions();
+        InteractionEntry[] entries = config != null ? config.getInteractions() : null;
+        if (entries == null || entries.length == 0) {
+            return null;
+        }
         for (int index = 0; index < entries.length; index++) {
             InteractionEntry entry = entries[index];
             if (entry == null || !entry.isEnabled()) {
@@ -122,6 +125,7 @@ final class InteractionSelector {
         if (bucket.isHarvestInteractionContext()) {
             return true;
         }
-        return bucket.getInteractionContext().length > 0;
+        TwInteractionConfig.InteractionContextRequirement[] contexts = bucket.getInteractionContext();
+        return contexts != null && contexts.length > 0;
     }
 }

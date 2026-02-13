@@ -30,13 +30,22 @@ public abstract class TameworkActionBase extends ActionBase {
 
     // Prefer the role's interaction target, then fall back to the info provider.
     protected Player resolveInteractionPlayer(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
+        Ref<EntityStore> target = resolveInteractionTarget(role, infoProvider);
+        if (target != null && target.isValid()) {
+            Player player = store.getComponent(target, Player.getComponentType());
+            if (player != null) {
+                return player;
+            }
+        }
+        return null;
+    }
+
+    // Resolves the current interaction target ref from role state or sensor info.
+    protected Ref<EntityStore> resolveInteractionTarget(Role role, InfoProvider infoProvider) {
         if (role != null && role.getStateSupport() != null) {
             Ref<EntityStore> target = role.getStateSupport().getInteractionIterationTarget();
             if (target != null && target.isValid()) {
-                Player player = store.getComponent(target, Player.getComponentType());
-                if (player != null) {
-                    return player;
-                }
+                return target;
             }
         }
         if (infoProvider != null && infoProvider.hasPosition()) {
@@ -44,10 +53,7 @@ public abstract class TameworkActionBase extends ActionBase {
             if (positionProvider instanceof EntityPositionProvider) {
                 Ref<EntityStore> target = ((EntityPositionProvider) positionProvider).getTarget();
                 if (target != null && target.isValid()) {
-                    Player player = store.getComponent(target, Player.getComponentType());
-                    if (player != null) {
-                        return player;
-                    }
+                    return target;
                 }
             }
         }

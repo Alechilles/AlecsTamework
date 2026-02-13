@@ -10,8 +10,10 @@ import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 // Handles item-based requirement resolution and checks for interactions.
@@ -51,11 +53,13 @@ final class InteractionItemRequirementResolver {
         if (itemSet.isEmpty()) {
             return false;
         }
+        Map<String, Integer> itemCounts = buildItemCountMap(container);
         for (String itemId : itemSet) {
             if (itemId == null || itemId.isBlank()) {
                 continue;
             }
-            if (countItemInContainer(container, itemId) >= quantity) {
+            int count = itemCounts.getOrDefault(itemId.toLowerCase(Locale.ROOT), 0);
+            if (count >= quantity) {
                 return true;
             }
         }
@@ -333,23 +337,26 @@ final class InteractionItemRequirementResolver {
         return false;
     }
 
-    // Counts occurrences of an item id in a combined container.
-    int countItemInContainer(CombinedItemContainer container, String itemId) {
-        if (container == null || itemId == null || itemId.isBlank()) {
-            return 0;
+    // Builds a count map of item id to total quantity for the container.
+    Map<String, Integer> buildItemCountMap(CombinedItemContainer container) {
+        Map<String, Integer> counts = new HashMap<>();
+        if (container == null) {
+            return counts;
         }
         short capacity = container.getCapacity();
-        int total = 0;
         for (short i = 0; i < capacity; i++) {
             ItemStack stack = container.getItemStack(i);
             if (stack == null || stack.isEmpty()) {
                 continue;
             }
-            if (itemId.equalsIgnoreCase(stack.getItemId())) {
-                total += stack.getQuantity();
+            String itemId = stack.getItemId();
+            if (itemId == null || itemId.isBlank()) {
+                continue;
             }
+            String key = itemId.toLowerCase(Locale.ROOT);
+            counts.merge(key, stack.getQuantity(), Integer::sum);
         }
-        return total;
+        return counts;
     }
 
     // Returns the combined inventory container for the interaction context.
