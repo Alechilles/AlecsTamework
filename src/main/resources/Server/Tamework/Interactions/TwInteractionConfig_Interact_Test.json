@@ -5,12 +5,112 @@
   ],
   "Interactions": [
     {
+      "Type": "Custom",
+      "Enabled": true,
+      "Requires": {
+        "All": {
+          "ItemsInHand": [
+            {
+              "ItemsParam": "TestItemsInHandParam",
+              "Quantity": 1
+            }
+          ]
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "ItemsParam: Hand"
+        }
+      }
+    },
+    {
+      "Type": "Custom",
+      "Enabled": true,
+      "Requires": {
+        "All": {
+          "ItemsInInventory": [
+            {
+              "ItemsParam": "TestItemsInInventoryParam",
+              "Quantity": 2
+            }
+          ]
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "ItemsParam: Inventory"
+        }
+      }
+    },
+    {
+      "Type": "Custom",
+      "Enabled": true,
+      "Requires": {
+        "All": {
+          "ItemsEquipped": [
+            {
+              "ItemsParam": "TestItemsEquippedParam",
+              "Slots": [
+                "Armor"
+              ]
+            }
+          ]
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "ItemsParam: Equipped"
+        }
+      }
+    },
+    {
+      "Type": "Custom",
+      "Enabled": true,
+      "Requires": {
+        "All": {
+          "AlarmState": [
+            {
+              "AlarmParam": "TestAlarmParam",
+              "State": "active"
+            }
+          ]
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "AlarmParam: Active"
+        }
+      }
+    },
+    {
+      "Type": "Custom",
+      "Enabled": true,
+      "Requires": {
+        "All": {
+          "InteractionContext": [
+            {
+              "ContextParam": "TestInteractionContextParam"
+            }
+          ]
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "ContextParam: Match"
+        }
+      }
+    },
+    {
       "Type": "Tame",
-      "Enabled": true
+      "Enabled": true,
+      "ItemsParam": "TestTameItemsParam"
     },
     {
       "Type": "Feed",
-      "Enabled": true
+      "Enabled": true,
+      "UseLovedItems": false,
+      "Heal": 2,
+      "ItemsParam": "TestFeedItemsParam"
     },
     {
       "Type": "Harvest",

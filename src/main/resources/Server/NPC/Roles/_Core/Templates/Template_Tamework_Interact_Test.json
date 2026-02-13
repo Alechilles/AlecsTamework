@@ -180,6 +180,46 @@
       "TypeHint": "String",
       "Description": "The list of items that are deemed very attractive."
     },
+    "TestItemsInHandParam": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for ItemsInHand requirement (test)."
+    },
+    "TestItemsInInventoryParam": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for ItemsInInventory requirement (test)."
+    },
+    "TestItemsEquippedParam": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for ItemsEquipped requirement (test). Replace with an equipped item."
+    },
+    "TestAlarmParam": {
+      "Value": "Harvest_Ready",
+      "Description": "AlarmParam name used for AlarmState requirements (test)."
+    },
+    "TestInteractionContextParam": {
+      "Value": "Tamework_Test_Context",
+      "Description": "ContextParam value used for InteractionContext requirements (test)."
+    },
+    "TestTameItemsParam": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for Tame interaction (test)."
+    },
+    "TestFeedItemsParam": {
+      "Value": "[{\"Item\":\"Plant_Fruit_Apple\",\"Heal\":2.0},{\"Item\":\"Plant_Fruit_Apple\"}]",
+      "Description": "JSON array string for Feed ItemsParam (items with optional Heal)."
+    },
     "InteractionConfigId": {
       "Value": "",
       "Description": "Optional override for Action_Tamework_Interact."
@@ -521,18 +561,6 @@
             "Type": "TameworkInteract",
             "ConfigId": {
               "Compute": "InteractionConfigId"
-            },
-            "LovedItems": {
-              "Compute": "LovedItems"
-            },
-            "IsMountable": {
-              "Compute": "IsMountable"
-            },
-            "IsHarvestable": {
-              "Compute": "IsHarvestable"
-            },
-            "HarvestInteractionContext": {
-              "Compute": "HarvestInteractionContext"
             }
           }
         ]
@@ -559,18 +587,6 @@
             "Type": "TameworkInteract",
             "ConfigId": {
               "Compute": "InteractionConfigId"
-            },
-            "LovedItems": {
-              "Compute": "LovedItems"
-            },
-            "IsMountable": {
-              "Compute": "IsMountable"
-            },
-            "IsHarvestable": {
-              "Compute": "IsHarvestable"
-            },
-            "HarvestInteractionContext": {
-              "Compute": "HarvestInteractionContext"
             }
           }
         ]
