@@ -8,18 +8,12 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Interactio
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquippedRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInventoryRequirement;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HarvestInteraction;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamOperator;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -77,6 +71,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final InteractionItemRequirementResolver itemRequirements;
     private final TameworkInteractEffects effects;
     private final TameworkInteractRequirements requirements;
+    private final InteractionExecutor executor;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         super(builder);
@@ -113,6 +108,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.itemRequirements = new InteractionItemRequirementResolver(paramResolver);
         this.effects = new TameworkInteractEffects(this);
         this.requirements = new TameworkInteractRequirements(this);
+        this.executor = new InteractionExecutor(this, effects);
     }
 
     @Override
@@ -155,7 +151,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             logDebug(buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
             return false;
         }
-        boolean applied = applyInteraction(interaction.entry, npcRef, role, infoProvider, store, player, ctx);
+        boolean applied = executor.applyInteraction(interaction.entry, npcRef, role, infoProvider, store, player, ctx);
         if (applied) {
             applyInteractionCooldown(interaction, npcRef, store);
         }
@@ -212,57 +208,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return null;
     }
 
-    private boolean applyInteraction(InteractionEntry entry,
-                                     Ref<EntityStore> npcRef,
-                                     Role role,
-                                     InfoProvider infoProvider,
-                                     Store<EntityStore> store,
-                                     Player player,
-                                     InteractionContextSnapshot ctx) {
-        if (entry instanceof CustomInteraction) {
-            return effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
-        }
-        if (entry instanceof TameInteraction) {
-            boolean applied = effects.applyStartTaming(npcRef, store, player);
-            consumeHeldItem(player);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
-        }
-        if (entry instanceof FeedInteraction) {
-            FeedInteraction feed = (FeedInteraction) entry;
-            double healAmount = resolveFeedHeal(feed, role, ctx);
-            boolean applied = effects.applyFeeding(npcRef, store, healAmount, player);
-            consumeHeldItem(player);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
-        }
-        if (entry instanceof HarvestInteraction) {
-            boolean applied = effects.applyStartHarvest(npcRef, role, store);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
-        }
-        if (entry instanceof MountInteraction) {
-            boolean applied = effects.applyMount(npcRef, role, infoProvider, store);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
-        }
-        if (entry instanceof ModeCycleInteraction) {
-            ModeCycleInteraction cycle = (ModeCycleInteraction) entry;
-            boolean applied = effects.applyToggleMode(
-                    cycle.getCycle(),
-                    cycle.isShowFloatingText(),
-                    cycle.isShowUiMessage(),
-                    npcRef,
-                    role,
-                    store,
-                    player
-            );
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
-        }
-        if (entry instanceof BreedInteraction) {
-            boolean applied = effects.applyStartBreeding();
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
-        }
-        return false;
-    }
-
-    private double resolveFeedHeal(FeedInteraction feed, Role role, InteractionContextSnapshot ctx) {
+    // Resolves the heal amount for feeding based on held item overrides.
+    double resolveFeedHeal(FeedInteraction feed, Role role, InteractionContextSnapshot ctx) {
         if (feed == null) {
             return 0;
         }
@@ -310,10 +257,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return requiresItems;
         }
     }
-    private boolean consumeHeldItem(Player player) {
-        return removeHeldItemQuantity(player, 1);
-    }
 
+    // Removes a quantity of the currently held item from the player's hotbar.
     boolean removeHeldItemQuantity(Player player, int quantity) {
         if (player == null) {
             return false;
