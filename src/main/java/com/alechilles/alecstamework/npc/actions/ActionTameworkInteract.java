@@ -72,6 +72,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final TameworkInteractEffects effects;
     private final TameworkInteractRequirements requirements;
     private final InteractionExecutor executor;
+    private final InteractionSelector selector;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         super(builder);
@@ -109,6 +110,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.effects = new TameworkInteractEffects(this);
         this.requirements = new TameworkInteractRequirements(this);
         this.executor = new InteractionExecutor(this, effects);
+        this.selector = new InteractionSelector(this, requirements);
     }
 
     @Override
@@ -145,7 +147,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             ));
             return false;
         }
-        ResolvedInteraction interaction = selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
+        ResolvedInteraction interaction = selector.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
         if (interaction == null) {
             maybeNotifyOwnerDenied(npcRef, store, player);
             logDebug(buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
@@ -178,34 +180,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return null;
         }
         return TwInteractionConfig.resolveForRole(roleId);
-    }
-
-    private ResolvedInteraction selectInteraction(TwInteractionConfig config,
-                                                  Ref<EntityStore> npcRef,
-                                                  Role role,
-                                                  InfoProvider infoProvider,
-                                                  Store<EntityStore> store,
-                                                  Player player,
-                                                  InteractionContextSnapshot ctx) {
-        InteractionEntry[] entries = config.getInteractions();
-        for (int index = 0; index < entries.length; index++) {
-            InteractionEntry entry = entries[index];
-            if (entry == null || !entry.isEnabled()) {
-                continue;
-            }
-            int cooldownSeconds = resolveCooldownSeconds(config, entry);
-            String cooldownAlarmName = cooldownSeconds > 0
-                    ? buildCooldownAlarmName(config, index)
-                    : null;
-            if (cooldownSeconds > 0
-                    && (cooldownAlarmName == null || !isCooldownReady(npcRef, store, cooldownAlarmName))) {
-                continue;
-            }
-            if (requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx)) {
-                return new ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
-            }
-        }
-        return null;
     }
 
     // Resolves the heal amount for feeding based on held item overrides.
@@ -828,7 +802,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "interact with");
     }
 
-    private int resolveCooldownSeconds(TwInteractionConfig config, InteractionEntry entry) {
+    // Determines the cooldown duration for a specific interaction entry.
+    int resolveCooldownSeconds(TwInteractionConfig config, InteractionEntry entry) {
         if (entry != null && entry.getCooldownSeconds() != null) {
             return Math.max(0, entry.getCooldownSeconds());
         }
@@ -839,7 +814,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return 0;
     }
 
-    private String buildCooldownAlarmName(TwInteractionConfig config, int index) {
+    // Builds the alarm name used to track interaction cooldowns.
+    String buildCooldownAlarmName(TwInteractionConfig config, int index) {
         String configId = config != null ? config.getId() : null;
         String safeConfigId = sanitizeAlarmSegment(configId);
         return DEFAULT_COOLDOWN_ALARM_PREFIX + "_" + safeConfigId + "_" + index;
@@ -888,7 +864,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         alarm.set(npcRef, Instant.now().plusSeconds(interaction.cooldownSeconds), store);
     }
 
-    private static final class ResolvedInteraction {
+    // Captures the selected interaction entry and cooldown metadata.
+    static final class ResolvedInteraction {
         private final InteractionEntry entry;
         private final int index;
         private final int cooldownSeconds;
@@ -905,7 +882,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
     }
 
-    private boolean isCooldownReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
+    // Checks whether a cooldown alarm is ready to allow another interaction.
+    boolean isCooldownReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
         NPCEntity npc = resolveNpcEntity(npcRef, store);
         if (npc == null || alarmName == null || alarmName.isBlank()) {
             return false;
