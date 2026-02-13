@@ -18,6 +18,7 @@
 - Ensure role parameters exist if you rely on them (`LovedItems`, `IsMountable`, `IsHarvestable`, `HarvestInteractionContext`).
 - If harvest always works, make sure your role sets the `Harvest_Ready` alarm when `$Harvest` runs.
 - If harvest never works, check `HarvestInteractionContext` and the `Harvest_Ready` alarm state.
+- Cooldowns are enforced in real-time seconds and stored as alarms. Use `/tw getalarm` to inspect them if interactions seem locked out.
 
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.

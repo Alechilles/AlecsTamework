@@ -3,7 +3,7 @@
 This file maps the custom behavior surface area currently implemented in Alec's Tamework.
 
 ## Actions (NPC instructions)
-- `TameworkInteract`: Runs the optimized interaction pipeline using `TwInteractionConfig` assets. Accepts optional overrides for `ConfigId`, `LovedItems`, `IsMountable`, `IsHarvestable`, and `HarvestInteractionContext`.
+- `TameworkInteract`: Runs the optimized interaction pipeline using `TwInteractionConfig` assets. Accepts optional overrides for `ConfigId`, `LovedItems`, `IsMountable`, `IsHarvestable`, and `HarvestInteractionContext` (otherwise role params are used).
 - `TameworkCaptureOwner`: Captures an owned NPC into a spawner item (owner-only capture path).
 - `TameworkCaptureStranger`: Captures an owned NPC as a non-owner (used when capture rules allow it).
 - `TameworkCaptureWild`: Captures an untamed NPC into a spawner item.
@@ -30,7 +30,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 ## Commands
 - `/tw getowner` prints the owner name + UUID (when available).
 - `/tw gettamed` prints the current tamed status for the targeted NPC.
-- `/tw getalarm [AlarmName] [NpcUuid]` prints alarm status (unset/active/passed) and remaining time when set. Uses the NPC in view if no UUID is provided.
+- `/tw getalarm [AlarmName] [NpcUuid]` prints alarm status (unset/active/passed) and remaining time when set. Uses the NPC in view if no UUID is provided. Defaults to `Harvest_Ready` when no alarm name is supplied.
 - `/tw setowner` assigns the targeted NPC to the executing player.
 - `/tw settamed` toggles the tamed flag on the targeted NPC.
 - `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig assets).

@@ -17,8 +17,10 @@ If multiple configs match, selection order depends on asset map iteration. Avoid
 `Interactions` is evaluated in order. The first enabled entry whose requirements pass is executed.
 
 ## Cooldowns
-- `CooldownSeconds` exists per entry but is not enforced yet.
-- `Cooldowns.InteractionSeconds` exists at the config level but is not enforced yet.
+Cooldowns are enforced in real-time seconds (not game time).
+`CooldownSeconds` on an entry overrides `Cooldowns.InteractionSeconds` on the config.
+Cooldowns are stored as NPC alarms named `TameworkInteract_Cooldown_<ConfigId>_<index>`.
+You can inspect them with `/tw getalarm`.
 
 ## Preset interactions
 Preset entries provide simple defaults plus optional `Requires` + `Effects` addâ€‘ons.
@@ -27,7 +29,7 @@ Preset entries provide simple defaults plus optional `Requires` + `Effects` addâ
 Fields:
 - `UseLovedItems` (default true)
 - `ItemsInHand` (item id or array)
-- `ItemsParam` (role parameter name that returns string or string array)
+- `ItemsParam` (role parameter name that returns string, string[], or JSON array string)
 
 Requirements:
 - NPC must be untamed.
@@ -48,6 +50,10 @@ Fields:
 - `"ItemId"` (string)
 - `{ "Item": "ItemId", "Heal": 8 }`
 - or an array of either form
+
+`ItemsParam` supports:
+- role param string array of item ids
+- or a JSON array string containing item ids and/or `{ "Item": "...", "Heal": 4 }` objects
 
 Requirements:
 - NPC must be tamed.
@@ -87,12 +93,14 @@ Effects:
 Fields:
 - `RequireTamed` (default true)
 - `RequireOwner` (default true)
+- `ShowFloatingText` (default false)
+- `ShowUiMessage` (default false)
 - `Cycle` (array of `ModeStep` entries)
 
 `ModeStep` fields:
 - `State`
 - `SubState`
-- `Message` (reserved for UI)
+- `Message` (used for `ShowFloatingText` / `ShowUiMessage`)
 
 If `Cycle` is empty, default cycle is `Hold -> Idle -> Defend`.
 
@@ -138,19 +146,24 @@ Within each requirement array, any entry can satisfy that requirement type. Empt
 ### ItemsInHand
 Fields:
 - `Items` (item id or array)
-- `Param` (role parameter name)
+- `ItemsParam` (role parameter name)
 - `Quantity` (minimum stack size)
 
 ### ItemsInInventory
 Fields:
 - `Items` (item id or array)
-- `Param` (role parameter name)
+- `ItemsParam` (role parameter name)
 - `Quantity` (minimum total quantity)
+
+`ItemsParam` for item requirements accepts a role param that returns:
+- a string array of item ids
+- or a JSON array string of item ids and/or objects with `Item`/`item` fields
 
 ### ItemsEquipped
 Fields:
 - `Items` (optional item id or array)
-- `Slots` (slot enum or array)
+- `ItemsParam` (role parameter name)
+- `Slots` (slot enum array)
 
 Slot values:
 `Head`, `Chest`, `Hands`, `Legs`, `Armor`, `Equipped`, `Utility`, `Accessory`, `Accessories`
@@ -168,6 +181,7 @@ Numeric comparison is used if both the param and value parse as numbers; otherwi
 
 ### AlarmState
 Fields:
+- `AlarmParam` (role parameter name for the alarm id)
 - `Name` (alarm id)
 - `State` (`Unset`, `Active`, `Passed`)
 
@@ -187,9 +201,9 @@ Field:
 ### InteractionContext
 Fields:
 - `Context`
-- `Param` (role parameter name)
+- `ContextParam` (role parameter name)
 
-If `Context` is blank, `Param` is resolved from the role. The context must exist and match a contextual interaction on the NPC.
+If `ContextParam` resolves to a value, it is used. Otherwise `Context` is used. The context must exist and match a contextual interaction on the NPC.
 
 ## Effects
 Effects are defined under `Effects` in any interaction type.
@@ -208,6 +222,7 @@ Available effects:
 - `DropItem` `{ "Item": "...", "DropList": "...", "QuantityMin": 1, "QuantityMax": 1, "ThrowSpeed": 0 }`
 - `TriggerNpcHook` `{ "HookId": "...", "PlayerOnly": true, "Consume": true }`
 - `ShowFloatingText` `{ "Message": "+10 HP" }`
+- `ShowUiMessage` `{ "Message": "Mode: Defend" }`
 
 ## Action usage in NPC roles
 Example interaction instruction snippet:
