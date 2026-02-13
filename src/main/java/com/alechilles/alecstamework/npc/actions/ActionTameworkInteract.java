@@ -374,6 +374,17 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return ctx != null ? ctx.combinedInventory : null;
     }
 
+    CombinedItemContainer resolveInventoryContainer(Player player) {
+        if (player == null) {
+            return null;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null) {
+            return null;
+        }
+        return inventory.getCombinedBackpackStorageHotbar();
+    }
+
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
         if (type == null) {
@@ -492,7 +503,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (!selection.hasAny()) {
             return false;
         }
-        String[] items = resolveItemsEquipped(requirement, role);
+        String[] items = resolveItemsEquipped(requirement, role, ctx);
         if (items == null || items.length == 0) {
             return hasAnyItemEquipped(inventory, selection);
         }
