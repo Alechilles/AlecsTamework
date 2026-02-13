@@ -40,20 +40,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final Boolean isHarvestableOverride;
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
-    private final InteractionConfigResolver configResolver;
-    private final InteractionParamAccess paramAccess;
-    private final InteractionFeedHelper feedHelper;
-    private final InteractionItemRequirementResolver itemRequirements;
-    private final TameworkInteractEffects effects;
-    private final TameworkInteractRequirements requirements;
-    private final InteractionExecutor executor;
-    private final InteractionCooldowns cooldowns;
-    private final InteractionSelector selector;
-    private final InteractionDiagnostics diagnostics;
-    private final InteractionMatchHelpers matchHelpers;
-    private final InteractionParamMatcher paramMatcher;
-    private final InteractionOwnershipHelper ownershipHelper;
-    private final InteractionAlarmHelper alarmHelper;
+    private final InteractionResolution resolution;
+    private final InteractionSelection selection;
+    private final InteractionExecution execution;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         super(builder);
@@ -87,30 +76,41 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             }
         }
         InteractionParamResolver paramResolver = new InteractionParamResolver(globalSnapshot, execSnapshot, sensorSnapshot);
-        this.paramAccess = new InteractionParamAccess(
+        InteractionParamAccess paramAccess = new InteractionParamAccess(
                 paramResolver,
                 hasLovedItemsOverride,
                 lovedItemsOverride,
                 isHarvestableOverride,
                 isMountableOverride
         );
-        this.configResolver = new InteractionConfigResolver(
+        InteractionConfigResolver configResolver = new InteractionConfigResolver(
                 configIdOverride,
                 paramAccess,
                 DEFAULT_CONFIG_PARAM
         );
-        this.feedHelper = new InteractionFeedHelper(paramAccess);
-        this.itemRequirements = new InteractionItemRequirementResolver(paramResolver);
-        this.effects = new TameworkInteractEffects(this);
-        this.alarmHelper = new InteractionAlarmHelper(this);
-        this.requirements = new TameworkInteractRequirements(this, feedHelper, alarmHelper);
-        this.executor = new InteractionExecutor(effects, feedHelper);
-        this.cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
-        this.selector = new InteractionSelector(this, requirements, cooldowns, alarmHelper);
-        this.diagnostics = new InteractionDiagnostics(this, alarmHelper);
-        this.matchHelpers = new InteractionMatchHelpers(this, paramAccess, alarmHelper);
-        this.paramMatcher = new InteractionParamMatcher(paramAccess);
-        this.ownershipHelper = new InteractionOwnershipHelper(this);
+        InteractionFeedHelper feedHelper = new InteractionFeedHelper(paramAccess);
+        InteractionAlarmHelper alarmHelper = new InteractionAlarmHelper(this);
+        InteractionItemRequirementResolver itemRequirements = new InteractionItemRequirementResolver(paramResolver);
+        InteractionMatchHelpers matchHelpers = new InteractionMatchHelpers(this, paramAccess, alarmHelper);
+        InteractionParamMatcher paramMatcher = new InteractionParamMatcher(paramAccess);
+        InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(this);
+        TameworkInteractEffects effects = new TameworkInteractEffects(this);
+        InteractionExecutor executor = new InteractionExecutor(effects, feedHelper);
+        InteractionCooldowns cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
+        TameworkInteractRequirements requirements = new TameworkInteractRequirements(this, feedHelper, alarmHelper);
+        InteractionSelector selector = new InteractionSelector(this, requirements, cooldowns, alarmHelper);
+        InteractionDiagnostics diagnostics = new InteractionDiagnostics(this, alarmHelper);
+        this.resolution = new InteractionResolution(paramAccess, configResolver);
+        this.selection = new InteractionSelection(
+                itemRequirements,
+                matchHelpers,
+                paramMatcher,
+                ownershipHelper,
+                requirements,
+                selector,
+                diagnostics
+        );
+        this.execution = new InteractionExecution(executor, cooldowns);
     }
 
     @Override
@@ -119,80 +119,76 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
-        diagnostics.logDebug("TameworkInteract: execute called.");
+        selection.logDebug("TameworkInteract: execute called.");
         if (npcRef == null || !npcRef.isValid()) {
             return false;
         }
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
-            diagnostics.logDebug("TameworkInteract: no player resolved for interaction.");
+            selection.logDebug("TameworkInteract: no player resolved for interaction.");
             return false;
         }
-        InteractionContextSnapshot ctx = paramAccess.buildContextSnapshot(player, role);
+        InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, role);
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, DEFAULT_CONFIG_PARAM);
-        diagnostics.logDebug(String.format(
+        selection.logDebug(String.format(
                 "TameworkInteract: role=%s configOverride=%s roleParam=%s heldItem=%s",
                 roleName,
                 configIdOverride,
                 roleOverride,
-                diagnostics.describeHeldItem(ctx)
+                selection.describeHeldItem(ctx)
         ));
-        TwInteractionConfig config = configResolver.resolveConfig(role, ctx);
+        TwInteractionConfig config = resolution.resolveConfig(role, ctx);
         if (config == null || !config.isEnabled()) {
-            diagnostics.logDebug(String.format(
+            selection.logDebug(String.format(
                     "TameworkInteract: no config resolved or config disabled (role=%s).",
                     roleName
             ));
             return false;
         }
-        ResolvedInteraction interaction = selector.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
+        ResolvedInteraction interaction = selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
         if (interaction == null) {
             maybeNotifyOwnerDenied(npcRef, store, player);
-            diagnostics.logDebug(diagnostics.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
+            selection.logDebug(selection.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
             return false;
         }
         if (interaction.blockedByCooldown) {
             return false;
         }
-        boolean applied = executor.applyInteraction(interaction.entry, npcRef, role, infoProvider, store, player, ctx);
-        if (applied) {
-            cooldowns.applyInteractionCooldown(interaction, npcRef, store);
-        }
-        return applied;
+        return execution.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
     }
 
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return ownershipHelper.isTamed(npcRef, store);
+        return selection.isTamed(npcRef, store);
     }
 
     boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        return ownershipHelper.isOwner(npcRef, store, player);
+        return selection.isOwner(npcRef, store, player);
     }
 
     // Delegates item-in-hand requirements to the shared resolver.
     boolean matchesItemsInHand(ItemsInHandRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        return itemRequirements.matchesItemsInHand(requirement, role, ctx);
+        return selection.matchesItemsInHand(requirement, role, ctx);
     }
 
     // Delegates inventory-based requirements to the shared resolver.
     boolean matchesItemsInInventory(ItemsInInventoryRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        return itemRequirements.matchesItemsInInventory(requirement, role, ctx);
+        return selection.matchesItemsInInventory(requirement, role, ctx);
     }
 
     // Delegates equipped-item requirements to the shared resolver.
     boolean matchesItemsEquipped(ItemsEquippedRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        return itemRequirements.matchesItemsEquipped(requirement, role, ctx);
+        return selection.matchesItemsEquipped(requirement, role, ctx);
     }
 
     // Delegates held-item matching for requirement checks.
     boolean isHeldItemInList(String[] items, InteractionContextSnapshot ctx) {
-        return itemRequirements.isHeldItemInList(items, ctx);
+        return selection.isHeldItemInList(items, ctx);
     }
 
     // Delegates item param resolution for requirement parsing.
     String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
-        return itemRequirements.resolveItemsParam(role, ctx, itemsParam);
+        return selection.resolveItemsParam(role, ctx, itemsParam);
     }
 
     boolean matchesHarvestContext(Role role,
@@ -201,32 +197,32 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         String context = hasHarvestContextOverride
                 ? harvestContextOverride
                 : getRoleStringParam(role, ctx, DEFAULT_HARVEST_CONTEXT_PARAM);
-        return matchHelpers.matchesInteractionContext(context, role, infoProvider, true);
+        return selection.matchesInteractionContext(context, role, infoProvider, true);
     }
 
     boolean matchesInteractionContext(InteractionContextRequirement requirement,
                                       Role role,
                                       InfoProvider infoProvider,
                                       InteractionContextSnapshot ctx) {
-        return matchHelpers.matchesInteractionContext(requirement, role, infoProvider, ctx);
+        return selection.matchesInteractionContext(requirement, role, infoProvider, ctx);
     }
 
     boolean matchesInteractionContext(String context,
                                       Role role,
                                       InfoProvider infoProvider,
                                       boolean allowBlank) {
-        return matchHelpers.matchesInteractionContext(context, role, infoProvider, allowBlank);
+        return selection.matchesInteractionContext(context, role, infoProvider, allowBlank);
     }
 
     boolean matchesMovementState(MovementStateRequirement requirement,
                                          Role role,
                                          InfoProvider infoProvider,
                                          Store<EntityStore> store) {
-        return matchHelpers.matchesMovementState(requirement, role, infoProvider, store);
+        return selection.matchesMovementState(requirement, role, infoProvider, store);
     }
 
     boolean isPlayerCrouching(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
-        return matchHelpers.isPlayerCrouching(role, infoProvider, store);
+        return selection.isPlayerCrouching(role, infoProvider, store);
     }
 
     boolean matchesAlarmState(AlarmRequirement requirement,
@@ -234,11 +230,11 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                               Store<EntityStore> store,
                               Role role,
                               InteractionContextSnapshot ctx) {
-        return matchHelpers.matchesAlarmState(requirement, npcRef, store, role, ctx);
+        return selection.matchesAlarmState(requirement, npcRef, store, role, ctx);
     }
 
     boolean matchesParamRequirement(ParamRequirement requirement, Role role) {
-        return paramMatcher.matchesParamRequirement(requirement, role);
+        return selection.matchesParamRequirement(requirement, role);
     }
 
     boolean matchesNpcState(StringRequirement requirement, Role role) {
@@ -272,57 +268,57 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     }
 
     String[] resolveLovedItems(Role role, InteractionContextSnapshot ctx) {
-        return paramAccess.resolveLovedItems(role, ctx);
+        return resolution.resolveLovedItems(role, ctx);
     }
 
     boolean resolveIsHarvestable(Role role, InteractionContextSnapshot ctx) {
-        return paramAccess.resolveIsHarvestable(role, ctx);
+        return resolution.resolveIsHarvestable(role, ctx);
     }
 
     boolean resolveIsMountable(Role role, InteractionContextSnapshot ctx) {
-        return paramAccess.resolveIsMountable(role, ctx);
+        return resolution.resolveIsMountable(role, ctx);
     }
 
     String getRoleStringParam(Role role, String paramName) {
-        return paramAccess.getRoleStringParam(role, null, paramName);
+        return resolution.getRoleStringParam(role, null, paramName);
     }
 
     String getRoleStringParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        return paramAccess.getRoleStringParam(role, ctx, paramName);
+        return resolution.getRoleStringParam(role, ctx, paramName);
     }
 
     String[] getRoleStringArrayParam(Role role, String paramName) {
-        return paramAccess.getRoleStringArrayParam(role, null, paramName);
+        return resolution.getRoleStringArrayParam(role, null, paramName);
     }
 
     String[] getRoleStringArrayParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        return paramAccess.getRoleStringArrayParam(role, ctx, paramName);
+        return resolution.getRoleStringArrayParam(role, ctx, paramName);
     }
 
     private boolean getRoleBooleanParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        return paramAccess.getRoleBooleanParam(role, ctx, paramName);
+        return resolution.getRoleBooleanParam(role, ctx, paramName);
     }
 
     double getRoleNumberParam(Role role, String paramName, double defaultValue) {
-        return paramAccess.getRoleNumberParam(role, null, paramName, defaultValue);
+        return resolution.getRoleNumberParam(role, null, paramName, defaultValue);
     }
 
     double getRoleNumberParam(Role role, InteractionContextSnapshot ctx, String paramName, double defaultValue) {
-        return paramAccess.getRoleNumberParam(role, ctx, paramName, defaultValue);
+        return resolution.getRoleNumberParam(role, ctx, paramName, defaultValue);
     }
 
     void logUnsupported(String message) {
-        diagnostics.logUnsupported(message);
+        selection.logUnsupported(message);
     }
 
     void logDebug(String message) {
-        diagnostics.logDebug(message);
+        selection.logDebug(message);
     }
 
     private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
                                         Store<EntityStore> store,
                                         Player player) {
-        ownershipHelper.maybeNotifyOwnerDenied(npcRef, store, player);
+        selection.maybeNotifyOwnerDenied(npcRef, store, player);
     }
 
     // Captures the selected interaction entry and cooldown metadata.

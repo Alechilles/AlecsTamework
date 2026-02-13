@@ -97,15 +97,43 @@ class InteractionBehaviorTest {
         ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
         InteractionParamResolver resolver = new InteractionParamResolver(null, null, null);
         InteractionParamAccess paramAccess = new InteractionParamAccess(resolver, false, null, null, null);
-        Field paramAccessField = ActionTameworkInteract.class.getDeclaredField("paramAccess");
-        paramAccessField.setAccessible(true);
-        paramAccessField.set(interact, paramAccess);
-        Field paramMatcherField = ActionTameworkInteract.class.getDeclaredField("paramMatcher");
-        paramMatcherField.setAccessible(true);
-        paramMatcherField.set(interact, new InteractionParamMatcher(paramAccess));
-        Field itemRequirementsField = ActionTameworkInteract.class.getDeclaredField("itemRequirements");
-        itemRequirementsField.setAccessible(true);
-        itemRequirementsField.set(interact, new InteractionItemRequirementResolver(resolver));
+        InteractionConfigResolver configResolver = new InteractionConfigResolver(
+                null,
+                paramAccess,
+                ActionTameworkInteract.DEFAULT_CONFIG_PARAM
+        );
+        InteractionResolution resolution = new InteractionResolution(paramAccess, configResolver);
+        InteractionFeedHelper feedHelper = new InteractionFeedHelper(paramAccess);
+        InteractionAlarmHelper alarmHelper = new InteractionAlarmHelper(interact);
+        InteractionItemRequirementResolver itemRequirements = new InteractionItemRequirementResolver(resolver);
+        InteractionMatchHelpers matchHelpers = new InteractionMatchHelpers(interact, paramAccess, alarmHelper);
+        InteractionParamMatcher paramMatcher = new InteractionParamMatcher(paramAccess);
+        InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(interact);
+        InteractionCooldowns cooldowns = new InteractionCooldowns(interact, ActionTameworkInteract.DEFAULT_COOLDOWN_ALARM_PREFIX);
+        TameworkInteractRequirements requirements = new TameworkInteractRequirements(interact, feedHelper, alarmHelper);
+        InteractionSelector selector = new InteractionSelector(interact, requirements, cooldowns, alarmHelper);
+        InteractionDiagnostics diagnostics = new InteractionDiagnostics(interact, alarmHelper);
+        InteractionSelection selection = new InteractionSelection(
+                itemRequirements,
+                matchHelpers,
+                paramMatcher,
+                ownershipHelper,
+                requirements,
+                selector,
+                diagnostics
+        );
+        InteractionExecutor executor = new InteractionExecutor(new TameworkInteractEffects(interact), feedHelper);
+        InteractionExecution execution = new InteractionExecution(executor, cooldowns);
+
+        Field resolutionField = ActionTameworkInteract.class.getDeclaredField("resolution");
+        resolutionField.setAccessible(true);
+        resolutionField.set(interact, resolution);
+        Field selectionField = ActionTameworkInteract.class.getDeclaredField("selection");
+        selectionField.setAccessible(true);
+        selectionField.set(interact, selection);
+        Field executionField = ActionTameworkInteract.class.getDeclaredField("execution");
+        executionField.setAccessible(true);
+        executionField.set(interact, execution);
         return interact;
     }
 
