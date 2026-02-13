@@ -11,12 +11,12 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
 // Selects the first matching interaction entry, respecting cooldowns and requirements.
 final class InteractionSelector {
-    private final ActionTameworkInteract owner;
     private final TameworkInteractRequirements requirements;
+    private final InteractionCooldowns cooldowns;
 
-    InteractionSelector(ActionTameworkInteract owner, TameworkInteractRequirements requirements) {
-        this.owner = owner;
+    InteractionSelector(TameworkInteractRequirements requirements, InteractionCooldowns cooldowns) {
         this.requirements = requirements;
+        this.cooldowns = cooldowns;
     }
 
     // Returns the first interaction entry that passes requirements and cooldown checks.
@@ -33,12 +33,12 @@ final class InteractionSelector {
             if (entry == null || !entry.isEnabled()) {
                 continue;
             }
-            int cooldownSeconds = owner.resolveCooldownSeconds(config, entry);
+            int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
             String cooldownAlarmName = cooldownSeconds > 0
-                    ? owner.buildCooldownAlarmName(config, index)
+                    ? cooldowns.buildCooldownAlarmName(config, index)
                     : null;
             if (cooldownSeconds > 0
-                    && (cooldownAlarmName == null || !owner.isCooldownReady(npcRef, store, cooldownAlarmName))) {
+                    && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
                 continue;
             }
             if (requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx)) {
