@@ -32,7 +32,7 @@
       },
       "Effects": {
         "ShowFloatingText": {
-          "Message": "Feed ItemsParam + Inventory"
+          "Message": "Feed ItemsParam  Inventory"
         }
       }
     },
@@ -47,10 +47,7 @@
         "All": {
           "ItemsEquipped": [
             {
-              "ItemsParam": "TestItemsEquippedParam",
-              "Slots": [
-                "Armor"
-              ]
+              "ItemsParam": "TestItemsEquippedParam"
             }
           ]
         }

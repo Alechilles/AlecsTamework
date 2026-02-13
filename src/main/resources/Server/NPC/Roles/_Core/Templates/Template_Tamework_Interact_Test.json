@@ -196,7 +196,7 @@
     },
     "TestItemsEquippedParam": {
       "Value": [
-        "Plant_Fruit_Apple"
+        "Armor_Wool_Head"
       ],
       "TypeHint": "String",
       "Description": "ItemsParam list for ItemsEquipped requirement (test). Replace with an equipped item."
