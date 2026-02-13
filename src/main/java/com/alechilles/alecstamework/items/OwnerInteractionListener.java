@@ -19,9 +19,13 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerMouseButtonEvent;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.protocol.MouseButtonEvent;
+import com.hypixel.hytale.protocol.MouseButtonState;
+import com.hypixel.hytale.protocol.MouseButtonType;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -178,6 +182,36 @@ public final class OwnerInteractionListener {
         );
     }
 
+    public void onPlayerMouseButton(PlayerMouseButtonEvent event) {
+        if (event == null) {
+            return;
+        }
+        MouseButtonEvent mouseButton = event.getMouseButton();
+        if (mouseButton == null || mouseButton.state != MouseButtonState.Pressed) {
+            return;
+        }
+        InteractionType actionType = null;
+        if (mouseButton.mouseButtonType == MouseButtonType.Left) {
+            actionType = InteractionType.Primary;
+        } else if (mouseButton.mouseButtonType == MouseButtonType.Right) {
+            actionType = InteractionType.Secondary;
+        }
+        if (actionType == null) {
+            return;
+        }
+        Player player = event.getPlayer();
+        if (player == null) {
+            return;
+        }
+        Entity target = event.getTargetEntity();
+        Entity recordTarget = target instanceof NPCEntity ? target : null;
+        InteractionInputTracker.record(player, recordTarget, actionType);
+        if (!(target instanceof NPCEntity)) {
+            return;
+        }
+        maybeTriggerAltInteraction(actionType, (NPCEntity) target, player);
+    }
+
     private void maybeTriggerAltInteraction(InteractionType actionType, NPCEntity npc, Player player) {
         if (actionType != InteractionType.Primary && actionType != InteractionType.Secondary) {
             return;
@@ -191,6 +225,9 @@ public final class OwnerInteractionListener {
         }
         if (!roleHasInteractionType(role, actionType)) {
             return;
+        }
+        if (player.getReference() != null && player.getReference().isValid()) {
+            role.getStateSupport().setInteractionIterationTarget(player.getReference());
         }
         role.getStateSupport().addInteraction(player);
     }

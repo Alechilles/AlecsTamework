@@ -40,6 +40,7 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerMouseButtonEvent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
@@ -156,6 +157,10 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().registerGlobal(
                 PlayerInteractEvent.class,
                 ownerInteractionListener::onPlayerInteract
+        );
+        getEventRegistry().registerGlobal(
+                PlayerMouseButtonEvent.class,
+                ownerInteractionListener::onPlayerMouseButton
         );
         getLogger().at(Level.INFO).log(
                 "Tamework item feature configs loaded: " + loaded
