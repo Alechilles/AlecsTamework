@@ -5,27 +5,21 @@
   ],
   "Interactions": [
     {
-      "Type": "Custom",
+      "Type": "Tame",
       "Enabled": true,
-      "Requires": {
-        "All": {
-          "ItemsInHand": [
-            {
-              "ItemsParam": "TestItemsInHandParam",
-              "Quantity": 1
-            }
-          ]
-        }
-      },
+      "ItemsParam": "TestTameItemsParam",
       "Effects": {
         "ShowFloatingText": {
-          "Message": "ItemsParam: Hand"
+          "Message": "Tame ItemsParam"
         }
       }
     },
     {
-      "Type": "Custom",
+      "Type": "Feed",
       "Enabled": true,
+      "UseLovedItems": false,
+      "Heal": 2,
+      "ItemsParam": "TestFeedItemsParam",
       "Requires": {
         "All": {
           "ItemsInInventory": [
@@ -38,13 +32,17 @@
       },
       "Effects": {
         "ShowFloatingText": {
-          "Message": "ItemsParam: Inventory"
+          "Message": "Feed ItemsParam + Inventory"
         }
       }
     },
     {
-      "Type": "Custom",
+      "Type": "Harvest",
       "Enabled": true,
+      "RequireTamed": false,
+      "RequireHarvestable": false,
+      "RequireHarvestAlarmReady": false,
+      "RequireHarvestInteractionContext": false,
       "Requires": {
         "All": {
           "ItemsEquipped": [
@@ -59,13 +57,17 @@
       },
       "Effects": {
         "ShowFloatingText": {
-          "Message": "ItemsParam: Equipped"
+          "Message": "Equipped ItemsParam"
         }
       }
     },
     {
-      "Type": "Custom",
+      "Type": "Mount",
       "Enabled": true,
+      "RequireTamed": false,
+      "RequireOwner": false,
+      "RequireMountable": false,
+      "RequireCrouching": false,
       "Requires": {
         "All": {
           "AlarmState": [
@@ -78,13 +80,15 @@
       },
       "Effects": {
         "ShowFloatingText": {
-          "Message": "AlarmParam: Active"
+          "Message": "AlarmParam Active"
         }
       }
     },
     {
-      "Type": "Custom",
+      "Type": "ModeCycle",
       "Enabled": true,
+      "RequireTamed": false,
+      "RequireOwner": false,
       "Requires": {
         "All": {
           "InteractionContext": [
@@ -96,29 +100,29 @@
       },
       "Effects": {
         "ShowFloatingText": {
-          "Message": "ContextParam: Match"
+          "Message": "ContextParam Match"
         }
       }
     },
     {
-      "Type": "Tame",
+      "Type": "Breed",
       "Enabled": true,
-      "ItemsParam": "TestTameItemsParam"
-    },
-    {
-      "Type": "Feed",
-      "Enabled": true,
-      "UseLovedItems": false,
-      "Heal": 2,
-      "ItemsParam": "TestFeedItemsParam"
-    },
-    {
-      "Type": "Harvest",
-      "Enabled": true
-    },
-    {
-      "Type": "ModeCycle",
-      "Enabled": true
+      "RequireTamed": false,
+      "Requires": {
+        "All": {
+          "ItemsInHand": [
+            {
+              "ItemsParam": "TestItemsInHandParam",
+              "Quantity": 1
+            }
+          ]
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "ItemsInHand Param"
+        }
+      }
     }
   ]
 }
