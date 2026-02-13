@@ -16,6 +16,11 @@ If multiple configs match, selection order depends on asset map iteration. Avoid
 ## Interaction order
 `Interactions` is evaluated in order. The first enabled entry whose requirements pass is executed.
 
+### Base fields (all entries)
+- `Enabled` (default true)
+- `InteractionType` (optional; `Use`, `Primary`, `Secondary`)
+- `CooldownSeconds` (optional)
+
 ## Cooldowns
 Cooldowns are enforced in real-time seconds (not game time).
 `CooldownSeconds` on an entry overrides `Cooldowns.InteractionSeconds` on the config.

@@ -31,6 +31,7 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.protocol.ItemArmorSlot;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -206,9 +207,13 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                                                   Store<EntityStore> store,
                                                   Player player) {
         InteractionEntry[] entries = config.getInteractions();
+        InteractionType interactionType = resolveInteractionType(player, npcRef, store);
         for (int index = 0; index < entries.length; index++) {
             InteractionEntry entry = entries[index];
             if (entry == null || !entry.isEnabled()) {
+                continue;
+            }
+            if (!matchesInteractionType(entry.getInteractionType(), interactionType)) {
                 continue;
             }
             int cooldownSeconds = resolveCooldownSeconds(config, entry);
@@ -1449,6 +1454,39 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return null;
     }
 
+    private InteractionType resolveInteractionType(Player player,
+                                                   Ref<EntityStore> npcRef,
+                                                   Store<EntityStore> store) {
+        if (player == null || npcRef == null || store == null) {
+            return null;
+        }
+        NPCEntity npc = resolveNpcEntity(npcRef, store);
+        if (npc == null) {
+            return null;
+        }
+        return InteractionInputTracker.getLastInteractionType(player, npc.getUuid());
+    }
+
+    private boolean matchesInteractionType(TwInteractionConfig.InteractionInputType required,
+                                           InteractionType actual) {
+        if (required == null) {
+            return true;
+        }
+        if (actual == null) {
+            return false;
+        }
+        switch (required) {
+            case Use:
+                return actual == InteractionType.Use;
+            case Primary:
+                return actual == InteractionType.Primary;
+            case Secondary:
+                return actual == InteractionType.Secondary;
+            default:
+                return false;
+        }
+    }
+
     void logUnsupported(String message) {
         Tamework instance = Tamework.getInstance();
         if (instance != null && instance.getLogger() != null) {
@@ -1481,6 +1519,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         String roleName = role != null ? role.getRoleName() : "<null>";
         boolean tamed = isTamed(npcRef, store);
         boolean owner = isOwner(npcRef, store, player);
+        InteractionType interactionType = resolveInteractionType(player, npcRef, store);
         boolean hasLoved = isHeldItemInList(resolveLovedItems(role), player);
         boolean isHarvestable = resolveIsHarvestable(role);
         boolean harvestReady = isAlarmReady(npcRef, store, DEFAULT_HARVEST_ALARM);
@@ -1489,10 +1528,11 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         boolean crouching = isPlayerCrouching(role, infoProvider, store);
         return String.format(
                 "TameworkInteract: no interactions matched (role=%s config=%s). " +
-                        "tamed=%s owner=%s held=%s lovedMatch=%s isHarvestable=%s harvestReady=%s harvestContext=%s " +
+                        "input=%s tamed=%s owner=%s held=%s lovedMatch=%s isHarvestable=%s harvestReady=%s harvestContext=%s " +
                         "isMountable=%s crouching=%s",
                 roleName,
                 config.getId(),
+                interactionType,
                 tamed,
                 owner,
                 describeHeldItem(player),

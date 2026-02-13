@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.actions.InteractionInputTracker;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.component.Ref;
@@ -74,6 +75,7 @@ public final class OwnerInteractionListener {
         }
         // Skip restriction when there is no owner or the player is the owner.
         if (ownerUuid == null || ownerUuid.equals(player.getUuid())) {
+            InteractionInputTracker.record(player, target, actionType);
             return;
         }
 
@@ -87,6 +89,7 @@ public final class OwnerInteractionListener {
                 if (registry != null) {
                     ItemFeatureConfig config = registry.get(active.getItemId());
                     if (config != null && config.isSpawnerEnabled() && !config.isCaptureOwnerRestricted()) {
+                        InteractionInputTracker.record(player, target, actionType);
                         return;
                     }
                 }
