@@ -1,0 +1,22 @@
+{
+  "Enabled": true,
+  "RoleIds": [
+    "Mob_Tamework_Interact_Test"
+  ],
+  "Interactions": [
+    {
+      "Type": "Tame",
+      "Enabled": true,
+      "Requires": {
+        "All": {
+          "AlarmState": [
+            {
+              "AlarmParam": "TestAlarmParam",
+              "State": "active"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}
