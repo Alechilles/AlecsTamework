@@ -16,39 +16,34 @@ class InteractionParsingTest {
 
     @Test
     void parseItemIdsFromJsonHandlesStringsAndObjects() throws Exception {
-        ActionTameworkInteract interact = newInteract();
         String json = "[\"ItemA\", {\"Item\": \"ItemB\"}, {\"item\": \"ItemC\"}, null, \"\"]";
-        String[] result = invokeParseItemIdsFromJson(interact, json);
+        String[] result = InteractionItemParser.parseItemIdsFromJson(json);
         assertArrayEquals(new String[] { "ItemA", "ItemB", "ItemC" }, result);
     }
 
     @Test
     void parseItemIdsFromJsonIgnoresMissingItemFields() throws Exception {
-        ActionTameworkInteract interact = newInteract();
         String json = "[{}, {\"Item\": \"\"}, {\"item\": \"ItemA\"}]";
-        String[] result = invokeParseItemIdsFromJson(interact, json);
+        String[] result = InteractionItemParser.parseItemIdsFromJson(json);
         assertArrayEquals(new String[] { "ItemA" }, result);
     }
 
     @Test
     void parseItemIdsFromParamHandlesJsonArrayString() throws Exception {
-        ActionTameworkInteract interact = newInteract();
-        String[] result = invokeParseItemIdsFromParam(interact, new String[] { "[\"ItemA\", \"ItemB\"]" });
+        String[] result = InteractionItemParser.parseItemIdsFromParam(new String[] { "[\"ItemA\", \"ItemB\"]" });
         assertArrayEquals(new String[] { "ItemA", "ItemB" }, result);
     }
 
     @Test
     void parseItemIdsFromParamFiltersBlanks() throws Exception {
-        ActionTameworkInteract interact = newInteract();
-        String[] result = invokeParseItemIdsFromParam(interact, new String[] { "", "ItemA", "  ", "ItemB" });
+        String[] result = InteractionItemParser.parseItemIdsFromParam(new String[] { "", "ItemA", "  ", "ItemB" });
         assertArrayEquals(new String[] { "ItemA", "ItemB" }, result);
     }
 
     @Test
     void parseFeedItemsFromJsonSupportsStringAndHealOverrides() throws Exception {
-        ActionTameworkInteract interact = newInteract();
         String json = "[\"ItemA\", {\"Item\": \"ItemB\", \"Heal\": 4}]";
-        FeedItem[] items = invokeParseFeedItemsFromJson(interact, json);
+        FeedItem[] items = InteractionItemParser.parseFeedItemsFromJson(json);
         assertNotNull(items);
         assertEquals(2, items.length);
         assertEquals("ItemA", items[0].getItem());
@@ -73,27 +68,6 @@ class InteractionParsingTest {
         method.setAccessible(true);
         String alarm = (String) method.invoke(interact, config, 2);
         assertEquals("TameworkInteract_Cooldown_My_Config_1_2", alarm);
-    }
-
-    private static String[] invokeParseItemIdsFromParam(ActionTameworkInteract interact, String[] values)
-            throws Exception {
-        Method method = ActionTameworkInteract.class.getDeclaredMethod("parseItemIdsFromParam", String[].class);
-        method.setAccessible(true);
-        return (String[]) method.invoke(interact, (Object) values);
-    }
-
-    private static String[] invokeParseItemIdsFromJson(ActionTameworkInteract interact, String json)
-            throws Exception {
-        Method method = ActionTameworkInteract.class.getDeclaredMethod("parseItemIdsFromJson", String.class);
-        method.setAccessible(true);
-        return (String[]) method.invoke(interact, json);
-    }
-
-    private static FeedItem[] invokeParseFeedItemsFromJson(ActionTameworkInteract interact, String json)
-            throws Exception {
-        Method method = ActionTameworkInteract.class.getDeclaredMethod("parseFeedItemsFromJson", String.class);
-        method.setAccessible(true);
-        return (FeedItem[]) method.invoke(interact, json);
     }
 
     private static ActionTameworkInteract newInteract() throws Exception {
