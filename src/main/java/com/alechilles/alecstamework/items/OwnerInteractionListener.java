@@ -204,6 +204,13 @@ public final class OwnerInteractionListener {
             return;
         }
         Entity target = event.getTargetEntity();
+        if (logger != null && target != null) {
+            logger.at(Level.INFO).log(
+                    "MouseButton: type=" + actionType
+                            + " target=" + target.getUuid()
+                            + " targetClass=" + target.getClass().getSimpleName()
+            );
+        }
         Entity recordTarget = target instanceof NPCEntity ? target : null;
         InteractionInputTracker.record(player, recordTarget, actionType);
         if (!(target instanceof NPCEntity)) {
