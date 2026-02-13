@@ -4,6 +4,7 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 
@@ -40,6 +41,37 @@ class TwInteractionConfigPriorityTest {
         assertSame(high, cache.get("mob_test"));
     }
 
+    @Test
+    void buildRoleCacheKeepsFirstOnPriorityTie() throws Exception {
+        TwInteractionConfig first = new TwInteractionConfig();
+        first.enabled = true;
+        first.priority = 2;
+        first.roleIds = new String[] { "Mob_Tie" };
+
+        TwInteractionConfig second = new TwInteractionConfig();
+        second.enabled = true;
+        second.priority = 2;
+        second.roleIds = new String[] { "Mob_Tie" };
+
+        DefaultAssetMap<String, TwInteractionConfig> assetMap = new DefaultAssetMap<>();
+        LinkedHashMap<String, TwInteractionConfig> entries = new LinkedHashMap<>();
+        entries.put("first", first);
+        entries.put("second", second);
+        seedAssetMap(assetMap, entries);
+
+        Method buildRoleCache = TwInteractionConfig.class.getDeclaredMethod(
+                "buildRoleCache",
+                DefaultAssetMap.class
+        );
+        buildRoleCache.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        Map<String, TwInteractionConfig> cache =
+                (Map<String, TwInteractionConfig>) buildRoleCache.invoke(null, assetMap);
+
+        assertNotNull(cache);
+        assertSame(first, cache.get("mob_tie"));
+    }
+
     private static void seedAssetMap(DefaultAssetMap<String, TwInteractionConfig> assetMap,
                                      Map<String, TwInteractionConfig> entries) throws Exception {
         try {
@@ -58,6 +90,6 @@ class TwInteractionConfigPriorityTest {
             throw new IllegalStateException("DefaultAssetMap does not expose a mutable map field.");
         }
         mapField.setAccessible(true);
-        mapField.set(assetMap, new HashMap<>(entries));
+        mapField.set(assetMap, new LinkedHashMap<>(entries));
     }
 }

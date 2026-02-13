@@ -23,6 +23,14 @@ class InteractionParsingTest {
     }
 
     @Test
+    void parseItemIdsFromJsonIgnoresMissingItemFields() throws Exception {
+        ActionTameworkInteract interact = newInteract();
+        String json = "[{}, {\"Item\": \"\"}, {\"item\": \"ItemA\"}]";
+        String[] result = invokeParseItemIdsFromJson(interact, json);
+        assertArrayEquals(new String[] { "ItemA" }, result);
+    }
+
+    @Test
     void parseItemIdsFromParamHandlesJsonArrayString() throws Exception {
         ActionTameworkInteract interact = newInteract();
         String[] result = invokeParseItemIdsFromParam(interact, new String[] { "[\"ItemA\", \"ItemB\"]" });
