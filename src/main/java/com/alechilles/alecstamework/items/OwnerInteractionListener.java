@@ -40,25 +40,30 @@ public final class OwnerInteractionListener {
         if (event == null) {
             return;
         }
+        Entity target = event.getTargetEntity();
+        Player player = event.getPlayer();
+        InteractionType actionType = event.getActionType();
+        if (player != null && actionType != null
+                && (actionType == InteractionType.Use
+                || actionType == InteractionType.Primary
+                || actionType == InteractionType.Secondary)) {
+            Entity recordTarget = target instanceof NPCEntity ? target : null;
+            InteractionInputTracker.record(player, recordTarget, actionType);
+        }
         if (event.isCancelled()) {
             return;
         }
-        InteractionType actionType = event.getActionType();
         if (actionType != InteractionType.Use
                 && actionType != InteractionType.Primary
                 && actionType != InteractionType.Secondary) {
             return;
         }
-        Entity target = event.getTargetEntity();
-        Player player = event.getPlayer();
         if (player == null) {
             return;
         }
         if (!(target instanceof NPCEntity)) {
-            InteractionInputTracker.record(player, null, actionType);
             return;
         }
-        InteractionInputTracker.record(player, target, actionType);
         UUID ownerUuid = null;
         String ownerName = null;
         boolean componentPresent = false;
@@ -77,7 +82,6 @@ public final class OwnerInteractionListener {
         }
         // Skip restriction when there is no owner or the player is the owner.
         if (ownerUuid == null || ownerUuid.equals(player.getUuid())) {
-            InteractionInputTracker.record(player, target, actionType);
             return;
         }
 
@@ -91,7 +95,6 @@ public final class OwnerInteractionListener {
                 if (registry != null) {
                     ItemFeatureConfig config = registry.get(active.getItemId());
                     if (config != null && config.isSpawnerEnabled() && !config.isCaptureOwnerRestricted()) {
-                        InteractionInputTracker.record(player, target, actionType);
                         return;
                     }
                 }

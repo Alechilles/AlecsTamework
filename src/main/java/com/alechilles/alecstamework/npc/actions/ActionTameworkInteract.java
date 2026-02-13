@@ -213,6 +213,14 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             if (entry == null || !entry.isEnabled()) {
                 continue;
             }
+            if (entry.getInteractionType() != null && interactionType == null) {
+                logDebug(String.format(
+                        "TameworkInteract: no input type recorded (required=%s role=%s config=%s).",
+                        entry.getInteractionType(),
+                        role != null ? role.getRoleName() : "<null>",
+                        config != null ? config.getId() : "<null>"
+                ));
+            }
             if (!matchesInteractionType(entry.getInteractionType(), interactionType)) {
                 continue;
             }

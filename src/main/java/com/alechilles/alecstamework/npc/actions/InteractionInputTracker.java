@@ -10,7 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * Tracks the most recent player interaction input to disambiguate Use/Primary/Secondary.
  */
 public final class InteractionInputTracker {
-    private static final long INPUT_TTL_MS = 750L;
+    private static final long INPUT_TTL_MS = 5000L;
     private static final ConcurrentHashMap<UUID, InputRecord> LAST_INPUT = new ConcurrentHashMap<>();
 
     private InteractionInputTracker() {
