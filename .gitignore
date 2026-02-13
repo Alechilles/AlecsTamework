@@ -18,3 +18,7 @@ Thumbs.db
 *.tmp
 *.bak
 *.cache
+# IDE settings
+.settings/
+.classpath
+.project
