@@ -10,18 +10,12 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInv
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamOperator;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -39,11 +33,7 @@ import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.server.npc.util.expression.Scope;
 import java.time.Instant;
-import java.util.Locale;
 import java.util.UUID;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 
 /**
  * Prototype action that executes a TwInteractionConfig-driven interaction flow.
@@ -72,6 +62,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final InteractionCooldowns cooldowns;
     private final InteractionSelector selector;
     private final InteractionDiagnostics diagnostics;
+    private final InteractionMatchHelpers matchHelpers;
+    private final InteractionParamMatcher paramMatcher;
+    private final InteractionOwnershipHelper ownershipHelper;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         super(builder);
@@ -119,6 +112,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
         this.selector = new InteractionSelector(requirements, cooldowns);
         this.diagnostics = new InteractionDiagnostics(this);
+        this.matchHelpers = new InteractionMatchHelpers(this, paramAccess);
+        this.paramMatcher = new InteractionParamMatcher(paramAccess);
+        this.ownershipHelper = new InteractionOwnershipHelper(this);
     }
 
     @Override
@@ -269,20 +265,11 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     }
 
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
-        TameworkTamedComponent component = store.getComponent(npcRef, type);
-        return component != null && component.isTamed();
+        return ownershipHelper.isTamed(npcRef, store);
     }
 
     boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        if (player == null) {
-            return false;
-        }
-        UUID ownerId = resolveOwnerUuid(npcRef, store);
-        return ownerId != null && ownerId.equals(getPlayerUuid(player));
+        return ownershipHelper.isOwner(npcRef, store, player);
     }
 
     boolean isAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
@@ -302,6 +289,18 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return true;
         }
         return alarm.hasPassed(resolveGameTime(store));
+    }
+
+    // Uses world time if available; otherwise falls back to wall-clock.
+    private Instant resolveGameTime(Store<EntityStore> store) {
+        if (store == null) {
+            return Instant.now();
+        }
+        WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
+        if (time == null) {
+            return Instant.now();
+        }
+        return time.getGameTime();
     }
 
     // Delegates item-in-hand requirements to the shared resolver.
@@ -335,116 +334,32 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         String context = hasHarvestContextOverride
                 ? harvestContextOverride
                 : getRoleStringParam(role, ctx, DEFAULT_HARVEST_CONTEXT_PARAM);
-        return matchesInteractionContext(context, role, infoProvider, true);
+        return matchHelpers.matchesInteractionContext(context, role, infoProvider, true);
     }
 
     boolean matchesInteractionContext(InteractionContextRequirement requirement,
                                       Role role,
                                       InfoProvider infoProvider,
                                       InteractionContextSnapshot ctx) {
-        if (requirement == null) {
-            return false;
-        }
-        String context = resolveInteractionContextParam(requirement, role, ctx);
-        if (context == null || context.isBlank()) {
-            context = requirement.getContext();
-        }
-        return matchesInteractionContext(context, role, infoProvider, false);
+        return matchHelpers.matchesInteractionContext(requirement, role, infoProvider, ctx);
     }
 
     boolean matchesInteractionContext(String context,
                                       Role role,
                                       InfoProvider infoProvider,
                                       boolean allowBlank) {
-        if (context == null || context.isBlank()) {
-            return allowBlank;
-        }
-        if (role == null || role.getStateSupport() == null) {
-            return false;
-        }
-        Ref<EntityStore> playerRef = resolveInteractionTarget(role, infoProvider);
-        if (playerRef == null || !playerRef.isValid()) {
-            return false;
-        }
-        return role.getStateSupport().hasContextualInteraction(playerRef, context);
-    }
-
-    private String resolveInteractionContextParam(InteractionContextRequirement requirement,
-                                                  Role role,
-                                                  InteractionContextSnapshot ctx) {
-        if (requirement == null) {
-            return null;
-        }
-        String paramName = requirement.getContextParam();
-        if (paramName == null || paramName.isBlank()) {
-            return null;
-        }
-        String context = getRoleStringParam(role, ctx, paramName);
-        return context != null && !context.isBlank() ? context : null;
+        return matchHelpers.matchesInteractionContext(context, role, infoProvider, allowBlank);
     }
 
     boolean matchesMovementState(MovementStateRequirement requirement,
                                          Role role,
                                          InfoProvider infoProvider,
                                          Store<EntityStore> store) {
-        if (requirement == null || requirement.getState() == null || requirement.getState().isBlank()) {
-            return false;
-        }
-        MovementStates states = statesForPlayer(role, infoProvider, store);
-        return matchesMovementState(states, requirement.getState());
+        return matchHelpers.matchesMovementState(requirement, role, infoProvider, store);
     }
 
     boolean isPlayerCrouching(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
-        return matchesMovementState(statesForPlayer(role, infoProvider, store), "Crouching");
-    }
-
-    private MovementStates statesForPlayer(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
-        Ref<EntityStore> playerRef = resolveInteractionTarget(role, infoProvider);
-        if (playerRef == null || !playerRef.isValid()) {
-            return null;
-        }
-        MovementStatesComponent component = store.getComponent(playerRef, MovementStatesComponent.getComponentType());
-        return component != null ? component.getMovementStates() : null;
-    }
-
-    boolean matchesMovementState(MovementStates states, String state) {
-        if (states == null || state == null) {
-            return false;
-        }
-        String normalized = state.trim().toLowerCase(Locale.ROOT);
-        switch (normalized) {
-            case "crouching":
-                return states.crouching || states.forcedCrouching;
-            case "walking":
-                return states.walking;
-            case "running":
-                return states.running;
-            case "sprinting":
-                return states.sprinting;
-            case "idle":
-                return states.idle;
-            case "mounting":
-                return states.mounting;
-            case "sleeping":
-                return states.sleeping;
-            default:
-                return false;
-        }
-    }
-
-    private String resolveAlarmName(AlarmRequirement requirement, Role role, InteractionContextSnapshot ctx) {
-        if (requirement == null) {
-            return null;
-        }
-        String paramName = requirement.getAlarmParam();
-        if (paramName != null && !paramName.isBlank()) {
-            String resolved = getRoleStringParam(role, ctx, paramName);
-            if (resolved != null && !resolved.isBlank()) {
-                return resolved;
-            }
-        }
-        String name = requirement.getName();
-        return name != null && !name.isBlank() ? name : null;
+        return matchHelpers.isPlayerCrouching(role, infoProvider, store);
     }
 
     boolean matchesAlarmState(AlarmRequirement requirement,
@@ -452,141 +367,11 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                               Store<EntityStore> store,
                               Role role,
                               InteractionContextSnapshot ctx) {
-        String alarmName = resolveAlarmName(requirement, role, ctx);
-        if (alarmName == null || alarmName.isBlank()) {
-            return false;
-        }
-        NPCEntity npc = resolveNpcEntity(npcRef, store);
-        if (npc == null) {
-            return false;
-        }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return false;
-        }
-        Alarm alarm = alarmStore.get(npc, alarmName);
-        String state = requirement.getState() != null ? requirement.getState().trim().toLowerCase(Locale.ROOT) : "";
-        if (alarm == null) {
-            return "unset".equals(state);
-        }
-        Instant now = resolveGameTime(store);
-        switch (state) {
-            case "unset":
-                return !alarm.isSet();
-            case "passed":
-                return alarm.isSet() && alarm.hasPassed(now);
-            case "active":
-                return alarm.isSet() && !alarm.hasPassed(now);
-            default:
-                return false;
-        }
+        return matchHelpers.matchesAlarmState(requirement, npcRef, store, role, ctx);
     }
 
     boolean matchesParamRequirement(ParamRequirement requirement, Role role) {
-        if (requirement == null || requirement.getName() == null || requirement.getName().isBlank()) {
-            return false;
-        }
-        String[] targets = requirement.getValues();
-        if (targets == null || targets.length == 0) {
-            return false;
-        }
-        StdScope scope = getRoleScope(role);
-        if (scope == null) {
-            return false;
-        }
-        ParamOperator operator = requirement.getOperator();
-        TwInteractionConfig.MatchType matchType = requirement.getMatch();
-
-        BooleanSupplier booleanSupplier;
-        try {
-            booleanSupplier = scope.getBooleanSupplier(requirement.getName());
-        } catch (IllegalStateException ignored) {
-            booleanSupplier = null;
-        }
-
-        DoubleSupplier numberSupplier;
-        try {
-            numberSupplier = scope.getNumberSupplier(requirement.getName());
-        } catch (IllegalStateException ignored) {
-            numberSupplier = null;
-        }
-
-        Supplier<String> stringSupplier;
-        try {
-            stringSupplier = scope.getStringSupplier(requirement.getName());
-        } catch (IllegalStateException ignored) {
-            stringSupplier = null;
-        }
-
-        boolean anyMatched = false;
-        for (String target : targets) {
-            if (target == null) {
-                continue;
-            }
-            boolean matched = evaluateParamTarget(operator, target, booleanSupplier, numberSupplier, stringSupplier);
-            if (matchType == TwInteractionConfig.MatchType.Any) {
-                if (matched) {
-                    return true;
-                }
-            } else {
-                if (!matched) {
-                    return false;
-                }
-            }
-            anyMatched |= matched;
-        }
-        return anyMatched;
-    }
-
-    private Instant resolveGameTime(Store<EntityStore> store) {
-        if (store == null) {
-            return Instant.now();
-        }
-        WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
-        if (time == null) {
-            return Instant.now();
-        }
-        return time.getGameTime();
-    }
-
-    private boolean evaluateParamTarget(ParamOperator operator,
-                                        String target,
-                                        BooleanSupplier booleanSupplier,
-                                        DoubleSupplier numberSupplier,
-                                        Supplier<String> stringSupplier) {
-        if (target == null) {
-            return false;
-        }
-        boolean targetIsBoolean = target.equalsIgnoreCase("true") || target.equalsIgnoreCase("false");
-        if ((operator == ParamOperator.Equals || operator == ParamOperator.NotEquals) && targetIsBoolean && booleanSupplier != null) {
-            boolean actual = booleanSupplier.getAsBoolean();
-            boolean expected = Boolean.parseBoolean(target);
-            return operator == ParamOperator.Equals ? actual == expected : actual != expected;
-        }
-        Double targetNumber = null;
-        try {
-            targetNumber = Double.parseDouble(target);
-        } catch (NumberFormatException ignored) {
-            targetNumber = null;
-        }
-        if (numberSupplier != null && targetNumber != null) {
-            double actual = numberSupplier.getAsDouble();
-            int compare = Double.compare(actual, targetNumber);
-            return switch (operator) {
-                case Equals -> compare == 0;
-                case NotEquals -> compare != 0;
-                case GreaterThan -> compare > 0;
-                case GreaterThanOrEqual -> compare >= 0;
-                case LessThan -> compare < 0;
-                case LessThanOrEqual -> compare <= 0;
-            };
-        }
-        if ((operator == ParamOperator.Equals || operator == ParamOperator.NotEquals) && stringSupplier != null) {
-            String value = stringSupplier.get();
-            boolean matches = value != null && value.equalsIgnoreCase(target);
-            return operator == ParamOperator.Equals ? matches : !matches;
-        }
-        return false;
+        return paramMatcher.matchesParamRequirement(requirement, role);
     }
 
     boolean matchesNpcState(StringRequirement requirement, Role role) {
@@ -663,10 +448,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return paramAccess.getRoleNumberParam(role, ctx, paramName, defaultValue);
     }
 
-    private StdScope getRoleScope(Role role) {
-        return paramAccess.resolveRoleScope(role);
-    }
-
     Ref<EntityStore> resolveInteractionTarget(Role role, InfoProvider infoProvider) {
         if (role != null && role.getStateSupport() != null) {
             Ref<EntityStore> target = role.getStateSupport().getInteractionIterationTarget();
@@ -697,17 +478,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
                                         Store<EntityStore> store,
                                         Player player) {
-        if (player == null) {
-            return;
-        }
-        UUID ownerUuid = resolveOwnerUuid(npcRef, store);
-        UUID playerUuid = getPlayerUuid(player);
-        if (ownerUuid == null || playerUuid == null || ownerUuid.equals(playerUuid)) {
-            return;
-        }
-        String npcName = resolveNpcName(resolveNpcEntity(npcRef, store));
-        String ownerName = resolveOwnerName(npcRef, store);
-        OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "interact with");
+        ownershipHelper.maybeNotifyOwnerDenied(npcRef, store, player);
     }
 
     // Captures the selected interaction entry and cooldown metadata.
