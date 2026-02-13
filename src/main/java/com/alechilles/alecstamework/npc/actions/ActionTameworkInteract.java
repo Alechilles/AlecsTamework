@@ -83,9 +83,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final Boolean isHarvestableOverride;
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
-    private final StdScope globalScopeSnapshot;
-    private final StdScope execScopeSnapshot;
-    private final StdScope sensorScopeSnapshot;
+    private final InteractionParamResolver paramResolver;
     private final TameworkInteractEffects effects;
     private final TameworkInteractRequirements requirements;
 
@@ -120,9 +118,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 sensorSnapshot = StdScope.copyOf(supportScope);
             }
         }
-        this.globalScopeSnapshot = globalSnapshot;
-        this.execScopeSnapshot = execSnapshot;
-        this.sensorScopeSnapshot = sensorSnapshot;
+        this.paramResolver = new InteractionParamResolver(globalSnapshot, execSnapshot, sensorSnapshot);
         this.effects = new TameworkInteractEffects(this);
         this.requirements = new TameworkInteractRequirements(this);
     }
@@ -142,7 +138,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             logDebug("TameworkInteract: no player resolved for interaction.");
             return false;
         }
-        StdScope[] roleScopes = orderedScopes(getRoleScope(role));
+        StdScope[] roleScopes = paramResolver.resolveRoleScopes(role, null);
         InteractionContextSnapshot ctx = InteractionContextSnapshot.from(player, roleScopes);
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, DEFAULT_CONFIG_PARAM);
@@ -1287,173 +1283,35 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     }
 
     String getRoleStringParam(Role role, String paramName) {
-        return getRoleStringParam(role, null, paramName);
+        return paramResolver.getStringParam(role, null, paramName);
     }
 
     String getRoleStringParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        if (paramName == null || paramName.isBlank()) {
-            return null;
-        }
-        for (StdScope scope : resolveRoleScopes(role, ctx)) {
-            String value = getStringFromScope(scope, paramName);
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
+        return paramResolver.getStringParam(role, ctx, paramName);
     }
 
     String[] getRoleStringArrayParam(Role role, String paramName) {
-        return getRoleStringArrayParam(role, null, paramName);
+        return paramResolver.getStringArrayParam(role, null, paramName);
     }
 
     String[] getRoleStringArrayParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        if (paramName == null || paramName.isBlank()) {
-            return null;
-        }
-        for (StdScope scope : resolveRoleScopes(role, ctx)) {
-            String[] values = getStringArrayFromScope(scope, paramName);
-            if (values != null && values.length > 0) {
-                return values;
-            }
-        }
-        return null;
+        return paramResolver.getStringArrayParam(role, ctx, paramName);
     }
 
     private boolean getRoleBooleanParam(Role role, InteractionContextSnapshot ctx, String paramName) {
-        if (paramName == null || paramName.isBlank()) {
-            return false;
-        }
-        for (StdScope scope : resolveRoleScopes(role, ctx)) {
-            Boolean value = getBooleanFromScope(scope, paramName);
-            if (value != null) {
-                return value;
-            }
-        }
-        return false;
+        return paramResolver.getBooleanParam(role, ctx, paramName);
     }
 
     double getRoleNumberParam(Role role, String paramName, double defaultValue) {
-        return getRoleNumberParam(role, null, paramName, defaultValue);
+        return paramResolver.getNumberParam(role, null, paramName, defaultValue);
     }
 
     double getRoleNumberParam(Role role, InteractionContextSnapshot ctx, String paramName, double defaultValue) {
-        if (paramName == null || paramName.isBlank()) {
-            return defaultValue;
-        }
-        for (StdScope scope : resolveRoleScopes(role, ctx)) {
-            Double value = getNumberFromScope(scope, paramName);
-            if (value != null) {
-                return value;
-            }
-        }
-        return defaultValue;
+        return paramResolver.getNumberParam(role, ctx, paramName, defaultValue);
     }
 
     private StdScope getRoleScope(Role role) {
-        if (role == null || role.getEntitySupport() == null) {
-            return null;
-        }
-        return role.getEntitySupport().getSensorScope();
-    }
-
-    private StdScope[] resolveRoleScopes(Role role, InteractionContextSnapshot ctx) {
-        if (ctx != null && ctx.roleScopes != null) {
-            return ctx.roleScopes;
-        }
-        return orderedScopes(getRoleScope(role));
-    }
-
-    private StdScope[] orderedScopes(StdScope primary) {
-        StdScope[] scopes = new StdScope[4];
-        int count = 0;
-        if (primary != null) {
-            scopes[count++] = primary;
-        }
-        if (globalScopeSnapshot != null && globalScopeSnapshot != primary) {
-            scopes[count++] = globalScopeSnapshot;
-        }
-        if (execScopeSnapshot != null && execScopeSnapshot != primary) {
-            scopes[count++] = execScopeSnapshot;
-        }
-        if (sensorScopeSnapshot != null
-                && sensorScopeSnapshot != primary
-                && sensorScopeSnapshot != globalScopeSnapshot
-                && sensorScopeSnapshot != execScopeSnapshot) {
-            scopes[count++] = sensorScopeSnapshot;
-        }
-        return count == scopes.length ? scopes : Arrays.copyOf(scopes, count);
-    }
-
-    private String getStringFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        Supplier<String> supplier;
-        try {
-            supplier = scope.getStringSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            return null;
-        }
-        return supplier != null ? supplier.get() : null;
-    }
-
-    private String[] getStringArrayFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        Supplier<String[]> arraySupplier;
-        try {
-            arraySupplier = scope.getStringArraySupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            arraySupplier = null;
-        }
-        if (arraySupplier != null) {
-            String[] values = arraySupplier.get();
-            if (values != null && values.length > 0) {
-                return values;
-            }
-        }
-        Supplier<String> stringSupplier;
-        try {
-            stringSupplier = scope.getStringSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            stringSupplier = null;
-        }
-        if (stringSupplier == null) {
-            return null;
-        }
-        String value = stringSupplier.get();
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return new String[] { value };
-    }
-
-    private Boolean getBooleanFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        BooleanSupplier supplier;
-        try {
-            supplier = scope.getBooleanSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            return null;
-        }
-        return supplier != null ? supplier.getAsBoolean() : null;
-    }
-
-    private Double getNumberFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        DoubleSupplier supplier;
-        try {
-            supplier = scope.getNumberSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            return null;
-        }
-        return supplier != null ? supplier.getAsDouble() : null;
+        return paramResolver.resolveRoleScope(role);
     }
 
     Ref<EntityStore> resolveInteractionTarget(Role role, InfoProvider infoProvider) {
