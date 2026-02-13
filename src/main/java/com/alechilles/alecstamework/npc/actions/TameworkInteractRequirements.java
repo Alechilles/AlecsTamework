@@ -293,7 +293,7 @@ final class TameworkInteractRequirements {
         if (!owner.isTamed(npcRef, store)) {
             return false;
         }
-        ActionTameworkInteract.ResolvedFeedItems resolved = owner.resolveFeedItems(interaction, role, ctx);
+        InteractionFeedItems resolved = owner.resolveFeedItems(interaction, role, ctx);
         if (resolved == null || !resolved.requiresItems()) {
             return true;
         }

@@ -8,22 +8,22 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
-import com.hypixel.hytale.server.npc.util.Alarm;
-import java.time.Instant;
 import java.util.Locale;
 
 // Helper routines for matching interaction context, movement state, and alarms.
 final class InteractionMatchHelpers {
     private final ActionTameworkInteract owner;
     private final InteractionParamAccess paramAccess;
+    private final InteractionAlarmHelper alarmHelper;
 
-    InteractionMatchHelpers(ActionTameworkInteract owner, InteractionParamAccess paramAccess) {
+    InteractionMatchHelpers(ActionTameworkInteract owner,
+                            InteractionParamAccess paramAccess,
+                            InteractionAlarmHelper alarmHelper) {
         this.owner = owner;
         this.paramAccess = paramAccess;
+        this.alarmHelper = alarmHelper;
     }
 
     // Checks whether the required interaction context is present.
@@ -112,30 +112,8 @@ final class InteractionMatchHelpers {
         if (alarmName == null || alarmName.isBlank()) {
             return false;
         }
-        NPCEntity npc = owner.resolveNpcEntity(npcRef, store);
-        if (npc == null) {
-            return false;
-        }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return false;
-        }
-        Alarm alarm = alarmStore.get(npc, alarmName);
         String state = requirement.getState() != null ? requirement.getState().trim().toLowerCase(Locale.ROOT) : "";
-        if (alarm == null) {
-            return "unset".equals(state);
-        }
-        Instant now = resolveGameTime(store);
-        switch (state) {
-            case "unset":
-                return !alarm.isSet();
-            case "passed":
-                return alarm.isSet() && alarm.hasPassed(now);
-            case "active":
-                return alarm.isSet() && !alarm.hasPassed(now);
-            default:
-                return false;
-        }
+        return alarmHelper.matchesAlarmState(npcRef, store, alarmName, state);
     }
 
     // Resolves a context parameter value from role params.
@@ -179,15 +157,4 @@ final class InteractionMatchHelpers {
         return component != null ? component.getMovementStates() : null;
     }
 
-    // Uses world time if available; otherwise falls back to wall-clock.
-    private Instant resolveGameTime(Store<EntityStore> store) {
-        if (store == null) {
-            return Instant.now();
-        }
-        var time = store.getResource(com.hypixel.hytale.server.core.modules.time.WorldTimeResource.getResourceType());
-        if (time == null) {
-            return Instant.now();
-        }
-        return time.getGameTime();
-    }
 }

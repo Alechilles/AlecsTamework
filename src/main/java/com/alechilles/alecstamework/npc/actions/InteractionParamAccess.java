@@ -83,29 +83,29 @@ final class InteractionParamAccess {
     }
 
     // Resolves feed items from params, explicit items, or loved items.
-    ActionTameworkInteract.ResolvedFeedItems resolveFeedItems(FeedInteraction interaction,
-                                                              Role role,
-                                                              InteractionContextSnapshot ctx) {
+    InteractionFeedItems resolveFeedItems(FeedInteraction interaction,
+                                          Role role,
+                                          InteractionContextSnapshot ctx) {
         if (interaction == null) {
-            return new ActionTameworkInteract.ResolvedFeedItems(new String[0], new FeedItem[0], false);
+            return new InteractionFeedItems(new String[0], new FeedItem[0], false);
         }
         FeedItem[] paramItems = resolveFeedItemsFromParam(role, ctx, interaction.getItemsParam());
         if (paramItems != null && paramItems.length > 0) {
             String[] paramIds = InteractionItemParser.extractItemIds(paramItems);
             if (paramIds.length > 0) {
-                return new ActionTameworkInteract.ResolvedFeedItems(paramIds, paramItems, true);
+                return new InteractionFeedItems(paramIds, paramItems, true);
             }
         }
         FeedItem[] explicitItems = interaction.getItemsInHand();
         String[] explicitIds = InteractionItemParser.extractItemIds(explicitItems);
         if (explicitIds.length > 0) {
-            return new ActionTameworkInteract.ResolvedFeedItems(explicitIds, explicitItems, true);
+            return new InteractionFeedItems(explicitIds, explicitItems, true);
         }
         boolean useLovedItems = interaction.getUseLovedItems() == null || interaction.getUseLovedItems();
         if (useLovedItems) {
-            return new ActionTameworkInteract.ResolvedFeedItems(resolveLovedItems(role, ctx), new FeedItem[0], true);
+            return new InteractionFeedItems(resolveLovedItems(role, ctx), new FeedItem[0], true);
         }
-        return new ActionTameworkInteract.ResolvedFeedItems(new String[0], new FeedItem[0], false);
+        return new InteractionFeedItems(new String[0], new FeedItem[0], false);
     }
 
     // Resolves feed items from a parameter that can include JSON or item lists.

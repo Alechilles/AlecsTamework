@@ -12,28 +12,21 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedIntera
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
-import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
-import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.EntityPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
-import com.hypixel.hytale.server.npc.storage.AlarmStore;
-import com.hypixel.hytale.server.npc.util.Alarm;
 import com.hypixel.hytale.server.npc.util.expression.ExecutionContext;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.server.npc.util.expression.Scope;
-import java.time.Instant;
-import java.util.UUID;
 
 /**
  * Prototype action that executes a TwInteractionConfig-driven interaction flow.
@@ -54,6 +47,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final Boolean isHarvestableOverride;
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
+    private final InteractionConfigResolver configResolver;
     private final InteractionParamAccess paramAccess;
     private final InteractionItemRequirementResolver itemRequirements;
     private final TameworkInteractEffects effects;
@@ -65,6 +59,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final InteractionMatchHelpers matchHelpers;
     private final InteractionParamMatcher paramMatcher;
     private final InteractionOwnershipHelper ownershipHelper;
+    private final InteractionAlarmHelper alarmHelper;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         super(builder);
@@ -105,6 +100,11 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 isHarvestableOverride,
                 isMountableOverride
         );
+        this.configResolver = new InteractionConfigResolver(
+                configIdOverride,
+                paramAccess,
+                DEFAULT_CONFIG_PARAM
+        );
         this.itemRequirements = new InteractionItemRequirementResolver(paramResolver);
         this.effects = new TameworkInteractEffects(this);
         this.requirements = new TameworkInteractRequirements(this);
@@ -112,7 +112,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
         this.selector = new InteractionSelector(this, requirements, cooldowns);
         this.diagnostics = new InteractionDiagnostics(this);
-        this.matchHelpers = new InteractionMatchHelpers(this, paramAccess);
+        this.alarmHelper = new InteractionAlarmHelper(this);
+        this.matchHelpers = new InteractionMatchHelpers(this, paramAccess, alarmHelper);
         this.paramMatcher = new InteractionParamMatcher(paramAccess);
         this.ownershipHelper = new InteractionOwnershipHelper(this);
     }
@@ -142,7 +143,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 roleOverride,
                 diagnostics.describeHeldItem(ctx)
         ));
-        TwInteractionConfig config = resolveConfig(role, ctx);
+        TwInteractionConfig config = configResolver.resolveConfig(role, ctx);
         if (config == null || !config.isEnabled()) {
             diagnostics.logDebug(String.format(
                     "TameworkInteract: no config resolved or config disabled (role=%s).",
@@ -166,28 +167,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return applied;
     }
 
-    private TwInteractionConfig resolveConfig(Role role, InteractionContextSnapshot ctx) {
-        DefaultAssetMap<String, TwInteractionConfig> assetMap = TwInteractionConfig.getAssetMap();
-        if (assetMap == null) {
-            return null;
-        }
-        String configId = configIdOverride;
-        if (configId == null || configId.isBlank()) {
-            String roleOverride = getRoleStringParam(role, ctx, DEFAULT_CONFIG_PARAM);
-            if (roleOverride != null && !roleOverride.isBlank()) {
-                configId = roleOverride;
-            }
-        }
-        if (configId != null && !configId.isBlank()) {
-            return assetMap.getAssetMap().get(configId);
-        }
-        String roleId = role != null ? role.getRoleName() : null;
-        if (roleId == null || roleId.isBlank()) {
-            return null;
-        }
-        return TwInteractionConfig.resolveForRole(roleId);
-    }
-
     // Resolves the heal amount for feeding based on held item overrides.
     double resolveFeedHeal(FeedInteraction feed, Role role, InteractionContextSnapshot ctx) {
         if (feed == null) {
@@ -196,7 +175,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         Double baseHeal = feed.getHeal();
         String heldItem = ctx != null ? ctx.activeItemId : null;
         if (heldItem != null && !heldItem.isBlank()) {
-            ResolvedFeedItems resolved = resolveFeedItems(feed, role, ctx);
+            InteractionFeedItems resolved = resolveFeedItems(feed, role, ctx);
             FeedItem[] feedItems = resolved != null ? resolved.getFeedItems() : null;
             if (feedItems != null) {
                 for (FeedItem feedItem : feedItems) {
@@ -212,30 +191,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             }
         }
         return baseHeal != null ? baseHeal : 0;
-    }
-
-    static final class ResolvedFeedItems {
-        private final String[] itemIds;
-        private final FeedItem[] feedItems;
-        private final boolean requiresItems;
-
-        ResolvedFeedItems(String[] itemIds, FeedItem[] feedItems, boolean requiresItems) {
-            this.itemIds = itemIds == null ? new String[0] : itemIds;
-            this.feedItems = feedItems == null ? new FeedItem[0] : feedItems;
-            this.requiresItems = requiresItems;
-        }
-
-        String[] getItemIds() {
-            return itemIds;
-        }
-
-        FeedItem[] getFeedItems() {
-            return feedItems;
-        }
-
-        boolean requiresItems() {
-            return requiresItems;
-        }
     }
 
     // Removes a quantity of the currently held item from the player's hotbar.
@@ -275,35 +230,9 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return ownershipHelper.isOwner(npcRef, store, player);
     }
 
+    // Delegates alarm readiness checks to the alarm helper.
     boolean isAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
-        NPCEntity npc = resolveNpcEntity(npcRef, store);
-        if (npc == null || alarmName == null || alarmName.isBlank()) {
-            return false;
-        }
-        AlarmStore alarmStore = npc.getAlarmStore();
-        if (alarmStore == null) {
-            return false;
-        }
-        Alarm alarm = alarmStore.get(npc, alarmName);
-        if (alarm == null) {
-            return true;
-        }
-        if (!alarm.isSet()) {
-            return true;
-        }
-        return alarm.hasPassed(resolveGameTime(store));
-    }
-
-    // Uses world time if available; otherwise falls back to wall-clock.
-    private Instant resolveGameTime(Store<EntityStore> store) {
-        if (store == null) {
-            return Instant.now();
-        }
-        WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
-        if (time == null) {
-            return Instant.now();
-        }
-        return time.getGameTime();
+        return alarmHelper.isAlarmReady(npcRef, store, alarmName);
     }
 
     // Delegates item-in-hand requirements to the shared resolver.
@@ -407,7 +336,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return currentSubName != null && currentSubName.equalsIgnoreCase(subState);
     }
 
-    ResolvedFeedItems resolveFeedItems(FeedInteraction interaction, Role role, InteractionContextSnapshot ctx) {
+    // Resolves feed items for the interaction using param access.
+    InteractionFeedItems resolveFeedItems(FeedInteraction interaction, Role role, InteractionContextSnapshot ctx) {
         return paramAccess.resolveFeedItems(interaction, role, ctx);
     }
 
