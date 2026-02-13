@@ -97,7 +97,11 @@ class InteractionBehaviorTest {
 
     private static ActionTameworkInteract newInteract() throws Exception {
         Unsafe unsafe = getUnsafe();
-        return (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
+        ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
+        Field paramResolverField = ActionTameworkInteract.class.getDeclaredField("paramResolver");
+        paramResolverField.setAccessible(true);
+        paramResolverField.set(interact, new InteractionParamResolver(null, null, null));
+        return interact;
     }
 
     private static TwInteractionConfig newInteractionConfig() throws Exception {
