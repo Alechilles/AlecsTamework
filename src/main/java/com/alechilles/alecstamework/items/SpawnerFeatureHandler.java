@@ -4,8 +4,11 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.codec.Codec;
@@ -604,10 +607,17 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (config.isCaptureRequireTamed() && !resolveTamedFromComponent(targetRef, world)) {
+            String npcName = resolveNpcDisplayName(npc);
+            OwnerMessageUtil.sendUntamed(player, npcName);
             return false;
         }
         UUID ownerUuid = resolveOwnerFromComponent(targetRef, world);
         if (!isCaptureAllowedByOwnership(player.getUuid(), ownerUuid, config)) {
+            if (ownerUuid != null) {
+                String npcName = resolveNpcDisplayName(npc);
+                String ownerName = resolveOwnerNameFromComponent(targetRef, world);
+                OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "capture");
+            }
             return false;
         }
         return isWithinCaptureDistance(player, targetRef, config, store);
@@ -1419,6 +1429,64 @@ public final class SpawnerFeatureHandler {
         Store<EntityStore> store = world.getEntityStore().getStore();
         TameworkOwnerComponent component = store.getComponent(targetRef, type);
         return component != null ? component.getOwnerId() : null;
+    }
+
+    private String resolveOwnerNameFromComponent(Ref<EntityStore> targetRef, World world) {
+        if (targetRef == null || world == null || !targetRef.isValid()) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
+        if (type == null) {
+            return null;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        TameworkOwnerComponent component = store.getComponent(targetRef, type);
+        return component != null ? component.getOwnerName() : null;
+    }
+
+    private String resolveNpcDisplayName(NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        String displayName = npc.getLegacyDisplayName();
+        if (displayName != null && !displayName.isBlank()) {
+            return displayName;
+        }
+        TranslationRegistry registry = null;
+        Tamework instance = Tamework.getInstance();
+        if (instance != null) {
+            registry = instance.getTranslationRegistry();
+        }
+        int roleIndex = npc.getRoleIndex();
+        if (roleIndex >= 0) {
+            String nameKey = NPCPlugin.get().getName(roleIndex);
+            if (nameKey != null && !nameKey.isBlank()) {
+                String translated = registry != null ? registry.get(nameKey) : null;
+                if (translated != null && !translated.isBlank()) {
+                    return translated;
+                }
+                if (registry != null && !nameKey.contains(".")) {
+                    String derivedKey = "npcRoles." + nameKey + ".name";
+                    translated = registry.get(derivedKey);
+                    if (translated != null && !translated.isBlank()) {
+                        return translated;
+                    }
+                }
+                return nameKey;
+            }
+        }
+        String roleName = npc.getRoleName();
+        if (roleName != null && !roleName.isBlank()) {
+            if (registry != null) {
+                String derivedKey = "npcRoles." + roleName + ".name";
+                String translated = registry.get(derivedKey);
+                if (translated != null && !translated.isBlank()) {
+                    return translated;
+                }
+            }
+            return roleName;
+        }
+        return null;
     }
 
     private UUID resolveEntityUuid(Player player, Ref<EntityStore> targetRef) {

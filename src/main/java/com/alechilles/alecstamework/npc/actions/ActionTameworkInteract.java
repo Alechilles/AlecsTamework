@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequi
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -154,6 +155,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         ResolvedInteraction interaction = selectInteraction(config, npcRef, role, infoProvider, store, player);
         if (interaction == null) {
+            maybeNotifyOwnerDenied(npcRef, store, player);
             logDebug(buildNoMatchSummary(config, npcRef, role, infoProvider, store, player));
             return false;
         }
@@ -1205,6 +1207,22 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 isMountable,
                 crouching
         );
+    }
+
+    private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
+                                        Store<EntityStore> store,
+                                        Player player) {
+        if (player == null) {
+            return;
+        }
+        UUID ownerUuid = resolveOwnerUuid(npcRef, store);
+        UUID playerUuid = getPlayerUuid(player);
+        if (ownerUuid == null || playerUuid == null || ownerUuid.equals(playerUuid)) {
+            return;
+        }
+        String npcName = resolveNpcName(resolveNpcEntity(npcRef, store));
+        String ownerName = resolveOwnerName(npcRef, store);
+        OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "interact with");
     }
 
     private int resolveCooldownSeconds(TwInteractionConfig config, InteractionEntry entry) {
