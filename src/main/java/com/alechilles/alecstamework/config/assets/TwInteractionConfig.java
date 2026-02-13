@@ -30,12 +30,6 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         LessThanOrEqual
     }
 
-    public enum InteractionInputType {
-        Use,
-        Primary,
-        Secondary
-    }
-
     public enum MatchType {
         Any,
         All
@@ -180,17 +174,12 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public static abstract class InteractionEntry {
         boolean enabled = true;
-        InteractionInputType interactionType;
         Integer cooldownSeconds;
         RequirementGroup requires;
         Effects effects;
 
         public boolean isEnabled() {
             return enabled;
-        }
-
-        public InteractionInputType getInteractionType() {
-            return interactionType;
         }
 
         public Integer getCooldownSeconds() {

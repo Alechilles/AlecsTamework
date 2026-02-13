@@ -30,8 +30,6 @@ public final class TwInteractionConfigCodecs {
 
     private static final EnumCodec<ParamOperator> PARAM_OPERATOR_CODEC =
             new EnumCodec<>(ParamOperator.class);
-    private static final EnumCodec<InteractionInputType> INTERACTION_INPUT_CODEC =
-            new EnumCodec<>(InteractionInputType.class);
     private static final EnumCodec<MatchType> MATCH_TYPE_CODEC =
             new EnumCodec<>(MatchType.class);
     private static final EnumCodec<OwnerSource> OWNER_SOURCE_CODEC =
@@ -1138,13 +1136,6 @@ public final class TwInteractionConfigCodecs {
             entry -> entry.enabled
         )
         .documentation("Whether this interaction entry is enabled. Default: true.")
-        .add()
-        .<InteractionInputType>append(
-            new KeyedCodec<>("InteractionType", INTERACTION_INPUT_CODEC),
-            (entry, value) -> entry.interactionType = value,
-            entry -> entry.interactionType
-        )
-        .documentation("Restrict this entry to a specific input type (Use/Primary/Secondary). Default: any.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("CooldownSeconds", Codec.INTEGER),

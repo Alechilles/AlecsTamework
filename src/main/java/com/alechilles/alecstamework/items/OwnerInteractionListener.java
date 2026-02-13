@@ -4,10 +4,8 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.alechilles.alecstamework.npc.actions.InteractionInputTracker;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -19,13 +17,8 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
-import com.hypixel.hytale.server.core.event.events.player.PlayerMouseButtonEvent;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.protocol.MouseButtonEvent;
-import com.hypixel.hytale.protocol.MouseButtonState;
-import com.hypixel.hytale.protocol.MouseButtonType;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -46,28 +39,21 @@ public final class OwnerInteractionListener {
         if (event == null) {
             return;
         }
-        Entity target = event.getTargetEntity();
-        Player player = event.getPlayer();
-        InteractionType actionType = event.getActionType();
-        if (player != null && actionType != null
-                && (actionType == InteractionType.Use
-                || actionType == InteractionType.Primary
-                || actionType == InteractionType.Secondary)) {
-            Entity recordTarget = target instanceof NPCEntity ? target : null;
-            InteractionInputTracker.record(player, recordTarget, actionType);
-        }
         if (event.isCancelled()) {
             return;
         }
+        InteractionType actionType = event.getActionType();
         if (actionType != InteractionType.Use
                 && actionType != InteractionType.Primary
                 && actionType != InteractionType.Secondary) {
             return;
         }
-        if (player == null) {
+        Entity target = event.getTargetEntity();
+        if (!(target instanceof NPCEntity)) {
             return;
         }
-        if (!(target instanceof NPCEntity)) {
+        Player player = event.getPlayer();
+        if (player == null) {
             return;
         }
         UUID ownerUuid = null;
@@ -88,7 +74,6 @@ public final class OwnerInteractionListener {
         }
         // Skip restriction when there is no owner or the player is the owner.
         if (ownerUuid == null || ownerUuid.equals(player.getUuid())) {
-            maybeTriggerAltInteraction(actionType, (NPCEntity) target, player);
             return;
         }
 
@@ -102,7 +87,6 @@ public final class OwnerInteractionListener {
                 if (registry != null) {
                     ItemFeatureConfig config = registry.get(active.getItemId());
                     if (config != null && config.isSpawnerEnabled() && !config.isCaptureOwnerRestricted()) {
-                        maybeTriggerAltInteraction(actionType, (NPCEntity) target, player);
                         return;
                     }
                 }
@@ -180,105 +164,5 @@ public final class OwnerInteractionListener {
                 "Owner restrict: denied interaction player=" + player.getDisplayName()
                         + " target=" + target.getUuid()
         );
-    }
-
-    public void onPlayerMouseButton(PlayerMouseButtonEvent event) {
-        if (event == null) {
-            return;
-        }
-        MouseButtonEvent mouseButton = event.getMouseButton();
-        if (mouseButton == null || mouseButton.state != MouseButtonState.Pressed) {
-            return;
-        }
-        InteractionType actionType = null;
-        if (mouseButton.mouseButtonType == MouseButtonType.Left) {
-            actionType = InteractionType.Primary;
-        } else if (mouseButton.mouseButtonType == MouseButtonType.Right) {
-            actionType = InteractionType.Secondary;
-        }
-        if (actionType == null) {
-            return;
-        }
-        Player player = event.getPlayer();
-        if (player == null) {
-            return;
-        }
-        Entity target = event.getTargetEntity();
-        if (logger != null && target != null) {
-            logger.at(Level.INFO).log(
-                    "MouseButton: type=" + actionType
-                            + " target=" + target.getUuid()
-                            + " targetClass=" + target.getClass().getSimpleName()
-            );
-        }
-        Entity recordTarget = target instanceof NPCEntity ? target : null;
-        InteractionInputTracker.record(player, recordTarget, actionType);
-        if (!(target instanceof NPCEntity)) {
-            return;
-        }
-        maybeTriggerAltInteraction(actionType, (NPCEntity) target, player);
-    }
-
-    private void maybeTriggerAltInteraction(InteractionType actionType, NPCEntity npc, Player player) {
-        if (actionType != InteractionType.Primary && actionType != InteractionType.Secondary) {
-            return;
-        }
-        if (npc == null || player == null) {
-            return;
-        }
-        Role role = npc.getRole();
-        if (role == null || role.getStateSupport() == null) {
-            return;
-        }
-        if (!roleHasInteractionType(role, actionType)) {
-            return;
-        }
-        if (player.getReference() != null && player.getReference().isValid()) {
-            role.getStateSupport().setInteractionIterationTarget(player.getReference());
-        }
-        role.getStateSupport().addInteraction(player);
-    }
-
-    private boolean roleHasInteractionType(Role role, InteractionType actionType) {
-        if (role == null || actionType == null) {
-            return false;
-        }
-        TwInteractionConfig config = resolveConfig(role);
-        if (config == null || !config.isEnabled()) {
-            return false;
-        }
-        TwInteractionConfig.InteractionInputType required =
-                actionType == InteractionType.Primary
-                        ? TwInteractionConfig.InteractionInputType.Primary
-                        : TwInteractionConfig.InteractionInputType.Secondary;
-        for (TwInteractionConfig.InteractionEntry entry : config.getInteractions()) {
-            if (entry == null || !entry.isEnabled()) {
-                continue;
-            }
-            if (required == entry.getInteractionType()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private TwInteractionConfig resolveConfig(Role role) {
-        if (role == null) {
-            return null;
-        }
-        String roleId = role.getRoleName();
-        if (roleId == null || roleId.isBlank()) {
-            return null;
-        }
-        var assetMap = TwInteractionConfig.getAssetMap();
-        if (assetMap == null) {
-            return null;
-        }
-        for (TwInteractionConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate != null && candidate.isEnabled() && candidate.matchesRole(roleId)) {
-                return candidate;
-            }
-        }
-        return null;
     }
 }

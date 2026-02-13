@@ -10,7 +10,6 @@
     "HarvestInteractionContext": "Shear",
     "HarvestParticles": "Sheep_Wool_Shear",
     "HarvestSound": "SFX_Sheep_Sheared",
-    "InteractionConfigId": "TwInteractionConfig_Interact_Test",
     "LovedItems": [
       "Plant_Fruit_Apple"
     ]
