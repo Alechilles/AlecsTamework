@@ -17,12 +17,13 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
 // Executes a resolved interaction entry using shared effect handlers.
 final class InteractionExecutor {
-    private final ActionTameworkInteract owner;
     private final TameworkInteractEffects effects;
+    private final InteractionFeedHelper feedHelper;
 
-    InteractionExecutor(ActionTameworkInteract owner, TameworkInteractEffects effects) {
-        this.owner = owner;
+    // Builds an executor using shared effect and feed helpers.
+    InteractionExecutor(TameworkInteractEffects effects, InteractionFeedHelper feedHelper) {
         this.effects = effects;
+        this.feedHelper = feedHelper;
     }
 
     // Applies a single interaction entry and any configured custom effects.
@@ -38,14 +39,14 @@ final class InteractionExecutor {
         }
         if (entry instanceof TameInteraction) {
             boolean applied = effects.applyStartTaming(npcRef, store, player);
-            owner.removeHeldItemQuantity(player, 1);
+            feedHelper.consumeHeldItem(player, 1);
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
         }
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;
-            double healAmount = owner.resolveFeedHeal(feed, role, ctx);
+            double healAmount = feedHelper.resolveFeedHeal(feed, role, ctx);
             boolean applied = effects.applyFeeding(npcRef, store, healAmount, player);
-            owner.removeHeldItemQuantity(player, 1);
+            feedHelper.consumeHeldItem(player, 1);
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
         }
         if (entry instanceof HarvestInteraction) {

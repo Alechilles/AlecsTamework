@@ -33,7 +33,7 @@ final class TameworkInteractEffects {
 
     TameworkInteractEffects(ActionTameworkInteract owner) {
         this.owner = owner;
-        this.inventoryEffects = new InteractionInventoryEffects(owner);
+        this.inventoryEffects = new InteractionInventoryEffects();
         this.presentationEffects = new InteractionPresentationEffects();
         this.stateEffects = new InteractionStateEffects();
         this.modeCycleEffects = new InteractionModeCycleEffects(owner, presentationEffects, stateEffects);

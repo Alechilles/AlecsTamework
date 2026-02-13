@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemInventoryEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
@@ -21,14 +22,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.util.logging.Level;
 
 // Applies inventory-related interaction effects and item drops.
 final class InteractionInventoryEffects {
-    private final ActionTameworkInteract owner;
-
-    // Builds inventory effects tied to the owning action.
-    InteractionInventoryEffects(ActionTameworkInteract owner) {
-        this.owner = owner;
+    // Builds inventory effects for interaction entries.
+    InteractionInventoryEffects() {
     }
 
     // Removes items from the player's active hotbar slot.
@@ -37,7 +36,7 @@ final class InteractionInventoryEffects {
             return false;
         }
         int quantity = effect.getQuantity() != null ? effect.getQuantity() : 1;
-        return owner.removeHeldItemQuantity(player, quantity);
+        return InteractionItemConsumption.removeHeldItemQuantity(player, quantity);
     }
 
     // Removes items from the player's inventory container.
@@ -155,7 +154,7 @@ final class InteractionInventoryEffects {
             DefaultAssetMap<String, ItemDropList> assetMap = ItemDropList.getAssetMap();
             ItemDropList dropList = assetMap != null ? assetMap.getAssetMap().get(dropListId) : null;
             if (dropList == null) {
-                owner.logDebug("DropItem effect: drop list not found: " + dropListId);
+                logDebug("DropItem effect: drop list not found: " + dropListId);
             } else {
                 ItemDropContainer container = dropList.getContainer();
                 if (container != null) {
@@ -206,5 +205,13 @@ final class InteractionInventoryEffects {
             return min;
         }
         return min + random.nextInt(max - min + 1);
+    }
+
+    // Emits a debug log entry when available.
+    private void logDebug(String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance != null && instance.getLogger() != null) {
+            instance.getLogger().at(Level.FINE).log(message);
+        }
     }
 }

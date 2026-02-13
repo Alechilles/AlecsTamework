@@ -20,9 +20,16 @@ import java.util.function.Predicate;
 
 final class TameworkInteractRequirements {
     private final ActionTameworkInteract owner;
+    private final InteractionFeedHelper feedHelper;
+    private final InteractionAlarmHelper alarmHelper;
 
-    TameworkInteractRequirements(ActionTameworkInteract owner) {
+    // Builds the requirement evaluator with shared helpers.
+    TameworkInteractRequirements(ActionTameworkInteract owner,
+                                 InteractionFeedHelper feedHelper,
+                                 InteractionAlarmHelper alarmHelper) {
         this.owner = owner;
+        this.feedHelper = feedHelper;
+        this.alarmHelper = alarmHelper;
     }
 
     boolean requirementsMet(InteractionEntry entry,
@@ -115,7 +122,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isHarvestAlarmReady()
-                && !owner.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
+                && !alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
             return false;
         }
         if (bucket.isHarvestInteractionContext()
@@ -196,7 +203,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isHarvestAlarmReady()
-                && owner.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
+                && alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
             return true;
         }
         if (bucket.isHarvestInteractionContext()
@@ -293,7 +300,7 @@ final class TameworkInteractRequirements {
         if (!owner.isTamed(npcRef, store)) {
             return false;
         }
-        InteractionFeedItems resolved = owner.resolveFeedItems(interaction, role, ctx);
+        InteractionFeedItems resolved = feedHelper.resolveFeedItems(interaction, role, ctx);
         if (resolved == null || !resolved.requiresItems()) {
             return true;
         }
@@ -317,7 +324,7 @@ final class TameworkInteractRequirements {
         if (requireHarvestable && !owner.resolveIsHarvestable(role, ctx)) {
             return false;
         }
-        if (requireAlarm && !owner.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
+        if (requireAlarm && !alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
             return false;
         }
         if (requireContext && !owner.matchesHarvestContext(role, infoProvider, ctx)) {

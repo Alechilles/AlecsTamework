@@ -7,17 +7,12 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Interactio
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquippedRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInventoryRequirement;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.Inventory;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -49,6 +44,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final String harvestContextOverride;
     private final InteractionConfigResolver configResolver;
     private final InteractionParamAccess paramAccess;
+    private final InteractionFeedHelper feedHelper;
     private final InteractionItemRequirementResolver itemRequirements;
     private final TameworkInteractEffects effects;
     private final TameworkInteractRequirements requirements;
@@ -105,14 +101,15 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 paramAccess,
                 DEFAULT_CONFIG_PARAM
         );
+        this.feedHelper = new InteractionFeedHelper(paramAccess);
         this.itemRequirements = new InteractionItemRequirementResolver(paramResolver);
         this.effects = new TameworkInteractEffects(this);
-        this.requirements = new TameworkInteractRequirements(this);
-        this.executor = new InteractionExecutor(this, effects);
-        this.cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
-        this.selector = new InteractionSelector(this, requirements, cooldowns);
-        this.diagnostics = new InteractionDiagnostics(this);
         this.alarmHelper = new InteractionAlarmHelper(this);
+        this.requirements = new TameworkInteractRequirements(this, feedHelper, alarmHelper);
+        this.executor = new InteractionExecutor(effects, feedHelper);
+        this.cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
+        this.selector = new InteractionSelector(this, requirements, cooldowns, alarmHelper);
+        this.diagnostics = new InteractionDiagnostics(this, alarmHelper);
         this.matchHelpers = new InteractionMatchHelpers(this, paramAccess, alarmHelper);
         this.paramMatcher = new InteractionParamMatcher(paramAccess);
         this.ownershipHelper = new InteractionOwnershipHelper(this);
@@ -167,72 +164,12 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         return applied;
     }
 
-    // Resolves the heal amount for feeding based on held item overrides.
-    double resolveFeedHeal(FeedInteraction feed, Role role, InteractionContextSnapshot ctx) {
-        if (feed == null) {
-            return 0;
-        }
-        Double baseHeal = feed.getHeal();
-        String heldItem = ctx != null ? ctx.activeItemId : null;
-        if (heldItem != null && !heldItem.isBlank()) {
-            InteractionFeedItems resolved = resolveFeedItems(feed, role, ctx);
-            FeedItem[] feedItems = resolved != null ? resolved.getFeedItems() : null;
-            if (feedItems != null) {
-                for (FeedItem feedItem : feedItems) {
-                    if (feedItem == null) {
-                        continue;
-                    }
-                    String itemId = feedItem.getItem();
-                    if (itemId != null && itemId.equalsIgnoreCase(heldItem)) {
-                        Double itemHeal = feedItem.getHeal();
-                        return itemHeal != null ? itemHeal : (baseHeal != null ? baseHeal : 0);
-                    }
-                }
-            }
-        }
-        return baseHeal != null ? baseHeal : 0;
-    }
-
-    // Removes a quantity of the currently held item from the player's hotbar.
-    boolean removeHeldItemQuantity(Player player, int quantity) {
-        if (player == null) {
-            return false;
-        }
-        if (quantity <= 0) {
-            return false;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return false;
-        }
-        byte slot = inventory.getActiveHotbarSlot();
-        if (slot == Inventory.INACTIVE_SLOT_INDEX) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        ItemStack stack = hotbar != null ? hotbar.getItemStack(slot) : null;
-        if (stack == null || stack.isEmpty()) {
-            return false;
-        }
-        int removeCount = Math.min(quantity, stack.getQuantity());
-        if (removeCount <= 0) {
-            return false;
-        }
-        hotbar.removeItemStackFromSlot((short) slot, removeCount);
-        return true;
-    }
-
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         return ownershipHelper.isTamed(npcRef, store);
     }
 
     boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
         return ownershipHelper.isOwner(npcRef, store, player);
-    }
-
-    // Delegates alarm readiness checks to the alarm helper.
-    boolean isAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
-        return alarmHelper.isAlarmReady(npcRef, store, alarmName);
     }
 
     // Delegates item-in-hand requirements to the shared resolver.
@@ -334,11 +271,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 .getStateHelper()
                 .getSubStateName(currentState, currentSubState);
         return currentSubName != null && currentSubName.equalsIgnoreCase(subState);
-    }
-
-    // Resolves feed items for the interaction using param access.
-    InteractionFeedItems resolveFeedItems(FeedInteraction interaction, Role role, InteractionContextSnapshot ctx) {
-        return paramAccess.resolveFeedItems(interaction, role, ctx);
     }
 
     String[] resolveLovedItems(Role role, InteractionContextSnapshot ctx) {
