@@ -11,7 +11,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.logging.Level;
 
-// Reports debug diagnostics for interaction matching and execution.
+/** Reports debug diagnostics for interaction matching and execution. */
 final class InteractionDiagnostics {
     private final ActionTameworkInteract owner;
     private final InteractionAlarmHelper alarmHelper;

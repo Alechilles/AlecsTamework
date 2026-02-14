@@ -20,7 +20,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.UUID;
 
-// Applies interaction effects that change NPC ownership, stats, or states.
+/** Applies interaction effects that change NPC ownership, stats, or states. */
 final class InteractionStateEffects {
     private static final String HEALTH_STAT_ID = "Health";
 

@@ -16,7 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-// Handles item-based requirement resolution and checks for interactions.
+/** Handles item-based requirement resolution and checks for interactions. */
 final class InteractionItemRequirementResolver {
     private final InteractionParamResolver paramResolver;
 

@@ -9,7 +9,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
-// Evaluates parameter-based requirements against role scopes.
+/** Evaluates parameter-based requirements against role scopes. */
 final class InteractionParamMatcher {
     private final InteractionParamAccess paramAccess;
 

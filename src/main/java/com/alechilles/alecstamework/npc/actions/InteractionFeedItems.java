@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 
-// Holds resolved feed items and their item id list.
+/** Holds resolved feed items and their item id list. */
 final class InteractionFeedItems {
     private final String[] itemIds;
     private final FeedItem[] feedItems;

@@ -25,7 +25,7 @@ import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 
-// Applies inventory-related interaction effects and item drops.
+/** Applies inventory-related interaction effects and item drops. */
 final class InteractionInventoryEffects {
     // Builds inventory effects for interaction entries.
     InteractionInventoryEffects() {

@@ -11,7 +11,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 
-// Applies interaction hook effects by writing the hook component to the NPC.
+/** Applies interaction hook effects by writing the hook component to the NPC. */
 final class InteractionHookEffects {
     private final ActionTameworkInteract owner;
 

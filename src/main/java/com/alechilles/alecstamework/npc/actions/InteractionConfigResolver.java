@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.npc.role.Role;
 
-// Resolves interaction configs using overrides, role params, and role IDs.
+/** Resolves interaction configs using overrides, role params, and role IDs. */
 final class InteractionConfigResolver {
     private final String configIdOverride;
     private final InteractionParamAccess paramAccess;

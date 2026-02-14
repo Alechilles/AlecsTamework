@@ -15,7 +15,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
-// Executes a resolved interaction entry using shared effect handlers.
+/** Executes a resolved interaction entry using shared effect handlers. */
 final class InteractionExecutor {
     private final TameworkInteractEffects effects;
     private final InteractionFeedHelper feedHelper;

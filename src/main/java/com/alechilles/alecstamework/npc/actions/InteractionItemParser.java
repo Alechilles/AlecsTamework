@@ -8,6 +8,7 @@ import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import java.util.ArrayList;
 
+/** Interaction item parser. */
 final class InteractionItemParser {
     private InteractionItemParser() {
     }

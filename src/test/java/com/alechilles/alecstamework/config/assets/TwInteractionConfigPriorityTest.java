@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
+/** Tests for Tw interaction config priority. */
 class TwInteractionConfigPriorityTest {
 
     @Test

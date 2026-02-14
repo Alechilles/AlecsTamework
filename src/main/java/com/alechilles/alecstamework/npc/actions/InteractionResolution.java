@@ -4,7 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.npc.role.Role;
 
-// Resolves interaction configs and role-scoped parameters.
+/** Resolves interaction configs and role-scoped parameters. */
 final class InteractionResolution {
     private final InteractionParamAccess paramAccess;
     private final InteractionConfigResolver configResolver;

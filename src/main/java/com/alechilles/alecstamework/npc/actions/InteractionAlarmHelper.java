@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.Locale;
 
 // Centralizes alarm lookups and time resolution for interaction checks.
-// Uses game time when available (WorldTimeResource), falling back to wall-clock.
+/** Uses game time when available (WorldTimeResource), falling back to wall-clock. */
 final class InteractionAlarmHelper {
     private final ActionTameworkInteract owner;
 

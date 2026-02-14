@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 
+/** Interaction ui message service. */
 final class InteractionUiMessageService {
     private static final long UI_MESSAGE_DURATION_MS = 1200L;
     private static final int UI_MESSAGE_FADE_STEP_COUNT = 6;

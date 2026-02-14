@@ -5,6 +5,7 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import javax.annotation.Nonnull;
 
+/** Tamework message hud. */
 public final class TameworkMessageHud extends CustomUIHud {
     public static final String UI_PATH = "TameworkMessageHud.ui";
     private static final String ROOT_VISIBLE_SELECTOR = "#TameworkMessageRoot.Visible";

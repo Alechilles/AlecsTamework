@@ -5,7 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.npc.role.Role;
 
-// Resolves feed items/heal values and applies item consumption.
+/** Resolves feed items/heal values and applies item consumption. */
 final class InteractionFeedHelper {
     private final InteractionParamAccess paramAccess;
 

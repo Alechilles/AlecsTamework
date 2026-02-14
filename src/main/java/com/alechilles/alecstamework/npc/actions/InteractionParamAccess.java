@@ -6,7 +6,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 
-// Resolves role-scoped parameters and feed item definitions.
+/** Resolves role-scoped parameters and feed item definitions. */
 final class InteractionParamAccess {
     private final InteractionParamResolver paramResolver;
     private final boolean hasLovedItemsOverride;

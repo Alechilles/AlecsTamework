@@ -8,6 +8,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
 
+/** Interaction param resolver. */
 final class InteractionParamResolver {
     private final StdScope globalScopeSnapshot;
     private final StdScope execScopeSnapshot;

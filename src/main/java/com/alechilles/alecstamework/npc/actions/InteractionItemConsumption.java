@@ -5,7 +5,7 @@ import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 
-// Handles removing consumed items from a player's held slot.
+/** Handles removing consumed items from a player's held slot. */
 final class InteractionItemConsumption {
     // Utility container for item consumption helpers.
     private InteractionItemConsumption() {

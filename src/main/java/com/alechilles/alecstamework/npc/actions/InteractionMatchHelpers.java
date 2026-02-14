@@ -12,7 +12,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Locale;
 
-// Helper routines for matching interaction context, movement state, and alarms.
+/** Helper routines for matching interaction context, movement state, and alarms. */
 final class InteractionMatchHelpers {
     private final ActionTameworkInteract owner;
     private final InteractionParamAccess paramAccess;

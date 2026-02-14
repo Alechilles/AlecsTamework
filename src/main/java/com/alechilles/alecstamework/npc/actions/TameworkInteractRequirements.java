@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.function.Predicate;
 
+/** Tamework interact requirements. */
 final class TameworkInteractRequirements {
     private final ActionTameworkInteract owner;
     private final InteractionFeedHelper feedHelper;

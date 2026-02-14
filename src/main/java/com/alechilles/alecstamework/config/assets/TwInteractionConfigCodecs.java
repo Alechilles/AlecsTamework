@@ -24,6 +24,7 @@ import org.bson.BsonNull;
 import org.bson.BsonValue;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.*;
 
+/** Tw interaction config codecs. */
 public final class TwInteractionConfigCodecs {
     private TwInteractionConfigCodecs() {
     }

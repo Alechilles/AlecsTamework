@@ -9,7 +9,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
 
-// Checks ownership/tamed state and sends ownership denial messages.
+/** Checks ownership/tamed state and sends ownership denial messages. */
 final class InteractionOwnershipHelper {
     private final ActionTameworkInteract owner;
 

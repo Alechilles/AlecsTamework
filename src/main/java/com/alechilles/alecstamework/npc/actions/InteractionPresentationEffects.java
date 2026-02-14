@@ -25,7 +25,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
-// Handles presentation-facing effects like UI messages, sounds, particles, and combat text.
+/** Handles presentation-facing effects like UI messages, sounds, particles, and combat text. */
 final class InteractionPresentationEffects {
     private final InteractionUiMessageService uiMessageService = new InteractionUiMessageService();
 

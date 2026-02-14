@@ -16,7 +16,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 
-// Applies mount-related interaction effects.
+/** Applies mount-related interaction effects. */
 final class InteractionMountEffects {
     private static final String EMPTY_ROLE_ID = "Empty_Role";
     private static final String DEFAULT_MOUNT_ANCHOR_X_PARAM = "MountAnchorX";

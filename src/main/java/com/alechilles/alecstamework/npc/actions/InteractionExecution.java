@@ -7,7 +7,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
-// Applies resolved interactions and handles cooldown updates.
+/** Applies resolved interactions and handles cooldown updates. */
 final class InteractionExecution {
     private final InteractionExecutor executor;
     private final InteractionCooldowns cooldowns;

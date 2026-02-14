@@ -9,7 +9,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.ArrayList;
 
-// Handles mode-cycle state transitions and related messaging.
+/** Handles mode-cycle state transitions and related messaging. */
 final class InteractionModeCycleEffects {
     private static final ModeStep[] DEFAULT_MODE_CYCLE = new ModeStep[] {
             new ModeStep("Hold", null, null),

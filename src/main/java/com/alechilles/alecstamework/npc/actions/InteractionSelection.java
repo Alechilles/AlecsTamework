@@ -15,7 +15,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
-// Groups selection helpers used to evaluate requirements and pick interactions.
+/** Groups selection helpers used to evaluate requirements and pick interactions. */
 final class InteractionSelection {
     private final InteractionItemRequirementResolver itemRequirements;
     private final InteractionMatchHelpers matchHelpers;

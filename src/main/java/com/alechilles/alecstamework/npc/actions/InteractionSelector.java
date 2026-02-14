@@ -9,7 +9,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
-// Selects the first matching interaction entry, respecting cooldowns and requirements.
+/** Selects the first matching interaction entry, respecting cooldowns and requirements. */
 final class InteractionSelector {
     private final ActionTameworkInteract owner;
     private final TameworkInteractRequirements requirements;

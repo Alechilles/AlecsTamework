@@ -22,6 +22,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 
+/** Tamework interact effects. */
 final class TameworkInteractEffects {
     private final ActionTameworkInteract owner;
     private final InteractionInventoryEffects inventoryEffects;
