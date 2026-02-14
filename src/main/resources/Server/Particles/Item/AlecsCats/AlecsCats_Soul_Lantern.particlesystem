@@ -1,0 +1,13 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "AlecsCats_Soul_Lantern_Fireflies"
+    },
+    {
+      "SpawnerId": "AlecsCats_Soul_Lantern_Fireflies_Start",
+      "PositionOffset": {
+        "Y": 0
+      }
+    }
+  ]
+}

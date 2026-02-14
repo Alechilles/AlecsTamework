@@ -1,0 +1,22 @@
+{
+  "Layers": [
+    {
+      "Files": [
+        "Sounds/Magic/Furniture/Kweebec_Lantern_Loop_01.ogg"
+      ],
+      "Volume": -12,
+      "RandomSettings": {
+        "MinPitch": -2,
+        "MaxPitch": 2,
+        "MinVolume": -2,
+        "MaxVolume": 2
+      },
+      "Looping": true
+    }
+  ],
+  "Volume": 0,
+  "Parent": "SFX_Attn_Moderate",
+  "Pitch": -12,
+  "StartAttenuationDistance": 0,
+  "MaxDistance": 5
+}
