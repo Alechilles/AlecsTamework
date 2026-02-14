@@ -24,6 +24,7 @@
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.
 - `TameworkHook` sensors can consume the hook automatically if `Consume` is true.
+- In NPC instructions, use `Sensor` (singular). `Sensors` is not supported and will default to always-match behavior.
 - Use debug logs or temporary particles to verify the hook was emitted and consumed.
 
 ## Visual debugging tips

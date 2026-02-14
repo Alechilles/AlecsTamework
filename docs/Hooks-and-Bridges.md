@@ -30,6 +30,9 @@ Fields:
 - `HookId` (required)
 - `Consume` (optional, clears the hook when matched)
 
+Important:
+- NPC instructions use the `Sensor` field (singular). `Sensors` is not a valid instruction field and will default to an always-matching instruction, which can cause the hook actions to fire every tick.
+
 Extra info params provided:
 - `HookId`
 - `HookPlayerId`
