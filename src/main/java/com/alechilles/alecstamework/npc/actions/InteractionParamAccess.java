@@ -13,17 +13,26 @@ final class InteractionParamAccess {
     private final String[] lovedItemsOverride;
     private final Boolean isHarvestableOverride;
     private final Boolean isMountableOverride;
+    private final String lovedItemsParamName;
+    private final String isHarvestableParamName;
+    private final String isMountableParamName;
 
     InteractionParamAccess(InteractionParamResolver paramResolver,
                            boolean hasLovedItemsOverride,
                            String[] lovedItemsOverride,
                            Boolean isHarvestableOverride,
-                           Boolean isMountableOverride) {
+                           Boolean isMountableOverride,
+                           String lovedItemsParamName,
+                           String isHarvestableParamName,
+                           String isMountableParamName) {
         this.paramResolver = paramResolver;
         this.hasLovedItemsOverride = hasLovedItemsOverride;
         this.lovedItemsOverride = lovedItemsOverride;
         this.isHarvestableOverride = isHarvestableOverride;
         this.isMountableOverride = isMountableOverride;
+        this.lovedItemsParamName = lovedItemsParamName;
+        this.isHarvestableParamName = isHarvestableParamName;
+        this.isMountableParamName = isMountableParamName;
     }
 
     // Builds an interaction snapshot from the player and role scopes.
@@ -62,7 +71,7 @@ final class InteractionParamAccess {
         if (hasLovedItemsOverride) {
             return lovedItemsOverride != null ? lovedItemsOverride : new String[0];
         }
-        String[] items = getRoleStringArrayParam(role, ctx, ActionTameworkInteract.DEFAULT_LOVED_ITEMS_PARAM);
+        String[] items = getRoleStringArrayParam(role, ctx, lovedItemsParamName);
         return items != null ? items : new String[0];
     }
 
@@ -71,7 +80,7 @@ final class InteractionParamAccess {
         if (isHarvestableOverride != null) {
             return isHarvestableOverride;
         }
-        return getRoleBooleanParam(role, ctx, ActionTameworkInteract.DEFAULT_IS_HARVESTABLE_PARAM);
+        return getRoleBooleanParam(role, ctx, isHarvestableParamName);
     }
 
     // Resolves whether the role is mountable using overrides or params.
@@ -79,7 +88,7 @@ final class InteractionParamAccess {
         if (isMountableOverride != null) {
             return isMountableOverride;
         }
-        return getRoleBooleanParam(role, ctx, ActionTameworkInteract.DEFAULT_IS_MOUNTABLE_PARAM);
+        return getRoleBooleanParam(role, ctx, isMountableParamName);
     }
 
     // Resolves feed items from params, explicit items, or loved items.

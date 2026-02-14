@@ -15,11 +15,15 @@ import java.util.logging.Level;
 final class InteractionDiagnostics {
     private final ActionTameworkInteract owner;
     private final InteractionAlarmHelper alarmHelper;
+    private final String harvestAlarmName;
 
     // Builds diagnostics output with shared alarm helper access.
-    InteractionDiagnostics(ActionTameworkInteract owner, InteractionAlarmHelper alarmHelper) {
+    InteractionDiagnostics(ActionTameworkInteract owner,
+                           InteractionAlarmHelper alarmHelper,
+                           String harvestAlarmName) {
         this.owner = owner;
         this.alarmHelper = alarmHelper;
+        this.harvestAlarmName = harvestAlarmName;
     }
 
     // Logs a warning-level message for unsupported interactions.
@@ -61,7 +65,7 @@ final class InteractionDiagnostics {
         boolean isOwner = owner.isOwner(npcRef, store, player);
         boolean hasLoved = owner.isHeldItemInList(owner.resolveLovedItems(role, ctx), ctx);
         boolean isHarvestable = owner.resolveIsHarvestable(role, ctx);
-        boolean harvestReady = alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM);
+        boolean harvestReady = alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
         boolean harvestContext = owner.matchesHarvestContext(role, infoProvider, ctx);
         boolean isMountable = owner.resolveIsMountable(role, ctx);
         boolean crouching = owner.isPlayerCrouching(role, infoProvider, store);

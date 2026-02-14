@@ -15,16 +15,19 @@ final class InteractionSelector {
     private final TameworkInteractRequirements requirements;
     private final InteractionCooldowns cooldowns;
     private final InteractionAlarmHelper alarmHelper;
+    private final String harvestAlarmName;
 
     // Builds the selector with requirement, cooldown, and alarm helpers.
     InteractionSelector(ActionTameworkInteract owner,
                         TameworkInteractRequirements requirements,
                         InteractionCooldowns cooldowns,
-                        InteractionAlarmHelper alarmHelper) {
+                        InteractionAlarmHelper alarmHelper,
+                        String harvestAlarmName) {
         this.owner = owner;
         this.requirements = requirements;
         this.cooldowns = cooldowns;
         this.alarmHelper = alarmHelper;
+        this.harvestAlarmName = harvestAlarmName;
     }
 
     // Returns the first interaction entry that passes requirements and cooldown checks.
@@ -96,7 +99,7 @@ final class InteractionSelector {
         boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null
                 || harvest.getRequireHarvestAlarmReady();
         return requireAlarm
-                && !alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM);
+                && !alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
     }
 
     // Returns true when the interaction is explicitly tied to contextual input.

@@ -15,7 +15,7 @@ A separate assets zip is produced on build (same output directory as the jar). I
 - `manifest.json`
 - `LICENSE.txt`
 
-The zip does not include server data files like `Tamework_Settings.json` because those are generated under the plugin data directory at runtime.
+The zip includes global config assets (Server/Tamework/Global). There is no generated settings file.
 
 ## Why Two
 This is a temporary solution while we wait for more robust load order control.

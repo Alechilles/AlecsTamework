@@ -1,16 +1,12 @@
 package com.alechilles.alecstamework;
 
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.charset.StandardCharsets;
-import java.nio.file.Path;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
 
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
-import com.alechilles.alecstamework.config.TameworkSettings;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
@@ -46,7 +42,6 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.plugin.event.PluginSetupEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.core.util.Config;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderFactory;
 import com.hypixel.hytale.server.npc.instructions.Action;
@@ -58,17 +53,13 @@ import com.hypixel.hytale.server.npc.instructions.Sensor;
 public class Tamework extends JavaPlugin {
 
     private static Tamework instance;
-    private static final String SETTINGS_RESOURCE_PATH =
-            "Server/Tamework/Tamework_Settings.json";
-    private static final String SETTINGS_FILENAME = "Tamework_Settings";
 
     private ItemFeatureRegistry itemFeatureRegistry;
-    private Config<TameworkSettings> settingsConfig;
-    private TameworkSettings settings;
 
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private boolean npcActionsRegistered;
+    private boolean globalAssetsRegistered;
     private boolean spawnerAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
@@ -87,14 +78,9 @@ public class Tamework extends JavaPlugin {
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
+        registerGlobalConfigAssets();
         registerSpawnerItemAssets();
         registerInteractionAssets();
-
-        // Resolve settings paths and optional server-level overrides.
-        Path settingsDir = getDataDirectory().resolve("Server").resolve("Tamework");
-        settingsConfig = new Config<>(settingsDir, SETTINGS_FILENAME, TameworkSettings.CODEC);
-        settings = loadSettings(settingsConfig, settingsDir);
-
 
         // Register components that persist owner and tamed state on NPCs.
         ownerComponentType = getEntityStoreRegistry().registerComponent(
@@ -125,9 +111,9 @@ public class Tamework extends JavaPlugin {
         // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(
                 new OwnerDamageFilterSystem(
-                        () -> settings != null && settings.isBlockOwnerDamage(),
-                        () -> settings != null && settings.isBlockAllPlayerDamageIfOwned(),
-                        () -> settings != null && settings.isInvulnerableIfOwned(),
+                        () -> getGlobalConfig().isBlockOwnerDamage(),
+                        () -> getGlobalConfig().isBlockAllPlayerDamageIfOwned(),
+                        () -> getGlobalConfig().isInvulnerableIfOwned(),
                         getLogger()
                 )
         );
@@ -191,6 +177,11 @@ public class Tamework extends JavaPlugin {
         return translationRegistry;
     }
 
+    // Returns the active global config asset or defaults if none are loaded.
+    public TwGlobalConfig getGlobalConfig() {
+        return TwGlobalConfig.resolveActive();
+    }
+
     public int reloadItemFeatureConfigs() {
         if (itemFeatureRegistry == null) {
             return 0;
@@ -224,6 +215,23 @@ public class Tamework extends JavaPlugin {
         spawnerAssetsRegistered = true;
     }
 
+    // Registers global config assets stored under Server/Tamework/Global.
+    private void registerGlobalConfigAssets() {
+        if (globalAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwGlobalConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Global")
+                        .setCodec(TwGlobalConfig.CODEC)
+                        .setKeyFunction(TwGlobalConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwGlobalConfig.class, this::onGlobalAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwGlobalConfig.class, this::onGlobalAssetsRemoved);
+        globalAssetsRegistered = true;
+    }
+
     private void registerInteractionAssets() {
         if (interactionAssetsRegistered) {
             return;
@@ -248,6 +256,18 @@ public class Tamework extends JavaPlugin {
     private void onSpawnerAssetsRemoved(
             RemovedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         reloadItemFeatureConfigs();
+    }
+
+    // Clears cached global config when assets change.
+    private void onGlobalAssetsLoaded(
+            LoadedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
+        TwGlobalConfig.clearCache();
+    }
+
+    // Clears cached global config when assets change.
+    private void onGlobalAssetsRemoved(
+            RemovedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
+        TwGlobalConfig.clearCache();
     }
 
     private void onInteractionAssetsLoaded(
@@ -283,59 +303,6 @@ public class Tamework extends JavaPlugin {
         return loaded;
     }
 
-    // Load settings from Server/Tamework/Tamework_Settings.json and seed defaults if missing.
-    private TameworkSettings loadSettings(Config<TameworkSettings> config, Path settingsDir) {
-        if (settingsDir != null) {
-            try {
-                Files.createDirectories(settingsDir);
-            } catch (Exception ex) {
-                getLogger().at(Level.WARNING).withCause(ex)
-                        .log("Failed to create settings directory: " + settingsDir);
-            }
-        }
-        ensureDefaultSettingsFile(settingsDir);
-        TameworkSettings loaded = null;
-        try {
-            loaded = config.load().join();
-        } catch (Exception ex) {
-            getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to load Tamework_Settings.json; using defaults.");
-        }
-        if (loaded == null) {
-            loaded = new TameworkSettings();
-        }
-        return loaded;
-    }
-
-    private void ensureDefaultSettingsFile(Path settingsDir) {
-        if (settingsDir == null) {
-            return;
-        }
-        Path settingsFile = settingsDir.resolve(SETTINGS_FILENAME + ".json");
-        if (Files.exists(settingsFile)) {
-            return;
-        }
-        try (InputStream stream = getClassLoader().getResourceAsStream(SETTINGS_RESOURCE_PATH)) {
-            if (stream != null) {
-                Files.copy(stream, settingsFile);
-                getLogger().at(Level.INFO).log("Seeded default Tamework settings: " + settingsFile);
-                return;
-            }
-        } catch (Exception ex) {
-            getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to seed default Tamework settings: " + settingsFile);
-        }
-        try {
-            Files.writeString(
-                    settingsFile,
-                    "{\n  \"BlockOwnerDamage\": true,\n  \"BlockAllPlayerDamageIfOwned\": false,\n  \"InvulnerableIfOwned\": false\n}\n",
-                    StandardCharsets.UTF_8
-            );
-        } catch (Exception ex) {
-            getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to write fallback Tamework settings: " + settingsFile);
-        }
-    }
 
     public SpawnerFeatureHandler getSpawnerFeatureHandler() {
         return spawnerFeatureHandler;

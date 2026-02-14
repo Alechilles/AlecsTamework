@@ -22,14 +22,17 @@ final class TameworkInteractRequirements {
     private final ActionTameworkInteract owner;
     private final InteractionFeedHelper feedHelper;
     private final InteractionAlarmHelper alarmHelper;
+    private final String harvestAlarmName;
 
     // Builds the requirement evaluator with shared helpers.
     TameworkInteractRequirements(ActionTameworkInteract owner,
                                  InteractionFeedHelper feedHelper,
-                                 InteractionAlarmHelper alarmHelper) {
+                                 InteractionAlarmHelper alarmHelper,
+                                 String harvestAlarmName) {
         this.owner = owner;
         this.feedHelper = feedHelper;
         this.alarmHelper = alarmHelper;
+        this.harvestAlarmName = harvestAlarmName;
     }
 
     boolean requirementsMet(InteractionEntry entry,
@@ -122,7 +125,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isHarvestAlarmReady()
-                && !alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
+                && !alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName)) {
             return false;
         }
         if (bucket.isHarvestInteractionContext()
@@ -203,7 +206,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isHarvestAlarmReady()
-                && alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
+                && alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName)) {
             return true;
         }
         if (bucket.isHarvestInteractionContext()
@@ -324,7 +327,7 @@ final class TameworkInteractRequirements {
         if (requireHarvestable && !owner.resolveIsHarvestable(role, ctx)) {
             return false;
         }
-        if (requireAlarm && !alarmHelper.isAlarmReady(npcRef, store, ActionTameworkInteract.DEFAULT_HARVEST_ALARM)) {
+        if (requireAlarm && !alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName)) {
             return false;
         }
         if (requireContext && !owner.matchesHarvestContext(role, infoProvider, ctx)) {

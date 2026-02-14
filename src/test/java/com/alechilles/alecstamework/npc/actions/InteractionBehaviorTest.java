@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -61,7 +62,7 @@ class InteractionBehaviorTest {
 
         InteractionCooldowns cooldownsHelper = new InteractionCooldowns(
                 interact,
-                ActionTameworkInteract.DEFAULT_COOLDOWN_ALARM_PREFIX
+                TwGlobalConfig.DEFAULT_COOLDOWN_ALARM_PREFIX
         );
         int result = cooldownsHelper.resolveCooldownSeconds(config, entry);
         assertEquals(3, result);
@@ -96,11 +97,20 @@ class InteractionBehaviorTest {
         Unsafe unsafe = getUnsafe();
         ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
         InteractionParamResolver resolver = new InteractionParamResolver(null, null, null);
-        InteractionParamAccess paramAccess = new InteractionParamAccess(resolver, false, null, null, null);
+        InteractionParamAccess paramAccess = new InteractionParamAccess(
+                resolver,
+                false,
+                null,
+                null,
+                null,
+                TwGlobalConfig.DEFAULT_LOVED_ITEMS_PARAM,
+                TwGlobalConfig.DEFAULT_IS_HARVESTABLE_PARAM,
+                TwGlobalConfig.DEFAULT_IS_MOUNTABLE_PARAM
+        );
         InteractionConfigResolver configResolver = new InteractionConfigResolver(
                 null,
                 paramAccess,
-                ActionTameworkInteract.DEFAULT_CONFIG_PARAM
+                TwGlobalConfig.DEFAULT_CONFIG_PARAM
         );
         InteractionResolution resolution = new InteractionResolution(paramAccess, configResolver);
         InteractionFeedHelper feedHelper = new InteractionFeedHelper(paramAccess);
@@ -109,10 +119,13 @@ class InteractionBehaviorTest {
         InteractionMatchHelpers matchHelpers = new InteractionMatchHelpers(interact, paramAccess, alarmHelper);
         InteractionParamMatcher paramMatcher = new InteractionParamMatcher(paramAccess);
         InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(interact);
-        InteractionCooldowns cooldowns = new InteractionCooldowns(interact, ActionTameworkInteract.DEFAULT_COOLDOWN_ALARM_PREFIX);
-        TameworkInteractRequirements requirements = new TameworkInteractRequirements(interact, feedHelper, alarmHelper);
-        InteractionSelector selector = new InteractionSelector(interact, requirements, cooldowns, alarmHelper);
-        InteractionDiagnostics diagnostics = new InteractionDiagnostics(interact, alarmHelper);
+        InteractionCooldowns cooldowns = new InteractionCooldowns(interact, TwGlobalConfig.DEFAULT_COOLDOWN_ALARM_PREFIX);
+        TameworkInteractRequirements requirements =
+                new TameworkInteractRequirements(interact, feedHelper, alarmHelper, TwGlobalConfig.DEFAULT_HARVEST_ALARM);
+        InteractionSelector selector =
+                new InteractionSelector(interact, requirements, cooldowns, alarmHelper, TwGlobalConfig.DEFAULT_HARVEST_ALARM);
+        InteractionDiagnostics diagnostics =
+                new InteractionDiagnostics(interact, alarmHelper, TwGlobalConfig.DEFAULT_HARVEST_ALARM);
         InteractionSelection selection = new InteractionSelection(
                 itemRequirements,
                 matchHelpers,

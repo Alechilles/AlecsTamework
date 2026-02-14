@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
@@ -25,14 +26,6 @@ import com.hypixel.hytale.server.npc.util.expression.Scope;
  * Prototype action that executes a TwInteractionConfig-driven interaction flow.
  */
 public final class ActionTameworkInteract extends TameworkActionBase {
-    static final String DEFAULT_CONFIG_PARAM = "InteractionConfigId";
-    static final String DEFAULT_LOVED_ITEMS_PARAM = "LovedItems";
-    static final String DEFAULT_IS_HARVESTABLE_PARAM = "IsHarvestable";
-    static final String DEFAULT_IS_MOUNTABLE_PARAM = "IsMountable";
-    static final String DEFAULT_HARVEST_CONTEXT_PARAM = "HarvestInteractionContext";
-    static final String DEFAULT_HARVEST_ALARM = "Harvest_Ready";
-    static final String DEFAULT_COOLDOWN_ALARM_PREFIX = "TameworkInteract_Cooldown";
-
     private final String configIdOverride;
     private final boolean hasLovedItemsOverride;
     private final String[] lovedItemsOverride;
@@ -40,6 +33,13 @@ public final class ActionTameworkInteract extends TameworkActionBase {
     private final Boolean isHarvestableOverride;
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
+    private final String configParamName;
+    private final String lovedItemsParamName;
+    private final String isHarvestableParamName;
+    private final String isMountableParamName;
+    private final String harvestContextParamName;
+    private final String harvestAlarmName;
+    private final String cooldownAlarmPrefix;
     private final InteractionResolution resolution;
     private final InteractionSelection selection;
     private final InteractionExecution execution;
@@ -53,6 +53,14 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         this.isHarvestableOverride = builder.hasIsHarvestableOverride() ? builder.getIsHarvestable(support) : null;
         this.hasHarvestContextOverride = builder.hasHarvestInteractionContextOverride();
         this.harvestContextOverride = hasHarvestContextOverride ? builder.getHarvestInteractionContext(support) : null;
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        this.configParamName = globalConfig.getInteractionConfigParam();
+        this.lovedItemsParamName = globalConfig.getLovedItemsParam();
+        this.isHarvestableParamName = globalConfig.getIsHarvestableParam();
+        this.isMountableParamName = globalConfig.getIsMountableParam();
+        this.harvestContextParamName = globalConfig.getHarvestContextParam();
+        this.harvestAlarmName = globalConfig.getHarvestAlarmName();
+        this.cooldownAlarmPrefix = globalConfig.getInteractionCooldownAlarmPrefix();
         StdScope globalSnapshot = null;
         StdScope execSnapshot = null;
         StdScope sensorSnapshot = null;
@@ -81,12 +89,15 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 hasLovedItemsOverride,
                 lovedItemsOverride,
                 isHarvestableOverride,
-                isMountableOverride
+                isMountableOverride,
+                lovedItemsParamName,
+                isHarvestableParamName,
+                isMountableParamName
         );
         InteractionConfigResolver configResolver = new InteractionConfigResolver(
                 configIdOverride,
                 paramAccess,
-                DEFAULT_CONFIG_PARAM
+                configParamName
         );
         InteractionFeedHelper feedHelper = new InteractionFeedHelper(paramAccess);
         InteractionAlarmHelper alarmHelper = new InteractionAlarmHelper(this);
@@ -96,10 +107,12 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(this);
         TameworkInteractEffects effects = new TameworkInteractEffects(this);
         InteractionExecutor executor = new InteractionExecutor(effects, feedHelper);
-        InteractionCooldowns cooldowns = new InteractionCooldowns(this, DEFAULT_COOLDOWN_ALARM_PREFIX);
-        TameworkInteractRequirements requirements = new TameworkInteractRequirements(this, feedHelper, alarmHelper);
-        InteractionSelector selector = new InteractionSelector(this, requirements, cooldowns, alarmHelper);
-        InteractionDiagnostics diagnostics = new InteractionDiagnostics(this, alarmHelper);
+        InteractionCooldowns cooldowns = new InteractionCooldowns(this, cooldownAlarmPrefix);
+        TameworkInteractRequirements requirements =
+                new TameworkInteractRequirements(this, feedHelper, alarmHelper, harvestAlarmName);
+        InteractionSelector selector =
+                new InteractionSelector(this, requirements, cooldowns, alarmHelper, harvestAlarmName);
+        InteractionDiagnostics diagnostics = new InteractionDiagnostics(this, alarmHelper, harvestAlarmName);
         this.resolution = new InteractionResolution(paramAccess, configResolver);
         this.selection = new InteractionSelection(
                 itemRequirements,
@@ -130,7 +143,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         }
         InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, role);
         String roleName = role != null ? role.getRoleName() : "<null>";
-        String roleOverride = getRoleStringParam(role, ctx, DEFAULT_CONFIG_PARAM);
+        String roleOverride = getRoleStringParam(role, ctx, configParamName);
         selection.logDebug(String.format(
                 "TameworkInteract: role=%s configOverride=%s roleParam=%s heldItem=%s",
                 roleName,
@@ -196,7 +209,7 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                                   InteractionContextSnapshot ctx) {
         String context = hasHarvestContextOverride
                 ? harvestContextOverride
-                : getRoleStringParam(role, ctx, DEFAULT_HARVEST_CONTEXT_PARAM);
+                : getRoleStringParam(role, ctx, harvestContextParamName);
         return selection.matchesInteractionContext(context, role, infoProvider, true);
     }
 

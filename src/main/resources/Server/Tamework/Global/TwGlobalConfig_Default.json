@@ -1,0 +1,14 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "BlockOwnerDamage": true,
+  "BlockAllPlayerDamageIfOwned": false,
+  "InvulnerableIfOwned": false,
+  "InteractionConfigParam": "InteractionConfigId",
+  "LovedItemsParam": "LovedItems",
+  "IsHarvestableParam": "IsHarvestable",
+  "IsMountableParam": "IsMountable",
+  "HarvestContextParam": "HarvestInteractionContext",
+  "HarvestAlarmName": "Harvest_Ready",
+  "InteractionCooldownAlarmPrefix": "TameworkInteract_Cooldown"
+}

@@ -30,7 +30,7 @@ This document is a high level map of how Alec's Tamework is organized and why th
 - Interaction config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwInteractionConfig.java`
 - Spawner config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwSpawnerConfig.java`
 - Spawner handler + item interaction: `src/main/java/com/alechilles/alecstamework/items` and `src/main/java/com/alechilles/alecstamework/interactions`
-- Settings model: `src/main/java/com/alechilles/alecstamework/config/TameworkSettings.java`
+- Global config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwGlobalConfig.java`
 - Example assets: `src/main/resources/Server/Tamework`
 
 ## Versioned docs
