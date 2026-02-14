@@ -68,6 +68,19 @@ class InteractionParsingTest {
         assertEquals("TameworkInteract_Cooldown_My_Config_1_2", alarm);
     }
 
+    @Test
+    void buildCooldownAlarmNameUsesUnknownWhenIdMissing() throws Exception {
+        ActionTameworkInteract interact = newInteract();
+        TwInteractionConfig config = newInteractionConfig();
+
+        InteractionCooldowns cooldowns = new InteractionCooldowns(
+                interact,
+                "TameworkInteract_Cooldown"
+        );
+        String alarm = cooldowns.buildCooldownAlarmName(config, 1);
+        assertEquals("TameworkInteract_Cooldown_unknown_1", alarm);
+    }
+
     private static ActionTameworkInteract newInteract() throws Exception {
         Field field = Unsafe.class.getDeclaredField("theUnsafe");
         field.setAccessible(true);
