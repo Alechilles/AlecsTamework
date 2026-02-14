@@ -17,6 +17,7 @@ This document is a high level map of how Alec's Tamework is organized and why th
 
 ## Key behaviors
 - Action_Tamework_Interact resolves a TwInteractionConfig and executes the first matching interaction entry.
+- The interaction pipeline is split into resolution, selection, and execution helpers to isolate matching, cooldowns, and effects.
 - TwInteractionConfig supports preset interactions (Tame, Feed, Harvest, Mount, ModeCycle, Breed) plus fully custom requirements and effects.
 - The hook system allows interaction effects to emit a hook signal that can be consumed by NPC instruction sensors.
 - TwSpawnerConfig assets are converted into per item feature configs and are used for capture and spawn logic.

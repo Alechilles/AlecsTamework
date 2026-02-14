@@ -15,10 +15,11 @@
 ## Interaction troubleshooting
 - Verify `TwInteractionConfig` is enabled and `RoleIds` include the NPC role id.
 - If multiple configs match the same role, use `ConfigId` on the action to force the selection.
-- Ensure role parameters exist if you rely on them (`LovedItems`, `IsMountable`, `IsHarvestable`, `HarvestInteractionContext`).
-- If harvest always works, make sure your role sets the `Harvest_Ready` alarm when `$Harvest` runs.
-- If harvest never works, check `HarvestInteractionContext` and the `Harvest_Ready` alarm state.
+- Ensure role parameters exist if you rely on them (names are defined by `TwGlobalConfig`, defaults are `LovedItems`, `IsMountable`, `IsHarvestable`, `HarvestInteractionContext`).
+- If harvest always works, make sure your role sets the `TwGlobalConfig.HarvestAlarmName` alarm when `$Harvest` runs (default `Harvest_Ready`).
+- If harvest never works, check `HarvestInteractionContext` (or your custom `HarvestContextParam`) and the harvest alarm state.
 - Cooldowns are enforced in real-time seconds and stored as alarms. Use `/tw getalarm` to inspect them if interactions seem locked out.
+  The alarm prefix is `TwGlobalConfig.InteractionCooldownAlarmPrefix`.
 
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.
@@ -35,6 +36,8 @@
 - Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
 - Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.
 - After editing spawner configs, run `/tw reloadconfig`.
+## Global config warnings
+- If `TwGlobalConfig` is missing required fields, the server logs a warning listing which fields are blank.
 
 ## Hytalor patches
 - Hytalor writes patched output to `.../Server/mods/HytalorOverrides/`.

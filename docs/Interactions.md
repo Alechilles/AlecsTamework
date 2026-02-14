@@ -8,10 +8,15 @@ Tamework replaces large NPC interaction instruction trees with a single action c
 
 ## Config resolution
 - If the action passes `ConfigId`, that asset id is used.
-- Otherwise the role parameter `InteractionConfigId` is used if present.
+- Otherwise the role parameter named by `TwGlobalConfig.InteractionConfigParam` (default `InteractionConfigId`) is used if present.
 - Otherwise the enabled config with the highest `Priority` whose `RoleIds` contains the NPC role id is selected.
 
 `Priority` defaults to `0`; higher values win. If multiple configs share the same priority, selection order follows asset map iteration.
+
+## Global defaults
+Default parameter names and alarm names used by the interaction system live in `TwGlobalConfig`
+(`Server/Tamework/Global/*.json`). If you change those names, update your role params and/or
+action overrides to match.
 
 ## Interaction order
 `Interactions` is evaluated in order. The first enabled entry whose requirements pass is executed.
@@ -19,8 +24,12 @@ Tamework replaces large NPC interaction instruction trees with a single action c
 ## Cooldowns
 Cooldowns are enforced in real-time seconds (not game time).
 `CooldownSeconds` on an entry overrides `Cooldowns.InteractionSeconds` on the config.
-Cooldowns are stored as NPC alarms named `TameworkInteract_Cooldown_<ConfigId>_<index>`.
+Cooldowns are stored as NPC alarms named
+`<InteractionCooldownAlarmPrefix>_<ConfigId>_<index>` where the prefix comes from `TwGlobalConfig`
+(default `TameworkInteract_Cooldown`).
 You can inspect them with `/tw getalarm`.
+Contextual interactions (e.g., harvest + interaction context) will block fall-through if their cooldown
+or harvest alarm is not ready.
 
 ## Preset interactions
 Preset entries provide simple defaults plus optional `Requires` + `Effects` add‑ons.
@@ -72,8 +81,9 @@ Fields:
 - `RequireHarvestInteractionContext` (default true)
 
 Requirements:
-- Uses role parameters `IsHarvestable` and `HarvestInteractionContext`.
-- Uses `Harvest_Ready` alarm on the NPC.
+- Uses role parameters named by `TwGlobalConfig.IsHarvestableParam` and
+  `TwGlobalConfig.HarvestContextParam` (defaults `IsHarvestable`, `HarvestInteractionContext`).
+- Uses the `TwGlobalConfig.HarvestAlarmName` alarm on the NPC (default `Harvest_Ready`).
 
 Effects:
 - Sets NPC state `$Harvest` (role should handle alarm/drops in that state).
@@ -133,15 +143,15 @@ Example:
 Within each requirement array, any entry can satisfy that requirement type. Empty arrays are ignored.
 
 ### Basic toggles
-- `LovedItems`
-- `IsHarvestable`
-- `IsMountable`
+- `LovedItems` (uses `TwGlobalConfig.LovedItemsParam`, default `LovedItems`)
+- `IsHarvestable` (uses `TwGlobalConfig.IsHarvestableParam`, default `IsHarvestable`)
+- `IsMountable` (uses `TwGlobalConfig.IsMountableParam`, default `IsMountable`)
 - `IsTamed`
 - `IsNotTamed`
 - `PlayerCrouching`
 - `PlayerIsOwner`
 - `HarvestAlarmReady`
-- `HarvestInteractionContext` (blank context is allowed)
+- `HarvestInteractionContext` (blank context is allowed; uses `TwGlobalConfig.HarvestContextParam`)
 
 ### ItemsInHand
 Fields:
@@ -244,4 +254,5 @@ Example interaction instruction snippet:
 ]
 ```
 
-`TameworkInteract` uses role parameters by default, and the action fields above override those values when provided.
+`TameworkInteract` uses role parameters by default (names defined in `TwGlobalConfig`), and the
+action fields above override those values when provided.
