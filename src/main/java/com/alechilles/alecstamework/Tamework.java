@@ -23,6 +23,8 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCapture
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
+import com.alechilles.alecstamework.npc.actions.InteractionInputListener;
+import com.alechilles.alecstamework.npc.actions.InteractionInputTracker;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -58,6 +60,7 @@ public class Tamework extends JavaPlugin {
 
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
+    private final InteractionInputTracker interactionInputTracker = new InteractionInputTracker();
     private boolean npcActionsRegistered;
     private boolean globalAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -144,6 +147,11 @@ public class Tamework extends JavaPlugin {
                 PlayerInteractEvent.class,
                 ownerInteractionListener::onPlayerInteract
         );
+        InteractionInputListener interactionInputListener = new InteractionInputListener(interactionInputTracker);
+        getEventRegistry().registerGlobal(
+                PlayerInteractEvent.class,
+                interactionInputListener::onPlayerInteract
+        );
         getLogger().at(Level.INFO).log(
                 "Tamework item feature configs loaded: " + loaded
                         + " (total: " + itemFeatureRegistry.snapshot().size() + ")"
@@ -176,6 +184,10 @@ public class Tamework extends JavaPlugin {
 
     public TranslationRegistry getTranslationRegistry() {
         return translationRegistry;
+    }
+
+    public InteractionInputTracker getInteractionInputTracker() {
+        return interactionInputTracker;
     }
 
     // Returns the active global config asset or defaults if none are loaded.
