@@ -20,6 +20,7 @@ import javax.annotation.Nonnull;
  * Sensor that matches when a Tamework hook has been triggered on the NPC.
  */
 public final class SensorTameworkHook extends TameworkSensorBase {
+    private static final long MAX_HOOK_AGE_MS = 1000L;
     private final String hookId;
     private final boolean consume;
     private final MultipleParameterProvider parameterProvider = new MultipleParameterProvider();
@@ -70,6 +71,22 @@ public final class SensorTameworkHook extends TameworkSensorBase {
         }
         TameworkHookComponent component = store.getComponent(ref, type);
         if (component == null || !component.matchesHook(hookId)) {
+            clearProviders();
+            return false;
+        }
+        long timestampMs = component.getTimestampMs();
+        if (timestampMs <= 0L || System.currentTimeMillis() - timestampMs > MAX_HOOK_AGE_MS) {
+            clearProviders();
+            if (consume || component.isConsumeOnMatch()) {
+                store.putComponent(ref, type, new TameworkHookComponent());
+            }
+            return false;
+        }
+        Ref<EntityStore> interactionTarget =
+                role != null && role.getStateSupport() != null
+                        ? role.getStateSupport().getInteractionIterationTarget()
+                        : null;
+        if (interactionTarget == null || !interactionTarget.isValid()) {
             clearProviders();
             return false;
         }
