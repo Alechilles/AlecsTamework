@@ -97,7 +97,7 @@ final class InteractionHookEffects {
             return;
         }
         Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
+        if (instance == null || instance.getLogger() == null || !instance.isDebugHookEnabled()) {
             return;
         }
         instance.getLogger().at(Level.WARNING).log(

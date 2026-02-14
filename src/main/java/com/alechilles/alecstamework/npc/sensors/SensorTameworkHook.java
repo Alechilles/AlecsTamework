@@ -124,7 +124,7 @@ public final class SensorTameworkHook extends TameworkSensorBase {
             return;
         }
         Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null) {
+        if (instance == null || instance.getLogger() == null || !instance.isDebugHookEnabled()) {
             return;
         }
         String hookIdValue = component != null ? component.getHookId() : null;
