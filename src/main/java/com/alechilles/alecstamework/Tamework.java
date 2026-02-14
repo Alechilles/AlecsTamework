@@ -62,6 +62,7 @@ public class Tamework extends JavaPlugin {
     private boolean globalAssetsRegistered;
     private boolean spawnerAssetsRegistered;
     private boolean interactionAssetsRegistered;
+    private String lastGlobalConfigWarningKey;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
@@ -179,7 +180,9 @@ public class Tamework extends JavaPlugin {
 
     // Returns the active global config asset or defaults if none are loaded.
     public TwGlobalConfig getGlobalConfig() {
-        return TwGlobalConfig.resolveActive();
+        TwGlobalConfig config = TwGlobalConfig.resolveActive();
+        warnIfGlobalConfigMissingFields(config);
+        return config;
     }
 
     public int reloadItemFeatureConfigs() {
@@ -262,12 +265,14 @@ public class Tamework extends JavaPlugin {
     private void onGlobalAssetsLoaded(
             LoadedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
+        lastGlobalConfigWarningKey = null;
     }
 
     // Clears cached global config when assets change.
     private void onGlobalAssetsRemoved(
             RemovedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
+        lastGlobalConfigWarningKey = null;
     }
 
     private void onInteractionAssetsLoaded(
@@ -318,6 +323,31 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkHookComponent> getHookComponentType() {
         return hookComponentType;
+    }
+
+    // Logs a warning if required global config fields are missing.
+    private void warnIfGlobalConfigMissingFields(TwGlobalConfig config) {
+        if (config == null || getLogger() == null) {
+            return;
+        }
+        String[] missing = config.listMissingRequiredFields();
+        if (missing.length == 0) {
+            lastGlobalConfigWarningKey = null;
+            return;
+        }
+        String configId = config.getId();
+        if (configId == null || configId.isBlank()) {
+            configId = "<unknown>";
+        }
+        String key = configId + "|" + String.join(",", missing);
+        if (key.equals(lastGlobalConfigWarningKey)) {
+            return;
+        }
+        lastGlobalConfigWarningKey = key;
+        getLogger().at(Level.WARNING).log(
+                "TwGlobalConfig '" + configId + "' is missing required fields: "
+                        + String.join(", ", missing)
+        );
     }
 
     // NPC action/sensor builders must be registered after NPCPlugin is ready.

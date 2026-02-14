@@ -8,6 +8,8 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
+import java.util.ArrayList;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -265,5 +267,24 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     public String getInteractionCooldownAlarmPrefix() {
         return interactionCooldownAlarmPrefix;
+    }
+
+    // Returns the names of required string fields that are missing or blank.
+    public String[] listMissingRequiredFields() {
+        List<String> missing = new ArrayList<>();
+        collectMissing(missing, "InteractionConfigParam", interactionConfigParam);
+        collectMissing(missing, "LovedItemsParam", lovedItemsParam);
+        collectMissing(missing, "IsHarvestableParam", isHarvestableParam);
+        collectMissing(missing, "IsMountableParam", isMountableParam);
+        collectMissing(missing, "HarvestContextParam", harvestContextParam);
+        collectMissing(missing, "HarvestAlarmName", harvestAlarmName);
+        collectMissing(missing, "InteractionCooldownAlarmPrefix", interactionCooldownAlarmPrefix);
+        return missing.isEmpty() ? new String[0] : missing.toArray(new String[0]);
+    }
+
+    private void collectMissing(List<String> missing, String fieldName, String value) {
+        if (value == null || value.isBlank()) {
+            missing.add(fieldName);
+        }
     }
 }
