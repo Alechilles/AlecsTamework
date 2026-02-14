@@ -51,14 +51,13 @@ Effects:
 ### Feed
 Fields:
 - `UseLovedItems` (default true)
-- `ItemsInHand` (string, object, or array)
+- `ItemsInHand` (array of string/object entries)
 - `Heal` (global fallback)
 - `ItemsParam` (role parameter name)
 
-`ItemsInHand` entries can be:
+`ItemsInHand` entries are an array of:
 - `"ItemId"` (string)
 - `{ "Item": "ItemId", "Heal": 8 }`
-- or an array of either form
 
 `ItemsParam` supports:
 - role param string array of item ids
@@ -155,13 +154,13 @@ Within each requirement array, any entry can satisfy that requirement type. Empt
 
 ### ItemsInHand
 Fields:
-- `Items` (item id or array)
+- `Items` (item id array)
 - `ItemsParam` (role parameter name)
 - `Quantity` (minimum stack size)
 
 ### ItemsInInventory
 Fields:
-- `Items` (item id or array)
+- `Items` (item id array)
 - `ItemsParam` (role parameter name)
 - `Quantity` (minimum total quantity)
 
@@ -171,7 +170,7 @@ Fields:
 
 ### ItemsEquipped
 Fields:
-- `Items` (optional item id or array)
+- `Items` (optional item id array)
 - `ItemsParam` (role parameter name)
 - `Slots` (slot enum array)
 
