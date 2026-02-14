@@ -2,18 +2,32 @@
 
 All notable changes to **Alec's Tamework!** will be documented in this file.
 
+## 1.2.0 - TwSpawnerConfig Assets + Capture/Spawn Overhaul - 2026-02-09
+### Added
+- TwSpawnerConfig asset type stored under Server/Tamework/Items/Spawners for spawner item behavior.
+- Capture/spawn settings split into Capture and Spawn sections with optional effects (ParticleSystem/SoundEvent) and limits (CooldownMs/MaxDistance).
+- Role-scoped icon overrides via IconOverridesByRole alongside default icon overrides.
+- Spawner items can capture/spawn using the TameworkSpawn interaction alone (no role interaction chain required), driven by spawner assets.
+
+### Changed
+- Allowed roles now default to **Allowlist**; use AllowAll explicitly when needed.
+- /tw reloadconfig now reloads spawner config assets from disk.
+
+### Removed
+- Legacy Server/Tamework/Tamework_Items_Config.json item config system and per-world overrides.
+
 ## 1.1.1 - Hytalor Example + Follow Component Split - 2026-02-06
 ### Added
 - Hytalor patch example assets (Template/Mob + patch) showing non-destructive Tamework integration.
-- New follow components split: `Follow_Simple_TP` (teleport/seek), `Follow_Simple` (basic follow), and `Follow_Advanced` (old IdleFollow behavior).
-- `/tw gettamed` and `/tw settamed` commands to read/flip tamed state.
+- New follow components split: Follow_Simple_TP (teleport/seek), Follow_Simple (basic follow), and Follow_Advanced (old IdleFollow behavior).
+- /tw gettamed and /tw settamed commands to read/flip tamed state.
 - Mount gating for tamed/owner state with crouch-based interaction (Hytalor example).
 
 ## 1.1.0 - Core Systems Update - 2026-02-03
 ### Added
 - Owner + Tamed components for NPCs, plus new actions/sensors (set owner, set tamed, owner/stranger/wild capture routing).
 - Deny capture while untamed action with optional food list hint (resolves item display names when available).
-- Per-mod item config discovery via `Server/Tamework/Tamework_Items_Config.json`.
+- Per-mod item config discovery via Server/Tamework/Tamework_Items_Config.json.
 - Save-world local overrides for item configs (created empty by default).
 - Localization discovery that scans both global Mods and save-world mods.
 - Owner utility messaging for denied interactions and untamed capture.
@@ -23,14 +37,12 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Tamework example templates updated to match the new capture/tame flow (feed to tame, capture only when tamed).
 - Settings/config resolution prefers save-world mods when present, with fallback to global mods.
 - Owner name resolution now prefers display name, then username, with UUID fallback.
-- `/tw getowner` now prints owner name + UUID when available.
+- /tw getowner now prints owner name + UUID when available.
 
 ### Fixed
 - Mod discovery null-path issues when running in save-world contexts.
 - Missing owner names (messages and getowner previously only showed UUIDs).
 
 ### Notes
-- Defaults now live in `Server/Tamework/Tamework_Items_Config.json` (no code-driven defaults).
+- Defaults now live in Server/Tamework/Tamework_Items_Config.json (no code-driven defaults).
 - Local override configs are intentionally created empty so new items/functions from mod updates are not masked.
-
-

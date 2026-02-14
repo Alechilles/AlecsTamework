@@ -1,0 +1,17 @@
+{
+  "$Comment": "Interaction test role for Action_Tamework_Interact.",
+  "Type": "Variant",
+  "Reference": "Template_Tamework_Interact_Test",
+  "Modify": {
+    "Appearance": "Tamework_Example",
+    "IsMountable": true,
+    "IsHarvestable": true,
+    "HarvestDropList": "Drop_Sheep_Harvest",
+    "HarvestInteractionContext": "Shear",
+    "HarvestParticles": "Sheep_Wool_Shear",
+    "HarvestSound": "SFX_Sheep_Sheared",
+    "LovedItems": [
+      "Plant_Fruit_Apple"
+    ]
+  }
+}

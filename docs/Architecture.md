@@ -1,40 +1,38 @@
 # Architecture Overview
 
-This document is a high‑level map of how **Alec’s Tamework!** is organized and why the major systems exist. It’s intended to help new contributors orient quickly.
+This document is a high level map of how Alec's Tamework is organized and why the major systems exist. It is intended to help new contributors orient quickly.
 
 ## Core concepts
-- **Tamework as a framework**: provides reusable actions, sensors, and components that other mods can reference in their NPC templates and items.
-- **Two layers**: asset layer (NPC templates/items/particles) + plugin layer (components, actions, sensors, config discovery, runtime behavior).
-- **Compatibility focus**: keep changes non‑breaking when possible; use opt‑in configs for behavior shifts.
+- Tamework is a framework mod that supplies reusable NPC actions, sensors, components, and asset driven configuration that other mods can reference.
+- Two layers: an asset layer (NPC templates, items, particles, interaction configs) and a plugin layer (components, actions, sensors, runtime behavior).
+- Asset driven configuration is preferred so other mods can override behavior without patching Java.
 
 ## Major subsystems
-- **NPC Actions & Sensors**
-  - Custom actions (capture flows, tamed state, owner setting/denial) are implemented in Java and referenced from templates.
-  - Sensors expose readable state for instructions (owner status, tamed status, etc.).
+- NPC actions and sensors
+- Optimized interactions pipeline (TwInteractionConfig + Action_Tamework_Interact)
+- Hook and instruction bridge (TriggerNpcHook effect + TameworkHook sensor)
+- Spawner items (TwSpawnerConfig assets + SpawnerFeatureHandler + TameworkSpawn interaction)
+- Ownership and taming (components, owner interaction blocking, damage filters)
+- Localization and messages (translation discovery + owner denial messages)
 
-- **Components**
-  - Components store persistent state on NPCs (owner/tamed).
-
-- **Config discovery**
-  - Item feature configs are discovered from other mods’ `Server/Tamework` folders and can be overridden per‑world.
-  - Local save overrides are intended to be additive, not replacements.
-
-- **Patch examples (Hytalor)**
-  - Non-destructive JSON patching for adding Tamework behaviors without rewriting base assets.
-
-- **Spawner integration**
-  - Capture/spawn flows attach metadata to items, preserve attachments, and enforce owner/tamed rules.
-
-- **Damage filtering**
-  - Optional server‑side filter blocks owner damage, all player damage, or all damage if owned (configurable).
+## Key behaviors
+- Action_Tamework_Interact resolves a TwInteractionConfig and executes the first matching interaction entry.
+- The interaction pipeline is split into resolution, selection, and execution helpers to isolate matching, cooldowns, and effects.
+- TwInteractionConfig supports preset interactions (Tame, Feed, Harvest, Mount, ModeCycle, Breed) plus fully custom requirements and effects.
+- The hook system allows interaction effects to emit a hook signal that can be consumed by NPC instruction sensors.
+- TwSpawnerConfig assets are converted into per item feature configs and are used for capture and spawn logic.
+- Owner protection can block owner damage, all player damage, or make owned NPCs invulnerable via settings.
 
 ## Where to look
-- Plugin entrypoint: `src/main/java/.../Tamework.java`
-- Actions/Sensors: `src/main/java/.../npc/actions` and `src/main/java/.../npc/sensors`
-- Components: `src/main/java/.../npc/components`
-- Item/config handling: `src/main/java/.../config`
-- Example assets: `src/main/resources/Server/...`
-- Hytalor patch: `src/main/resources/Server/Patch/Tamework_Example_Hytalor_Patch.json`
+- Plugin entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`
+- Actions: `src/main/java/com/alechilles/alecstamework/npc/actions`
+- Sensors: `src/main/java/com/alechilles/alecstamework/npc/sensors`
+- Components: `src/main/java/com/alechilles/alecstamework/npc/components`
+- Interaction config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwInteractionConfig.java`
+- Spawner config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwSpawnerConfig.java`
+- Spawner handler + item interaction: `src/main/java/com/alechilles/alecstamework/items` and `src/main/java/com/alechilles/alecstamework/interactions`
+- Global config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwGlobalConfig.java`
+- Example assets: `src/main/resources/Server/Tamework`
 
 ## Versioned docs
-Public end‑user docs live in the separate wiki repo. Internal docs live here under `/docs`.
+Public end user docs live in the separate wiki repo. Internal docs live here under `/docs`.

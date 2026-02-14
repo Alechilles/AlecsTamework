@@ -1,34 +1,42 @@
-# Config Discovery and Overrides
+# Config Discovery
 
-This document explains how Tamework discovers item configs and how per‑world overrides work.
+This document explains how Tamework discovers asset based configuration and settings.
 
-## Mod‑level config (defaults)
-Each mod can include a default config in:
-```
-<ModRoot>/Server/Tamework/Tamework_Items_Config.json
-```
-This is the canonical config shipped with the mod.
+## Asset locations
+- TwSpawnerConfig assets live under:
+  `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
+- TwInteractionConfig assets live under:
+  `<ModRoot>/Server/Tamework/Interactions/*.json`
+- TwGlobalConfig assets live under:
+  `<ModRoot>/Server/Tamework/Global/*.json`
 
-## Per‑world overrides (local saves)
-Overrides are stored per‑world in:
-```
-<UserData>/Saves/<World>/mods/<ModName>/Tamework_Items_Config.json
-```
-Notes:
-- The per‑world file is auto‑created **empty** to avoid overriding future defaults.
-- The mod name is taken from the manifest (not the zip name).
-- If empty, defaults from the mod are used.
+Both asset types are registered with the asset registry and are available to any mod that ships assets at those paths.
 
-## Settings config
-Tamework settings are stored per‑world and are copied from the mod defaults if missing. The default path is:
-```
-<UserData>/Saves/<World>/mods/<ModName>/tamework-settings.json
-```
+## Resolution and overrides
+- Asset ids are derived from the filename (standard asset behavior).
+- If multiple mods provide the same asset id, the later loaded asset wins.
+- `Action_Tamework_Interact` resolves configs in this order:
+  `ConfigId` override (if provided on the action), then the role param named by `TwGlobalConfig.InteractionConfigParam`
+  (default `InteractionConfigId`) if present, then the enabled config with the highest `Priority` whose `RoleIds`
+  contains the role id.
+- `Priority` defaults to `0`. Higher values win. If multiple configs share the same priority, selection order follows asset map iteration.
+- TwGlobalConfig resolves to the highest priority enabled asset. If multiple configs share the same priority, the lowest asset id (case-insensitive) is selected.
 
-## Why this design
-- Avoids breaking updates (defaults keep working even if new items are added).
-- Allows players to override only what they need.
+## Global config asset
+TwGlobalConfig replaces the old settings file and controls owner damage filtering plus interaction defaults:
+- `BlockOwnerDamage`
+- `BlockAllPlayerDamageIfOwned`
+- `InvulnerableIfOwned`
+- `InteractionConfigParam`
+- `LovedItemsParam`
+- `IsHarvestableParam`
+- `IsMountableParam`
+- `HarvestContextParam`
+- `HarvestAlarmName`
+- `InteractionCooldownAlarmPrefix`
 
-## Common pitfalls
-- Putting overrides in `Server/Tamework` (that’s for the mod copy).
-- Using the zip name instead of the manifest name for `<ModName>`.
+All fields are required; missing or blank values will emit a warning on startup.
+
+## Reloading
+- `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig -> item feature registry).
+- TwInteractionConfig assets are managed by the asset registry and do not require a manual reload command.

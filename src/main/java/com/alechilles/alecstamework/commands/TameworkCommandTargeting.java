@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 
+/** Tamework command targeting. */
 final class TameworkCommandTargeting {
     private static final double MAX_DISTANCE = 6.0;
     private static final double MIN_DOT = 0.7; // ~45 degrees

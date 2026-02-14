@@ -15,11 +15,6 @@
     "HarvestInteractionContext": "Shear",
     "HarvestParticles": "Sheep_Wool_Shear",
     "HarvestSound": "SFX_Sheep_Sheared",
-    "InteractParticleOffset": [
-      0,
-      1.2,
-      -0.75
-    ],
     "AttitudeGroup": "Prey",
     "FlockArray": [
       "Mouflon",
