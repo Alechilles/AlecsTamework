@@ -88,22 +88,13 @@ public final class SensorTameworkHook extends TameworkSensorBase {
             logHookEvent("stale", ref, component, null);
             return false;
         }
-        Ref<EntityStore> interactionTarget =
-                role != null && role.getStateSupport() != null
-                        ? role.getStateSupport().getInteractionIterationTarget()
-                        : null;
-        if (interactionTarget == null || !interactionTarget.isValid()) {
-            clearProviders();
-            logHookEvent("noTarget", ref, component, interactionTarget);
-            return false;
-        }
         this.hookIdProvider.overrideString(component.getHookId());
         this.playerIdProvider.overrideString(component.getPlayerId() != null ? component.getPlayerId().toString() : null);
         this.playerNameProvider.overrideString(component.getPlayerName());
         this.heldItemProvider.overrideString(component.getHeldItemId());
         this.timestampProvider.overrideDouble((double) component.getTimestampMs());
         this.hookInfo.updateFrom(component);
-        logHookEvent("match", ref, component, interactionTarget);
+        logHookEvent("match", ref, component, null);
         if (consume || component.isConsumeOnMatch()) {
             store.putComponent(ref, type, new TameworkHookComponent());
         }
