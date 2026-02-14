@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
@@ -149,8 +148,8 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                 || role.getStateSupport() == null) {
             return false;
         }
-        if (!consumeRecentInteraction(npcRef, player)) {
-            selection.logDebug("TameworkInteract: no recent interaction input recorded.");
+        if (!role.getStateSupport().consumeInteraction(interactionTarget)) {
+            selection.logDebug("TameworkInteract: no interaction input recorded.");
             return false;
         }
         InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, role);
@@ -344,19 +343,6 @@ public final class ActionTameworkInteract extends TameworkActionBase {
                                         Store<EntityStore> store,
                                         Player player) {
         selection.maybeNotifyOwnerDenied(npcRef, store, player);
-    }
-
-    // Consumes a recently recorded player interaction input for this NPC.
-    private boolean consumeRecentInteraction(Ref<EntityStore> npcRef, Player player) {
-        if (npcRef == null || player == null) {
-            return false;
-        }
-        Tamework instance = Tamework.getInstance();
-        InteractionInputTracker tracker = instance != null ? instance.getInteractionInputTracker() : null;
-        if (tracker == null) {
-            return false;
-        }
-        return tracker.consumeInteraction(npcRef, player.getUuid());
     }
 
     // Captures the selected interaction entry and cooldown metadata.
