@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import java.lang.reflect.Field;
@@ -62,7 +61,7 @@ class InteractionParsingTest {
 
         InteractionCooldowns cooldowns = new InteractionCooldowns(
                 interact,
-                TwGlobalConfig.DEFAULT_COOLDOWN_ALARM_PREFIX
+                "TameworkInteract_Cooldown"
         );
         String alarm = cooldowns.buildCooldownAlarmName(config, 2);
         assertEquals("TameworkInteract_Cooldown_My_Config_1_2", alarm);

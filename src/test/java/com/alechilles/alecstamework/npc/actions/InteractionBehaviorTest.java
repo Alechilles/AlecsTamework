@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -62,7 +61,7 @@ class InteractionBehaviorTest {
 
         InteractionCooldowns cooldownsHelper = new InteractionCooldowns(
                 interact,
-                TwGlobalConfig.DEFAULT_COOLDOWN_ALARM_PREFIX
+                "TameworkInteract_Cooldown"
         );
         int result = cooldownsHelper.resolveCooldownSeconds(config, entry);
         assertEquals(3, result);
@@ -103,14 +102,14 @@ class InteractionBehaviorTest {
                 null,
                 null,
                 null,
-                TwGlobalConfig.DEFAULT_LOVED_ITEMS_PARAM,
-                TwGlobalConfig.DEFAULT_IS_HARVESTABLE_PARAM,
-                TwGlobalConfig.DEFAULT_IS_MOUNTABLE_PARAM
+                "LovedItems",
+                "IsHarvestable",
+                "IsMountable"
         );
         InteractionConfigResolver configResolver = new InteractionConfigResolver(
                 null,
                 paramAccess,
-                TwGlobalConfig.DEFAULT_CONFIG_PARAM
+                "InteractionConfigId"
         );
         InteractionResolution resolution = new InteractionResolution(paramAccess, configResolver);
         InteractionFeedHelper feedHelper = new InteractionFeedHelper(paramAccess);
@@ -119,13 +118,13 @@ class InteractionBehaviorTest {
         InteractionMatchHelpers matchHelpers = new InteractionMatchHelpers(interact, paramAccess, alarmHelper);
         InteractionParamMatcher paramMatcher = new InteractionParamMatcher(paramAccess);
         InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(interact);
-        InteractionCooldowns cooldowns = new InteractionCooldowns(interact, TwGlobalConfig.DEFAULT_COOLDOWN_ALARM_PREFIX);
+        InteractionCooldowns cooldowns = new InteractionCooldowns(interact, "TameworkInteract_Cooldown");
         TameworkInteractRequirements requirements =
-                new TameworkInteractRequirements(interact, feedHelper, alarmHelper, TwGlobalConfig.DEFAULT_HARVEST_ALARM);
+                new TameworkInteractRequirements(interact, feedHelper, alarmHelper, "Harvest_Ready");
         InteractionSelector selector =
-                new InteractionSelector(interact, requirements, cooldowns, alarmHelper, TwGlobalConfig.DEFAULT_HARVEST_ALARM);
+                new InteractionSelector(interact, requirements, cooldowns, alarmHelper, "Harvest_Ready");
         InteractionDiagnostics diagnostics =
-                new InteractionDiagnostics(interact, alarmHelper, TwGlobalConfig.DEFAULT_HARVEST_ALARM);
+                new InteractionDiagnostics(interact, alarmHelper, "Harvest_Ready");
         InteractionSelection selection = new InteractionSelection(
                 itemRequirements,
                 matchHelpers,

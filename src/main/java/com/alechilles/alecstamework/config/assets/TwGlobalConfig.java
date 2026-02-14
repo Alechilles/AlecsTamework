@@ -15,18 +15,6 @@ import javax.annotation.Nullable;
  * Stored under Server/Tamework/Global.
  */
 public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwGlobalConfig>> {
-    public static final String DEFAULT_CONFIG_PARAM = "InteractionConfigId";
-    public static final String DEFAULT_LOVED_ITEMS_PARAM = "LovedItems";
-    public static final String DEFAULT_IS_HARVESTABLE_PARAM = "IsHarvestable";
-    public static final String DEFAULT_IS_MOUNTABLE_PARAM = "IsMountable";
-    public static final String DEFAULT_HARVEST_CONTEXT_PARAM = "HarvestInteractionContext";
-    public static final String DEFAULT_HARVEST_ALARM = "Harvest_Ready";
-    public static final String DEFAULT_COOLDOWN_ALARM_PREFIX = "TameworkInteract_Cooldown";
-
-    public static final boolean DEFAULT_BLOCK_OWNER_DAMAGE = true;
-    public static final boolean DEFAULT_BLOCK_ALL_PLAYER_DAMAGE_IF_OWNED = false;
-    public static final boolean DEFAULT_INVULNERABLE_IF_OWNED = false;
-
     public static final AssetBuilderCodec<String, TwGlobalConfig> CODEC =
             AssetBuilderCodec.builder(
                     TwGlobalConfig.class,
@@ -133,16 +121,16 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private String id;
     private boolean enabled = true;
     private int priority;
-    private boolean blockOwnerDamage = DEFAULT_BLOCK_OWNER_DAMAGE;
-    private boolean blockAllPlayerDamageIfOwned = DEFAULT_BLOCK_ALL_PLAYER_DAMAGE_IF_OWNED;
-    private boolean invulnerableIfOwned = DEFAULT_INVULNERABLE_IF_OWNED;
-    private String interactionConfigParam = DEFAULT_CONFIG_PARAM;
-    private String lovedItemsParam = DEFAULT_LOVED_ITEMS_PARAM;
-    private String isHarvestableParam = DEFAULT_IS_HARVESTABLE_PARAM;
-    private String isMountableParam = DEFAULT_IS_MOUNTABLE_PARAM;
-    private String harvestContextParam = DEFAULT_HARVEST_CONTEXT_PARAM;
-    private String harvestAlarmName = DEFAULT_HARVEST_ALARM;
-    private String interactionCooldownAlarmPrefix = DEFAULT_COOLDOWN_ALARM_PREFIX;
+    private boolean blockOwnerDamage;
+    private boolean blockAllPlayerDamageIfOwned;
+    private boolean invulnerableIfOwned;
+    private String interactionConfigParam;
+    private String lovedItemsParam;
+    private String isHarvestableParam;
+    private String isMountableParam;
+    private String harvestContextParam;
+    private String harvestAlarmName;
+    private String interactionCooldownAlarmPrefix;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -252,37 +240,30 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public String getInteractionConfigParam() {
-        return defaultIfBlank(interactionConfigParam, DEFAULT_CONFIG_PARAM);
+        return interactionConfigParam;
     }
 
     public String getLovedItemsParam() {
-        return defaultIfBlank(lovedItemsParam, DEFAULT_LOVED_ITEMS_PARAM);
+        return lovedItemsParam;
     }
 
     public String getIsHarvestableParam() {
-        return defaultIfBlank(isHarvestableParam, DEFAULT_IS_HARVESTABLE_PARAM);
+        return isHarvestableParam;
     }
 
     public String getIsMountableParam() {
-        return defaultIfBlank(isMountableParam, DEFAULT_IS_MOUNTABLE_PARAM);
+        return isMountableParam;
     }
 
     public String getHarvestContextParam() {
-        return defaultIfBlank(harvestContextParam, DEFAULT_HARVEST_CONTEXT_PARAM);
+        return harvestContextParam;
     }
 
     public String getHarvestAlarmName() {
-        return defaultIfBlank(harvestAlarmName, DEFAULT_HARVEST_ALARM);
+        return harvestAlarmName;
     }
 
     public String getInteractionCooldownAlarmPrefix() {
-        return defaultIfBlank(interactionCooldownAlarmPrefix, DEFAULT_COOLDOWN_ALARM_PREFIX);
-    }
-
-    private static String defaultIfBlank(String value, String fallback) {
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-        return value;
+        return interactionCooldownAlarmPrefix;
     }
 }
