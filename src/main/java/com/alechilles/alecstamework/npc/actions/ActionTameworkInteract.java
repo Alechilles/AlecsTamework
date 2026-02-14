@@ -136,20 +136,17 @@ public final class ActionTameworkInteract extends TameworkActionBase {
         if (npcRef == null || !npcRef.isValid()) {
             return false;
         }
-        Player player = resolveInteractionPlayer(role, infoProvider, store);
+        if (role == null || role.getStateSupport() == null) {
+            return false;
+        }
+        Ref<EntityStore> interactionTarget = role.getStateSupport().getInteractionIterationTarget();
+        if (interactionTarget == null || !interactionTarget.isValid()) {
+            selection.logDebug("TameworkInteract: no interaction target recorded.");
+            return false;
+        }
+        Player player = store.getComponent(interactionTarget, Player.getComponentType());
         if (player == null) {
             selection.logDebug("TameworkInteract: no player resolved for interaction.");
-            return false;
-        }
-        Ref<EntityStore> interactionTarget = resolveInteractionTarget(role, infoProvider);
-        if (interactionTarget == null
-                || !interactionTarget.isValid()
-                || role == null
-                || role.getStateSupport() == null) {
-            return false;
-        }
-        if (!role.getStateSupport().consumeInteraction(interactionTarget)) {
-            selection.logDebug("TameworkInteract: no interaction input recorded.");
             return false;
         }
         InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, role);
