@@ -43,6 +43,6 @@ public final class InteractionInputListener {
         if (player == null) {
             return;
         }
-        tracker.recordInteraction(targetRef, player);
+        tracker.recordInteraction(targetRef, player, event.getClientUseTime());
     }
 }

@@ -18,7 +18,7 @@ public final class InteractionInputTracker {
     /**
      * Records a player interaction input against an NPC target.
      */
-    public void recordInteraction(Ref<EntityStore> targetRef, Player player) {
+    public void recordInteraction(Ref<EntityStore> targetRef, Player player, long clientUseTime) {
         if (targetRef == null || player == null) {
             return;
         }
@@ -26,8 +26,13 @@ public final class InteractionInputTracker {
         if (playerId == null) {
             return;
         }
-        inputs.computeIfAbsent(targetRef, key -> new ConcurrentHashMap<>())
-                .put(playerId, new InteractionInput(System.currentTimeMillis()));
+        ConcurrentHashMap<UUID, InteractionInput> byPlayer =
+                inputs.computeIfAbsent(targetRef, key -> new ConcurrentHashMap<>());
+        InteractionInput existing = byPlayer.get(playerId);
+        if (clientUseTime > 0 && existing != null && existing.clientUseTime == clientUseTime) {
+            return;
+        }
+        byPlayer.put(playerId, new InteractionInput(System.currentTimeMillis(), clientUseTime));
     }
 
     /**
@@ -56,8 +61,11 @@ public final class InteractionInputTracker {
 
     private static final class InteractionInput {
         private final long timestampMs;
-        private InteractionInput(long timestampMs) {
+        private final long clientUseTime;
+
+        private InteractionInput(long timestampMs, long clientUseTime) {
             this.timestampMs = timestampMs;
+            this.clientUseTime = clientUseTime;
         }
     }
 }
