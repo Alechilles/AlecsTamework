@@ -100,7 +100,7 @@ final class InteractionHookEffects {
         if (instance == null || instance.getLogger() == null) {
             return;
         }
-        instance.getLogger().at(Level.INFO).log(
+        instance.getLogger().at(Level.WARNING).log(
                 "TameworkHook: " + action
                         + " npcRef=" + npcRef
                         + " hookId=" + hookId

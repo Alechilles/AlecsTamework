@@ -138,7 +138,7 @@ public final class SensorTameworkHook extends TameworkSensorBase {
         }
         String hookIdValue = component != null ? component.getHookId() : null;
         long tsMs = component != null ? component.getTimestampMs() : 0L;
-        instance.getLogger().at(Level.INFO).log(
+        instance.getLogger().at(Level.WARNING).log(
                 "TameworkHook: " + action
                         + " npcRef=" + npcRef
                         + " hookId=" + hookIdValue
