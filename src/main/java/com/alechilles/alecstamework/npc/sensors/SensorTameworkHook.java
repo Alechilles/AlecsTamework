@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.sensors;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkHookInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkHookInfoProvider;
@@ -14,6 +15,8 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.parameterproviders.MultipleParameterProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.parameterproviders.SingleDoubleParameterProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.parameterproviders.SingleStringParameterProvider;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
@@ -21,6 +24,8 @@ import javax.annotation.Nonnull;
  */
 public final class SensorTameworkHook extends TameworkSensorBase {
     private static final long MAX_HOOK_AGE_MS = 1000L;
+    private static final AtomicLong LAST_LOG_MS = new AtomicLong();
+    private static final long LOG_THROTTLE_MS = 500L;
     private final String hookId;
     private final boolean consume;
     private final MultipleParameterProvider parameterProvider = new MultipleParameterProvider();
@@ -80,6 +85,7 @@ public final class SensorTameworkHook extends TameworkSensorBase {
             if (consume || component.isConsumeOnMatch()) {
                 store.putComponent(ref, type, new TameworkHookComponent());
             }
+            logHookEvent("stale", ref, component, null);
             return false;
         }
         Ref<EntityStore> interactionTarget =
@@ -88,6 +94,7 @@ public final class SensorTameworkHook extends TameworkSensorBase {
                         : null;
         if (interactionTarget == null || !interactionTarget.isValid()) {
             clearProviders();
+            logHookEvent("noTarget", ref, component, interactionTarget);
             return false;
         }
         this.hookIdProvider.overrideString(component.getHookId());
@@ -96,6 +103,7 @@ public final class SensorTameworkHook extends TameworkSensorBase {
         this.heldItemProvider.overrideString(component.getHeldItemId());
         this.timestampProvider.overrideDouble((double) component.getTimestampMs());
         this.hookInfo.updateFrom(component);
+        logHookEvent("match", ref, component, interactionTarget);
         if (consume || component.isConsumeOnMatch()) {
             store.putComponent(ref, type, new TameworkHookComponent());
         }
@@ -110,5 +118,33 @@ public final class SensorTameworkHook extends TameworkSensorBase {
     private void clearProviders() {
         this.parameterProvider.clear();
         this.hookInfo.clear();
+    }
+
+    private void logHookEvent(String action,
+                              Ref<EntityStore> npcRef,
+                              TameworkHookComponent component,
+                              Ref<EntityStore> interactionTarget) {
+        long now = System.currentTimeMillis();
+        long last = LAST_LOG_MS.get();
+        if (now - last < LOG_THROTTLE_MS) {
+            return;
+        }
+        if (!LAST_LOG_MS.compareAndSet(last, now)) {
+            return;
+        }
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null) {
+            return;
+        }
+        String hookIdValue = component != null ? component.getHookId() : null;
+        long tsMs = component != null ? component.getTimestampMs() : 0L;
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkHook: " + action
+                        + " npcRef=" + npcRef
+                        + " hookId=" + hookIdValue
+                        + " tsMs=" + tsMs
+                        + " interactionTarget=" + interactionTarget
+                        + " consume=" + consume
+        );
     }
 }

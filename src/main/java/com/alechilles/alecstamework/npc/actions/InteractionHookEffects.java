@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HookEffect;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -10,10 +11,14 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
 
 /** Applies interaction hook effects by writing the hook component to the NPC. */
 final class InteractionHookEffects {
     private final ActionTameworkInteract owner;
+    private static final AtomicLong LAST_LOG_MS = new AtomicLong();
+    private static final long LOG_THROTTLE_MS = 500L;
 
     InteractionHookEffects(ActionTameworkInteract owner) {
         this.owner = owner;
@@ -62,6 +67,48 @@ final class InteractionHookEffects {
                 hookEffect.isConsume()
         );
         store.putComponent(npcRef, type, component);
+        logHookEvent(
+                "applyTriggerNpcHook",
+                npcRef,
+                hookId,
+                hookEffect.isConsume(),
+                playerId,
+                playerName,
+                heldItemId,
+                timestampMs
+        );
         return true;
+    }
+
+    private void logHookEvent(String action,
+                              Ref<EntityStore> npcRef,
+                              String hookId,
+                              boolean consume,
+                              UUID playerId,
+                              String playerName,
+                              String heldItemId,
+                              long timestampMs) {
+        long now = System.currentTimeMillis();
+        long last = LAST_LOG_MS.get();
+        if (now - last < LOG_THROTTLE_MS) {
+            return;
+        }
+        if (!LAST_LOG_MS.compareAndSet(last, now)) {
+            return;
+        }
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkHook: " + action
+                        + " npcRef=" + npcRef
+                        + " hookId=" + hookId
+                        + " consume=" + consume
+                        + " playerId=" + playerId
+                        + " playerName=" + playerName
+                        + " heldItemId=" + heldItemId
+                        + " tsMs=" + timestampMs
+        );
     }
 }
