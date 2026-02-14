@@ -141,6 +141,14 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             selection.logDebug("TameworkInteract: no player resolved for interaction.");
             return false;
         }
+        Ref<EntityStore> interactionTarget = resolveInteractionTarget(role, infoProvider);
+        if (interactionTarget == null
+                || !interactionTarget.isValid()
+                || role == null
+                || role.getStateSupport() == null
+                || !role.getStateSupport().consumeInteraction(interactionTarget)) {
+            return false;
+        }
         InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, role);
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, configParamName);
