@@ -34,6 +34,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `/tw setowner` assigns the targeted NPC to the executing player.
 - `/tw settamed` toggles the tamed flag on the targeted NPC.
 - `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig assets).
+- `/tw debughook [on|off]` toggles hook debug logging (or explicitly enables/disables it).
 
 ## Notes
 - Components persist across reloads.
