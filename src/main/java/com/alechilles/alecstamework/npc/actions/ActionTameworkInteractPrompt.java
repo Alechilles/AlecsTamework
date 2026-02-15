@@ -25,14 +25,14 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
  * Updates the NPC interaction prompt based on the first matching Tamework interaction entry.
  */
 public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
-    private static final String HINT_GENERIC = "interactionHints.generic";
-    private static final String HINT_HARVEST = "interactionHints.harvest";
-    private static final String HINT_MOUNT = "interactionHints.mount";
-    private static final String HINT_TAME = "interactionHints.tame";
-    private static final String HINT_FEED = "interactionHints.feed";
-    private static final String HINT_BREED = "interactionHints.breed";
-    private static final String HINT_MODE_CYCLE = "interactionHints.modeCycle";
-    private static final String HINT_CUSTOM = "interactionHints.custom";
+    private static final String HINT_GENERIC = "server.interactionHints.generic";
+    private static final String HINT_HARVEST = "server.interactionHints.harvest";
+    private static final String HINT_MOUNT = "server.interactionHints.mount";
+    private static final String HINT_TAME = "server.interactionHints.tame";
+    private static final String HINT_FEED = "server.interactionHints.feed";
+    private static final String HINT_BREED = "server.interactionHints.breed";
+    private static final String HINT_MODE_CYCLE = "server.interactionHints.modeCycle";
+    private static final String HINT_CUSTOM = "server.interactionHints.custom";
 
     private final Map<UUID, PromptState> lastPrompts = new HashMap<>();
 
