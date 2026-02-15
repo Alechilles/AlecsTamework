@@ -8,8 +8,8 @@ server.npcRoles.Tamework_Example_Vanilla.name=Tamework Example (Vanilla)
 server.npcRoles.Tamework_Example_Simple_Vanilla.name=Tamework Example (Simple, Vanilla)
 
 # === Tamework interaction hints ===
-server.interactionHints.tame=Press [{key}] to tame
-server.interactionHints.feed=Press [{key}] to feed
-server.interactionHints.breed=Press [{key}] to breed
-server.interactionHints.modeCycle=Press [{key}] to change modes
-server.interactionHints.custom=Press [{key}] to interact
+interactionHints.tame=Press [{key}] to tame
+interactionHints.feed=Press [{key}] to feed
+interactionHints.breed=Press [{key}] to breed
+interactionHints.modeCycle=Press [{key}] to change modes
+interactionHints.custom=Press [{key}] to interact

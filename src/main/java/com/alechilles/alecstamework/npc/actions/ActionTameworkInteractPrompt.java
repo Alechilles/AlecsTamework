@@ -16,6 +16,9 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Updates the NPC interaction prompt based on the first matching Tamework interaction entry.
@@ -29,6 +32,8 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private static final String HINT_BREED = "server.interactionHints.breed";
     private static final String HINT_MODE_CYCLE = "server.interactionHints.modeCycle";
     private static final String HINT_CUSTOM = "server.interactionHints.custom";
+
+    private final Map<UUID, PromptState> lastPrompts = new HashMap<>();
 
     public ActionTameworkInteractPrompt(BuilderActionTameworkInteractPrompt builder, BuilderSupport support) {
         super(builder, support);
@@ -60,7 +65,21 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
 
         PromptState prompt = resolvePromptState(resolved);
-        role.getStateSupport().setInteractable(npcRef, interactionTarget, true, prompt.hint, prompt.showPrompt, store);
+        UUID playerId = ctx != null ? ctx.playerId : null;
+        if (playerId == null) {
+            return false;
+        }
+        PromptState previous = lastPrompts.get(playerId);
+        if (!prompt.equals(previous)) {
+            // Force a refresh when the prompt changes so the hint updates on the client.
+            role.getStateSupport().setInteractable(npcRef, interactionTarget, false, null, false, store);
+            role.getStateSupport().setInteractable(npcRef, interactionTarget, true, prompt.hint, prompt.showPrompt, store);
+            if (prompt.isHidden()) {
+                lastPrompts.remove(playerId);
+            } else {
+                lastPrompts.put(playerId, prompt);
+            }
+        }
         return true;
     }
 
@@ -116,6 +135,35 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         private PromptState(String hint, boolean showPrompt) {
             this.hint = hint;
             this.showPrompt = showPrompt;
+        }
+
+        boolean isHidden() {
+            return !showPrompt || hint == null || hint.isBlank();
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            if (this == other) {
+                return true;
+            }
+            if (!(other instanceof PromptState)) {
+                return false;
+            }
+            PromptState that = (PromptState) other;
+            if (this.showPrompt != that.showPrompt) {
+                return false;
+            }
+            if (this.hint == null) {
+                return that.hint == null;
+            }
+            return this.hint.equals(that.hint);
+        }
+
+        @Override
+        public int hashCode() {
+            int result = Boolean.hashCode(showPrompt);
+            result = 31 * result + (hint == null ? 0 : hint.hashCode());
+            return result;
         }
 
         static PromptState hidden() {
