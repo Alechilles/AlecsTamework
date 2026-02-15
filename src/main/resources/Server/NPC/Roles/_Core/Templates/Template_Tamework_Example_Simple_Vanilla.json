@@ -1,6 +1,6 @@
 {
   "$Comment": "Simplified example template showing the minimum required wiring to use all Tamework components. (Vanilla interaction flow example.)",
-  "Debug": "",
+  "Debug": "DisplayState, DisplayTarget",
   "StartState": "Hold",
   "DefaultSubState": "Default",
   "Type": "Abstract",

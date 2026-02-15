@@ -1,6 +1,6 @@
 {
   "Type": "Abstract",
-  "Debug": "",
+  "Debug": "DisplayState, DisplayTarget",
   "StartState": "Idle",
   "Parameters": {
     "Appearance": {
