@@ -1200,6 +1200,20 @@ public final class TwInteractionConfigCodecs {
         )
         .documentation("Cooldown before this entry can trigger again. Default: none.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("PromptHint", Codec.STRING),
+            (entry, value) -> entry.promptHint = value,
+            entry -> entry.promptHint
+        )
+        .documentation("Optional interaction prompt hint key (translation key).")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("ShowPrompt", Codec.BOOLEAN),
+            (entry, value) -> entry.showPrompt = value,
+            entry -> entry.showPrompt
+        )
+        .documentation("Whether to show the interaction prompt when this entry matches. Default: true.")
+        .add()
         .build();
 
     public static final BuilderCodec<TameInteraction> TAME_INTERACTION_CODEC = BuilderCodec.builder(

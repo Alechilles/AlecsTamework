@@ -240,6 +240,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static abstract class InteractionEntry {
         boolean enabled = true;
         Integer cooldownSeconds;
+        String promptHint;
+        Boolean showPrompt;
         RequirementGroup requires;
         Effects effects;
 
@@ -249,6 +251,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public Integer getCooldownSeconds() {
             return cooldownSeconds;
+        }
+
+        public String getPromptHint() {
+            return promptHint;
+        }
+
+        public Boolean getShowPrompt() {
+            return showPrompt;
         }
 
         public RequirementGroup getRequires() {

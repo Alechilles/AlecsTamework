@@ -5,6 +5,30 @@
   ],
   "Interactions": [
     {
+      "Type": "Custom",
+      "Requires": {
+        "All": {
+          "ItemsInHand": [
+            {
+              "Items": [
+                "Container_Bucket"
+              ]
+            }
+          ]
+        }
+      },
+      "Effects": {
+        "AddItemsHand": {
+          "ItemsParam": "HarvestAddItemBucket"
+        },
+        "RemoveItemsHand": {
+          "Items": [
+            "Container_Bucket"
+          ]
+        }
+      }
+    },
+    {
       "Type": "Tame",
       "ItemsParam": "TestTameItemsParam",
       "Effects": {

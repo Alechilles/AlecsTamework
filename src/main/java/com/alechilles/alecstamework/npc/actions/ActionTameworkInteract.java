@@ -25,7 +25,7 @@ import com.hypixel.hytale.server.npc.util.expression.Scope;
 /**
  * Prototype action that executes a TwInteractionConfig-driven interaction flow.
  */
-public final class ActionTameworkInteract extends TameworkActionBase {
+public class ActionTameworkInteract extends TameworkActionBase {
     private final String configIdOverride;
     private final boolean hasLovedItemsOverride;
     private final String[] lovedItemsOverride;
@@ -177,6 +177,27 @@ public final class ActionTameworkInteract extends TameworkActionBase {
             return false;
         }
         return execution.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
+    }
+
+    // Builds the cached context snapshot for prompt/selection helpers.
+    InteractionContextSnapshot buildContextSnapshot(Player player, Role role) {
+        return resolution.buildContextSnapshot(player, role);
+    }
+
+    // Resolves the interaction config for prompt/selection helpers.
+    TwInteractionConfig resolveConfig(Role role, InteractionContextSnapshot ctx) {
+        return resolution.resolveConfig(role, ctx);
+    }
+
+    // Selects an interaction entry without executing it.
+    ResolvedInteraction selectInteraction(TwInteractionConfig config,
+                                          Ref<EntityStore> npcRef,
+                                          Role role,
+                                          InfoProvider infoProvider,
+                                          Store<EntityStore> store,
+                                          Player player,
+                                          InteractionContextSnapshot ctx) {
+        return selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {

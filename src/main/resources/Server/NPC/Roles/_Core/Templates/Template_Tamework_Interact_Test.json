@@ -541,8 +541,7 @@
         },
         "Actions": [
           {
-            "Type": "SetInteractable",
-            "Interactable": true
+            "Type": "TameworkInteractPrompt"
           }
         ]
       },

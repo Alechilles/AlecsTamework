@@ -10,7 +10,7 @@ import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
 /**
  * Builder for ActionTameworkInteract.
  */
-public final class BuilderActionTameworkInteract extends TameworkActionBuilderBase {
+public class BuilderActionTameworkInteract extends TameworkActionBuilderBase {
     public static final String BUILDER_ID = "TameworkInteract";
 
     private final StringHolder configId = new StringHolder();

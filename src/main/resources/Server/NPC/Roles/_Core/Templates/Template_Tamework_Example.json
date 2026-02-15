@@ -1108,13 +1108,12 @@
         "Sensor": {
           "Type": "Any"
         },
-        "Actions": [
-          {
-            "Type": "SetInteractable",
-            "Interactable": true
-          }
-        ]
-      },
+          "Actions": [
+            {
+              "Type": "TameworkInteractPrompt"
+            }
+          ]
+        },
       {
         "Sensor": {
           "Type": "HasInteracted"
