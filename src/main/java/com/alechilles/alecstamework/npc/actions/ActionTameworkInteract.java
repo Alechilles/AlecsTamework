@@ -40,6 +40,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
     private final String harvestContextParamName;
     private final String harvestAlarmName;
     private final String cooldownAlarmPrefix;
+    private final InteractionAlarmHelper alarmHelper;
     private final InteractionResolution resolution;
     private final InteractionSelection selection;
     private final InteractionExecution execution;
@@ -101,6 +102,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
         );
         InteractionFeedHelper feedHelper = new InteractionFeedHelper(paramAccess);
         InteractionAlarmHelper alarmHelper = new InteractionAlarmHelper(this);
+        this.alarmHelper = alarmHelper;
         InteractionItemRequirementResolver itemRequirements = new InteractionItemRequirementResolver(paramResolver);
         InteractionMatchHelpers matchHelpers = new InteractionMatchHelpers(this, paramAccess, alarmHelper);
         InteractionParamMatcher paramMatcher = new InteractionParamMatcher(paramAccess);
@@ -253,11 +255,27 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return selection.matchesInteractionContext(context, role, infoProvider, true);
     }
 
+    boolean matchesHarvestContextForPrompt(Role role,
+                                           InfoProvider infoProvider,
+                                           InteractionContextSnapshot ctx) {
+        String context = hasHarvestContextOverride
+                ? harvestContextOverride
+                : getRoleStringParam(role, ctx, harvestContextParamName);
+        return selection.matchesInteractionContextForPrompt(context, role, infoProvider, ctx, true);
+    }
+
     boolean matchesInteractionContext(InteractionContextRequirement requirement,
                                       Role role,
                                       InfoProvider infoProvider,
                                       InteractionContextSnapshot ctx) {
         return selection.matchesInteractionContext(requirement, role, infoProvider, ctx);
+    }
+
+    boolean matchesInteractionContextForPrompt(InteractionContextRequirement requirement,
+                                               Role role,
+                                               InfoProvider infoProvider,
+                                               InteractionContextSnapshot ctx) {
+        return selection.matchesInteractionContextForPrompt(requirement, role, infoProvider, ctx);
     }
 
     boolean matchesInteractionContext(String context,
@@ -366,6 +384,10 @@ public class ActionTameworkInteract extends TameworkActionBase {
 
     void logDebug(String message) {
         selection.logDebug(message);
+    }
+
+    boolean isHarvestAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
     }
 
     private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,

@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
@@ -16,9 +20,6 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
 
 /**
  * Updates the NPC interaction prompt based on the first matching Tamework interaction entry.
@@ -62,6 +63,13 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         ActionTameworkInteract.ResolvedInteraction resolved = null;
         if (config != null && config.isEnabled()) {
             resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+        }
+        if (resolved != null && resolved.entry instanceof HarvestInteraction) {
+            HarvestInteraction harvest = (HarvestInteraction) resolved.entry;
+            boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null || harvest.getRequireHarvestAlarmReady();
+            if (requireAlarm && !isHarvestAlarmReady(npcRef, store)) {
+                resolved = null;
+            }
         }
 
         PromptState prompt = resolvePromptState(resolved);
