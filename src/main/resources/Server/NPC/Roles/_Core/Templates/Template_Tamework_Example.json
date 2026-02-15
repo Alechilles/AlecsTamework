@@ -753,6 +753,32 @@
   ],
   "Instructions": [
     {
+      "$Comment": "Validation-only state setters (disabled).",
+      "Enabled": false,
+      "Actions": [
+        {
+          "Type": "State",
+          "State": "Idle"
+        },
+        {
+          "Type": "State",
+          "State": "Hold"
+        },
+        {
+          "Type": "State",
+          "State": "Defend"
+        },
+        {
+          "Type": "State",
+          "State": "Sleep"
+        },
+        {
+          "Type": "State",
+          "State": "$Harvest"
+        }
+      ]
+    },
+    {
       "$Comment": "Default follow/idle behavior using Tamework component.",
       "Sensor": {
         "Type": "State",
@@ -1035,10 +1061,7 @@
             }
           },
           {
-            "Type": "TameworkInteract",
-            "ConfigId": {
-              "Compute": "InteractionConfigId"
-            }
+            "Type": "TameworkInteract"
           }
         ]
       },
@@ -1061,10 +1084,7 @@
             }
           },
           {
-            "Type": "TameworkInteract",
-            "ConfigId": {
-              "Compute": "InteractionConfigId"
-            }
+            "Type": "TameworkInteract"
           }
         ]
       }
