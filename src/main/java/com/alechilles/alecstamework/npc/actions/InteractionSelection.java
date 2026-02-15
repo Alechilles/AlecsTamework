@@ -52,6 +52,17 @@ final class InteractionSelection {
         return selector.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
+    // Selects an interaction for prompts, preferring contextual and conditional entries.
+    ActionTameworkInteract.ResolvedInteraction selectInteractionForPrompt(TwInteractionConfig config,
+                                                                          Ref<EntityStore> npcRef,
+                                                                          Role role,
+                                                                          InfoProvider infoProvider,
+                                                                          Store<EntityStore> store,
+                                                                          Player player,
+                                                                          InteractionContextSnapshot ctx) {
+        return selector.selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+    }
+
     // Returns true if the held item matches the requirement list.
     boolean matchesItemsInHand(ItemsInHandRequirement requirement, Role role, InteractionContextSnapshot ctx) {
         return itemRequirements.matchesItemsInHand(requirement, role, ctx);

@@ -200,6 +200,17 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
+    // Selects an interaction for prompts, prioritizing contextual and conditional entries.
+    ResolvedInteraction selectInteractionForPrompt(TwInteractionConfig config,
+                                                   Ref<EntityStore> npcRef,
+                                                   Role role,
+                                                   InfoProvider infoProvider,
+                                                   Store<EntityStore> store,
+                                                   Player player,
+                                                   InteractionContextSnapshot ctx) {
+        return selection.selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+    }
+
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         return selection.isTamed(npcRef, store);
     }

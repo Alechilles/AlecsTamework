@@ -38,6 +38,83 @@ final class InteractionSelector {
                                                                   Store<EntityStore> store,
                                                                   Player player,
                                                                   InteractionContextSnapshot ctx) {
+        return selectInteractionInternal(config, npcRef, role, infoProvider, store, player, ctx, false);
+    }
+
+    // Selects an interaction for prompts, preferring contextual and conditional entries.
+    ActionTameworkInteract.ResolvedInteraction selectInteractionForPrompt(TwInteractionConfig config,
+                                                                          Ref<EntityStore> npcRef,
+                                                                          Role role,
+                                                                          InfoProvider infoProvider,
+                                                                          Store<EntityStore> store,
+                                                                          Player player,
+                                                                          InteractionContextSnapshot ctx) {
+        InteractionEntry[] entries = config != null ? config.getInteractions() : null;
+        if (entries == null || entries.length == 0) {
+            return null;
+        }
+        ActionTameworkInteract.ResolvedInteraction best = null;
+        int bestScore = -1;
+        for (int index = 0; index < entries.length; index++) {
+            InteractionEntry entry = entries[index];
+            if (entry == null || !entry.isEnabled()) {
+                continue;
+            }
+            boolean contextual = isContextualEntry(entry);
+            int score = contextual ? 100 : (isConditionalEntry(entry) ? 50 : 0);
+            if (score < bestScore) {
+                continue;
+            }
+            int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
+            String cooldownAlarmName = cooldownSeconds > 0
+                    ? cooldowns.buildCooldownAlarmName(config, index)
+                    : null;
+            if (cooldownSeconds > 0
+                    && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
+                if (contextual && score >= bestScore) {
+                    bestScore = score;
+                    best = new ActionTameworkInteract.ResolvedInteraction(
+                            entry,
+                            index,
+                            cooldownSeconds,
+                            cooldownAlarmName,
+                            true
+                    );
+                }
+                continue;
+            }
+            if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx)) {
+                if (contextual && score >= bestScore) {
+                    bestScore = score;
+                    best = new ActionTameworkInteract.ResolvedInteraction(
+                            entry,
+                            index,
+                            cooldownSeconds,
+                            cooldownAlarmName,
+                            true
+                    );
+                }
+                continue;
+            }
+            if (!requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx)) {
+                continue;
+            }
+            if (score > bestScore) {
+                bestScore = score;
+                best = new ActionTameworkInteract.ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
+            }
+        }
+        return best;
+    }
+
+    private ActionTameworkInteract.ResolvedInteraction selectInteractionInternal(TwInteractionConfig config,
+                                                                                 Ref<EntityStore> npcRef,
+                                                                                 Role role,
+                                                                                 InfoProvider infoProvider,
+                                                                                 Store<EntityStore> store,
+                                                                                 Player player,
+                                                                                 InteractionContextSnapshot ctx,
+                                                                                 boolean contextualOnly) {
         InteractionEntry[] entries = config != null ? config.getInteractions() : null;
         if (entries == null || entries.length == 0) {
             return null;
@@ -45,6 +122,9 @@ final class InteractionSelector {
         for (int index = 0; index < entries.length; index++) {
             InteractionEntry entry = entries[index];
             if (entry == null || !entry.isEnabled()) {
+                continue;
+            }
+            if (contextualOnly && !isContextualEntry(entry)) {
                 continue;
             }
             int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
@@ -130,5 +210,56 @@ final class InteractionSelector {
         }
         TwInteractionConfig.InteractionContextRequirement[] contexts = bucket.getInteractionContext();
         return contexts != null && contexts.length > 0;
+    }
+
+    private boolean isConditionalEntry(InteractionEntry entry) {
+        if (entry == null) {
+            return false;
+        }
+        if (entry instanceof TwInteractionConfig.TameInteraction
+                || entry instanceof TwInteractionConfig.FeedInteraction
+                || entry instanceof TwInteractionConfig.HarvestInteraction
+                || entry instanceof TwInteractionConfig.MountInteraction
+                || entry instanceof TwInteractionConfig.BreedInteraction) {
+            return true;
+        }
+        if (entry instanceof TwInteractionConfig.ModeCycleInteraction) {
+            TwInteractionConfig.ModeCycleInteraction mode = (TwInteractionConfig.ModeCycleInteraction) entry;
+            if (mode.getRequireTamed() != null || mode.getRequireOwner() != null) {
+                return true;
+            }
+        }
+        TwInteractionConfig.RequirementGroup requires = entry.getRequires();
+        return requires != null
+                && (bucketHasRequirements(requires.getAll()) || bucketHasRequirements(requires.getAny()));
+    }
+
+    private boolean bucketHasRequirements(TwInteractionConfig.RequirementBucket bucket) {
+        if (bucket == null) {
+            return false;
+        }
+        if (bucket.isLovedItems()
+                || bucket.isHarvestable()
+                || bucket.isMountable()
+                || bucket.isTamed()
+                || bucket.isNotTamed()
+                || bucket.isPlayerCrouching()
+                || bucket.isPlayerIsOwner()
+                || bucket.isHarvestAlarmReady()
+                || bucket.isHarvestInteractionContext()) {
+            return true;
+        }
+        return hasEntries(bucket.getItemsInHand())
+                || hasEntries(bucket.getItemsInInventory())
+                || hasEntries(bucket.getItemsEquipped())
+                || hasEntries(bucket.getParameter())
+                || hasEntries(bucket.getAlarmState())
+                || hasEntries(bucket.getNpcState())
+                || hasEntries(bucket.getPlayerMovementState())
+                || hasEntries(bucket.getInteractionContext());
+    }
+
+    private boolean hasEntries(Object[] entries) {
+        return entries != null && entries.length > 0;
     }
 }
