@@ -1,5 +1,5 @@
 {
-  "$Comment": "Simplified example template showing the minimum required wiring to use all Tamework components.",
+  "$Comment": "Simple interaction-system example template (updated from vanilla interaction flow).",
   "Debug": "DisplayState, DisplayTarget",
   "StartState": "Hold",
   "DefaultSubState": "Default",
@@ -141,6 +141,88 @@
     "InteractSoundPickUp": {
       "Value": "SFX_Tamework_Poof",
       "Description": "Sound to play when picking up."
+    },
+    "IsMountable": {
+      "Value": false,
+      "Description": "Whether this NPC can be mounted."
+    },
+    "IsHarvestable": {
+      "Value": false,
+      "Description": "Whether this NPC can be 'harvested'. This includes shearing, milking, etc."
+    },
+    "HarvestInteractionContext": {
+      "Value": "",
+      "Description": "The interaction context of the harvest tool. If empty, no tool is needed to harvest the NPC."
+    },
+    "HarvestDropList": {
+      "Value": "",
+      "Description": "The drop list that's executed when the NPC is harvested."
+    },
+    "HarvestParticles": {
+      "Value": "Alerted",
+      "Description": "The particle system that is spawned when the NPC is harvested."
+    },
+    "HarvestSound": {
+      "Value": "SFX_Sheep_Sheared",
+      "Description": "The sound that plays when NPC is harvested."
+    },
+    "HarvestTimeout": {
+      "Value": [
+        "PT45M",
+        "PT1H"
+      ],
+      "Description": "The minimum time between consecutive harvests. Expressed as an ISO-8601 time period range."
+    },
+    "LovedItems": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "The list of items that are deemed very attractive."
+    },
+    "TestItemsInHandParam": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for ItemsInHand requirement (test)."
+    },
+    "TestItemsInInventoryParam": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for ItemsInInventory requirement (test)."
+    },
+    "TestItemsEquippedParam": {
+      "Value": [
+        "Armor_Wool_Head"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for ItemsEquipped requirement (test). Replace with an equipped item."
+    },
+    "TestAlarmParam": {
+      "Value": "Harvest_Ready",
+      "Description": "AlarmParam name used for AlarmState requirements (test)."
+    },
+    "TestInteractionContextParam": {
+      "Value": "Tamework_Test_Context",
+      "Description": "ContextParam value used for InteractionContext requirements (test)."
+    },
+    "TestTameItemsParam": {
+      "Value": [
+        "Plant_Fruit_Apple"
+      ],
+      "TypeHint": "String",
+      "Description": "ItemsParam list for Tame interaction (test)."
+    },
+    "TestFeedItemsParam": {
+      "Value": "[{\"Item\":\"Plant_Fruit_Apple\",\"Heal\":2.0},{\"Item\":\"Plant_Fruit_Apple\"}]",
+      "Description": "JSON array string for Feed ItemsParam (items with optional Heal)."
+    },
+    "InteractionConfigId": {
+      "Value": "",
+      "Description": "Optional override for Action_Tamework_Interact."
     }
   },
   "MotionControllerList": [
@@ -339,7 +421,10 @@
     }
   ],
   "InteractionInstruction": {
-    "$Comment": "Example interaction flow: pickup, feed, toggle hold/follow/defend.",
+    "$Comment": "Isolated interaction flow for Action_Tamework_Interact.",
+    "Enabled": {
+      "Compute": "IsMountable || IsHarvestable || !isEmptyStringArray(LovedItems)"
+    },
     "Instructions": [
       {
         "Continue": true,
@@ -357,464 +442,44 @@
         "Sensor": {
           "Type": "HasInteracted"
         },
-        "Instructions": [
+        "Actions": [
           {
-            "Continue": true,
-            "Sensor": {
-              "Type": "Any"
-            },
-            "Actions": [
-              {
-                "Type": "LockOnInteractionTarget",
-                "TargetSlot": {
-                  "Compute": "MasterTargetSlot"
-                }
-              }
-            ]
+            "Type": "LockOnInteractionTarget",
+            "TargetSlot": {
+              "Compute": "MasterTargetSlot"
+            }
           },
           {
-            "$Comment": "Non-owner interaction warning",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "TameworkHasOwner"
-                },
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "TameworkIsOwner"
-                  }
-                },
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "Target",
-                    "TargetSlot": {
-                      "Compute": "MasterTargetSlot"
-                    },
-                    "Filters": [
-                      {
-                        "Type": "ItemInHand",
-                        "Items": {
-                          "Compute": "SpawnerEmptyItemID"
-                        }
-                      }
-                    ]
-                  }
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "TameworkDenyInteract"
-              }
-            ]
+            "Type": "TameworkInteract",
+            "ConfigId": {
+              "Compute": "InteractionConfigId"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Contextual (left-click) harvest trigger.",
+        "Enabled": {
+          "Compute": "!isEmpty(HarvestInteractionContext)"
+        },
+        "Sensor": {
+          "Type": "InteractionContext",
+          "Context": {
+            "Compute": "HarvestInteractionContext"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "LockOnInteractionTarget",
+            "TargetSlot": {
+              "Compute": "MasterTargetSlot"
+            }
           },
           {
-            "$Comment": "Wild feed to tame (set owner + tamed).",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "TameworkHasOwner"
-                  }
-                },
-                {
-                  "Type": "Target",
-                  "TargetSlot": {
-                    "Compute": "MasterTargetSlot"
-                  },
-                  "Filters": [
-                    {
-                      "Type": "ItemInHand",
-                      "Items": {
-                        "Compute": "FoodItemIDs"
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "Inventory",
-                "UseTarget": true,
-                "Operation": "RemoveHeldItem",
-                "Count": 1
-              },
-              {
-                "Type": "TameworkSetOwner"
-              },
-              {
-                "Type": "TameworkSetTamed",
-                "Value": true
-              },
-              {
-                "Type": "State",
-                "State": "Idle.Default"
-              },
-              {
-                "Type": "SpawnParticles",
-                "Offset": [
-                  0,
-                  0.8,
-                  0
-                ],
-                "ParticleSystem": "Pet_Heal"
-              },
-              {
-                "Type": "PlaySound",
-                "SoundEventId": {
-                  "Compute": "InteractSoundFeed"
-                }
-              }
-            ]
-          },
-          {
-            "$Comment": "Capture blocked until tamed.",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "Target",
-                  "TargetSlot": {
-                    "Compute": "MasterTargetSlot"
-                  },
-                  "Filters": [
-                    {
-                      "Type": "ItemInHand",
-                      "Items": {
-                        "Compute": "SpawnerEmptyItemID"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "TameworkIsTamed"
-                  }
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "TameworkDenyCaptureUntamed",
-                "FoodItemIDs": {
-                  "Compute": "FoodItemIDs"
-                }
-              }
-            ]
-          },
-          {
-            "$Comment": "Owner capture with empty spawner",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "Target",
-                  "TargetSlot": {
-                    "Compute": "MasterTargetSlot"
-                  },
-                  "Filters": [
-                    {
-                      "Type": "ItemInHand",
-                      "Items": {
-                        "Compute": "SpawnerEmptyItemID"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "Type": "TameworkIsOwner"
-                },
-                {
-                  "Type": "TameworkIsTamed"
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "TameworkCaptureOwner"
-              },
-              {
-                "Type": "SpawnParticles",
-                "Offset": [
-                  0,
-                  0.1,
-                  0
-                ],
-                "ParticleSystem": "Poof_Small"
-              },
-              {
-                "Type": "PlaySound",
-                "SoundEventId": {
-                  "Compute": "InteractSoundPickUp"
-                }
-              }
-            ]
-          },
-          {
-            "$Comment": "Block non-owner capture",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "Target",
-                  "TargetSlot": {
-                    "Compute": "MasterTargetSlot"
-                  },
-                  "Filters": [
-                    {
-                      "Type": "ItemInHand",
-                      "Items": {
-                        "Compute": "SpawnerEmptyItemID"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "Type": "TameworkHasOwner"
-                },
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "TameworkIsOwner"
-                  }
-                },
-                {
-                  "Type": "TameworkIsTamed"
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "TameworkCaptureStranger"
-              }
-            ]
-          },
-          {
-            "$Comment": "Wild capture with empty spawner",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "Target",
-                  "TargetSlot": {
-                    "Compute": "MasterTargetSlot"
-                  },
-                  "Filters": [
-                    {
-                      "Type": "ItemInHand",
-                      "Items": {
-                        "Compute": "SpawnerEmptyItemID"
-                      }
-                    }
-                  ]
-                },
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "TameworkHasOwner"
-                  }
-                },
-                {
-                  "Type": "TameworkIsTamed"
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "TameworkCaptureWild"
-              },
-              {
-                "Type": "SpawnParticles",
-                "Offset": [
-                  0,
-                  0.1,
-                  0
-                ],
-                "ParticleSystem": "Poof_Small"
-              },
-              {
-                "Type": "PlaySound",
-                "SoundEventId": {
-                  "Compute": "InteractSoundPickUp"
-                }
-              }
-            ]
-          },
-          {
-            "$Comment": "Feed with a valid food item.",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "TameworkIsOwner"
-                },
-                {
-                  "Type": "Target",
-                  "TargetSlot": {
-                    "Compute": "MasterTargetSlot"
-                  },
-                  "Filters": [
-                    {
-                      "Type": "ItemInHand",
-                      "Items": {
-                        "Compute": "FoodItemIDs"
-                      }
-                    }
-                  ]
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "Inventory",
-                "UseTarget": true,
-                "Operation": "RemoveHeldItem",
-                "Count": 1
-              },
-              {
-                "Type": "SpawnParticles",
-                "Offset": [
-                  0,
-                  1.2,
-                  -0.6
-                ],
-                "ParticleSystem": "Pet_Heal"
-              },
-              {
-                "Type": "PlaySound",
-                "SoundEventId": {
-                  "Compute": "InteractSoundFeed"
-                }
-              }
-            ]
-          },
-          {
-            "$Comment": "If in Defend, switch to Hold.",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "TameworkIsOwner"
-                },
-                {
-                  "Type": "State",
-                  "State": "Defend"
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": "Hold"
-              },
-              {
-                "Type": "SpawnParticles",
-                "Offset": [
-                  0,
-                  1.2,
-                  -0.6
-                ],
-                "ParticleSystem": "Hold"
-              },
-              {
-                "Type": "PlaySound",
-                "SoundEventId": {
-                  "Compute": "InteractSoundHold"
-                }
-              }
-            ]
-          },
-          {
-            "$Comment": "If in Hold/Sleep, switch to Idle (follow).",
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "TameworkIsOwner"
-                },
-                {
-                  "Type": "Or",
-                  "Sensors": [
-                    {
-                      "Type": "State",
-                      "State": "Hold"
-                    },
-                    {
-                      "Type": "State",
-                      "State": "Sleep"
-                    }
-                  ]
-                }
-              ]
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": "Idle.Default"
-              },
-              {
-                "Type": "SpawnParticles",
-                "Offset": [
-                  0,
-                  1.2,
-                  -0.6
-                ],
-                "ParticleSystem": "Follow"
-              },
-              {
-                "Type": "PlaySound",
-                "SoundEventId": {
-                  "Compute": "InteractSoundFollow"
-                }
-              }
-            ]
-          },
-          {
-            "$Comment": "If in Idle, switch to Defend.",
-            "Instructions": [
-              {
-                "Sensor": {
-                  "Type": "And",
-                  "Sensors": [
-                    {
-                      "Type": "TameworkIsOwner"
-                    },
-                    {
-                      "Type": "State",
-                      "State": "Idle"
-                    }
-                  ]
-                },
-                "Actions": [
-                  {
-                    "Type": "State",
-                    "State": "Defend.Default"
-                  },
-                  {
-                    "Type": "SpawnParticles",
-                    "Offset": [
-                      0,
-                      1.2,
-                      -0.6
-                    ],
-                    "ParticleSystem": "Defend"
-                  },
-                  {
-                    "Type": "PlaySound",
-                    "SoundEventId": {
-                      "Compute": "InteractSoundDefend"
-                    }
-                  }
-                ]
-              }
-            ]
+            "Type": "TameworkInteract",
+            "ConfigId": {
+              "Compute": "InteractionConfigId"
+            }
           }
         ]
       }

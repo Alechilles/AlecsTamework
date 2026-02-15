@@ -1,5 +1,5 @@
 {
-  "$Comment": "Simplified example NPC role that uses Template_Tamework_Example_Simple.",
+  "$Comment": "Simplified example NPC role using the Tamework interaction system.",
   "Type": "Variant",
   "Reference": "Template_Tamework_Example_Simple",
   "Modify": {
@@ -14,7 +14,7 @@
   },
   "Parameters": {
     "NameTranslationKey": {
-      "Value": "server.npcRoles.Mob_Tamework_Example_Simple.name",
+      "Value": "server.npcRoles.Tamework_Example_Simple.name",
       "Description": "Translation key for NPC name display."
     }
   }

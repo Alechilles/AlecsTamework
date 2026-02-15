@@ -1,0 +1,21 @@
+{
+  "$Comment": "Simplified example NPC role that uses Template_Tamework_Example_Simple. (Vanilla interaction flow example.)",
+  "Type": "Variant",
+  "Reference": "Template_Tamework_Example_Simple_Vanilla",
+  "Modify": {
+    "Appearance": "Tamework_Example",
+    "NameTranslationKey": "server.npcRoles.Tamework_Example_Simple_Vanilla.name",
+    "SpawnerEmptyItemID": [
+      "Spawner_Tamework_Example"
+    ],
+    "FoodItemIDs": [
+      "Plant_Fruit_Apple"
+    ]
+  },
+  "Parameters": {
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.Tamework_Example_Simple_Vanilla.name",
+      "Description": "Translation key for NPC name display."
+    }
+  }
+}

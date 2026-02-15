@@ -1,10 +1,10 @@
 {
-  "$Comment": "Example NPC role using the Tamework interaction system.",
+  "$Comment": "Example NPC role that uses Template_Tamework_Example. Copy and adjust values for your own NPC. (Vanilla interaction flow example.)",
   "Type": "Variant",
-  "Reference": "Template_Tamework_Example",
+  "Reference": "Template_Tamework_Example_Vanilla",
   "Modify": {
     "Appearance": "Tamework_Example",
-    "NameTranslationKey": "server.npcRoles.Tamework_Example.name",
+    "NameTranslationKey": "server.npcRoles.Tamework_Example_Vanilla.name",
     "MasterTargetSlot": "MasterTarget",
     "FollowDefaultSpotRange": 5,
     "FollowLockOnRange": 15,
@@ -187,7 +187,7 @@
   },
   "Parameters": {
     "NameTranslationKey": {
-      "Value": "server.npcRoles.Tamework_Example.name",
+      "Value": "server.npcRoles.Tamework_Example_Vanilla.name",
       "Description": "Translation key for NPC name display."
     }
   }
