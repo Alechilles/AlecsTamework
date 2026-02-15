@@ -15,9 +15,9 @@
       ]
     }
   },
-  "Model": "Items/Tools/Collar.blockymodel",
-  "Texture": "Items/Tools/Collar_Texture.png",
-  "Icon": "Icons/ItemsGenerated/Deco_Dog_Collar.png",
+  "Model": "Items/Tamework/Lantern/Tamework_Soul_Lantern.blockymodel",
+  "Texture": "Items/Tamework/Lantern/Tamework_Soul_Lantern_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Tamework_Soul_Lantern_Empty.png",
   "IconProperties": {
     "Scale": 0.85,
     "Translation": [
@@ -47,9 +47,9 @@
           ]
         }
       },
-      "Model": "Items/Consumables/Food/Egg.blockymodel",
-      "Texture": "Items/Consumables/Food/Egg_White_Texture.png",
-      "Icon": "Icons/ItemsGenerated/Food_Egg_White.png",
+      "Model": "Items/Tamework/Lantern/Tamework_Soul_Lantern.blockymodel",
+      "Texture": "Items/Tamework/Lantern/Tamework_Soul_Lantern_Texture.png",
+      "Icon": "Icons/ItemsGenerated/Tamework_Soul_Lantern_Filled.png",
       "IconProperties": {
         "Rotation": [
           22.5,
@@ -62,7 +62,23 @@
           -5.4
         ]
       },
-      "MaxStack": 1
+      "MaxStack": 1,
+      "Scale": 1,
+      "Particles": [
+        {
+          "SystemId": "Tamework_Soul_Lantern",
+          "Color": "#00f3f3",
+          "PositionOffset": {
+            "Y": 0.17
+          },
+          "Scale": 0.5
+        }
+      ],
+      "Light": {
+        "Color": "#045",
+        "Radius": 0
+      },
+      "SoundEventId": "SFX_Tamework_Soul_Lantern_Loop"
     }
   }
 }
