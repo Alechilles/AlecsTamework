@@ -24,11 +24,11 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private static final String HINT_GENERIC = "server.interactionHints.generic";
     private static final String HINT_HARVEST = "server.interactionHints.harvest";
     private static final String HINT_MOUNT = "server.interactionHints.mount";
-    private static final String HINT_TAME = "tamework.interactionHints.tame";
-    private static final String HINT_FEED = "tamework.interactionHints.feed";
-    private static final String HINT_BREED = "tamework.interactionHints.breed";
-    private static final String HINT_MODE_CYCLE = "tamework.interactionHints.modeCycle";
-    private static final String HINT_CUSTOM = "tamework.interactionHints.custom";
+    private static final String HINT_TAME = "server.interactionHints.tame";
+    private static final String HINT_FEED = "server.interactionHints.feed";
+    private static final String HINT_BREED = "server.interactionHints.breed";
+    private static final String HINT_MODE_CYCLE = "server.interactionHints.modeCycle";
+    private static final String HINT_CUSTOM = "server.interactionHints.custom";
 
     public ActionTameworkInteractPrompt(BuilderActionTameworkInteractPrompt builder, BuilderSupport support) {
         super(builder, support);
@@ -43,7 +43,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         if (npcRef == null || !npcRef.isValid() || role == null || role.getStateSupport() == null) {
             return false;
         }
-        Ref<EntityStore> interactionTarget = role.getStateSupport().getInteractionIterationTarget();
+        Ref<EntityStore> interactionTarget = resolveInteractionTarget(role, infoProvider);
         if (interactionTarget == null || !interactionTarget.isValid() || store == null) {
             return false;
         }
