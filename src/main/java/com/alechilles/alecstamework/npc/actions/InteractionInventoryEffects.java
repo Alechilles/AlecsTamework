@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemInventoryEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
@@ -17,6 +18,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer;
+import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
@@ -24,28 +26,85 @@ import java.util.List;
 import java.util.Random;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
+import com.hypixel.hytale.server.npc.role.Role;
 
 /** Applies inventory-related interaction effects and item drops. */
 final class InteractionInventoryEffects {
+    private final ActionTameworkInteract owner;
+
     // Builds inventory effects for interaction entries.
-    InteractionInventoryEffects() {
+    InteractionInventoryEffects(ActionTameworkInteract owner) {
+        this.owner = owner;
     }
 
     // Removes items from the player's active hotbar slot.
-    boolean applyRemoveItemsHand(RemoveItemsHandEffect effect, Player player) {
-        if (effect == null) {
+    boolean applyRemoveItemsHand(RemoveItemsHandEffect effect,
+                                 Role role,
+                                 InteractionContextSnapshot ctx,
+                                 Player player) {
+        if (effect == null || player == null) {
+            return false;
+        }
+        String[] allowedItems = resolveHandItems(effect, role, ctx);
+        if (allowedItems != null && allowedItems.length > 0 && !owner.isHeldItemInList(allowedItems, ctx)) {
             return false;
         }
         int quantity = effect.getQuantity() != null ? effect.getQuantity() : 1;
         return InteractionItemConsumption.removeHeldItemQuantity(player, quantity);
     }
 
-    // Removes items from the player's inventory container.
-    boolean applyRemoveItemsInventory(RemoveItemsInventoryEffect effect, Player player) {
+    // Adds items to the player's active hotbar slot when possible.
+    boolean applyAddItemsHand(AddItemsHandEffect effect,
+                              Role role,
+                              InteractionContextSnapshot ctx,
+                              Player player) {
         if (effect == null || player == null) {
             return false;
         }
-        ItemQuantity[] items = effect.getItems();
+        ItemQuantity[] items = resolveItemQuantities(effect.getItems(), effect.getItemsParam(), role, ctx);
+        if (items == null || items.length == 0) {
+            return false;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null) {
+            return false;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        CombinedItemContainer combined = resolveInventoryContainer(player);
+        byte activeSlot = inventory.getActiveHotbarSlot();
+        boolean applied = false;
+        for (ItemQuantity item : items) {
+            if (item == null || item.getItem() == null || item.getItem().isBlank()) {
+                continue;
+            }
+            int quantity = item.getQuantity() != null ? item.getQuantity() : 1;
+            if (quantity <= 0) {
+                continue;
+            }
+            boolean placed = tryAddToHotbarSlot(hotbar, activeSlot, item.getItem(), quantity);
+            if (!placed && combined != null) {
+                ItemStackTransaction transaction = combined.addItemStack(new ItemStack(item.getItem(), quantity));
+                if (transaction != null) {
+                    ItemStack remainder = transaction.getRemainder();
+                    if (remainder == null || remainder.isEmpty() || remainder.getQuantity() < quantity) {
+                        placed = true;
+                    }
+                }
+            }
+            applied |= placed;
+        }
+        return applied;
+    }
+
+    // Removes items from the player's inventory container.
+    boolean applyRemoveItemsInventory(RemoveItemsInventoryEffect effect,
+                                      Role role,
+                                      InteractionContextSnapshot ctx,
+                                      Player player) {
+        if (effect == null || player == null) {
+            return false;
+        }
+        ItemQuantity[] items = resolveItemQuantities(effect.getItems(), effect.getItemsParam(), role, ctx);
         if (items == null || items.length == 0) {
             return false;
         }
@@ -74,11 +133,14 @@ final class InteractionInventoryEffects {
     }
 
     // Adds items into the player's inventory container.
-    boolean applyAddItemInventory(AddItemInventoryEffect effect, Player player) {
+    boolean applyAddItemInventory(AddItemInventoryEffect effect,
+                                  Role role,
+                                  InteractionContextSnapshot ctx,
+                                  Player player) {
         if (effect == null || player == null) {
             return false;
         }
-        ItemQuantity[] items = effect.getItems();
+        ItemQuantity[] items = resolveItemQuantities(effect.getItems(), effect.getItemsParam(), role, ctx);
         if (items == null || items.length == 0) {
             return false;
         }
@@ -141,6 +203,66 @@ final class InteractionInventoryEffects {
             return null;
         }
         return inventory.getCombinedBackpackStorageHotbar();
+    }
+
+    private boolean tryAddToHotbarSlot(ItemContainer hotbar,
+                                       byte slot,
+                                       String itemId,
+                                       int quantity) {
+        if (hotbar == null || itemId == null || itemId.isBlank() || quantity <= 0) {
+            return false;
+        }
+        short slotIndex = slot < 0 ? 0 : (short) slot;
+        ItemStack existing = hotbar.getItemStack(slotIndex);
+        if (existing == null || existing.isEmpty()) {
+            hotbar.setItemStackForSlot(slotIndex, new ItemStack(itemId, quantity));
+            return true;
+        }
+        String existingId = existing.getItemId();
+        if (existingId != null && existingId.equalsIgnoreCase(itemId)) {
+            int newQuantity = existing.getQuantity() + quantity;
+            ItemStack merged = new ItemStack(
+                    existingId,
+                    newQuantity,
+                    existing.getDurability(),
+                    existing.getMaxDurability(),
+                    existing.getMetadata()
+            );
+            hotbar.setItemStackForSlot(slotIndex, merged);
+            return true;
+        }
+        return false;
+    }
+
+    private String[] resolveHandItems(RemoveItemsHandEffect effect,
+                                      Role role,
+                                      InteractionContextSnapshot ctx) {
+        if (effect == null || owner == null) {
+            return null;
+        }
+        String itemsParam = effect.getItemsParam();
+        if (itemsParam != null && !itemsParam.isBlank()) {
+            String[] rawValues = owner.getRoleStringArrayParam(role, ctx, itemsParam);
+            String[] resolved = InteractionItemParser.parseItemIdsFromParam(rawValues);
+            if (resolved != null && resolved.length > 0) {
+                return resolved;
+            }
+        }
+        return effect.getItems();
+    }
+
+    private ItemQuantity[] resolveItemQuantities(ItemQuantity[] configured,
+                                                 String itemsParam,
+                                                 Role role,
+                                                 InteractionContextSnapshot ctx) {
+        if (owner != null && itemsParam != null && !itemsParam.isBlank()) {
+            String[] rawValues = owner.getRoleStringArrayParam(role, ctx, itemsParam);
+            ItemQuantity[] resolved = InteractionItemParser.parseItemQuantitiesFromParam(rawValues);
+            if (resolved != null && resolved.length > 0) {
+                return resolved;
+            }
+        }
+        return configured;
     }
 
     // Builds the list of item drops for a drop effect.

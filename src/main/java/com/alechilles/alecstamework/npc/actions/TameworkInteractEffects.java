@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemInventoryEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Effects;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
@@ -34,7 +35,7 @@ final class TameworkInteractEffects {
 
     TameworkInteractEffects(ActionTameworkInteract owner) {
         this.owner = owner;
-        this.inventoryEffects = new InteractionInventoryEffects();
+        this.inventoryEffects = new InteractionInventoryEffects(owner);
         this.presentationEffects = new InteractionPresentationEffects();
         this.stateEffects = new InteractionStateEffects();
         this.modeCycleEffects = new InteractionModeCycleEffects(owner, presentationEffects, stateEffects);
@@ -47,7 +48,8 @@ final class TameworkInteractEffects {
                                Role role,
                                InfoProvider infoProvider,
                                Store<EntityStore> store,
-                               Player player) {
+                               Player player,
+                               InteractionContextSnapshot ctx) {
         if (effects == null) {
             return false;
         }
@@ -70,15 +72,19 @@ final class TameworkInteractEffects {
         }
         RemoveItemsHandEffect removeItemsHand = effects.getRemoveItemsHand();
         if (removeItemsHand != null) {
-            applied |= inventoryEffects.applyRemoveItemsHand(removeItemsHand, player);
+            applied |= inventoryEffects.applyRemoveItemsHand(removeItemsHand, role, ctx, player);
+        }
+        AddItemsHandEffect addItemsHand = effects.getAddItemsHand();
+        if (addItemsHand != null) {
+            applied |= inventoryEffects.applyAddItemsHand(addItemsHand, role, ctx, player);
         }
         RemoveItemsInventoryEffect removeItemsInventory = effects.getRemoveItemsInventory();
         if (removeItemsInventory != null) {
-            applied |= inventoryEffects.applyRemoveItemsInventory(removeItemsInventory, player);
+            applied |= inventoryEffects.applyRemoveItemsInventory(removeItemsInventory, role, ctx, player);
         }
         AddItemInventoryEffect addItemInventory = effects.getAddItemInventory();
         if (addItemInventory != null) {
-            applied |= inventoryEffects.applyAddItemInventory(addItemInventory, player);
+            applied |= inventoryEffects.applyAddItemInventory(addItemInventory, role, ctx, player);
         }
         if (Boolean.TRUE.equals(effects.getMount())) {
             applied |= mountEffects.applyMount(npcRef, role, infoProvider, store);

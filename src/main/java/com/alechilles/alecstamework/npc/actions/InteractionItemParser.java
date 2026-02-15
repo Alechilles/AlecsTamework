@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -91,6 +92,54 @@ final class InteractionItemParser {
         return items.isEmpty() ? null : items.toArray(new FeedItem[0]);
     }
 
+    static ItemQuantity[] parseItemQuantitiesFromParam(String[] rawValues) {
+        if (rawValues == null || rawValues.length == 0) {
+            return null;
+        }
+        if (rawValues.length == 1 && looksLikeJsonArray(rawValues[0])) {
+            ItemQuantity[] parsed = parseItemQuantitiesFromJson(rawValues[0]);
+            if (parsed != null && parsed.length > 0) {
+                return parsed;
+            }
+            return null;
+        }
+        return toItemQuantities(filterItemIds(rawValues), 1);
+    }
+
+    static ItemQuantity[] parseItemQuantitiesFromJson(String json) {
+        if (!looksLikeJsonArray(json)) {
+            return null;
+        }
+        JsonArray array = parseJsonArray(json);
+        if (array == null) {
+            return null;
+        }
+        ArrayList<ItemQuantity> items = new ArrayList<>();
+        for (JsonElement element : array) {
+            if (element == null || element.isJsonNull()) {
+                continue;
+            }
+            if (element.isJsonPrimitive() && element.getAsJsonPrimitive().isString()) {
+                String value = element.getAsString();
+                if (value != null && !value.isBlank()) {
+                    items.add(new ItemQuantity(value, 1));
+                }
+                continue;
+            }
+            if (element.isJsonObject()) {
+                JsonObject obj = element.getAsJsonObject();
+                String item = firstNonBlank(getJsonString(obj, "Item"), getJsonString(obj, "item"));
+                if (item == null || item.isBlank()) {
+                    continue;
+                }
+                Double quantity = firstNonNull(getJsonNumber(obj, "Quantity"), getJsonNumber(obj, "quantity"));
+                int count = quantity != null ? Math.max(1, quantity.intValue()) : 1;
+                items.add(new ItemQuantity(item, count));
+            }
+        }
+        return items.isEmpty() ? null : items.toArray(new ItemQuantity[0]);
+    }
+
     static FeedItem[] toFeedItems(String[] itemIds) {
         if (itemIds == null || itemIds.length == 0) {
             return new FeedItem[0];
@@ -103,6 +152,21 @@ final class InteractionItemParser {
             items.add(new FeedItem(itemId, null));
         }
         return items.toArray(new FeedItem[0]);
+    }
+
+    static ItemQuantity[] toItemQuantities(String[] itemIds, int defaultQuantity) {
+        if (itemIds == null || itemIds.length == 0) {
+            return new ItemQuantity[0];
+        }
+        int quantity = Math.max(1, defaultQuantity);
+        ArrayList<ItemQuantity> items = new ArrayList<>();
+        for (String itemId : itemIds) {
+            if (itemId == null || itemId.isBlank()) {
+                continue;
+            }
+            items.add(new ItemQuantity(itemId, quantity));
+        }
+        return items.toArray(new ItemQuantity[0]);
     }
 
     static String[] extractItemIds(FeedItem[] items) {

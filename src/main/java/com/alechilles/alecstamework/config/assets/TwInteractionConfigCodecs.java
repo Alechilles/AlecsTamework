@@ -936,6 +936,20 @@ public final class TwInteractionConfigCodecs {
             RemoveItemsHandEffect.class,
             RemoveItemsHandEffect::new
     )
+        .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (effect, value) -> effect.itemsParam = value,
+            effect -> effect.itemsParam
+        )
+        .documentation("Role param to import hand item IDs from (string, string[], or JSON array string).")
+        .add()
+        .<String[]>append(
+            new KeyedCodec<>("Items", ITEM_ASSET_ARRAY_CODEC),
+            (effect, value) -> effect.items = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
+            effect -> effect.items
+        )
+        .documentation("Items that are eligible to be removed from hand.")
+        .add()
         .<Integer>append(
             new KeyedCodec<>("Quantity", Codec.INTEGER),
             (effect, value) -> effect.quantity = value,
@@ -968,10 +982,37 @@ public final class TwInteractionConfigCodecs {
     public static final ArrayCodec<ItemQuantity> ITEM_QUANTITY_ARRAY_CODEC =
             new ArrayCodec<>(ITEM_QUANTITY_CODEC, ItemQuantity[]::new);
 
+    public static final BuilderCodec<AddItemsHandEffect> ADD_ITEMS_HAND_EFFECT_CODEC = BuilderCodec.builder(
+            AddItemsHandEffect.class,
+            AddItemsHandEffect::new
+    )
+        .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (effect, value) -> effect.itemsParam = value,
+            effect -> effect.itemsParam
+        )
+        .documentation("Role param to import item quantities from (string, string[], or JSON array string).")
+        .add()
+        .<ItemQuantity[]>append(
+            new KeyedCodec<>("Items", ITEM_QUANTITY_ARRAY_CODEC),
+            (effect, value) -> effect.items = value == null ? EMPTY_ITEM_QUANTITIES : value,
+            effect -> effect.items
+        )
+        .documentation("Items to add to the active hotbar slot.")
+        .add()
+        .build();
+
     public static final BuilderCodec<RemoveItemsInventoryEffect> REMOVE_ITEMS_INVENTORY_EFFECT_CODEC = BuilderCodec.builder(
             RemoveItemsInventoryEffect.class,
             RemoveItemsInventoryEffect::new
     )
+        .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (effect, value) -> effect.itemsParam = value,
+            effect -> effect.itemsParam
+        )
+        .documentation("Role param to import item quantities from (string, string[], or JSON array string).")
+        .add()
         .<ItemQuantity[]>append(
             new KeyedCodec<>("Items", ITEM_QUANTITY_ARRAY_CODEC),
             (effect, value) -> effect.items = value == null ? EMPTY_ITEM_QUANTITIES : value,
@@ -985,6 +1026,13 @@ public final class TwInteractionConfigCodecs {
             AddItemInventoryEffect.class,
             AddItemInventoryEffect::new
     )
+        .<String>append(
+            new KeyedCodec<>("ItemsParam", Codec.STRING),
+            (effect, value) -> effect.itemsParam = value,
+            effect -> effect.itemsParam
+        )
+        .documentation("Role param to import item quantities from (string, string[], or JSON array string).")
+        .add()
         .<ItemQuantity[]>append(
             new KeyedCodec<>("Items", ITEM_QUANTITY_ARRAY_CODEC),
             (effect, value) -> effect.items = value == null ? EMPTY_ITEM_QUANTITIES : value,
@@ -1032,6 +1080,13 @@ public final class TwInteractionConfigCodecs {
             effects -> effects.removeItemsHand
         )
         .documentation("Remove items from the player's hand.")
+        .add()
+        .<AddItemsHandEffect>append(
+            new KeyedCodec<>("AddItemsHand", ADD_ITEMS_HAND_EFFECT_CODEC),
+            (effects, value) -> effects.addItemsHand = value,
+            effects -> effects.addItemsHand
+        )
+        .documentation("Add items to the player's active hotbar slot.")
         .add()
         .<RemoveItemsInventoryEffect>append(
             new KeyedCodec<>("RemoveItemsInventory", REMOVE_ITEMS_INVENTORY_EFFECT_CODEC),

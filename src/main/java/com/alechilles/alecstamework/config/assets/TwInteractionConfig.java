@@ -675,6 +675,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         ModifyStatsEffect modifyStats;
         SetStateEffect setState;
         RemoveItemsHandEffect removeItemsHand;
+        AddItemsHandEffect addItemsHand;
         RemoveItemsInventoryEffect removeItemsInventory;
         AddItemInventoryEffect addItemInventory;
         Boolean mount;
@@ -703,6 +704,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public RemoveItemsHandEffect getRemoveItemsHand() {
             return removeItemsHand;
+        }
+
+        public AddItemsHandEffect getAddItemsHand() {
+            return addItemsHand;
         }
 
         public RemoveItemsInventoryEffect getRemoveItemsInventory() {
@@ -790,15 +795,43 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class RemoveItemsHandEffect {
+        String itemsParam;
+        String[] items = ArrayUtil.EMPTY_STRING_ARRAY;
         Integer quantity;
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
+
+        public String[] getItems() {
+            return items == null ? ArrayUtil.EMPTY_STRING_ARRAY : items;
+        }
 
         public Integer getQuantity() {
             return quantity;
         }
     }
 
-    public static final class RemoveItemsInventoryEffect {
+    public static final class AddItemsHandEffect {
+        String itemsParam;
         ItemQuantity[] items = EMPTY_ITEM_QUANTITIES;
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
+
+        public ItemQuantity[] getItems() {
+            return items == null ? EMPTY_ITEM_QUANTITIES : items;
+        }
+    }
+
+    public static final class RemoveItemsInventoryEffect {
+        String itemsParam;
+        ItemQuantity[] items = EMPTY_ITEM_QUANTITIES;
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
 
         public ItemQuantity[] getItems() {
             return items == null ? EMPTY_ITEM_QUANTITIES : items;
@@ -806,7 +839,12 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class AddItemInventoryEffect {
+        String itemsParam;
         ItemQuantity[] items = EMPTY_ITEM_QUANTITIES;
+
+        public String getItemsParam() {
+            return itemsParam;
+        }
 
         public ItemQuantity[] getItems() {
             return items == null ? EMPTY_ITEM_QUANTITIES : items;

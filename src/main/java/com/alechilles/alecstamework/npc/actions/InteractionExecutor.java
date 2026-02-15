@@ -35,27 +35,27 @@ final class InteractionExecutor {
                              Player player,
                              InteractionContextSnapshot ctx) {
         if (entry instanceof CustomInteraction) {
-            return effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
+            return effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof TameInteraction) {
             boolean applied = effects.applyStartTaming(npcRef, store, player);
             feedHelper.consumeHeldItem(player, 1);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
+            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;
             double healAmount = feedHelper.resolveFeedHeal(feed, role, ctx);
             boolean applied = effects.applyFeeding(npcRef, store, healAmount, player);
             feedHelper.consumeHeldItem(player, 1);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
+            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof HarvestInteraction) {
             boolean applied = effects.applyStartHarvest(npcRef, role, store);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
+            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof MountInteraction) {
             boolean applied = effects.applyMount(npcRef, role, infoProvider, store);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
+            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof ModeCycleInteraction) {
             ModeCycleInteraction cycle = (ModeCycleInteraction) entry;
@@ -68,11 +68,11 @@ final class InteractionExecutor {
                     store,
                     player
             );
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
+            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof BreedInteraction) {
             boolean applied = effects.applyStartBreeding();
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player);
+            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         return false;
     }
