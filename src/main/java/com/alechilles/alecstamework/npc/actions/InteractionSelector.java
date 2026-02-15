@@ -83,7 +83,7 @@ final class InteractionSelector {
                 }
                 continue;
             }
-            if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx)) {
+            if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, true)) {
                 if (contextual && score >= bestScore) {
                     bestScore = score;
                     best = new ActionTameworkInteract.ResolvedInteraction(
@@ -96,7 +96,7 @@ final class InteractionSelector {
                 }
                 continue;
             }
-            if (!requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx)) {
+            if (!requirements.requirementsMetForPrompt(entry, npcRef, role, infoProvider, store, player, ctx)) {
                 continue;
             }
             if (score > bestScore) {
@@ -144,7 +144,7 @@ final class InteractionSelector {
                 }
                 continue;
             }
-            if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx)) {
+            if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, false)) {
                 return new ActionTameworkInteract.ResolvedInteraction(
                         entry,
                         index,
@@ -166,14 +166,18 @@ final class InteractionSelector {
                                            Role role,
                                            InfoProvider infoProvider,
                                            Store<EntityStore> store,
-                                           InteractionContextSnapshot ctx) {
+                                           InteractionContextSnapshot ctx,
+                                           boolean forPrompt) {
         if (!(entry instanceof TwInteractionConfig.HarvestInteraction)) {
             return false;
         }
         TwInteractionConfig.HarvestInteraction harvest = (TwInteractionConfig.HarvestInteraction) entry;
         boolean requireContext = harvest.getRequireHarvestInteractionContext() == null
                 || harvest.getRequireHarvestInteractionContext();
-        if (!requireContext || !owner.matchesHarvestContext(role, infoProvider, ctx)) {
+        if (!requireContext
+                || !(forPrompt
+                ? owner.matchesHarvestContextForPrompt(role, infoProvider, ctx)
+                : owner.matchesHarvestContext(role, infoProvider, ctx))) {
             return false;
         }
         boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null
