@@ -837,6 +837,10 @@ public final class SpawnerFeatureHandler {
             int blockY,
             int blockZ
     ) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugSpawnerEnabled()) {
+            return;
+        }
         StringBuilder message = new StringBuilder(200);
         message.append("Spawner spawn debug [").append(stage).append("] ");
         message.append("ray=").append(rayDistance).append(" max=").append(maxDistance).append(" ");
