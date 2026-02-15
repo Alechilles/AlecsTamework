@@ -1,0 +1,13 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Tamework_Soul_Lantern_Fireflies"
+    },
+    {
+      "SpawnerId": "Tamework_Soul_Lantern_Fireflies_Start",
+      "PositionOffset": {
+        "Y": 0
+      }
+    }
+  ]
+}
