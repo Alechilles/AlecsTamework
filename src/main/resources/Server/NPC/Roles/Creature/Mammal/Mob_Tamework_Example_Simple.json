@@ -5,12 +5,14 @@
   "Modify": {
     "Appearance": "Tamework_Example",
     "NameTranslationKey": "server.npcRoles.Tamework_Example_Simple.name",
-    "SpawnerEmptyItemID": [
-      "Spawner_Tamework_Example"
-    ],
-    "FoodItemIDs": [
+    "LovedItems": [
       "Plant_Fruit_Apple"
-    ]
+    ],
+    "IsMountable": true,
+    "MountAnchorX": 0,
+    "MountAnchorY": 0.8,
+    "MountAnchorZ": 0.3,
+    "MountMovementConfig": "Mount"
   },
   "Parameters": {
     "NameTranslationKey": {

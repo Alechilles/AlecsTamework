@@ -1,5 +1,4 @@
 {
-  "$Comment": "Simple interaction-system example template (updated from vanilla interaction flow).",
   "Debug": "DisplayState, DisplayTarget",
   "StartState": "Hold",
   "DefaultSubState": "Default",
@@ -10,7 +9,7 @@
       "Description": "Model to be used. Replace with your NPC model ID."
     },
     "NameTranslationKey": {
-      "Value": "server.npcRoles.Tamework_Example_Simple.name",
+      "Value": "server.npcRoles.Tamework_Example_Simple_Vanilla.name",
       "Description": "Translation key for NPC name display."
     },
     "MasterTargetSlot": {
@@ -108,121 +107,28 @@
       "TypeHint": "String",
       "Description": "NPCGroup array for flock behavior (used by sleep wakeups)."
     },
-    "SpawnerEmptyItemID": {
-      "Value": [
-        "Spawner_Tamework_Example"
-      ],
-      "TypeHint": "String",
-      "Description": "Item IDs that can pick up this NPC (empty spawner)."
-    },
-    "FoodItemIDs": {
+    "LovedItems": {
       "Value": [
         "Plant_Fruit_Apple"
       ],
       "TypeHint": "String",
       "Description": "Food items accepted for feeding."
     },
-    "InteractSoundHold": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when switching to Hold."
-    },
-    "InteractSoundFollow": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when switching to Follow."
-    },
-    "InteractSoundDefend": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when switching to Defend."
-    },
-    "InteractSoundFeed": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when feeding."
-    },
-    "InteractSoundPickUp": {
-      "Value": "SFX_Tamework_Poof",
-      "Description": "Sound to play when picking up."
-    },
     "IsMountable": {
       "Value": false,
       "Description": "Whether this NPC can be mounted."
     },
-    "IsHarvestable": {
-      "Value": false,
-      "Description": "Whether this NPC can be 'harvested'. This includes shearing, milking, etc."
+    "MountAnchorX": {
+      "Value": 0
     },
-    "HarvestInteractionContext": {
-      "Value": "",
-      "Description": "The interaction context of the harvest tool. If empty, no tool is needed to harvest the NPC."
+    "MountAnchorY": {
+      "Value": 0
     },
-    "HarvestDropList": {
-      "Value": "",
-      "Description": "The drop list that's executed when the NPC is harvested."
+    "MountAnchorZ": {
+      "Value": 0
     },
-    "HarvestParticles": {
-      "Value": "Alerted",
-      "Description": "The particle system that is spawned when the NPC is harvested."
-    },
-    "HarvestSound": {
-      "Value": "SFX_Sheep_Sheared",
-      "Description": "The sound that plays when NPC is harvested."
-    },
-    "HarvestTimeout": {
-      "Value": [
-        "PT45M",
-        "PT1H"
-      ],
-      "Description": "The minimum time between consecutive harvests. Expressed as an ISO-8601 time period range."
-    },
-    "LovedItems": {
-      "Value": [
-        "Plant_Fruit_Apple"
-      ],
-      "TypeHint": "String",
-      "Description": "The list of items that are deemed very attractive."
-    },
-    "TestItemsInHandParam": {
-      "Value": [
-        "Plant_Fruit_Apple"
-      ],
-      "TypeHint": "String",
-      "Description": "ItemsParam list for ItemsInHand requirement (test)."
-    },
-    "TestItemsInInventoryParam": {
-      "Value": [
-        "Plant_Fruit_Apple"
-      ],
-      "TypeHint": "String",
-      "Description": "ItemsParam list for ItemsInInventory requirement (test)."
-    },
-    "TestItemsEquippedParam": {
-      "Value": [
-        "Armor_Wool_Head"
-      ],
-      "TypeHint": "String",
-      "Description": "ItemsParam list for ItemsEquipped requirement (test). Replace with an equipped item."
-    },
-    "TestAlarmParam": {
-      "Value": "Harvest_Ready",
-      "Description": "AlarmParam name used for AlarmState requirements (test)."
-    },
-    "TestInteractionContextParam": {
-      "Value": "Tamework_Test_Context",
-      "Description": "ContextParam value used for InteractionContext requirements (test)."
-    },
-    "TestTameItemsParam": {
-      "Value": [
-        "Plant_Fruit_Apple"
-      ],
-      "TypeHint": "String",
-      "Description": "ItemsParam list for Tame interaction (test)."
-    },
-    "TestFeedItemsParam": {
-      "Value": "[{\"Item\":\"Plant_Fruit_Apple\",\"Heal\":2.0},{\"Item\":\"Plant_Fruit_Apple\"}]",
-      "Description": "JSON array string for Feed ItemsParam (items with optional Heal)."
-    },
-    "InteractionConfigId": {
-      "Value": "",
-      "Description": "Optional override for Action_Tamework_Interact."
+    "MountMovementConfig": {
+      "Value": "Mount"
     }
   },
   "MotionControllerList": [
@@ -316,10 +222,6 @@
         {
           "Type": "State",
           "State": "Sleep"
-        },
-        {
-          "Type": "State",
-          "State": "$Harvest"
         }
       ]
     },
@@ -447,10 +349,6 @@
     }
   ],
   "InteractionInstruction": {
-    "$Comment": "Isolated interaction flow for Action_Tamework_Interact.",
-    "Enabled": {
-      "Compute": "IsMountable || IsHarvestable || !isEmptyStringArray(LovedItems)"
-    },
     "Instructions": [
       {
         "Continue": true,
@@ -467,29 +365,6 @@
       {
         "Sensor": {
           "Type": "HasInteracted"
-        },
-        "Actions": [
-          {
-            "Type": "LockOnInteractionTarget",
-            "TargetSlot": {
-              "Compute": "MasterTargetSlot"
-            }
-          },
-          {
-            "Type": "TameworkInteract"
-          }
-        ]
-      },
-      {
-        "$Comment": "Contextual (left-click) harvest trigger.",
-        "Enabled": {
-          "Compute": "!isEmpty(HarvestInteractionContext)"
-        },
-        "Sensor": {
-          "Type": "InteractionContext",
-          "Context": {
-            "Compute": "HarvestInteractionContext"
-          }
         },
         "Actions": [
           {

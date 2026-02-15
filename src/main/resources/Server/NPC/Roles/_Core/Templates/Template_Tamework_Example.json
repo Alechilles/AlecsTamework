@@ -468,26 +468,6 @@
       "TypeHint": "String",
       "Description": "Weapons to equip in hotbar."
     },
-    "InteractSoundHold": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when switching to Hold."
-    },
-    "InteractSoundFollow": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when switching to Follow."
-    },
-    "InteractSoundDefend": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when switching to Defend."
-    },
-    "InteractSoundFeed": {
-      "Value": "SFX_Torch_Swing_Right_Local",
-      "Description": "Sound to play when feeding."
-    },
-    "InteractSoundPickUp": {
-      "Value": "SFX_Tamework_Poof",
-      "Description": "Sound to play when picking up."
-    },
     "DisableDamageGroups": {
       "Value": [
         "Self"
@@ -541,6 +521,14 @@
       ],
       "Description": "The minimum time between consecutive harvests. Expressed as an ISO-8601 time period range."
     },
+    "HarvestAddItemBucket": {
+      "Value": "",
+      "Description": "Item to add when player holds Container_Bucket (e.g., milk bucket for milking)."
+    },
+    "HarvestAddItemDecoBucket": {
+      "Value": "",
+      "Description": "Item to add when player holds Deco_Bucket (e.g., milk bucket for milking)."
+    },
     "LovedItems": {
       "Value": [
         "Plant_Fruit_Apple"
@@ -585,12 +573,8 @@
       "Description": "ItemsParam list for Tame interaction (test)."
     },
     "TestFeedItemsParam": {
-      "Value": "[{\"Item\":\"Plant_Fruit_Apple\",\"Heal\":2.0},{\"Item\":\"Plant_Fruit_Apple\"}]",
+      "Value": "[{\"Item\":\"Plant_Fruit_Apple\",\"Heal\":2.0},{\"Item\":\"Plant_Fruit_Azure\",\"Heal\":10.0},{\"Item\":\"Plant_Fruit_Pinkberry\"}]",
       "Description": "JSON array string for Feed ItemsParam (items with optional Heal)."
-    },
-    "InteractionConfigId": {
-      "Value": "",
-      "Description": "Optional override for Action_Tamework_Interact."
     }
   },
   "MotionControllerList": [
@@ -1027,6 +1011,88 @@
               "Compute": "FlockArray"
             }
           }
+        }
+      ]
+    },
+    {
+      "$Comment": "Minimal harvest behavior for the example.",
+      "Sensor": {
+        "Type": "State",
+        "State": "$Harvest"
+      },
+      "Instructions": [
+        {
+          "Continue": true,
+          "Sensor": {
+            "Type": "Any",
+            "Once": true
+          },
+          "Actions": [
+            {
+              "Type": "SpawnParticles",
+              "Offset": [
+                0,
+                1,
+                0
+              ],
+              "ParticleSystem": {
+                "Compute": "HarvestParticles"
+              }
+            },
+            {
+              "Type": "PlaySound",
+              "SoundEventId": {
+                "Compute": "HarvestSound"
+              }
+            },
+            {
+              "Type": "SetAlarm",
+              "Name": "Harvest_Ready",
+              "DurationRange": {
+                "Compute": "HarvestTimeout"
+              }
+            }
+          ]
+        },
+        {
+          "Enabled": {
+            "Compute": "!isEmpty(HarvestDropList)"
+          },
+          "Continue": true,
+          "Sensor": {
+            "Type": "Any",
+            "Once": true
+          },
+          "Actions": [
+            {
+              "Type": "DropItem",
+              "DropList": {
+                "Compute": "HarvestDropList"
+              },
+              "Distance": [
+                0.2,
+                0.5
+              ],
+              "Delay": [
+                0,
+                0
+              ],
+              "DropSector": [
+                -360,
+                360
+              ],
+              "PitchHigh": false,
+              "ThrowSpeed": 14
+            }
+          ]
+        },
+        {
+          "Actions": [
+            {
+              "Type": "State",
+              "State": "Hold"
+            }
+          ]
         }
       ]
     }

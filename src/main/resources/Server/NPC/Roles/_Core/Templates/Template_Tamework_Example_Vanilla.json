@@ -469,19 +469,19 @@
       "Description": "Weapons to equip in hotbar."
     },
     "InteractSoundHold": {
-      "Value": "SFX_Torch_Swing_Right_Local",
+      "Value": "SFX_Creative_Play_Selection_Widget",
       "Description": "Sound to play when switching to Hold."
     },
     "InteractSoundFollow": {
-      "Value": "SFX_Torch_Swing_Right_Local",
+      "Value": "SFX_Creative_Play_Selection_Widget",
       "Description": "Sound to play when switching to Follow."
     },
     "InteractSoundDefend": {
-      "Value": "SFX_Torch_Swing_Right_Local",
+      "Value": "SFX_Creative_Play_Selection_Widget",
       "Description": "Sound to play when switching to Defend."
     },
     "InteractSoundFeed": {
-      "Value": "SFX_Torch_Swing_Right_Local",
+      "Value": "SFX_Creative_Play_Selection_Widget",
       "Description": "Sound to play when feeding."
     },
     "InteractSoundPickUp": {

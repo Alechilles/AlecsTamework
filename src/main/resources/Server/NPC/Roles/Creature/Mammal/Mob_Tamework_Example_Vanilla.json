@@ -172,10 +172,10 @@
       "Plant_Fruit_Apple"
     ],
     "Weapons": [],
-    "InteractSoundHold": "SFX_Torch_Swing_Right_Local",
-    "InteractSoundFollow": "SFX_Torch_Swing_Right_Local",
-    "InteractSoundDefend": "SFX_Torch_Swing_Right_Local",
-    "InteractSoundFeed": "SFX_Torch_Swing_Right_Local",
+    "InteractSoundHold": "SFX_Creative_Play_Selection_Widget",
+    "InteractSoundFollow": "SFX_Creative_Play_Selection_Widget",
+    "InteractSoundDefend": "SFX_Creative_Play_Selection_Widget",
+    "InteractSoundFeed": "SFX_Creative_Play_Selection_Widget",
     "InteractSoundPickUp": "SFX_Tamework_Poof",
     "DisableDamageGroups": [
       "Self"

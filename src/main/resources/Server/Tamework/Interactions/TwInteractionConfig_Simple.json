@@ -1,0 +1,36 @@
+{
+  "Enabled": true,
+  "RoleIds": [
+    "Mob_Tamework_Example_Simple"
+  ],
+  "Interactions": [
+    {
+      "Type": "Tame"
+    },
+    {
+      "Type": "Feed",
+      "Heal": 20
+    },
+    {
+      "Type": "Mount"
+    },
+    {
+      "Type": "ModeCycle",
+      "Cycle": [
+        {
+          "State": "Idle",
+          "Message": "Following"
+        },
+        {
+          "State": "Hold",
+          "Message": "Staying"
+        },
+        {
+          "State": "Defend",
+          "Message": "Defending"
+        }
+      ],
+      "ShowFloatingText": true
+    }
+  ]
+}

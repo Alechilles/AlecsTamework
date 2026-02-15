@@ -1,124 +1,65 @@
 {
   "Enabled": true,
   "RoleIds": [
-    "Mob_Tamework_Example",
-    "Mob_Tamework_Example_Simple"
+    "Mob_Tamework_Example"
   ],
   "Interactions": [
     {
       "Type": "Tame",
-      "Enabled": true,
       "ItemsParam": "TestTameItemsParam",
       "Effects": {
         "ShowFloatingText": {
-          "Message": "Example: Tame ItemsParam"
+          "Message": "Tamed"
         }
       }
     },
     {
       "Type": "Feed",
-      "Enabled": true,
       "UseLovedItems": false,
-      "Heal": 2,
-      "ItemsParam": "TestFeedItemsParam",
-      "Requires": {
-        "All": {
-          "ItemsInInventory": [
-            {
-              "ItemsParam": "TestItemsInInventoryParam",
-              "Quantity": 2
-            }
-          ]
-        }
-      },
-      "Effects": {
-        "ShowFloatingText": {
-          "Message": "Example: Feed ItemsParam  Inventory"
-        }
-      }
+      "Heal": 10,
+      "ItemsParam": "TestFeedItemsParam"
     },
     {
       "Type": "Harvest",
-      "Enabled": true,
-      "RequireTamed": false,
-      "RequireHarvestable": false,
-      "RequireHarvestAlarmReady": false,
-      "RequireHarvestInteractionContext": false,
+      "RequireTamed": false
+    },
+    {
+      "Type": "Mount",
       "Requires": {
         "All": {
           "ItemsEquipped": [
             {
-              "ItemsParam": "TestItemsEquippedParam"
+              "Slots": [
+                "Legs"
+              ]
             }
           ]
-        }
-      },
-      "Effects": {
-        "ShowFloatingText": {
-          "Message": "Example: Equipped ItemsParam"
-        }
-      }
-    },
-    {
-      "Type": "Mount",
-      "Enabled": true,
-      "RequireTamed": false,
-      "RequireOwner": false,
-      "RequireMountable": false,
-      "RequireCrouching": false,
-      "Requires": {
-        "All": {
-          "AlarmState": [
-            {
-              "AlarmParam": "TestAlarmParam",
-              "State": "active"
-            }
-          ]
-        }
-      },
-      "Effects": {
-        "ShowFloatingText": {
-          "Message": "Example: AlarmParam Active"
         }
       }
     },
     {
       "Type": "ModeCycle",
       "Enabled": true,
-      "RequireTamed": false,
-      "RequireOwner": false,
-      "Requires": {
-        "All": {
-          "InteractionContext": [
-            {
-              "ContextParam": "TestInteractionContextParam"
-            }
-          ]
+      "Cycle": [
+        {
+          "State": "Idle",
+          "Message": "Following"
+        },
+        {
+          "State": "Hold",
+          "Message": "Staying"
+        },
+        {
+          "State": "Defend",
+          "Message": "Defending"
         }
-      },
+      ],
+      "ShowFloatingText": true,
+      "CooldownSeconds": 0,
       "Effects": {
-        "ShowFloatingText": {
-          "Message": "Example: ContextParam Match"
-        }
-      }
-    },
-    {
-      "Type": "Breed",
-      "Enabled": true,
-      "RequireTamed": false,
-      "Requires": {
-        "All": {
-          "ItemsInHand": [
-            {
-              "ItemsParam": "TestItemsInHandParam",
-              "Quantity": 1
-            }
-          ]
-        }
-      },
-      "Effects": {
-        "ShowFloatingText": {
-          "Message": "Example: ItemsInHand Param"
+        "PlaySound": {
+          "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+          "PlayerOnly": true
         }
       }
     }

@@ -168,15 +168,16 @@
     "SpawnerEmptyItemID": [
       "Spawner_Tamework_Example"
     ],
-    "FoodItemIDs": [
+    "LovedItems": [
       "Plant_Fruit_Apple"
     ],
-    "Weapons": [],
-    "InteractSoundHold": "SFX_Torch_Swing_Right_Local",
-    "InteractSoundFollow": "SFX_Torch_Swing_Right_Local",
-    "InteractSoundDefend": "SFX_Torch_Swing_Right_Local",
-    "InteractSoundFeed": "SFX_Torch_Swing_Right_Local",
-    "InteractSoundPickUp": "SFX_Tamework_Poof",
+    "IsHarvestable": true,
+    "HarvestDropList": "Drop_Sheep_Harvest",
+    "HarvestInteractionContext": "Shear",
+    "HarvestParticles": "Sheep_Wool_Shear",
+    "HarvestSound": "SFX_Sheep_Sheared",
+    "HarvestAddItemBucket": "*Container_Bucket_State_Filled_Milk",
+    "HarvestAddItemDecoBucket": "*Deco_Bucket_State_Filled_Milk",
     "DisableDamageGroups": [
       "Self"
     ],
