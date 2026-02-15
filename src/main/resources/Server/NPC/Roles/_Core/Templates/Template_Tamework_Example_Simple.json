@@ -1,5 +1,5 @@
 {
-  "Debug": "DisplayState, DisplayTarget",
+  "Debug": "",
   "StartState": "Hold",
   "DefaultSubState": "Default",
   "Type": "Abstract",

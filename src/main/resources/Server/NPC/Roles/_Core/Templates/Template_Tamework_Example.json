@@ -1,6 +1,6 @@
 {
   "$Comment": "Interaction-system example template (updated from vanilla interaction flow).",
-  "Debug": "DisplayState, DisplayTarget",
+  "Debug": "",
   "StartState": "Hold",
   "DefaultSubState": "Default",
   "Type": "Abstract",
@@ -493,6 +493,18 @@
     "IsMountable": {
       "Value": false,
       "Description": "Whether this NPC can be mounted."
+    },
+    "MountAnchorX": {
+      "Value": 0
+    },
+    "MountAnchorY": {
+      "Value": 0
+    },
+    "MountAnchorZ": {
+      "Value": 0
+    },
+    "MountMovementConfig": {
+      "Value": "Mount"
     },
     "IsHarvestable": {
       "Value": false,
@@ -1108,12 +1120,12 @@
         "Sensor": {
           "Type": "Any"
         },
-          "Actions": [
-            {
-              "Type": "TameworkInteractPrompt"
-            }
-          ]
-        },
+        "Actions": [
+          {
+            "Type": "TameworkInteractPrompt"
+          }
+        ]
+      },
       {
         "Sensor": {
           "Type": "HasInteracted"
