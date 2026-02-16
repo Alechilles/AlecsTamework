@@ -1,20 +1,49 @@
 <img width="400" height="400" alt="Alec&#39;sTamework400Transparent" src="https://github.com/user-attachments/assets/251cbac2-26ea-4daf-b552-30594e96f8da" />
 
 # Alec's Tamework!
-A modular taming framework for Hytale that focuses on **fast setup** and **clean long‑term maintenance**. Add ownership, taming, capture/spawn, and rich NPC interactions without 600+ lines of JSON.
+A modular taming framework for Hytale that focuses on fast, easy setup and empowering moders to turn custom NPCs into interesting, highly interactive companions. Add ownership, taming, capture/spawn, and rich NPC interactions without 600+ lines of JSON in every NPC template.
 
-## What the Tamework Offers
-- **Optimized interactions** via `TwInteractionConfig` assets: clear requirements + effects, ordered matching, cooldowns, and role‑based overrides.
-  - Set up complex interaction chains in ~20 lines of JSON that would take over 600 with vanilla `InteractionInstructions`.
-- **Prompted interactions** with `TameworkInteractPrompt` and translation keys (fully customizable or hidden per entry).
-  - System automatically decides what prompt to show the user based on interaction requirements.
-- **Parameter‑driven configs** so one asset can power many NPC variants.
-- **Ownership + tamed state** stored on NPCs and persisted through reloads.
-- **Spawner items** that capture and spawn NPCs while preserving attachments/variants.
-- **Hooks and bridges** that let interaction effects trigger your own instruction chains.
-- **Polished examples** (simple and full templates, testbeds, and spawner samples).
+## Core Features
+- **Interaction System** - Use `TwInteractionConfig` assets to create NPC interactions quickly and easily
+  - Full asset editor GUI support unlike the base game instructions system
+  - Requires ~10% as much JSON as the base InteractionInstrucitons system for a vast majority of cases
+  - Interaction prompts (Ex: "Press F to...") update automatically based on interaction requirements
+  - Can pass in parameters so the same instructions can be used for many different NPCs
+  - `TameworkHook` sensor to allow triggering actions in the vanilla system for when you need the most granular control
+- **Ownership and Tamed Components** - Enforce ownership and tamed status of NPCs with extremely simple actions
+  - Sensors for ownership and tamed status
+  - Allow/disallow players to interact with or harm NPCs that do or do not belong to them (100% configurable, globally and per NPC)
+- **Capture/Spawn NPCs With Metadata** - Capture system saves metadata on capture and replicates the exact same mob on respawn
+  - Includes random attachments such as varying textures, models, etc.
+  - Also includes components like tamed status and ownership
+    - Ownership can optionally be cleared on capture and re-set on spawn to enable player trading of captured NPCs
+  - This will be expanded in the near future as new systems such as breeding, traits, talents, etc. are added. Everything will always be saved on capture.
+- **Examples and Documentation** - Plenty of examples and thorough documenation to help you get started integrating Tamework
+  - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
-The goal of Tamework is to make it easier for modders to turn their NPCs into interesting, highly interactive companions.
+
+## Coming Soon
+- **Naming Items**
+  - Name NPCs with an item similar to Minecraft's nametags
+  - As always with Tamework, this won't be a specific item, it will be an action you can add to any item to make your own nametags
+- **Command Flute/Whistle/Etc**
+  - Technically any item, it will be an action that can be called by any item you want
+  - Remotely command multiple mobs to change modes, attack a target, and more
+- **Needs System**
+  - Hunger, thirst, happiness, space etc.
+- **Breeding**
+  - Passive happiness-based system *and* simpler more Minecraft-like breed on interact system
+- **Trait system**
+  - Highly integrated with breeding
+  - Size, attachments (so colors, models, etc), harvest rates, strength, health, etc.
+- **NPC XP/leveling system**
+  - Gain XP passively when with owner or when doing certain configurable actions
+- **Talent trees**
+  - Create your own talent trees for your NPCs
+  - Allow unlocking new behaviors, stat increases, etc.
+  - Will include a talent tree UI
+- **Atittude group override system**
+  - Vanilla attitude groups can't be changed at runtime, but this will be a parallel system that we will have more freedom to work with
 
 ## Quick Start (2.0.0)
 1. Add the dependency in your `manifest.json`:
