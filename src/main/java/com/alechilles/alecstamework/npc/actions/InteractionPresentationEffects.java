@@ -20,6 +20,8 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -277,14 +279,68 @@ final class InteractionPresentationEffects {
         if (viewer == null) {
             return false;
         }
-        ComponentUpdate update = new ComponentUpdate();
-        update.type = ComponentUpdateType.CombatText;
-        CombatTextUpdate combatTextUpdate = new CombatTextUpdate();
-        combatTextUpdate.hitAngleDeg = 0.0f;
-        combatTextUpdate.text = text;
-        update.combatTextUpdate = combatTextUpdate;
-        viewer.queueUpdate(npcRef, update);
-        return true;
+        try {
+            if (isAbstractComponentUpdate()) {
+                CombatTextUpdate combatTextUpdate = new CombatTextUpdate();
+                combatTextUpdate.hitAngleDeg = 0.0f;
+                combatTextUpdate.text = text;
+                return invokeQueueUpdate(viewer, npcRef, combatTextUpdate);
+            }
+            ComponentUpdate update = new ComponentUpdate();
+            update.type = ComponentUpdateType.CombatText;
+            CombatTextUpdate combatTextUpdate = new CombatTextUpdate();
+            combatTextUpdate.hitAngleDeg = 0.0f;
+            combatTextUpdate.text = text;
+            update.combatTextUpdate = combatTextUpdate;
+            viewer.queueUpdate(npcRef, update);
+            return true;
+        } catch (Exception | LinkageError ex) {
+            return false;
+        }
+    }
+
+    private static boolean isAbstractComponentUpdate() {
+        try {
+            return Modifier.isAbstract(ComponentUpdate.class.getModifiers());
+        } catch (Exception | LinkageError ex) {
+            return false;
+        }
+    }
+
+    private static boolean invokeQueueUpdate(EntityTrackerSystems.EntityViewer viewer,
+                                             Ref<EntityStore> npcRef,
+                                             Object update) {
+        if (viewer == null || npcRef == null || update == null) {
+            return false;
+        }
+        try {
+            Method method = viewer.getClass().getMethod("queueUpdate", Ref.class, update.getClass());
+            method.invoke(viewer, npcRef, update);
+            return true;
+        } catch (NoSuchMethodException ignored) {
+            // Fallback: find any compatible queueUpdate overload.
+            for (Method method : viewer.getClass().getMethods()) {
+                if (!"queueUpdate".equals(method.getName()) || method.getParameterCount() != 2) {
+                    continue;
+                }
+                Class<?>[] params = method.getParameterTypes();
+                if (!params[0].isInstance(npcRef)) {
+                    continue;
+                }
+                if (!params[1].isInstance(update)) {
+                    continue;
+                }
+                try {
+                    method.invoke(viewer, npcRef, update);
+                    return true;
+                } catch (Exception | LinkageError ex) {
+                    return false;
+                }
+            }
+            return false;
+        } catch (Exception | LinkageError ex) {
+            return false;
+        }
     }
 
     // Formats a healing value for floating combat text.
