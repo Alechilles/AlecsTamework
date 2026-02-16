@@ -53,6 +53,7 @@ final class InteractionSelector {
         if (entries == null || entries.length == 0) {
             return null;
         }
+        ActionTameworkInteract.ResolvedInteraction blockedContext = null;
         ActionTameworkInteract.ResolvedInteraction best = null;
         int bestScore = -1;
         for (int index = 0; index < entries.length; index++) {
@@ -62,18 +63,14 @@ final class InteractionSelector {
             }
             boolean contextual = isContextualEntry(entry);
             int score = contextual ? 100 : (isConditionalEntry(entry) ? 50 : 0);
-            if (score < bestScore) {
-                continue;
-            }
             int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
             String cooldownAlarmName = cooldownSeconds > 0
                     ? cooldowns.buildCooldownAlarmName(config, index)
                     : null;
             if (cooldownSeconds > 0
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
-                if (contextual && score >= bestScore) {
-                    bestScore = score;
-                    best = new ActionTameworkInteract.ResolvedInteraction(
+                if (contextual && blockedContext == null) {
+                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
                             entry,
                             index,
                             cooldownSeconds,
@@ -84,9 +81,8 @@ final class InteractionSelector {
                 continue;
             }
             if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, true)) {
-                if (contextual && score >= bestScore) {
-                    bestScore = score;
-                    best = new ActionTameworkInteract.ResolvedInteraction(
+                if (contextual && blockedContext == null) {
+                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
                             entry,
                             index,
                             cooldownSeconds,
@@ -104,7 +100,7 @@ final class InteractionSelector {
                 best = new ActionTameworkInteract.ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
             }
         }
-        return best;
+        return best != null ? best : blockedContext;
     }
 
     private ActionTameworkInteract.ResolvedInteraction selectInteractionInternal(TwInteractionConfig config,
@@ -119,6 +115,7 @@ final class InteractionSelector {
         if (entries == null || entries.length == 0) {
             return null;
         }
+        ActionTameworkInteract.ResolvedInteraction blockedContext = null;
         for (int index = 0; index < entries.length; index++) {
             InteractionEntry entry = entries[index];
             if (entry == null || !entry.isEnabled()) {
@@ -133,8 +130,8 @@ final class InteractionSelector {
                     : null;
             if (cooldownSeconds > 0
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
-                if (isContextualEntry(entry)) {
-                    return new ActionTameworkInteract.ResolvedInteraction(
+                if (isContextualEntry(entry) && blockedContext == null) {
+                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
                             entry,
                             index,
                             cooldownSeconds,
@@ -145,19 +142,22 @@ final class InteractionSelector {
                 continue;
             }
             if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, false)) {
-                return new ActionTameworkInteract.ResolvedInteraction(
-                        entry,
-                        index,
-                        cooldownSeconds,
-                        cooldownAlarmName,
-                        true
-                );
+                if (isContextualEntry(entry) && blockedContext == null) {
+                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                            entry,
+                            index,
+                            cooldownSeconds,
+                            cooldownAlarmName,
+                            true
+                    );
+                }
+                continue;
             }
             if (requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx)) {
                 return new ActionTameworkInteract.ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
             }
         }
-        return null;
+        return blockedContext;
     }
 
     // Returns true when harvest alarm cooldown blocks a contextual harvest interaction.
