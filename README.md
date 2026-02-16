@@ -21,7 +21,6 @@ A modular taming framework for Hytale that focuses on fast, easy setup and empow
 - **Examples and Documentation** - Plenty of examples and thorough documenation to help you get started integrating Tamework
   - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
-
 ## Coming Soon
 - **Naming Items**
   - Name NPCs with an item similar to Minecraft's nametags
