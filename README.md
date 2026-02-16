@@ -3,7 +3,7 @@
 # Alec's Tamework!
 A modular taming framework for Hytale that focuses on fast, easy setup and empowering moders to turn custom NPCs into interesting, highly interactive companions. Add ownership, taming, capture/spawn, and rich NPC interactions without 600+ lines of JSON in every NPC template.
 
-## What the Tamework Offers
+## Core Features
 - **Interaction System** - Use `TwInteractionConfig` assets to create NPC interactions quickly and easily
   - Full asset editor GUI support unlike the base game instructions system
   - Requires ~10% as much JSON as the base InteractionInstrucitons system for a vast majority of cases
