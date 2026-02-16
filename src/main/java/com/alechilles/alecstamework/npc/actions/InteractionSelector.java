@@ -182,8 +182,12 @@ final class InteractionSelector {
         }
         boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null
                 || harvest.getRequireHarvestAlarmReady();
-        return requireAlarm
-                && !alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
+        if (!requireAlarm) {
+            return false;
+        }
+        return forPrompt
+                ? !owner.isHarvestAlarmReady(npcRef, store)
+                : !alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
     }
 
     // Returns true when the interaction is explicitly tied to contextual input.

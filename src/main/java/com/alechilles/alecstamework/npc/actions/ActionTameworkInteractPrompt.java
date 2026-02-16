@@ -65,8 +65,10 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
         }
         if (resolved != null && resolved.entry instanceof HarvestInteraction) {
-            // Prompt should only show when the harvest alarm is actually ready.
-            if (!isHarvestAlarmPassed(npcRef, store)) {
+            HarvestInteraction harvest = (HarvestInteraction) resolved.entry;
+            boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null || harvest.getRequireHarvestAlarmReady();
+            // Prompt should only show when the harvest alarm is ready (unset or passed).
+            if (requireAlarm && !isHarvestAlarmReady(npcRef, store)) {
                 resolved = null;
             }
         }
