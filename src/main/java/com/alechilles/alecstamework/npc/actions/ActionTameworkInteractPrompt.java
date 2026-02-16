@@ -79,16 +79,21 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             return false;
         }
         PromptState previous = lastPrompts.get(playerId);
-        if (!prompt.equals(previous)) {
+        boolean changed = !prompt.equals(previous);
+        boolean interactable = !prompt.isHidden();
+        if (changed) {
             // Force a refresh when the prompt changes so the hint updates on the client.
             role.getStateSupport().setInteractable(npcRef, interactionTarget, false, null, false, store);
-            role.getStateSupport().setInteractable(npcRef, interactionTarget, true, prompt.hint, prompt.showPrompt, store);
-            if (prompt.isHidden()) {
-                lastPrompts.remove(playerId);
-            } else {
-                lastPrompts.put(playerId, prompt);
-            }
         }
+        role.getStateSupport().setInteractable(
+                npcRef,
+                interactionTarget,
+                interactable,
+                prompt.hint,
+                prompt.showPrompt,
+                store
+        );
+        lastPrompts.put(playerId, prompt);
         return true;
     }
 
