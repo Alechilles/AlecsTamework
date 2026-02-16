@@ -4,26 +4,26 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 
 ## 2.0.0 - Interaction System Overhaul + Global Config - 2026-02-15
 ### Added
-- New **TwInteractionConfig** system with requirements/effects and interaction test assets.
-- Parameterized requirements/effects via role params: ItemsParam (items or items+quantities), AlarmParam, and InteractionContextParam with role-scope fallback.
-- Interaction config **Priority** field and role→config cache to control overrides.
-- UI feedback options for interactions: floating text + UI message overlay (TameworkMessageHud) and mode cycle messages.
-- TameworkHook trigger effect diagnostics and `/tw debughook` toggle; `/tw getalarm` command.
-- Interaction prompt system (`TameworkInteractPrompt`) with default hint keys, prompt selection, and updated example assets.
+- New **TwInteractionConfig** interaction system with explicit requirements/effects, cooldowns, and configurable priorities.
+- Parameterized requirements/effects via role params (ItemsParam, AlarmParam, InteractionContextParam) with role-scope fallback.
+- Interaction prompt system (`TameworkInteractPrompt`) with translation keys, prompt selection, and contextual prompt support.
+- UI feedback options for interactions: floating text, HUD message overlay (TameworkMessageHud), and mode-cycle messages.
+- `AddItemsHand` effect and ItemsParam support for inventory effects.
+- Global config asset **TwGlobalConfig** with defaults defined in assets and warnings when fields are missing.
+- TameworkHook trigger effect + diagnostics gated by `/tw debughook`, plus `/tw getalarm`.
 - Debug toggles for prompts and spawners: `/tw debugprompt` and `/tw debugspawner`.
-- `AddItemsHand` effect plus ItemsParam support for inventory effects.
+- Soul lantern shared assets moved into Tamework (spawner example assets updated).
 - Build step to copy the jar + assets zip directly to `Hytale\UserData\Mods`.
 - Unit tests for interaction parsing, matching, params, cooldowns, and alarms.
 
 ### Changed
-- Interactions are now gated by actual player input; duplicate inputs are deduped by client use time.
-- Cooldowns use real time (seconds), and contextual harvest now respects cooldowns.
-- Global settings moved to **TwGlobalConfig** assets with defaults defined in assets and warnings when fields are missing.
-- Requirements updated: ItemsInHand/ItemsInInventory/ItemsEquipped are arrays; equipped slots require arrays.
-- Interaction matching and inventory checks hardened; feed handling and alarm/cooldown resolution centralized.
-- UI message placement and fade tuned for readability.
-- Prompt selection now prioritizes contextual interactions, detects contextual items, refreshes hints on change, and falls back when contextual entries are blocked.
+- Interactions are gated by actual player input; duplicate inputs are deduped by client use time.
+- Cooldowns use real time (seconds) and contextual harvest respects cooldowns.
+- Interaction config resolution is cached by role and respects Priority overrides.
+- Requirements schema updated: ItemsInHand/ItemsInInventory/ItemsEquipped are arrays; equipped slots require arrays.
+- Prompt selection prioritizes contextual interactions, refreshes hints on change, detects contextual items, and falls back when contextual entries are blocked.
 - Harvest prompt text updated for contextual use (`Use item to harvest`).
+- UI message placement/fade tuned for readability.
 - Example templates refreshed (state setters for validation, mount anchors, and debug nameplate disabled).
 
 ### Removed
@@ -33,6 +33,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 ### Fixed
 - Harvest prompt gating for alarm readiness (including unset/active handling).
 - Alarm evaluation now blocks when world time is unavailable.
+- Hook sensor restricted to recent interactions (prevents passive firing).
 
 ## 1.2.0 - TwSpawnerConfig Assets + Capture/Spawn Overhaul - 2026-02-09
 ### Added
