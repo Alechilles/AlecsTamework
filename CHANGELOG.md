@@ -2,6 +2,11 @@
 
 All notable changes to **Alec's Tamework!** will be documented in this file.
 
+## 2.0.1 - Pre-release Compatibility Fixes - 2026-02-16
+### Fixed
+- Spawner capture/spawn now tolerates `CapturedNPCMetadata` getter/setter changes in the pre-release build (prevents `NoSuchMethodError` when resolving roles).
+- Interaction floating text/combat text no longer crashes world threads on pre-release builds where `ComponentUpdate` is abstract (uses `CombatTextUpdate` with a compatibility fallback).
+
 ## 2.0.0 - Interaction System Overhaul + Global Config - 2026-02-15
 ### Added
 - New **TwInteractionConfig** interaction system with explicit requirements/effects, cooldowns, and configurable priorities.
