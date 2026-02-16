@@ -29,6 +29,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private static final String HINT_GENERIC = "server.interactionHints.generic";
     private static final String HINT_HARVEST = "server.interactionHints.harvest";
+    private static final String HINT_HARVEST_CONTEXT = "server.interactionHints.harvestContext";
     private static final String HINT_MOUNT = "server.interactionHints.mount";
     private static final String HINT_TAME = "server.interactionHints.tame";
     private static final String HINT_FEED = "server.interactionHints.feed";
@@ -122,7 +123,10 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     // Selects a default hint key by interaction type.
     private String resolveDefaultHint(InteractionEntry entry) {
         if (entry instanceof HarvestInteraction) {
-            return HINT_HARVEST;
+            HarvestInteraction harvest = (HarvestInteraction) entry;
+            boolean requireContext = harvest.getRequireHarvestInteractionContext() == null
+                    || harvest.getRequireHarvestInteractionContext();
+            return requireContext ? HINT_HARVEST_CONTEXT : HINT_HARVEST;
         }
         if (entry instanceof MountInteraction) {
             return HINT_MOUNT;
