@@ -1,18 +1,20 @@
 <img width="400" height="400" alt="Alec&#39;sTamework400Transparent" src="https://github.com/user-attachments/assets/251cbac2-26ea-4daf-b552-30594e96f8da" />
 
 # Alec's Tamework!
-A modular taming framework for Hytale that focuses on **fast setup** and **clean long‑term maintenance**. Add ownership, taming, capture/spawn, and rich NPC interactions without bloated instruction trees.
+A modular taming framework for Hytale that focuses on **fast setup** and **clean long‑term maintenance**. Add ownership, taming, capture/spawn, and rich NPC interactions without 600+ lines of JSON.
 
-## Why Modders Use It
+## What the Tamework Offers
 - **Optimized interactions** via `TwInteractionConfig` assets: clear requirements + effects, ordered matching, cooldowns, and role‑based overrides.
+  - Set up complex interaction chains in ~20 lines of JSON that would take over 600 with vanilla `InteractionInstructions`.
 - **Prompted interactions** with `TameworkInteractPrompt` and translation keys (fully customizable or hidden per entry).
+  - System automatically decides what prompt to show the user based on interaction requirements.
 - **Parameter‑driven configs** so one asset can power many NPC variants.
 - **Ownership + tamed state** stored on NPCs and persisted through reloads.
 - **Spawner items** that capture and spawn NPCs while preserving attachments/variants.
 - **Hooks and bridges** that let interaction effects trigger your own instruction chains.
 - **Polished examples** (simple and full templates, testbeds, and spawner samples).
 
-If you want a tight interaction system without losing flexibility, this is the “use it everywhere” toolkit.
+The goal of Tamework is to make it easier for modders to turn their NPCs into interesting, highly interactive companions.
 
 ## Quick Start (2.0.0)
 1. Add the dependency in your `manifest.json`:
@@ -24,10 +26,11 @@ If you want a tight interaction system without losing flexibility, this is the �
 "IncludesAssetPack": true
 ```
 
-Asset pack load order note: Hytale loads asset packs alphabetically by folder name, so your mod folder must come after `.Alec's Tamework!`. The `manifest.json` name does not affect load order.
+Asset pack load order note: Hytale loads asset packs alphabetically by folder name, so your mod folder must come after `.Alec's Tamework!`. The `manifest.json` name does not affect load order for now, but hopefully it will in the near future.
 
 2. Choose your interaction path:
-   Optimized system (`TameworkInteract` + `TwInteractionConfig`) or vanilla instruction flow (full control).
+   Tamework's optimized system (`TameworkInteract` + `TwInteractionConfig`) or vanilla instruction flow (full control but a lot more work).
+   This quick-start guide will use `TameworkInteract`, but you can find more information on the components for use with the [vanilla flow here](https://github.com/Alechilles/AlecsTamework/wiki/Interactions-Vanilla).
 
 3. Copy a template:
    `Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json` or `Template_Tamework_Example_Simple.json`
