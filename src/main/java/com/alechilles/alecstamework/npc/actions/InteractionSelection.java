@@ -93,12 +93,29 @@ final class InteractionSelection {
         return matchHelpers.matchesInteractionContext(context, role, infoProvider, allowBlank);
     }
 
+    // Checks whether a context string matches for prompt display.
+    boolean matchesInteractionContextForPrompt(String context,
+                                               Role role,
+                                               InfoProvider infoProvider,
+                                               InteractionContextSnapshot ctx,
+                                               boolean allowBlank) {
+        return matchHelpers.matchesInteractionContextForPrompt(context, role, infoProvider, ctx, allowBlank);
+    }
+
     // Checks whether a context requirement matches.
     boolean matchesInteractionContext(InteractionContextRequirement requirement,
                                       Role role,
                                       InfoProvider infoProvider,
                                       InteractionContextSnapshot ctx) {
         return matchHelpers.matchesInteractionContext(requirement, role, infoProvider, ctx);
+    }
+
+    // Checks whether a context requirement matches for prompt display.
+    boolean matchesInteractionContextForPrompt(InteractionContextRequirement requirement,
+                                               Role role,
+                                               InfoProvider infoProvider,
+                                               InteractionContextSnapshot ctx) {
+        return matchHelpers.matchesInteractionContextForPrompt(requirement, role, infoProvider, ctx);
     }
 
     // Checks movement state requirements against the player.
