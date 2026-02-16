@@ -4,6 +4,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 
 ## Actions (NPC instructions)
 - `TameworkInteract`: Runs the optimized interaction pipeline using `TwInteractionConfig` assets. Accepts optional overrides for `ConfigId`, `LovedItems`, `IsMountable`, `IsHarvestable`, and `HarvestInteractionContext` (otherwise role params are used; defaults are defined in `TwGlobalConfig`).
+- `TameworkInteractPrompt`: Updates the NPC interaction prompt based on the first matching interaction entry (supports `PromptHint` + `ShowPrompt` per entry).
 - `TameworkCaptureOwner`: Captures an owned NPC into a spawner item (owner-only capture path).
 - `TameworkCaptureStranger`: Captures an owned NPC as a non-owner (used when capture rules allow it).
 - `TameworkCaptureWild`: Captures an untamed NPC into a spawner item.
@@ -35,6 +36,8 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `/tw settamed` toggles the tamed flag on the targeted NPC.
 - `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig assets).
 - `/tw debughook [on|off]` toggles hook debug logging (or explicitly enables/disables it).
+- `/tw debugprompt [on|off]` toggles interaction prompt diagnostics (selection + alarm state).
+- `/tw debugspawner [on|off]` toggles spawner raycast debug logs.
 
 ## Notes
 - Components persist across reloads.

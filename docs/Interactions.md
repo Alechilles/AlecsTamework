@@ -21,6 +21,27 @@ action overrides to match.
 ## Interaction order
 `Interactions` is evaluated in order. The first enabled entry whose requirements pass is executed.
 
+## Prompts (optional)
+If you include the `TameworkInteractPrompt` action in your role instructions, Tamework will show a
+prompt for the first matching interaction entry.
+
+Each entry can override prompt behavior with:
+- `PromptHint` (translation key string, e.g. `server.interactionHints.feed`)
+- `ShowPrompt` (boolean; hide prompts for entries that should never show UI)
+
+Default prompt keys (used when `PromptHint` is empty):
+- `server.interactionHints.generic`
+- `server.interactionHints.tame`
+- `server.interactionHints.feed`
+- `server.interactionHints.harvest`
+- `server.interactionHints.harvestContext`
+- `server.interactionHints.mount`
+- `server.interactionHints.modeCycle`
+- `server.interactionHints.breed`
+- `server.interactionHints.custom`
+
+Define the keys in `Server/Languages/en-US/server.lang` **without** the `server.` prefix.
+
 ## Cooldowns
 Cooldowns are enforced in real-time seconds (not game time).
 `CooldownSeconds` on an entry overrides `Cooldowns.InteractionSeconds` on the config.
@@ -223,6 +244,7 @@ Available effects:
 - `ModifyStats` `{ "Stats": [ { "StatId": "...", "Amount": 5 } ] }`
 - `SetState` `{ "State": "...", "SubState": "..." }`
 - `RemoveItemsHand` `{ "Quantity": 1 }`
+- `AddItemsHand` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
 - `RemoveItemsInventory` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
 - `AddItemInventory` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
 - `Mount` `true`
@@ -232,6 +254,11 @@ Available effects:
 - `TriggerNpcHook` `{ "HookId": "...", "PlayerOnly": true, "Consume": true }`
 - `ShowFloatingText` `{ "Message": "+10 HP" }`
 - `ShowUiMessage` `{ "Message": "Mode: Defend" }`
+
+Item list resolution for inventory effects:
+- `RemoveItemsHand`, `AddItemsHand`, `RemoveItemsInventory`, and `AddItemInventory` accept `ItemsParam`.
+- `ItemsParam` supports string arrays of item ids, or a JSON array string of item ids and/or objects
+  with `Item`/`Quantity` fields (quantity defaults to 1).
 
 ## Action usage in NPC roles
 Example interaction instruction snippet:

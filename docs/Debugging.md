@@ -20,6 +20,8 @@
 - If harvest never works, check `HarvestInteractionContext` (or your custom `HarvestContextParam`) and the harvest alarm state.
 - Cooldowns are enforced in real-time seconds and stored as alarms. Use `/tw getalarm` to inspect them if interactions seem locked out.
   The alarm prefix is `TwGlobalConfig.InteractionCooldownAlarmPrefix`.
+- If prompts look wrong or stale, ensure `TameworkInteractPrompt` is running and use `/tw debugprompt` to inspect prompt selection.
+- Prompt hint keys are `server.interactionHints.*` and must be defined in `Server/Languages/en-US/server.lang` without the `server.` prefix.
 
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.
@@ -37,6 +39,7 @@
 - Confirm capture and spawn preserves attachments.
 - Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
 - Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.
+- Toggle spawner raycast logs with `/tw debugspawner` when testing spawner items.
 - After editing spawner configs, run `/tw reloadconfig`.
 ## Global config warnings
 - If `TwGlobalConfig` is missing required fields, the server logs a warning listing which fields are blank.
