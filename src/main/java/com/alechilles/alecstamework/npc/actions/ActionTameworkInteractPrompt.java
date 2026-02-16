@@ -3,7 +3,9 @@ package com.alechilles.alecstamework.npc.actions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.logging.Level;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
@@ -35,6 +37,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private static final String HINT_CUSTOM = "server.interactionHints.custom";
 
     private final Map<UUID, PromptState> lastPrompts = new HashMap<>();
+    private final Map<UUID, Long> lastDebugMs = new HashMap<>();
 
     public ActionTameworkInteractPrompt(BuilderActionTameworkInteractPrompt builder, BuilderSupport support) {
         super(builder, support);
@@ -81,6 +84,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         PromptState previous = lastPrompts.get(playerId);
         boolean changed = !prompt.equals(previous);
         boolean interactable = !prompt.isHidden();
+        maybeLogPromptDebug(resolved, config, npcRef, role, store, ctx, prompt);
         if (changed) {
             // Force a refresh when the prompt changes so the hint updates on the client.
             role.getStateSupport().setInteractable(npcRef, interactionTarget, false, null, false, store);
@@ -183,5 +187,62 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         static PromptState hidden() {
             return new PromptState(null, false);
         }
+    }
+
+    private void maybeLogPromptDebug(ActionTameworkInteract.ResolvedInteraction resolved,
+                                     TwInteractionConfig config,
+                                     Ref<EntityStore> npcRef,
+                                     Role role,
+                                     Store<EntityStore> store,
+                                     InteractionContextSnapshot ctx,
+                                     PromptState prompt) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugPromptEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        UUID playerId = ctx != null ? ctx.playerId : null;
+        if (playerId == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        Long last = lastDebugMs.get(playerId);
+        if (last != null && now - last < 1000) {
+            return;
+        }
+        lastDebugMs.put(playerId, now);
+
+        String roleName = role != null ? role.getRoleName() : "<null>";
+        String configId = config != null ? config.getId() : "<null>";
+        String entryType = resolved != null && resolved.entry != null
+                ? resolved.entry.getClass().getSimpleName()
+                : "<none>";
+        boolean showPrompt = !prompt.isHidden();
+        boolean alarmReady = isHarvestAlarmReady(npcRef, store);
+        boolean alarmActive = isHarvestAlarmActive(npcRef, store);
+        boolean alarmPassed = isHarvestAlarmPassed(npcRef, store);
+        boolean alarmUnset = isHarvestAlarmUnset(npcRef, store);
+        boolean requireAlarm = false;
+        boolean requireContext = false;
+        if (resolved != null && resolved.entry instanceof HarvestInteraction) {
+            HarvestInteraction harvest = (HarvestInteraction) resolved.entry;
+            requireAlarm = harvest.getRequireHarvestAlarmReady() == null || harvest.getRequireHarvestAlarmReady();
+            requireContext = harvest.getRequireHarvestInteractionContext() == null || harvest.getRequireHarvestInteractionContext();
+        }
+
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkPrompt debug: role=%s config=%s entry=%s show=%s alarmName=%s " +
+                        "ready=%s active=%s passed=%s unset=%s requireAlarm=%s requireContext=%s",
+                roleName,
+                configId,
+                entryType,
+                showPrompt,
+                getHarvestAlarmName(),
+                alarmReady,
+                alarmActive,
+                alarmPassed,
+                alarmUnset,
+                requireAlarm,
+                requireContext
+        );
     }
 }

@@ -69,6 +69,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
+    private volatile boolean debugPromptLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -354,6 +355,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugSpawnerEnabled() {
         debugSpawnerLogs = !debugSpawnerLogs;
         return debugSpawnerLogs;
+    }
+
+    public boolean isDebugPromptEnabled() {
+        return debugPromptLogs;
+    }
+
+    public boolean setDebugPromptEnabled(boolean enabled) {
+        debugPromptLogs = enabled;
+        return debugPromptLogs;
+    }
+
+    public boolean toggleDebugPromptEnabled() {
+        debugPromptLogs = !debugPromptLogs;
+        return debugPromptLogs;
     }
 
     // Logs a warning if required global config fields are missing.

@@ -390,6 +390,22 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
     }
 
+    boolean isHarvestAlarmPassed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "passed");
+    }
+
+    boolean isHarvestAlarmActive(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "active");
+    }
+
+    boolean isHarvestAlarmUnset(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "unset");
+    }
+
+    String getHarvestAlarmName() {
+        return harvestAlarmName;
+    }
+
     private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,
                                         Store<EntityStore> store,
                                         Player player) {
