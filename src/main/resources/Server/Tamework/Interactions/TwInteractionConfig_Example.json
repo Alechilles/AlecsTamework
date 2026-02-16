@@ -25,6 +25,9 @@
           "Items": [
             "Container_Bucket"
           ]
+        },
+        "PlaySound": {
+          "SoundEvent": "SFX_Water_MoveIn"
         }
       }
     },
