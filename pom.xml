@@ -16,7 +16,9 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <hytale.install.path>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path>
+        <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
+        <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
+        <hytale.install.path>${hytale.install.path.release}</hytale.install.path>
         <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/UserData</hytale.userdata.path>
         <hytale.toolkit.path>C:/Users/22ale/AppData/Local/Hytale-Toolkit</hytale.toolkit.path>
         <hytale.jdk.path>C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot</hytale.jdk.path>
@@ -138,6 +140,19 @@
     </build>
 
     <profiles>
+        <!-- Switch to prerelease install path with -Dprerelease=true -->
+        <profile>
+            <id>prerelease</id>
+            <activation>
+                <property>
+                    <name>prerelease</name>
+                    <value>true</value>
+                </property>
+            </activation>
+            <properties>
+                <hytale.install.path>${hytale.install.path.prerelease}</hytale.install.path>
+            </properties>
+        </profile>
         <!-- Run the Hytale server with the plugin installed -->
         <profile>
             <id>run-server</id>
