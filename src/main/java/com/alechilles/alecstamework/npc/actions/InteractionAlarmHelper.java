@@ -26,12 +26,16 @@ final class InteractionAlarmHelper {
         }
         Alarm alarm = resolveAlarm(npcRef, store, alarmName);
         if (alarm == null) {
-            return true;
+            return false;
         }
         if (!alarm.isSet()) {
             return true;
         }
-        return alarm.hasPassed(resolveGameTime(store));
+        Instant now = resolveGameTime(store);
+        if (now == null) {
+            return false;
+        }
+        return alarm.hasPassed(now);
     }
 
     // Checks whether the alarm matches the required state string.
@@ -52,9 +56,9 @@ final class InteractionAlarmHelper {
             case "unset":
                 return !alarm.isSet();
             case "passed":
-                return alarm.isSet() && alarm.hasPassed(now);
+                return alarm.isSet() && now != null && alarm.hasPassed(now);
             case "active":
-                return alarm.isSet() && !alarm.hasPassed(now);
+                return alarm.isSet() && (now == null || !alarm.hasPassed(now));
             default:
                 return false;
         }
@@ -73,14 +77,14 @@ final class InteractionAlarmHelper {
         return alarmStore.get(npc, alarmName);
     }
 
-    // Uses world time if available; otherwise falls back to wall-clock.
+    // Uses world time if available; returns null when unavailable.
     private Instant resolveGameTime(Store<EntityStore> store) {
         if (store == null) {
-            return Instant.now();
+            return null;
         }
         WorldTimeResource time = store.getResource(WorldTimeResource.getResourceType());
         if (time == null) {
-            return Instant.now();
+            return null;
         }
         return time.getGameTime();
     }
