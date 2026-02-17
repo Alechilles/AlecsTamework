@@ -10,9 +10,6 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - `TameworkNameNpc` item interaction to start a chat-based naming flow.
 - `TameworkNpcNameComponent` to persist custom NPC names and metadata.
 
-### Fixed
-- Tamework NPC names now persist across reloads and are preserved when capturing/spawning with spawner items.
-
 ## 2.0.1 - Pre-release Compatibility Fixes - 2026-02-16
 ### Fixed
 - Spawner capture/spawn now tolerates `CapturedNPCMetadata` getter/setter changes in the pre-release build (prevents `NoSuchMethodError` when resolving roles).
