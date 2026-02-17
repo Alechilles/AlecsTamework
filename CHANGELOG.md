@@ -14,9 +14,6 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 ### Changed
 - Tame checks now treat NPC role ids that start with `Tamed` as tamed for vanilla compatibility (interactions, naming, spawner capture, `TameworkIsTamed`, and `/tw gettamed`).
 
-### Fixed
-- Spawner asset codec initialization order so startup does not fail while registering `TwSpawnerConfig` assets.
-
 ## 2.0.1 - Pre-release Compatibility Fixes - 2026-02-16
 ### Fixed
 - Spawner capture/spawn now tolerates `CapturedNPCMetadata` getter/setter changes in the pre-release build (prevents `NoSuchMethodError` when resolving roles).

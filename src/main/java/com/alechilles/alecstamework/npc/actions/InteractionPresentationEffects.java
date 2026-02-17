@@ -9,8 +9,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.protocol.CombatTextUpdate;
 import com.hypixel.hytale.protocol.Color;
-import com.hypixel.hytale.protocol.ComponentUpdate;
-import com.hypixel.hytale.protocol.ComponentUpdateType;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -20,6 +18,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
@@ -280,28 +279,45 @@ final class InteractionPresentationEffects {
             return false;
         }
         try {
-            if (isAbstractComponentUpdate()) {
-                CombatTextUpdate combatTextUpdate = new CombatTextUpdate();
-                combatTextUpdate.hitAngleDeg = 0.0f;
-                combatTextUpdate.text = text;
-                return invokeQueueUpdate(viewer, npcRef, combatTextUpdate);
-            }
-            ComponentUpdate update = new ComponentUpdate();
-            update.type = ComponentUpdateType.CombatText;
             CombatTextUpdate combatTextUpdate = new CombatTextUpdate();
             combatTextUpdate.hitAngleDeg = 0.0f;
             combatTextUpdate.text = text;
-            update.combatTextUpdate = combatTextUpdate;
-            viewer.queueUpdate(npcRef, update);
-            return true;
+            if (invokeQueueUpdate(viewer, npcRef, combatTextUpdate)) {
+                return true;
+            }
+            return invokeLegacyCombatTextUpdate(viewer, npcRef, combatTextUpdate);
         } catch (Exception | LinkageError ex) {
             return false;
         }
     }
 
-    private static boolean isAbstractComponentUpdate() {
+    // Supports old protocol shapes where CombatText had to be wrapped inside ComponentUpdate.
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    private static boolean invokeLegacyCombatTextUpdate(EntityTrackerSystems.EntityViewer viewer,
+                                                        Ref<EntityStore> npcRef,
+                                                        CombatTextUpdate combatTextUpdate) {
         try {
-            return Modifier.isAbstract(ComponentUpdate.class.getModifiers());
+            Class<?> componentUpdateClass = Class.forName("com.hypixel.hytale.protocol.ComponentUpdate");
+            if (Modifier.isAbstract(componentUpdateClass.getModifiers())) {
+                return false;
+            }
+            Object legacyUpdate = componentUpdateClass.getDeclaredConstructor().newInstance();
+
+            Class<?> componentUpdateTypeClass = Class.forName("com.hypixel.hytale.protocol.ComponentUpdateType");
+            if (!componentUpdateTypeClass.isEnum()) {
+                return false;
+            }
+            Object combatTextType = Enum.valueOf(
+                    (Class<? extends Enum>) componentUpdateTypeClass.asSubclass(Enum.class),
+                    "CombatText"
+            );
+
+            Field typeField = componentUpdateClass.getField("type");
+            typeField.set(legacyUpdate, combatTextType);
+            Field combatTextField = componentUpdateClass.getField("combatTextUpdate");
+            combatTextField.set(legacyUpdate, combatTextUpdate);
+
+            return invokeQueueUpdate(viewer, npcRef, legacyUpdate);
         } catch (Exception | LinkageError ex) {
             return false;
         }
