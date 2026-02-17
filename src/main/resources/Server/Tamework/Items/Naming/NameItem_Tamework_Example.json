@@ -5,7 +5,8 @@
     "Allowlist": [
       "Mob_Tamework_Example",
       "Mob_Tamework_Example_Simple",
-      "Cat_Pet"
+      "Cat_Pet",
+      "Tamed_Sheep"
     ]
   },
   "Naming": {
