@@ -90,13 +90,13 @@ public final class NamingFeatureHandler {
         }
 
         UUID ownerUuid = resolveOwnerUuid(targetRef, store);
-        if (rules.isRequireOwner()) {
+        UUID playerUuid = player.getUuid();
+        if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
             if (ownerUuid == null) {
                 sendMessage(player, "That NPC does not have an owner.");
                 return false;
             }
-            UUID playerUuid = player.getUuid();
-            if (playerUuid == null || !ownerUuid.equals(playerUuid)) {
+            if (rules.isRequireOwner()) {
                 String npcName = resolveNpcDisplayName(npc);
                 String ownerName = resolveOwnerName(targetRef, store);
                 OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
@@ -120,7 +120,6 @@ public final class NamingFeatureHandler {
             return false;
         }
 
-        UUID playerUuid = player.getUuid();
         if (playerUuid == null) {
             return false;
         }
@@ -273,13 +272,13 @@ public final class NamingFeatureHandler {
         }
 
         UUID ownerUuid = resolveOwnerUuid(request.npcRef, store);
-        if (rules.isRequireOwner()) {
+        if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
             if (ownerUuid == null) {
                 pendingByPlayer.remove(playerUuid);
                 sendMessage(player, "That NPC does not have an owner.");
                 return;
             }
-            if (!ownerUuid.equals(playerUuid)) {
+            if (rules.isRequireOwner()) {
                 pendingByPlayer.remove(playerUuid);
                 String npcName = resolveNpcDisplayName(npc);
                 String ownerName = resolveOwnerName(request.npcRef, store);
@@ -345,6 +344,7 @@ public final class NamingFeatureHandler {
             TwNameItemConfig.NamingSettings naming = config.getNaming();
             builder.requireTamed(naming.isRequireTamed())
                 .requireOwner(naming.isRequireOwner())
+                .allowUnownedWhenRequireOwner(naming.isAllowUnownedWhenRequireOwner())
                 .allowRename(naming.isAllowRename())
                 .replaceExisting(naming.isReplaceExisting())
                 .consumeItem(naming.isConsumeItem())
@@ -362,6 +362,9 @@ public final class NamingFeatureHandler {
             }
             if (overrides.getRequireOwner() != null) {
                 builder.requireOwner(overrides.getRequireOwner());
+            }
+            if (overrides.getAllowUnownedWhenRequireOwner() != null) {
+                builder.allowUnownedWhenRequireOwner(overrides.getAllowUnownedWhenRequireOwner());
             }
             if (overrides.getAllowRename() != null) {
                 builder.allowRename(overrides.getAllowRename());

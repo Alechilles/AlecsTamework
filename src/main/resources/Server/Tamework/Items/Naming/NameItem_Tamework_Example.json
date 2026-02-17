@@ -11,6 +11,7 @@
   "Naming": {
     "RequireTamed": true,
     "RequireOwner": true,
+    "AllowUnownedWhenRequireOwner": true,
     "AllowRename": true,
     "MinLength": 1,
     "MaxLength": 24,

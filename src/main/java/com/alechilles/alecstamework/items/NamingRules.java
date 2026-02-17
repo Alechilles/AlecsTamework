@@ -17,6 +17,7 @@ final class NamingRules {
 
     private final boolean requireTamed;
     private final boolean requireOwner;
+    private final boolean allowUnownedWhenRequireOwner;
     private final boolean allowRename;
     private final boolean replaceExisting;
     private final boolean consumeItem;
@@ -41,6 +42,7 @@ final class NamingRules {
 
         this.requireTamed = builder.requireTamed;
         this.requireOwner = builder.requireOwner;
+        this.allowUnownedWhenRequireOwner = builder.allowUnownedWhenRequireOwner;
         this.allowRename = builder.allowRename;
         this.replaceExisting = builder.replaceExisting;
         this.consumeItem = builder.consumeItem;
@@ -63,6 +65,10 @@ final class NamingRules {
 
     boolean isRequireOwner() {
         return requireOwner;
+    }
+
+    boolean isAllowUnownedWhenRequireOwner() {
+        return allowUnownedWhenRequireOwner;
     }
 
     boolean isAllowRename() {
@@ -108,6 +114,7 @@ final class NamingRules {
     static final class Builder {
         private boolean requireTamed = true;
         private boolean requireOwner = true;
+        private boolean allowUnownedWhenRequireOwner;
         private boolean allowRename = true;
         private boolean replaceExisting = true;
         private boolean consumeItem;
@@ -126,6 +133,11 @@ final class NamingRules {
 
         Builder requireOwner(boolean requireOwner) {
             this.requireOwner = requireOwner;
+            return this;
+        }
+
+        Builder allowUnownedWhenRequireOwner(boolean allowUnownedWhenRequireOwner) {
+            this.allowUnownedWhenRequireOwner = allowUnownedWhenRequireOwner;
             return this;
         }
 

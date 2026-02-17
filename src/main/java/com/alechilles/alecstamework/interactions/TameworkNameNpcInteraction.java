@@ -51,6 +51,13 @@ public class TameworkNameNpcInteraction extends SimpleInteraction {
         )
         .add()
         .<Boolean>appendInherited(
+            new KeyedCodec<>("AllowUnownedWhenRequireOwner", Codec.BOOLEAN),
+            (interaction, value) -> interaction.allowUnownedWhenRequireOwner = value,
+            interaction -> interaction.allowUnownedWhenRequireOwner,
+            (interaction, parent) -> interaction.allowUnownedWhenRequireOwner = parent.allowUnownedWhenRequireOwner
+        )
+        .add()
+        .<Boolean>appendInherited(
             new KeyedCodec<>("AllowRename", Codec.BOOLEAN),
             (interaction, value) -> interaction.allowRename = value,
             interaction -> interaction.allowRename,
@@ -111,6 +118,7 @@ public class TameworkNameNpcInteraction extends SimpleInteraction {
     private String configId;
     private Boolean requireTamed;
     private Boolean requireOwner;
+    private Boolean allowUnownedWhenRequireOwner;
     private Boolean allowRename;
     private Integer minLength;
     private Integer maxLength;
@@ -184,6 +192,7 @@ public class TameworkNameNpcInteraction extends SimpleInteraction {
         NamingOverrides overrides = new NamingOverrides(
                 requireTamed,
                 requireOwner,
+                allowUnownedWhenRequireOwner,
                 allowRename,
                 minLength,
                 maxLength,

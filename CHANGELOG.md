@@ -9,6 +9,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - New `TwNameItemConfig` asset type under `Server/Tamework/Items/Naming` for naming item rules.
 - `TameworkNameNpc` item interaction to start a chat-based naming flow.
 - `TameworkNpcNameComponent` to persist custom NPC names and metadata.
+- Naming ownership option `AllowUnownedWhenRequireOwner` for owner-or-unowned naming behavior.
 
 ## 2.0.1 - Pre-release Compatibility Fixes - 2026-02-16
 ### Fixed

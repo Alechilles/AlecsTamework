@@ -35,6 +35,7 @@ Fields:
 Fields:
 - `RequireTamed` (default true). Requires the Tamework tamed component.
 - `RequireOwner` (default true). Requires the player to be the owner.
+- `AllowUnownedWhenRequireOwner` (default false). When `RequireOwner` is true, allows naming NPCs with no owner.
 - `AllowRename` (default true). Allows renaming if a Tamework name already exists.
 - `ReplaceExisting` (default true). Allows overriding non‑Tamework display names.
 - `MinLength` (default 1). Minimum name length.
@@ -78,6 +79,7 @@ Spawner capture preserves the Tamework name and restores it on spawn.
   "Naming": {
     "RequireTamed": true,
     "RequireOwner": true,
+    "AllowUnownedWhenRequireOwner": true,
     "AllowRename": true,
     "MinLength": 1,
     "MaxLength": 24,

@@ -71,6 +71,13 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         .documentation("Require the player to be the owner before naming.")
         .add()
         .<Boolean>append(
+            new KeyedCodec<>("AllowUnownedWhenRequireOwner", Codec.BOOLEAN),
+            (settings, value) -> settings.allowUnownedWhenRequireOwner = value,
+            settings -> settings.allowUnownedWhenRequireOwner
+        )
+        .documentation("When RequireOwner is true, allow naming unowned NPCs.")
+        .add()
+        .<Boolean>append(
             new KeyedCodec<>("AllowRename", Codec.BOOLEAN),
             (settings, value) -> settings.allowRename = value,
             settings -> settings.allowRename
@@ -240,6 +247,7 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
     public static final class NamingSettings {
         private boolean requireTamed = true;
         private boolean requireOwner = true;
+        private boolean allowUnownedWhenRequireOwner;
         private boolean allowRename = true;
         private int minLength = 1;
         private int maxLength = 24;
@@ -257,6 +265,10 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
 
         public boolean isRequireOwner() {
             return requireOwner;
+        }
+
+        public boolean isAllowUnownedWhenRequireOwner() {
+            return allowUnownedWhenRequireOwner;
         }
 
         public boolean isAllowRename() {

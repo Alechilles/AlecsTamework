@@ -6,6 +6,7 @@ package com.alechilles.alecstamework.items;
 public final class NamingOverrides {
     private final Boolean requireTamed;
     private final Boolean requireOwner;
+    private final Boolean allowUnownedWhenRequireOwner;
     private final Boolean allowRename;
     private final Integer minLength;
     private final Integer maxLength;
@@ -17,6 +18,7 @@ public final class NamingOverrides {
 
     public NamingOverrides(Boolean requireTamed,
                            Boolean requireOwner,
+                           Boolean allowUnownedWhenRequireOwner,
                            Boolean allowRename,
                            Integer minLength,
                            Integer maxLength,
@@ -27,6 +29,7 @@ public final class NamingOverrides {
                            Integer cooldownMs) {
         this.requireTamed = requireTamed;
         this.requireOwner = requireOwner;
+        this.allowUnownedWhenRequireOwner = allowUnownedWhenRequireOwner;
         this.allowRename = allowRename;
         this.minLength = minLength;
         this.maxLength = maxLength;
@@ -43,6 +46,10 @@ public final class NamingOverrides {
 
     public Boolean getRequireOwner() {
         return requireOwner;
+    }
+
+    public Boolean getAllowUnownedWhenRequireOwner() {
+        return allowUnownedWhenRequireOwner;
     }
 
     public Boolean getAllowRename() {
