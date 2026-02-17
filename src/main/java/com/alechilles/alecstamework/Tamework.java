@@ -6,11 +6,15 @@ import javax.annotation.Nonnull;
 
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
+import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
+import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
@@ -25,17 +29,21 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPro
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
+import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
+import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -44,6 +52,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.plugin.event.PluginSetupEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderFactory;
 import com.hypixel.hytale.server.npc.instructions.Action;
 import com.hypixel.hytale.server.npc.instructions.Sensor;
@@ -56,17 +65,21 @@ public class Tamework extends JavaPlugin {
     private static Tamework instance;
 
     private ItemFeatureRegistry itemFeatureRegistry;
+    private NameItemRegistry nameItemRegistry;
 
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
+    private NamingFeatureHandler namingFeatureHandler;
     private boolean npcActionsRegistered;
     private boolean globalAssetsRegistered;
     private boolean spawnerAssetsRegistered;
+    private boolean namingAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private String lastGlobalConfigWarningKey;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
+    private ComponentType<EntityStore, TameworkNpcNameComponent> npcNameComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
@@ -80,11 +93,16 @@ public class Tamework extends JavaPlugin {
     protected void setup() {
         // Registry for item-level feature configs and spawn/capture behaviors.
         itemFeatureRegistry = new ItemFeatureRegistry();
+        // Registry for naming item configs.
+        nameItemRegistry = new NameItemRegistry();
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
+        // Register the custom item interaction used by naming items.
+        Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class, TameworkNameNpcInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
         registerSpawnerItemAssets();
+        registerNamingItemAssets();
         registerInteractionAssets();
 
         // Register components that persist owner and tamed state on NPCs.
@@ -106,6 +124,16 @@ public class Tamework extends JavaPlugin {
                 TameworkHookComponent.CODEC
         );
 
+        npcNameComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkNpcNameComponent.class,
+                "TameworkNpcName",
+                TameworkNpcNameComponent.CODEC
+        );
+
+        getEntityStoreRegistry().registerSystem(
+                new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
+        );
+
         // Damage event is needed for owner damage filtering; avoid double-registration.
         try {
             getEntityStoreRegistry().registerEntityEventType(Damage.class);
@@ -124,8 +152,9 @@ public class Tamework extends JavaPlugin {
         );
 
         // Load item feature configs from bundled defaults and mod overrides.
-        int loaded = 0;
-        loaded += loadSpawnerItemAssets();
+        int loadedSpawner = loadSpawnerItemAssets();
+        int loadedNaming = loadNameItemAssets();
+        int loaded = loadedSpawner + loadedNaming;
 
         // Load translation entries from mods so messages can be localized.
         translationRegistry = new TranslationRegistry();
@@ -134,6 +163,8 @@ public class Tamework extends JavaPlugin {
 
         // Core handler for capture/spawn flows.
         spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry);
+        // Core handler for naming flows.
+        namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
 
         // Register /tw commands if the server supports it.
         if (getCommandRegistry() != null) {
@@ -148,9 +179,17 @@ public class Tamework extends JavaPlugin {
                 PlayerInteractEvent.class,
                 ownerInteractionListener::onPlayerInteract
         );
+        if (namingFeatureHandler != null) {
+            getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
+            getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
+        }
         getLogger().at(Level.INFO).log(
-                "Tamework item feature configs loaded: " + loaded
-                        + " (total: " + itemFeatureRegistry.snapshot().size() + ")"
+                "Tamework item configs loaded: spawners="
+                        + loadedSpawner
+                        + " (total: " + itemFeatureRegistry.snapshot().size()
+                        + "), naming="
+                        + loadedNaming
+                        + (nameItemRegistry != null ? " (total: " + nameItemRegistry.snapshot().size() + ")" : "")
         );
 
         // Register custom NPC action/sensor builders once NPCPlugin is available.
@@ -172,6 +211,10 @@ public class Tamework extends JavaPlugin {
 
     public ItemFeatureRegistry getItemFeatureRegistry() {
         return itemFeatureRegistry;
+    }
+
+    public NameItemRegistry getNameItemRegistry() {
+        return nameItemRegistry;
     }
 
     public static Tamework getInstance() {
@@ -196,13 +239,23 @@ public class Tamework extends JavaPlugin {
         itemFeatureRegistry.clear();
         itemFeatureRegistry.registerDefaults();
         registerSpawnerItemAssets();
-        int loaded = 0;
-        loaded += loadSpawnerItemAssets();
+        int loadedSpawner = 0;
+        int loadedNaming = 0;
+        loadedSpawner += loadSpawnerItemAssets();
+        if (nameItemRegistry != null) {
+            nameItemRegistry.clear();
+            registerNamingItemAssets();
+            loadedNaming += loadNameItemAssets();
+        }
         getLogger().at(Level.INFO).log(
-                "Reloaded Tamework item feature configs: " + loaded
-                        + " (total: " + itemFeatureRegistry.snapshot().size() + ")"
+                "Reloaded Tamework item configs: spawners="
+                        + loadedSpawner
+                        + " (total: " + itemFeatureRegistry.snapshot().size()
+                        + "), naming="
+                        + loadedNaming
+                        + (nameItemRegistry != null ? " (total: " + nameItemRegistry.snapshot().size() + ")" : "")
         );
-        return loaded;
+        return loadedSpawner + loadedNaming;
     }
 
 
@@ -220,6 +273,22 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwSpawnerConfig.class, this::onSpawnerAssetsRemoved);
         spawnerAssetsRegistered = true;
+    }
+
+    private void registerNamingItemAssets() {
+        if (namingAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwNameItemConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Items/Naming")
+                        .setCodec(TwNameItemConfig.CODEC)
+                        .setKeyFunction(TwNameItemConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsRemoved);
+        namingAssetsRegistered = true;
     }
 
     // Registers global config assets stored under Server/Tamework/Global.
@@ -262,6 +331,16 @@ public class Tamework extends JavaPlugin {
 
     private void onSpawnerAssetsRemoved(
             RemovedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
+        reloadItemFeatureConfigs();
+    }
+
+    private void onNamingAssetsLoaded(
+            LoadedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
+        reloadItemFeatureConfigs();
+    }
+
+    private void onNamingAssetsRemoved(
+            RemovedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
         reloadItemFeatureConfigs();
     }
 
@@ -312,9 +391,36 @@ public class Tamework extends JavaPlugin {
         return loaded;
     }
 
+    private int loadNameItemAssets() {
+        if (nameItemRegistry == null) {
+            return 0;
+        }
+        DefaultAssetMap<String, TwNameItemConfig> assetMap = TwNameItemConfig.getAssetMap();
+        if (assetMap == null) {
+            return 0;
+        }
+        int loaded = 0;
+        for (TwNameItemConfig asset : assetMap.getAssetMap().values()) {
+            if (asset == null) {
+                continue;
+            }
+            String itemId = asset.getItemId();
+            if (itemId == null || itemId.isBlank()) {
+                continue;
+            }
+            nameItemRegistry.register(itemId, asset);
+            loaded++;
+        }
+        return loaded;
+    }
+
 
     public SpawnerFeatureHandler getSpawnerFeatureHandler() {
         return spawnerFeatureHandler;
+    }
+
+    public NamingFeatureHandler getNamingFeatureHandler() {
+        return namingFeatureHandler;
     }
 
     public ComponentType<EntityStore, TameworkOwnerComponent> getOwnerComponentType() {
@@ -327,6 +433,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkHookComponent> getHookComponentType() {
         return hookComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkNpcNameComponent> getNpcNameComponentType() {
+        return npcNameComponentType;
     }
 
     public boolean isDebugHookEnabled() {

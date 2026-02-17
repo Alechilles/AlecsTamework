@@ -33,11 +33,16 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
             return;
         }
         int loaded = plugin.reloadItemFeatureConfigs();
-        int total = plugin.getItemFeatureRegistry() != null
+        int totalSpawners = plugin.getItemFeatureRegistry() != null
                 ? plugin.getItemFeatureRegistry().snapshot().size()
                 : 0;
+        int totalNaming = plugin.getNameItemRegistry() != null
+                ? plugin.getNameItemRegistry().snapshot().size()
+                : 0;
         commandContext.sender().sendMessage(Message.raw(
-                "Reloaded Tamework item configs. Loaded=" + loaded + " Total=" + total
+                "Reloaded Tamework item configs. Loaded=" + loaded
+                        + " Spawners=" + totalSpawners
+                        + " Naming=" + totalNaming
         ));
     }
 }

@@ -16,8 +16,10 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.UUID;
 
 /** Applies interaction effects that change NPC ownership, stats, or states. */
@@ -165,6 +167,26 @@ final class InteractionStateEffects {
             subState = resolveDefaultSubState(role);
         }
         role.getStateSupport().setState(npcRef, state, subState == null ? "" : subState, store);
+        return true;
+    }
+
+    // Swaps the NPC role using the role change system.
+    boolean applySetRole(String roleId, Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
+        if (role == null || npcRef == null || store == null) {
+            return false;
+        }
+        if (roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        NPCPlugin plugin = NPCPlugin.get();
+        if (plugin == null) {
+            return false;
+        }
+        int roleIndex = plugin.getIndex(roleId);
+        if (roleIndex < 0) {
+            return false;
+        }
+        RoleChangeSystem.requestRoleChange(npcRef, role, roleIndex, true, store);
         return true;
     }
 

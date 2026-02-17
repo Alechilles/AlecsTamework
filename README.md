@@ -18,13 +18,13 @@ A modular taming framework for Hytale that focuses on fast, easy setup and empow
   - Also includes components like tamed status and ownership
     - Ownership can optionally be cleared on capture and re-set on spawn to enable player trading of captured NPCs
   - This will be expanded in the near future as new systems such as breeding, traits, talents, etc. are added. Everything will always be saved on capture.
+- **Naming Items** - Name tamed NPCs via chat using `TwNameItemConfig` + `TameworkNameNpc`
+  - Works with any custom item; not a fixed nametag item
+  - Per-item rules for roles, ownership, allowed characters, rename rules, and more
 - **Examples and Documentation** - Plenty of examples and thorough documenation to help you get started integrating Tamework
   - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
 ## Coming Soon
-- **Naming Items**
-  - Name NPCs with an item similar to Minecraft's nametags
-  - As always with Tamework, this won't be a specific item, it will be an action you can add to any item to make your own nametags
 - **Command Flute/Whistle/Etc**
   - Technically any item, it will be an action that can be called by any item you want
   - Remotely command multiple mobs to change modes, attack a target, and more
@@ -96,14 +96,20 @@ Optional prompt updater (see the example template for full usage):
 7. Spawner items (optional):
    Create a `TwSpawnerConfig` asset under `<ModRoot>/Server/Tamework/Items/Spawners/` and wire your item with `TameworkSpawn`.
 
-8. Add translations in `Server/Languages/en-US/server.lang`.
+8. Naming items (optional):
+   Create a `TwNameItemConfig` asset under `<ModRoot>/Server/Tamework/Items/Naming/` and add `TameworkNameNpc` to your item’s `Interactions`.
+   After editing spawner or naming configs, use `/tw reloadconfig`.
+
+9. Add translations in `Server/Languages/en-US/server.lang`.
 
 ## Configuration Overview
 - **TwGlobalConfig**: default parameter names + interaction defaults.
   Location: `<ModRoot>/Server/Tamework/Global/*.json`
 - **TwSpawnerConfig**: spawner capture/spawn behavior.
   Location: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
-- After editing spawner configs, use `/tw reloadconfig`.
+- **TwNameItemConfig**: naming item behavior.
+  Location: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
+- After editing spawner or naming configs, use `/tw reloadconfig`.
 
 ## Documentation (Wiki)
 - Home: https://github.com/Alechilles/AlecsTamework/wiki
@@ -112,6 +118,7 @@ Optional prompt updater (see the example template for full usage):
 - Interactions (Vanilla): https://github.com/Alechilles/AlecsTamework/wiki/Interactions-Vanilla
 - Items: https://github.com/Alechilles/AlecsTamework/wiki/Items
 - Spawner Config (Assets): https://github.com/Alechilles/AlecsTamework/wiki/Item-Config
+- Naming Items: https://github.com/Alechilles/AlecsTamework/wiki/Naming-Items
 - Actions and Sensors: https://github.com/Alechilles/AlecsTamework/wiki/Actions-and-Sensors
 - Hooks and Bridges: https://github.com/Alechilles/AlecsTamework/wiki/Hooks-and-Bridges
 - Templates: https://github.com/Alechilles/AlecsTamework/wiki/Templates

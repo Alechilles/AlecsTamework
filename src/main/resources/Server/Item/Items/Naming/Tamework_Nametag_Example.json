@@ -1,0 +1,34 @@
+{
+  "$Comment": "Example naming item that triggers the TameworkNameNpc interaction.",
+  "TranslationProperties": {
+    "Name": "server.items.Tamework_Nametag_Example.name",
+    "Description": "server.items.Tamework_Nametag_Example.description"
+  },
+  "Quality": "Common",
+  "PlayerAnimationsId": "Item",
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "TameworkNameNpc"
+        }
+      ]
+    }
+  },
+  "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
+  "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
+  "IconProperties": {
+    "Scale": 0.76,
+    "Translation": [
+      -1,
+      5
+    ],
+    "Rotation": [
+      135,
+      135,
+      0
+    ]
+  },
+  "MaxStack": 1
+}

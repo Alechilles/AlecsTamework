@@ -40,6 +40,8 @@ Fields:
 - `CooldownMs` (optional). Per item spawn cooldown.
 - `MaxDistance` (optional). Max distance for spawn.
 
+Captured Tamework NPC names are stored on the spawner item and restored on spawn.
+
 ## Icon overrides
 Optional overrides for filled spawner icons based on attachments or role.
 

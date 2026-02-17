@@ -38,9 +38,12 @@ final class InteractionExecutor {
             return effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof TameInteraction) {
+            TameInteraction tame = (TameInteraction) entry;
             boolean applied = effects.applyStartTaming(npcRef, store, player);
+            applied |= effects.applyTameRoleChange(tame, npcRef, role, store, ctx);
             feedHelper.consumeHeldItem(player, 1);
-            return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
+            applied |= effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
+            return applied;
         }
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;

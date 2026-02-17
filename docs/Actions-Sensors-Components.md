@@ -24,9 +24,11 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `TameworkOwnerComponent`: Stores owner UUID and name.
 - `TameworkTamedComponent`: Stores tamed boolean.
 - `TameworkHookComponent`: Stores the latest hook signal for instruction bridges.
+- `TameworkNpcNameComponent`: Stores custom NPC name metadata (name, owner id, timestamp). Names are re‑applied on load and preserved by spawner capture.
 
 ## Item interactions
 - `TameworkSpawn`: Custom item interaction used by spawner items to capture or spawn NPCs.
+- `TameworkNameNpc`: Custom item interaction used by naming items to name tamed NPCs via chat input.
 
 ## Commands
 - `/tw getowner` prints the owner name + UUID (when available).
@@ -34,7 +36,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `/tw getalarm [AlarmName] [NpcUuid]` prints alarm status (unset/active/passed) and remaining time when set. Uses the NPC in view if no UUID is provided. Defaults to `TwGlobalConfig.HarvestAlarmName` (default `Harvest_Ready`) when no alarm name is supplied.
 - `/tw setowner` assigns the targeted NPC to the executing player.
 - `/tw settamed` toggles the tamed flag on the targeted NPC.
-- `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig assets).
+- `/tw reloadconfig` reloads spawner + naming item configs from disk (TwSpawnerConfig + TwNameItemConfig assets).
 - `/tw debughook [on|off]` toggles hook debug logging (or explicitly enables/disables it).
 - `/tw debugprompt [on|off]` toggles interaction prompt diagnostics (selection + alarm state).
 - `/tw debugspawner [on|off]` toggles spawner raycast debug logs.

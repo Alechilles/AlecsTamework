@@ -5,6 +5,8 @@ This document explains how Tamework discovers asset based configuration and sett
 ## Asset locations
 - TwSpawnerConfig assets live under:
   `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
+- TwNameItemConfig assets live under:
+  `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 - TwInteractionConfig assets live under:
   `<ModRoot>/Server/Tamework/Interactions/*.json`
 - TwGlobalConfig assets live under:
@@ -38,5 +40,5 @@ TwGlobalConfig replaces the old settings file and controls owner damage filterin
 All fields are required; missing or blank values will emit a warning on startup.
 
 ## Reloading
-- `/tw reloadconfig` reloads spawner item configs from disk (TwSpawnerConfig -> item feature registry).
+- `/tw reloadconfig` reloads spawner + naming item configs from disk (TwSpawnerConfig + TwNameItemConfig).
 - TwInteractionConfig assets are managed by the asset registry and do not require a manual reload command.

@@ -100,6 +100,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final ArrayCodec<StatDelta> STAT_DELTA_ARRAY_CODEC = TwInteractionConfigCodecs.STAT_DELTA_ARRAY_CODEC;
     public static final Codec<ModifyStatsEffect> MODIFY_STATS_EFFECT_CODEC = TwInteractionConfigCodecs.MODIFY_STATS_EFFECT_CODEC;
     public static final BuilderCodec<SetStateEffect> SET_STATE_EFFECT_CODEC = TwInteractionConfigCodecs.SET_STATE_EFFECT_CODEC;
+    public static final BuilderCodec<SetRoleEffect> SET_ROLE_EFFECT_CODEC = TwInteractionConfigCodecs.SET_ROLE_EFFECT_CODEC;
     public static final BuilderCodec<RemoveItemsHandEffect> REMOVE_ITEMS_HAND_EFFECT_CODEC = TwInteractionConfigCodecs.REMOVE_ITEMS_HAND_EFFECT_CODEC;
     public static final BuilderCodec<ItemQuantity> ITEM_QUANTITY_CODEC = TwInteractionConfigCodecs.ITEM_QUANTITY_CODEC;
     public static final ArrayCodec<ItemQuantity> ITEM_QUANTITY_ARRAY_CODEC = TwInteractionConfigCodecs.ITEM_QUANTITY_ARRAY_CODEC;
@@ -274,6 +275,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         Boolean useLovedItems;
         String[] itemsInHand = ArrayUtil.EMPTY_STRING_ARRAY;
         String itemsParam;
+        String role;
+        String roleParam;
 
         public Boolean getUseLovedItems() {
             return useLovedItems;
@@ -285,6 +288,14 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getItemsParam() {
             return itemsParam;
+        }
+
+        public String getRole() {
+            return role;
+        }
+
+        public String getRoleParam() {
+            return roleParam;
         }
     }
 
@@ -684,6 +695,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         SetOwnerEffect setOwner;
         ModifyStatsEffect modifyStats;
         SetStateEffect setState;
+        SetRoleEffect setRole;
         RemoveItemsHandEffect removeItemsHand;
         AddItemsHandEffect addItemsHand;
         RemoveItemsInventoryEffect removeItemsInventory;
@@ -710,6 +722,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public SetStateEffect getSetState() {
             return setState;
+        }
+
+        public SetRoleEffect getSetRole() {
+            return setRole;
         }
 
         public RemoveItemsHandEffect getRemoveItemsHand() {
@@ -801,6 +817,22 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getSubState() {
             return subState;
+        }
+    }
+
+    /**
+     * Effect that swaps the NPC role.
+     */
+    public static final class SetRoleEffect {
+        String role;
+        String roleParam;
+
+        public String getRole() {
+            return role;
+        }
+
+        public String getRoleParam() {
+            return roleParam;
         }
     }
 

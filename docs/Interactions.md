@@ -60,6 +60,8 @@ Fields:
 - `UseLovedItems` (default true)
 - `ItemsInHand` (item id or array)
 - `ItemsParam` (role parameter name that returns string, string[], or JSON array string)
+- `Role` (optional NPC role id to swap to after taming)
+- `RoleParam` (role parameter name that resolves a role id; overrides `Role`)
 
 Requirements:
 - NPC must be untamed.
@@ -68,6 +70,7 @@ Requirements:
 Effects:
 - Sets tamed true and owner to the interacting player.
 - Consumes the held item.
+- If `Role`/`RoleParam` is provided, swaps the NPC role after taming.
 
 ### Feed
 Fields:
@@ -243,6 +246,7 @@ Available effects:
 - `SetOwner` `{ "Source": "Player" | "None" | "Custom", "Uuid": "...", "Name": "..." }`
 - `ModifyStats` `{ "Stats": [ { "StatId": "...", "Amount": 5 } ] }`
 - `SetState` `{ "State": "...", "SubState": "..." }`
+- `SetRole` `{ "Role": "...", "RoleParam": "RoleIdParam" }` (RoleParam overrides Role when resolved; role swaps run before other effects)
 - `RemoveItemsHand` `{ "Quantity": 1 }`
 - `AddItemsHand` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
 - `RemoveItemsInventory` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`

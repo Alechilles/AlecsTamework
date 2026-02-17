@@ -12,9 +12,11 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.PlaySoundE
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetOwnerEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetRoleEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetStateEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParticlesEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -54,6 +56,10 @@ final class TameworkInteractEffects {
             return false;
         }
         boolean applied = false;
+        SetRoleEffect setRole = effects.getSetRole();
+        if (setRole != null) {
+            applied |= applySetRole(setRole, npcRef, role, store, ctx);
+        }
         SetTamedEffect setTamed = effects.getSetTamed();
         if (setTamed != null) {
             applied |= stateEffects.applySetTamed(setTamed, npcRef, store);
@@ -118,6 +124,46 @@ final class TameworkInteractEffects {
 
     boolean applyStartTaming(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
         return stateEffects.applyStartTaming(npcRef, store, player);
+    }
+
+    boolean applyTameRoleChange(TameInteraction interaction,
+                                Ref<EntityStore> npcRef,
+                                Role role,
+                                Store<EntityStore> store,
+                                InteractionContextSnapshot ctx) {
+        if (interaction == null) {
+            return false;
+        }
+        String roleId = resolveRoleId(interaction.getRole(), interaction.getRoleParam(), role, ctx);
+        if (roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        return stateEffects.applySetRole(roleId, npcRef, role, store);
+    }
+
+    private boolean applySetRole(SetRoleEffect effect,
+                                 Ref<EntityStore> npcRef,
+                                 Role role,
+                                 Store<EntityStore> store,
+                                 InteractionContextSnapshot ctx) {
+        if (effect == null) {
+            return false;
+        }
+        String roleId = resolveRoleId(effect.getRole(), effect.getRoleParam(), role, ctx);
+        if (roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        return stateEffects.applySetRole(roleId, npcRef, role, store);
+    }
+
+    private String resolveRoleId(String roleId, String roleParam, Role role, InteractionContextSnapshot ctx) {
+        if (roleParam != null && !roleParam.isBlank()) {
+            String resolved = owner.getRoleStringParam(role, ctx, roleParam);
+            if (resolved != null && !resolved.isBlank()) {
+                return resolved;
+            }
+        }
+        return roleId;
     }
 
     boolean applyFeeding(Ref<EntityStore> npcRef, Store<EntityStore> store, double healAmount, Player player) {
