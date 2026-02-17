@@ -9,7 +9,7 @@ import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.codec.codecs.EnumCodec;
+import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.Collections;
 import javax.annotation.Nullable;
@@ -25,33 +25,48 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         Denylist
     }
 
-    private static final EnumCodec<RoleFilterMode> ROLE_FILTER_MODE_CODEC = new EnumCodec<>(RoleFilterMode.class);
+    private static final BuilderCodec<AllowedRoles> ALLOWED_ROLES_BASE_CODEC = BuilderCodec.abstractBuilder(
+            AllowedRoles.class
+        )
+        .build();
 
-    public static final BuilderCodec<AllowedRoles> ALLOWED_ROLES_CODEC = BuilderCodec.builder(
-            AllowedRoles.class, AllowedRoles::new
+    private static final BuilderCodec<AllowAllRoles> ALLOW_ALL_ROLES_CODEC = BuilderCodec.builder(
+            AllowAllRoles.class, AllowAllRoles::new, ALLOWED_ROLES_BASE_CODEC
         )
-        .<RoleFilterMode>append(
-            new KeyedCodec<>("Mode", ROLE_FILTER_MODE_CODEC),
-            (settings, value) -> settings.mode = value,
-            settings -> settings.mode
+        .build();
+
+    private static final BuilderCodec<AllowlistRoles> ALLOWLIST_ROLES_CODEC = BuilderCodec.builder(
+            AllowlistRoles.class, AllowlistRoles::new, ALLOWED_ROLES_BASE_CODEC
         )
-        .documentation("How to interpret allowlist/denylist for roles.")
-        .add()
         .<String[]>append(
             new KeyedCodec<>("Allowlist", Codec.STRING_ARRAY),
             (settings, value) -> settings.allowlist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.allowlist
         )
-        .documentation("Role IDs that are allowed (when Mode is Allowlist).")
+        .documentation("Role IDs that are allowed.")
         .add()
+        .build();
+
+    private static final BuilderCodec<DenylistRoles> DENYLIST_ROLES_CODEC = BuilderCodec.builder(
+            DenylistRoles.class, DenylistRoles::new, ALLOWED_ROLES_BASE_CODEC
+        )
         .<String[]>append(
             new KeyedCodec<>("Denylist", Codec.STRING_ARRAY),
             (settings, value) -> settings.denylist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.denylist
         )
-        .documentation("Role IDs that are denied (when Mode is Denylist).")
+        .documentation("Role IDs that are denied.")
         .add()
         .build();
+
+    public static final StringCodecMapCodec<AllowedRoles, BuilderCodec<? extends AllowedRoles>> ALLOWED_ROLES_CODEC =
+            new StringCodecMapCodec<>("Mode") { };
+
+    static {
+        ALLOWED_ROLES_CODEC.register("AllowAll", AllowAllRoles.class, ALLOW_ALL_ROLES_CODEC);
+        ALLOWED_ROLES_CODEC.register("Allowlist", AllowlistRoles.class, ALLOWLIST_ROLES_CODEC);
+        ALLOWED_ROLES_CODEC.register("Denylist", DenylistRoles.class, DENYLIST_ROLES_CODEC);
+    }
 
     public static final BuilderCodec<NamingSettings> NAMING_CODEC = BuilderCodec.builder(
             NamingSettings.class, NamingSettings::new
@@ -169,7 +184,7 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         .add()
         .<AllowedRoles>append(
             new KeyedCodec<>("AllowedRoles", ALLOWED_ROLES_CODEC),
-            (asset, value) -> asset.allowedRoles = value == null ? new AllowedRoles() : value,
+            (asset, value) -> asset.allowedRoles = value == null ? new AllowAllRoles() : value,
             asset -> asset.allowedRoles
         )
         .documentation("Role restrictions for naming targets.")
@@ -188,7 +203,7 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
     private AssetExtraInfo.Data data;
     private String id;
     private String itemId;
-    private AllowedRoles allowedRoles = new AllowedRoles();
+    private AllowedRoles allowedRoles = new AllowAllRoles();
     private NamingSettings naming = new NamingSettings();
 
     public static AssetStore<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> getAssetStore() {
@@ -226,19 +241,52 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         return naming;
     }
 
-    public static final class AllowedRoles {
-        private RoleFilterMode mode = RoleFilterMode.AllowAll;
-        private String[] allowlist = ArrayUtil.EMPTY_STRING_ARRAY;
-        private String[] denylist = ArrayUtil.EMPTY_STRING_ARRAY;
+    /** Base role filter model for naming targets. */
+    public abstract static class AllowedRoles {
+        public abstract RoleFilterMode getMode();
 
-        public RoleFilterMode getMode() {
-            return mode;
+        public String[] getAllowlist() {
+            return ArrayUtil.EMPTY_STRING_ARRAY;
         }
 
+        public String[] getDenylist() {
+            return ArrayUtil.EMPTY_STRING_ARRAY;
+        }
+    }
+
+    /** Allow naming for all NPC roles. */
+    public static final class AllowAllRoles extends AllowedRoles {
+        @Override
+        public RoleFilterMode getMode() {
+            return RoleFilterMode.AllowAll;
+        }
+    }
+
+    /** Allow naming only for explicitly listed NPC roles. */
+    public static final class AllowlistRoles extends AllowedRoles {
+        private String[] allowlist = ArrayUtil.EMPTY_STRING_ARRAY;
+
+        @Override
+        public RoleFilterMode getMode() {
+            return RoleFilterMode.Allowlist;
+        }
+
+        @Override
         public String[] getAllowlist() {
             return allowlist;
         }
+    }
 
+    /** Deny naming for explicitly listed NPC roles. */
+    public static final class DenylistRoles extends AllowedRoles {
+        private String[] denylist = ArrayUtil.EMPTY_STRING_ARRAY;
+
+        @Override
+        public RoleFilterMode getMode() {
+            return RoleFilterMode.Denylist;
+        }
+
+        @Override
         public String[] getDenylist() {
             return denylist;
         }
