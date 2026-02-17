@@ -22,7 +22,7 @@ Fields:
 ## Capture settings
 Fields:
 - `ClearsOwner` (default true). Clears owner on capture.
-- `RequireTamed` (default true). Only allow capture if NPC is tamed.
+- `RequireTamed` (default true). Only allow capture if NPC is tamed (Tamework tamed component or a role id that starts with `Tamed`).
 - `OwnerRestricted` (default true). If true, only the owner can capture.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
 - `ParticleSystem` (optional). Particle system to play on capture.

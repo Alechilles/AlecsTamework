@@ -4,9 +4,9 @@ import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
@@ -471,12 +471,7 @@ public final class NamingFeatureHandler {
     }
 
     private boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
-        TameworkTamedComponent component = store.getComponent(npcRef, type);
-        return component != null && component.isTamed();
+        return TamedStateResolver.isTamed(npcRef, store);
     }
 
     private UUID resolveOwnerUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {

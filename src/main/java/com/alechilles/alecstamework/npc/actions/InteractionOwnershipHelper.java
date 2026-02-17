@@ -1,8 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -19,12 +18,7 @@ final class InteractionOwnershipHelper {
 
     // Returns whether the NPC is marked as tamed.
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
-        TameworkTamedComponent component = store.getComponent(npcRef, type);
-        return component != null && component.isTamed();
+        return TamedStateResolver.isTamed(npcRef, store);
     }
 
     // Returns whether the player is the owner of the NPC.

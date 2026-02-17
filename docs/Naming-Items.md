@@ -33,7 +33,7 @@ Fields:
 
 ## Naming settings
 Fields:
-- `RequireTamed` (default true). Requires the Tamework tamed component.
+- `RequireTamed` (default true). Requires a tamed NPC (Tamework tamed component or a role id that starts with `Tamed`).
 - `RequireOwner` (default true). Requires the player to be the owner.
 - `AllowUnownedWhenRequireOwner` (default false). When `RequireOwner` is true, allows naming NPCs with no owner.
 - `AllowRename` (default true). Allows renaming if a Tamework name already exists.

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
@@ -634,7 +635,7 @@ public final class SpawnerFeatureHandler {
         if (attachmentsJson != null) {
             updated = updated.withMetadata(TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, attachmentsJson);
         }
-        boolean tamed = resolveTamedFromComponent(targetRef, player.getWorld());
+        boolean tamed = resolveTamedState(targetRef, player.getWorld());
         if (tamed) {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
@@ -728,7 +729,7 @@ public final class SpawnerFeatureHandler {
         if (!isRoleAllowed(roleId, config)) {
             return false;
         }
-        if (config.isCaptureRequireTamed() && !resolveTamedFromComponent(targetRef, world)) {
+        if (config.isCaptureRequireTamed() && !resolveTamedState(targetRef, world)) {
             String npcName = resolveNpcDisplayName(npc);
             OwnerMessageUtil.sendUntamed(player, npcName);
             return false;
@@ -1630,17 +1631,12 @@ public final class SpawnerFeatureHandler {
         return stack.withMetadata(copy);
     }
 
-    private boolean resolveTamedFromComponent(Ref<EntityStore> targetRef, World world) {
+    private boolean resolveTamedState(Ref<EntityStore> targetRef, World world) {
         if (targetRef == null || world == null || !targetRef.isValid()) {
             return false;
         }
-        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
         Store<EntityStore> store = world.getEntityStore().getStore();
-        TameworkTamedComponent component = store.getComponent(targetRef, type);
-        return component != null && component.isTamed();
+        return TamedStateResolver.isTamed(targetRef, store);
     }
 
     private UUID resolveOwnerFromComponent(Ref<EntityStore> targetRef, World world) {
