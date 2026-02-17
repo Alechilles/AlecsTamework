@@ -53,6 +53,37 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         }
     }
 
+    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new Codec<>() {
+        @Override
+        public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return ArrayUtil.EMPTY_STRING_ARRAY;
+            }
+            if (bsonValue.isArray()) {
+                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
+            }
+            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
+        }
+
+        @Override
+        public BsonValue encode(String[] value, ExtraInfo extraInfo) {
+            if (value == null) {
+                return new BsonNull();
+            }
+            return Codec.STRING_ARRAY.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            StringSchema roleSchema = new StringSchema();
+            roleSchema.setHytaleAssetRef("NPCRole");
+            ArraySchema arraySchema = new ArraySchema();
+            arraySchema.setItem(roleSchema);
+            return arraySchema;
+        }
+    };
+
     private static final BuilderCodec<AllowedRoles> ALLOWED_ROLES_BASE_CODEC = BuilderCodec.abstractBuilder(
             AllowedRoles.class
         )
@@ -443,37 +474,6 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             return ArrayUtil.EMPTY_STRING_ARRAY;
         }
     }
-
-    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new Codec<>() {
-        @Override
-        public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return ArrayUtil.EMPTY_STRING_ARRAY;
-            }
-            if (bsonValue.isArray()) {
-                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
-            }
-            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
-        }
-
-        @Override
-        public BsonValue encode(String[] value, ExtraInfo extraInfo) {
-            if (value == null) {
-                return new BsonNull();
-            }
-            return Codec.STRING_ARRAY.encode(value, extraInfo);
-        }
-
-        @Nonnull
-        @Override
-        public Schema toSchema(@Nonnull SchemaContext context) {
-            StringSchema roleSchema = new StringSchema();
-            roleSchema.setHytaleAssetRef("NPCRole");
-            ArraySchema arraySchema = new ArraySchema();
-            arraySchema.setItem(roleSchema);
-            return arraySchema;
-        }
-    };
 
     /** Allow capture/spawn for all NPC roles. */
     public static final class AllowAllRoles extends AllowedRoles {
