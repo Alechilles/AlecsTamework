@@ -8,18 +8,27 @@ import com.hypixel.hytale.assetstore.codec.AssetBuilderCodec;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
+import com.hypixel.hytale.codec.exception.CodecException;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
+import com.hypixel.hytale.codec.schema.SchemaContext;
+import com.hypixel.hytale.codec.schema.config.ArraySchema;
+import com.hypixel.hytale.codec.schema.config.Schema;
+import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.bson.BsonNull;
+import org.bson.BsonValue;
 
 /**
  * Asset-backed configuration for spawner items.
@@ -58,7 +67,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             AllowlistRoles.class, AllowlistRoles::new, ALLOWED_ROLES_BASE_CODEC
         )
         .<String[]>append(
-            new KeyedCodec<>("Allowlist", Codec.STRING_ARRAY),
+            new KeyedCodec<>("Allowlist", NPC_ROLE_ARRAY_CODEC),
             (settings, value) -> settings.allowlist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.allowlist
         )
@@ -70,7 +79,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             DenylistRoles.class, DenylistRoles::new, ALLOWED_ROLES_BASE_CODEC
         )
         .<String[]>append(
-            new KeyedCodec<>("Denylist", Codec.STRING_ARRAY),
+            new KeyedCodec<>("Denylist", NPC_ROLE_ARRAY_CODEC),
             (settings, value) -> settings.denylist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.denylist
         )
@@ -434,6 +443,37 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             return ArrayUtil.EMPTY_STRING_ARRAY;
         }
     }
+
+    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new Codec<>() {
+        @Override
+        public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return ArrayUtil.EMPTY_STRING_ARRAY;
+            }
+            if (bsonValue.isArray()) {
+                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
+            }
+            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
+        }
+
+        @Override
+        public BsonValue encode(String[] value, ExtraInfo extraInfo) {
+            if (value == null) {
+                return new BsonNull();
+            }
+            return Codec.STRING_ARRAY.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            StringSchema roleSchema = new StringSchema();
+            roleSchema.setHytaleAssetRef("NPCRole");
+            ArraySchema arraySchema = new ArraySchema();
+            arraySchema.setItem(roleSchema);
+            return arraySchema;
+        }
+    };
 
     /** Allow capture/spawn for all NPC roles. */
     public static final class AllowAllRoles extends AllowedRoles {
