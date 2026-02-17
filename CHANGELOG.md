@@ -2,7 +2,7 @@
 
 All notable changes to **Alec's Tamework!** will be documented in this file.
 
-## 2.0.2 - Interaction Role Swaps - 2026-02-16
+## 2.0.2 - Interaction Role Swaps and Naming Items - 2026-02-17
 ### Added
 - Tame interaction option to swap NPC roles after taming via `Role`/`RoleParam`.
 - `SetRole` interaction effect for role swaps in any interaction entry.
