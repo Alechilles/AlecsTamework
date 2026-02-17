@@ -3,9 +3,11 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
@@ -44,8 +46,10 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
 import org.bson.BsonDocument;
+import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -68,17 +72,37 @@ public final class SpawnerFeatureHandler {
     private static final Gson GSON = new Gson();
     private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
 
+    private static final class CapturedName {
+        private final String name;
+        private final UUID ownerId;
+        private final long updatedMs;
+        private final TameworkNpcNameComponent.NameSource source;
+
+        private CapturedName(String name, UUID ownerId, long updatedMs, TameworkNpcNameComponent.NameSource source) {
+            this.name = name;
+            this.ownerId = ownerId;
+            this.updatedMs = updatedMs;
+            this.source = source;
+        }
+    }
+
     private static final class CaptureInfo {
         private final String attachmentsJson;
         private final Integer roleIndex;
         private final String npcNameKey;
         private final String iconPath;
+        private final CapturedName capturedName;
 
-        private CaptureInfo(String attachmentsJson, Integer roleIndex, String npcNameKey, String iconPath) {
+        private CaptureInfo(String attachmentsJson,
+                            Integer roleIndex,
+                            String npcNameKey,
+                            String iconPath,
+                            CapturedName capturedName) {
             this.attachmentsJson = attachmentsJson;
             this.roleIndex = roleIndex;
             this.npcNameKey = npcNameKey;
             this.iconPath = iconPath;
+            this.capturedName = capturedName;
         }
     }
 
@@ -352,6 +376,7 @@ public final class SpawnerFeatureHandler {
         applyAttachments(itemStack, npcRef, npc, store);
         applyOwner(config, npcRef, npc, playerRef, ownerUuid, world);
         applyTamed(npcRef, tamed, world);
+        applyCapturedName(itemStack, npcRef, store);
 
         ItemStack updated = itemStack;
         if (isAlreadyCaptured(itemStack)) {
@@ -442,17 +467,29 @@ public final class SpawnerFeatureHandler {
 
     private String resolveRoleIdFromMetadata(ItemStack itemStack) {
         CapturedNPCMetadata meta = resolveCapturedMetadata(itemStack);
-        if (meta != null) {
-            int roleIndex = meta.getRoleIndex();
-            if (roleIndex >= 0) {
-                String roleName = NPCPlugin.get().getName(roleIndex);
+        if (meta == null) {
+            return null;
+        }
+
+        String roleId = readStringGetter(meta,
+                "getRoleId",
+                "getRoleKey",
+                "getRoleNameKey",
+                "getRoleName",
+                "getNpcNameKey"
+        );
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
+        }
+
+        Integer roleIndex = readIntGetter(meta, "getRoleIndex");
+        if (roleIndex != null && roleIndex >= 0) {
+            NPCPlugin npcPlugin = NPCPlugin.get();
+            if (npcPlugin != null) {
+                String roleName = npcPlugin.getName(roleIndex);
                 if (roleName != null && !roleName.isBlank()) {
                     return roleName;
                 }
-            }
-            String npcNameKey = meta.getNpcNameKey();
-            if (npcNameKey != null && !npcNameKey.isBlank()) {
-                return npcNameKey;
             }
         }
         return null;
@@ -469,6 +506,91 @@ public final class SpawnerFeatureHandler {
                     "Spawner stub: failed to read captured NPC metadata from item."
             );
             return null;
+        }
+    }
+
+    // Compatibility shim for evolving CapturedNPCMetadata getters/setters across pre-release builds.
+    private static String readStringGetter(Object target, String... methodNames) {
+        if (target == null || methodNames == null) {
+            return null;
+        }
+        for (String methodName : methodNames) {
+            String value = invokeStringGetter(target, methodName);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static Integer readIntGetter(Object target, String... methodNames) {
+        if (target == null || methodNames == null) {
+            return null;
+        }
+        for (String methodName : methodNames) {
+            Integer value = invokeIntGetter(target, methodName);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String invokeStringGetter(Object target, String methodName) {
+        if (target == null || methodName == null) {
+            return null;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            Object value = method.invoke(target);
+            return value instanceof String ? (String) value : null;
+        } catch (Exception | LinkageError ex) {
+            return null;
+        }
+    }
+
+    private static Integer invokeIntGetter(Object target, String methodName) {
+        if (target == null || methodName == null) {
+            return null;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            Object value = method.invoke(target);
+            if (value instanceof Integer) {
+                return (Integer) value;
+            }
+            if (value instanceof Number) {
+                return ((Number) value).intValue();
+            }
+            return null;
+        } catch (Exception | LinkageError ex) {
+            return null;
+        }
+    }
+
+    private static boolean invokeStringSetter(Object target, String methodName, String value) {
+        if (target == null || methodName == null || value == null || value.isBlank()) {
+            return false;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName, String.class);
+            method.invoke(target, value);
+            return true;
+        } catch (Exception | LinkageError ex) {
+            return false;
+        }
+    }
+
+    private static boolean invokeIntSetter(Object target, String methodName, int value) {
+        if (target == null || methodName == null) {
+            return false;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName, int.class);
+            method.invoke(target, value);
+            return true;
+        } catch (Exception | LinkageError ex) {
+            return false;
         }
     }
 
@@ -513,12 +635,13 @@ public final class SpawnerFeatureHandler {
         if (attachmentsJson != null) {
             updated = updated.withMetadata(TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, attachmentsJson);
         }
-        boolean tamed = resolveTamedFromComponent(targetRef, player.getWorld());
+        boolean tamed = resolveTamedState(targetRef, player.getWorld());
         if (tamed) {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
         updated = applyOwnerMetadata(updated, ownerToStore);
         updated = applyCapturedMetadata(updated, captureInfo, fullItemIcon);
+        updated = applyCapturedNameMetadata(updated, captureInfo);
         updated = applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
 
         if (!updateHeldItem(player, updated)) {
@@ -606,7 +729,7 @@ public final class SpawnerFeatureHandler {
         if (!isRoleAllowed(roleId, config)) {
             return false;
         }
-        if (config.isCaptureRequireTamed() && !resolveTamedFromComponent(targetRef, world)) {
+        if (config.isCaptureRequireTamed() && !resolveTamedState(targetRef, world)) {
             String npcName = resolveNpcDisplayName(npc);
             OwnerMessageUtil.sendUntamed(player, npcName);
             return false;
@@ -1075,6 +1198,40 @@ public final class SpawnerFeatureHandler {
         store.putComponent(npcRef, type, new TameworkTamedComponent(tamed));
     }
 
+    private void applyCapturedName(ItemStack itemStack, Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (itemStack == null || npcRef == null || store == null || !npcRef.isValid()) {
+            return;
+        }
+        String name = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME, Codec.STRING);
+        if (name == null || name.isBlank()) {
+            return;
+        }
+        UUID ownerId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME_OWNER_UUID, Codec.UUID_STRING);
+        Long updatedMs = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME_UPDATED_MS, Codec.LONG);
+        String sourceRaw = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME_SOURCE, Codec.STRING);
+        TameworkNpcNameComponent.NameSource source = parseNameSource(sourceRaw);
+        if (source == null) {
+            source = TameworkNpcNameComponent.NameSource.Player;
+        }
+        long resolvedUpdatedMs = (updatedMs != null && updatedMs > 0) ? updatedMs : System.currentTimeMillis();
+        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+        if (nameType != null) {
+            store.putComponent(npcRef, nameType, new TameworkNpcNameComponent(name, ownerId, resolvedUpdatedMs, source));
+        }
+        EntitySupport.setDisplayName(npcRef, name, store);
+    }
+
+    private TameworkNpcNameComponent.NameSource parseNameSource(String sourceRaw) {
+        if (sourceRaw == null || sourceRaw.isBlank()) {
+            return null;
+        }
+        try {
+            return TameworkNpcNameComponent.NameSource.valueOf(sourceRaw);
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
     private void applyAttachments(ItemStack itemStack,
                                   Ref<EntityStore> npcRef,
                                   NPCEntity npc,
@@ -1121,11 +1278,11 @@ public final class SpawnerFeatureHandler {
     // Collect attachments, role/name keys, and icon overrides from the target NPC.
     private CaptureInfo buildCaptureInfo(Player player, Ref<EntityStore> targetRef) {
         if (player == null || targetRef == null || !targetRef.isValid()) {
-            return new CaptureInfo(null, null, null, null);
+            return new CaptureInfo(null, null, null, null, null);
         }
         World world = player.getWorld();
         if (world == null) {
-            return new CaptureInfo(null, null, null, null);
+            return new CaptureInfo(null, null, null, null, null);
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
 
@@ -1161,7 +1318,24 @@ public final class SpawnerFeatureHandler {
             }
         }
 
-        return new CaptureInfo(attachmentsJson, roleIndex, npcNameKey, iconPath);
+        CapturedName capturedName = null;
+        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+        if (nameType != null) {
+            TameworkNpcNameComponent nameComponent = store.getComponent(targetRef, nameType);
+            if (nameComponent != null) {
+                String name = nameComponent.getName();
+                if (name != null && !name.isBlank()) {
+                    capturedName = new CapturedName(
+                            name,
+                            nameComponent.getOwnerId(),
+                            nameComponent.getLastUpdatedMs(),
+                            nameComponent.getSource()
+                    );
+                }
+            }
+        }
+
+        return new CaptureInfo(attachmentsJson, roleIndex, npcNameKey, iconPath, capturedName);
     }
 
 
@@ -1187,24 +1361,71 @@ public final class SpawnerFeatureHandler {
         if (updated == null || captureInfo == null) {
             return updated;
         }
-        Integer roleIndex = captureInfo.roleIndex;
-        if (roleIndex == null || roleIndex < 0) {
-            return updated;
-        }
         CapturedNPCMetadata meta = new CapturedNPCMetadata();
-        meta.setRoleIndex(roleIndex);
+        boolean wrote = false;
+
+        Integer roleIndex = captureInfo.roleIndex;
+        if (roleIndex != null && roleIndex >= 0) {
+            wrote |= invokeIntSetter(meta, "setRoleIndex", roleIndex);
+        }
         String npcNameKey = captureInfo.npcNameKey;
         if (npcNameKey != null && !npcNameKey.isBlank()) {
-            meta.setNpcNameKey(npcNameKey);
+            wrote |= invokeStringSetter(meta, "setNpcNameKey", npcNameKey);
+            wrote |= invokeStringSetter(meta, "setRoleNameKey", npcNameKey);
+            wrote |= invokeStringSetter(meta, "setRoleId", npcNameKey);
+            wrote |= invokeStringSetter(meta, "setRoleKey", npcNameKey);
         }
         String icon = (fullItemIcon != null && !fullItemIcon.isBlank()) ? fullItemIcon : captureInfo.iconPath;
         if (icon != null && !icon.isBlank()) {
-            meta.setIconPath(icon);
+            wrote |= invokeStringSetter(meta, "setIconPath", icon);
         }
         if (fullItemIcon != null && !fullItemIcon.isBlank()) {
-            meta.setFullItemIcon(fullItemIcon);
+            wrote |= invokeStringSetter(meta, "setFullItemIcon", fullItemIcon);
+        }
+        if (!wrote) {
+            return updated;
         }
         return updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, meta);
+    }
+
+    private ItemStack applyCapturedNameMetadata(ItemStack updated, CaptureInfo captureInfo) {
+        if (updated == null || captureInfo == null) {
+            return updated;
+        }
+        CapturedName capturedName = captureInfo.capturedName;
+        if (capturedName == null || capturedName.name == null || capturedName.name.isBlank()) {
+            return clearNameMetadata(updated);
+        }
+        ItemStack result = updated.withMetadata(TameworkMetadataKeys.NPC_NAME, Codec.STRING, capturedName.name);
+        if (capturedName.ownerId != null) {
+            result = result.withMetadata(
+                    TameworkMetadataKeys.NPC_NAME_OWNER_UUID,
+                    Codec.UUID_STRING,
+                    capturedName.ownerId
+            );
+        } else {
+            result = clearMetadataKey(result, TameworkMetadataKeys.NPC_NAME_OWNER_UUID);
+        }
+        long updatedMs = capturedName.updatedMs > 0 ? capturedName.updatedMs : System.currentTimeMillis();
+        result = result.withMetadata(TameworkMetadataKeys.NPC_NAME_UPDATED_MS, Codec.LONG, updatedMs);
+        if (capturedName.source != null) {
+            result = result.withMetadata(
+                    TameworkMetadataKeys.NPC_NAME_SOURCE,
+                    Codec.STRING,
+                    capturedName.source.name()
+            );
+        } else {
+            result = clearMetadataKey(result, TameworkMetadataKeys.NPC_NAME_SOURCE);
+        }
+        return result;
+    }
+
+    private ItemStack clearNameMetadata(ItemStack updated) {
+        ItemStack cleared = clearMetadataKey(updated, TameworkMetadataKeys.NPC_NAME);
+        cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_OWNER_UUID);
+        cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_UPDATED_MS);
+        cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_SOURCE);
+        return cleared;
     }
 
     private ItemFeatureConfig resolveIconConfig(ItemFeatureConfig config) {
@@ -1360,6 +1581,7 @@ public final class SpawnerFeatureHandler {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.ATTACHMENTS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TAMED);
+        updated = clearNameMetadata(updated);
         updated = updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, null);
         return updated;
     }
@@ -1409,17 +1631,12 @@ public final class SpawnerFeatureHandler {
         return stack.withMetadata(copy);
     }
 
-    private boolean resolveTamedFromComponent(Ref<EntityStore> targetRef, World world) {
+    private boolean resolveTamedState(Ref<EntityStore> targetRef, World world) {
         if (targetRef == null || world == null || !targetRef.isValid()) {
             return false;
         }
-        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
         Store<EntityStore> store = world.getEntityStore().getStore();
-        TameworkTamedComponent component = store.getComponent(targetRef, type);
-        return component != null && component.isTamed();
+        return TamedStateResolver.isTamed(targetRef, store);
     }
 
     private UUID resolveOwnerFromComponent(Ref<EntityStore> targetRef, World world) {

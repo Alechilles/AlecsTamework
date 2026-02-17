@@ -1,0 +1,27 @@
+{
+  "ItemId": "Tamework_Nametag_Example",
+  "AllowedRoles": {
+    "Mode": "Allowlist",
+    "Allowlist": [
+      "Mob_Tamework_Example",
+      "Mob_Tamework_Example_Simple",
+      "Cat_Pet",
+      "Tamed_Sheep"
+    ]
+  },
+  "Naming": {
+    "RequireTamed": true,
+    "RequireOwner": true,
+    "AllowUnownedWhenRequireOwner": true,
+    "AllowRename": true,
+    "MinLength": 1,
+    "MaxLength": 24,
+    "AllowedChars": "LettersNumbersSpaces",
+    "TrimWhitespace": true,
+    "ReplaceExisting": true,
+    "ConsumeItem": true,
+    "CooldownMs": 5000,
+    "SoundEvent": "SFX_Tamework_NameTag",
+    "ParticleSystem": "Hearts"
+  }
+}

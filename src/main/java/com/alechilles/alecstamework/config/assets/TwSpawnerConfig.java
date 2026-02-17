@@ -8,18 +8,27 @@ import com.hypixel.hytale.assetstore.codec.AssetBuilderCodec;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
-import com.hypixel.hytale.codec.codecs.EnumCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
+import com.hypixel.hytale.codec.exception.CodecException;
+import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
+import com.hypixel.hytale.codec.schema.SchemaContext;
+import com.hypixel.hytale.codec.schema.config.ArraySchema;
+import com.hypixel.hytale.codec.schema.config.Schema;
+import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import org.bson.BsonNull;
+import org.bson.BsonValue;
 
 /**
  * Asset-backed configuration for spawner items.
@@ -44,33 +53,79 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         }
     }
 
-    private static final EnumCodec<RoleFilterMode> ROLE_FILTER_MODE_CODEC = new EnumCodec<>(RoleFilterMode.class);
+    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new Codec<>() {
+        @Override
+        public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return ArrayUtil.EMPTY_STRING_ARRAY;
+            }
+            if (bsonValue.isArray()) {
+                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
+            }
+            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
+        }
 
-    public static final BuilderCodec<AllowedRoles> ALLOWED_ROLES_CODEC = BuilderCodec.builder(
-            AllowedRoles.class, AllowedRoles::new
+        @Override
+        public BsonValue encode(String[] value, ExtraInfo extraInfo) {
+            if (value == null) {
+                return new BsonNull();
+            }
+            return Codec.STRING_ARRAY.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            StringSchema roleSchema = new StringSchema();
+            roleSchema.setHytaleAssetRef("NPCRole");
+            ArraySchema arraySchema = new ArraySchema();
+            arraySchema.setItem(roleSchema);
+            return arraySchema;
+        }
+    };
+
+    private static final BuilderCodec<AllowedRoles> ALLOWED_ROLES_BASE_CODEC = BuilderCodec.abstractBuilder(
+            AllowedRoles.class
         )
-        .<RoleFilterMode>append(
-            new KeyedCodec<>("Mode", ROLE_FILTER_MODE_CODEC),
-            (settings, value) -> settings.mode = value,
-            settings -> settings.mode
+        .build();
+
+    private static final BuilderCodec<AllowAllRoles> ALLOW_ALL_ROLES_CODEC = BuilderCodec.builder(
+            AllowAllRoles.class, AllowAllRoles::new, ALLOWED_ROLES_BASE_CODEC
         )
-        .documentation("How to interpret allowlist/denylist for roles.")
-        .add()
+        .build();
+
+    private static final BuilderCodec<AllowlistRoles> ALLOWLIST_ROLES_CODEC = BuilderCodec.builder(
+            AllowlistRoles.class, AllowlistRoles::new, ALLOWED_ROLES_BASE_CODEC
+        )
         .<String[]>append(
-            new KeyedCodec<>("Allowlist", Codec.STRING_ARRAY),
+            new KeyedCodec<>("Allowlist", NPC_ROLE_ARRAY_CODEC),
             (settings, value) -> settings.allowlist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.allowlist
         )
-        .documentation("Role IDs that are allowed (when Mode is Allowlist).")
+        .documentation("Role IDs that are allowed.")
         .add()
+        .build();
+
+    private static final BuilderCodec<DenylistRoles> DENYLIST_ROLES_CODEC = BuilderCodec.builder(
+            DenylistRoles.class, DenylistRoles::new, ALLOWED_ROLES_BASE_CODEC
+        )
         .<String[]>append(
-            new KeyedCodec<>("Denylist", Codec.STRING_ARRAY),
+            new KeyedCodec<>("Denylist", NPC_ROLE_ARRAY_CODEC),
             (settings, value) -> settings.denylist = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.denylist
         )
-        .documentation("Role IDs that are denied (when Mode is Denylist).")
+        .documentation("Role IDs that are denied.")
         .add()
         .build();
+
+    public static final StringCodecMapCodec<AllowedRoles, BuilderCodec<? extends AllowedRoles>> ALLOWED_ROLES_CODEC =
+            new StringCodecMapCodec<>("Mode") { };
+
+    static {
+        ALLOWED_ROLES_CODEC.register("AllowAll", AllowAllRoles.class, ALLOW_ALL_ROLES_CODEC);
+        ALLOWED_ROLES_CODEC.register("Allowlist", AllowlistRoles.class, ALLOWLIST_ROLES_CODEC);
+        ALLOWED_ROLES_CODEC.register("Denylist", DenylistRoles.class, DENYLIST_ROLES_CODEC);
+    }
 
     public static final BuilderCodec<SpawnerIconOverride> ICON_OVERRIDE_CODEC = BuilderCodec.builder(
             SpawnerIconOverride.class, SpawnerIconOverride::new
@@ -250,7 +305,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         .add()
         .<AllowedRoles>append(
             new KeyedCodec<>("AllowedRoles", ALLOWED_ROLES_CODEC),
-            (asset, value) -> asset.allowedRoles = value == null ? new AllowedRoles() : value,
+            (asset, value) -> asset.allowedRoles = value == null ? new AllowlistRoles() : value,
             asset -> asset.allowedRoles
         )
         .documentation("Role restrictions for what can be captured/spawned.")
@@ -290,7 +345,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     private AssetExtraInfo.Data data;
     private String id;
     private String emptyItemId;
-    private AllowedRoles allowedRoles = new AllowedRoles();
+    private AllowedRoles allowedRoles = new AllowlistRoles();
     private String filledItemId;
     private String iconDefault;
     private SpawnerIconOverride[] iconOverrides = EMPTY_OVERRIDES;
@@ -332,12 +387,10 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         String[] allowlist = ArrayUtil.EMPTY_STRING_ARRAY;
         String[] denylist = ArrayUtil.EMPTY_STRING_ARRAY;
         AllowedRoles allowed = allowedRoles;
-        if (allowed != null && (allowed.mode != null
-                || (allowed.allowlist != null && allowed.allowlist.length > 0)
-                || (allowed.denylist != null && allowed.denylist.length > 0))) {
-            mode = allowed.mode != null ? allowed.mode : mode;
-            allowlist = allowed.allowlist != null ? allowed.allowlist : ArrayUtil.EMPTY_STRING_ARRAY;
-            denylist = allowed.denylist != null ? allowed.denylist : ArrayUtil.EMPTY_STRING_ARRAY;
+        if (allowed != null) {
+            mode = allowed.getMode() != null ? allowed.getMode() : mode;
+            allowlist = allowed.getAllowlist() != null ? allowed.getAllowlist() : ArrayUtil.EMPTY_STRING_ARRAY;
+            denylist = allowed.getDenylist() != null ? allowed.getDenylist() : ArrayUtil.EMPTY_STRING_ARRAY;
         }
 
         return ItemFeatureConfig.builder()
@@ -409,10 +462,55 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         return result.isEmpty() ? Map.of() : result;
     }
 
-    public static final class AllowedRoles {
-        private RoleFilterMode mode = RoleFilterMode.Allowlist;
+    /** Base role filter model for spawner capture/spawn restrictions. */
+    public abstract static class AllowedRoles {
+        public abstract RoleFilterMode getMode();
+
+        public String[] getAllowlist() {
+            return ArrayUtil.EMPTY_STRING_ARRAY;
+        }
+
+        public String[] getDenylist() {
+            return ArrayUtil.EMPTY_STRING_ARRAY;
+        }
+    }
+
+    /** Allow capture/spawn for all NPC roles. */
+    public static final class AllowAllRoles extends AllowedRoles {
+        @Override
+        public RoleFilterMode getMode() {
+            return RoleFilterMode.AllowAll;
+        }
+    }
+
+    /** Allow capture/spawn only for explicitly listed NPC roles. */
+    public static final class AllowlistRoles extends AllowedRoles {
         private String[] allowlist = ArrayUtil.EMPTY_STRING_ARRAY;
+
+        @Override
+        public RoleFilterMode getMode() {
+            return RoleFilterMode.Allowlist;
+        }
+
+        @Override
+        public String[] getAllowlist() {
+            return allowlist;
+        }
+    }
+
+    /** Deny capture/spawn for explicitly listed NPC roles. */
+    public static final class DenylistRoles extends AllowedRoles {
         private String[] denylist = ArrayUtil.EMPTY_STRING_ARRAY;
+
+        @Override
+        public RoleFilterMode getMode() {
+            return RoleFilterMode.Denylist;
+        }
+
+        @Override
+        public String[] getDenylist() {
+            return denylist;
+        }
     }
 
     public static final class CaptureSettings {

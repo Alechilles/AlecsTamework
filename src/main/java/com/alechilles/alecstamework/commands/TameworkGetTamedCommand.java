@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.hypixel.hytale.component.ComponentType;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -34,14 +33,7 @@ public final class TameworkGetTamedCommand extends AbstractPlayerCommand {
             return;
         }
 
-        boolean tamed = false;
-        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
-        if (type != null) {
-            TameworkTamedComponent component = store.getComponent(candidate.ref, type);
-            if (component != null) {
-                tamed = component.isTamed();
-            }
-        }
+        boolean tamed = TamedStateResolver.isTamed(candidate.ref, store);
 
         commandContext.sender().sendMessage(Message.raw("Tamed for NPC " + candidate.npcUuid + " is " + tamed));
     }

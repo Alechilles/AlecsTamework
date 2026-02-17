@@ -22,7 +22,7 @@ Fields:
 ## Capture settings
 Fields:
 - `ClearsOwner` (default true). Clears owner on capture.
-- `RequireTamed` (default true). Only allow capture if NPC is tamed.
+- `RequireTamed` (default true). Only allow capture if NPC is tamed (Tamework tamed component or a role id that starts with `Tamed`).
 - `OwnerRestricted` (default true). If true, only the owner can capture.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
 - `ParticleSystem` (optional). Particle system to play on capture.
@@ -39,6 +39,8 @@ Fields:
 - `SoundEvent` (optional). Sound event to play on spawn.
 - `CooldownMs` (optional). Per item spawn cooldown.
 - `MaxDistance` (optional). Max distance for spawn.
+
+Captured Tamework NPC names are stored on the spawner item and restored on spawn.
 
 ## Icon overrides
 Optional overrides for filled spawner icons based on attachments or role.

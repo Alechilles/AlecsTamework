@@ -151,6 +151,35 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
+    private static final Codec<String> NPC_ROLE_ASSET_CODEC = new Codec<>() {
+        @Override
+        public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return null;
+            }
+            if (bsonValue.isString()) {
+                return bsonValue.asString().getValue();
+            }
+            throw new CodecException("Expected string", bsonValue, extraInfo, null);
+        }
+
+        @Override
+        public BsonValue encode(String value, ExtraInfo extraInfo) {
+            if (value == null) {
+                return new BsonNull();
+            }
+            return Codec.STRING.encode(value, extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            StringSchema schema = new StringSchema();
+            schema.setHytaleAssetRef("NPCRole");
+            return schema;
+        }
+    };
+
     private static final Codec<String[]> ITEM_ASSET_ARRAY_OR_SINGLE_CODEC = new Codec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
@@ -932,6 +961,26 @@ public final class TwInteractionConfigCodecs {
         .add()
         .build();
 
+    public static final BuilderCodec<SetRoleEffect> SET_ROLE_EFFECT_CODEC = BuilderCodec.builder(
+            SetRoleEffect.class,
+            SetRoleEffect::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Role", NPC_ROLE_ASSET_CODEC),
+            (effect, value) -> effect.role = value,
+            effect -> effect.role
+        )
+        .documentation("NPC role asset ID to swap to.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("RoleParam", Codec.STRING),
+            (effect, value) -> effect.roleParam = value,
+            effect -> effect.roleParam
+        )
+        .documentation("Role param to resolve a role asset ID (overrides Role).")
+        .add()
+        .build();
+
     public static final BuilderCodec<RemoveItemsHandEffect> REMOVE_ITEMS_HAND_EFFECT_CODEC = BuilderCodec.builder(
             RemoveItemsHandEffect.class,
             RemoveItemsHandEffect::new
@@ -1073,6 +1122,13 @@ public final class TwInteractionConfigCodecs {
             effects -> effects.setState
         )
         .documentation("Set NPC state/substate.")
+        .add()
+        .<SetRoleEffect>append(
+            new KeyedCodec<>("SetRole", SET_ROLE_EFFECT_CODEC),
+            (effects, value) -> effects.setRole = value,
+            effects -> effects.setRole
+        )
+        .documentation("Swap the NPC role.")
         .add()
         .<RemoveItemsHandEffect>append(
             new KeyedCodec<>("RemoveItemsHand", REMOVE_ITEMS_HAND_EFFECT_CODEC),
@@ -1241,6 +1297,20 @@ public final class TwInteractionConfigCodecs {
             entry -> entry.itemsParam
         )
         .documentation("Role param that provides items list (string, string[], or JSON array string). Default: none.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Role", NPC_ROLE_ASSET_CODEC),
+            (entry, value) -> entry.role = value,
+            entry -> entry.role
+        )
+        .documentation("NPC role asset ID to swap to after taming (optional).")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("RoleParam", Codec.STRING),
+            (entry, value) -> entry.roleParam = value,
+            entry -> entry.roleParam
+        )
+        .documentation("Role param that provides a role asset ID (overrides Role).")
         .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
