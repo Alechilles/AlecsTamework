@@ -19,6 +19,8 @@ import com.hypixel.hytale.codec.schema.config.ArraySchema;
 import com.hypixel.hytale.codec.schema.config.Schema;
 import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.common.util.ArrayUtil;
+import com.hypixel.hytale.math.codec.Vector3dArrayCodec;
+import com.hypixel.hytale.math.vector.Vector3d;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
@@ -112,6 +114,23 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 
+    public enum StoreSource {
+        RaycastHit,
+        OwnerPosition;
+
+        public static StoreSource fromString(String value) {
+            if (value == null || value.isBlank()) {
+                return RaycastHit;
+            }
+            for (StoreSource source : values()) {
+                if (source.name().equalsIgnoreCase(value.trim())) {
+                    return source;
+                }
+            }
+            return RaycastHit;
+        }
+    }
+
     private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new Codec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
@@ -142,6 +161,41 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             return arraySchema;
         }
     };
+
+    private static Codec<String> assetRefCodec(String assetType) {
+        return new Codec<>() {
+            @Override
+            public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+                if (Codec.isNullBsonValue(bsonValue)) {
+                    return null;
+                }
+                if (bsonValue.isString()) {
+                    return bsonValue.asString().getValue();
+                }
+                throw new CodecException("Expected string", bsonValue, extraInfo, null);
+            }
+
+            @Override
+            public BsonValue encode(String value, ExtraInfo extraInfo) {
+                if (value == null) {
+                    return new BsonNull();
+                }
+                return Codec.STRING.encode(value, extraInfo);
+            }
+
+            @Nonnull
+            @Override
+            public Schema toSchema(@Nonnull SchemaContext context) {
+                StringSchema schema = new StringSchema();
+                schema.setHytaleAssetRef(assetType);
+                return schema;
+            }
+        };
+    }
+
+    private static final Codec<String> PARTICLE_SYSTEM_CODEC = assetRefCodec("ParticleSystem");
+    private static final Codec<String> SOUND_EVENT_CODEC = assetRefCodec("SoundEvent");
+    private static final Codec<Vector3d> VECTOR3D_CODEC = new Vector3dArrayCodec();
 
     private static final BuilderCodec<AllowedRoles> ALLOWED_ROLES_BASE_CODEC = BuilderCodec.abstractBuilder(
             AllowedRoles.class
@@ -313,6 +367,17 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .build();
 
+    private static final BuilderCodec<StoreHomeStep> STORE_HOME_STEP_CODEC = BuilderCodec.builder(
+            StoreHomeStep.class, StoreHomeStep::new, COMMAND_STEP_BASE_CODEC
+        )
+        .<String>append(
+            new KeyedCodec<>("Source", Codec.STRING),
+            (step, value) -> step.source = StoreSource.fromString(value),
+            step -> step.source.name()
+        )
+        .add()
+        .build();
+
     private static final BuilderCodec<TriggerHookStep> TRIGGER_HOOK_STEP_CODEC = BuilderCodec.builder(
             TriggerHookStep.class, TriggerHookStep::new, COMMAND_STEP_BASE_CODEC
         )
@@ -339,6 +404,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         COMMAND_STEP_CODEC.register("ClearTarget", ClearTargetStep.class, CLEAR_TARGET_STEP_CODEC);
         COMMAND_STEP_CODEC.register("ClearCombat", ClearCombatStep.class, CLEAR_COMBAT_STEP_CODEC);
         COMMAND_STEP_CODEC.register("MoveToPosition", MoveToPositionStep.class, MOVE_TO_POSITION_STEP_CODEC);
+        COMMAND_STEP_CODEC.register("StoreHome", StoreHomeStep.class, STORE_HOME_STEP_CODEC);
         COMMAND_STEP_CODEC.register("TriggerHook", TriggerHookStep.class, TRIGGER_HOOK_STEP_CODEC);
     }
 
@@ -347,6 +413,41 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
     private static final CommandEntry[] EMPTY_COMMAND_LIST = new CommandEntry[0];
     private static final CommandStep[] EMPTY_STEPS = new CommandStep[0];
+
+    public static final BuilderCodec<CommandFeedback> COMMAND_FEEDBACK_CODEC = BuilderCodec.builder(
+            CommandFeedback.class, CommandFeedback::new
+        )
+        .<String>append(
+            new KeyedCodec<>("ChatMessage", Codec.STRING),
+            (feedback, value) -> feedback.chatMessage = value,
+            feedback -> feedback.chatMessage
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("HudMessage", Codec.STRING),
+            (feedback, value) -> feedback.hudMessage = value,
+            feedback -> feedback.hudMessage
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("SoundEvent", SOUND_EVENT_CODEC),
+            (feedback, value) -> feedback.soundEvent = value,
+            feedback -> feedback.soundEvent
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("ParticleSystem", PARTICLE_SYSTEM_CODEC),
+            (feedback, value) -> feedback.particleSystem = value,
+            feedback -> feedback.particleSystem
+        )
+        .add()
+        .<Vector3d>append(
+            new KeyedCodec<>("ParticleOffset", VECTOR3D_CODEC),
+            (feedback, value) -> feedback.particleOffset = value,
+            feedback -> feedback.particleOffset
+        )
+        .add()
+        .build();
 
     public static final BuilderCodec<CommandEntry> COMMAND_ENTRY_CODEC = BuilderCodec.builder(
             CommandEntry.class, CommandEntry::new
@@ -373,6 +474,12 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             new KeyedCodec<>("Default", Codec.BOOLEAN),
             (entry, value) -> entry.defaultCommand = value != null && value,
             entry -> entry.defaultCommand
+        )
+        .add()
+        .<CommandFeedback>append(
+            new KeyedCodec<>("Feedback", COMMAND_FEEDBACK_CODEC),
+            (entry, value) -> entry.feedback = value,
+            entry -> entry.feedback
         )
         .add()
         .<ModeMapping>append(
@@ -732,6 +839,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         private String displayName;
         private String icon;
         private boolean defaultCommand;
+        private CommandFeedback feedback;
         private ModeMapping modeMapping;
         private CommandStep[] steps = EMPTY_STEPS;
 
@@ -749,6 +857,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isDefaultCommand() {
             return defaultCommand;
+        }
+
+        public CommandFeedback getFeedback() {
+            return feedback;
         }
 
         public ModeMapping getModeMapping() {
@@ -838,6 +950,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 
+    public static final class StoreHomeStep extends CommandStep {
+        private StoreSource source = StoreSource.RaycastHit;
+
+        public StoreSource getSource() {
+            return source;
+        }
+    }
+
     public static final class TriggerHookStep extends CommandStep {
         private String hookId;
         private Map<String, String> payload = Collections.emptyMap();
@@ -848,6 +968,34 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public Map<String, String> getPayload() {
             return payload;
+        }
+    }
+
+    public static final class CommandFeedback {
+        private String chatMessage;
+        private String hudMessage;
+        private String soundEvent;
+        private String particleSystem;
+        private Vector3d particleOffset;
+
+        public String getChatMessage() {
+            return chatMessage;
+        }
+
+        public String getHudMessage() {
+            return hudMessage;
+        }
+
+        public String getSoundEvent() {
+            return soundEvent;
+        }
+
+        public String getParticleSystem() {
+            return particleSystem;
+        }
+
+        public Vector3d getParticleOffset() {
+            return particleOffset;
         }
     }
 }

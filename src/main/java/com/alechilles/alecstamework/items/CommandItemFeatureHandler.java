@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandFeedback;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearCombatStep;
@@ -15,12 +16,15 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MoveSource
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MoveToPositionStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.SetStateStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.SetTargetStep;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreHomeStep;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -28,13 +32,17 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.util.TargetUtil;
+import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
+import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
@@ -56,6 +64,7 @@ public final class CommandItemFeatureHandler {
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
 
     private final CommandItemRegistry registry;
+    private final TameworkUiMessageService uiMessageService = new TameworkUiMessageService();
 
     public CommandItemFeatureHandler(CommandItemRegistry registry) {
         this.registry = registry;
@@ -105,7 +114,9 @@ public final class CommandItemFeatureHandler {
                 sendMessage(player, "No command is configured for this item.");
                 return false;
             }
-            sendMessage(player, "Selected command: " + resolveCommandLabel(selection.command) + ".");
+            String label = resolveCommandLabel(selection.command);
+            sendMessage(player, "Selected command: " + label + ".");
+            uiMessageService.show(player, "Selected: " + label);
             return true;
         }
 
@@ -139,7 +150,8 @@ public final class CommandItemFeatureHandler {
         }
 
         Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, command, targetRef);
-        Vector3d targetPosition = resolveTargetPosition(playerRef, store, config, command);
+        Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, command);
+        Vector3d storedHomePosition = resolveStoredHomePosition(working, command);
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         Context context = new Context(
                 player,
@@ -150,13 +162,28 @@ public final class CommandItemFeatureHandler {
                 working.getItemId(),
                 tool.toolId,
                 commandTarget,
-                targetPosition,
+                raycastPosition,
+                storedHomePosition,
+                working,
                 globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
                 globalConfig != null && globalConfig.isInvulnerableIfOwned()
         );
 
+        GlobalStepResult globalStepResult = executeGlobalSteps(context);
+        if (context.itemChanged) {
+            working = context.workingItem;
+            updateHeldItem = true;
+        }
+        if (globalStepResult.blocked) {
+            if (updateHeldItem) {
+                updateHeldItem(player, working);
+            }
+            sendMessage(player, "That command could not be executed.");
+            return false;
+        }
+
         List<Candidate> recipients = queryRecipients(context);
-        if (recipients.isEmpty()) {
+        if (recipients.isEmpty() && !globalStepResult.applied) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
@@ -165,16 +192,18 @@ public final class CommandItemFeatureHandler {
         }
 
         int affected = 0;
-        for (Candidate candidate : recipients) {
-            StepResult stepResult = executeCommand(context, candidate);
-            if (stepResult.applied) {
-                affected++;
-            }
-            if (stepResult.abortAll) {
-                break;
+        if (!recipients.isEmpty()) {
+            for (Candidate candidate : recipients) {
+                StepResult stepResult = executeCommand(context, candidate);
+                if (stepResult.applied) {
+                    affected++;
+                }
+                if (stepResult.abortAll) {
+                    break;
+                }
             }
         }
-        if (affected <= 0) {
+        if (affected <= 0 && !globalStepResult.applied) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
@@ -189,11 +218,13 @@ public final class CommandItemFeatureHandler {
                     System.currentTimeMillis() + cooldownMs
             );
             updateHeldItem = true;
+            context.workingItem = working;
+            context.itemChanged = true;
         }
         if (updateHeldItem) {
             updateHeldItem(player, working);
         }
-        sendMessage(player, "Command " + resolveCommandLabel(command) + " applied to " + affected + " NPC(s).");
+        emitCommandExecutionFeedback(context, affected, globalStepResult.applied);
         return true;
     }
 
@@ -331,15 +362,28 @@ public final class CommandItemFeatureHandler {
         return (float) distance;
     }
 
-    private Vector3d resolveTargetPosition(Ref<EntityStore> playerRef,
-                                           Store<EntityStore> store,
-                                           TwCommandItemConfig config,
-                                           CommandEntry command) {
+    private Vector3d resolveRaycastPosition(Ref<EntityStore> playerRef,
+                                            Store<EntityStore> store,
+                                            TwCommandItemConfig config,
+                                            CommandEntry command) {
         if (!needsRaycast(command) || playerRef == null || !playerRef.isValid()) {
             return null;
         }
         double distance = config != null && config.getRadius() > 0 ? config.getRadius() : DEFAULT_RAYCAST_DISTANCE;
         return TargetUtil.getTargetLocation(playerRef, blockId -> blockId != 0, distance, store);
+    }
+
+    private Vector3d resolveStoredHomePosition(ItemStack stack, CommandEntry command) {
+        if (!needsStoredHome(command) || stack == null || stack.isEmpty()) {
+            return null;
+        }
+        Double x = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_HOME_X, Codec.DOUBLE);
+        Double y = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_HOME_Y, Codec.DOUBLE);
+        Double z = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_HOME_Z, Codec.DOUBLE);
+        if (x == null || y == null || z == null) {
+            return null;
+        }
+        return new Vector3d(x, y, z);
     }
 
     private boolean needsRaycast(CommandEntry command) {
@@ -350,8 +394,50 @@ public final class CommandItemFeatureHandler {
             if (step instanceof MoveToPositionStep moveStep && moveStep.getSource() == MoveSource.RaycastHit) {
                 return true;
             }
+            if (step instanceof StoreHomeStep storeHomeStep
+                    && storeHomeStep.getSource() == StoreSource.RaycastHit) {
+                return true;
+            }
         }
         return false;
+    }
+
+    private boolean needsStoredHome(CommandEntry command) {
+        if (command == null || command.getSteps() == null) {
+            return false;
+        }
+        for (CommandStep step : command.getSteps()) {
+            if (step instanceof MoveToPositionStep moveStep && moveStep.getSource() == MoveSource.StoredHome) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private GlobalStepResult executeGlobalSteps(Context context) {
+        CommandStep[] steps = context.command.getSteps();
+        if (steps == null || steps.length == 0) {
+            return GlobalStepResult.none();
+        }
+        boolean applied = false;
+        for (CommandStep step : steps) {
+            if (!(step instanceof StoreHomeStep storeHomeStep)) {
+                continue;
+            }
+            boolean ok = applyStoreHome(storeHomeStep, context);
+            if (ok) {
+                applied = true;
+                continue;
+            }
+            if (step.isOptional()) {
+                continue;
+            }
+            FailurePolicy policy = step.getFailurePolicy() != null ? step.getFailurePolicy() : FailurePolicy.Continue;
+            if (policy == FailurePolicy.AbortAll || policy == FailurePolicy.AbortCommandForNpc) {
+                return new GlobalStepResult(applied, true);
+            }
+        }
+        return new GlobalStepResult(applied, false);
     }
 
     private List<Candidate> queryRecipients(Context context) {
@@ -519,6 +605,9 @@ public final class CommandItemFeatureHandler {
             if (step == null) {
                 continue;
             }
+            if (isGlobalStep(step)) {
+                continue;
+            }
             boolean ok = applyStep(step, context, candidate);
             if (ok) {
                 applied = true;
@@ -536,6 +625,10 @@ public final class CommandItemFeatureHandler {
             }
         }
         return new StepResult(applied, false);
+    }
+
+    private boolean isGlobalStep(CommandStep step) {
+        return step instanceof StoreHomeStep;
     }
 
     private StepResult executeModeMapping(Context context, Candidate candidate) {
@@ -571,6 +664,9 @@ public final class CommandItemFeatureHandler {
         }
         if (step instanceof MoveToPositionStep moveStep) {
             return applyMove(moveStep, context, candidate);
+        }
+        if (step instanceof StoreHomeStep storeHomeStep) {
+            return applyStoreHome(storeHomeStep, context);
         }
         if (step instanceof TriggerHookStep hookStep) {
             return applyHook(hookStep.getHookId(), context, candidate.ref);
@@ -683,16 +779,50 @@ public final class CommandItemFeatureHandler {
 
     private boolean applyMove(MoveToPositionStep moveStep, Context context, Candidate candidate) {
         MoveSource source = moveStep.getSource() != null ? moveStep.getSource() : MoveSource.RaycastHit;
-        if (source == MoveSource.RaycastHit && context.targetPosition == null) {
-            return false;
-        }
-        if (source == MoveSource.OwnerPosition && candidate.npc.getRole() != null
+        Vector3d targetPosition = null;
+        if (source == MoveSource.RaycastHit) {
+            targetPosition = context.raycastPosition;
+            if (targetPosition == null) {
+                return false;
+            }
+        } else if (source == MoveSource.StoredHome) {
+            targetPosition = context.storedHomePosition;
+            if (targetPosition == null) {
+                return false;
+            }
+        } else if (source == MoveSource.OwnerPosition && candidate.npc.getRole() != null
                 && candidate.npc.getRole().getMarkedEntitySupport() != null
                 && context.playerRef != null
                 && context.playerRef.isValid()) {
             candidate.npc.getRole().getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
         }
-        return applyHook("Tamework.Command.MoveToPosition." + source.name(), context, candidate.ref);
+        return applyHook("Tamework.Command.MoveToPosition." + source.name(), context, candidate.ref, targetPosition);
+    }
+
+    private boolean applyStoreHome(StoreHomeStep step, Context context) {
+        if (step == null || context == null || context.workingItem == null || context.workingItem.isEmpty()) {
+            return false;
+        }
+        Vector3d home = null;
+        StoreSource source = step.getSource() != null ? step.getSource() : StoreSource.RaycastHit;
+        if (source == StoreSource.RaycastHit) {
+            home = context.raycastPosition;
+        } else if (source == StoreSource.OwnerPosition) {
+            TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
+            if (playerTransform != null) {
+                home = new Vector3d(playerTransform.getPosition());
+            }
+        }
+        if (home == null) {
+            return false;
+        }
+        context.workingItem = context.workingItem
+                .withMetadata(TameworkMetadataKeys.COMMAND_HOME_X, Codec.DOUBLE, home.x)
+                .withMetadata(TameworkMetadataKeys.COMMAND_HOME_Y, Codec.DOUBLE, home.y)
+                .withMetadata(TameworkMetadataKeys.COMMAND_HOME_Z, Codec.DOUBLE, home.z);
+        context.storedHomePosition = new Vector3d(home);
+        context.itemChanged = true;
+        return true;
     }
 
     private boolean applyClearCombat(ClearCombatStep step, Context context, Candidate candidate) {
@@ -729,6 +859,13 @@ public final class CommandItemFeatureHandler {
     }
 
     private boolean applyHook(String hookId, Context context, Ref<EntityStore> npcRef) {
+        return applyHook(hookId, context, npcRef, null);
+    }
+
+    private boolean applyHook(String hookId,
+                              Context context,
+                              Ref<EntityStore> npcRef,
+                              Vector3d targetPosition) {
         if (hookId == null || hookId.isBlank() || npcRef == null || !npcRef.isValid()) {
             return false;
         }
@@ -737,7 +874,15 @@ public final class CommandItemFeatureHandler {
         context.store.putComponent(
                 npcRef,
                 TameworkHookComponent.getComponentType(),
-                new TameworkHookComponent(hookId, playerId, playerName, context.itemId, System.currentTimeMillis(), true)
+                new TameworkHookComponent(
+                        hookId,
+                        playerId,
+                        playerName,
+                        context.itemId,
+                        System.currentTimeMillis(),
+                        true,
+                        targetPosition
+                )
         );
         return true;
     }
@@ -797,6 +942,90 @@ public final class CommandItemFeatureHandler {
         return new LinkToggleResult(true, linked, name);
     }
 
+    private void emitCommandExecutionFeedback(Context context, int affected, boolean globalApplied) {
+        if (context == null || context.player == null || context.command == null) {
+            return;
+        }
+        String defaultMessage;
+        if (affected > 0) {
+            defaultMessage = "Command " + resolveCommandLabel(context.command) + " applied to " + affected + " NPC(s).";
+        } else if (globalApplied) {
+            defaultMessage = "Command " + resolveCommandLabel(context.command) + " applied.";
+        } else {
+            defaultMessage = "No NPCs could execute that command.";
+        }
+        CommandFeedback feedback = context.command.getFeedback();
+        String chatMessage = resolveFeedbackText(
+                feedback != null ? feedback.getChatMessage() : null,
+                context.command,
+                affected,
+                defaultMessage
+        );
+        sendMessage(context.player, chatMessage);
+        if (feedback == null) {
+            return;
+        }
+        String hudMessage = resolveFeedbackText(feedback.getHudMessage(), context.command, affected, null);
+        if (hudMessage != null && !hudMessage.isBlank()) {
+            uiMessageService.show(context.player, hudMessage);
+        }
+        emitFeedbackSound(feedback.getSoundEvent(), context.playerRef, context.store);
+        emitFeedbackParticles(feedback.getParticleSystem(), feedback.getParticleOffset(), context.playerRef, context.store);
+    }
+
+    private String resolveFeedbackText(String template,
+                                       CommandEntry command,
+                                       int affected,
+                                       String fallback) {
+        String value = (template != null && !template.isBlank()) ? template : fallback;
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String commandLabel = resolveCommandLabel(command);
+        return value
+                .replace("%count%", Integer.toString(affected))
+                .replace("%command%", commandLabel)
+                .replace("{count}", Integer.toString(affected))
+                .replace("{command}", commandLabel);
+    }
+
+    private void emitFeedbackSound(String soundEventId,
+                                   Ref<EntityStore> playerRef,
+                                   Store<EntityStore> store) {
+        if (soundEventId == null || soundEventId.isBlank() || playerRef == null || !playerRef.isValid() || store == null) {
+            return;
+        }
+        int soundEventIndex = SoundEvent.getAssetMap().getIndex(soundEventId);
+        if (soundEventIndex <= 0) {
+            return;
+        }
+        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+        if (transform == null) {
+            return;
+        }
+        SoundUtil.playSoundEvent3d(soundEventIndex, SoundCategory.SFX, transform.getPosition(), store);
+    }
+
+    private void emitFeedbackParticles(String particleSystem,
+                                       Vector3d offset,
+                                       Ref<EntityStore> playerRef,
+                                       Store<EntityStore> store) {
+        if (particleSystem == null || particleSystem.isBlank() || playerRef == null || !playerRef.isValid() || store == null) {
+            return;
+        }
+        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+        if (transform == null) {
+            return;
+        }
+        Vector3d position = new Vector3d(transform.getPosition());
+        if (offset != null) {
+            position.x += offset.x;
+            position.y += offset.y;
+            position.z += offset.z;
+        }
+        ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+    }
+
     private boolean isCooldownActive(ItemStack stack, int cooldownMs) {
         if (cooldownMs <= 0) {
             return false;
@@ -852,7 +1081,10 @@ public final class CommandItemFeatureHandler {
         private final String itemId;
         private final String toolId;
         private final Ref<EntityStore> commandTarget;
-        private final Vector3d targetPosition;
+        private final Vector3d raycastPosition;
+        private Vector3d storedHomePosition;
+        private ItemStack workingItem;
+        private boolean itemChanged;
         private final boolean blockAllPlayerDamageIfOwned;
         private final boolean invulnerableIfOwned;
 
@@ -864,7 +1096,9 @@ public final class CommandItemFeatureHandler {
                         String itemId,
                         String toolId,
                         Ref<EntityStore> commandTarget,
-                        Vector3d targetPosition,
+                        Vector3d raycastPosition,
+                        Vector3d storedHomePosition,
+                        ItemStack workingItem,
                         boolean blockAllPlayerDamageIfOwned,
                         boolean invulnerableIfOwned) {
             this.player = player;
@@ -875,9 +1109,25 @@ public final class CommandItemFeatureHandler {
             this.itemId = itemId;
             this.toolId = toolId;
             this.commandTarget = commandTarget;
-            this.targetPosition = targetPosition;
+            this.raycastPosition = raycastPosition;
+            this.storedHomePosition = storedHomePosition;
+            this.workingItem = workingItem;
             this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
             this.invulnerableIfOwned = invulnerableIfOwned;
+        }
+    }
+
+    private static final class GlobalStepResult {
+        private final boolean applied;
+        private final boolean blocked;
+
+        private GlobalStepResult(boolean applied, boolean blocked) {
+            this.applied = applied;
+            this.blocked = blocked;
+        }
+
+        private static GlobalStepResult none() {
+            return new GlobalStepResult(false, false);
         }
     }
 
