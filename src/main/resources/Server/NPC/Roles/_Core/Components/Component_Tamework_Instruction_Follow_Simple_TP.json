@@ -10,7 +10,7 @@
       "Description": "Target slot used to track the owner/master."
     },
     "FollowLockOnRange": {
-      "Value": 30,
+      "Value": 20,
       "Description": "Range used to lock onto the master target."
     },
     "FollowSeekSlowDownDistance": {
