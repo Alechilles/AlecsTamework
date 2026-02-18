@@ -1,0 +1,101 @@
+Group #TameworkCommandMenuRoot {
+  LayoutMode: Full;
+  Background: #000000(0.45);
+  Visible: false;
+
+  Group #TameworkCommandMenuWheel {
+    LayoutMode: Middle;
+    Anchor: (Width: 620, Height: 620);
+    Background: #0f1319(0.9);
+    Padding: (Full: 8);
+
+    Label #TameworkCommandMenuTitle {
+      Anchor: (Top: 16, Width: 520, Height: 36, Left: 50);
+      Text: "";
+      Style: (
+        FontSize: 28,
+        RenderBold: true,
+        TextColor: #ffffff,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center
+      );
+    }
+
+    Label #TameworkCommandMenuSubtitle {
+      Anchor: (Top: 52, Width: 520, Height: 24, Left: 50);
+      Text: "";
+      Style: (
+        FontSize: 16,
+        TextColor: #dbe4e7,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center
+      );
+    }
+
+    Label #TameworkCommandMenuCurrent {
+      Anchor: (Top: 282, Width: 320, Height: 56, Left: 150);
+      Text: "";
+      Style: (
+        FontSize: 18,
+        RenderBold: true,
+        TextColor: #ffffff,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center,
+        Wrap: true
+      );
+    }
+
+    TextButton #CommandButton0 {
+      Anchor: (Top: 88, Left: 225, Width: 170, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton1 {
+      Anchor: (Top: 152, Left: 405, Width: 170, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton2 {
+      Anchor: (Top: 290, Left: 450, Width: 160, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton3 {
+      Anchor: (Top: 430, Left: 395, Width: 170, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton4 {
+      Anchor: (Top: 492, Left: 225, Width: 170, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton5 {
+      Anchor: (Top: 430, Left: 55, Width: 170, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton6 {
+      Anchor: (Top: 290, Left: 10, Width: 160, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton7 {
+      Anchor: (Top: 152, Left: 45, Width: 170, Height: 40);
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandMenuCloseButton {
+      Anchor: (Top: 560, Left: 255, Width: 110, Height: 34);
+      Text: "Close";
+    }
+  }
+}

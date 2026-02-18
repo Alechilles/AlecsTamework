@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -45,6 +46,7 @@ import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -62,6 +64,7 @@ public final class CommandItemFeatureHandler {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final double DEFAULT_RAYCAST_DISTANCE = 64.0;
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
+    private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
 
     private final CommandItemRegistry registry;
     private final TameworkUiMessageService uiMessageService = new TameworkUiMessageService();
@@ -99,6 +102,17 @@ public final class CommandItemFeatureHandler {
         boolean updateHeldItem = tool.changed;
         if (tool.toolId == null || tool.toolId.isBlank()) {
             return false;
+        }
+
+        if (isOpenSelectionMenuCommand(commandIdOverride)) {
+            if (updateHeldItem) {
+                updateHeldItem(player, working);
+            }
+            boolean opened = openSelectionMenu(player, store, config, working, tool.toolId);
+            if (!opened) {
+                sendMessage(player, "No command choices are available for this item.");
+            }
+            return opened;
         }
 
         if (isCycleSelectionCommand(commandIdOverride)) {
@@ -233,6 +247,100 @@ public final class CommandItemFeatureHandler {
             return false;
         }
         return CYCLE_SELECTION_COMMAND_ID.equalsIgnoreCase(commandIdOverride.trim());
+    }
+
+    private boolean isOpenSelectionMenuCommand(String commandIdOverride) {
+        if (commandIdOverride == null || commandIdOverride.isBlank()) {
+            return false;
+        }
+        return OPEN_SELECTION_MENU_COMMAND_ID.equalsIgnoreCase(commandIdOverride.trim());
+    }
+
+    private boolean openSelectionMenu(Player player,
+                                      Store<EntityStore> store,
+                                      TwCommandItemConfig config,
+                                      ItemStack working,
+                                      String toolId) {
+        if (player == null || store == null || config == null || toolId == null || toolId.isBlank()) {
+            return false;
+        }
+        CommandEntry[] commands = config.getCommandList();
+        if (commands == null || commands.length == 0) {
+            return false;
+        }
+        if (player.getPageManager() == null) {
+            return false;
+        }
+        String selectedId = working != null
+                ? working.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING)
+                : null;
+        Ref<EntityStore> playerRef = player.getReference();
+        if (playerRef == null || !playerRef.isValid()) {
+            return false;
+        }
+        PlayerRef uiPlayerRef = player.getPlayerRef();
+        if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
+            return false;
+        }
+        TameworkCommandSelectionPage page = new TameworkCommandSelectionPage(
+                uiPlayerRef,
+                config,
+                selectedId,
+                commandId -> applyMenuSelection(player, toolId, config, commandId)
+        );
+        player.getPageManager().openCustomPage(playerRef, store, page);
+        return true;
+    }
+
+    private void applyMenuSelection(Player player,
+                                    String toolId,
+                                    TwCommandItemConfig config,
+                                    String commandId) {
+        if (player == null || toolId == null || toolId.isBlank() || config == null
+                || commandId == null || commandId.isBlank()) {
+            return;
+        }
+        CommandEntry selected = config.findCommandById(commandId);
+        if (selected == null) {
+            sendMessage(player, "That command is no longer available.");
+            return;
+        }
+        boolean updated = setSelectedCommandOnTool(player, toolId, selected.getId());
+        if (!updated) {
+            sendMessage(player, "Unable to apply the selected command.");
+            return;
+        }
+        String label = resolveCommandLabel(selected);
+        sendMessage(player, "Selected command: " + label + ".");
+        uiMessageService.show(player, "Selected: " + label);
+    }
+
+    private boolean setSelectedCommandOnTool(Player player, String toolId, String commandId) {
+        Inventory inventory = player != null ? player.getInventory() : null;
+        if (inventory == null) {
+            return false;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        if (hotbar == null) {
+            return false;
+        }
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            ItemStack updated = stack.withMetadata(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING, commandId);
+            hotbar.setItemStackForSlot(slot, updated);
+            inventory.markChanged();
+            player.sendInventory();
+            return true;
+        }
+        return false;
     }
 
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
