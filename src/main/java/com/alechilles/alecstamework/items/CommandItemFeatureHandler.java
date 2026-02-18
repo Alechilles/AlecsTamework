@@ -1362,7 +1362,7 @@ public final class CommandItemFeatureHandler {
         if (stack == null || stack.isEmpty() || npcUuid == null) {
             return stack;
         }
-        List<LinkedNpcRecord> records = readLinkedNpcRecords(stack);
+        List<LinkedNpcRecord> records = new ArrayList<>(readLinkedNpcRecords(stack));
         String key = npcUuid.toString().toLowerCase(Locale.ROOT);
         boolean updated = false;
         for (int i = 0; i < records.size(); i++) {
