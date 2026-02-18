@@ -55,14 +55,14 @@
       "DisplayName": "Attack Target",
       "Steps": [
         {
-          "Type": "SetState",
-          "State": "Combat"
-        },
-        {
           "Type": "SetTarget",
           "TargetSlot": "LockedTarget",
           "Source": "CrosshairTarget",
           "FailurePolicy": "AbortCommandForNpc"
+        },
+        {
+          "Type": "SetState",
+          "State": "Combat"
         }
       ]
     }

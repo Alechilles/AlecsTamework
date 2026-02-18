@@ -136,9 +136,7 @@ public final class CommandItemFeatureHandler {
             return false;
         }
 
-        Ref<EntityStore> commandTarget = targetRef != null && targetRef.isValid() && !targetRef.equals(playerRef)
-                ? targetRef
-                : null;
+        Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, command, targetRef);
         Vector3d targetPosition = resolveTargetPosition(playerRef, store, config, command);
         Context context = new Context(player, playerRef, store, config, command, working.getItemId(), tool.toolId, commandTarget, targetPosition);
 
@@ -271,6 +269,51 @@ public final class CommandItemFeatureHandler {
             }
         }
         return config.findDefaultCommand();
+    }
+
+    private Ref<EntityStore> resolveCommandTarget(Ref<EntityStore> playerRef,
+                                                  Store<EntityStore> store,
+                                                  TwCommandItemConfig config,
+                                                  CommandEntry command,
+                                                  Ref<EntityStore> explicitTarget) {
+        if (playerRef == null || !playerRef.isValid() || store == null) {
+            return null;
+        }
+        if (explicitTarget != null && explicitTarget.isValid() && !explicitTarget.equals(playerRef)) {
+            return explicitTarget;
+        }
+        if (!needsEntityTarget(command)) {
+            return null;
+        }
+        float radius = resolveTargetEntityRadius(config);
+        Ref<EntityStore> raycastTarget = TargetUtil.getTargetEntity(playerRef, radius, store);
+        if (raycastTarget == null || !raycastTarget.isValid() || raycastTarget.equals(playerRef)) {
+            return null;
+        }
+        return raycastTarget;
+    }
+
+    private boolean needsEntityTarget(CommandEntry command) {
+        if (command == null || command.getSteps() == null) {
+            return false;
+        }
+        for (CommandStep step : command.getSteps()) {
+            if (step instanceof SetTargetStep targetStep) {
+                TargetSource source = targetStep.getSource() != null
+                        ? targetStep.getSource()
+                        : TargetSource.CrosshairTarget;
+                if (source == TargetSource.CrosshairTarget || source == TargetSource.LastAttackTarget) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private float resolveTargetEntityRadius(TwCommandItemConfig config) {
+        double distance = config != null && config.getRadius() > 0 ? config.getRadius() : DEFAULT_RAYCAST_DISTANCE;
+        distance = Math.max(1.0, Math.min(distance, Float.MAX_VALUE));
+        return (float) distance;
     }
 
     private Vector3d resolveTargetPosition(Ref<EntityStore> playerRef,
@@ -554,7 +597,8 @@ public final class CommandItemFeatureHandler {
         if (slot == null || slot.isBlank()) {
             slot = MASTER_TARGET_SLOT;
         }
-        Ref<EntityStore> target = switch (targetStep.getSource() != null ? targetStep.getSource() : TargetSource.CrosshairTarget) {
+        TargetSource source = targetStep.getSource() != null ? targetStep.getSource() : TargetSource.CrosshairTarget;
+        Ref<EntityStore> target = switch (source) {
             case OwnerPlayer -> context.playerRef;
             case StoredTarget -> readMarkedEntity(role, slot);
             case LastAttackTarget, CrosshairTarget -> context.commandTarget;
@@ -562,8 +606,41 @@ public final class CommandItemFeatureHandler {
         if (target == null || !target.isValid()) {
             return false;
         }
+        if ((source == TargetSource.CrosshairTarget || source == TargetSource.LastAttackTarget)
+                && !isHostileTargetAllowed(target, context, candidate)) {
+            return false;
+        }
         role.getMarkedEntitySupport().setMarkedEntity(slot, target);
         return true;
+    }
+
+    private boolean isHostileTargetAllowed(Ref<EntityStore> target, Context context, Candidate candidate) {
+        if (target == null || !target.isValid()) {
+            return false;
+        }
+        if (target.equals(context.playerRef) || target.equals(candidate.ref)) {
+            return false;
+        }
+        UUID commanderId = context.player != null ? context.player.getUuid() : null;
+        TameworkOwnerComponent targetOwner = context.store.getComponent(target, TameworkOwnerComponent.getComponentType());
+        if (commanderId != null
+                && targetOwner != null
+                && targetOwner.getOwnerId() != null
+                && commanderId.equals(targetOwner.getOwnerId())) {
+            return false;
+        }
+        Player targetPlayer = context.store.getComponent(target, Player.getComponentType());
+        if (targetPlayer != null && !isPlayerTargetAllowed(context.player.getWorld())) {
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isPlayerTargetAllowed(World world) {
+        if (world == null || world.getWorldConfig() == null) {
+            return true;
+        }
+        return world.getWorldConfig().isPvpEnabled();
     }
 
     @SuppressWarnings("unchecked")
