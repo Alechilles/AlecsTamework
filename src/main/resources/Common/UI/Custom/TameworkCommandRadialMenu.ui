@@ -2,9 +2,9 @@ $C = "Common.ui";
 
 @WheelCommandButtonStyle = TextButtonStyle(
   Default: (
-    Background: #0c1522(0.32),
+    Background: #00000000,
     LabelStyle: (
-      FontSize: 17,
+      FontSize: 18,
       RenderBold: true,
       RenderUppercase: true,
       TextColor: #cfdae8,
@@ -15,9 +15,9 @@ $C = "Common.ui";
     )
   ),
   Hovered: (
-    Background: #2f4f74(0.82),
+    Background: #2a4460(0.58),
     LabelStyle: (
-      FontSize: 17,
+      FontSize: 18,
       RenderBold: true,
       RenderUppercase: true,
       TextColor: #ffffff,
@@ -28,9 +28,9 @@ $C = "Common.ui";
     )
   ),
   Pressed: (
-    Background: #436a91(0.88),
+    Background: #3d5f82(0.72),
     LabelStyle: (
-      FontSize: 17,
+      FontSize: 18,
       RenderBold: true,
       RenderUppercase: true,
       TextColor: #ffffff,
@@ -41,9 +41,9 @@ $C = "Common.ui";
     )
   ),
   Disabled: (
-    Background: #0c1522(0.18),
+    Background: #00000000,
     LabelStyle: (
-      FontSize: 17,
+      FontSize: 18,
       RenderBold: true,
       RenderUppercase: true,
       TextColor: #738296,
@@ -59,11 +59,11 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkCommandMenuWheel {
-    Anchor: (Width: 980, Height: 820);
+    Anchor: (Width: 920, Height: 760);
     Visible: false;
 
     Label #TameworkCommandMenuTitle {
-      Anchor: (Top: 20, Width: 620, Height: 36, Left: 180);
+      Anchor: (Top: 20, Width: 620, Height: 36, Left: 150);
       Text: "";
       Style: (
         FontSize: 38,
@@ -75,7 +75,7 @@ $C.@PageOverlay {
     }
 
     Label #TameworkCommandMenuSubtitle {
-      Anchor: (Top: 64, Width: 620, Height: 24, Left: 180);
+      Anchor: (Top: 62, Width: 620, Height: 24, Left: 150);
       Text: "";
       Style: (
         FontSize: 16,
@@ -85,24 +85,18 @@ $C.@PageOverlay {
       );
     }
 
-    $C.@CircularProgressBar #CommandWheelOuterRing {
-      @Anchor = (Top: 120, Left: 180);
-      @Size = 620;
-      Value: 1.0;
-      Color: #4f79a5(0.56);
-      Background: #0b1320(0.2);
+    Group #CommandWheelOuterRing {
+      Anchor: (Top: 104, Left: 174, Width: 572, Height: 572);
+      Background: (TexturePath: "Tamework/CommandWheelRingOuter.png");
     }
 
-    $C.@CircularProgressBar #CommandWheelInnerRing {
-      @Anchor = (Top: 220, Left: 280);
-      @Size = 420;
-      Value: 1.0;
-      Color: #365d87(0.46);
-      Background: #0d1724(0.06);
+    Group #CommandWheelInnerRing {
+      Anchor: (Top: 174, Left: 244, Width: 432, Height: 432);
+      Background: (TexturePath: "Tamework/CommandWheelRingInner.png");
     }
 
     Label #TameworkCommandMenuCurrent {
-      Anchor: (Top: 374, Width: 300, Height: 112, Left: 340);
+      Anchor: (Top: 330, Width: 280, Height: 120, Left: 320);
       Text: "";
       Style: (
         FontSize: 24,
@@ -116,63 +110,63 @@ $C.@PageOverlay {
     }
 
     TextButton #CommandButton0 {
-      Anchor: (Top: 103, Left: 375, Width: 230, Height: 44);
+      Anchor: (Top: 118, Left: 355, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     TextButton #CommandButton1 {
-      Anchor: (Top: 192, Left: 591, Width: 230, Height: 44);
+      Anchor: (Top: 205, Left: 585, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     TextButton #CommandButton2 {
-      Anchor: (Top: 408, Left: 680, Width: 230, Height: 44);
+      Anchor: (Top: 370, Left: 640, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     TextButton #CommandButton3 {
-      Anchor: (Top: 624, Left: 591, Width: 230, Height: 44);
+      Anchor: (Top: 535, Left: 585, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     TextButton #CommandButton4 {
-      Anchor: (Top: 713, Left: 375, Width: 230, Height: 44);
+      Anchor: (Top: 622, Left: 355, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     TextButton #CommandButton5 {
-      Anchor: (Top: 624, Left: 159, Width: 230, Height: 44);
+      Anchor: (Top: 535, Left: 125, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     TextButton #CommandButton6 {
-      Anchor: (Top: 408, Left: 70, Width: 230, Height: 44);
+      Anchor: (Top: 370, Left: 70, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     TextButton #CommandButton7 {
-      Anchor: (Top: 192, Left: 159, Width: 230, Height: 44);
+      Anchor: (Top: 205, Left: 125, Width: 210, Height: 40);
       Style: @WheelCommandButtonStyle;
       Text: "";
       Visible: false;
     }
 
     $C.@SecondaryTextButton #CommandMenuCloseButton {
-      @Anchor = (Bottom: 22, Width: 180, Left: 400);
+      @Anchor = (Bottom: 10, Width: 180, Left: 370);
       Text: "Close";
     }
   }
