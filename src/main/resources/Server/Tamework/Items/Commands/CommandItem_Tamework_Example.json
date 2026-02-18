@@ -62,7 +62,7 @@
         },
         {
           "Type": "SetState",
-          "State": "Combat"
+          "State": "Defend"
         }
       ]
     }
