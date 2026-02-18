@@ -11,6 +11,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Command wheel command buttons now render as texture-based radial pie slices with hover/pressed states, while command labels render separately around the wheel for readability.
 - Command wheel art pack now includes a styled center panel texture and geometry-aligned anchors for slice hitboxes/labels, improving visual alignment of the radial UI.
 - Command wheel background ring layers are now disabled by default so the radial slices read more cleanly with less visual noise.
+- Command wheel slice textures now use a single-tone dark blue style, and the center status panel texture has been switched from rounded-square to circular.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
