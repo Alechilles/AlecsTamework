@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
@@ -42,6 +43,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHa
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
+import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
@@ -79,6 +81,7 @@ public class Tamework extends JavaPlugin {
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
+    private CommandNpcRelocationService commandNpcRelocationService;
     private boolean npcActionsRegistered;
     private boolean globalAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -155,6 +158,10 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
+        commandNpcRelocationService = new CommandNpcRelocationService();
+        getEntityStoreRegistry().registerSystem(
+                new CommandNpcRelocationOnLoadSystem(commandNpcRelocationService)
+        );
 
         // Damage event is needed for owner damage filtering; avoid double-registration.
         try {
@@ -189,7 +196,7 @@ public class Tamework extends JavaPlugin {
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
-        commandItemFeatureHandler = new CommandItemFeatureHandler(commandItemRegistry);
+        commandItemFeatureHandler = new CommandItemFeatureHandler(commandItemRegistry, commandNpcRelocationService);
 
         // Register /tw commands if the server supports it.
         if (getCommandRegistry() != null) {

@@ -14,10 +14,13 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Command wheel slice textures now use a single-tone dark blue style, and the center status panel texture has been switched from rounded-square to circular.
 - Command labels are now anchored inside each slice region and no longer prepend a selected-command bullet, reducing overflow on long labels like `Attack Target`.
 - Command wheel close button position is now offset lower to avoid overlapping the bottom radial slice.
+- Command links are now mirrored onto command-tool metadata (`UUID + last-known position`) so linked NPC sets can still be resolved for off-screen command handling.
+- Long-distance command relocation now uses a hybrid flow: far `ReturnHome` first paths a short visible segment before deferred teleport, and far `Recall` relocates near the player before normal follow behavior resumes.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
 - Added `Tamework.Instruction.Follow` interfaces to Tamework follow components and constrained Defend computed follow references to `Hytale.Instruction.Null` or `Tamework.Instruction.Follow` so computed references validate and load correctly.
+- Commands on linked NPCs no longer fail silently when the NPC is unloaded; relocation-style commands now queue and apply once the NPC/chunk streams back in.
 
 ## 2.0.3 - Example NPC Spawn Fix - 2026-02-18
 ### Fixed
