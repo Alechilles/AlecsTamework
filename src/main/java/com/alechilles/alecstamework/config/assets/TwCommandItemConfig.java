@@ -555,12 +555,11 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (commands == null || commands.length == 0) {
             return null;
         }
-        String expected = commandId.trim().toLowerCase(Locale.ROOT);
         for (CommandEntry entry : commands) {
             if (entry == null || entry.id == null) {
                 continue;
             }
-            if (entry.id.trim().toLowerCase(Locale.ROOT).equals(expected)) {
+            if (commandIdEquals(entry.id, commandId)) {
                 return entry;
             }
         }
@@ -584,6 +583,49 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             }
         }
         return null;
+    }
+
+    @Nullable
+    public CommandEntry findNextCommand(@Nullable String currentCommandId) {
+        CommandEntry[] commands = commandList;
+        if (commands == null || commands.length == 0) {
+            return null;
+        }
+        int firstValidIndex = -1;
+        int currentIndex = -1;
+        for (int i = 0; i < commands.length; i++) {
+            CommandEntry entry = commands[i];
+            if (entry == null || entry.id == null || entry.id.isBlank()) {
+                continue;
+            }
+            if (firstValidIndex < 0) {
+                firstValidIndex = i;
+            }
+            if (commandIdEquals(entry.id, currentCommandId)) {
+                currentIndex = i;
+            }
+        }
+        if (firstValidIndex < 0) {
+            return null;
+        }
+        if (currentIndex < 0) {
+            return commands[firstValidIndex];
+        }
+        for (int offset = 1; offset <= commands.length; offset++) {
+            int index = (currentIndex + offset) % commands.length;
+            CommandEntry entry = commands[index];
+            if (entry != null && entry.id != null && !entry.id.isBlank()) {
+                return entry;
+            }
+        }
+        return commands[currentIndex];
+    }
+
+    private boolean commandIdEquals(@Nullable String left, @Nullable String right) {
+        if (left == null || right == null || left.isBlank() || right.isBlank()) {
+            return false;
+        }
+        return left.trim().toLowerCase(Locale.ROOT).equals(right.trim().toLowerCase(Locale.ROOT));
     }
 
     /** Base role filter model for command targets. */

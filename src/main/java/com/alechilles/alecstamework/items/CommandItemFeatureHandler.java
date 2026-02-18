@@ -26,8 +26,10 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -100,6 +102,23 @@ public final class CommandItemFeatureHandler {
             }
         }
 
+        if (shouldCycleCommand(commandIdOverride, store, playerRef)) {
+            CommandSelectionResult selection = cycleSelectedCommand(config, working);
+            if (selection.changed) {
+                working = selection.stack;
+                updateHeldItem = true;
+            }
+            if (updateHeldItem) {
+                updateHeldItem(player, working);
+            }
+            if (selection.command == null) {
+                sendMessage(player, "No command is configured for this item.");
+                return false;
+            }
+            sendMessage(player, "Selected command: " + resolveCommandLabel(selection.command) + ".");
+            return true;
+        }
+
         int cooldownMs = Math.max(0, config.getCooldownSeconds()) * 1000;
         if (isCooldownActive(working, cooldownMs)) {
             if (updateHeldItem) {
@@ -162,11 +181,66 @@ public final class CommandItemFeatureHandler {
         if (updateHeldItem) {
             updateHeldItem(player, working);
         }
-        String label = command.getDisplayName() != null && !command.getDisplayName().isBlank()
-                ? command.getDisplayName()
-                : command.getId();
-        sendMessage(player, "Command " + label + " applied to " + affected + " NPC(s).");
+        sendMessage(player, "Command " + resolveCommandLabel(command) + " applied to " + affected + " NPC(s).");
         return true;
+    }
+
+    private boolean shouldCycleCommand(String commandIdOverride,
+                                       Store<EntityStore> store,
+                                       Ref<EntityStore> playerRef) {
+        if (commandIdOverride != null && !commandIdOverride.isBlank()) {
+            return false;
+        }
+        return isPlayerCrouching(store, playerRef);
+    }
+
+    private boolean isPlayerCrouching(Store<EntityStore> store, Ref<EntityStore> playerRef) {
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            return false;
+        }
+        MovementStatesComponent movement = store.getComponent(playerRef, MovementStatesComponent.getComponentType());
+        if (movement == null || movement.getMovementStates() == null) {
+            return false;
+        }
+        MovementStates states = movement.getMovementStates();
+        return states.crouching || states.forcedCrouching;
+    }
+
+    private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
+        if (config == null || stack == null) {
+            return CommandSelectionResult.none(stack);
+        }
+        String selectedId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
+        CommandEntry next = config.findNextCommand(selectedId);
+        if (next == null || next.getId() == null || next.getId().isBlank()) {
+            return CommandSelectionResult.none(stack);
+        }
+        boolean changed = !commandIdEquals(next.getId(), selectedId);
+        if (!changed) {
+            return new CommandSelectionResult(stack, next, false);
+        }
+        ItemStack updated = stack.withMetadata(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING, next.getId());
+        return new CommandSelectionResult(updated, next, true);
+    }
+
+    private boolean commandIdEquals(String left, String right) {
+        if (left == null || right == null || left.isBlank() || right.isBlank()) {
+            return false;
+        }
+        return left.trim().equalsIgnoreCase(right.trim());
+    }
+
+    private String resolveCommandLabel(CommandEntry command) {
+        if (command == null) {
+            return "Unknown";
+        }
+        if (command.getDisplayName() != null && !command.getDisplayName().isBlank()) {
+            return command.getDisplayName();
+        }
+        if (command.getId() != null && !command.getId().isBlank()) {
+            return command.getId();
+        }
+        return "Unknown";
     }
 
     private TwCommandItemConfig resolveConfig(String itemId, String configIdOverride) {
@@ -704,6 +778,22 @@ public final class CommandItemFeatureHandler {
         private StepResult(boolean applied, boolean abortAll) {
             this.applied = applied;
             this.abortAll = abortAll;
+        }
+    }
+
+    private static final class CommandSelectionResult {
+        private final ItemStack stack;
+        private final CommandEntry command;
+        private final boolean changed;
+
+        private CommandSelectionResult(ItemStack stack, CommandEntry command, boolean changed) {
+            this.stack = stack;
+            this.command = command;
+            this.changed = changed;
+        }
+
+        private static CommandSelectionResult none(ItemStack stack) {
+            return new CommandSelectionResult(stack, null, false);
         }
     }
 

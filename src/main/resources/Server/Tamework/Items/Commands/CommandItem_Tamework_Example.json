@@ -39,10 +39,16 @@
     {
       "Id": "Hold",
       "DisplayName": "Hold",
-      "ModeMapping": {
-        "State": "Hold",
-        "Message": "Hold"
-      }
+      "Steps": [
+        {
+          "Type": "ClearTarget",
+          "TargetSlot": "LockedTarget"
+        },
+        {
+          "Type": "SetState",
+          "State": "Hold"
+        }
+      ]
     },
     {
       "Id": "AttackTarget",
