@@ -51,7 +51,7 @@ public final class TameworkCommandSelectionPage
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
         commandBuilder.append(UI_PATH);
-        commandBuilder.set("#TameworkCommandMenuRoot.Visible", true);
+        commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
         commandBuilder.set("#TameworkCommandMenuTitle.Text", "Select Command");
         commandBuilder.set("#TameworkCommandMenuSubtitle.Text", "Click a command to set it.");
         commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
