@@ -51,6 +51,20 @@
       ]
     },
     {
+      "Id": "Recall",
+      "DisplayName": "Recall",
+      "Steps": [
+        {
+          "Type": "ClearCombat",
+          "State": "Idle",
+          "TargetSlots": [
+            "LockedTarget"
+          ],
+          "AssignOwnerAsMasterTarget": true
+        }
+      ]
+    },
+    {
       "Id": "AttackTarget",
       "DisplayName": "Attack Target",
       "Steps": [

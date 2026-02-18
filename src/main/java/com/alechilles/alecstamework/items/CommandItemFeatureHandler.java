@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearCombatStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearTargetStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandStep;
@@ -138,7 +140,20 @@ public final class CommandItemFeatureHandler {
 
         Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, command, targetRef);
         Vector3d targetPosition = resolveTargetPosition(playerRef, store, config, command);
-        Context context = new Context(player, playerRef, store, config, command, working.getItemId(), tool.toolId, commandTarget, targetPosition);
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        Context context = new Context(
+                player,
+                playerRef,
+                store,
+                config,
+                command,
+                working.getItemId(),
+                tool.toolId,
+                commandTarget,
+                targetPosition,
+                globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
+                globalConfig != null && globalConfig.isInvulnerableIfOwned()
+        );
 
         List<Candidate> recipients = queryRecipients(context);
         if (recipients.isEmpty()) {
@@ -551,6 +566,9 @@ public final class CommandItemFeatureHandler {
             role.getMarkedEntitySupport().setMarkedEntity(slot, null);
             return true;
         }
+        if (step instanceof ClearCombatStep clearCombatStep) {
+            return applyClearCombat(clearCombatStep, context, candidate);
+        }
         if (step instanceof MoveToPositionStep moveStep) {
             return applyMove(moveStep, context, candidate);
         }
@@ -618,22 +636,25 @@ public final class CommandItemFeatureHandler {
         if (target == null || !target.isValid()) {
             return false;
         }
-        if (target.equals(context.playerRef) || target.equals(candidate.ref)) {
-            return false;
-        }
         UUID commanderId = context.player != null ? context.player.getUuid() : null;
         TameworkOwnerComponent targetOwner = context.store.getComponent(target, TameworkOwnerComponent.getComponentType());
-        if (commanderId != null
-                && targetOwner != null
-                && targetOwner.getOwnerId() != null
-                && commanderId.equals(targetOwner.getOwnerId())) {
-            return false;
-        }
+        UUID targetOwnerId = targetOwner != null ? targetOwner.getOwnerId() : null;
+        boolean targetOwnedByCommander = commanderId != null && targetOwnerId != null && commanderId.equals(targetOwnerId);
         Player targetPlayer = context.store.getComponent(target, Player.getComponentType());
-        if (targetPlayer != null && !isPlayerTargetAllowed(context.player.getWorld())) {
-            return false;
-        }
-        return true;
+        boolean targetIsPlayer = targetPlayer != null;
+        boolean playerTargetingAllowed = !targetIsPlayer || isPlayerTargetAllowed(context.player.getWorld());
+        boolean targetPlayerSpawnProtected = targetIsPlayer && targetPlayer.hasSpawnProtection();
+        return CommandTargetPermission.isAllowed(
+                target.equals(context.playerRef),
+                target.equals(candidate.ref),
+                targetOwnedByCommander,
+                targetIsPlayer,
+                playerTargetingAllowed,
+                targetPlayerSpawnProtected,
+                targetOwnerId != null,
+                context.blockAllPlayerDamageIfOwned,
+                context.invulnerableIfOwned
+        );
     }
 
     private boolean isPlayerTargetAllowed(World world) {
@@ -672,6 +693,39 @@ public final class CommandItemFeatureHandler {
             candidate.npc.getRole().getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
         }
         return applyHook("Tamework.Command.MoveToPosition." + source.name(), context, candidate.ref);
+    }
+
+    private boolean applyClearCombat(ClearCombatStep step, Context context, Candidate candidate) {
+        if (step == null || candidate == null || candidate.npc == null) {
+            return false;
+        }
+        boolean applied = false;
+        Role role = candidate.npc.getRole();
+        if (role != null && role.getMarkedEntitySupport() != null) {
+            String[] slots = step.getTargetSlots();
+            if (slots == null || slots.length == 0) {
+                slots = new String[] { "LockedTarget" };
+            }
+            for (String slot : slots) {
+                if (slot == null || slot.isBlank()) {
+                    continue;
+                }
+                role.getMarkedEntitySupport().setMarkedEntity(slot, null);
+                applied = true;
+            }
+            if (step.isAssignOwnerAsMasterTarget()
+                    && context.playerRef != null
+                    && context.playerRef.isValid()) {
+                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
+                applied = true;
+            }
+        }
+        String state = step.getState();
+        if (state == null || state.isBlank()) {
+            return applied;
+        }
+        boolean stateApplied = applyState(candidate.ref, candidate.npc, context.store, state, step.getSubState());
+        return applied || stateApplied;
     }
 
     private boolean applyHook(String hookId, Context context, Ref<EntityStore> npcRef) {
@@ -799,6 +853,8 @@ public final class CommandItemFeatureHandler {
         private final String toolId;
         private final Ref<EntityStore> commandTarget;
         private final Vector3d targetPosition;
+        private final boolean blockAllPlayerDamageIfOwned;
+        private final boolean invulnerableIfOwned;
 
         private Context(Player player,
                         Ref<EntityStore> playerRef,
@@ -808,7 +864,9 @@ public final class CommandItemFeatureHandler {
                         String itemId,
                         String toolId,
                         Ref<EntityStore> commandTarget,
-                        Vector3d targetPosition) {
+                        Vector3d targetPosition,
+                        boolean blockAllPlayerDamageIfOwned,
+                        boolean invulnerableIfOwned) {
             this.player = player;
             this.playerRef = playerRef;
             this.store = store;
@@ -818,6 +876,8 @@ public final class CommandItemFeatureHandler {
             this.toolId = toolId;
             this.commandTarget = commandTarget;
             this.targetPosition = targetPosition;
+            this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
+            this.invulnerableIfOwned = invulnerableIfOwned;
         }
     }
 

@@ -273,6 +273,35 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .build();
 
+    private static final BuilderCodec<ClearCombatStep> CLEAR_COMBAT_STEP_CODEC = BuilderCodec.builder(
+            ClearCombatStep.class, ClearCombatStep::new, COMMAND_STEP_BASE_CODEC
+        )
+        .<String>append(
+            new KeyedCodec<>("State", Codec.STRING),
+            (step, value) -> step.state = value,
+            step -> step.state
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("SubState", Codec.STRING),
+            (step, value) -> step.subState = value,
+            step -> step.subState
+        )
+        .add()
+        .<String[]>append(
+            new KeyedCodec<>("TargetSlots", Codec.STRING_ARRAY),
+            (step, value) -> step.targetSlots = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
+            step -> step.targetSlots
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("AssignOwnerAsMasterTarget", Codec.BOOLEAN),
+            (step, value) -> step.assignOwnerAsMasterTarget = value == null || value,
+            step -> step.assignOwnerAsMasterTarget
+        )
+        .add()
+        .build();
+
     private static final BuilderCodec<MoveToPositionStep> MOVE_TO_POSITION_STEP_CODEC = BuilderCodec.builder(
             MoveToPositionStep.class, MoveToPositionStep::new, COMMAND_STEP_BASE_CODEC
         )
@@ -308,6 +337,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         COMMAND_STEP_CODEC.register("SetState", SetStateStep.class, SET_STATE_STEP_CODEC);
         COMMAND_STEP_CODEC.register("SetTarget", SetTargetStep.class, SET_TARGET_STEP_CODEC);
         COMMAND_STEP_CODEC.register("ClearTarget", ClearTargetStep.class, CLEAR_TARGET_STEP_CODEC);
+        COMMAND_STEP_CODEC.register("ClearCombat", ClearCombatStep.class, CLEAR_COMBAT_STEP_CODEC);
         COMMAND_STEP_CODEC.register("MoveToPosition", MoveToPositionStep.class, MOVE_TO_POSITION_STEP_CODEC);
         COMMAND_STEP_CODEC.register("TriggerHook", TriggerHookStep.class, TRIGGER_HOOK_STEP_CODEC);
     }
@@ -774,6 +804,29 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getTargetSlot() {
             return targetSlot;
+        }
+    }
+
+    public static final class ClearCombatStep extends CommandStep {
+        private String state = "Idle";
+        private String subState;
+        private String[] targetSlots = new String[] { "LockedTarget" };
+        private boolean assignOwnerAsMasterTarget = true;
+
+        public String getState() {
+            return state;
+        }
+
+        public String getSubState() {
+            return subState;
+        }
+
+        public String[] getTargetSlots() {
+            return targetSlots;
+        }
+
+        public boolean isAssignOwnerAsMasterTarget() {
+            return assignOwnerAsMasterTarget;
         }
     }
 
