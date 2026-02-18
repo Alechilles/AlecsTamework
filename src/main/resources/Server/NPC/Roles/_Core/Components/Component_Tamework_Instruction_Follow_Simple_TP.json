@@ -2,6 +2,7 @@
   "$Comment": "Barebones player following functionality with teleporting when out of range",
   "Type": "Component",
   "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Follow",
   "DefaultState": ".Default",
   "Parameters": {
     "MasterTargetSlot": {

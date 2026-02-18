@@ -342,7 +342,11 @@
           {
             "Reference": {
               "Compute": "DefendFollowMacroElement"
-            }
+            },
+            "Interfaces": [
+              "Hytale.Instruction.Null",
+              "Tamework.Instruction.Follow"
+            ]
           }
         ]
       },

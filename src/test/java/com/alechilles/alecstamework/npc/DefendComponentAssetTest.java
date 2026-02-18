@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,7 +42,24 @@ class DefendComponentAssetTest {
         assertNotNull(instructions, "Defend content instructions must exist");
         JsonObject followReferenceNode = findFollowMacroReferenceNode(instructions);
         assertNotNull(followReferenceNode, "Defend follow macro reference node must exist");
-        assertFalse(followReferenceNode.has("Interfaces"), "Defend follow macro reference must not declare Interfaces");
+        assertTrue(followReferenceNode.has("Interfaces"), "Defend follow macro reference must declare Interfaces");
+        JsonArray interfaces = followReferenceNode.getAsJsonArray("Interfaces");
+        assertEquals(2, interfaces.size(), "Defend follow macro interfaces must include exactly two entries");
+        assertEquals("Hytale.Instruction.Null", interfaces.get(0).getAsString());
+        assertEquals("Tamework.Instruction.Follow", interfaces.get(1).getAsString());
+    }
+
+    @Test
+    void tameworkFollowComponentsDeclareFollowInterface() {
+        assertComponentInterface(
+            "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Follow_Simple_TP.json",
+            "Tamework.Instruction.Follow");
+        assertComponentInterface(
+            "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Follow_Simple.json",
+            "Tamework.Instruction.Follow");
+        assertComponentInterface(
+            "Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Follow_Advanced.json",
+            "Tamework.Instruction.Follow");
     }
 
     @Test
@@ -111,5 +129,12 @@ class DefendComponentAssetTest {
         }
 
         return null;
+    }
+
+    private void assertComponentInterface(String path, String expectedInterface) {
+        String component = readResource(path);
+        JsonObject root = JsonParser.parseString(component).getAsJsonObject();
+        assertTrue(root.has("Interface"), "Component must declare Interface: " + path);
+        assertEquals(expectedInterface, root.get("Interface").getAsString(), "Unexpected interface in: " + path);
     }
 }

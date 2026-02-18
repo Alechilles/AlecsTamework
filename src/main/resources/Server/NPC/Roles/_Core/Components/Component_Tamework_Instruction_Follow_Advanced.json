@@ -2,6 +2,7 @@
   "$Comment": "Complex player following functionality",
   "Type": "Component",
   "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Follow",
   "DefaultState": ".Default",
   "Parameters": {
     "MasterTargetSlot": {
