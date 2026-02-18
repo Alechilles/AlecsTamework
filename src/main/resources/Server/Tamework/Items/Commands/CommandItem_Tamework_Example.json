@@ -1,0 +1,64 @@
+{
+  "Enabled": true,
+  "ItemIds": [
+    "Tamework_Command_Whistle_Example"
+  ],
+  "Radius": -1,
+  "MembershipMode": "LinkedOnly",
+  "LinkEnabled": true,
+  "LinkUseTogglesMembership": true,
+  "RequireTamed": true,
+  "RequireOwner": true,
+  "MaxTargets": 25,
+  "CooldownSeconds": 2,
+  "RequireLineOfSight": false,
+  "AllowedRoles": {
+    "Mode": "AllowAll"
+  },
+  "CommandList": [
+    {
+      "Id": "Follow",
+      "DisplayName": "Follow",
+      "Default": true,
+      "Steps": [
+        {
+          "Type": "ClearTarget",
+          "TargetSlot": "LockedTarget"
+        },
+        {
+          "Type": "SetState",
+          "State": "Follow"
+        },
+        {
+          "Type": "SetTarget",
+          "TargetSlot": "MasterTarget",
+          "Source": "OwnerPlayer"
+        }
+      ]
+    },
+    {
+      "Id": "Hold",
+      "DisplayName": "Hold",
+      "ModeMapping": {
+        "State": "Hold",
+        "Message": "Hold"
+      }
+    },
+    {
+      "Id": "AttackTarget",
+      "DisplayName": "Attack Target",
+      "Steps": [
+        {
+          "Type": "SetState",
+          "State": "Combat"
+        },
+        {
+          "Type": "SetTarget",
+          "TargetSlot": "LockedTarget",
+          "Source": "CrosshairTarget",
+          "FailurePolicy": "AbortCommandForNpc"
+        }
+      ]
+    }
+  ]
+}
