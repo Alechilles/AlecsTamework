@@ -7,10 +7,18 @@
   "Quality": "Common",
   "PlayerAnimationsId": "Item",
   "Interactions": {
-    "Secondary": {
+    "Primary": {
       "Interactions": [
         {
           "Type": "TameworkCommand"
+        }
+      ]
+    },
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommand",
+          "CommandId": "CycleSelection"
         }
       ]
     }

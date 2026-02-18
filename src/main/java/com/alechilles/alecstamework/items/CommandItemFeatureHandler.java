@@ -26,10 +26,8 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.protocol.MovementStates;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -53,6 +51,7 @@ import java.util.UUID;
 public final class CommandItemFeatureHandler {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final double DEFAULT_RAYCAST_DISTANCE = 64.0;
+    private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
 
     private final CommandItemRegistry registry;
 
@@ -91,18 +90,7 @@ public final class CommandItemFeatureHandler {
             return false;
         }
 
-        if (targetRef != null && config.isLinkEnabled() && config.isLinkUseTogglesMembership()) {
-            LinkToggleResult link = tryToggleLink(player, store, targetRef, tool.toolId, config);
-            if (link.toggled) {
-                if (updateHeldItem) {
-                    updateHeldItem(player, working);
-                }
-                sendMessage(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
-                return true;
-            }
-        }
-
-        if (shouldCycleCommand(commandIdOverride, store, playerRef)) {
+        if (isCycleSelectionCommand(commandIdOverride)) {
             CommandSelectionResult selection = cycleSelectedCommand(config, working);
             if (selection.changed) {
                 working = selection.stack;
@@ -117,6 +105,17 @@ public final class CommandItemFeatureHandler {
             }
             sendMessage(player, "Selected command: " + resolveCommandLabel(selection.command) + ".");
             return true;
+        }
+
+        if (targetRef != null && config.isLinkEnabled() && config.isLinkUseTogglesMembership()) {
+            LinkToggleResult link = tryToggleLink(player, store, targetRef, tool.toolId, config);
+            if (link.toggled) {
+                if (updateHeldItem) {
+                    updateHeldItem(player, working);
+                }
+                sendMessage(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
+                return true;
+            }
         }
 
         int cooldownMs = Math.max(0, config.getCooldownSeconds()) * 1000;
@@ -185,25 +184,11 @@ public final class CommandItemFeatureHandler {
         return true;
     }
 
-    private boolean shouldCycleCommand(String commandIdOverride,
-                                       Store<EntityStore> store,
-                                       Ref<EntityStore> playerRef) {
-        if (commandIdOverride != null && !commandIdOverride.isBlank()) {
+    private boolean isCycleSelectionCommand(String commandIdOverride) {
+        if (commandIdOverride == null || commandIdOverride.isBlank()) {
             return false;
         }
-        return isPlayerCrouching(store, playerRef);
-    }
-
-    private boolean isPlayerCrouching(Store<EntityStore> store, Ref<EntityStore> playerRef) {
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            return false;
-        }
-        MovementStatesComponent movement = store.getComponent(playerRef, MovementStatesComponent.getComponentType());
-        if (movement == null || movement.getMovementStates() == null) {
-            return false;
-        }
-        MovementStates states = movement.getMovementStates();
-        return states.crouching || states.forcedCrouching;
+        return CYCLE_SELECTION_COMMAND_ID.equalsIgnoreCase(commandIdOverride.trim());
     }
 
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
