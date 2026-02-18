@@ -298,6 +298,18 @@
   ],
   "Instructions": [
     {
+      "$Comment": "Bridge command-item move hooks into NPC movement.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "Any"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Command_Move"
+        }
+      ]
+    },
+    {
       "$Comment": "Validation-only state setters (disabled).",
       "Enabled": false,
       "Actions": [

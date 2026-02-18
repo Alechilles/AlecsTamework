@@ -671,6 +671,18 @@
   ],
   "Instructions": [
     {
+      "$Comment": "Bridge command-item move hooks into NPC movement.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "Any"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Command_Move"
+        }
+      ]
+    },
+    {
       "$Comment": "Default follow/idle behavior using Tamework component.",
       "Sensor": {
         "Type": "State",

@@ -1,0 +1,200 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.CommandMove",
+  "Parameters": {
+    "CommandMoveTargetSlot": {
+      "Value": "TameworkCommandMoveTarget",
+      "Description": "Stored position slot used as the active command-move destination."
+    },
+    "CommandMoveState": {
+      "Value": "CommandMove",
+      "Description": "State entered when a move command is received."
+    },
+    "CommandMoveCompletionState": {
+      "Value": "Hold",
+      "Description": "State entered when the move destination is reached or missing."
+    },
+    "CommandMoveHookIdRaycast": {
+      "Value": "Tamework.Command.MoveToPosition.RaycastHit",
+      "Description": "Hook id consumed for move-to-ping commands."
+    },
+    "CommandMoveHookIdStoredHome": {
+      "Value": "Tamework.Command.MoveToPosition.StoredHome",
+      "Description": "Hook id consumed for return-home commands."
+    },
+    "CommandMoveSeekSlowDownDistance": {
+      "Value": 4,
+      "Description": "Distance from destination where movement starts to slow."
+    },
+    "CommandMoveSeekStopDistance": {
+      "Value": 1.3,
+      "Description": "Distance from destination considered reached."
+    },
+    "CommandMoveSeekRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative seek speed while executing move commands."
+    }
+  },
+  "Content": {
+    "$Comment": "Global bridge that converts command-item move hooks into movement behavior.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Move-to-ping hook: store destination and switch to command move state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "TameworkHook",
+          "HookId": {
+            "Compute": "CommandMoveHookIdRaycast"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "CommandMoveTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": {
+              "Compute": "CommandMoveState"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Return-home hook: store destination and switch to command move state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "TameworkHook",
+          "HookId": {
+            "Compute": "CommandMoveHookIdStoredHome"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "CommandMoveTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": {
+              "Compute": "CommandMoveState"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "While in move state, seek the stored destination.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": {
+                "Compute": "CommandMoveState"
+              }
+            },
+            {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "CommandMoveTargetSlot"
+              }
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "Seek",
+          "SlowDownDistance": {
+            "Compute": "CommandMoveSeekSlowDownDistance"
+          },
+          "StopDistance": {
+            "Compute": "CommandMoveSeekStopDistance"
+          },
+          "RelativeSpeed": {
+            "Compute": "CommandMoveSeekRelativeSpeed"
+          }
+        }
+      },
+      {
+        "$Comment": "When close enough, leave move state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": {
+                "Compute": "CommandMoveState"
+              }
+            },
+            {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "CommandMoveTargetSlot"
+              },
+              "Range": {
+                "Compute": "CommandMoveSeekStopDistance + 0.2"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": {
+              "Compute": "CommandMoveCompletionState"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "If move state has no destination, recover immediately.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": {
+                "Compute": "CommandMoveState"
+              }
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "ReadPosition",
+                "Slot": {
+                  "Compute": "CommandMoveTargetSlot"
+                }
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": {
+              "Compute": "CommandMoveCompletionState"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
