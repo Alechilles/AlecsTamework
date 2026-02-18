@@ -288,7 +288,7 @@
         ]
       },
       {
-        "$Comment": "While in Defend.Default with no combat target, clear stale combat target data and run the configured follow behavior.",
+        "$Comment": "While in Defend.Default with no combat target, clear stale combat target data.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
@@ -314,7 +314,30 @@
             "Type": "ReleaseTarget",
             "TargetSlot": "LockedTarget"
           }
-        ],
+        ]
+      },
+      {
+        "$Comment": "While in Defend.Default with no combat target, run the configured follow behavior.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": "LockedTarget",
+                "Range": {
+                  "Compute": "AlertedRange"
+                }
+              }
+            }
+          ]
+        },
         "Instructions": [
           {
             "Reference": {

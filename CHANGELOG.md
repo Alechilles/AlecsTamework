@@ -6,6 +6,9 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 ### Changed
 - `Component_Tamework_Instruction_Defend` now delegates non-combat follow behavior through configurable `DefendFollowMacroElement` (defaults to `Component_Tamework_Instruction_Follow_Simple_TP`), so modders can swap in custom follow components without editing Tamework core assets.
 
+### Fixed
+- Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
+
 ## 2.0.3 - Example NPC Spawn Fix - 2026-02-18
 ### Fixed
 - Updated Tamework example NPC/template `AttitudeGroup` defaults from `Livestock` to `PreyBig` so `Mob_Tamework_Example` and related examples spawn correctly on current Hytale builds.

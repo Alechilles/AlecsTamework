@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.npc;
 
+import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.charset.StandardCharsets;
@@ -34,6 +37,17 @@ class DefendComponentAssetTest {
     }
 
     @Test
+    void defendInstructionNodesDoNotMixActionsAndInstructions() {
+        String defend = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Defend.json");
+        JsonObject root = JsonParser.parseString(defend).getAsJsonObject();
+        JsonObject content = root.getAsJsonObject("Content");
+        assertNotNull(content, "Defend content must exist");
+        JsonArray instructions = content.getAsJsonArray("Instructions");
+        assertNotNull(instructions, "Defend content instructions must exist");
+        validateInstructionNodes(instructions, "Content.Instructions");
+    }
+
+    @Test
     void hostileToMasterTargetSensorUsesCustomAttitudeFilter() {
         String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget.json");
         assertTrue(sensor.contains("\"Type\": \"TameworkAttitudeFromTargetSlot\""));
@@ -51,6 +65,21 @@ class DefendComponentAssetTest {
             return content;
         } catch (Exception e) {
             throw new RuntimeException("Failed reading resource: " + path, e);
+        }
+    }
+
+    private void validateInstructionNodes(JsonArray instructions, String path) {
+        for (int i = 0; i < instructions.size(); i++) {
+            JsonObject node = instructions.get(i).getAsJsonObject();
+            boolean hasActions = node.has("Actions");
+            boolean hasInstructions = node.has("Instructions");
+            assertFalse(
+                hasActions && hasInstructions,
+                "Instruction node has both Actions and Instructions at " + path + "[" + i + "]");
+
+            if (hasInstructions) {
+                validateInstructionNodes(node.getAsJsonArray("Instructions"), path + "[" + i + "].Instructions");
+            }
         }
     }
 }
