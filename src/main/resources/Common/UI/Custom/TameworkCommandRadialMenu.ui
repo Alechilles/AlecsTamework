@@ -112,11 +112,13 @@ $C.@PageOverlay {
     Group #CommandWheelOuterRing {
       Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
       Background: (TexturePath: "Tamework/CommandWheelRingOuter.png");
+      Visible: false;
     }
 
     Group #CommandWheelInnerRing {
       Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
       Background: (TexturePath: "Tamework/CommandWheelRingInner.png");
+      Visible: false;
     }
 
     Group #CommandWheelCenterPanel {
