@@ -756,7 +756,13 @@
       },
       "Instructions": [
         {
-          "Reference": "Component_Tamework_Instruction_Command_Move"
+          "Reference": "Component_Tamework_Instruction_Command_Move",
+          "Modify": {
+            "_ExportStates": [
+              "CommandMove",
+              "Hold"
+            ]
+          }
         }
       ]
     },
@@ -771,6 +777,10 @@
         {
           "Type": "State",
           "State": "Hold"
+        },
+        {
+          "Type": "State",
+          "State": "CommandMove"
         },
         {
           "Type": "State",

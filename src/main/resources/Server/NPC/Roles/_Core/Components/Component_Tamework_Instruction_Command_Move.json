@@ -2,7 +2,12 @@
   "Type": "Component",
   "Class": "Instruction",
   "Interface": "Tamework.Instruction.CommandMove",
+  "DefaultState": ".Listen",
   "Parameters": {
+    "_ImportStates": [
+      "OnMoveActive",
+      "OnMoveComplete"
+    ],
     "CommandMoveTargetSlot": {
       "Value": "TameworkCommandMoveTarget",
       "Description": "Stored position slot used as the active command-move destination."
@@ -26,6 +31,10 @@
     "CommandMoveSeekRelativeSpeed": {
       "Value": 1,
       "Description": "Relative seek speed while executing move commands."
+    },
+    "CommandMoveReadRange": {
+      "Value": 256,
+      "Description": "Range used to read stored command destinations."
     }
   },
   "Content": {
@@ -57,7 +66,11 @@
           },
           {
             "Type": "State",
-            "State": "CommandMove"
+            "State": ".Move"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnMoveActive"
           }
         ]
       },
@@ -83,15 +96,19 @@
           },
           {
             "Type": "State",
-            "State": "CommandMove"
+            "State": ".Move"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnMoveActive"
           }
         ]
       },
       {
-        "$Comment": "CommandMove runtime behavior.",
+        "$Comment": "Command move runtime behavior while local move state is active.",
         "Sensor": {
           "Type": "State",
-          "State": "CommandMove"
+          "State": ".Move"
         },
         "Instructions": [
           {
@@ -109,7 +126,11 @@
             "Actions": [
               {
                 "Type": "State",
-                "State": "Hold"
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnMoveComplete"
               }
             ]
           },
@@ -122,13 +143,20 @@
                 "Type": "ReadPosition",
                 "Slot": {
                   "Compute": "CommandMoveTargetSlot"
+                },
+                "Range": {
+                  "Compute": "CommandMoveReadRange"
                 }
               }
             },
             "Actions": [
               {
                 "Type": "State",
-                "State": "Hold"
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnMoveComplete"
               }
             ]
           },
@@ -138,6 +166,12 @@
               "Type": "ReadPosition",
               "Slot": {
                 "Compute": "CommandMoveTargetSlot"
+              },
+              "Range": {
+                "Compute": "CommandMoveReadRange"
+              },
+              "MinRange": {
+                "Compute": "CommandMoveSeekStopDistance + 0.2"
               }
             },
             "BodyMotion": {
