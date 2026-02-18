@@ -27,7 +27,7 @@
         },
         {
           "Type": "SetState",
-          "State": "Follow"
+          "State": "Idle"
         },
         {
           "Type": "SetTarget",
