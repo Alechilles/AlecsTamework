@@ -66,9 +66,6 @@ public final class TameworkCommandSelectionPage
             }
             CommandOption option = options[i];
             String label = option.label;
-            if (commandIdEquals(option.id, selectedCommandId)) {
-                label = "• " + label;
-            }
             commandBuilder.set(selector + ".Visible", true);
             commandBuilder.set(selector + ".Text", "");
             commandBuilder.set(labelSelector + ".Visible", true);

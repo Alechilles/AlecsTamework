@@ -1,13 +1,15 @@
 $C = "Common.ui";
 
 @SliceLabelStyle = LabelStyle(
-  FontSize: 16,
+  FontSize: 15,
   RenderBold: true,
-  RenderUppercase: true,
   TextColor: #d6e0ec,
   HorizontalAlignment: Center,
   VerticalAlignment: Center,
-  OutlineColor: #000000(0.7)
+  OutlineColor: #000000(0.7),
+  Wrap: true,
+  ShrinkTextToFit: true,
+  MinShrinkTextToFitFontSize: 11
 );
 
 @SliceButtonLabelStyle = LabelStyle(
@@ -197,56 +199,56 @@ $C.@PageOverlay {
     }
 
     Label #CommandLabel0 {
-      Anchor: (Top: 151, Left: 340, Width: 240, Height: 34);
+      Anchor: (Top: 164, Left: 376, Width: 168, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel1 {
-      Anchor: (Top: 225, Left: 528, Width: 220, Height: 34);
+      Anchor: (Top: 233, Left: 541, Width: 170, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel2 {
-      Anchor: (Top: 403, Left: 602, Width: 220, Height: 34);
+      Anchor: (Top: 398, Left: 610, Width: 170, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel3 {
-      Anchor: (Top: 581, Left: 528, Width: 220, Height: 34);
+      Anchor: (Top: 563, Left: 541, Width: 170, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel4 {
-      Anchor: (Top: 655, Left: 340, Width: 240, Height: 34);
+      Anchor: (Top: 632, Left: 376, Width: 168, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel5 {
-      Anchor: (Top: 581, Left: 172, Width: 220, Height: 34);
+      Anchor: (Top: 563, Left: 211, Width: 170, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel6 {
-      Anchor: (Top: 403, Left: 98, Width: 220, Height: 34);
+      Anchor: (Top: 398, Left: 142, Width: 170, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel7 {
-      Anchor: (Top: 225, Left: 172, Width: 220, Height: 34);
+      Anchor: (Top: 233, Left: 211, Width: 170, Height: 44);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
