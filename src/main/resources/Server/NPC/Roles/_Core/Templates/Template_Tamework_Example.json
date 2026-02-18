@@ -164,7 +164,7 @@
       "Description": "General wander radius."
     },
     "AttitudeGroup": {
-      "Value": "Livestock",
+      "Value": "Prey",
       "Description": "Attitude group for this NPC."
     },
     "DefaultPlayerAttitude": {

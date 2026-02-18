@@ -80,7 +80,7 @@
       "Description": "The maximum climb height, in blocks."
     },
     "AttitudeGroup": {
-      "Value": "Livestock",
+      "Value": "Prey",
       "Description": "The attitude group this NPC belongs to."
     },
     "PlayerDefaultAttitude": {
