@@ -58,8 +58,10 @@ public final class TameworkCommandSelectionPage
 
         for (int i = 0; i < MAX_COMMAND_BUTTONS; i++) {
             String selector = "#CommandButton" + i;
+            String labelSelector = "#CommandLabel" + i;
             if (i >= options.length) {
                 commandBuilder.set(selector + ".Visible", false);
+                commandBuilder.set(labelSelector + ".Visible", false);
                 continue;
             }
             CommandOption option = options[i];
@@ -68,7 +70,9 @@ public final class TameworkCommandSelectionPage
                 label = "• " + label;
             }
             commandBuilder.set(selector + ".Visible", true);
-            commandBuilder.set(selector + ".Text", label);
+            commandBuilder.set(selector + ".Text", "");
+            commandBuilder.set(labelSelector + ".Visible", true);
+            commandBuilder.set(labelSelector + ".Text", label);
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     selector,

@@ -8,6 +8,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Removed unused legacy parameters from `Component_Tamework_Instruction_Follow_Simple` so the asset only exposes fields that are actually consumed by the simple follow logic.
 - Command whistle secondary use now opens a clickable command selection wheel page (radial-style layout) for direct command selection.
 - Command selection wheel visuals now use dedicated UI ring textures instead of `CircularProgressBar`, eliminating arc artifacts and enabling cleaner circular styling.
+- Command wheel command buttons now render as texture-based radial pie slices with hover/pressed states, while command labels render separately around the wheel for readability.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
