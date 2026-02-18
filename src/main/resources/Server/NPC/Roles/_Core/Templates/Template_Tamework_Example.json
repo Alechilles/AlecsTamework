@@ -164,7 +164,7 @@
       "Description": "General wander radius."
     },
     "AttitudeGroup": {
-      "Value": "Prey",
+      "Value": "PreyBig",
       "Description": "Attitude group for this NPC."
     },
     "DefaultPlayerAttitude": {

@@ -56,7 +56,7 @@
     "DescentSteepness": 1.4,
     "DescentBlending": 1.8,
     "WanderRadius": 8,
-    "AttitudeGroup": "Prey",
+    "AttitudeGroup": "PreyBig",
     "DefaultPlayerAttitude": "Neutral",
     "ViewRange": 16,
     "ViewSector": 120,

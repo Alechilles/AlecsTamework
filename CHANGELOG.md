@@ -2,6 +2,10 @@
 
 All notable changes to **Alec's Tamework!** will be documented in this file.
 
+## 2.0.3 - Example NPC Spawn Fix - 2026-02-18
+### Fixed
+- Updated Tamework example NPC/template `AttitudeGroup` defaults from `Livestock` to `PreyBig` so `Mob_Tamework_Example` and related examples spawn correctly on current Hytale builds.
+
 ## 2.0.2 - Interaction Role Swaps and Naming Items - 2026-02-17
 ### Added
 - Tame interaction option to swap NPC roles after taming via `Role`/`RoleParam`.
