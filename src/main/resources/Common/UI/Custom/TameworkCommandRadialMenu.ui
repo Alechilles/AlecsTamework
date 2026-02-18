@@ -111,12 +111,12 @@ $C.@PageOverlay {
 
     Group #CommandWheelOuterRing {
       Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
-      Background: (TexturePath: "Tamework/CommandWheelRingOuter.png");
+      Background: (TexturePath: "Tamework/CommandWheelRingOuter.png", Color: #ffffff(0.78));
     }
 
     Group #CommandWheelInnerRing {
       Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
-      Background: (TexturePath: "Tamework/CommandWheelRingInner.png");
+      Background: (TexturePath: "Tamework/CommandWheelRingInner.png", Color: #ffffff(0.72));
     }
 
     Group {
@@ -195,56 +195,56 @@ $C.@PageOverlay {
     }
 
     Label #CommandLabel0 {
-      Anchor: (Top: 128, Left: 330, Width: 260, Height: 34);
+      Anchor: (Top: 126, Left: 340, Width: 240, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel1 {
-      Anchor: (Top: 203, Left: 575, Width: 220, Height: 34);
+      Anchor: (Top: 230, Left: 494, Width: 220, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel2 {
-      Anchor: (Top: 364, Left: 676, Width: 220, Height: 34);
+      Anchor: (Top: 403, Left: 554, Width: 220, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel3 {
-      Anchor: (Top: 540, Left: 575, Width: 220, Height: 34);
+      Anchor: (Top: 576, Left: 494, Width: 220, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel4 {
-      Anchor: (Top: 608, Left: 330, Width: 260, Height: 34);
+      Anchor: (Top: 646, Left: 340, Width: 240, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel5 {
-      Anchor: (Top: 540, Left: 125, Width: 220, Height: 34);
+      Anchor: (Top: 576, Left: 206, Width: 220, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel6 {
-      Anchor: (Top: 364, Left: 24, Width: 220, Height: 34);
+      Anchor: (Top: 403, Left: 146, Width: 220, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
     }
 
     Label #CommandLabel7 {
-      Anchor: (Top: 203, Left: 125, Width: 220, Height: 34);
+      Anchor: (Top: 230, Left: 206, Width: 220, Height: 34);
       Text: "";
       Style: @SliceLabelStyle;
       Visible: false;
