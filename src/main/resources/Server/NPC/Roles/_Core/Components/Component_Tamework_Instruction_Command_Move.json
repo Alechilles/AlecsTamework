@@ -7,14 +7,6 @@
       "Value": "TameworkCommandMoveTarget",
       "Description": "Stored position slot used as the active command-move destination."
     },
-    "CommandMoveState": {
-      "Value": "CommandMove",
-      "Description": "State entered when a move command is received."
-    },
-    "CommandMoveCompletionState": {
-      "Value": "Hold",
-      "Description": "State entered when the move destination is reached or missing."
-    },
     "CommandMoveHookIdRaycast": {
       "Value": "Tamework.Command.MoveToPosition.RaycastHit",
       "Description": "Hook id consumed for move-to-ping commands."
@@ -65,9 +57,7 @@
           },
           {
             "Type": "State",
-            "State": {
-              "Compute": "CommandMoveState"
-            }
+            "State": "CommandMove"
           }
         ]
       },
@@ -93,58 +83,21 @@
           },
           {
             "Type": "State",
-            "State": {
-              "Compute": "CommandMoveState"
-            }
+            "State": "CommandMove"
           }
         ]
       },
       {
-        "$Comment": "While in move state, seek the stored destination.",
-        "Continue": true,
+        "$Comment": "CommandMove runtime behavior.",
         "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": {
-                "Compute": "CommandMoveState"
-              }
-            },
-            {
-              "Type": "ReadPosition",
-              "Slot": {
-                "Compute": "CommandMoveTargetSlot"
-              }
-            }
-          ]
+          "Type": "State",
+          "State": "CommandMove"
         },
-        "BodyMotion": {
-          "Type": "Seek",
-          "SlowDownDistance": {
-            "Compute": "CommandMoveSeekSlowDownDistance"
-          },
-          "StopDistance": {
-            "Compute": "CommandMoveSeekStopDistance"
-          },
-          "RelativeSpeed": {
-            "Compute": "CommandMoveSeekRelativeSpeed"
-          }
-        }
-      },
-      {
-        "$Comment": "When close enough, leave move state.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": {
-                "Compute": "CommandMoveState"
-              }
-            },
-            {
+        "Instructions": [
+          {
+            "$Comment": "When close enough, complete the move.",
+            "Continue": true,
+            "Sensor": {
               "Type": "ReadPosition",
               "Slot": {
                 "Compute": "CommandMoveTargetSlot"
@@ -152,30 +105,18 @@
               "Range": {
                 "Compute": "CommandMoveSeekStopDistance + 0.2"
               }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": {
-              "Compute": "CommandMoveCompletionState"
-            }
-          }
-        ]
-      },
-      {
-        "$Comment": "If move state has no destination, recover immediately.",
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": {
-                "Compute": "CommandMoveState"
-              }
             },
-            {
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Hold"
+              }
+            ]
+          },
+          {
+            "$Comment": "If no destination exists, recover immediately.",
+            "Continue": true,
+            "Sensor": {
               "Type": "Not",
               "Sensor": {
                 "Type": "ReadPosition",
@@ -183,14 +124,33 @@
                   "Compute": "CommandMoveTargetSlot"
                 }
               }
-            }
-          ]
-        },
-        "Actions": [
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": "Hold"
+              }
+            ]
+          },
           {
-            "Type": "State",
-            "State": {
-              "Compute": "CommandMoveCompletionState"
+            "$Comment": "Seek to the stored command destination.",
+            "Sensor": {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "CommandMoveTargetSlot"
+              }
+            },
+            "BodyMotion": {
+              "Type": "Seek",
+              "SlowDownDistance": {
+                "Compute": "CommandMoveSeekSlowDownDistance"
+              },
+              "StopDistance": {
+                "Compute": "CommandMoveSeekStopDistance"
+              },
+              "RelativeSpeed": {
+                "Compute": "CommandMoveSeekRelativeSpeed"
+              }
             }
           }
         ]
