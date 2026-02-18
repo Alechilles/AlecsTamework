@@ -17,6 +17,9 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURE_COOLDOWN_UNTIL = "Tamework.CaptureCooldownUntil";
     public static final String SPAWN_COOLDOWN_UNTIL = "Tamework.SpawnCooldownUntil";
     public static final String NAME_COOLDOWN_UNTIL = "Tamework.NameCooldownUntil";
+    public static final String COMMAND_TOOL_ID = "Tamework.Command.ToolId";
+    public static final String COMMAND_SELECTED_ID = "Tamework.Command.SelectedId";
+    public static final String COMMAND_COOLDOWN_UNTIL = "Tamework.Command.CooldownUntil";
 
     private TameworkMetadataKeys() {
     }
