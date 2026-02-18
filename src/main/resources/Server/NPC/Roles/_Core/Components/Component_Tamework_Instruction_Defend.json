@@ -342,11 +342,7 @@
           {
             "Reference": {
               "Compute": "DefendFollowMacroElement"
-            },
-            "Interfaces": [
-              "Hytale.Instruction.Null",
-              "Hytale.Instruction"
-            ]
+            }
           }
         ]
       },

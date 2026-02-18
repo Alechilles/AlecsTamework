@@ -34,6 +34,14 @@ class DefendComponentAssetTest {
         assertTrue(defend.contains("\"DefendFollowMacroElement\""));
         assertTrue(defend.contains("\"Value\": \"Component_Tamework_Instruction_Follow_Simple_TP\""));
         assertTrue(defend.contains("\"Compute\": \"DefendFollowMacroElement\""));
+        JsonObject root = JsonParser.parseString(defend).getAsJsonObject();
+        JsonObject content = root.getAsJsonObject("Content");
+        assertNotNull(content, "Defend content must exist");
+        JsonArray instructions = content.getAsJsonArray("Instructions");
+        assertNotNull(instructions, "Defend content instructions must exist");
+        JsonObject followReferenceNode = findFollowMacroReferenceNode(instructions);
+        assertNotNull(followReferenceNode, "Defend follow macro reference node must exist");
+        assertFalse(followReferenceNode.has("Interfaces"), "Defend follow macro reference must not declare Interfaces");
     }
 
     @Test
@@ -81,5 +89,27 @@ class DefendComponentAssetTest {
                 validateInstructionNodes(node.getAsJsonArray("Instructions"), path + "[" + i + "].Instructions");
             }
         }
+    }
+
+    private JsonObject findFollowMacroReferenceNode(JsonArray instructions) {
+        for (int i = 0; i < instructions.size(); i++) {
+            JsonObject node = instructions.get(i).getAsJsonObject();
+            if (node.has("Reference")) {
+                JsonObject reference = node.getAsJsonObject("Reference");
+                if (reference.has("Compute")
+                    && "DefendFollowMacroElement".equals(reference.get("Compute").getAsString())) {
+                    return node;
+                }
+            }
+
+            if (node.has("Instructions")) {
+                JsonObject nested = findFollowMacroReferenceNode(node.getAsJsonArray("Instructions"));
+                if (nested != null) {
+                    return nested;
+                }
+            }
+        }
+
+        return null;
     }
 }

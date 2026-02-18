@@ -8,6 +8,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
+- Removed interface slot constraints from Defend follow macro references so computed follow components (including defaults) load correctly.
 
 ## 2.0.3 - Example NPC Spawn Fix - 2026-02-18
 ### Fixed
