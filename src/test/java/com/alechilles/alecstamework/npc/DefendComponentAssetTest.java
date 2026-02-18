@@ -26,6 +26,14 @@ class DefendComponentAssetTest {
     }
 
     @Test
+    void defendInstructionUsesConfigurableFollowMacroElement() {
+        String defend = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Defend.json");
+        assertTrue(defend.contains("\"DefendFollowMacroElement\""));
+        assertTrue(defend.contains("\"Value\": \"Component_Tamework_Instruction_Follow_Simple_TP\""));
+        assertTrue(defend.contains("\"Compute\": \"DefendFollowMacroElement\""));
+    }
+
+    @Test
     void hostileToMasterTargetSensorUsesCustomAttitudeFilter() {
         String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget.json");
         assertTrue(sensor.contains("\"Type\": \"TameworkAttitudeFromTargetSlot\""));

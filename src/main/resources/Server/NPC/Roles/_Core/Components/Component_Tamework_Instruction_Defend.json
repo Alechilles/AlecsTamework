@@ -124,6 +124,10 @@
       "Value": 1,
       "Description": "Relative chasing speed when pursuing a target."
     },
+    "DefendFollowMacroElement": {
+      "Value": "Component_Tamework_Instruction_Follow_Simple_TP",
+      "Description": "Instruction component used for non-combat follow behavior while defending."
+    },
     "AdditionalCombatBehaviorMacroElement": {
       "Value": "Component_Instruction_Null",
       "Description": "An optional macro element for supplying more bespoke combat movement behavior. Weight for the behavior must be internally defined in the macro element."
@@ -284,11 +288,15 @@
         ]
       },
       {
-        "$Comment": "If there is no combat target, follow the player while defending (keep follow and combat targets separate).",
+        "$Comment": "While in Defend.Default with no combat target, clear stale combat target data and run the configured follow behavior.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
           "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
             {
               "Type": "Not",
               "Sensor": {
@@ -298,12 +306,6 @@
                   "Compute": "AlertedRange"
                 }
               }
-            },
-            {
-              "Type": "Player",
-              "Range": 30,
-              "LockOnTarget": true,
-              "LockedTargetSlot": "MasterTarget"
             }
           ]
         },
@@ -311,53 +313,17 @@
           {
             "Type": "ReleaseTarget",
             "TargetSlot": "LockedTarget"
-          },
-          {
-            "Type": "State",
-            "State": ".Default"
           }
         ],
-        "BodyMotion": {
-          "Type": "Seek",
-          "UsePathfinder": true,
-          "SlowDownDistance": 5,
-          "StopDistance": 3,
-          "RelativeSpeed": 1
-        }
-      },
-      {
-        "$Comment": "While in Defend.Default with no target, stay near the player.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "State",
-          "State": ".Default"
-        },
         "Instructions": [
           {
-            "Continue": true,
-            "Sensor": {
-              "Type": "Player",
-              "Range": 30,
-              "LockOnTarget": true,
-              "LockedTargetSlot": "MasterTarget"
+            "Reference": {
+              "Compute": "DefendFollowMacroElement"
             },
-            "BodyMotion": {
-              "Type": "Seek",
-              "UsePathfinder": true,
-              "SlowDownDistance": 5,
-              "StopDistance": 3,
-              "RelativeSpeed": 1
-            }
-          },
-          {
-            "Continue": true,
-            "Sensor": {
-              "Type": "Target",
-              "TargetSlot": "MasterTarget"
-            },
-            "BodyMotion": {
-              "Type": "Teleport"
-            }
+            "Interfaces": [
+              "Hytale.Instruction.Null",
+              "Hytale.Instruction"
+            ]
           }
         ]
       },
