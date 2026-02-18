@@ -173,15 +173,7 @@
               "TargetSlot": "LockedTarget",
               "Range": {
                 "Compute": "AlertedRange"
-              },
-              "Filters": [
-                {
-                  "Type": "Attitude",
-                  "Attitudes": [
-                    "Hostile"
-                  ]
-                }
-              ]
+              }
             }
           ]
         },
@@ -210,27 +202,56 @@
               }
             },
             {
-              "Reference": "Component_Sensor_Standard_Detection",
-              "Modify": {
-                "ViewRange": {
-                  "Compute": "AlertedRange"
+              "Type": "Or",
+              "Sensors": [
+                {
+                  "Reference": "Component_Sensor_Standard_Detection",
+                  "Modify": {
+                    "ViewRange": {
+                      "Compute": "AlertedRange"
+                    },
+                    "ViewSector": {
+                      "Compute": "ViewSector"
+                    },
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "AbsoluteDetectionRange": {
+                      "Compute": "AbsoluteDetectionRange"
+                    },
+                    "Attitudes": [
+                      "Hostile"
+                    ],
+                    "ExcludeGroups": [
+                      "Self"
+                    ]
+                  }
                 },
-                "ViewSector": {
-                  "Compute": "ViewSector"
-                },
-                "HearingRange": {
-                  "Compute": "HearingRange"
-                },
-                "AbsoluteDetectionRange": {
-                  "Compute": "AbsoluteDetectionRange"
-                },
-                "Attitudes": [
-                  "Hostile"
-                ],
-                "ExcludeGroups": [
-                  "Self"
-                ]
-              }
+                {
+                  "Reference": "Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget",
+                  "Modify": {
+                    "ViewRange": {
+                      "Compute": "AlertedRange"
+                    },
+                    "ViewSector": {
+                      "Compute": "ViewSector"
+                    },
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "AbsoluteDetectionRange": {
+                      "Compute": "AbsoluteDetectionRange"
+                    },
+                    "Attitudes": [
+                      "Hostile"
+                    ],
+                    "SourceTargetSlot": "MasterTarget",
+                    "ExcludeGroups": [
+                      "Self"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         },
@@ -434,12 +455,6 @@
               "Filters": [
                 {
                   "Type": "LineOfSight"
-                },
-                {
-                  "Type": "Attitude",
-                  "Attitudes": [
-                    "Hostile"
-                  ]
                 }
               ]
             },
@@ -660,43 +675,26 @@
             ]
           },
           {
-            "$Comment": "If target lost or non-hostile, return to Default.",
+            "$Comment": "If target is lost, return to Default.",
             "Sensor": {
               "Type": "Not",
               "Sensor": {
-                "Type": "And",
-                "Sensors": [
-                  {
-                    "Reference": "Component_Sensor_Lost_Target_Detection",
-                    "Modify": {
-                      "ViewRange": {
-                        "Compute": "AlertedRange"
-                      },
-                      "ViewSector": {
-                        "Compute": "ViewSector"
-                      },
-                      "HearingRange": {
-                        "Compute": "HearingRange"
-                      },
-                      "AbsoluteDetectionRange": {
-                        "Compute": "AbsoluteDetectionRange"
-                      },
-                      "TargetSlot": "LockedTarget"
-                    }
+                "Reference": "Component_Sensor_Lost_Target_Detection",
+                "Modify": {
+                  "ViewRange": {
+                    "Compute": "AlertedRange"
                   },
-                  {
-                    "Type": "Target",
-                    "TargetSlot": "LockedTarget",
-                    "Filters": [
-                      {
-                        "Type": "Attitude",
-                        "Attitudes": [
-                          "Hostile"
-                        ]
-                      }
-                    ]
-                  }
-                ]
+                  "ViewSector": {
+                    "Compute": "ViewSector"
+                  },
+                  "HearingRange": {
+                    "Compute": "HearingRange"
+                  },
+                  "AbsoluteDetectionRange": {
+                    "Compute": "AbsoluteDetectionRange"
+                  },
+                  "TargetSlot": "LockedTarget"
+                }
               }
             },
             "Actions": [
