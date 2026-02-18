@@ -689,6 +689,14 @@
       ]
     },
     {
+      "$Comment": "No-op branch to pair the CommandMove state with a state sensor.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "State",
+        "State": "CommandMove"
+      }
+    },
+    {
       "$Comment": "Default follow/idle behavior using Tamework component.",
       "Sensor": {
         "Type": "State",

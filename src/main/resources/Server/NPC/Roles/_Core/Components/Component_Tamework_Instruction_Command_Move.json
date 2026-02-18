@@ -45,6 +45,14 @@
     },
     "Instructions": [
       {
+        "$Comment": "No-op listen branch to satisfy local state pairing validation.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Listen"
+        }
+      },
+      {
         "$Comment": "Move-to-ping hook: store destination and switch to command move state.",
         "Continue": true,
         "Sensor": {

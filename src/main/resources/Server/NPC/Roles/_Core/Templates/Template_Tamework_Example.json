@@ -767,6 +767,14 @@
       ]
     },
     {
+      "$Comment": "No-op branch to pair the CommandMove state with a state sensor.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "State",
+        "State": "CommandMove"
+      }
+    },
+    {
       "$Comment": "Validation-only state setters (disabled).",
       "Enabled": false,
       "Actions": [
