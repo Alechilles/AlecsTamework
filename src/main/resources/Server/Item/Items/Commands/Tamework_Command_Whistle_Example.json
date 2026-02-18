@@ -7,7 +7,7 @@
   "Quality": "Common",
   "PlayerAnimationsId": "Item",
   "Interactions": {
-    "Primary": {
+    "Secondary": {
       "Interactions": [
         {
           "Type": "TameworkCommand"
