@@ -20,6 +20,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Relocation source chunk hints now fall back to server-side last-known NPC positions captured on entity add/remove, improving chunk targeting after pets unload.
 - Command relocation/recall tuning values (hybrid path/teleport thresholds and relocation retry limits) are now configurable via `TwGlobalConfig`.
 - Follow seek behavior now tracks the locked `MasterTarget` directly (instead of visibility-dependent player sensors), so follow mode is no longer blocked by grass/occluders.
+- Updated Tamework plugin manifest `ServerVersion` to `2026.02.18-f3b8fff95` for latest pre-release server compatibility.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
