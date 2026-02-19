@@ -37,7 +37,10 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                                @Nonnull RemoveReason reason,
                                @Nonnull Store<EntityStore> store,
                                @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        // No-op.
+        if (relocationService == null) {
+            return;
+        }
+        relocationService.onNpcRemoved(reference, store);
     }
 
     @Override

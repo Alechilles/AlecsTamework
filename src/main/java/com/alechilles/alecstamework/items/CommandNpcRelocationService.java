@@ -5,6 +5,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
@@ -26,6 +27,7 @@ public final class CommandNpcRelocationService {
     private static final int MAX_RETRY_ATTEMPTS = 60;
 
     private final ConcurrentHashMap<UUID, PendingRelocation> pendingByNpc = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Vector3d> lastKnownByNpc = new ConcurrentHashMap<>();
 
     public void queueRelocation(World world,
                                 UUID npcUuid,
@@ -53,6 +55,9 @@ public final class CommandNpcRelocationService {
                 executeAfterMs,
                 System.currentTimeMillis()
         );
+        if (sourceHintPosition != null) {
+            lastKnownByNpc.put(npcUuid, new Vector3d(sourceHintPosition));
+        }
         pendingByNpc.put(npcUuid, pending);
         requestChunksForPending(world, pending);
         scheduleTryApply(world, npcUuid, Math.max(delayMs, RETRY_INTERVAL_MS));
@@ -62,15 +67,29 @@ public final class CommandNpcRelocationService {
         if (reference == null || !reference.isValid() || store == null) {
             return;
         }
-        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
-        if (npc == null || npc.getUuid() == null) {
+        NpcSnapshot snapshot = resolveSnapshot(reference, store);
+        if (snapshot == null || snapshot.npcUuid == null) {
             return;
+        }
+        if (snapshot.position != null) {
+            lastKnownByNpc.put(snapshot.npcUuid, snapshot.position);
         }
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null) {
             return;
         }
-        tryApply(world, npc.getUuid());
+        tryApply(world, snapshot.npcUuid);
+    }
+
+    public void onNpcRemoved(Ref<EntityStore> reference, Store<EntityStore> store) {
+        if (reference == null || store == null) {
+            return;
+        }
+        NpcSnapshot snapshot = resolveSnapshot(reference, store);
+        if (snapshot == null || snapshot.npcUuid == null || snapshot.position == null) {
+            return;
+        }
+        lastKnownByNpc.put(snapshot.npcUuid, snapshot.position);
     }
 
     public boolean tryApply(World world, UUID npcUuid) {
@@ -117,6 +136,7 @@ public final class CommandNpcRelocationService {
         if (pending.state != null && !pending.state.isBlank()) {
             applyState(role, ref, store, pending.state, pending.subState);
         }
+        lastKnownByNpc.put(npcUuid, new Vector3d(pending.destination));
         pendingByNpc.remove(npcUuid, pending);
         return true;
     }
@@ -139,21 +159,23 @@ public final class CommandNpcRelocationService {
         if (world == null || pending == null) {
             return;
         }
-        requestChunkLoad(world, pending.destination, pending.npcUuid, false);
-        if (pending.sourceHintPosition != null) {
-            requestChunkLoad(world, pending.sourceHintPosition, pending.npcUuid, true);
+        requestChunkLoad(world, pending.destination, pending.npcUuid);
+        Vector3d source = pending.sourceHintPosition;
+        if (source == null) {
+            source = lastKnownByNpc.get(pending.npcUuid);
+        }
+        if (source != null) {
+            requestChunkLoad(world, source, pending.npcUuid);
         }
     }
 
-    private void requestChunkLoad(World world, Vector3d position, UUID npcUuid, boolean nonTicking) {
+    private void requestChunkLoad(World world, Vector3d position, UUID npcUuid) {
         if (world == null || position == null || npcUuid == null) {
             return;
         }
         int chunkX = toChunk(position.x);
         int chunkZ = toChunk(position.z);
-        CompletableFuture<?> request = nonTicking
-                ? world.getNonTickingChunkAsync(chunkX, chunkZ)
-                : world.getChunkAsync(chunkX, chunkZ);
+        CompletableFuture<?> request = world.getChunkAsync(chunkX, chunkZ);
         request.thenAccept(chunk -> world.execute(() -> tryApply(world, npcUuid)));
     }
 
@@ -194,6 +216,29 @@ public final class CommandNpcRelocationService {
 
     private int toChunk(double coord) {
         return Math.floorDiv((int) Math.floor(coord), CHUNK_SIZE);
+    }
+
+    private NpcSnapshot resolveSnapshot(Ref<EntityStore> reference, Store<EntityStore> store) {
+        if (reference == null || store == null) {
+            return null;
+        }
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        if (npc == null || npc.getUuid() == null) {
+            return null;
+        }
+        TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
+        Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
+        return new NpcSnapshot(npc.getUuid(), position);
+    }
+
+    private static final class NpcSnapshot {
+        private final UUID npcUuid;
+        private final Vector3d position;
+
+        private NpcSnapshot(UUID npcUuid, Vector3d position) {
+            this.npcUuid = npcUuid;
+            this.position = position;
+        }
     }
 
     private static final class PendingRelocation {
