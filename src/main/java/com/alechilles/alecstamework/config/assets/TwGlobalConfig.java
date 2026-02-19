@@ -112,6 +112,62 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .documentation("Prefix used for per-interaction cooldown alarms.")
             .add()
+            .<Double>append(
+                    new KeyedCodec<>("CommandReturnHomeTeleportDistance", Codec.DOUBLE),
+                    (asset, value) -> asset.commandReturnHomeTeleportDistance = value != null ? value : asset.commandReturnHomeTeleportDistance,
+                    asset -> asset.commandReturnHomeTeleportDistance
+            )
+            .documentation("Distance threshold where Return Home switches from pure pathing to hybrid path-then-teleport.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("CommandReturnHomePathDistanceBeforeTeleport", Codec.DOUBLE),
+                    (asset, value) -> asset.commandReturnHomePathDistanceBeforeTeleport = value != null ? value : asset.commandReturnHomePathDistanceBeforeTeleport,
+                    asset -> asset.commandReturnHomePathDistanceBeforeTeleport
+            )
+            .documentation("Visible path distance to travel before deferred Return Home teleport.")
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("CommandReturnHomeTeleportDelayMs", Codec.INTEGER),
+                    (asset, value) -> asset.commandReturnHomeTeleportDelayMs = value != null ? value : asset.commandReturnHomeTeleportDelayMs,
+                    asset -> asset.commandReturnHomeTeleportDelayMs
+            )
+            .documentation("Delay before deferred Return Home teleport occurs.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("CommandRecallSafeSpawnDistance", Codec.DOUBLE),
+                    (asset, value) -> asset.commandRecallSafeSpawnDistance = value != null ? value : asset.commandRecallSafeSpawnDistance,
+                    asset -> asset.commandRecallSafeSpawnDistance
+            )
+            .documentation("Distance from owner used when recalling far NPCs to a safe nearby position.")
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("CommandRecallForceRelocateDistance", Codec.DOUBLE),
+                    (asset, value) -> asset.commandRecallForceRelocateDistance = value != null ? value : asset.commandRecallForceRelocateDistance,
+                    asset -> asset.commandRecallForceRelocateDistance
+            )
+            .documentation("Distance beyond which loaded recalled NPCs are force-relocated near owner before pathing in.")
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("CommandRelocationRetryIntervalMs", Codec.INTEGER),
+                    (asset, value) -> asset.commandRelocationRetryIntervalMs = value != null ? value : asset.commandRelocationRetryIntervalMs,
+                    asset -> asset.commandRelocationRetryIntervalMs
+            )
+            .documentation("Retry interval for queued off-screen command relocations.")
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("CommandRelocationMaxWaitMs", Codec.INTEGER),
+                    (asset, value) -> asset.commandRelocationMaxWaitMs = value != null ? value : asset.commandRelocationMaxWaitMs,
+                    asset -> asset.commandRelocationMaxWaitMs
+            )
+            .documentation("Maximum time to keep trying a queued off-screen command relocation.")
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("CommandRelocationMaxRetryAttempts", Codec.INTEGER),
+                    (asset, value) -> asset.commandRelocationMaxRetryAttempts = value != null ? value : asset.commandRelocationMaxRetryAttempts,
+                    asset -> asset.commandRelocationMaxRetryAttempts
+            )
+            .documentation("Maximum retry attempts for queued off-screen command relocations.")
+            .add()
             .build();
 
     private static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> ASSET_STORE;
@@ -133,6 +189,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private String harvestContextParam;
     private String harvestAlarmName;
     private String interactionCooldownAlarmPrefix;
+    private double commandReturnHomeTeleportDistance = 96.0;
+    private double commandReturnHomePathDistanceBeforeTeleport = 24.0;
+    private int commandReturnHomeTeleportDelayMs = 2500;
+    private double commandRecallSafeSpawnDistance = 20.0;
+    private double commandRecallForceRelocateDistance = 80.0;
+    private int commandRelocationRetryIntervalMs = 2000;
+    private int commandRelocationMaxWaitMs = 120000;
+    private int commandRelocationMaxRetryAttempts = 60;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -267,6 +331,38 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     public String getInteractionCooldownAlarmPrefix() {
         return interactionCooldownAlarmPrefix;
+    }
+
+    public double getCommandReturnHomeTeleportDistance() {
+        return commandReturnHomeTeleportDistance;
+    }
+
+    public double getCommandReturnHomePathDistanceBeforeTeleport() {
+        return commandReturnHomePathDistanceBeforeTeleport;
+    }
+
+    public int getCommandReturnHomeTeleportDelayMs() {
+        return commandReturnHomeTeleportDelayMs;
+    }
+
+    public double getCommandRecallSafeSpawnDistance() {
+        return commandRecallSafeSpawnDistance;
+    }
+
+    public double getCommandRecallForceRelocateDistance() {
+        return commandRecallForceRelocateDistance;
+    }
+
+    public int getCommandRelocationRetryIntervalMs() {
+        return commandRelocationRetryIntervalMs;
+    }
+
+    public int getCommandRelocationMaxWaitMs() {
+        return commandRelocationMaxWaitMs;
+    }
+
+    public int getCommandRelocationMaxRetryAttempts() {
+        return commandRelocationMaxRetryAttempts;
     }
 
     // Returns the names of required string fields that are missing or blank.

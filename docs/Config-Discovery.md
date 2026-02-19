@@ -36,8 +36,17 @@ TwGlobalConfig replaces the old settings file and controls owner damage filterin
 - `HarvestContextParam`
 - `HarvestAlarmName`
 - `InteractionCooldownAlarmPrefix`
+- `CommandReturnHomeTeleportDistance`
+- `CommandReturnHomePathDistanceBeforeTeleport`
+- `CommandReturnHomeTeleportDelayMs`
+- `CommandRecallSafeSpawnDistance`
+- `CommandRecallForceRelocateDistance`
+- `CommandRelocationRetryIntervalMs`
+- `CommandRelocationMaxWaitMs`
+- `CommandRelocationMaxRetryAttempts`
 
-All fields are required; missing or blank values will emit a warning on startup.
+String parameter-name fields are required; missing or blank values emit a warning on startup.
+Numeric command-tuning fields are optional and fall back to built-in defaults when omitted or invalid.
 
 ## Reloading
 - `/tw reloadconfig` reloads spawner + naming item configs from disk (TwSpawnerConfig + TwNameItemConfig).

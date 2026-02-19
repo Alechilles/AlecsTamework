@@ -183,6 +183,26 @@ public final class CommandItemFeatureHandler {
         Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, command);
         Vector3d storedHomePosition = resolveStoredHomePosition(working, command);
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        double returnHomeTeleportDistance = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDistance() : 0.0,
+                HYBRID_TELEPORT_DISTANCE_THRESHOLD
+        );
+        double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandReturnHomePathDistanceBeforeTeleport() : 0.0,
+                HYBRID_PATH_DISTANCE_BEFORE_TELEPORT
+        );
+        long returnHomeTeleportDelayMs = resolvePositiveLong(
+                globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDelayMs() : 0L,
+                HYBRID_TELEPORT_DELAY_MS
+        );
+        double recallSafeSpawnDistance = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
+                RECALL_SAFE_SPAWN_DISTANCE
+        );
+        double recallForceRelocateDistance = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandRecallForceRelocateDistance() : 0.0,
+                RECALL_FORCE_RELOCATE_DISTANCE
+        );
         Context context = new Context(
                 player,
                 playerRef,
@@ -196,7 +216,12 @@ public final class CommandItemFeatureHandler {
                 storedHomePosition,
                 working,
                 globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
-                globalConfig != null && globalConfig.isInvulnerableIfOwned()
+                globalConfig != null && globalConfig.isInvulnerableIfOwned(),
+                returnHomeTeleportDistance,
+                returnHomePathDistanceBeforeTeleport,
+                returnHomeTeleportDelayMs,
+                recallSafeSpawnDistance,
+                recallForceRelocateDistance
         );
 
         GlobalStepResult globalStepResult = executeGlobalSteps(context);
@@ -1038,8 +1063,8 @@ public final class CommandItemFeatureHandler {
         if (source == MoveSource.StoredHome && targetPosition != null) {
             TransformComponent npcTransform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
             Vector3d start = npcTransform != null ? new Vector3d(npcTransform.getPosition()) : null;
-            if (start != null && start.distanceTo(targetPosition) > HYBRID_TELEPORT_DISTANCE_THRESHOLD) {
-                Vector3d intermediate = computeIntermediatePoint(start, targetPosition, HYBRID_PATH_DISTANCE_BEFORE_TELEPORT);
+            if (start != null && start.distanceTo(targetPosition) > context.returnHomeTeleportDistance) {
+                Vector3d intermediate = computeIntermediatePoint(start, targetPosition, context.returnHomePathDistanceBeforeTeleport);
                 RelocationState postRelocationState = resolveRelocationState(context.command, true, false);
                 World world = context.player != null ? context.player.getWorld() : null;
                 UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
@@ -1054,7 +1079,7 @@ public final class CommandItemFeatureHandler {
                             true,
                             postRelocationState.state,
                             postRelocationState.subState,
-                            HYBRID_TELEPORT_DELAY_MS,
+                            context.returnHomeTeleportDelayMs,
                             start
                     );
                 }
@@ -1237,7 +1262,7 @@ public final class CommandItemFeatureHandler {
         double dy = npcPos.y - playerPos.y;
         double dz = npcPos.z - playerPos.z;
         double distSq = dx * dx + dy * dy + dz * dz;
-        if (distSq < RECALL_FORCE_RELOCATE_DISTANCE * RECALL_FORCE_RELOCATE_DISTANCE) {
+        if (distSq < context.recallForceRelocateDistance * context.recallForceRelocateDistance) {
             return;
         }
         Vector3d safePosition = computeSafeRecallPosition(context, new Vector3d(npcPos));
@@ -1352,9 +1377,9 @@ public final class CommandItemFeatureHandler {
             }
         }
         return new Vector3d(
-                playerPos.x + dirX * RECALL_SAFE_SPAWN_DISTANCE,
+                playerPos.x + dirX * context.recallSafeSpawnDistance,
                 playerPos.y,
-                playerPos.z + dirZ * RECALL_SAFE_SPAWN_DISTANCE
+                playerPos.z + dirZ * context.recallSafeSpawnDistance
         );
     }
 
@@ -1601,6 +1626,14 @@ public final class CommandItemFeatureHandler {
         player.sendMessage(Message.raw(text));
     }
 
+    private double resolvePositiveDouble(double configured, double fallback) {
+        return configured > 0.0 ? configured : fallback;
+    }
+
+    private long resolvePositiveLong(long configured, long fallback) {
+        return configured > 0L ? configured : fallback;
+    }
+
     private boolean updateHeldItem(Player player, ItemStack updated) {
         Inventory inventory = player.getInventory();
         if (inventory == null) {
@@ -1647,6 +1680,11 @@ public final class CommandItemFeatureHandler {
         private boolean itemChanged;
         private final boolean blockAllPlayerDamageIfOwned;
         private final boolean invulnerableIfOwned;
+        private final double returnHomeTeleportDistance;
+        private final double returnHomePathDistanceBeforeTeleport;
+        private final long returnHomeTeleportDelayMs;
+        private final double recallSafeSpawnDistance;
+        private final double recallForceRelocateDistance;
 
         private Context(Player player,
                         Ref<EntityStore> playerRef,
@@ -1660,7 +1698,12 @@ public final class CommandItemFeatureHandler {
                         Vector3d storedHomePosition,
                         ItemStack workingItem,
                         boolean blockAllPlayerDamageIfOwned,
-                        boolean invulnerableIfOwned) {
+                        boolean invulnerableIfOwned,
+                        double returnHomeTeleportDistance,
+                        double returnHomePathDistanceBeforeTeleport,
+                        long returnHomeTeleportDelayMs,
+                        double recallSafeSpawnDistance,
+                        double recallForceRelocateDistance) {
             this.player = player;
             this.playerRef = playerRef;
             this.store = store;
@@ -1674,6 +1717,11 @@ public final class CommandItemFeatureHandler {
             this.workingItem = workingItem;
             this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
             this.invulnerableIfOwned = invulnerableIfOwned;
+            this.returnHomeTeleportDistance = returnHomeTeleportDistance;
+            this.returnHomePathDistanceBeforeTeleport = returnHomePathDistanceBeforeTeleport;
+            this.returnHomeTeleportDelayMs = returnHomeTeleportDelayMs;
+            this.recallSafeSpawnDistance = recallSafeSpawnDistance;
+            this.recallForceRelocateDistance = recallForceRelocateDistance;
         }
     }
 

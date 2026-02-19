@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -60,7 +61,7 @@ public final class CommandNpcRelocationService {
         }
         pendingByNpc.put(npcUuid, pending);
         requestChunksForPending(world, pending);
-        scheduleTryApply(world, npcUuid, Math.max(delayMs, RETRY_INTERVAL_MS));
+        scheduleTryApply(world, npcUuid, Math.max(delayMs, resolveRetryIntervalMs()));
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -146,13 +147,14 @@ public final class CommandNpcRelocationService {
             return;
         }
         long now = System.currentTimeMillis();
-        if (now - pending.queuedAtMs > MAX_RELOCATION_WAIT_MS || pending.retryAttempts >= MAX_RETRY_ATTEMPTS) {
+        if (now - pending.queuedAtMs > resolveMaxRelocationWaitMs()
+                || pending.retryAttempts >= resolveMaxRetryAttempts()) {
             pendingByNpc.remove(npcUuid, pending);
             return;
         }
         pending.retryAttempts++;
         requestChunksForPending(world, pending);
-        scheduleTryApply(world, npcUuid, RETRY_INTERVAL_MS);
+        scheduleTryApply(world, npcUuid, resolveRetryIntervalMs());
     }
 
     private void requestChunksForPending(World world, PendingRelocation pending) {
@@ -212,6 +214,24 @@ public final class CommandNpcRelocationService {
             }
         }
         support.setState(npcRef, state, resolvedSubState == null ? "" : resolvedSubState, store);
+    }
+
+    private long resolveRetryIntervalMs() {
+        TwGlobalConfig config = TwGlobalConfig.resolveActive();
+        long configured = config != null ? config.getCommandRelocationRetryIntervalMs() : 0L;
+        return configured > 0L ? configured : RETRY_INTERVAL_MS;
+    }
+
+    private long resolveMaxRelocationWaitMs() {
+        TwGlobalConfig config = TwGlobalConfig.resolveActive();
+        long configured = config != null ? config.getCommandRelocationMaxWaitMs() : 0L;
+        return configured > 0L ? configured : MAX_RELOCATION_WAIT_MS;
+    }
+
+    private int resolveMaxRetryAttempts() {
+        TwGlobalConfig config = TwGlobalConfig.resolveActive();
+        int configured = config != null ? config.getCommandRelocationMaxRetryAttempts() : 0;
+        return configured > 0 ? configured : MAX_RETRY_ATTEMPTS;
     }
 
     private int toChunk(double coord) {
