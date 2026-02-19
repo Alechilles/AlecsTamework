@@ -684,7 +684,12 @@ public final class CommandItemFeatureHandler {
             }
             Ref<EntityStore> ref = world.getEntityRef(record.npcUuid);
             if (ref != null && ref.isValid()) {
-                continue;
+                // A valid world ref does not guarantee the NPC is currently loaded in chunk store.
+                // If the component is absent, treat this record as unloaded so relocation can be queued.
+                NPCEntity npc = context.store.getComponent(ref, NPCEntity.getComponentType());
+                if (npc != null) {
+                    continue;
+                }
             }
             unloaded.add(record);
             if (unloaded.size() >= remaining) {
