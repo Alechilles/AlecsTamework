@@ -21,6 +21,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Command relocation/recall tuning values (hybrid path/teleport thresholds and relocation retry limits) are now configurable via `TwGlobalConfig`.
 - Follow seek behavior now tracks the locked `MasterTarget` directly (instead of visibility-dependent player sensors), so follow mode is no longer blocked by grass/occluders.
 - Updated Tamework plugin and assets manifests `ServerVersion` to `2026.02.18-f3b8fff95` for latest pre-release server compatibility.
+- Added an early asset-pack ordering hook that keeps `Alechilles:Alec's Tamework!` directly after `Hytale:Hytale` before the main `LoadAssetEvent` asset load pass.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.

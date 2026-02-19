@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework;
 
+import java.util.List;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
@@ -45,11 +46,15 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIs
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
+import com.hypixel.hytale.assetstore.AssetPack;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
+import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
+import com.hypixel.hytale.server.core.asset.LoadAssetEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
@@ -72,6 +77,8 @@ import com.hypixel.hytale.server.npc.instructions.Sensor;
 public class Tamework extends JavaPlugin {
 
     private static Tamework instance;
+    private static final short EARLY_ASSET_PACK_ORDER_PRIORITY = (short) -40;
+    private static final String BASE_ASSET_PACK_ID = "Hytale:Hytale";
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private NameItemRegistry nameItemRegistry;
@@ -111,6 +118,7 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         // Registry for command item configs.
         commandItemRegistry = new CommandItemRegistry();
+        registerEarlyAssetPackOrderingHook();
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         // Register the custom item interaction used by naming items.
@@ -305,6 +313,83 @@ public class Tamework extends JavaPlugin {
                         + (commandItemRegistry != null ? " (total: " + commandItemRegistry.snapshot().size() + ")" : "")
         );
         return loadedSpawner + loadedNaming + loadedCommands;
+    }
+
+    // Move Tamework's embedded asset pack before other mod packs before the core load pass.
+    private void registerEarlyAssetPackOrderingHook() {
+        if (getEventRegistry() == null) {
+            return;
+        }
+        getEventRegistry().register(
+                EARLY_ASSET_PACK_ORDER_PRIORITY,
+                LoadAssetEvent.class,
+                this::onEarlyAssetLoad
+        );
+    }
+
+    private void onEarlyAssetLoad(LoadAssetEvent event) {
+        AssetModule assetModule = AssetModule.get();
+        if (assetModule == null) {
+            getLogger().at(Level.WARNING).log(
+                    "Tamework asset pack ordering: AssetModule unavailable during LoadAssetEvent."
+            );
+            return;
+        }
+
+        String packId = new PluginIdentifier(getManifest()).toString();
+        if (assetModule.getAssetPack(packId) == null) {
+            try {
+                assetModule.registerPack(packId, getFile(), getManifest(), true);
+            } catch (RuntimeException ex) {
+                getLogger().at(Level.WARNING).withCause(ex)
+                        .log("Tamework asset pack ordering: failed to register missing embedded pack '" + packId + "'.");
+            }
+        }
+
+        List<AssetPack> packs = assetModule.getAssetPacks();
+        int currentIndex = indexOfPack(packs, packId);
+        if (currentIndex < 0) {
+            getLogger().at(Level.WARNING).log(
+                    "Tamework asset pack ordering: pack '" + packId + "' not found after registration attempt."
+            );
+            return;
+        }
+
+        int targetIndex = desiredTameworkPackIndex(packs);
+        if (currentIndex == targetIndex) {
+            getLogger().at(Level.INFO).log(
+                    "Tamework asset pack ordering: pack '" + packId + "' already ordered at index " + currentIndex + "."
+            );
+            return;
+        }
+
+        AssetPack tameworkPack = packs.remove(currentIndex);
+        if (currentIndex < targetIndex) {
+            targetIndex--;
+        }
+        packs.add(targetIndex, tameworkPack);
+        getLogger().at(Level.INFO).log(
+                "Tamework asset pack ordering: moved pack '" + packId + "' from index "
+                        + currentIndex + " to index " + targetIndex + "."
+        );
+    }
+
+    private int desiredTameworkPackIndex(List<AssetPack> packs) {
+        int basePackIndex = indexOfPack(packs, BASE_ASSET_PACK_ID);
+        if (basePackIndex < 0) {
+            return 0;
+        }
+        return basePackIndex + 1;
+    }
+
+    private int indexOfPack(List<AssetPack> packs, String packId) {
+        for (int i = 0; i < packs.size(); i++) {
+            AssetPack pack = packs.get(i);
+            if (pack != null && packId.equals(pack.getName())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
 
