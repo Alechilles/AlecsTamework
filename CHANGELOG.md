@@ -16,6 +16,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Command wheel close button position is now offset lower to avoid overlapping the bottom radial slice.
 - Command links are now mirrored onto command-tool metadata (`UUID + last-known position`) so linked NPC sets can still be resolved for off-screen command handling.
 - Long-distance command relocation now uses a hybrid flow: far `ReturnHome` first paths a short visible segment before deferred teleport, and far `Recall` relocates near the player before normal follow behavior resumes.
+- Off-screen relocation now retries chunk preloading (source + destination) on a bounded interval/time window, improving reliability when linked NPCs are far outside active player chunks.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.

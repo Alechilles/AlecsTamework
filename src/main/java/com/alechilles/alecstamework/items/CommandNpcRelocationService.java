@@ -21,6 +21,9 @@ import javax.annotation.Nullable;
 public final class CommandNpcRelocationService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final int CHUNK_SIZE = 32;
+    private static final long RETRY_INTERVAL_MS = 2000L;
+    private static final long MAX_RELOCATION_WAIT_MS = 120000L;
+    private static final int MAX_RETRY_ATTEMPTS = 60;
 
     private final ConcurrentHashMap<UUID, PendingRelocation> pendingByNpc = new ConcurrentHashMap<>();
 
@@ -41,19 +44,18 @@ public final class CommandNpcRelocationService {
         PendingRelocation pending = new PendingRelocation(
                 npcUuid,
                 new Vector3d(destination),
+                sourceHintPosition != null ? new Vector3d(sourceHintPosition) : null,
                 ownerUuid,
                 assignOwnerAsMasterTarget,
                 clearLockedTarget,
                 state,
                 subState,
-                executeAfterMs
+                executeAfterMs,
+                System.currentTimeMillis()
         );
         pendingByNpc.put(npcUuid, pending);
-        requestChunkLoad(world, destination, npcUuid);
-        if (sourceHintPosition != null) {
-            requestChunkLoad(world, sourceHintPosition, npcUuid);
-        }
-        scheduleTryApply(world, npcUuid, delayMs);
+        requestChunksForPending(world, pending);
+        scheduleTryApply(world, npcUuid, Math.max(delayMs, RETRY_INTERVAL_MS));
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -86,14 +88,17 @@ public final class CommandNpcRelocationService {
         }
         Ref<EntityStore> ref = world.getEntityRef(npcUuid);
         if (ref == null || !ref.isValid()) {
+            retryPending(world, npcUuid, pending);
             return false;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
+            retryPending(world, npcUuid, pending);
             return false;
         }
         NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
         if (npc == null) {
+            retryPending(world, npcUuid, pending);
             return false;
         }
         npc.moveTo(ref, pending.destination.x, pending.destination.y, pending.destination.z, store);
@@ -116,13 +121,40 @@ public final class CommandNpcRelocationService {
         return true;
     }
 
-    private void requestChunkLoad(World world, Vector3d position, UUID npcUuid) {
+    private void retryPending(World world, UUID npcUuid, PendingRelocation pending) {
+        if (world == null || npcUuid == null || pending == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - pending.queuedAtMs > MAX_RELOCATION_WAIT_MS || pending.retryAttempts >= MAX_RETRY_ATTEMPTS) {
+            pendingByNpc.remove(npcUuid, pending);
+            return;
+        }
+        pending.retryAttempts++;
+        requestChunksForPending(world, pending);
+        scheduleTryApply(world, npcUuid, RETRY_INTERVAL_MS);
+    }
+
+    private void requestChunksForPending(World world, PendingRelocation pending) {
+        if (world == null || pending == null) {
+            return;
+        }
+        requestChunkLoad(world, pending.destination, pending.npcUuid, false);
+        if (pending.sourceHintPosition != null) {
+            requestChunkLoad(world, pending.sourceHintPosition, pending.npcUuid, true);
+        }
+    }
+
+    private void requestChunkLoad(World world, Vector3d position, UUID npcUuid, boolean nonTicking) {
         if (world == null || position == null || npcUuid == null) {
             return;
         }
         int chunkX = toChunk(position.x);
         int chunkZ = toChunk(position.z);
-        world.getChunkAsync(chunkX, chunkZ).thenAccept(chunk -> world.execute(() -> tryApply(world, npcUuid)));
+        CompletableFuture<?> request = nonTicking
+                ? world.getNonTickingChunkAsync(chunkX, chunkZ)
+                : world.getChunkAsync(chunkX, chunkZ);
+        request.thenAccept(chunk -> world.execute(() -> tryApply(world, npcUuid)));
     }
 
     private void scheduleTryApply(World world, UUID npcUuid, long delayMs) {
@@ -167,29 +199,37 @@ public final class CommandNpcRelocationService {
     private static final class PendingRelocation {
         private final UUID npcUuid;
         private final Vector3d destination;
+        private final Vector3d sourceHintPosition;
         private final UUID ownerUuid;
         private final boolean assignOwnerAsMasterTarget;
         private final boolean clearLockedTarget;
         private final String state;
         private final String subState;
         private final long executeAfterMs;
+        private final long queuedAtMs;
+        private int retryAttempts;
 
         private PendingRelocation(UUID npcUuid,
                                   Vector3d destination,
+                                  Vector3d sourceHintPosition,
                                   UUID ownerUuid,
                                   boolean assignOwnerAsMasterTarget,
                                   boolean clearLockedTarget,
                                   String state,
                                   String subState,
-                                  long executeAfterMs) {
+                                  long executeAfterMs,
+                                  long queuedAtMs) {
             this.npcUuid = Objects.requireNonNull(npcUuid, "npcUuid");
             this.destination = Objects.requireNonNull(destination, "destination");
+            this.sourceHintPosition = sourceHintPosition;
             this.ownerUuid = ownerUuid;
             this.assignOwnerAsMasterTarget = assignOwnerAsMasterTarget;
             this.clearLockedTarget = clearLockedTarget;
             this.state = state;
             this.subState = subState;
             this.executeAfterMs = executeAfterMs;
+            this.queuedAtMs = queuedAtMs;
+            this.retryAttempts = 0;
         }
     }
 }
