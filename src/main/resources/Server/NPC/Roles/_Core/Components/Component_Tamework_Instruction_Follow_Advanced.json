@@ -128,12 +128,8 @@
           },
           {
             "Sensor": {
-              "Type": "Player",
-              "Range": {
-                "Compute": "FollowLockOnRange"
-              },
-              "LockOnTarget": true,
-              "LockedTargetSlot": {
+              "Type": "Target",
+              "TargetSlot": {
                 "Compute": "MasterTargetSlot"
               }
             },

@@ -19,6 +19,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Off-screen relocation now retries chunk preloading (source + destination) on a bounded interval/time window, improving reliability when linked NPCs are far outside active player chunks.
 - Relocation source chunk hints now fall back to server-side last-known NPC positions captured on entity add/remove, improving chunk targeting after pets unload.
 - Command relocation/recall tuning values (hybrid path/teleport thresholds and relocation retry limits) are now configurable via `TwGlobalConfig`.
+- Follow seek behavior now tracks the locked `MasterTarget` directly (instead of visibility-dependent player sensors), so follow mode is no longer blocked by grass/occluders.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
