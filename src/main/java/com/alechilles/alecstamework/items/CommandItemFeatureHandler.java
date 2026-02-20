@@ -35,7 +35,6 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.protocol.SoundCategory;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
@@ -123,7 +122,7 @@ public final class CommandItemFeatureHandler {
             }
             boolean opened = openSelectionMenu(player, store, config, working, tool.toolId);
             if (!opened) {
-                sendMessage(player, "No command choices are available for this item.");
+                sendWarningMessage(player, "No command choices are available for this item.");
             }
             return opened;
         }
@@ -138,12 +137,11 @@ public final class CommandItemFeatureHandler {
                 updateHeldItem(player, working);
             }
             if (selection.command == null) {
-                sendMessage(player, "No command is configured for this item.");
+                sendWarningMessage(player, "No command is configured for this item.");
                 return false;
             }
             String label = resolveCommandLabel(selection.command);
-            sendMessage(player, "Selected command: " + label + ".");
-            uiMessageService.show(player, "Selected: " + label);
+            sendDefaultMessage(player, "Selected: " + label);
             return true;
         }
 
@@ -157,7 +155,7 @@ public final class CommandItemFeatureHandler {
                 if (updateHeldItem) {
                     updateHeldItem(player, working);
                 }
-                sendMessage(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
+                sendSuccessMessage(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
                 return true;
             }
         }
@@ -338,17 +336,16 @@ public final class CommandItemFeatureHandler {
         }
         CommandEntry selected = config.findCommandById(commandId);
         if (selected == null) {
-            sendMessage(player, "That command is no longer available.");
+            sendWarningMessage(player, "That command is no longer available.");
             return;
         }
         boolean updated = setSelectedCommandOnTool(player, toolId, selected.getId());
         if (!updated) {
-            sendMessage(player, "Unable to apply the selected command.");
+            sendWarningMessage(player, "Unable to apply the selected command.");
             return;
         }
         String label = resolveCommandLabel(selected);
-        sendMessage(player, "Selected command: " + label + ".");
-        uiMessageService.show(player, "Selected: " + label);
+        sendDefaultMessage(player, "Selected: " + label);
     }
 
     private boolean setSelectedCommandOnTool(Player player, String toolId, String commandId) {
@@ -1522,19 +1519,17 @@ public final class CommandItemFeatureHandler {
             defaultMessage = "No NPCs could execute that command.";
         }
         CommandFeedback feedback = context.command.getFeedback();
-        String chatMessage = resolveFeedbackText(
-                feedback != null ? feedback.getChatMessage() : null,
+        String hudMessage = resolveFeedbackText(
+                feedback != null ? feedback.getHudMessage() : null,
                 context.command,
                 affected,
                 defaultMessage
         );
-        sendMessage(context.player, chatMessage);
+        if (hudMessage != null && !hudMessage.isBlank()) {
+            sendSuccessMessage(context.player, hudMessage);
+        }
         if (feedback == null) {
             return;
-        }
-        String hudMessage = resolveFeedbackText(feedback.getHudMessage(), context.command, affected, null);
-        if (hudMessage != null && !hudMessage.isBlank()) {
-            uiMessageService.show(context.player, hudMessage, NotificationStyle.Success);
         }
         emitFeedbackSound(feedback.getSoundEvent(), context.playerRef, context.store);
         emitFeedbackParticles(feedback.getParticleSystem(), feedback.getParticleOffset(), context.playerRef, context.store);
@@ -1601,15 +1596,24 @@ public final class CommandItemFeatureHandler {
         return until != null && until > System.currentTimeMillis();
     }
 
-    private void sendMessage(Player player, String text) {
+    private void sendDefaultMessage(Player player, String text) {
         if (player == null || text == null || text.isBlank()) {
             return;
         }
-        player.sendMessage(Message.raw(text));
+        uiMessageService.show(player, text, NotificationStyle.Default);
+    }
+
+    private void sendSuccessMessage(Player player, String text) {
+        if (player == null || text == null || text.isBlank()) {
+            return;
+        }
+        uiMessageService.show(player, text, NotificationStyle.Success);
     }
 
     private void sendWarningMessage(Player player, String text) {
-        sendMessage(player, text);
+        if (player == null || text == null || text.isBlank()) {
+            return;
+        }
         uiMessageService.show(player, text, NotificationStyle.Warning);
     }
 
