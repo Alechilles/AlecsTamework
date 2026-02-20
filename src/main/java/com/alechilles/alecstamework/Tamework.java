@@ -82,6 +82,7 @@ public class Tamework extends JavaPlugin {
     private static Tamework instance;
     private static final short EARLY_ASSET_PACK_ORDER_PRIORITY = (short) -40;
     private static final String BASE_ASSET_PACK_ID = "Hytale:Hytale";
+    private static final String EYESPY_PACK_ID = "JarHax:EyeSpy";
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private NameItemRegistry nameItemRegistry;
@@ -99,6 +100,7 @@ public class Tamework extends JavaPlugin {
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private String lastGlobalConfigWarningKey;
+    private boolean eyeSpyPackOrderingSuppressedLogged;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
@@ -373,6 +375,16 @@ public class Tamework extends JavaPlugin {
         }
 
         List<AssetPack> packs = assetModule.getAssetPacks();
+        if (indexOfPack(packs, EYESPY_PACK_ID) >= 0) {
+            if (!eyeSpyPackOrderingSuppressedLogged) {
+                eyeSpyPackOrderingSuppressedLogged = true;
+                getLogger().at(Level.INFO).log(
+                        "Tamework asset pack ordering: skipped reorder while '" + EYESPY_PACK_ID
+                                + "' is loaded to avoid known CustomUI HUD conflicts on local clients."
+                );
+            }
+            return;
+        }
         int currentIndex = indexOfPack(packs, packId);
         if (currentIndex < 0) {
             getLogger().at(Level.WARNING).log(
