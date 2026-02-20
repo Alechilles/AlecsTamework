@@ -11,6 +11,10 @@ import com.hypixel.hytale.server.core.util.NotificationUtil;
  */
 public final class TameworkUiMessageService {
     public boolean show(Player player, String message) {
+        return show(player, message, NotificationStyle.Default);
+    }
+
+    public boolean show(Player player, String message, NotificationStyle style) {
         if (player == null || message == null || message.isBlank()) {
             return false;
         }
@@ -18,7 +22,8 @@ public final class TameworkUiMessageService {
         if (packetHandler == null) {
             return false;
         }
-        NotificationUtil.sendNotification(packetHandler, Message.raw(message), NotificationStyle.Default);
+        NotificationStyle resolvedStyle = style != null ? style : NotificationStyle.Default;
+        NotificationUtil.sendNotification(packetHandler, Message.raw(message), resolvedStyle);
         return true;
     }
 }

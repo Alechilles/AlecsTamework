@@ -33,6 +33,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
@@ -166,7 +167,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendMessage(player, "That command item is on cooldown.");
+            sendWarningMessage(player, "That command item is on cooldown.");
             return false;
         }
 
@@ -175,7 +176,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendMessage(player, "No command is configured for this item.");
+            sendWarningMessage(player, "No command is configured for this item.");
             return false;
         }
 
@@ -233,7 +234,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendMessage(player, "That command could not be executed.");
+            sendWarningMessage(player, "That command could not be executed.");
             return false;
         }
 
@@ -243,7 +244,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendMessage(player, "No linked NPCs matched this command.");
+            sendWarningMessage(player, "No linked NPCs matched this command.");
             return false;
         }
 
@@ -271,7 +272,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendMessage(player, "No NPCs could execute that command.");
+            sendWarningMessage(player, "No NPCs could execute that command.");
             return false;
         }
 
@@ -1557,7 +1558,7 @@ public final class CommandItemFeatureHandler {
         }
         String hudMessage = resolveFeedbackText(feedback.getHudMessage(), context.command, affected, null);
         if (hudMessage != null && !hudMessage.isBlank()) {
-            uiMessageService.show(context.player, hudMessage);
+            uiMessageService.show(context.player, hudMessage, NotificationStyle.Success);
         }
         emitFeedbackSound(feedback.getSoundEvent(), context.playerRef, context.store);
         emitFeedbackParticles(feedback.getParticleSystem(), feedback.getParticleOffset(), context.playerRef, context.store);
@@ -1629,6 +1630,11 @@ public final class CommandItemFeatureHandler {
             return;
         }
         player.sendMessage(Message.raw(text));
+    }
+
+    private void sendWarningMessage(Player player, String text) {
+        sendMessage(player, text);
+        uiMessageService.show(player, text, NotificationStyle.Warning);
     }
 
     private double resolvePositiveDouble(double configured, double fallback) {
