@@ -16,10 +16,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
-import java.util.function.Supplier;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
@@ -32,85 +29,19 @@ public final class TameworkCommandSelectionPage
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String CLOSE_COMMAND_ID = "__close__";
-    private static final String REMOVE_LINK_PREFIX = "__remove_link__:";
     private static final int MAX_COMMAND_BUTTONS = 8;
-    private static final String LINKED_NPC_ROW_INLINE = """
-            Group #LinkedNpcRow {
-              Anchor: (Height: 78);
-              Background: #13263c(0.86);
-
-              Label #LinkedNpcName {
-                Anchor: (Top: 8, Left: 10, Right: 164, Height: 22);
-                Text: "";
-                Style: (
-                  FontSize: 16,
-                  RenderBold: true,
-                  TextColor: #eff4fa,
-                  HorizontalAlignment: Left,
-                  VerticalAlignment: Center,
-                  ShrinkTextToFit: true,
-                  MinShrinkTextToFitFontSize: 11
-                );
-              }
-
-              Label #LinkedNpcStatus {
-                Anchor: (Top: 9, Right: 88, Width: 72, Height: 20);
-                Text: "";
-                Style: (
-                  FontSize: 12,
-                  TextColor: #bad4e6,
-                  HorizontalAlignment: Center,
-                  VerticalAlignment: Center
-                );
-              }
-
-              TextButton #LinkedNpcRemove {
-                Anchor: (Top: 6, Right: 10, Width: 70, Height: 24);
-                Text: "Remove";
-              }
-
-              Group #LinkedNpcHealthFrame {
-                Anchor: (Top: 36, Left: 10, Right: 10, Height: 16);
-                Background: #0a121b(0.95);
-                Padding: (Horizontal: 1, Vertical: 1);
-
-                ProgressBar #LinkedNpcHealthBar {
-                  Anchor: (Left: 0, Right: 0, Height: 14);
-                  Background: #2b4357;
-                  Bar: #6fc576;
-                  Value: 0.0;
-                }
-              }
-
-              Label #LinkedNpcHealthText {
-                Anchor: (Top: 54, Left: 12, Right: 12, Height: 16);
-                Text: "";
-                Style: (
-                  FontSize: 11,
-                  TextColor: #bed0e3,
-                  HorizontalAlignment: Left,
-                  VerticalAlignment: Center,
-                  ShrinkTextToFit: true,
-                  MinShrinkTextToFitFontSize: 10
-                );
-              }
-            }
-            """;
 
     private final CommandOption[] options;
     private final String selectedCommandId;
-    private final Supplier<List<LinkedNpcMenuEntry>> linkedNpcSupplier;
     private final Consumer<String> selectionCallback;
 
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
                                         String selectedCommandId,
-                                        @Nonnull Supplier<List<LinkedNpcMenuEntry>> linkedNpcSupplier,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
         this.selectedCommandId = selectedCommandId;
-        this.linkedNpcSupplier = linkedNpcSupplier;
         this.selectionCallback = selectionCallback;
     }
 
@@ -124,7 +55,6 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkCommandMenuTitle.Text", "Select Command");
         commandBuilder.set("#TameworkCommandMenuSubtitle.Text", "Click a command to set it.");
         commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
-        buildLinkedNpcList(commandBuilder, eventBuilder);
 
         for (int i = 0; i < MAX_COMMAND_BUTTONS; i++) {
             String selector = "#CommandButton" + i;
@@ -135,10 +65,11 @@ public final class TameworkCommandSelectionPage
                 continue;
             }
             CommandOption option = options[i];
+            String label = option.label;
             commandBuilder.set(selector + ".Visible", true);
             commandBuilder.set(selector + ".Text", "");
             commandBuilder.set(labelSelector + ".Visible", true);
-            commandBuilder.set(labelSelector + ".Text", option.label);
+            commandBuilder.set(labelSelector + ".Text", label);
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     selector,
@@ -163,71 +94,12 @@ public final class TameworkCommandSelectionPage
             close();
             return;
         }
-        if (isRemoveLinkCommand(data.commandId)) {
-            selectionCallback.accept(data.commandId);
-            rebuild();
-            return;
-        }
         if (!containsOption(data.commandId)) {
             close();
             return;
         }
         close();
         selectionCallback.accept(data.commandId);
-    }
-
-    private void buildLinkedNpcList(@Nonnull UICommandBuilder commandBuilder,
-                                    @Nonnull UIEventBuilder eventBuilder) {
-        List<LinkedNpcMenuEntry> entries = resolveLinkedNpcEntries();
-        commandBuilder.set("#LinkedNpcPanel.Visible", true);
-        commandBuilder.set("#LinkedNpcPanelCount.Text", "Linked NPCs: " + entries.size());
-        commandBuilder.clear("#LinkedNpcList");
-
-        if (entries.isEmpty()) {
-            commandBuilder.appendInline(
-                    "#LinkedNpcList",
-                    "Label { Text: \"No linked NPCs\"; Style: (FontSize: 14, TextColor: #d6e0ec, HorizontalAlignment: Center, VerticalAlignment: Top); }"
-            );
-            return;
-        }
-
-        for (int i = 0; i < entries.size(); i++) {
-            LinkedNpcMenuEntry entry = entries.get(i);
-            String selector = "#LinkedNpcList[" + i + "]";
-            commandBuilder.appendInline("#LinkedNpcList", LINKED_NPC_ROW_INLINE);
-            commandBuilder.set(selector + " #LinkedNpcName.Text", entry.displayName());
-            commandBuilder.set(selector + " #LinkedNpcStatus.Text", entry.statusText());
-            commandBuilder.set(selector + " #LinkedNpcHealthBar.Value", entry.healthRatio());
-            commandBuilder.set(selector + " #LinkedNpcHealthText.Text", entry.healthText());
-            commandBuilder.set(selector + " #LinkedNpcRemove.Text", "Remove");
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    selector + " #LinkedNpcRemove",
-                    EventData.of(EVENT_COMMAND_ID, toRemoveLinkCommandId(entry.npcUuid())),
-                    false
-            );
-        }
-    }
-
-    private List<LinkedNpcMenuEntry> resolveLinkedNpcEntries() {
-        if (linkedNpcSupplier == null) {
-            return List.of();
-        }
-        List<LinkedNpcMenuEntry> values = linkedNpcSupplier.get();
-        if (values == null || values.isEmpty()) {
-            return List.of();
-        }
-        ArrayList<LinkedNpcMenuEntry> filtered = new ArrayList<>(values.size());
-        for (LinkedNpcMenuEntry entry : values) {
-            if (entry == null || entry.npcUuid() == null || entry.npcUuid().isBlank()) {
-                continue;
-            }
-            filtered.add(entry);
-        }
-        if (filtered.isEmpty()) {
-            return List.of();
-        }
-        return Collections.unmodifiableList(filtered);
     }
 
     private boolean containsOption(String commandId) {
@@ -285,49 +157,7 @@ public final class TameworkCommandSelectionPage
         return left.trim().equalsIgnoreCase(right.trim());
     }
 
-    private static boolean isRemoveLinkCommand(String commandId) {
-        return commandId != null && commandId.startsWith(REMOVE_LINK_PREFIX);
-    }
-
-    public static String toRemoveLinkCommandId(String npcUuid) {
-        if (npcUuid == null || npcUuid.isBlank()) {
-            return REMOVE_LINK_PREFIX;
-        }
-        return REMOVE_LINK_PREFIX + npcUuid.trim();
-    }
-
-    public static String extractRemoveLinkNpcUuid(String commandId) {
-        if (!isRemoveLinkCommand(commandId)) {
-            return null;
-        }
-        String raw = commandId.substring(REMOVE_LINK_PREFIX.length());
-        return raw == null || raw.isBlank() ? null : raw.trim();
-    }
-
     private record CommandOption(String id, String label) { }
-
-    /** UI model for a linked-NPC entry shown beside the command radial menu. */
-    public record LinkedNpcMenuEntry(
-            String npcUuid,
-            String displayName,
-            float healthRatio,
-            String healthText,
-            String statusText
-    ) {
-        public LinkedNpcMenuEntry {
-            Objects.requireNonNull(npcUuid, "npcUuid");
-            if (displayName == null || displayName.isBlank()) {
-                displayName = npcUuid;
-            }
-            if (healthText == null || healthText.isBlank()) {
-                healthText = "Health: unknown";
-            }
-            if (statusText == null || statusText.isBlank()) {
-                statusText = "Unknown";
-            }
-            healthRatio = Math.max(0.0f, Math.min(1.0f, healthRatio));
-        }
-    }
 
     /** Event payload emitted by command-button clicks in the command selection page. */
     public static final class CommandSelectionEventData {

@@ -41,9 +41,6 @@ import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
-import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
-import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
@@ -78,7 +75,6 @@ public final class CommandItemFeatureHandler {
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
     private static final String LINK_RECORD_SEPARATOR = "\n";
     private static final String LINK_RECORD_PARTS_SEPARATOR = "\\|";
-    private static final String HEALTH_STAT_ID = "Health";
 
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
@@ -324,7 +320,6 @@ public final class CommandItemFeatureHandler {
                 uiPlayerRef,
                 config,
                 selectedId,
-                () -> buildLinkedNpcMenuEntries(player, store, toolId),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
@@ -337,26 +332,6 @@ public final class CommandItemFeatureHandler {
                                     String commandId) {
         if (player == null || toolId == null || toolId.isBlank() || config == null
                 || commandId == null || commandId.isBlank()) {
-            return;
-        }
-        String removeNpcUuid = TameworkCommandSelectionPage.extractRemoveLinkNpcUuid(commandId);
-        if (removeNpcUuid != null) {
-            UUID npcUuid = parseUuid(removeNpcUuid);
-            if (npcUuid == null) {
-                sendWarningMessage(player, "Unable to unlink NPC: invalid id.");
-                return;
-            }
-            Store<EntityStore> store = resolvePlayerStore(player);
-            if (store == null) {
-                sendWarningMessage(player, "Unable to unlink NPC right now.");
-                return;
-            }
-            RemoveLinkResult removeResult = removeLinkedNpcFromTool(player, store, toolId, npcUuid);
-            if (!removeResult.removed) {
-                sendWarningMessage(player, "Unable to unlink that NPC from this tool.");
-                return;
-            }
-            sendSuccessMessage(player, "Unlinked " + removeResult.npcName + ".");
             return;
         }
         CommandEntry selected = config.findCommandById(commandId);
@@ -374,189 +349,13 @@ public final class CommandItemFeatureHandler {
     }
 
     private boolean setSelectedCommandOnTool(Player player, String toolId, String commandId) {
-        ToolStackSlot slot = findToolStackSlot(player, toolId);
-        if (slot == null || slot.stack == null || slot.stack.isEmpty()) {
-            return false;
-        }
-        ItemStack updated = slot.stack.withMetadata(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING, commandId);
-        return updateToolStackSlot(player, slot.slot, updated);
-    }
-
-    private List<TameworkCommandSelectionPage.LinkedNpcMenuEntry> buildLinkedNpcMenuEntries(Player player,
-                                                                                             Store<EntityStore> store,
-                                                                                             String toolId) {
-        if (player == null || store == null || toolId == null || toolId.isBlank()) {
-            return List.of();
-        }
-        ToolStackSlot slot = findToolStackSlot(player, toolId);
-        if (slot == null || slot.stack == null || slot.stack.isEmpty()) {
-            return List.of();
-        }
-        List<LinkedNpcRecord> records = readLinkedNpcRecords(slot.stack);
-        if (records.isEmpty()) {
-            return List.of();
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return List.of();
-        }
-        ArrayList<TameworkCommandSelectionPage.LinkedNpcMenuEntry> entries = new ArrayList<>(records.size());
-        for (LinkedNpcRecord record : records) {
-            if (record == null || record.npcUuid == null) {
-                continue;
-            }
-            entries.add(buildLinkedNpcMenuEntry(record, world, store));
-        }
-        return entries;
-    }
-
-    private TameworkCommandSelectionPage.LinkedNpcMenuEntry buildLinkedNpcMenuEntry(LinkedNpcRecord record,
-                                                                                     World world,
-                                                                                     Store<EntityStore> store) {
-        String fallbackName = "NPC " + shortUuid(record.npcUuid);
-        String displayName = fallbackName;
-        String statusText = "Unloaded";
-        float healthRatio = 0.0f;
-        String healthText = "Health: unknown";
-
-        Ref<EntityStore> ref = world != null ? world.getEntityRef(record.npcUuid) : null;
-        if (ref != null && ref.isValid() && store != null) {
-            NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
-            if (npc != null) {
-                displayName = resolveNpcDisplayName(npc, fallbackName);
-                statusText = "Loaded";
-                HealthDisplay healthDisplay = resolveHealthDisplay(ref, store);
-                healthRatio = healthDisplay.ratio;
-                healthText = healthDisplay.text;
-            }
-        }
-
-        return new TameworkCommandSelectionPage.LinkedNpcMenuEntry(
-                record.npcUuid.toString(),
-                displayName,
-                healthRatio,
-                healthText,
-                statusText
-        );
-    }
-
-    private RemoveLinkResult removeLinkedNpcFromTool(Player player,
-                                                     Store<EntityStore> store,
-                                                     String toolId,
-                                                     UUID npcUuid) {
-        if (player == null || store == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return RemoveLinkResult.notRemoved();
-        }
-        World world = player.getWorld();
-        String fallbackName = "NPC " + shortUuid(npcUuid);
-        String npcName = fallbackName;
-        boolean componentRemoved = false;
-        if (world != null) {
-            Ref<EntityStore> ref = world.getEntityRef(npcUuid);
-            if (ref != null && ref.isValid()) {
-                NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
-                if (npc != null) {
-                    npcName = resolveNpcDisplayName(npc, fallbackName);
-                }
-                TameworkCommandLinksComponent links = store.getComponent(ref, TameworkCommandLinksComponent.getComponentType());
-                if (links != null && links.containsToolId(toolId)) {
-                    store.putComponent(ref, TameworkCommandLinksComponent.getComponentType(), links.withToolIdRemoved(toolId));
-                    componentRemoved = true;
-                }
-            }
-        }
-
-        ToolStackSlot slot = findToolStackSlot(player, toolId);
-        if (slot == null || slot.stack == null || slot.stack.isEmpty()) {
-            return new RemoveLinkResult(componentRemoved, npcName);
-        }
-
-        int before = readLinkedNpcRecords(slot.stack).size();
-        ItemStack updated = removeLinkedNpcRecord(slot.stack, npcUuid);
-        int after = readLinkedNpcRecords(updated).size();
-        boolean itemRemoved = after < before;
-        boolean itemUpdated = itemRemoved || updated != slot.stack;
-        if (itemUpdated) {
-            updateToolStackSlot(player, slot.slot, updated);
-        }
-        return new RemoveLinkResult(componentRemoved || itemRemoved, npcName);
-    }
-
-    private HealthDisplay resolveHealthDisplay(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return HealthDisplay.unknown();
-        }
-        EntityStatMap statMap = store.getComponent(npcRef, EntityStatMap.getComponentType());
-        if (statMap == null) {
-            return HealthDisplay.unknown();
-        }
-        int healthIndex = EntityStatType.getAssetMap().getIndex(HEALTH_STAT_ID);
-        if (healthIndex < 0) {
-            return HealthDisplay.unknown();
-        }
-        EntityStatValue value = statMap.get(healthIndex);
-        if (value == null || value.getMax() <= 0.0f) {
-            return HealthDisplay.unknown();
-        }
-        float current = Math.max(0.0f, value.get());
-        float max = Math.max(1.0f, value.getMax());
-        float ratio = Math.max(0.0f, Math.min(1.0f, current / max));
-        String text = "Health: " + Math.round(current) + "/" + Math.round(max);
-        return new HealthDisplay(ratio, text);
-    }
-
-    private String resolveNpcDisplayName(NPCEntity npc, String fallback) {
-        if (npc == null) {
-            return fallback;
-        }
-        String displayName = npc.getLegacyDisplayName();
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName;
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
-        return fallback;
-    }
-
-    private String shortUuid(UUID uuid) {
-        if (uuid == null) {
-            return "unknown";
-        }
-        String raw = uuid.toString();
-        return raw.length() > 8 ? raw.substring(0, 8) : raw;
-    }
-
-    private UUID parseUuid(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw.trim());
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private Store<EntityStore> resolvePlayerStore(Player player) {
-        if (player == null || player.getWorld() == null || player.getWorld().getEntityStore() == null) {
-            return null;
-        }
-        return player.getWorld().getEntityStore().getStore();
-    }
-
-    private ToolStackSlot findToolStackSlot(Player player, String toolId) {
-        if (player == null || toolId == null || toolId.isBlank()) {
-            return null;
-        }
-        Inventory inventory = player.getInventory();
+        Inventory inventory = player != null ? player.getInventory() : null;
         if (inventory == null) {
-            return null;
+            return false;
         }
         ItemContainer hotbar = inventory.getHotbar();
         if (hotbar == null) {
-            return null;
+            return false;
         }
         short capacity = hotbar.getCapacity();
         for (short slot = 0; slot < capacity; slot++) {
@@ -568,27 +367,13 @@ public final class CommandItemFeatureHandler {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            return new ToolStackSlot(slot, stack);
+            ItemStack updated = stack.withMetadata(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING, commandId);
+            hotbar.setItemStackForSlot(slot, updated);
+            inventory.markChanged();
+            player.sendInventory();
+            return true;
         }
-        return null;
-    }
-
-    private boolean updateToolStackSlot(Player player, short slot, ItemStack updated) {
-        if (player == null || updated == null) {
-            return false;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        if (hotbar == null || slot < 0 || slot >= hotbar.getCapacity()) {
-            return false;
-        }
-        hotbar.setItemStackForSlot(slot, updated);
-        inventory.markChanged();
-        player.sendInventory();
-        return true;
+        return false;
     }
 
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
@@ -2003,44 +1788,6 @@ public final class CommandItemFeatureHandler {
 
         private static LinkToggleResult notToggled() {
             return new LinkToggleResult(false, false, null, null);
-        }
-    }
-
-    private static final class ToolStackSlot {
-        private final short slot;
-        private final ItemStack stack;
-
-        private ToolStackSlot(short slot, ItemStack stack) {
-            this.slot = slot;
-            this.stack = stack;
-        }
-    }
-
-    private static final class HealthDisplay {
-        private final float ratio;
-        private final String text;
-
-        private HealthDisplay(float ratio, String text) {
-            this.ratio = Math.max(0.0f, Math.min(1.0f, ratio));
-            this.text = text;
-        }
-
-        private static HealthDisplay unknown() {
-            return new HealthDisplay(0.0f, "Health: unknown");
-        }
-    }
-
-    private static final class RemoveLinkResult {
-        private final boolean removed;
-        private final String npcName;
-
-        private RemoveLinkResult(boolean removed, String npcName) {
-            this.removed = removed;
-            this.npcName = npcName;
-        }
-
-        private static RemoveLinkResult notRemoved() {
-            return new RemoveLinkResult(false, "NPC");
         }
     }
 }

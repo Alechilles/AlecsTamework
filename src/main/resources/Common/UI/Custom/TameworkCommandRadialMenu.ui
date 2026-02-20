@@ -85,7 +85,7 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkCommandMenuWheel {
-    Anchor: (Width: 1280, Height: 760);
+    Anchor: (Width: 920, Height: 760);
     Visible: false;
 
     Label #TameworkCommandMenuTitle {
@@ -109,46 +109,6 @@ $C.@PageOverlay {
         HorizontalAlignment: Center,
         VerticalAlignment: Center
       );
-    }
-
-    Group #LinkedNpcPanel {
-      Anchor: (Top: 92, Left: 800, Width: 452, Height: 640);
-      LayoutMode: Top;
-      Padding: (Horizontal: 14, Vertical: 12);
-      Background: #0b1a2c(0.78);
-
-      Label #LinkedNpcPanelTitle {
-        Anchor: (Height: 28);
-        Text: "Linked Companions";
-        Style: (
-          FontSize: 24,
-          RenderBold: true,
-          TextColor: #eef3f8,
-          HorizontalAlignment: Left,
-          VerticalAlignment: Center
-        );
-      }
-
-      Label #LinkedNpcPanelCount {
-        Anchor: (Top: 2, Height: 20);
-        Text: "";
-        Style: (
-          FontSize: 14,
-          TextColor: #c4d2e1,
-          HorizontalAlignment: Left,
-          VerticalAlignment: Center
-        );
-      }
-
-      Group {
-        Anchor: (Top: 8, Height: 1);
-      }
-
-      Group #LinkedNpcList {
-        LayoutMode: TopScrolling;
-        FlexWeight: 1;
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
-      }
     }
 
     Group #CommandWheelOuterRing {

@@ -82,7 +82,7 @@ public class Tamework extends JavaPlugin {
     private static Tamework instance;
     private static final short EARLY_ASSET_PACK_ORDER_PRIORITY = (short) -40;
     private static final String BASE_ASSET_PACK_ID = "Hytale:Hytale";
-    private static final boolean ENABLE_EARLY_ASSET_PACK_ORDERING = false;
+    private static final boolean ENABLE_EARLY_ASSET_PACK_ORDERING = true;
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private NameItemRegistry nameItemRegistry;
