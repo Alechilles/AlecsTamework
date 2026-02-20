@@ -348,6 +348,8 @@ public class Tamework extends JavaPlugin {
             return;
         }
 
+        removeLegacyStandaloneAssetPack(assetModule, packId, pluginPackPath);
+
         AssetPack existingPack = assetModule.getAssetPack(packId);
         if (existingPack != null) {
             Path existingPackPath = normalizePath(existingPack.getPackLocation());
@@ -396,6 +398,21 @@ public class Tamework extends JavaPlugin {
                 "Tamework asset pack ordering: moved pack '" + packId + "' from index "
                         + currentIndex + " to index " + targetIndex + "."
         );
+    }
+
+    private void removeLegacyStandaloneAssetPack(AssetModule assetModule, String packId, Path pluginPackPath) {
+        String legacyPackId = packId + " (Assets)";
+        AssetPack legacyPack = assetModule.getAssetPack(legacyPackId);
+        if (legacyPack == null) {
+            return;
+        }
+        Path legacyPackPath = normalizePath(legacyPack.getPackLocation());
+        getLogger().at(Level.INFO).log(
+                "Tamework asset pack ordering: removing legacy standalone pack '"
+                        + legacyPackId + "' from " + legacyPackPath + "."
+        );
+        assetModule.unregisterPack(legacyPackId);
+        tryDeleteLegacyAssetsZip(legacyPackPath, pluginPackPath);
     }
 
     private void tryDeleteLegacyAssetsZip(Path existingPackPath, Path pluginPackPath) {
