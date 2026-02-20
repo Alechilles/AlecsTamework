@@ -30,11 +30,72 @@ import javax.annotation.Nonnull;
 public final class TameworkCommandSelectionPage
         extends InteractiveCustomUIPage<TameworkCommandSelectionPage.CommandSelectionEventData> {
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
-    public static final String LINKED_NPC_ROW_UI_PATH = "TameworkLinkedNpcRow.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final String REMOVE_LINK_PREFIX = "__remove_link__:";
     private static final int MAX_COMMAND_BUTTONS = 8;
+    private static final String LINKED_NPC_ROW_INLINE = """
+            Group #LinkedNpcRow {
+              Anchor: (Height: 78);
+              Background: #13263c(0.86);
+
+              Label #LinkedNpcName {
+                Anchor: (Top: 8, Left: 10, Right: 164, Height: 22);
+                Text: "";
+                Style: (
+                  FontSize: 16,
+                  RenderBold: true,
+                  TextColor: #eff4fa,
+                  HorizontalAlignment: Left,
+                  VerticalAlignment: Center,
+                  ShrinkTextToFit: true,
+                  MinShrinkTextToFitFontSize: 11
+                );
+              }
+
+              Label #LinkedNpcStatus {
+                Anchor: (Top: 9, Right: 88, Width: 72, Height: 20);
+                Text: "";
+                Style: (
+                  FontSize: 12,
+                  TextColor: #bad4e6,
+                  HorizontalAlignment: Center,
+                  VerticalAlignment: Center
+                );
+              }
+
+              TextButton #LinkedNpcRemove {
+                Anchor: (Top: 6, Right: 10, Width: 70, Height: 24);
+                Text: "Remove";
+              }
+
+              Group #LinkedNpcHealthFrame {
+                Anchor: (Top: 36, Left: 10, Right: 10, Height: 16);
+                Background: #0a121b(0.95);
+                Padding: (Horizontal: 1, Vertical: 1);
+
+                ProgressBar #LinkedNpcHealthBar {
+                  Anchor: (Left: 0, Right: 0, Height: 14);
+                  Background: #2b4357;
+                  Bar: #6fc576;
+                  Value: 0.0;
+                }
+              }
+
+              Label #LinkedNpcHealthText {
+                Anchor: (Top: 54, Left: 12, Right: 12, Height: 16);
+                Text: "";
+                Style: (
+                  FontSize: 11,
+                  TextColor: #bed0e3,
+                  HorizontalAlignment: Left,
+                  VerticalAlignment: Center,
+                  ShrinkTextToFit: true,
+                  MinShrinkTextToFitFontSize: 10
+                );
+              }
+            }
+            """;
 
     private final CommandOption[] options;
     private final String selectedCommandId;
@@ -133,7 +194,7 @@ public final class TameworkCommandSelectionPage
         for (int i = 0; i < entries.size(); i++) {
             LinkedNpcMenuEntry entry = entries.get(i);
             String selector = "#LinkedNpcList[" + i + "]";
-            commandBuilder.append("#LinkedNpcList", LINKED_NPC_ROW_UI_PATH);
+            commandBuilder.appendInline("#LinkedNpcList", LINKED_NPC_ROW_INLINE);
             commandBuilder.set(selector + " #LinkedNpcName.Text", entry.displayName());
             commandBuilder.set(selector + " #LinkedNpcStatus.Text", entry.statusText());
             commandBuilder.set(selector + " #LinkedNpcHealthBar.Value", entry.healthRatio());
