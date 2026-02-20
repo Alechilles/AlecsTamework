@@ -39,6 +39,12 @@ Extra info params provided:
 - `HookPlayerName`
 - `HookHeldItemId`
 - `HookTimestampMs`
+- `HookHasTargetPosition`
+- `HookTargetX`
+- `HookTargetY`
+- `HookTargetZ`
+
+When target-position values are present, `TameworkHook` also exposes them through the sensor position provider, so movement instructions can seek directly to hook targets.
 
 ## Example
 Custom interaction effect:
@@ -73,3 +79,6 @@ NPC instructions using the hook:
 ## Notes
 - Hooks are stored on the NPC component, so they persist until consumed or replaced.
 - Use unique `HookId` values to avoid collisions when multiple systems emit hooks.
+- Command-item move/home commands use this bridge pattern with hook ids:
+  - `Tamework.Command.MoveToPosition.RaycastHit`
+  - `Tamework.Command.MoveToPosition.StoredHome`

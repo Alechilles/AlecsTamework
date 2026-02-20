@@ -6,13 +6,18 @@ How the project is packaged and where outputs go.
 Built via Maven. The jar includes:
 - Java code
 - `src/main/resources` assets (`Common/`, `Server/`, and metadata)
-- Manifest and metadata
+- Filtered manifests (`manifest.json`, `manifest-assets.json`)
 
-## Assets zip
-No standalone assets zip is produced by default.
+## Packaging model
+- Tamework is shipped as jar-only.
+- No standalone `(Assets)` zip is produced by current build profiles.
+- Runtime asset-pack ordering keeps Tamework directly after `Hytale:Hytale` before the main load pass.
+- Legacy standalone `Alec's Tamework! (Assets)` packs/zips are removed/replaced when detected in the same mods directory.
 
-## Why One
-Builds now ship jar-only. Asset resources are embedded in the plugin jar, and install/run profiles copy only the jar to mods directories.
+## Maven profiles
+- `install-plugin`: copies only the built jar to server mods and userdata mods paths.
+- `run-server`: copies only the built jar, then starts the server.
+- `prerelease` (`-Dprerelease=true`): switches install paths to prerelease.
 
 ## Dev hot reload
 During dev runs, the server references `src/main/resources` directly for faster iteration.

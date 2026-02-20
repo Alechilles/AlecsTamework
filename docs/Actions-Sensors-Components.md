@@ -18,17 +18,20 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `TameworkHasOwner`: True when the NPC has an owner component.
 - `TameworkIsTamed`: True when the NPC has the tamed component set or its role id starts with `Tamed`.
 - `TameworkHook`: True when the NPC has a matching hook signal. Emits extra info params:
-  `HookId`, `HookPlayerId`, `HookPlayerName`, `HookHeldItemId`, `HookTimestampMs`.
+  `HookId`, `HookPlayerId`, `HookPlayerName`, `HookHeldItemId`, `HookTimestampMs`,
+  `HookHasTargetPosition`, `HookTargetX`, `HookTargetY`, `HookTargetZ`.
 
 ## Components
 - `TameworkOwnerComponent`: Stores owner UUID and name.
 - `TameworkTamedComponent`: Stores tamed boolean.
 - `TameworkHookComponent`: Stores the latest hook signal for instruction bridges.
 - `TameworkNpcNameComponent`: Stores custom NPC name metadata (name, owner id, timestamp). Names are re‑applied on load and preserved by spawner capture.
+- `TameworkCommandLinksComponent`: Stores per-owner command tool links on NPCs.
 
 ## Item interactions
 - `TameworkSpawn`: Custom item interaction used by spawner items to capture or spawn NPCs.
 - `TameworkNameNpc`: Custom item interaction used by naming items to name tamed NPCs via chat input.
+- `TameworkCommand`: Custom item interaction used by command tools for linking, command selection, and command dispatch.
 
 ## Commands
 - `/tw getowner` prints the owner name + UUID (when available).
@@ -36,7 +39,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `/tw getalarm [AlarmName] [NpcUuid]` prints alarm status (unset/active/passed) and remaining time when set. Uses the NPC in view if no UUID is provided. Defaults to `TwGlobalConfig.HarvestAlarmName` (default `Harvest_Ready`) when no alarm name is supplied.
 - `/tw setowner` assigns the targeted NPC to the executing player.
 - `/tw settamed` toggles the tamed flag on the targeted NPC.
-- `/tw reloadconfig` reloads spawner + naming item configs from disk (TwSpawnerConfig + TwNameItemConfig assets).
+- `/tw reloadconfig` reloads spawner + naming + command item configs from disk (`TwSpawnerConfig`, `TwNameItemConfig`, `TwCommandItemConfig`).
 - `/tw debughook [on|off]` toggles hook debug logging (or explicitly enables/disables it).
 - `/tw debugprompt [on|off]` toggles interaction prompt diagnostics (selection + alarm state).
 - `/tw debugspawner [on|off]` toggles spawner raycast debug logs.
@@ -45,3 +48,4 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - Components persist across reloads.
 - `TameworkHook` can be paired with the `TriggerNpcHook` effect in `TwInteractionConfig` to bridge interaction logic into custom NPC instructions.
 - `TameworkInteract` logs a warning when no interaction matches, which is useful for debugging requirements.
+- See `docs/Command-Items.md` for command-tool command list schema, selection UI, and relocation behavior.

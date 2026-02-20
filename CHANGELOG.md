@@ -3,27 +3,27 @@
 All notable changes to **Alec's Tamework!** will be documented in this file.
 
 ## Unreleased
+### Added
+- New command item config asset type **TwCommandItemConfig** under `Server/Tamework/Items/Commands`, plus the `TameworkCommand` item interaction and example command whistle assets.
+- Command item runtime support for per-tool linking, selected-command metadata, command-step execution, and command feedback (chat/HUD/sound/particles).
+- Command selection radial UI page (`TameworkCommandRadialMenu.ui`) opened via secondary use (`CommandId: OpenSelectionMenu`) with clickable slice buttons.
+- New `Component_Tamework_Instruction_Command_Move` instruction bridge for move-to-ping/return-home hooks.
+- `TameworkHook` now exposes hook target-position info (`HookHasTargetPosition`, `HookTargetX/Y/Z`) and position-provider support for movement instructions.
+- Off-screen command relocation queue service with chunk preload retries, last-known NPC position tracking, and on-load application for unloaded linked NPCs.
+- Early asset-pack ordering hook that reorders Tamework directly after `Hytale:Hytale`, replaces conflicting Tamework packs with the plugin jar pack, and removes legacy standalone `Alec's Tamework! (Assets)` packs/archives.
+
 ### Changed
 - `Component_Tamework_Instruction_Defend` now delegates non-combat follow behavior through configurable `DefendFollowMacroElement` (defaults to `Component_Tamework_Instruction_Follow_Simple_TP`), so modders can swap in custom follow components without editing Tamework core assets.
 - Removed unused legacy parameters from `Component_Tamework_Instruction_Follow_Simple` so the asset only exposes fields that are actually consumed by the simple follow logic.
-- Command whistle secondary use now opens a clickable command selection wheel page (radial-style layout) for direct command selection.
-- Command selection wheel visuals now use dedicated UI ring textures instead of `CircularProgressBar`, eliminating arc artifacts and enabling cleaner circular styling.
-- Command wheel command buttons now render as texture-based radial pie slices with hover/pressed states, while command labels render separately around the wheel for readability.
-- Command wheel art pack now includes a styled center panel texture and geometry-aligned anchors for slice hitboxes/labels, improving visual alignment of the radial UI.
-- Command wheel background ring layers are now disabled by default so the radial slices read more cleanly with less visual noise.
-- Command wheel slice textures now use a single-tone dark blue style, and the center status panel texture has been switched from rounded-square to circular.
-- Command labels are now anchored inside each slice region and no longer prepend a selected-command bullet, reducing overflow on long labels like `Attack Target`.
-- Command wheel close button position is now offset lower to avoid overlapping the bottom radial slice.
+- Command wheel visuals now use textured radial slices and a circular center panel; labels are aligned inside slices, background ring layers are disabled by default, and close-button placement avoids overlap with the lower slice.
 - Command links are now mirrored onto command-tool metadata (`UUID + last-known position`) so linked NPC sets can still be resolved for off-screen command handling.
 - Long-distance command relocation now uses a hybrid flow: far `ReturnHome` first paths a short visible segment before deferred teleport, and far `Recall` relocates near the player before normal follow behavior resumes.
 - Off-screen relocation now retries chunk preloading (source + destination) on a bounded interval/time window, improving reliability when linked NPCs are far outside active player chunks.
 - Relocation source chunk hints now fall back to server-side last-known NPC positions captured on entity add/remove, improving chunk targeting after pets unload.
 - Command relocation/recall tuning values (hybrid path/teleport thresholds and relocation retry limits) are now configurable via `TwGlobalConfig`.
 - Follow seek behavior now tracks the locked `MasterTarget` directly (instead of visibility-dependent player sensors), so follow mode is no longer blocked by grass/occluders.
-- Updated Tamework plugin and assets manifests `ServerVersion` to `2026.02.18-f3b8fff95` for latest pre-release server compatibility.
-- Added an early asset-pack ordering hook that keeps `Alechilles:Alec's Tamework!` directly after `Hytale:Hytale` before the main `LoadAssetEvent` asset load pass.
 - Packaging now embeds `Common/` and `Server/` assets directly in the plugin jar and deploy profiles copy jar-only (no separate `(Assets)` zip).
-- Early asset-pack ordering now removes the legacy standalone `Alechilles:Alec's Tamework! (Assets)` pack, replaces any conflicting Tamework pack with the plugin jar pack, and deletes legacy Tamework `(Assets)` zip archives in the same mods folder when detected.
+- Updated Tamework plugin and assets manifests `ServerVersion` to `2026.02.18-f3b8fff95` for latest pre-release server compatibility.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.

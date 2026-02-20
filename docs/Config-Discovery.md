@@ -7,12 +7,14 @@ This document explains how Tamework discovers asset based configuration and sett
   `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - TwNameItemConfig assets live under:
   `<ModRoot>/Server/Tamework/Items/Naming/*.json`
+- TwCommandItemConfig assets live under:
+  `<ModRoot>/Server/Tamework/Items/Commands/*.json`
 - TwInteractionConfig assets live under:
   `<ModRoot>/Server/Tamework/Interactions/*.json`
 - TwGlobalConfig assets live under:
   `<ModRoot>/Server/Tamework/Global/*.json`
 
-Both asset types are registered with the asset registry and are available to any mod that ships assets at those paths.
+These asset types are registered with the asset registry and are available to any mod that ships assets at those paths.
 
 ## Resolution and overrides
 - Asset ids are derived from the filename (standard asset behavior).
@@ -49,5 +51,6 @@ String parameter-name fields are required; missing or blank values emit a warnin
 Numeric command-tuning fields are optional and fall back to built-in defaults when omitted or invalid.
 
 ## Reloading
-- `/tw reloadconfig` reloads spawner + naming item configs from disk (TwSpawnerConfig + TwNameItemConfig).
+- `/tw reloadconfig` reloads spawner + naming + command item configs from disk
+  (`TwSpawnerConfig`, `TwNameItemConfig`, `TwCommandItemConfig`).
 - TwInteractionConfig assets are managed by the asset registry and do not require a manual reload command.
