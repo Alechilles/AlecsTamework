@@ -1,0 +1,65 @@
+$C = "Common.ui";
+
+@LinkedNpcHealthBarFill = PatchStyle(Color: #6fc576);
+@LinkedNpcHealthBarBackground = PatchStyle(Color: #2b4357);
+
+Group #LinkedNpcRow {
+  Anchor: (Height: 78);
+  Background: #13263c(0.86);
+
+  Label #LinkedNpcName {
+    Anchor: (Top: 8, Left: 10, Right: 164, Height: 22);
+    Text: "";
+    Style: (
+      FontSize: 16,
+      RenderBold: true,
+      TextColor: #eff4fa,
+      HorizontalAlignment: Left,
+      VerticalAlignment: Center,
+      ShrinkTextToFit: true,
+      MinShrinkTextToFitFontSize: 11
+    );
+  }
+
+  Label #LinkedNpcStatus {
+    Anchor: (Top: 9, Right: 88, Width: 72, Height: 20);
+    Text: "";
+    Style: (
+      FontSize: 12,
+      TextColor: #bad4e6,
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center
+    );
+  }
+
+  $C.@SecondaryTextButton #LinkedNpcRemove {
+    @Anchor = (Top: 6, Right: 10, Width: 70, Height: 24);
+    Text: "Remove";
+  }
+
+  Group #LinkedNpcHealthFrame {
+    Anchor: (Top: 36, Left: 10, Right: 10, Height: 16);
+    Background: #0a121b(0.95);
+    Padding: (Horizontal: 1, Vertical: 1);
+
+    ProgressBar #LinkedNpcHealthBar {
+      Anchor: (Left: 0, Right: 0, Height: 14);
+      Background: @LinkedNpcHealthBarBackground;
+      Bar: @LinkedNpcHealthBarFill;
+      Value: 0.0;
+    }
+  }
+
+  Label #LinkedNpcHealthText {
+    Anchor: (Top: 54, Left: 12, Right: 12, Height: 16);
+    Text: "";
+    Style: (
+      FontSize: 11,
+      TextColor: #bed0e3,
+      HorizontalAlignment: Left,
+      VerticalAlignment: Center,
+      ShrinkTextToFit: true,
+      MinShrinkTextToFitFontSize: 10
+    );
+  }
+}
