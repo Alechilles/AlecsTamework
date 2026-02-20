@@ -82,6 +82,7 @@ public class Tamework extends JavaPlugin {
     private static Tamework instance;
     private static final short EARLY_ASSET_PACK_ORDER_PRIORITY = (short) -40;
     private static final String BASE_ASSET_PACK_ID = "Hytale:Hytale";
+    private static final boolean ENABLE_EARLY_ASSET_PACK_ORDERING = false;
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private NameItemRegistry nameItemRegistry;
@@ -320,6 +321,12 @@ public class Tamework extends JavaPlugin {
 
     // Move Tamework's embedded asset pack before other mod packs before the core load pass.
     private void registerEarlyAssetPackOrderingHook() {
+        if (!ENABLE_EARLY_ASSET_PACK_ORDERING) {
+            getLogger().at(Level.INFO).log(
+                    "Tamework asset pack ordering: early reorder hook disabled for compatibility diagnostics."
+            );
+            return;
+        }
         if (getEventRegistry() == null) {
             return;
         }
