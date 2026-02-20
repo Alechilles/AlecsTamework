@@ -23,6 +23,7 @@ All notable changes to **Alec's Tamework!** will be documented in this file.
 - Updated Tamework plugin and assets manifests `ServerVersion` to `2026.02.18-f3b8fff95` for latest pre-release server compatibility.
 - Added an early asset-pack ordering hook that keeps `Alechilles:Alec's Tamework!` directly after `Hytale:Hytale` before the main `LoadAssetEvent` asset load pass.
 - Packaging now embeds `Common/` and `Server/` assets directly in the plugin jar and deploy profiles copy jar-only (no separate `(Assets)` zip).
+- Early asset-pack ordering now replaces any pre-registered conflicting Tamework pack with the plugin jar pack; legacy Tamework `(Assets)` zip archives in the same mods folder are deleted when detected.
 
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.

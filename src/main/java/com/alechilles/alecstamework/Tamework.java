@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
+import java.util.Locale;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
@@ -337,6 +340,27 @@ public class Tamework extends JavaPlugin {
         }
 
         String packId = new PluginIdentifier(getManifest()).toString();
+        Path pluginPackPath = normalizePath(getFile());
+        if (pluginPackPath == null) {
+            getLogger().at(Level.WARNING).log(
+                    "Tamework asset pack ordering: plugin file path unavailable during LoadAssetEvent."
+            );
+            return;
+        }
+
+        AssetPack existingPack = assetModule.getAssetPack(packId);
+        if (existingPack != null) {
+            Path existingPackPath = normalizePath(existingPack.getPackLocation());
+            if (!samePath(existingPackPath, pluginPackPath)) {
+                getLogger().at(Level.INFO).log(
+                        "Tamework asset pack ordering: replacing pre-registered pack '" + packId
+                                + "' from " + existingPackPath + " with " + pluginPackPath + "."
+                );
+                assetModule.unregisterPack(packId);
+                tryDeleteLegacyAssetsZip(existingPackPath, pluginPackPath);
+            }
+        }
+
         if (assetModule.getAssetPack(packId) == null) {
             try {
                 assetModule.registerPack(packId, getFile(), getManifest(), true);
@@ -372,6 +396,51 @@ public class Tamework extends JavaPlugin {
                 "Tamework asset pack ordering: moved pack '" + packId + "' from index "
                         + currentIndex + " to index " + targetIndex + "."
         );
+    }
+
+    private void tryDeleteLegacyAssetsZip(Path existingPackPath, Path pluginPackPath) {
+        if (existingPackPath == null || !isLegacyAssetsZip(existingPackPath)) {
+            return;
+        }
+        Path pluginDir = pluginPackPath.getParent();
+        Path existingDir = existingPackPath.getParent();
+        if (pluginDir == null || existingDir == null || !pluginDir.equals(existingDir)) {
+            return;
+        }
+        try {
+            if (Files.deleteIfExists(existingPackPath)) {
+                getLogger().at(Level.INFO).log(
+                        "Tamework asset pack ordering: deleted legacy assets archive " + existingPackPath + "."
+                );
+            }
+        } catch (Exception ex) {
+            getLogger().at(Level.WARNING).withCause(ex).log(
+                    "Tamework asset pack ordering: failed to delete legacy assets archive " + existingPackPath + "."
+            );
+        }
+    }
+
+    private boolean isLegacyAssetsZip(Path path) {
+        String fileName = path.getFileName() == null
+                ? ""
+                : path.getFileName().toString().toLowerCase(Locale.ROOT);
+        return fileName.endsWith(".zip")
+                && fileName.contains("tamework")
+                && fileName.contains("assets");
+    }
+
+    private Path normalizePath(Path path) {
+        if (path == null) {
+            return null;
+        }
+        return path.toAbsolutePath().normalize();
+    }
+
+    private boolean samePath(Path a, Path b) {
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.equals(b);
     }
 
     private int desiredTameworkPackIndex(List<AssetPack> packs) {
