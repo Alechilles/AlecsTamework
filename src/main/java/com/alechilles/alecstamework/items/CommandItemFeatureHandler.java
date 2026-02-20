@@ -182,7 +182,6 @@ public final class CommandItemFeatureHandler {
 
         Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, command, targetRef);
         Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, command);
-        Vector3d storedHomePosition = resolveStoredHomePosition(working, command);
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         double returnHomeTeleportDistance = resolvePositiveDouble(
                 globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDistance() : 0.0,
@@ -214,7 +213,6 @@ public final class CommandItemFeatureHandler {
                 tool.toolId,
                 commandTarget,
                 raycastPosition,
-                storedHomePosition,
                 working,
                 globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
                 globalConfig != null && globalConfig.isInvulnerableIfOwned(),
@@ -225,22 +223,9 @@ public final class CommandItemFeatureHandler {
                 recallForceRelocateDistance
         );
 
-        GlobalStepResult globalStepResult = executeGlobalSteps(context);
-        if (context.itemChanged) {
-            working = context.workingItem;
-            updateHeldItem = true;
-        }
-        if (globalStepResult.blocked) {
-            if (updateHeldItem) {
-                updateHeldItem(player, working);
-            }
-            sendWarningMessage(player, "That command could not be executed.");
-            return false;
-        }
-
         List<Candidate> recipients = queryRecipients(context);
         List<LinkedNpcRecord> unloadedLinked = queryUnloadedLinkedRecords(context, recipients);
-        if (recipients.isEmpty() && unloadedLinked.isEmpty() && !globalStepResult.applied) {
+        if (recipients.isEmpty() && unloadedLinked.isEmpty()) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
@@ -268,7 +253,7 @@ public final class CommandItemFeatureHandler {
             updateHeldItem = true;
         }
         int queued = queueRelocationsForUnloaded(context, unloadedLinked);
-        if (affected <= 0 && queued <= 0 && !globalStepResult.applied) {
+        if (affected <= 0 && queued <= 0) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
@@ -289,7 +274,7 @@ public final class CommandItemFeatureHandler {
         if (updateHeldItem) {
             updateHeldItem(player, working);
         }
-        emitCommandExecutionFeedback(context, affected, queued, globalStepResult.applied);
+        emitCommandExecutionFeedback(context, affected, queued);
         return true;
     }
 
@@ -532,19 +517,6 @@ public final class CommandItemFeatureHandler {
         return TargetUtil.getTargetLocation(playerRef, blockId -> blockId != 0, distance, store);
     }
 
-    private Vector3d resolveStoredHomePosition(ItemStack stack, CommandEntry command) {
-        if (!needsStoredHome(command) || stack == null || stack.isEmpty()) {
-            return null;
-        }
-        Double x = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_HOME_X, Codec.DOUBLE);
-        Double y = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_HOME_Y, Codec.DOUBLE);
-        Double z = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_HOME_Z, Codec.DOUBLE);
-        if (x == null || y == null || z == null) {
-            return null;
-        }
-        return new Vector3d(x, y, z);
-    }
-
     private boolean needsRaycast(CommandEntry command) {
         if (command == null || command.getSteps() == null) {
             return false;
@@ -559,44 +531,6 @@ public final class CommandItemFeatureHandler {
             }
         }
         return false;
-    }
-
-    private boolean needsStoredHome(CommandEntry command) {
-        if (command == null || command.getSteps() == null) {
-            return false;
-        }
-        for (CommandStep step : command.getSteps()) {
-            if (step instanceof MoveToPositionStep moveStep && moveStep.getSource() == MoveSource.StoredHome) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private GlobalStepResult executeGlobalSteps(Context context) {
-        CommandStep[] steps = context.command.getSteps();
-        if (steps == null || steps.length == 0) {
-            return GlobalStepResult.none();
-        }
-        boolean applied = false;
-        for (CommandStep step : steps) {
-            if (!(step instanceof StoreHomeStep storeHomeStep)) {
-                continue;
-            }
-            boolean ok = applyStoreHome(storeHomeStep, context);
-            if (ok) {
-                applied = true;
-                continue;
-            }
-            if (step.isOptional()) {
-                continue;
-            }
-            FailurePolicy policy = step.getFailurePolicy() != null ? step.getFailurePolicy() : FailurePolicy.Continue;
-            if (policy == FailurePolicy.AbortAll || policy == FailurePolicy.AbortCommandForNpc) {
-                return new GlobalStepResult(applied, true);
-            }
-        }
-        return new GlobalStepResult(applied, false);
     }
 
     private List<Candidate> queryRecipients(Context context) {
@@ -721,13 +655,13 @@ public final class CommandItemFeatureHandler {
                 continue;
             }
             if (returnHome) {
-                if (context.storedHomePosition == null) {
+                if (record.homePosition == null) {
                     continue;
                 }
                 relocationService.queueRelocation(
                         world,
                         record.npcUuid,
-                        context.storedHomePosition,
+                        record.homePosition,
                         ownerUuid,
                         false,
                         true,
@@ -875,9 +809,6 @@ public final class CommandItemFeatureHandler {
             if (step == null) {
                 continue;
             }
-            if (isGlobalStep(step)) {
-                continue;
-            }
             boolean ok = applyStep(step, context, candidate);
             if (ok) {
                 applied = true;
@@ -895,10 +826,6 @@ public final class CommandItemFeatureHandler {
             }
         }
         return new StepResult(applied, false);
-    }
-
-    private boolean isGlobalStep(CommandStep step) {
-        return step instanceof StoreHomeStep;
     }
 
     private StepResult executeModeMapping(Context context, Candidate candidate) {
@@ -936,7 +863,7 @@ public final class CommandItemFeatureHandler {
             return applyMove(moveStep, context, candidate);
         }
         if (step instanceof StoreHomeStep storeHomeStep) {
-            return applyStoreHome(storeHomeStep, context);
+            return applyStoreHome(storeHomeStep, context, candidate);
         }
         if (step instanceof TriggerHookStep hookStep) {
             return applyHook(hookStep.getHookId(), context, candidate.ref);
@@ -1056,7 +983,7 @@ public final class CommandItemFeatureHandler {
                 return false;
             }
         } else if (source == MoveSource.StoredHome) {
-            targetPosition = context.storedHomePosition;
+            targetPosition = readStoredHomePosition(candidate.ref, context.store);
             if (targetPosition == null) {
                 return false;
             }
@@ -1095,8 +1022,19 @@ public final class CommandItemFeatureHandler {
         return applyHook("Tamework.Command.MoveToPosition." + source.name(), context, candidate.ref, targetPosition);
     }
 
-    private boolean applyStoreHome(StoreHomeStep step, Context context) {
-        if (step == null || context == null || context.workingItem == null || context.workingItem.isEmpty()) {
+    private Vector3d readStoredHomePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+        if (links == null || !links.hasHome()) {
+            return null;
+        }
+        return links.getHomePosition();
+    }
+
+    private boolean applyStoreHome(StoreHomeStep step, Context context, Candidate candidate) {
+        if (step == null || context == null || candidate == null || candidate.ref == null || candidate.npc == null) {
             return false;
         }
         Vector3d home = null;
@@ -1112,12 +1050,28 @@ public final class CommandItemFeatureHandler {
         if (home == null) {
             return false;
         }
-        context.workingItem = context.workingItem
-                .withMetadata(TameworkMetadataKeys.COMMAND_HOME_X, Codec.DOUBLE, home.x)
-                .withMetadata(TameworkMetadataKeys.COMMAND_HOME_Y, Codec.DOUBLE, home.y)
-                .withMetadata(TameworkMetadataKeys.COMMAND_HOME_Z, Codec.DOUBLE, home.z);
-        context.storedHomePosition = new Vector3d(home);
-        context.itemChanged = true;
+        TameworkCommandLinksComponent links = context.store.getComponent(
+                candidate.ref,
+                TameworkCommandLinksComponent.getComponentType()
+        );
+        if (links == null) {
+            links = new TameworkCommandLinksComponent();
+        }
+        if (links.getOwnerId() == null && context.player != null && context.player.getUuid() != null) {
+            links.setOwnerId(context.player.getUuid());
+        }
+        links.setHomePosition(home);
+        context.store.putComponent(candidate.ref, TameworkCommandLinksComponent.getComponentType(), links);
+
+        if (context.workingItem != null && !context.workingItem.isEmpty() && candidate.npc.getUuid() != null) {
+            TransformComponent transform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
+            Vector3d currentPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
+            ItemStack updated = upsertLinkedNpcRecord(context.workingItem, candidate.npc.getUuid(), currentPosition, home);
+            if (updated != context.workingItem) {
+                context.workingItem = updated;
+                context.itemChanged = true;
+            }
+        }
         return true;
     }
 
@@ -1235,7 +1189,8 @@ public final class CommandItemFeatureHandler {
             if (linked) {
                 TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
                 Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
-                updatedItem = upsertLinkedNpcRecord(updatedItem, npcUuid, lastKnown);
+                Vector3d homePosition = updated != null && updated.hasHome() ? updated.getHomePosition() : null;
+                updatedItem = upsertLinkedNpcRecord(updatedItem, npcUuid, lastKnown, homePosition);
             } else {
                 updatedItem = removeLinkedNpcRecord(updatedItem, npcUuid);
             }
@@ -1389,7 +1344,7 @@ public final class CommandItemFeatureHandler {
         );
     }
 
-    private ItemStack upsertLinkedNpcRecord(ItemStack stack, UUID npcUuid, Vector3d position) {
+    private ItemStack upsertLinkedNpcRecord(ItemStack stack, UUID npcUuid, Vector3d position, Vector3d homePosition) {
         if (stack == null || stack.isEmpty() || npcUuid == null) {
             return stack;
         }
@@ -1404,12 +1359,14 @@ public final class CommandItemFeatureHandler {
             if (!key.equals(record.npcUuid.toString().toLowerCase(Locale.ROOT))) {
                 continue;
             }
-            records.set(i, new LinkedNpcRecord(npcUuid, position));
+            Vector3d mergedLastKnown = position != null ? position : record.lastKnownPosition;
+            Vector3d mergedHome = homePosition != null ? homePosition : record.homePosition;
+            records.set(i, new LinkedNpcRecord(npcUuid, mergedLastKnown, mergedHome));
             updated = true;
             break;
         }
         if (!updated) {
-            records.add(new LinkedNpcRecord(npcUuid, position));
+            records.add(new LinkedNpcRecord(npcUuid, position, homePosition));
         }
         return writeLinkedNpcRecords(stack, records);
     }
@@ -1425,7 +1382,8 @@ public final class CommandItemFeatureHandler {
             }
             TransformComponent transform = store.getComponent(candidate.ref, TransformComponent.getComponentType());
             Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
-            updated = upsertLinkedNpcRecord(updated, candidate.npc.getUuid(), position);
+            Vector3d homePosition = readStoredHomePosition(candidate.ref, store);
+            updated = upsertLinkedNpcRecord(updated, candidate.npc.getUuid(), position, homePosition);
         }
         return updated;
     }
@@ -1490,10 +1448,18 @@ public final class CommandItemFeatureHandler {
                 builder.append('\n');
             }
             builder.append(record.npcUuid);
-            if (record.lastKnownPosition != null) {
-                builder.append('|').append(record.lastKnownPosition.x);
-                builder.append('|').append(record.lastKnownPosition.y);
-                builder.append('|').append(record.lastKnownPosition.z);
+            Vector3d encodedLastKnown = record.lastKnownPosition != null
+                    ? record.lastKnownPosition
+                    : record.homePosition;
+            if (encodedLastKnown != null) {
+                builder.append('|').append(encodedLastKnown.x);
+                builder.append('|').append(encodedLastKnown.y);
+                builder.append('|').append(encodedLastKnown.z);
+            }
+            if (record.homePosition != null) {
+                builder.append('|').append(record.homePosition.x);
+                builder.append('|').append(record.homePosition.y);
+                builder.append('|').append(record.homePosition.z);
             }
         }
         return stack.withMetadata(TameworkMetadataKeys.COMMAND_LINKED_NPCS, Codec.STRING, builder.toString());
@@ -1514,6 +1480,7 @@ public final class CommandItemFeatureHandler {
             return null;
         }
         Vector3d position = null;
+        Vector3d homePosition = null;
         if (parts.length >= 4) {
             try {
                 position = new Vector3d(
@@ -1525,10 +1492,21 @@ public final class CommandItemFeatureHandler {
                 position = null;
             }
         }
-        return new LinkedNpcRecord(uuid, position);
+        if (parts.length >= 7) {
+            try {
+                homePosition = new Vector3d(
+                        Double.parseDouble(parts[4]),
+                        Double.parseDouble(parts[5]),
+                        Double.parseDouble(parts[6])
+                );
+            } catch (NumberFormatException ignored) {
+                homePosition = null;
+            }
+        }
+        return new LinkedNpcRecord(uuid, position, homePosition);
     }
 
-    private void emitCommandExecutionFeedback(Context context, int affected, int queued, boolean globalApplied) {
+    private void emitCommandExecutionFeedback(Context context, int affected, int queued) {
         if (context == null || context.player == null || context.command == null) {
             return;
         }
@@ -1540,8 +1518,6 @@ public final class CommandItemFeatureHandler {
             defaultMessage = "Command " + resolveCommandLabel(context.command) + " applied to " + affected + " NPC(s).";
         } else if (queued > 0) {
             defaultMessage = "Command " + resolveCommandLabel(context.command) + " queued for " + queued + " unloaded NPC(s).";
-        } else if (globalApplied) {
-            defaultMessage = "Command " + resolveCommandLabel(context.command) + " applied.";
         } else {
             defaultMessage = "No NPCs could execute that command.";
         }
@@ -1686,7 +1662,6 @@ public final class CommandItemFeatureHandler {
         private final String toolId;
         private final Ref<EntityStore> commandTarget;
         private final Vector3d raycastPosition;
-        private Vector3d storedHomePosition;
         private ItemStack workingItem;
         private boolean itemChanged;
         private final boolean blockAllPlayerDamageIfOwned;
@@ -1706,7 +1681,6 @@ public final class CommandItemFeatureHandler {
                         String toolId,
                         Ref<EntityStore> commandTarget,
                         Vector3d raycastPosition,
-                        Vector3d storedHomePosition,
                         ItemStack workingItem,
                         boolean blockAllPlayerDamageIfOwned,
                         boolean invulnerableIfOwned,
@@ -1724,7 +1698,6 @@ public final class CommandItemFeatureHandler {
             this.toolId = toolId;
             this.commandTarget = commandTarget;
             this.raycastPosition = raycastPosition;
-            this.storedHomePosition = storedHomePosition;
             this.workingItem = workingItem;
             this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
             this.invulnerableIfOwned = invulnerableIfOwned;
@@ -1733,20 +1706,6 @@ public final class CommandItemFeatureHandler {
             this.returnHomeTeleportDelayMs = returnHomeTeleportDelayMs;
             this.recallSafeSpawnDistance = recallSafeSpawnDistance;
             this.recallForceRelocateDistance = recallForceRelocateDistance;
-        }
-    }
-
-    private static final class GlobalStepResult {
-        private final boolean applied;
-        private final boolean blocked;
-
-        private GlobalStepResult(boolean applied, boolean blocked) {
-            this.applied = applied;
-            this.blocked = blocked;
-        }
-
-        private static GlobalStepResult none() {
-            return new GlobalStepResult(false, false);
         }
     }
 
@@ -1791,10 +1750,12 @@ public final class CommandItemFeatureHandler {
     private static final class LinkedNpcRecord {
         private final UUID npcUuid;
         private final Vector3d lastKnownPosition;
+        private final Vector3d homePosition;
 
-        private LinkedNpcRecord(UUID npcUuid, Vector3d lastKnownPosition) {
+        private LinkedNpcRecord(UUID npcUuid, Vector3d lastKnownPosition, Vector3d homePosition) {
             this.npcUuid = npcUuid;
             this.lastKnownPosition = lastKnownPosition != null ? new Vector3d(lastKnownPosition) : null;
+            this.homePosition = homePosition != null ? new Vector3d(homePosition) : null;
         }
     }
 

@@ -98,7 +98,7 @@
       "Id": "SetHome",
       "DisplayName": "Set Home",
       "Feedback": {
-        "ChatMessage": "Home set for this command tool.",
+        "ChatMessage": "Home set for linked NPC(s).",
         "HudMessage": "Home Set",
         "SoundEvent": "SFX_Creative_Play_Selection_Widget",
         "ParticleSystem": "Poof_Small"

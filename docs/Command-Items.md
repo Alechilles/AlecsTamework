@@ -60,8 +60,8 @@ Additional filters:
 - `RequireLineOfSight`
 
 Linking state is stored in:
-- NPC component: `TameworkCommandLinksComponent`
-- Tool metadata: linked NPC UUIDs plus last-known positions
+- NPC component: `TameworkCommandLinksComponent` (owner/tool links plus optional per-NPC home position)
+- Tool metadata: linked NPC UUIDs plus last-known positions (and mirrored home data for unloaded relocation)
 
 ## Command List and Steps
 Each command entry in `CommandList` defines:
@@ -99,6 +99,7 @@ Behavior:
 Command relocation supports both loaded and unloaded NPCs.
 
 Loaded flow:
+- `SetHome` stores home per linked NPC (not per command tool), so each NPC can return to a different location.
 - `ReturnHome` can use hybrid behavior:
   - path a short visible segment
   - deferred teleport to stored home
