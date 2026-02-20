@@ -8,7 +8,6 @@ import javax.annotation.Nonnull;
 /** Tamework message hud. */
 public final class TameworkMessageHud extends CustomUIHud {
     public static final String UI_PATH = "TameworkMessageHud.ui";
-    private static final String ROOT_VISIBLE_SELECTOR = "#TameworkMessageRoot.Visible";
     private static final int FADE_STEP_COUNT = 6;
 
     private String message;
@@ -24,6 +23,7 @@ public final class TameworkMessageHud extends CustomUIHud {
         if (message != null) {
             for (int i = 0; i < FADE_STEP_COUNT; i++) {
                 commandBuilder.set(textSelector(i), message);
+                commandBuilder.set(visibleSelector(i), i == 0);
             }
         }
     }
@@ -31,7 +31,6 @@ public final class TameworkMessageHud extends CustomUIHud {
     public void updateMessage(@Nonnull String message) {
         this.message = message;
         UICommandBuilder builder = new UICommandBuilder();
-        builder.set(ROOT_VISIBLE_SELECTOR, true);
         for (int i = 0; i < FADE_STEP_COUNT; i++) {
             builder.set(textSelector(i), message);
             builder.set(visibleSelector(i), i == 0);
@@ -44,7 +43,6 @@ public final class TameworkMessageHud extends CustomUIHud {
             return;
         }
         UICommandBuilder builder = new UICommandBuilder();
-        builder.set(ROOT_VISIBLE_SELECTOR, true);
         for (int i = 0; i < FADE_STEP_COUNT; i++) {
             builder.set(visibleSelector(i), i == step);
         }
@@ -58,7 +56,6 @@ public final class TameworkMessageHud extends CustomUIHud {
             builder.set(textSelector(i), "");
             builder.set(visibleSelector(i), false);
         }
-        builder.set(ROOT_VISIBLE_SELECTOR, false);
         update(false, builder);
     }
 

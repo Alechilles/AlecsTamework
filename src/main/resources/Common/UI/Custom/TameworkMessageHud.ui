@@ -1,6 +1,6 @@
 Group #TameworkMessageRoot {
   Anchor: (Width: 350, Height: 200);
-  Visible: false;
+  Visible: true;
 
   Label #TameworkMessage0 {
     Anchor: (Top: -200, Width: 350, Height: 24);
