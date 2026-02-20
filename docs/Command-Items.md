@@ -1,5 +1,7 @@
 # Command Items (TwCommandItemConfig)
 
+### Note: Command items are a beta feature. Changes to core systems are likely. Expect breaking changes if you implement this in your mod currently.
+
 ## Overview
 Command items let players link companion NPCs to a tool and issue commands at runtime.
 The system is asset-driven and built around:
