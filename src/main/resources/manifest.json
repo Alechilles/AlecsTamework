@@ -2,7 +2,7 @@
     "Group": "Alechilles",
     "Name": "Alec's Tamework!",
     "Version": "${project.version}",
-    "Description": "A modular taming framework for Hytale!",
+    "Description": "A modular mob taming, behavior, and mechanics framework for Hytale!",
     "Authors": [
         {
             "Name": "Alec (Alechilles)",
@@ -13,7 +13,7 @@
     ],
     "Website": "",
     "Main": "com.alechilles.alecstamework.Tamework",
-    "ServerVersion": "2026.02.18-f3b8fff95",
+    "ServerVersion": "2026.02.19-1A311A592",
     "Dependencies": {},
     "OptionalDependencies": {},
     "LoadBefore": {},
