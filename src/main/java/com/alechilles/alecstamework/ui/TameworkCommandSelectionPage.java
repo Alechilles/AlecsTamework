@@ -98,8 +98,8 @@ public final class TameworkCommandSelectionPage
             close();
             return;
         }
-        selectionCallback.accept(data.commandId);
         close();
+        selectionCallback.accept(data.commandId);
     }
 
     private boolean containsOption(String commandId) {
