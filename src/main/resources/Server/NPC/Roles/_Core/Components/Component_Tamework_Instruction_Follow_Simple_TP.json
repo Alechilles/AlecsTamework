@@ -2,6 +2,7 @@
   "$Comment": "Barebones player following functionality with teleporting when out of range",
   "Type": "Component",
   "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Follow",
   "DefaultState": ".Default",
   "Parameters": {
     "MasterTargetSlot": {
@@ -9,7 +10,7 @@
       "Description": "Target slot used to track the owner/master."
     },
     "FollowLockOnRange": {
-      "Value": 30,
+      "Value": 20,
       "Description": "Range used to lock onto the master target."
     },
     "FollowSeekSlowDownDistance": {
@@ -40,12 +41,8 @@
         "Instructions": [
           {
             "Sensor": {
-              "Type": "Player",
-              "Range": {
-                "Compute": "FollowLockOnRange"
-              },
-              "LockOnTarget": true,
-              "LockedTargetSlot": {
+              "Type": "Target",
+              "TargetSlot": {
                 "Compute": "MasterTargetSlot"
               }
             },

@@ -1,0 +1,152 @@
+{
+  "Enabled": true,
+  "ItemIds": [
+    "Tamework_Command_Whistle_Example"
+  ],
+  "Radius": -1,
+  "MembershipMode": "LinkedOnly",
+  "LinkEnabled": true,
+  "LinkUseTogglesMembership": true,
+  "RequireTamed": true,
+  "RequireOwner": true,
+  "MaxTargets": 25,
+  "CooldownSeconds": 2,
+  "RequireLineOfSight": false,
+  "AllowedRoles": {
+    "Mode": "AllowAll"
+  },
+  "CommandList": [
+    {
+      "Id": "Follow",
+      "DisplayName": "Follow",
+      "Default": true,
+      "Feedback": {
+        "HudMessage": "Follow: {count}",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Follow"
+      },
+      "Steps": [
+        {
+          "Type": "ClearTarget",
+          "TargetSlot": "LockedTarget"
+        },
+        {
+          "Type": "SetState",
+          "State": "Idle"
+        },
+        {
+          "Type": "SetTarget",
+          "TargetSlot": "MasterTarget",
+          "Source": "OwnerPlayer"
+        }
+      ]
+    },
+    {
+      "Id": "Hold",
+      "DisplayName": "Hold",
+      "Feedback": {
+        "HudMessage": "Hold: {count}",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Hold"
+      },
+      "Steps": [
+        {
+          "Type": "ClearTarget",
+          "TargetSlot": "LockedTarget"
+        },
+        {
+          "Type": "SetState",
+          "State": "Hold"
+        }
+      ]
+    },
+    {
+      "Id": "Recall",
+      "DisplayName": "Recall",
+      "Feedback": {
+        "HudMessage": "Recall: {count}",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Poof_Small"
+      },
+      "Steps": [
+        {
+          "Type": "ClearCombat",
+          "State": "Idle",
+          "TargetSlots": [
+            "LockedTarget"
+          ],
+          "AssignOwnerAsMasterTarget": true
+        }
+      ]
+    },
+    {
+      "Id": "MoveToPing",
+      "DisplayName": "Move To Ping",
+      "Feedback": {
+        "HudMessage": "Move To Ping: {count}",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Alerted"
+      },
+      "Steps": [
+        {
+          "Type": "MoveToPosition",
+          "Source": "RaycastHit"
+        }
+      ]
+    },
+    {
+      "Id": "SetHome",
+      "DisplayName": "Set Home",
+      "Feedback": {
+        "ChatMessage": "Home set for this command tool.",
+        "HudMessage": "Home Set",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Poof_Small"
+      },
+      "Steps": [
+        {
+          "Type": "StoreHome",
+          "Source": "RaycastHit",
+          "FailurePolicy": "AbortAll"
+        }
+      ]
+    },
+    {
+      "Id": "ReturnHome",
+      "DisplayName": "Return Home",
+      "Feedback": {
+        "HudMessage": "Return Home: {count}",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Follow"
+      },
+      "Steps": [
+        {
+          "Type": "MoveToPosition",
+          "Source": "StoredHome",
+          "FailurePolicy": "AbortCommandForNpc"
+        }
+      ]
+    },
+    {
+      "Id": "AttackTarget",
+      "DisplayName": "Attack Target",
+      "Feedback": {
+        "HudMessage": "Attack Target: {count}",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Defend"
+      },
+      "Steps": [
+        {
+          "Type": "SetTarget",
+          "TargetSlot": "LockedTarget",
+          "Source": "CrosshairTarget",
+          "FailurePolicy": "AbortCommandForNpc"
+        },
+        {
+          "Type": "SetState",
+          "State": "Defend"
+        }
+      ]
+    }
+  ]
+}

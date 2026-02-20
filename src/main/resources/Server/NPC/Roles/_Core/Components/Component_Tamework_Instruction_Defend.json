@@ -124,6 +124,10 @@
       "Value": 1,
       "Description": "Relative chasing speed when pursuing a target."
     },
+    "DefendFollowMacroElement": {
+      "Value": "Component_Tamework_Instruction_Follow_Simple_TP",
+      "Description": "Instruction component used for non-combat follow behavior while defending."
+    },
     "AdditionalCombatBehaviorMacroElement": {
       "Value": "Component_Instruction_Null",
       "Description": "An optional macro element for supplying more bespoke combat movement behavior. Weight for the behavior must be internally defined in the macro element."
@@ -173,15 +177,7 @@
               "TargetSlot": "LockedTarget",
               "Range": {
                 "Compute": "AlertedRange"
-              },
-              "Filters": [
-                {
-                  "Type": "Attitude",
-                  "Attitudes": [
-                    "Hostile"
-                  ]
-                }
-              ]
+              }
             }
           ]
         },
@@ -210,27 +206,56 @@
               }
             },
             {
-              "Reference": "Component_Sensor_Standard_Detection",
-              "Modify": {
-                "ViewRange": {
-                  "Compute": "AlertedRange"
+              "Type": "Or",
+              "Sensors": [
+                {
+                  "Reference": "Component_Sensor_Standard_Detection",
+                  "Modify": {
+                    "ViewRange": {
+                      "Compute": "AlertedRange"
+                    },
+                    "ViewSector": {
+                      "Compute": "ViewSector"
+                    },
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "AbsoluteDetectionRange": {
+                      "Compute": "AbsoluteDetectionRange"
+                    },
+                    "Attitudes": [
+                      "Hostile"
+                    ],
+                    "ExcludeGroups": [
+                      "Self"
+                    ]
+                  }
                 },
-                "ViewSector": {
-                  "Compute": "ViewSector"
-                },
-                "HearingRange": {
-                  "Compute": "HearingRange"
-                },
-                "AbsoluteDetectionRange": {
-                  "Compute": "AbsoluteDetectionRange"
-                },
-                "Attitudes": [
-                  "Hostile"
-                ],
-                "ExcludeGroups": [
-                  "Self"
-                ]
-              }
+                {
+                  "Reference": "Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget",
+                  "Modify": {
+                    "ViewRange": {
+                      "Compute": "AlertedRange"
+                    },
+                    "ViewSector": {
+                      "Compute": "ViewSector"
+                    },
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "AbsoluteDetectionRange": {
+                      "Compute": "AbsoluteDetectionRange"
+                    },
+                    "Attitudes": [
+                      "Hostile"
+                    ],
+                    "SourceTargetSlot": "MasterTarget",
+                    "ExcludeGroups": [
+                      "Self"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         },
@@ -263,11 +288,15 @@
         ]
       },
       {
-        "$Comment": "If there is no combat target, follow the player while defending (keep follow and combat targets separate).",
+        "$Comment": "While in Defend.Default with no combat target, clear stale combat target data.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
           "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
             {
               "Type": "Not",
               "Sensor": {
@@ -277,12 +306,6 @@
                   "Compute": "AlertedRange"
                 }
               }
-            },
-            {
-              "Type": "Player",
-              "Range": 30,
-              "LockOnTarget": true,
-              "LockedTargetSlot": "MasterTarget"
             }
           ]
         },
@@ -290,53 +313,40 @@
           {
             "Type": "ReleaseTarget",
             "TargetSlot": "LockedTarget"
-          },
-          {
-            "Type": "State",
-            "State": ".Default"
           }
-        ],
-        "BodyMotion": {
-          "Type": "Seek",
-          "UsePathfinder": true,
-          "SlowDownDistance": 5,
-          "StopDistance": 3,
-          "RelativeSpeed": 1
-        }
+        ]
       },
       {
-        "$Comment": "While in Defend.Default with no target, stay near the player.",
+        "$Comment": "While in Defend.Default with no combat target, run the configured follow behavior.",
         "Continue": true,
         "Sensor": {
-          "Type": "State",
-          "State": ".Default"
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": "LockedTarget",
+                "Range": {
+                  "Compute": "AlertedRange"
+                }
+              }
+            }
+          ]
         },
         "Instructions": [
           {
-            "Continue": true,
-            "Sensor": {
-              "Type": "Player",
-              "Range": 30,
-              "LockOnTarget": true,
-              "LockedTargetSlot": "MasterTarget"
+            "Reference": {
+              "Compute": "DefendFollowMacroElement"
             },
-            "BodyMotion": {
-              "Type": "Seek",
-              "UsePathfinder": true,
-              "SlowDownDistance": 5,
-              "StopDistance": 3,
-              "RelativeSpeed": 1
-            }
-          },
-          {
-            "Continue": true,
-            "Sensor": {
-              "Type": "Target",
-              "TargetSlot": "MasterTarget"
-            },
-            "BodyMotion": {
-              "Type": "Teleport"
-            }
+            "Interfaces": [
+              "Hytale.Instruction.Null",
+              "Tamework.Instruction.Follow"
+            ]
           }
         ]
       },
@@ -434,12 +444,6 @@
               "Filters": [
                 {
                   "Type": "LineOfSight"
-                },
-                {
-                  "Type": "Attitude",
-                  "Attitudes": [
-                    "Hostile"
-                  ]
                 }
               ]
             },
@@ -660,43 +664,26 @@
             ]
           },
           {
-            "$Comment": "If target lost or non-hostile, return to Default.",
+            "$Comment": "If target is lost, return to Default.",
             "Sensor": {
               "Type": "Not",
               "Sensor": {
-                "Type": "And",
-                "Sensors": [
-                  {
-                    "Reference": "Component_Sensor_Lost_Target_Detection",
-                    "Modify": {
-                      "ViewRange": {
-                        "Compute": "AlertedRange"
-                      },
-                      "ViewSector": {
-                        "Compute": "ViewSector"
-                      },
-                      "HearingRange": {
-                        "Compute": "HearingRange"
-                      },
-                      "AbsoluteDetectionRange": {
-                        "Compute": "AbsoluteDetectionRange"
-                      },
-                      "TargetSlot": "LockedTarget"
-                    }
+                "Reference": "Component_Sensor_Lost_Target_Detection",
+                "Modify": {
+                  "ViewRange": {
+                    "Compute": "AlertedRange"
                   },
-                  {
-                    "Type": "Target",
-                    "TargetSlot": "LockedTarget",
-                    "Filters": [
-                      {
-                        "Type": "Attitude",
-                        "Attitudes": [
-                          "Hostile"
-                        ]
-                      }
-                    ]
-                  }
-                ]
+                  "ViewSector": {
+                    "Compute": "ViewSector"
+                  },
+                  "HearingRange": {
+                    "Compute": "HearingRange"
+                  },
+                  "AbsoluteDetectionRange": {
+                    "Compute": "AbsoluteDetectionRange"
+                  },
+                  "TargetSlot": "LockedTarget"
+                }
               }
             },
             "Actions": [

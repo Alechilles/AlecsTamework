@@ -6,7 +6,7 @@
 
     <groupId>com.alechilles</groupId>
     <artifactId>alecstamework</artifactId>
-    <version>2.0.3</version>
+    <version>2.1.0</version>
     <packaging>jar</packaging>
 
     <name>.Alec's Tamework!</name>
@@ -60,8 +60,6 @@
             <resource>
                 <directory>src/main/resources</directory>
                 <excludes>
-                    <exclude>Common/**</exclude>
-                    <exclude>Server/**</exclude>
                     <exclude>manifest.json</exclude>
                     <exclude>manifest-assets.json</exclude>
                 </excludes>
@@ -107,27 +105,6 @@
                 </executions>
             </plugin>
         
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.7.1</version>
-                <executions>
-                    <execution>
-                        <id>build-assets-zip</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                        <configuration>
-                            <descriptors>
-                                <descriptor>src/main/assembly/assets.xml</descriptor>
-                            </descriptors>
-                            <finalName>.Alec's Tamework! (Assets) v${project.version}</finalName>
-                            <appendAssemblyId>false</appendAssemblyId>
-                        </configuration>
-                    </execution>
-                </executions>
-            </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
@@ -176,7 +153,6 @@
                                             <directory>${project.build.directory}</directory>
                                             <includes>
                                                 <include>${project.build.finalName}.jar</include>
-                                                <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
                                             </includes>
                                         </resource>
                                     </resources>
@@ -195,7 +171,6 @@
                                             <directory>${project.build.directory}</directory>
                                             <includes>
                                                 <include>${project.build.finalName}.jar</include>
-                                                <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
                                             </includes>
                                         </resource>
                                     </resources>
@@ -258,7 +233,6 @@
                                             <directory>${project.build.directory}</directory>
                                             <includes>
                                                 <include>${project.build.finalName}.jar</include>
-                                                <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
                                             </includes>
                                         </resource>
                                     </resources>
@@ -277,7 +251,6 @@
                                             <directory>${project.build.directory}</directory>
                                             <includes>
                                                 <include>${project.build.finalName}.jar</include>
-                                                <include>.Alec's Tamework! (Assets) v${project.version}.zip</include>
                                             </includes>
                                         </resource>
                                     </resources>

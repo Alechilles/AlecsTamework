@@ -1,0 +1,262 @@
+$C = "Common.ui";
+
+@SliceLabelStyle = LabelStyle(
+  FontSize: 15,
+  RenderBold: true,
+  TextColor: #d6e0ec,
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center,
+  OutlineColor: #000000(0.7),
+  Wrap: true,
+  ShrinkTextToFit: true,
+  MinShrinkTextToFitFontSize: 11
+);
+
+@SliceButtonLabelStyle = LabelStyle(
+  FontSize: 14,
+  RenderBold: true,
+  RenderUppercase: true,
+  TextColor: #00000000,
+  HorizontalAlignment: Center,
+  VerticalAlignment: Center
+);
+
+@SliceButtonDisabledLabelStyle = LabelStyle(
+  ...@SliceButtonLabelStyle
+);
+
+@Slice0ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+@Slice1ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+@Slice2ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+@Slice3ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+@Slice4ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+@Slice5ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+@Slice6ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+@Slice7ButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Default.png"), LabelStyle: @SliceButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+);
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  Group #TameworkCommandMenuWheel {
+    Anchor: (Width: 920, Height: 760);
+    Visible: false;
+
+    Label #TameworkCommandMenuTitle {
+      Anchor: (Top: 18, Width: 620, Height: 42, Left: 150);
+      Text: "";
+      Style: (
+        FontSize: 38,
+        RenderBold: true,
+        TextColor: #ffffff,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center
+      );
+    }
+
+    Label #TameworkCommandMenuSubtitle {
+      Anchor: (Top: 62, Width: 620, Height: 26, Left: 150);
+      Text: "";
+      Style: (
+        FontSize: 16,
+        TextColor: #dbe4e7,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center
+      );
+    }
+
+    Group #CommandWheelOuterRing {
+      Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
+      Background: (TexturePath: "Tamework/CommandWheelRingOuter.png");
+      Visible: false;
+    }
+
+    Group #CommandWheelInnerRing {
+      Anchor: (Top: 100, Left: 140, Width: 640, Height: 640);
+      Background: (TexturePath: "Tamework/CommandWheelRingInner.png");
+      Visible: false;
+    }
+
+    Group #CommandWheelCenterPanel {
+      Anchor: (Top: 270, Left: 310, Width: 300, Height: 300);
+      Background: (TexturePath: "Tamework/CommandWheelCenterPanel.png");
+    }
+
+    Label #TameworkCommandMenuCurrent {
+      Anchor: (Top: 355, Width: 260, Height: 130, Left: 330);
+      Text: "";
+      Style: (
+        FontSize: 22,
+        RenderBold: true,
+        TextColor: #ffffff,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center,
+        Wrap: true,
+        OutlineColor: #000000(0.7)
+      );
+    }
+
+    TextButton #CommandButton0 {
+      Anchor: (Top: 121, Left: 352, Width: 217, Height: 142);
+      Style: @Slice0ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton1 {
+      Anchor: (Top: 147, Left: 526, Width: 207, Height: 207);
+      Style: @Slice1ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton2 {
+      Anchor: (Top: 312, Left: 617, Width: 142, Height: 217);
+      Style: @Slice2ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton3 {
+      Anchor: (Top: 486, Left: 526, Width: 207, Height: 207);
+      Style: @Slice3ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton4 {
+      Anchor: (Top: 577, Left: 352, Width: 217, Height: 142);
+      Style: @Slice4ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton5 {
+      Anchor: (Top: 486, Left: 187, Width: 207, Height: 207);
+      Style: @Slice5ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton6 {
+      Anchor: (Top: 312, Left: 161, Width: 142, Height: 217);
+      Style: @Slice6ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    TextButton #CommandButton7 {
+      Anchor: (Top: 147, Left: 187, Width: 207, Height: 207);
+      Style: @Slice7ButtonStyle;
+      Text: "";
+      Visible: false;
+    }
+
+    Label #CommandLabel0 {
+      Anchor: (Top: 164, Left: 376, Width: 168, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    Label #CommandLabel1 {
+      Anchor: (Top: 233, Left: 541, Width: 170, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    Label #CommandLabel2 {
+      Anchor: (Top: 398, Left: 610, Width: 170, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    Label #CommandLabel3 {
+      Anchor: (Top: 563, Left: 541, Width: 170, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    Label #CommandLabel4 {
+      Anchor: (Top: 632, Left: 376, Width: 168, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    Label #CommandLabel5 {
+      Anchor: (Top: 563, Left: 211, Width: 170, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    Label #CommandLabel6 {
+      Anchor: (Top: 398, Left: 142, Width: 170, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    Label #CommandLabel7 {
+      Anchor: (Top: 233, Left: 211, Width: 170, Height: 44);
+      Text: "";
+      Style: @SliceLabelStyle;
+      Visible: false;
+    }
+
+    $C.@SecondaryTextButton #CommandMenuCloseButton {
+      @Anchor = (Bottom: -8, Width: 180, Left: 370);
+      Text: "Close";
+    }
+  }
+}

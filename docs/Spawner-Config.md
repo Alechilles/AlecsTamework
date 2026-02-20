@@ -80,4 +80,4 @@ Attachment maps use the NPC attachment keys as the match criteria.
 ```
 
 ## Reloading
-Use `/tw reloadconfig` to reload spawner configs into the item feature registry.
+Use `/tw reloadconfig` to reload spawner, naming, and command item configs into the item feature registries.

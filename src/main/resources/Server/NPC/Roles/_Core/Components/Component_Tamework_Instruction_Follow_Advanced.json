@@ -2,6 +2,7 @@
   "$Comment": "Complex player following functionality",
   "Type": "Component",
   "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Follow",
   "DefaultState": ".Default",
   "Parameters": {
     "MasterTargetSlot": {
@@ -127,12 +128,8 @@
           },
           {
             "Sensor": {
-              "Type": "Player",
-              "Range": {
-                "Compute": "FollowLockOnRange"
-              },
-              "LockOnTarget": true,
-              "LockedTargetSlot": {
+              "Type": "Target",
+              "TargetSlot": {
                 "Compute": "MasterTargetSlot"
               }
             },

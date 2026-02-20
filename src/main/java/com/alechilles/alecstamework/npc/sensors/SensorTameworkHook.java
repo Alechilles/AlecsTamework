@@ -34,6 +34,10 @@ public final class SensorTameworkHook extends TameworkSensorBase {
     private final SingleStringParameterProvider playerNameProvider;
     private final SingleStringParameterProvider heldItemProvider;
     private final SingleDoubleParameterProvider timestampProvider;
+    private final SingleDoubleParameterProvider hasTargetPositionProvider;
+    private final SingleDoubleParameterProvider targetXProvider;
+    private final SingleDoubleParameterProvider targetYProvider;
+    private final SingleDoubleParameterProvider targetZProvider;
     private final TameworkHookInfo hookInfo = new TameworkHookInfo();
     private final InfoProvider infoProvider;
 
@@ -60,6 +64,22 @@ public final class SensorTameworkHook extends TameworkSensorBase {
         int timestampSlot = support.getParameterSlot(TameworkHookInfo.PARAM_HOOK_TIMESTAMP_MS);
         this.timestampProvider = new SingleDoubleParameterProvider(timestampSlot);
         this.parameterProvider.addParameterProvider(timestampSlot, this.timestampProvider);
+
+        int hasTargetPositionSlot = support.getParameterSlot(TameworkHookInfo.PARAM_HOOK_HAS_TARGET_POSITION);
+        this.hasTargetPositionProvider = new SingleDoubleParameterProvider(hasTargetPositionSlot);
+        this.parameterProvider.addParameterProvider(hasTargetPositionSlot, this.hasTargetPositionProvider);
+
+        int targetXSlot = support.getParameterSlot(TameworkHookInfo.PARAM_HOOK_TARGET_X);
+        this.targetXProvider = new SingleDoubleParameterProvider(targetXSlot);
+        this.parameterProvider.addParameterProvider(targetXSlot, this.targetXProvider);
+
+        int targetYSlot = support.getParameterSlot(TameworkHookInfo.PARAM_HOOK_TARGET_Y);
+        this.targetYProvider = new SingleDoubleParameterProvider(targetYSlot);
+        this.parameterProvider.addParameterProvider(targetYSlot, this.targetYProvider);
+
+        int targetZSlot = support.getParameterSlot(TameworkHookInfo.PARAM_HOOK_TARGET_Z);
+        this.targetZProvider = new SingleDoubleParameterProvider(targetZSlot);
+        this.parameterProvider.addParameterProvider(targetZSlot, this.targetZProvider);
 
         this.infoProvider = new TameworkHookInfoProvider(this.parameterProvider, this.hookInfo);
     }
@@ -93,6 +113,10 @@ public final class SensorTameworkHook extends TameworkSensorBase {
         this.playerNameProvider.overrideString(component.getPlayerName());
         this.heldItemProvider.overrideString(component.getHeldItemId());
         this.timestampProvider.overrideDouble((double) component.getTimestampMs());
+        this.hasTargetPositionProvider.overrideDouble(component.hasTargetPosition() ? 1.0 : 0.0);
+        this.targetXProvider.overrideDouble(component.getTargetX());
+        this.targetYProvider.overrideDouble(component.getTargetY());
+        this.targetZProvider.overrideDouble(component.getTargetZ());
         this.hookInfo.updateFrom(component);
         logHookEvent("match", ref, component, null);
         if (consume || component.isConsumeOnMatch()) {

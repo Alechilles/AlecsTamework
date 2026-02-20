@@ -1,0 +1,42 @@
+{
+  "$Comment": "Example command whistle that links NPCs and dispatches command steps.",
+  "TranslationProperties": {
+    "Name": "server.items.Tamework_Command_Whistle_Example.name",
+    "Description": "server.items.Tamework_Command_Whistle_Example.description"
+  },
+  "Quality": "Common",
+  "PlayerAnimationsId": "Item",
+  "Interactions": {
+    "Primary": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommand"
+        }
+      ]
+    },
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "TameworkCommand",
+          "CommandId": "OpenSelectionMenu"
+        }
+      ]
+    }
+  },
+  "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
+  "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
+  "IconProperties": {
+    "Scale": 0.76,
+    "Translation": [
+      -1,
+      5
+    ],
+    "Rotation": [
+      135,
+      135,
+      0
+    ]
+  },
+  "MaxStack": 1
+}

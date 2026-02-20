@@ -5,12 +5,15 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.UUIDBinaryCodec;
 import com.hypixel.hytale.codec.codecs.simple.BooleanCodec;
+import com.hypixel.hytale.codec.codecs.simple.DoubleCodec;
 import com.hypixel.hytale.codec.codecs.simple.LongCodec;
 import com.hypixel.hytale.codec.codecs.simple.StringCodec;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Component that stores the latest Tamework hook signal for NPC instruction bridges.
@@ -22,6 +25,10 @@ public final class TameworkHookComponent implements Component<EntityStore> {
     public static final String HELD_ITEM_TAG = "HeldItemId";
     public static final String TIMESTAMP_TAG = "TimestampMs";
     public static final String CONSUME_TAG = "ConsumeOnMatch";
+    public static final String HAS_TARGET_POSITION_TAG = "HasTargetPosition";
+    public static final String TARGET_POSITION_X_TAG = "TargetX";
+    public static final String TARGET_POSITION_Y_TAG = "TargetY";
+    public static final String TARGET_POSITION_Z_TAG = "TargetZ";
 
     public static final BuilderCodec<TameworkHookComponent> CODEC = BuilderCodec.builder(
             TameworkHookComponent.class,
@@ -63,6 +70,30 @@ public final class TameworkHookComponent implements Component<EntityStore> {
             TameworkHookComponent::isConsumeOnMatch
         )
         .add()
+        .append(
+            new KeyedCodec<>(HAS_TARGET_POSITION_TAG, new BooleanCodec()),
+            TameworkHookComponent::setHasTargetPosition,
+            TameworkHookComponent::hasTargetPosition
+        )
+        .add()
+        .append(
+            new KeyedCodec<>(TARGET_POSITION_X_TAG, new DoubleCodec()),
+            TameworkHookComponent::setTargetX,
+            TameworkHookComponent::getTargetX
+        )
+        .add()
+        .append(
+            new KeyedCodec<>(TARGET_POSITION_Y_TAG, new DoubleCodec()),
+            TameworkHookComponent::setTargetY,
+            TameworkHookComponent::getTargetY
+        )
+        .add()
+        .append(
+            new KeyedCodec<>(TARGET_POSITION_Z_TAG, new DoubleCodec()),
+            TameworkHookComponent::setTargetZ,
+            TameworkHookComponent::getTargetZ
+        )
+        .add()
         .build();
 
     private String hookId;
@@ -71,6 +102,10 @@ public final class TameworkHookComponent implements Component<EntityStore> {
     private String heldItemId;
     private long timestampMs;
     private boolean consumeOnMatch;
+    private boolean hasTargetPosition;
+    private double targetX;
+    private double targetY;
+    private double targetZ;
 
     public TameworkHookComponent() {
     }
@@ -81,12 +116,23 @@ public final class TameworkHookComponent implements Component<EntityStore> {
                                  String heldItemId,
                                  long timestampMs,
                                  boolean consumeOnMatch) {
+        this(hookId, playerId, playerName, heldItemId, timestampMs, consumeOnMatch, null);
+    }
+
+    public TameworkHookComponent(String hookId,
+                                 UUID playerId,
+                                 String playerName,
+                                 String heldItemId,
+                                 long timestampMs,
+                                 boolean consumeOnMatch,
+                                 @Nullable Vector3d targetPosition) {
         this.hookId = hookId;
         this.playerId = playerId;
         this.playerName = playerName;
         this.heldItemId = heldItemId;
         this.timestampMs = timestampMs;
         this.consumeOnMatch = consumeOnMatch;
+        setTargetPosition(targetPosition);
     }
 
     public static ComponentType<EntityStore, TameworkHookComponent> getComponentType() {
@@ -142,6 +188,60 @@ public final class TameworkHookComponent implements Component<EntityStore> {
         this.consumeOnMatch = consumeOnMatch;
     }
 
+    public boolean hasTargetPosition() {
+        return hasTargetPosition;
+    }
+
+    public void setHasTargetPosition(boolean hasTargetPosition) {
+        this.hasTargetPosition = hasTargetPosition;
+    }
+
+    public double getTargetX() {
+        return targetX;
+    }
+
+    public void setTargetX(double targetX) {
+        this.targetX = targetX;
+    }
+
+    public double getTargetY() {
+        return targetY;
+    }
+
+    public void setTargetY(double targetY) {
+        this.targetY = targetY;
+    }
+
+    public double getTargetZ() {
+        return targetZ;
+    }
+
+    public void setTargetZ(double targetZ) {
+        this.targetZ = targetZ;
+    }
+
+    @Nullable
+    public Vector3d getTargetPosition() {
+        if (!hasTargetPosition) {
+            return null;
+        }
+        return new Vector3d(targetX, targetY, targetZ);
+    }
+
+    public void setTargetPosition(@Nullable Vector3d targetPosition) {
+        if (targetPosition == null) {
+            this.hasTargetPosition = false;
+            this.targetX = 0.0;
+            this.targetY = 0.0;
+            this.targetZ = 0.0;
+            return;
+        }
+        this.hasTargetPosition = true;
+        this.targetX = targetPosition.x;
+        this.targetY = targetPosition.y;
+        this.targetZ = targetPosition.z;
+    }
+
     public boolean matchesHook(String hookId) {
         if (hookId == null || hookId.isBlank()) {
             return false;
@@ -154,6 +254,14 @@ public final class TameworkHookComponent implements Component<EntityStore> {
 
     @Override
     public TameworkHookComponent clone() {
-        return new TameworkHookComponent(hookId, playerId, playerName, heldItemId, timestampMs, consumeOnMatch);
+        return new TameworkHookComponent(
+                hookId,
+                playerId,
+                playerName,
+                heldItemId,
+                timestampMs,
+                consumeOnMatch,
+                getTargetPosition()
+        );
     }
 }

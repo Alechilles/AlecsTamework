@@ -1,33 +1,36 @@
 <img width="400" height="400" alt="Alec&#39;sTamework400Transparent" src="https://github.com/user-attachments/assets/251cbac2-26ea-4daf-b552-30594e96f8da" />
 
 # Alec's Tamework!
-A modular taming framework for Hytale that focuses on fast, easy setup and empowering moders to turn custom NPCs into interesting, highly interactive companions. Add ownership, taming, capture/spawn, and rich NPC interactions without 600+ lines of JSON in every NPC template.
+A modular taming framework for Hytale that focuses on fast setup and giving modders reusable systems for companion NPCs. Add ownership, taming, capture/spawn, command tools, and rich NPC interactions without huge custom instruction trees in every role.
 
 ## Core Features
-- **Interaction System** - Use `TwInteractionConfig` assets to create NPC interactions quickly and easily
-  - Full asset editor GUI support unlike the base game instructions system
-  - Requires ~10% as much JSON as the base InteractionInstrucitons system for a vast majority of cases
-  - Interaction prompts (Ex: "Press F to...") update automatically based on interaction requirements
-  - Can pass in parameters so the same instructions can be used for many different NPCs
-  - `TameworkHook` sensor to allow triggering actions in the vanilla system for when you need the most granular control
-- **Ownership and Tamed Components** - Enforce ownership and tamed status of NPCs with extremely simple actions
-  - Sensors for ownership and tamed status
-  - Allow/disallow players to interact with or harm NPCs that do or do not belong to them (100% configurable, globally and per NPC)
-- **Capture/Spawn NPCs With Metadata** - Capture system saves metadata on capture and replicates the exact same mob on respawn
+- **Interaction System** - Use `TwInteractionConfig` assets to create NPC interactions quickly and easily.
+  - Full asset-editor GUI support unlike large vanilla instruction chains.
+  - Requires far less JSON than the base interaction flow in most cases.
+  - Interaction prompts update automatically from requirements.
+  - Role parameters let one interaction config drive many NPC roles.
+  - `TriggerNpcHook` + `TameworkHook` bridges optimized interactions into custom instruction logic.
+- **Ownership and Tamed Components** - Enforce ownership and tamed status with simple actions/sensors.
+  - Sensors for ownership and tamed status.
+  - Global and per-role behavior controls for who can interact with or damage owned NPCs.
+- **Capture/Spawn NPCs With Metadata** - Capture saves metadata and restores the same NPC on spawn.
   - Includes random attachments such as varying textures, models, etc.
   - Also includes components like tamed status and ownership
     - Ownership can optionally be cleared on capture and re-set on spawn to enable player trading of captured NPCs
   - This will be expanded in the near future as new systems such as breeding, traits, talents, etc. are added. Everything will always be saved on capture.
-- **Naming Items** - Name tamed NPCs via chat using `TwNameItemConfig` + `TameworkNameNpc`
+- **Naming Items** - Name tamed NPCs via chat using `TwNameItemConfig` + `TameworkNameNpc`.
   - Works with any custom item; not a fixed nametag item
   - Per-item rules for roles, ownership, allowed characters, rename rules, and more
-- **Examples and Documentation** - Plenty of examples and thorough documenation to help you get started integrating Tamework
+- **Command Item System** - Build custom command tools with `TwCommandItemConfig` + `TameworkCommand`.
+  - Link/unlink NPCs to each tool.
+  - Left-click executes the selected command; right-click opens the radial command wheel.
+  - Supports command steps like state changes, target assignment, move-to-ping, set/return-home, and hook triggers.
+  - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation.
+  - Command relocation tuning is configurable in `TwGlobalConfig`.
+- **Examples and Documentation** - Plenty of examples and thorough documentation to help you integrate Tamework.
   - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
 ## Coming Soon
-- **Command Flute/Whistle/Etc**
-  - Technically any item, it will be an action that can be called by any item you want
-  - Remotely command multiple mobs to change modes, attack a target, and more
 - **Needs System**
   - Hunger, thirst, happiness, space etc.
 - **Breeding**
@@ -41,20 +44,20 @@ A modular taming framework for Hytale that focuses on fast, easy setup and empow
   - Create your own talent trees for your NPCs
   - Allow unlocking new behaviors, stat increases, etc.
   - Will include a talent tree UI
-- **Atittude group override system**
+- **Attitude group override system**
   - Vanilla attitude groups can't be changed at runtime, but this will be a parallel system that we will have more freedom to work with
 
-## Quick Start (2.0.0)
+## Quick Start (2.1.x)
 1. Add the dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.0.0"
+  "Alechilles:Alec's Tamework!": "2.1.0"
 },
 "IncludesAssetPack": true
 ```
 
-**Asset pack load order note:** Hytale loads asset packs alphabetically by folder name, so your mod folder must come after `.Alec's Tamework!`. The `manifest.json` name does not affect load order for now, but it's meant to, so just keep in the habit of doing that for the future when Hypixel fixes it in the near future.
+**Asset pack note:** Tamework ships as a jar with embedded `Common/` + `Server/` assets. At load time, Tamework also enforces early asset-pack ordering and removes legacy standalone `Alec's Tamework! (Assets)` packs/archives when detected.
 
 2. Choose your interaction path:
    Tamework's optimized system (`TameworkInteract` + `TwInteractionConfig`) or vanilla instruction flow (full control but a lot more work).
@@ -98,9 +101,24 @@ Optional prompt updater (see the example template for full usage):
 
 8. Naming items (optional):
    Create a `TwNameItemConfig` asset under `<ModRoot>/Server/Tamework/Items/Naming/` and add `TameworkNameNpc` to your item’s `Interactions`.
-   After editing spawner or naming configs, use `/tw reloadconfig`.
 
-9. Add translations in `Server/Languages/en-US/server.lang`.
+9. Command items (optional):
+   Create a `TwCommandItemConfig` asset under `<ModRoot>/Server/Tamework/Items/Commands/` and add `TameworkCommand` interactions to your tool item:
+
+```json
+"Interactions": {
+  "Primary": {
+    "Interactions": [ { "Type": "TameworkCommand" } ]
+  },
+  "Secondary": {
+    "Interactions": [ { "Type": "TameworkCommand", "CommandId": "OpenSelectionMenu" } ]
+  }
+}
+```
+
+10. After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
+
+11. Add translations in `Server/Languages/en-US/server.lang`.
 
 ## Configuration Overview
 - **TwGlobalConfig**: default parameter names + interaction defaults.
@@ -109,7 +127,9 @@ Optional prompt updater (see the example template for full usage):
   Location: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - **TwNameItemConfig**: naming item behavior.
   Location: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
-- After editing spawner or naming configs, use `/tw reloadconfig`.
+- **TwCommandItemConfig**: command-tool behavior and command list.
+  Location: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
+- After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
 
 ## Documentation (Wiki)
 - Home: https://github.com/Alechilles/AlecsTamework/wiki
@@ -119,6 +139,7 @@ Optional prompt updater (see the example template for full usage):
 - Items: https://github.com/Alechilles/AlecsTamework/wiki/Items
 - Spawner Config (Assets): https://github.com/Alechilles/AlecsTamework/wiki/Item-Config
 - Naming Items: https://github.com/Alechilles/AlecsTamework/wiki/Naming-Items
+- Command Items: https://github.com/Alechilles/AlecsTamework/wiki/Command-Items
 - Actions and Sensors: https://github.com/Alechilles/AlecsTamework/wiki/Actions-and-Sensors
 - Hooks and Bridges: https://github.com/Alechilles/AlecsTamework/wiki/Hooks-and-Bridges
 - Templates: https://github.com/Alechilles/AlecsTamework/wiki/Templates

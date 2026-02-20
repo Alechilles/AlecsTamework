@@ -1,0 +1,202 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.CommandMove",
+  "DefaultState": ".Listen",
+  "Parameters": {
+    "_ImportStates": [
+      "OnMoveActive",
+      "OnMoveComplete"
+    ],
+    "CommandMoveTargetSlot": {
+      "Value": "TameworkCommandMoveTarget",
+      "Description": "Stored position slot used as the active command-move destination."
+    },
+    "CommandMoveHookIdRaycast": {
+      "Value": "Tamework.Command.MoveToPosition.RaycastHit",
+      "Description": "Hook id consumed for move-to-ping commands."
+    },
+    "CommandMoveHookIdStoredHome": {
+      "Value": "Tamework.Command.MoveToPosition.StoredHome",
+      "Description": "Hook id consumed for return-home commands."
+    },
+    "CommandMoveSeekSlowDownDistance": {
+      "Value": 4,
+      "Description": "Distance from destination where movement starts to slow."
+    },
+    "CommandMoveSeekStopDistance": {
+      "Value": 1.3,
+      "Description": "Distance from destination considered reached."
+    },
+    "CommandMoveSeekRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative seek speed while executing move commands."
+    },
+    "CommandMoveReadRange": {
+      "Value": 256,
+      "Description": "Range used to read stored command destinations."
+    }
+  },
+  "Content": {
+    "$Comment": "Global bridge that converts command-item move hooks into movement behavior.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "No-op listen branch to satisfy local state pairing validation.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Listen"
+        }
+      },
+      {
+        "$Comment": "Move-to-ping hook: store destination and switch to command move state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "TameworkHook",
+          "HookId": {
+            "Compute": "CommandMoveHookIdRaycast"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "CommandMoveTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": ".Move"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnMoveActive"
+          }
+        ]
+      },
+      {
+        "$Comment": "Return-home hook: store destination and switch to command move state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "TameworkHook",
+          "HookId": {
+            "Compute": "CommandMoveHookIdStoredHome"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "CommandMoveTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": ".Move"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnMoveActive"
+          }
+        ]
+      },
+      {
+        "$Comment": "Command move runtime behavior while local move state is active.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".Move"
+        },
+        "Instructions": [
+          {
+            "$Comment": "When close enough, complete the move.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "CommandMoveTargetSlot"
+              },
+              "Range": {
+                "Compute": "CommandMoveSeekStopDistance + 0.2"
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnMoveComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "If no destination exists, recover immediately.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "ReadPosition",
+                "Slot": {
+                  "Compute": "CommandMoveTargetSlot"
+                },
+                "Range": {
+                  "Compute": "CommandMoveReadRange"
+                }
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnMoveComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Seek to the stored command destination.",
+            "Sensor": {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "CommandMoveTargetSlot"
+              },
+              "Range": {
+                "Compute": "CommandMoveReadRange"
+              },
+              "MinRange": {
+                "Compute": "CommandMoveSeekStopDistance + 0.2"
+              }
+            },
+            "BodyMotion": {
+              "Type": "Seek",
+              "SlowDownDistance": {
+                "Compute": "CommandMoveSeekSlowDownDistance"
+              },
+              "StopDistance": {
+                "Compute": "CommandMoveSeekStopDistance"
+              },
+              "RelativeSpeed": {
+                "Compute": "CommandMoveSeekRelativeSpeed"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

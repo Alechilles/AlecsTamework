@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.config;
 
 /**
- * Centralized metadata keys stored on spawner items.
+ * Centralized metadata keys stored on mod items.
  */
 public final class TameworkMetadataKeys {
     public static final String CAPTURED = "Tamework.Captured";
@@ -17,6 +17,13 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURE_COOLDOWN_UNTIL = "Tamework.CaptureCooldownUntil";
     public static final String SPAWN_COOLDOWN_UNTIL = "Tamework.SpawnCooldownUntil";
     public static final String NAME_COOLDOWN_UNTIL = "Tamework.NameCooldownUntil";
+    public static final String COMMAND_TOOL_ID = "Tamework.Command.ToolId";
+    public static final String COMMAND_SELECTED_ID = "Tamework.Command.SelectedId";
+    public static final String COMMAND_COOLDOWN_UNTIL = "Tamework.Command.CooldownUntil";
+    public static final String COMMAND_LINKED_NPCS = "Tamework.Command.LinkedNpcs";
+    public static final String COMMAND_HOME_X = "Tamework.Command.HomeX";
+    public static final String COMMAND_HOME_Y = "Tamework.Command.HomeY";
+    public static final String COMMAND_HOME_Z = "Tamework.Command.HomeZ";
 
     private TameworkMetadataKeys() {
     }

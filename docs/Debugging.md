@@ -30,6 +30,14 @@
 - Use `/tw debughook [on|off]` to enable hook debug logs (or toggle without args).
 - Use debug logs or temporary particles to verify the hook was emitted and consumed.
 
+## Command-item troubleshooting
+- Confirm your item is present in a `TwCommandItemConfig.ItemIds` list.
+- If secondary-use radial selection does not open, verify the item has a `TameworkCommand` interaction with `CommandId: OpenSelectionMenu`.
+- If move/home commands select but do not move, ensure your role/template includes `Component_Tamework_Instruction_Command_Move`.
+- If unloaded linked NPCs are not relocating, verify the tool still contains linked NPC metadata and check command feedback for queued counts.
+- If recall/return-home behavior feels wrong at distance, review `TwGlobalConfig` command relocation tuning fields.
+- If command linking fails unexpectedly, verify owner/tamed requirements and `AllowedRoles` filters in `TwCommandItemConfig`.
+
 ## Visual debugging tips
 - Enable NPC debug options such as `DisplayState` and `DisplayTarget` to see live behavior state and targeting.
 - Add temporary particles or sounds inside instructions to confirm sensor triggers.
@@ -40,7 +48,7 @@
 - Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
 - Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.
 - Toggle spawner raycast logs with `/tw debugspawner` when testing spawner items.
-- After editing spawner configs, run `/tw reloadconfig`.
+- After editing spawner, naming, or command item configs, run `/tw reloadconfig`.
 ## Global config warnings
 - If `TwGlobalConfig` is missing required fields, the server logs a warning listing which fields are blank.
 
