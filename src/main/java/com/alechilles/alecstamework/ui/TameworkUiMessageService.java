@@ -11,8 +11,8 @@ import java.util.concurrent.TimeUnit;
  * Displays Tamework HUD messages to a player.
  */
 public final class TameworkUiMessageService {
-    private static final long UI_MESSAGE_REAPPLY_DELAY_MS = 80L;
     private static final long UI_MESSAGE_CLEAR_DELAY_MS = 1200L;
+    private static final long UI_MESSAGE_REAPPLY_INTERVAL_MS = 80L;
     private static final ConcurrentHashMap<UUID, Integer> UI_MESSAGE_TOKENS = new ConcurrentHashMap<>();
 
     public boolean show(Player player, String message) {
@@ -30,7 +30,7 @@ public final class TameworkUiMessageService {
         UUID playerId = player.getUuid();
         int token = UI_MESSAGE_TOKENS.merge(playerId, 1, Integer::sum);
         setMessageHud(hudManager, playerRef, message);
-        scheduleReapply(playerId, token, hudManager, playerRef, message);
+        scheduleReapplyLoop(playerId, token, hudManager, playerRef, message);
         scheduleClear(playerId, token, hudManager, playerRef);
         return true;
     }
@@ -46,22 +46,27 @@ public final class TameworkUiMessageService {
     }
 
     /**
-     * Re-applies the HUD after a short delay so page-close teardown does not swallow the message.
+     * Re-applies the HUD multiple times during its display window so late page/hud teardown does not swallow it.
      */
-    private void scheduleReapply(UUID playerId,
-                                 int token,
-                                 HudManager hudManager,
-                                 PlayerRef playerRef,
-                                 String message) {
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
-            if (!isUiMessageTokenCurrent(playerId, token)) {
-                return;
-            }
-            if (playerRef == null || !playerRef.isValid()) {
-                return;
-            }
-            setMessageHud(hudManager, playerRef, message);
-        }, UI_MESSAGE_REAPPLY_DELAY_MS, TimeUnit.MILLISECONDS);
+    private void scheduleReapplyLoop(UUID playerId,
+                                     int token,
+                                     HudManager hudManager,
+                                     PlayerRef playerRef,
+                                     String message) {
+        long nextDelay = UI_MESSAGE_REAPPLY_INTERVAL_MS;
+        while (nextDelay < UI_MESSAGE_CLEAR_DELAY_MS) {
+            long delayMs = nextDelay;
+            com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
+                if (!isUiMessageTokenCurrent(playerId, token)) {
+                    return;
+                }
+                if (playerRef == null || !playerRef.isValid()) {
+                    return;
+                }
+                setMessageHud(hudManager, playerRef, message);
+            }, delayMs, TimeUnit.MILLISECONDS);
+            nextDelay += UI_MESSAGE_REAPPLY_INTERVAL_MS;
+        }
     }
 
     /**
@@ -75,6 +80,7 @@ public final class TameworkUiMessageService {
             if (!isUiMessageTokenCurrent(playerId, token)) {
                 return;
             }
+            UI_MESSAGE_TOKENS.remove(playerId, token);
             if (playerRef == null || !playerRef.isValid()) {
                 return;
             }
@@ -82,7 +88,6 @@ public final class TameworkUiMessageService {
                 return;
             }
             setMessageHud(hudManager, playerRef, "");
-            UI_MESSAGE_TOKENS.remove(playerId, token);
         }, UI_MESSAGE_CLEAR_DELAY_MS, TimeUnit.MILLISECONDS);
     }
 
