@@ -25,15 +25,6 @@ $C = "Common.ui";
   ...@SliceButtonLabelStyle
 );
 
-@LinkedNpcPanelScrollbarStyle = ScrollbarStyle(
-  Spacing: 6,
-  Size: 8,
-  Background: #24374b(0.75),
-  Handle: #90abc6,
-  HoveredHandle: #adc5dc,
-  DraggedHandle: #7e9ab7
-);
-
 @Slice0ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
@@ -149,11 +140,14 @@ $C.@PageOverlay {
         );
       }
 
+      Group {
+        Anchor: (Top: 8, Height: 1);
+      }
+
       Group #LinkedNpcList {
-        Anchor: (Top: 8);
-        FlexWeight: 1;
         LayoutMode: TopScrolling;
-        ScrollbarStyle: @LinkedNpcPanelScrollbarStyle;
+        FlexWeight: 1;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
       }
     }
 
