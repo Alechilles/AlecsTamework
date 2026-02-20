@@ -21,6 +21,7 @@
 ### Fixed
 - Corrected `Component_Tamework_Instruction_Defend` instruction structure to avoid defining both `Actions` and `Instructions` on the same instruction node.
 - Added `Tamework.Instruction.Follow` interfaces to Tamework follow components and constrained Defend computed follow references to `Hytale.Instruction.Null` or `Tamework.Instruction.Follow` so computed references validate and load correctly.
+- HUD popup delivery now routes through shared multi-HUD layers when available (for compatibility with HUD mods like EyeSpy) and no longer relies on repeated delayed reapply writes that could cause flicker.
 
 ## 2.0.3 - Example NPC Spawn Fix - 2026-02-18
 ### Fixed

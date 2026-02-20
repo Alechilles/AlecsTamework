@@ -12,8 +12,6 @@ import java.util.concurrent.TimeUnit;
  */
 public final class TameworkUiMessageService {
     private static final long UI_MESSAGE_DURATION_MS = 1200L;
-    private static final long UI_MESSAGE_SHOW_DELAY_MS = 120L;
-    private static final long UI_MESSAGE_SHOW_RETRY_DELAY_MS = 260L;
     private static final ConcurrentHashMap<UUID, Integer> UI_MESSAGE_TOKENS = new ConcurrentHashMap<>();
 
     public boolean show(Player player, String message) {
@@ -30,37 +28,24 @@ public final class TameworkUiMessageService {
         }
         UUID playerId = player.getUuid();
         int token = UI_MESSAGE_TOKENS.merge(playerId, 1, Integer::sum);
-        scheduleShow(playerId, token, hudManager, playerRef, message, UI_MESSAGE_SHOW_DELAY_MS);
-        scheduleShow(playerId, token, hudManager, playerRef, message, UI_MESSAGE_SHOW_RETRY_DELAY_MS);
-        scheduleClear(playerId, token, hudManager, playerRef, UI_MESSAGE_SHOW_RETRY_DELAY_MS + UI_MESSAGE_DURATION_MS);
-        return true;
+        boolean shown = setMessageHud(player, hudManager, playerRef, message);
+        if (!shown) {
+            UI_MESSAGE_TOKENS.remove(playerId, token);
+            return false;
+        }
+        scheduleClear(playerId, token, player, hudManager, playerRef, UI_MESSAGE_DURATION_MS);
+        return shown;
     }
 
     /**
      * Always installs a fresh HUD instance to avoid stale selector updates when the active custom HUD changes.
      */
-    private void setMessageHud(HudManager hudManager,
-                               PlayerRef playerRef,
-                               String message) {
+    private boolean setMessageHud(Player player,
+                                  HudManager hudManager,
+                                  PlayerRef playerRef,
+                                  String message) {
         TameworkMessageHud messageHud = new TameworkMessageHud(playerRef, message);
-        hudManager.setCustomHud(playerRef, messageHud);
-    }
-
-    private void scheduleShow(UUID playerId,
-                              int token,
-                              HudManager hudManager,
-                              PlayerRef playerRef,
-                              String message,
-                              long delayMs) {
-        com.hypixel.hytale.server.core.HytaleServer.SCHEDULED_EXECUTOR.schedule(() -> {
-            if (!isUiMessageTokenCurrent(playerId, token)) {
-                return;
-            }
-            if (playerRef == null || !playerRef.isValid()) {
-                return;
-            }
-            setMessageHud(hudManager, playerRef, message);
-        }, delayMs, TimeUnit.MILLISECONDS);
+        return TameworkHudCompat.setCustomHud(player, hudManager, playerRef, messageHud);
     }
 
     /**
@@ -68,6 +53,7 @@ public final class TameworkUiMessageService {
      */
     private void scheduleClear(UUID playerId,
                                int token,
+                               Player player,
                                HudManager hudManager,
                                PlayerRef playerRef,
                                long delayMs) {
@@ -79,10 +65,10 @@ public final class TameworkUiMessageService {
             if (playerRef == null || !playerRef.isValid()) {
                 return;
             }
-            if (!(hudManager.getCustomHud() instanceof TameworkMessageHud)) {
+            if (!TameworkHudCompat.isMultiHudAvailable() && !(hudManager.getCustomHud() instanceof TameworkMessageHud)) {
                 return;
             }
-            setMessageHud(hudManager, playerRef, "");
+            setMessageHud(player, hudManager, playerRef, "");
         }, delayMs, TimeUnit.MILLISECONDS);
     }
 
