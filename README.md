@@ -1,4 +1,6 @@
-<img width="400" height="400" alt="Alec&#39;sTamework400Transparent" src="https://github.com/user-attachments/assets/251cbac2-26ea-4daf-b552-30594e96f8da" />
+[![CurseForge Downloads](https://img.shields.io/curseforge/dt/1447962?style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-tamework)
+[![Discord](https://img.shields.io/discord/1468261809739005996?style=for-the-badge&logo=discord&logoColor=%23ffffff&logoSize=auto&label=Alec%27s%20Mods%20Discord&color=%235865F2)](https://discord.gg/E8n8RgTTdq)
+[![GitHub Repo stars](https://img.shields.io/github/stars/Alechilles/AlecsCats?style=for-the-badge&logo=github&label=GitHub)](https://github.com/Alechilles/AlecsTamework)
 
 # Alec's Tamework!
 A modular taming framework for Hytale that focuses on fast setup and giving modders reusable systems for companion NPCs. Add ownership, taming, capture/spawn, command tools, and rich NPC interactions without huge custom instruction trees in every role.
