@@ -1,0 +1,58 @@
+$C = "Common.ui";
+
+@RemoveIconButtonLabelStyle = LabelStyle(
+  FontSize: 1,
+  TextColor: #00000000
+);
+
+@RemoveIconButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Default.png"), LabelStyle: @RemoveIconButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Hover.png"), LabelStyle: @RemoveIconButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Pressed.png"), LabelStyle: @RemoveIconButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Disabled.png"), LabelStyle: @RemoveIconButtonLabelStyle)
+);
+
+Group {
+  Anchor: (Top: 8, Height: 92);
+  Background: #13263c(0.86);
+  Padding: (Horizontal: 10, Vertical: 8);
+
+  Label #Name {
+    Anchor: (Top: 0, Left: 0, Width: 320, Height: 22);
+    Text: "Companion";
+    Style: (
+      FontSize: 16,
+      RenderBold: true,
+      TextColor: #eff4fa,
+      HorizontalAlignment: Start,
+      VerticalAlignment: Center
+    );
+  }
+
+  TextButton #RemoveButton {
+    Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+    Style: @RemoveIconButtonStyle;
+    Text: "";
+  }
+
+  Group #HealthFrame {
+    Anchor: (Top: 30, Left: 0, Width: 360, Height: 14);
+    Background: #0a121b(0.95);
+
+    Group #HealthFill {
+      Anchor: (Left: 1, Top: 1, Width: 358, Height: 12);
+      Background: #6fc576;
+    }
+  }
+
+  Label #HealthText {
+    Anchor: (Top: 50, Left: 0, Width: 360, Height: 16);
+    Text: "Health: ?/?";
+    Style: (
+      FontSize: 11,
+      TextColor: #bed0e3,
+      HorizontalAlignment: Start,
+      VerticalAlignment: Center
+    );
+  }
+}

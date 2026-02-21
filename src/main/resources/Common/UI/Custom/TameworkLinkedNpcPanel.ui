@@ -1,19 +1,7 @@
 $C = "Common.ui";
 
-@RemoveIconButtonLabelStyle = LabelStyle(
-  FontSize: 1,
-  TextColor: #00000000
-);
-
-@RemoveIconButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Default.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Hover.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Pressed.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Disabled.png"), LabelStyle: @RemoveIconButtonLabelStyle)
-);
-
 Group #TameworkLinkedPanelRoot {
-  Anchor: (Top: 240, Left: 160, Width: 430, Height: 640);
+  Anchor: (Top: 290, Left: 132, Width: 430, Height: 640);
   LayoutMode: Top;
   Padding: (Horizontal: 14, Vertical: 12);
   Background: #0b1a2c(0.78);
@@ -42,213 +30,16 @@ Group #TameworkLinkedPanelRoot {
     );
   }
 
-  Group #TameworkLinkedPanelCard0 {
-    Anchor: (Top: 12, Height: 90);
-    Background: #13263c(0.86);
-    Padding: (Horizontal: 10, Vertical: 8);
-    Visible: false;
+  Group #TameworkLinkedPanelListViewport {
+    Anchor: (Top: 10);
+    FlexWeight: 1;
+    LayoutMode: TopScrolling;
+    ScrollbarStyle: $C.@DefaultScrollbarStyle;
 
-    Label #TameworkLinkedPanelCard0Name {
-      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
-      Text: "Companion";
-      Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    TextButton #TameworkLinkedPanelCard0RemoveButton {
-      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
-      Style: @RemoveIconButtonStyle;
-      Text: "";
-    }
-
-    Group #TameworkLinkedPanelCard0HealthFrame {
-      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
-      Background: #0a121b(0.95);
-
-      Group #TameworkLinkedPanelCard0HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
-        Background: #6fc576;
-      }
-    }
-
-    Label #TameworkLinkedPanelCard0HealthText {
-      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
-      Text: "Health: ?/?";
-      Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-  }
-
-  Group #TameworkLinkedPanelCard1 {
-    Anchor: (Top: 8, Height: 90);
-    Background: #13263c(0.86);
-    Padding: (Horizontal: 10, Vertical: 8);
-    Visible: false;
-
-    Label #TameworkLinkedPanelCard1Name {
-      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
-      Text: "Companion";
-      Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    TextButton #TameworkLinkedPanelCard1RemoveButton {
-      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
-      Style: @RemoveIconButtonStyle;
-      Text: "";
-    }
-
-    Group #TameworkLinkedPanelCard1HealthFrame {
-      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
-      Background: #0a121b(0.95);
-
-      Group #TameworkLinkedPanelCard1HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
-        Background: #6fc576;
-      }
-    }
-
-    Label #TameworkLinkedPanelCard1HealthText {
-      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
-      Text: "Health: ?/?";
-      Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-  }
-
-  Group #TameworkLinkedPanelCard2 {
-    Anchor: (Top: 8, Height: 90);
-    Background: #13263c(0.86);
-    Padding: (Horizontal: 10, Vertical: 8);
-    Visible: false;
-
-    Label #TameworkLinkedPanelCard2Name {
-      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
-      Text: "Companion";
-      Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    TextButton #TameworkLinkedPanelCard2RemoveButton {
-      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
-      Style: @RemoveIconButtonStyle;
-      Text: "";
-    }
-
-    Group #TameworkLinkedPanelCard2HealthFrame {
-      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
-      Background: #0a121b(0.95);
-
-      Group #TameworkLinkedPanelCard2HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
-        Background: #6fc576;
-      }
-    }
-
-    Label #TameworkLinkedPanelCard2HealthText {
-      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
-      Text: "Health: ?/?";
-      Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-  }
-
-  Group #TameworkLinkedPanelCard3 {
-    Anchor: (Top: 8, Height: 90);
-    Background: #13263c(0.86);
-    Padding: (Horizontal: 10, Vertical: 8);
-    Visible: false;
-
-    Label #TameworkLinkedPanelCard3Name {
-      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
-      Text: "Companion";
-      Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    TextButton #TameworkLinkedPanelCard3RemoveButton {
-      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
-      Style: @RemoveIconButtonStyle;
-      Text: "";
-    }
-
-    Group #TameworkLinkedPanelCard3HealthFrame {
-      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
-      Background: #0a121b(0.95);
-
-      Group #TameworkLinkedPanelCard3HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
-        Background: #6fc576;
-      }
-    }
-
-    Label #TameworkLinkedPanelCard3HealthText {
-      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
-      Text: "Health: ?/?";
-      Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-  }
-
-  Group #TameworkLinkedPanelCard4 {
-    Anchor: (Top: 8, Height: 90);
-    Background: #13263c(0.86);
-    Padding: (Horizontal: 10, Vertical: 8);
-    Visible: false;
-
-    Label #TameworkLinkedPanelCard4Name {
-      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
-      Text: "Companion";
-      Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    TextButton #TameworkLinkedPanelCard4RemoveButton {
-      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
-      Style: @RemoveIconButtonStyle;
-      Text: "";
-    }
-
-    Group #TameworkLinkedPanelCard4HealthFrame {
-      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
-      Background: #0a121b(0.95);
-
-      Group #TameworkLinkedPanelCard4HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
-        Background: #6fc576;
-      }
-    }
-
-    Label #TameworkLinkedPanelCard4HealthText {
-      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
-      Text: "Health: ?/?";
-      Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-  }
-
-  Group #TameworkLinkedPanelCard5 {
-    Anchor: (Top: 8, Height: 90);
-    Background: #13263c(0.86);
-    Padding: (Horizontal: 10, Vertical: 8);
-    Visible: false;
-
-    Label #TameworkLinkedPanelCard5Name {
-      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
-      Text: "Companion";
-      Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
-    }
-
-    TextButton #TameworkLinkedPanelCard5RemoveButton {
-      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
-      Style: @RemoveIconButtonStyle;
-      Text: "";
-    }
-
-    Group #TameworkLinkedPanelCard5HealthFrame {
-      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
-      Background: #0a121b(0.95);
-
-      Group #TameworkLinkedPanelCard5HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
-        Background: #6fc576;
-      }
-    }
-
-    Label #TameworkLinkedPanelCard5HealthText {
-      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
-      Text: "Health: ?/?";
-      Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Group #TameworkLinkedPanelList {
+      LayoutMode: Top;
+      Anchor: (Bottom: 6);
+      Padding: (Right: 8);
     }
   }
 }

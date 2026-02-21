@@ -320,14 +320,12 @@ public final class CommandItemFeatureHandler {
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return false;
         }
-        List<TameworkCommandSelectionPage.LinkedNpcEntry> linkedNpcEntries =
-                buildLinkedPanelEntries(player, store, working);
         TameworkCommandSelectionPage page = new TameworkCommandSelectionPage(
                 uiPlayerRef,
                 config,
                 selectedId,
-                linkedNpcEntries,
-                npcUuid -> applyMenuUnlink(player, toolId, config, npcUuid),
+                () -> buildLinkedPanelEntriesForTool(player, toolId),
+                npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
@@ -358,7 +356,6 @@ public final class CommandItemFeatureHandler {
 
     private void applyMenuUnlink(Player player,
                                  String toolId,
-                                 TwCommandItemConfig config,
                                  UUID npcUuid) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
@@ -390,16 +387,42 @@ public final class CommandItemFeatureHandler {
                 player.sendInventory();
                 sendSuccessMessage(player, "Removed linked NPC.");
             }
-            World world = player.getWorld();
-            if (world != null) {
-                Store<EntityStore> store = world.getEntityStore().getStore();
-                if (store != null) {
-                    openSelectionMenu(player, store, config, updatedStack, toolId);
-                }
-            }
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
+    }
+
+    private List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player,
+                                                                                              String toolId) {
+        if (player == null || toolId == null || toolId.isBlank()) {
+            return List.of();
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return List.of();
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            World world = player.getWorld();
+            if (world == null) {
+                return List.of();
+            }
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            if (store == null) {
+                return List.of();
+            }
+            return buildLinkedPanelEntries(player, store, stack);
+        }
+        return List.of();
     }
 
     private List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntries(Player player,
