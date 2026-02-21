@@ -18,7 +18,7 @@ Group {
   Padding: (Horizontal: 10, Vertical: 8);
 
   Label #Name {
-    Anchor: (Top: 0, Left: 0, Width: 320, Height: 22);
+    Anchor: (Top: 0, Left: 0, Width: 206, Height: 22);
     Text: "Companion";
     Style: (
       FontSize: 16,
@@ -30,7 +30,7 @@ Group {
   }
 
   Label #StatusUnloaded {
-    Anchor: (Top: 2, Right: 34, Width: 86, Height: 18);
+    Anchor: (Top: 2, Right: 34, Width: 76, Height: 18);
     Text: "UNLOADED";
     Style: (
       FontSize: 10,
@@ -43,7 +43,7 @@ Group {
   }
 
   Label #StatusConfirm {
-    Anchor: (Top: 2, Right: 34, Width: 124, Height: 18);
+    Anchor: (Top: 2, Right: 34, Width: 96, Height: 18);
     Text: "CONFIRM REMOVE";
     Style: (
       FontSize: 10,
@@ -56,9 +56,23 @@ Group {
   }
 
   $C.@SmallSecondaryTextButton #RespawnButton {
-    Anchor: (Top: 0, Right: 34, Width: 104, Height: 22);
+    Anchor: (Top: 0, Right: 34, Width: 76, Height: 22);
     Padding: (Horizontal: 8);
     Text: "Respawn";
+    Visible: false;
+  }
+
+  $C.@SmallSecondaryTextButton #RecallButton {
+    Anchor: (Top: 24, Right: 34, Width: 76, Height: 22);
+    Padding: (Horizontal: 8);
+    Text: "Recall";
+    Visible: false;
+  }
+
+  $C.@SmallSecondaryTextButton #SetHomeButton {
+    Anchor: (Top: 48, Right: 34, Width: 76, Height: 22);
+    Padding: (Horizontal: 8);
+    Text: "Set Home";
     Visible: false;
   }
 
@@ -69,17 +83,17 @@ Group {
   }
 
   Group #HealthFrame {
-    Anchor: (Top: 30, Left: 0, Width: 360, Height: 14);
+    Anchor: (Top: 30, Left: 0, Width: 206, Height: 14);
     Background: #0a121b(0.95);
 
     Group #HealthFill {
-      Anchor: (Left: 1, Top: 1, Width: 358, Height: 12);
+      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
       Background: #6fc576;
     }
   }
 
   Label #HealthText {
-    Anchor: (Top: 50, Left: 0, Width: 360, Height: 16);
+    Anchor: (Top: 50, Left: 0, Width: 206, Height: 16);
     Text: "Health: ?/?";
     Style: (
       FontSize: 11,

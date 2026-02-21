@@ -366,6 +366,8 @@ public final class CommandItemFeatureHandler {
                 () -> buildLinkedPanelEntriesForTool(player, toolId),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
+                npcUuid -> applyMenuRecall(player, toolId, npcUuid),
+                npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
@@ -503,6 +505,202 @@ public final class CommandItemFeatureHandler {
                 name = "companion";
             }
             sendSuccessMessage(player, "Respawned " + name + ".");
+            return;
+        }
+        sendWarningMessage(player, "Unable to find that command item.");
+    }
+
+    private void applyMenuSetHome(Player player,
+                                  String toolId,
+                                  UUID npcUuid) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            sendWarningMessage(player, "Unable to set home right now.");
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            sendWarningMessage(player, "Unable to set home right now.");
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            sendWarningMessage(player, "Unable to set home right now.");
+            return;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
+            if (record == null) {
+                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                return;
+            }
+            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+            if (npcRef == null || !npcRef.isValid()) {
+                sendWarningMessage(player, "That companion must be loaded to set home.");
+                return;
+            }
+            NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+            if (npc == null) {
+                sendWarningMessage(player, "That companion must be loaded to set home.");
+                return;
+            }
+            TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+            if (links == null || !links.containsToolId(toolId)) {
+                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                return;
+            }
+            UUID ownerId = links.getOwnerId();
+            if (ownerId != null && !ownerId.equals(player.getUuid())) {
+                sendWarningMessage(player, "You cannot set home for that companion.");
+                return;
+            }
+            TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
+            if (transform == null) {
+                sendWarningMessage(player, "Unable to read that companion's position.");
+                return;
+            }
+            Vector3d home = new Vector3d(transform.getPosition());
+            if (links.getOwnerId() == null && player.getUuid() != null) {
+                links.setOwnerId(player.getUuid());
+            }
+            links.setHomePosition(home);
+            store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links);
+            ItemStack updatedStack = upsertLinkedNpcRecord(stack, npcUuid, home, home);
+            hotbar.setItemStackForSlot(slot, updatedStack);
+            inventory.markChanged();
+            player.sendInventory();
+            sendSuccessMessage(player, "Set home for " + resolveNpcDisplayName(npcRef, store, npc) + ".");
+            return;
+        }
+        sendWarningMessage(player, "Unable to find that command item.");
+    }
+
+    private void applyMenuRecall(Player player,
+                                 String toolId,
+                                 UUID npcUuid) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            sendWarningMessage(player, "Unable to recall right now.");
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            sendWarningMessage(player, "Unable to recall right now.");
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        Ref<EntityStore> playerRef = player.getReference();
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            sendWarningMessage(player, "Unable to recall right now.");
+            return;
+        }
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        double safeSpawnDistance = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
+                RECALL_SAFE_SPAWN_DISTANCE
+        );
+        double forceRelocateDistance = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandRecallForceRelocateDistance() : 0.0,
+                RECALL_FORCE_RELOCATE_DISTANCE
+        );
+
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
+            if (record == null) {
+                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                return;
+            }
+            if (deathService != null
+                    && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
+                sendWarningMessage(player, "That companion is dead. Use Respawn when it is ready.");
+                return;
+            }
+
+            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+            NPCEntity npc = (npcRef != null && npcRef.isValid())
+                    ? store.getComponent(npcRef, NPCEntity.getComponentType())
+                    : null;
+            if (npc != null && npcRef != null && npcRef.isValid()) {
+                TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
+                Vector3d currentPosition = npcTransform != null ? new Vector3d(npcTransform.getPosition()) : record.lastKnownPosition;
+                Vector3d safeDestination = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, currentPosition);
+                if (safeDestination == null) {
+                    sendWarningMessage(player, "Unable to find a safe recall position.");
+                    return;
+                }
+                boolean moved = false;
+                TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
+                if (playerTransform != null && currentPosition != null) {
+                    Vector3d playerPos = playerTransform.getPosition();
+                    double dx = currentPosition.x - playerPos.x;
+                    double dy = currentPosition.y - playerPos.y;
+                    double dz = currentPosition.z - playerPos.z;
+                    double distSq = dx * dx + dy * dy + dz * dz;
+                    if (distSq >= forceRelocateDistance * forceRelocateDistance) {
+                        npc.moveTo(npcRef, safeDestination.x, safeDestination.y, safeDestination.z, store);
+                        currentPosition = safeDestination;
+                        moved = true;
+                    }
+                }
+                applyRespawnFollowBootstrap(npcRef, npc, playerRef, store);
+                ItemStack updatedStack = upsertLinkedNpcRecord(stack, npcUuid, currentPosition, record.homePosition);
+                hotbar.setItemStackForSlot(slot, updatedStack);
+                inventory.markChanged();
+                player.sendInventory();
+                String name = resolveNpcDisplayName(npcRef, store, npc);
+                sendSuccessMessage(player, (moved ? "Recalled " : "Issued recall for ") + name + ".");
+                return;
+            }
+
+            if (relocationService == null) {
+                sendWarningMessage(player, "Unable to recall unloaded companions right now.");
+                return;
+            }
+            Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
+            Vector3d safeDestination = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourceHint);
+            if (safeDestination == null) {
+                sendWarningMessage(player, "Unable to find a safe recall position.");
+                return;
+            }
+            relocationService.queueRelocation(
+                    world,
+                    npcUuid,
+                    safeDestination,
+                    player.getUuid(),
+                    true,
+                    true,
+                    "Follow",
+                    null,
+                    0L,
+                    sourceHint
+            );
+            sendSuccessMessage(player, "Queued recall for unloaded companion.");
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
