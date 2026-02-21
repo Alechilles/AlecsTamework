@@ -18,10 +18,13 @@
 - Linked-companions panel now updates row health/cooldown/status once per second while open via incremental UI selector updates (no full page rebuild).
 - Linked-panel `Respawn` button now uses the shared secondary button style for clearer outline/hover/pressed feedback.
 - Dead companion respawns now re-enter follow behavior immediately by clearing combat lock, restoring owner as `MasterTarget`, and applying follow-compatible state fallback.
+- Dead companion respawn follow bootstrap now prioritizes `Follow` state first, with `Idle` as fallback.
 
 ### Fixed
 - Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.
 - Dead companion respawns now sample nearby surface positions and avoid spawning inside terrain blocks in common recall/respawn cases.
+- Dead companion respawns now retry follow bootstrap shortly after spawn to avoid race conditions where state/target supports are not yet ready on the first frame.
+- Dead companion respawn placement now prioritizes nearby forward-facing in-view points and low-height surface probes, reducing outside-building spawns when the player is indoors.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.

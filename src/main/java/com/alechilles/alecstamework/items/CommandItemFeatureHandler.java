@@ -48,6 +48,7 @@ import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
+import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
@@ -73,6 +74,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
 /**
@@ -90,6 +93,7 @@ public final class CommandItemFeatureHandler {
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
     private static final String LINK_RECORD_SEPARATOR = "\n";
     private static final String LINK_RECORD_PARTS_SEPARATOR = "\\|";
+    private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
 
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
@@ -575,6 +579,7 @@ public final class CommandItemFeatureHandler {
             EntitySupport.setDisplayName(spawnedRef, deadSnapshot.customName(), store);
         }
         applyRespawnFollowBootstrap(spawnedRef, spawnedNpc, playerRef, store);
+        scheduleRespawnFollowRetry(player.getWorld(), spawnedNpc.getUuid(), playerRef);
         ItemStack updated = removeLinkedNpcRecord(stack, record.npcUuid);
         updated = upsertLinkedNpcRecord(updated, spawnedNpc.getUuid(), destination, homePosition);
         if (deathService != null) {
@@ -597,10 +602,34 @@ public final class CommandItemFeatureHandler {
                 role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, playerRef);
             }
         }
-        // Match default Follow behavior (Idle + MasterTarget owner) after respawn.
-        if (!applyState(npcRef, npc, store, "Idle", null)) {
-            applyState(npcRef, npc, store, "Follow", null);
+        // Match default Follow behavior after respawn.
+        if (!applyState(npcRef, npc, store, "Follow", null)) {
+            applyState(npcRef, npc, store, "Idle", null);
         }
+    }
+
+    private void scheduleRespawnFollowRetry(World world, UUID npcUuid, Ref<EntityStore> playerRef) {
+        if (world == null || npcUuid == null) {
+            return;
+        }
+        CompletableFuture.runAsync(
+                () -> world.execute(() -> {
+                    Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+                    if (npcRef == null || !npcRef.isValid()) {
+                        return;
+                    }
+                    Store<EntityStore> store = world.getEntityStore().getStore();
+                    if (store == null) {
+                        return;
+                    }
+                    NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+                    if (npc == null) {
+                        return;
+                    }
+                    applyRespawnFollowBootstrap(npcRef, npc, playerRef, store);
+                }),
+                CompletableFuture.delayedExecutor(RESPAWN_FOLLOW_RETRY_DELAY_MS, TimeUnit.MILLISECONDS)
+        );
     }
 
     private LinkedNpcRecord findLinkedNpcRecord(List<LinkedNpcRecord> records, UUID npcUuid) {
@@ -2106,9 +2135,10 @@ public final class CommandItemFeatureHandler {
         }
 
         Vector3d desired = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourcePosition);
-        double dirX = 1.0;
-        double dirZ = 0.0;
-        if (desired != null) {
+        Vector3d lookDirection = resolvePlayerLookDirection(playerRef, store);
+        double dirX = lookDirection != null ? lookDirection.x : 1.0;
+        double dirZ = lookDirection != null ? lookDirection.z : 0.0;
+        if (lookDirection == null && desired != null) {
             double dx = desired.x - playerPos.x;
             double dz = desired.z - playerPos.z;
             double len = Math.sqrt(dx * dx + dz * dz);
@@ -2119,15 +2149,26 @@ public final class CommandItemFeatureHandler {
         }
         double baseAngle = Math.atan2(dirZ, dirX);
         double targetDistance = Math.max(2.0, safeSpawnDistance);
-        double[] distanceMultipliers = {1.0, 0.8, 0.6, 0.4, 0.25};
-        double[] angleOffsets = {0.0, 30.0, -30.0, 60.0, -60.0, 90.0, -90.0, 120.0, -120.0, 150.0, -150.0, 180.0};
-        for (double distanceMultiplier : distanceMultipliers) {
-            double distance = Math.max(2.0, targetDistance * distanceMultiplier);
+        double[] distanceCandidates = {
+                Math.min(5.0, targetDistance),
+                Math.min(8.0, targetDistance),
+                Math.min(12.0, targetDistance),
+                Math.min(16.0, targetDistance),
+                targetDistance
+        };
+        double[] angleOffsets = {0.0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0, 60.0, -60.0, 90.0, -90.0, 120.0, -120.0, 180.0};
+        for (double distance : distanceCandidates) {
+            if (distance < 2.0) {
+                continue;
+            }
             for (double angleOffset : angleOffsets) {
                 double radians = baseAngle + Math.toRadians(angleOffset);
                 double x = playerPos.x + Math.cos(radians) * distance;
                 double z = playerPos.z + Math.sin(radians) * distance;
-                Vector3d surface = projectToSurface(world, x, playerPos.y + 16.0, z, 64.0);
+                Vector3d surface = projectToSurface(world, x, playerPos.y + 2.0, z, 48.0);
+                if (surface == null) {
+                    surface = projectToSurface(world, x, playerPos.y + 24.0, z, 64.0);
+                }
                 if (surface != null) {
                     return surface;
                 }
@@ -2142,6 +2183,34 @@ public final class CommandItemFeatureHandler {
             return new Vector3d(desired.x, playerPos.y + 1.0, desired.z);
         }
         return new Vector3d(playerPos.x, playerPos.y + 1.0, playerPos.z);
+    }
+
+    private Vector3d resolvePlayerLookDirection(Ref<EntityStore> playerRef, Store<EntityStore> store) {
+        if (playerRef == null || !playerRef.isValid() || store == null) {
+            return null;
+        }
+        Vector3f rotation = null;
+        HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
+        if (headRotation != null) {
+            rotation = new Vector3f(headRotation.getRotation());
+        }
+        if (rotation == null) {
+            TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+            if (transform == null) {
+                return null;
+            }
+            rotation = new Vector3f(transform.getRotation());
+        }
+        Vector3f forward = new Vector3f(Vector3f.FORWARD);
+        forward.rotateY(rotation.getYaw());
+        forward.rotateX(rotation.getPitch());
+        forward.normalize();
+        Vector3d out = new Vector3d(forward.x, 0.0, forward.z);
+        if (out.squaredLength() <= 0.0001) {
+            return null;
+        }
+        out.normalize();
+        return out;
     }
 
     private Vector3d projectToSurface(World world,
