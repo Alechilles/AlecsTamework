@@ -203,9 +203,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
             commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
             commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
-            commandBuilder.set(traitsButtonSelector + ".Enabled", entry.isTraitsActionEnabled());
             commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
-            commandBuilder.set(talentsButtonSelector + ".Enabled", entry.isTalentsActionEnabled());
             commandBuilder.set(removeSelector + ".Text", "");
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,

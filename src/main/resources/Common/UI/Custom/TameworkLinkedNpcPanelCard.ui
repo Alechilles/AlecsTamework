@@ -148,14 +148,12 @@ Group {
       Anchor: (Left: 0, Width: 108, Height: 22);
       Text: "Traits";
       Visible: false;
-      Enabled: false;
     }
 
     TextButton #TalentsButton {
       Anchor: (Left: 6, Width: 108, Height: 22);
       Text: "Talents";
       Visible: false;
-      Enabled: false;
     }
   }
 }
