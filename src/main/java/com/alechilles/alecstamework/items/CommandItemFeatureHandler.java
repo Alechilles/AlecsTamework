@@ -63,6 +63,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 /**
  * Handles command-item linking and command dispatch.
@@ -598,6 +599,10 @@ public final class CommandItemFeatureHandler {
         if (npc == null) {
             return null;
         }
+        String roleParamNameKey = resolveRoleNameKeyFromParams(npc.getRole());
+        if (roleParamNameKey != null && !roleParamNameKey.isBlank()) {
+            return roleParamNameKey;
+        }
         String nameKey = readStringGetter(
                 npc,
                 "getRoleNameKey",
@@ -612,9 +617,67 @@ public final class CommandItemFeatureHandler {
             NPCPlugin plugin = NPCPlugin.get();
             if (plugin != null) {
                 String indexedNameKey = plugin.getName(roleIndex);
-                if (indexedNameKey != null && !indexedNameKey.isBlank()) {
+                if (looksLikeTranslationKey(indexedNameKey)) {
                     return indexedNameKey;
                 }
+            }
+        }
+        return null;
+    }
+
+    private String resolveRoleNameKeyFromParams(Role role) {
+        if (role == null) {
+            return null;
+        }
+        String direct = readStringGetter(
+                role,
+                "getRoleNameKey",
+                "getNpcNameKey",
+                "getNameKey",
+                "getNameTranslationKey"
+        );
+        if (direct != null && !direct.isBlank()) {
+            return direct;
+        }
+        Object entitySupport = invokeObjectGetter(role, "getEntitySupport");
+        Object sensorScope = invokeObjectGetter(entitySupport, "getSensorScope");
+        return readScopeStringParam(
+                sensorScope,
+                "NameTranslationKey",
+                "RoleNameTranslationKey",
+                "NameKey",
+                "RoleNameKey",
+                "NpcNameKey"
+        );
+    }
+
+    private static boolean looksLikeTranslationKey(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        return value.indexOf('.') >= 0;
+    }
+
+    private static String readScopeStringParam(Object scope, String... paramNames) {
+        if (scope == null || paramNames == null) {
+            return null;
+        }
+        for (String paramName : paramNames) {
+            if (paramName == null || paramName.isBlank()) {
+                continue;
+            }
+            try {
+                Method supplierMethod = scope.getClass().getMethod("getStringSupplier", String.class);
+                Object supplierObj = supplierMethod.invoke(scope, paramName);
+                if (!(supplierObj instanceof Supplier<?> supplier)) {
+                    continue;
+                }
+                Object value = supplier.get();
+                if (value instanceof String stringValue && !stringValue.isBlank()) {
+                    return stringValue;
+                }
+            } catch (Exception | LinkageError ignored) {
+                // Continue trying alternate parameter names and compatibility paths.
             }
         }
         return null;
@@ -656,6 +719,18 @@ public final class CommandItemFeatureHandler {
             Method method = target.getClass().getMethod(methodName);
             Object value = method.invoke(target);
             return value instanceof String ? (String) value : null;
+        } catch (Exception | LinkageError ex) {
+            return null;
+        }
+    }
+
+    private static Object invokeObjectGetter(Object target, String methodName) {
+        if (target == null || methodName == null) {
+            return null;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            return method.invoke(target);
         } catch (Exception | LinkageError ex) {
             return null;
         }
