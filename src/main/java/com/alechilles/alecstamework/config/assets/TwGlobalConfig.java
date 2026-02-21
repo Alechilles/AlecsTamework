@@ -4,6 +4,7 @@ import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
 import com.hypixel.hytale.assetstore.codec.AssetBuilderCodec;
+import com.hypixel.hytale.assetstore.codec.BuilderCodec;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
@@ -17,6 +18,194 @@ import javax.annotation.Nullable;
  * Stored under Server/Tamework/Global.
  */
 public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwGlobalConfig>> {
+    private static final BuilderCodec<GeneralSection> GENERAL_SECTION_CODEC = BuilderCodec.builder(
+                    GeneralSection.class, GeneralSection::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (section, value) -> section.enabled = value,
+                    section -> section.enabled
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("Priority", Codec.INTEGER),
+                    (section, value) -> section.priority = value,
+                    section -> section.priority
+            )
+            .add()
+            .build();
+
+    private static final BuilderCodec<OwnershipProtectionSection> OWNERSHIP_PROTECTION_SECTION_CODEC = BuilderCodec.builder(
+                    OwnershipProtectionSection.class, OwnershipProtectionSection::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("BlockOwnerDamage", Codec.BOOLEAN),
+                    (section, value) -> section.blockOwnerDamage = value,
+                    section -> section.blockOwnerDamage
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("BlockAllPlayerDamageIfOwned", Codec.BOOLEAN),
+                    (section, value) -> section.blockAllPlayerDamageIfOwned = value,
+                    section -> section.blockAllPlayerDamageIfOwned
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
+                    (section, value) -> section.invulnerableIfOwned = value,
+                    section -> section.invulnerableIfOwned
+            )
+            .add()
+            .build();
+
+    private static final BuilderCodec<InteractionDefaultsSection> INTERACTION_DEFAULTS_SECTION_CODEC = BuilderCodec.builder(
+                    InteractionDefaultsSection.class, InteractionDefaultsSection::new
+            )
+            .<String>append(
+                    new KeyedCodec<>("InteractionConfigParam", Codec.STRING),
+                    (section, value) -> section.interactionConfigParam = value,
+                    section -> section.interactionConfigParam
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("LovedItemsParam", Codec.STRING),
+                    (section, value) -> section.lovedItemsParam = value,
+                    section -> section.lovedItemsParam
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("IsHarvestableParam", Codec.STRING),
+                    (section, value) -> section.isHarvestableParam = value,
+                    section -> section.isHarvestableParam
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("IsMountableParam", Codec.STRING),
+                    (section, value) -> section.isMountableParam = value,
+                    section -> section.isMountableParam
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("HarvestContextParam", Codec.STRING),
+                    (section, value) -> section.harvestContextParam = value,
+                    section -> section.harvestContextParam
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("HarvestAlarmName", Codec.STRING),
+                    (section, value) -> section.harvestAlarmName = value,
+                    section -> section.harvestAlarmName
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("InteractionCooldownAlarmPrefix", Codec.STRING),
+                    (section, value) -> section.interactionCooldownAlarmPrefix = value,
+                    section -> section.interactionCooldownAlarmPrefix
+            )
+            .add()
+            .build();
+
+    private static final BuilderCodec<CommandSection> COMMAND_SECTION_CODEC = BuilderCodec.builder(
+                    CommandSection.class, CommandSection::new
+            )
+            .<Double>append(
+                    new KeyedCodec<>("ReturnHomeTeleportDistance", Codec.DOUBLE),
+                    (section, value) -> section.returnHomeTeleportDistance = value,
+                    section -> section.returnHomeTeleportDistance
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("ReturnHomePathDistanceBeforeTeleport", Codec.DOUBLE),
+                    (section, value) -> section.returnHomePathDistanceBeforeTeleport = value,
+                    section -> section.returnHomePathDistanceBeforeTeleport
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("ReturnHomeTeleportDelayMs", Codec.INTEGER),
+                    (section, value) -> section.returnHomeTeleportDelayMs = value,
+                    section -> section.returnHomeTeleportDelayMs
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("RecallSafeSpawnDistance", Codec.DOUBLE),
+                    (section, value) -> section.recallSafeSpawnDistance = value,
+                    section -> section.recallSafeSpawnDistance
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("RecallForceRelocateDistance", Codec.DOUBLE),
+                    (section, value) -> section.recallForceRelocateDistance = value,
+                    section -> section.recallForceRelocateDistance
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("RelocationRetryIntervalMs", Codec.INTEGER),
+                    (section, value) -> section.relocationRetryIntervalMs = value,
+                    section -> section.relocationRetryIntervalMs
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("RelocationMaxWaitMs", Codec.INTEGER),
+                    (section, value) -> section.relocationMaxWaitMs = value,
+                    section -> section.relocationMaxWaitMs
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("RelocationMaxRetryAttempts", Codec.INTEGER),
+                    (section, value) -> section.relocationMaxRetryAttempts = value,
+                    section -> section.relocationMaxRetryAttempts
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("DeadRespawnEnabled", Codec.BOOLEAN),
+                    (section, value) -> section.deadRespawnEnabled = value,
+                    section -> section.deadRespawnEnabled
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
+                    (section, value) -> section.deadRespawnCooldownMs = value,
+                    section -> section.deadRespawnCooldownMs
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("DeadRespawnFollowRetryDelayMs", Codec.INTEGER),
+                    (section, value) -> section.deadRespawnFollowRetryDelayMs = value,
+                    section -> section.deadRespawnFollowRetryDelayMs
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("DeadRespawnDistanceClose", Codec.DOUBLE),
+                    (section, value) -> section.deadRespawnDistanceClose = value,
+                    section -> section.deadRespawnDistanceClose
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("DeadRespawnDistanceNear", Codec.DOUBLE),
+                    (section, value) -> section.deadRespawnDistanceNear = value,
+                    section -> section.deadRespawnDistanceNear
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("DeadRespawnDistanceMid", Codec.DOUBLE),
+                    (section, value) -> section.deadRespawnDistanceMid = value,
+                    section -> section.deadRespawnDistanceMid
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("DeadRespawnDistanceFar", Codec.DOUBLE),
+                    (section, value) -> section.deadRespawnDistanceFar = value,
+                    section -> section.deadRespawnDistanceFar
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("LinkedPanelRequireUnlinkConfirm", Codec.BOOLEAN),
+                    (section, value) -> section.linkedPanelRequireUnlinkConfirm = value,
+                    section -> section.linkedPanelRequireUnlinkConfirm
+            )
+            .add()
+            .build();
+
     public static final AssetBuilderCodec<String, TwGlobalConfig> CODEC =
             AssetBuilderCodec.builder(
                     TwGlobalConfig.class,
@@ -28,172 +217,33 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     asset -> asset.data
             )
             .documentation("Global defaults and settings for Alec's Tamework.")
-            .<Boolean>append(
-                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
-                    (asset, value) -> asset.enabled = value != null ? value : asset.enabled,
-                    asset -> asset.enabled
+            .<GeneralSection>append(
+                    new KeyedCodec<>("General", GENERAL_SECTION_CODEC),
+                    TwGlobalConfig::applyGeneralSection,
+                    TwGlobalConfig::toGeneralSection
             )
-            .documentation("Whether this global config is active.")
+            .documentation("Organized section for global enabled/priority settings.")
             .add()
-            .<Integer>append(
-                    new KeyedCodec<>("Priority", Codec.INTEGER),
-                    (asset, value) -> asset.priority = value != null ? value : asset.priority,
-                    asset -> asset.priority
+            .<OwnershipProtectionSection>append(
+                    new KeyedCodec<>("OwnershipProtection", OWNERSHIP_PROTECTION_SECTION_CODEC),
+                    TwGlobalConfig::applyOwnershipProtectionSection,
+                    TwGlobalConfig::toOwnershipProtectionSection
             )
-            .documentation("Priority for resolving multiple global configs (higher wins).")
+            .documentation("Organized section for owner-damage and ownership protection settings.")
             .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("BlockOwnerDamage", Codec.BOOLEAN),
-                    (asset, value) -> asset.blockOwnerDamage = value != null ? value : asset.blockOwnerDamage,
-                    asset -> asset.blockOwnerDamage
+            .<InteractionDefaultsSection>append(
+                    new KeyedCodec<>("InteractionDefaults", INTERACTION_DEFAULTS_SECTION_CODEC),
+                    TwGlobalConfig::applyInteractionDefaultsSection,
+                    TwGlobalConfig::toInteractionDefaultsSection
             )
-            .documentation("Block damage dealt by the owner to owned NPCs.")
+            .documentation("Organized section for interaction parameter defaults.")
             .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("BlockAllPlayerDamageIfOwned", Codec.BOOLEAN),
-                    (asset, value) -> asset.blockAllPlayerDamageIfOwned = value != null ? value : asset.blockAllPlayerDamageIfOwned,
-                    asset -> asset.blockAllPlayerDamageIfOwned
+            .<CommandSection>append(
+                    new KeyedCodec<>("Command", COMMAND_SECTION_CODEC),
+                    TwGlobalConfig::applyCommandSection,
+                    TwGlobalConfig::toCommandSection
             )
-            .documentation("Block all player damage to owned NPCs.")
-            .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
-                    (asset, value) -> asset.invulnerableIfOwned = value != null ? value : asset.invulnerableIfOwned,
-                    asset -> asset.invulnerableIfOwned
-            )
-            .documentation("Make owned NPCs invulnerable.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("InteractionConfigParam", Codec.STRING),
-                    (asset, value) -> asset.interactionConfigParam = value != null ? value : asset.interactionConfigParam,
-                    asset -> asset.interactionConfigParam
-            )
-            .documentation("Role param name that overrides interaction config id.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("LovedItemsParam", Codec.STRING),
-                    (asset, value) -> asset.lovedItemsParam = value != null ? value : asset.lovedItemsParam,
-                    asset -> asset.lovedItemsParam
-            )
-            .documentation("Role param name that stores loved item ids.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("IsHarvestableParam", Codec.STRING),
-                    (asset, value) -> asset.isHarvestableParam = value != null ? value : asset.isHarvestableParam,
-                    asset -> asset.isHarvestableParam
-            )
-            .documentation("Role param name that signals harvestable state.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("IsMountableParam", Codec.STRING),
-                    (asset, value) -> asset.isMountableParam = value != null ? value : asset.isMountableParam,
-                    asset -> asset.isMountableParam
-            )
-            .documentation("Role param name that signals mountable state.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("HarvestContextParam", Codec.STRING),
-                    (asset, value) -> asset.harvestContextParam = value != null ? value : asset.harvestContextParam,
-                    asset -> asset.harvestContextParam
-            )
-            .documentation("Role param name used for harvest interaction context.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("HarvestAlarmName", Codec.STRING),
-                    (asset, value) -> asset.harvestAlarmName = value != null ? value : asset.harvestAlarmName,
-                    asset -> asset.harvestAlarmName
-            )
-            .documentation("Alarm name used to gate harvest readiness.")
-            .add()
-            .<String>append(
-                    new KeyedCodec<>("InteractionCooldownAlarmPrefix", Codec.STRING),
-                    (asset, value) -> asset.interactionCooldownAlarmPrefix = value != null ? value : asset.interactionCooldownAlarmPrefix,
-                    asset -> asset.interactionCooldownAlarmPrefix
-            )
-            .documentation("Prefix used for per-interaction cooldown alarms.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("CommandReturnHomeTeleportDistance", Codec.DOUBLE),
-                    (asset, value) -> asset.commandReturnHomeTeleportDistance = value != null ? value : asset.commandReturnHomeTeleportDistance,
-                    asset -> asset.commandReturnHomeTeleportDistance
-            )
-            .documentation("Distance threshold where Return Home switches from pure pathing to hybrid path-then-teleport.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("CommandReturnHomePathDistanceBeforeTeleport", Codec.DOUBLE),
-                    (asset, value) -> asset.commandReturnHomePathDistanceBeforeTeleport = value != null ? value : asset.commandReturnHomePathDistanceBeforeTeleport,
-                    asset -> asset.commandReturnHomePathDistanceBeforeTeleport
-            )
-            .documentation("Visible path distance to travel before deferred Return Home teleport.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("CommandReturnHomeTeleportDelayMs", Codec.INTEGER),
-                    (asset, value) -> asset.commandReturnHomeTeleportDelayMs = value != null ? value : asset.commandReturnHomeTeleportDelayMs,
-                    asset -> asset.commandReturnHomeTeleportDelayMs
-            )
-            .documentation("Delay before deferred Return Home teleport occurs.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("CommandRecallSafeSpawnDistance", Codec.DOUBLE),
-                    (asset, value) -> asset.commandRecallSafeSpawnDistance = value != null ? value : asset.commandRecallSafeSpawnDistance,
-                    asset -> asset.commandRecallSafeSpawnDistance
-            )
-            .documentation("Distance from owner used when recalling far NPCs to a safe nearby position.")
-            .add()
-            .<Double>append(
-                    new KeyedCodec<>("CommandRecallForceRelocateDistance", Codec.DOUBLE),
-                    (asset, value) -> asset.commandRecallForceRelocateDistance = value != null ? value : asset.commandRecallForceRelocateDistance,
-                    asset -> asset.commandRecallForceRelocateDistance
-            )
-            .documentation("Distance beyond which loaded recalled NPCs are force-relocated near owner before pathing in.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("CommandRelocationRetryIntervalMs", Codec.INTEGER),
-                    (asset, value) -> asset.commandRelocationRetryIntervalMs = value != null ? value : asset.commandRelocationRetryIntervalMs,
-                    asset -> asset.commandRelocationRetryIntervalMs
-            )
-            .documentation("Retry interval for queued off-screen command relocations.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("CommandRelocationMaxWaitMs", Codec.INTEGER),
-                    (asset, value) -> asset.commandRelocationMaxWaitMs = value != null ? value : asset.commandRelocationMaxWaitMs,
-                    asset -> asset.commandRelocationMaxWaitMs
-            )
-            .documentation("Maximum time to keep trying a queued off-screen command relocation.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("CommandRelocationMaxRetryAttempts", Codec.INTEGER),
-                    (asset, value) -> asset.commandRelocationMaxRetryAttempts = value != null ? value : asset.commandRelocationMaxRetryAttempts,
-                    asset -> asset.commandRelocationMaxRetryAttempts
-            )
-            .documentation("Maximum retry attempts for queued off-screen command relocations.")
-            .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("CommandDeadRespawnEnabled", Codec.BOOLEAN),
-                    (asset, value) -> asset.commandDeadRespawnEnabled = value != null
-                            ? value
-                            : asset.commandDeadRespawnEnabled,
-                    asset -> asset.commandDeadRespawnEnabled
-            )
-            .documentation("Allow dead linked companions to respawn from the linked-companions panel after cooldown.")
-            .add()
-            .<Integer>append(
-                    new KeyedCodec<>("CommandDeadRespawnCooldownMs", Codec.INTEGER),
-                    (asset, value) -> asset.commandDeadRespawnCooldownMs = value != null
-                            ? value
-                            : asset.commandDeadRespawnCooldownMs,
-                    asset -> asset.commandDeadRespawnCooldownMs
-            )
-            .documentation("Cooldown before a dead linked companion can be respawned from the linked-companions panel.")
-            .add()
-            .<Boolean>append(
-                    new KeyedCodec<>("CommandLinkedPanelRequireUnlinkConfirm", Codec.BOOLEAN),
-                    (asset, value) -> asset.commandLinkedPanelRequireUnlinkConfirm = value != null
-                            ? value
-                            : asset.commandLinkedPanelRequireUnlinkConfirm,
-                    asset -> asset.commandLinkedPanelRequireUnlinkConfirm
-            )
-            .documentation("When enabled, the linked-companions panel requires a second click to confirm unlink.")
+            .documentation("Organized section for command runtime and respawn tuning settings.")
             .add()
             .build();
 
@@ -226,6 +276,11 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private int commandRelocationMaxRetryAttempts = 60;
     private boolean commandDeadRespawnEnabled;
     private int commandDeadRespawnCooldownMs = 60000;
+    private int commandDeadRespawnFollowRetryDelayMs = 1250;
+    private double commandDeadRespawnDistanceClose = 5.0;
+    private double commandDeadRespawnDistanceNear = 8.0;
+    private double commandDeadRespawnDistanceMid = 12.0;
+    private double commandDeadRespawnDistanceFar = 16.0;
     private boolean commandLinkedPanelRequireUnlinkConfirm = true;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
@@ -403,8 +458,184 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return commandDeadRespawnCooldownMs;
     }
 
+    public int getCommandDeadRespawnFollowRetryDelayMs() {
+        return commandDeadRespawnFollowRetryDelayMs;
+    }
+
+    public double getCommandDeadRespawnDistanceClose() {
+        return commandDeadRespawnDistanceClose;
+    }
+
+    public double getCommandDeadRespawnDistanceNear() {
+        return commandDeadRespawnDistanceNear;
+    }
+
+    public double getCommandDeadRespawnDistanceMid() {
+        return commandDeadRespawnDistanceMid;
+    }
+
+    public double getCommandDeadRespawnDistanceFar() {
+        return commandDeadRespawnDistanceFar;
+    }
+
     public boolean isCommandLinkedPanelRequireUnlinkConfirm() {
         return commandLinkedPanelRequireUnlinkConfirm;
+    }
+
+    private void applyGeneralSection(@Nullable GeneralSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.enabled != null) {
+            enabled = section.enabled;
+        }
+        if (section.priority != null) {
+            priority = section.priority;
+        }
+    }
+
+    private GeneralSection toGeneralSection() {
+        GeneralSection section = new GeneralSection();
+        section.enabled = enabled;
+        section.priority = priority;
+        return section;
+    }
+
+    private void applyOwnershipProtectionSection(@Nullable OwnershipProtectionSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.blockOwnerDamage != null) {
+            blockOwnerDamage = section.blockOwnerDamage;
+        }
+        if (section.blockAllPlayerDamageIfOwned != null) {
+            blockAllPlayerDamageIfOwned = section.blockAllPlayerDamageIfOwned;
+        }
+        if (section.invulnerableIfOwned != null) {
+            invulnerableIfOwned = section.invulnerableIfOwned;
+        }
+    }
+
+    private OwnershipProtectionSection toOwnershipProtectionSection() {
+        OwnershipProtectionSection section = new OwnershipProtectionSection();
+        section.blockOwnerDamage = blockOwnerDamage;
+        section.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
+        section.invulnerableIfOwned = invulnerableIfOwned;
+        return section;
+    }
+
+    private void applyInteractionDefaultsSection(@Nullable InteractionDefaultsSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.interactionConfigParam != null) {
+            interactionConfigParam = section.interactionConfigParam;
+        }
+        if (section.lovedItemsParam != null) {
+            lovedItemsParam = section.lovedItemsParam;
+        }
+        if (section.isHarvestableParam != null) {
+            isHarvestableParam = section.isHarvestableParam;
+        }
+        if (section.isMountableParam != null) {
+            isMountableParam = section.isMountableParam;
+        }
+        if (section.harvestContextParam != null) {
+            harvestContextParam = section.harvestContextParam;
+        }
+        if (section.harvestAlarmName != null) {
+            harvestAlarmName = section.harvestAlarmName;
+        }
+        if (section.interactionCooldownAlarmPrefix != null) {
+            interactionCooldownAlarmPrefix = section.interactionCooldownAlarmPrefix;
+        }
+    }
+
+    private InteractionDefaultsSection toInteractionDefaultsSection() {
+        InteractionDefaultsSection section = new InteractionDefaultsSection();
+        section.interactionConfigParam = interactionConfigParam;
+        section.lovedItemsParam = lovedItemsParam;
+        section.isHarvestableParam = isHarvestableParam;
+        section.isMountableParam = isMountableParam;
+        section.harvestContextParam = harvestContextParam;
+        section.harvestAlarmName = harvestAlarmName;
+        section.interactionCooldownAlarmPrefix = interactionCooldownAlarmPrefix;
+        return section;
+    }
+
+    private void applyCommandSection(@Nullable CommandSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.returnHomeTeleportDistance != null) {
+            commandReturnHomeTeleportDistance = section.returnHomeTeleportDistance;
+        }
+        if (section.returnHomePathDistanceBeforeTeleport != null) {
+            commandReturnHomePathDistanceBeforeTeleport = section.returnHomePathDistanceBeforeTeleport;
+        }
+        if (section.returnHomeTeleportDelayMs != null) {
+            commandReturnHomeTeleportDelayMs = section.returnHomeTeleportDelayMs;
+        }
+        if (section.recallSafeSpawnDistance != null) {
+            commandRecallSafeSpawnDistance = section.recallSafeSpawnDistance;
+        }
+        if (section.recallForceRelocateDistance != null) {
+            commandRecallForceRelocateDistance = section.recallForceRelocateDistance;
+        }
+        if (section.relocationRetryIntervalMs != null) {
+            commandRelocationRetryIntervalMs = section.relocationRetryIntervalMs;
+        }
+        if (section.relocationMaxWaitMs != null) {
+            commandRelocationMaxWaitMs = section.relocationMaxWaitMs;
+        }
+        if (section.relocationMaxRetryAttempts != null) {
+            commandRelocationMaxRetryAttempts = section.relocationMaxRetryAttempts;
+        }
+        if (section.deadRespawnEnabled != null) {
+            commandDeadRespawnEnabled = section.deadRespawnEnabled;
+        }
+        if (section.deadRespawnCooldownMs != null) {
+            commandDeadRespawnCooldownMs = section.deadRespawnCooldownMs;
+        }
+        if (section.deadRespawnFollowRetryDelayMs != null) {
+            commandDeadRespawnFollowRetryDelayMs = section.deadRespawnFollowRetryDelayMs;
+        }
+        if (section.deadRespawnDistanceClose != null) {
+            commandDeadRespawnDistanceClose = section.deadRespawnDistanceClose;
+        }
+        if (section.deadRespawnDistanceNear != null) {
+            commandDeadRespawnDistanceNear = section.deadRespawnDistanceNear;
+        }
+        if (section.deadRespawnDistanceMid != null) {
+            commandDeadRespawnDistanceMid = section.deadRespawnDistanceMid;
+        }
+        if (section.deadRespawnDistanceFar != null) {
+            commandDeadRespawnDistanceFar = section.deadRespawnDistanceFar;
+        }
+        if (section.linkedPanelRequireUnlinkConfirm != null) {
+            commandLinkedPanelRequireUnlinkConfirm = section.linkedPanelRequireUnlinkConfirm;
+        }
+    }
+
+    private CommandSection toCommandSection() {
+        CommandSection section = new CommandSection();
+        section.returnHomeTeleportDistance = commandReturnHomeTeleportDistance;
+        section.returnHomePathDistanceBeforeTeleport = commandReturnHomePathDistanceBeforeTeleport;
+        section.returnHomeTeleportDelayMs = commandReturnHomeTeleportDelayMs;
+        section.recallSafeSpawnDistance = commandRecallSafeSpawnDistance;
+        section.recallForceRelocateDistance = commandRecallForceRelocateDistance;
+        section.relocationRetryIntervalMs = commandRelocationRetryIntervalMs;
+        section.relocationMaxWaitMs = commandRelocationMaxWaitMs;
+        section.relocationMaxRetryAttempts = commandRelocationMaxRetryAttempts;
+        section.deadRespawnEnabled = commandDeadRespawnEnabled;
+        section.deadRespawnCooldownMs = commandDeadRespawnCooldownMs;
+        section.deadRespawnFollowRetryDelayMs = commandDeadRespawnFollowRetryDelayMs;
+        section.deadRespawnDistanceClose = commandDeadRespawnDistanceClose;
+        section.deadRespawnDistanceNear = commandDeadRespawnDistanceNear;
+        section.deadRespawnDistanceMid = commandDeadRespawnDistanceMid;
+        section.deadRespawnDistanceFar = commandDeadRespawnDistanceFar;
+        section.linkedPanelRequireUnlinkConfirm = commandLinkedPanelRequireUnlinkConfirm;
+        return section;
     }
 
     // Returns the names of required string fields that are missing or blank.
@@ -424,5 +655,45 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (value == null || value.isBlank()) {
             missing.add(fieldName);
         }
+    }
+
+    private static final class GeneralSection {
+        private Boolean enabled;
+        private Integer priority;
+    }
+
+    private static final class OwnershipProtectionSection {
+        private Boolean blockOwnerDamage;
+        private Boolean blockAllPlayerDamageIfOwned;
+        private Boolean invulnerableIfOwned;
+    }
+
+    private static final class InteractionDefaultsSection {
+        private String interactionConfigParam;
+        private String lovedItemsParam;
+        private String isHarvestableParam;
+        private String isMountableParam;
+        private String harvestContextParam;
+        private String harvestAlarmName;
+        private String interactionCooldownAlarmPrefix;
+    }
+
+    private static final class CommandSection {
+        private Double returnHomeTeleportDistance;
+        private Double returnHomePathDistanceBeforeTeleport;
+        private Integer returnHomeTeleportDelayMs;
+        private Double recallSafeSpawnDistance;
+        private Double recallForceRelocateDistance;
+        private Integer relocationRetryIntervalMs;
+        private Integer relocationMaxWaitMs;
+        private Integer relocationMaxRetryAttempts;
+        private Boolean deadRespawnEnabled;
+        private Integer deadRespawnCooldownMs;
+        private Integer deadRespawnFollowRetryDelayMs;
+        private Double deadRespawnDistanceClose;
+        private Double deadRespawnDistanceNear;
+        private Double deadRespawnDistanceMid;
+        private Double deadRespawnDistanceFar;
+        private Boolean linkedPanelRequireUnlinkConfirm;
     }
 }

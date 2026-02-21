@@ -9,6 +9,12 @@
 - New `TwGlobalConfig` options for dead companion recovery:
   - `CommandDeadRespawnEnabled` (default `false`)
   - `CommandDeadRespawnCooldownMs` (default `60000`)
+- New `TwGlobalConfig` respawn tuning values:
+  - `CommandDeadRespawnFollowRetryDelayMs`
+  - `CommandDeadRespawnDistanceClose`
+  - `CommandDeadRespawnDistanceNear`
+  - `CommandDeadRespawnDistanceMid`
+  - `CommandDeadRespawnDistanceFar`
 
 ### Changed
 - Linked-companions rows now show clearer unloaded fallback text (`Unloaded companion (<uuid>)`) and unloaded health messaging.
@@ -19,6 +25,7 @@
 - Linked-panel `Respawn` button now uses the shared secondary button style for clearer outline/hover/pressed feedback.
 - Dead companion respawns now re-enter follow behavior immediately by clearing combat lock, restoring owner as `MasterTarget`, and applying follow-compatible state fallback.
 - Dead companion respawn follow bootstrap now prioritizes `Follow` state first, with `Idle` as fallback.
+- `TwGlobalConfig_Default.json` is now organized into top-level sections (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`), and `TwGlobalConfig` now reads the sectioned schema directly.
 
 ### Fixed
 - Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.

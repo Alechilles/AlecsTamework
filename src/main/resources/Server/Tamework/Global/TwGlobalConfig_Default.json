@@ -1,25 +1,38 @@
 {
-  "Enabled": true,
-  "Priority": 0,
-  "BlockOwnerDamage": false,
-  "BlockAllPlayerDamageIfOwned": false,
-  "InvulnerableIfOwned": false,
-  "InteractionConfigParam": "InteractionConfigId",
-  "LovedItemsParam": "LovedItems",
-  "IsHarvestableParam": "IsHarvestable",
-  "IsMountableParam": "IsMountable",
-  "HarvestContextParam": "HarvestInteractionContext",
-  "HarvestAlarmName": "Harvest_Ready",
-  "InteractionCooldownAlarmPrefix": "TameworkInteract_Cooldown",
-  "CommandReturnHomeTeleportDistance": 96.0,
-  "CommandReturnHomePathDistanceBeforeTeleport": 24.0,
-  "CommandReturnHomeTeleportDelayMs": 2500,
-  "CommandRecallSafeSpawnDistance": 20.0,
-  "CommandRecallForceRelocateDistance": 80.0,
-  "CommandRelocationRetryIntervalMs": 2000,
-  "CommandRelocationMaxWaitMs": 120000,
-  "CommandRelocationMaxRetryAttempts": 60,
-  "CommandDeadRespawnEnabled": true,
-  "CommandDeadRespawnCooldownMs": 6000,
-  "CommandLinkedPanelRequireUnlinkConfirm": true
+  "General": {
+    "Enabled": true,
+    "Priority": 0
+  },
+  "OwnershipProtection": {
+    "BlockOwnerDamage": false,
+    "BlockAllPlayerDamageIfOwned": false,
+    "InvulnerableIfOwned": false
+  },
+  "InteractionDefaults": {
+    "InteractionConfigParam": "InteractionConfigId",
+    "LovedItemsParam": "LovedItems",
+    "IsHarvestableParam": "IsHarvestable",
+    "IsMountableParam": "IsMountable",
+    "HarvestContextParam": "HarvestInteractionContext",
+    "HarvestAlarmName": "Harvest_Ready",
+    "InteractionCooldownAlarmPrefix": "TameworkInteract_Cooldown"
+  },
+  "Command": {
+    "ReturnHomeTeleportDistance": 96.0,
+    "ReturnHomePathDistanceBeforeTeleport": 24.0,
+    "ReturnHomeTeleportDelayMs": 2500,
+    "RecallSafeSpawnDistance": 20.0,
+    "RecallForceRelocateDistance": 80.0,
+    "RelocationRetryIntervalMs": 2000,
+    "RelocationMaxWaitMs": 120000,
+    "RelocationMaxRetryAttempts": 60,
+    "DeadRespawnEnabled": true,
+    "DeadRespawnCooldownMs": 6000,
+    "DeadRespawnFollowRetryDelayMs": 1250,
+    "DeadRespawnDistanceClose": 5.0,
+    "DeadRespawnDistanceNear": 8.0,
+    "DeadRespawnDistanceMid": 12.0,
+    "DeadRespawnDistanceFar": 16.0,
+    "LinkedPanelRequireUnlinkConfirm": true
+  }
 }

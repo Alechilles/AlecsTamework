@@ -94,6 +94,10 @@ public final class CommandItemFeatureHandler {
     private static final String LINK_RECORD_SEPARATOR = "\n";
     private static final String LINK_RECORD_PARTS_SEPARATOR = "\\|";
     private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
+    private static final double RESPAWN_DISTANCE_CLOSE = 5.0;
+    private static final double RESPAWN_DISTANCE_NEAR = 8.0;
+    private static final double RESPAWN_DISTANCE_MID = 12.0;
+    private static final double RESPAWN_DISTANCE_FAR = 16.0;
 
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
@@ -579,7 +583,11 @@ public final class CommandItemFeatureHandler {
             EntitySupport.setDisplayName(spawnedRef, deadSnapshot.customName(), store);
         }
         applyRespawnFollowBootstrap(spawnedRef, spawnedNpc, playerRef, store);
-        scheduleRespawnFollowRetry(player.getWorld(), spawnedNpc.getUuid(), playerRef);
+        long followRetryDelayMs = resolvePositiveLong(
+                globalConfig != null ? globalConfig.getCommandDeadRespawnFollowRetryDelayMs() : 0L,
+                RESPAWN_FOLLOW_RETRY_DELAY_MS
+        );
+        scheduleRespawnFollowRetry(player.getWorld(), spawnedNpc.getUuid(), playerRef, followRetryDelayMs);
         ItemStack updated = removeLinkedNpcRecord(stack, record.npcUuid);
         updated = upsertLinkedNpcRecord(updated, spawnedNpc.getUuid(), destination, homePosition);
         if (deathService != null) {
@@ -608,10 +616,14 @@ public final class CommandItemFeatureHandler {
         }
     }
 
-    private void scheduleRespawnFollowRetry(World world, UUID npcUuid, Ref<EntityStore> playerRef) {
+    private void scheduleRespawnFollowRetry(World world,
+                                            UUID npcUuid,
+                                            Ref<EntityStore> playerRef,
+                                            long delayMs) {
         if (world == null || npcUuid == null) {
             return;
         }
+        long safeDelayMs = Math.max(0L, delayMs);
         CompletableFuture.runAsync(
                 () -> world.execute(() -> {
                     Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
@@ -628,7 +640,7 @@ public final class CommandItemFeatureHandler {
                     }
                     applyRespawnFollowBootstrap(npcRef, npc, playerRef, store);
                 }),
-                CompletableFuture.delayedExecutor(RESPAWN_FOLLOW_RETRY_DELAY_MS, TimeUnit.MILLISECONDS)
+                CompletableFuture.delayedExecutor(safeDelayMs, TimeUnit.MILLISECONDS)
         );
     }
 
@@ -2149,13 +2161,8 @@ public final class CommandItemFeatureHandler {
         }
         double baseAngle = Math.atan2(dirZ, dirX);
         double targetDistance = Math.max(2.0, safeSpawnDistance);
-        double[] distanceCandidates = {
-                Math.min(5.0, targetDistance),
-                Math.min(8.0, targetDistance),
-                Math.min(12.0, targetDistance),
-                Math.min(16.0, targetDistance),
-                targetDistance
-        };
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        double[] distanceCandidates = resolveRespawnDistanceCandidates(globalConfig, targetDistance);
         double[] angleOffsets = {0.0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0, 60.0, -60.0, 90.0, -90.0, 120.0, -120.0, 180.0};
         for (double distance : distanceCandidates) {
             if (distance < 2.0) {
@@ -2183,6 +2190,32 @@ public final class CommandItemFeatureHandler {
             return new Vector3d(desired.x, playerPos.y + 1.0, desired.z);
         }
         return new Vector3d(playerPos.x, playerPos.y + 1.0, playerPos.z);
+    }
+
+    private double[] resolveRespawnDistanceCandidates(TwGlobalConfig globalConfig, double fallbackDistance) {
+        double close = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceClose() : 0.0,
+                RESPAWN_DISTANCE_CLOSE
+        );
+        double near = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceNear() : 0.0,
+                RESPAWN_DISTANCE_NEAR
+        );
+        double mid = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceMid() : 0.0,
+                RESPAWN_DISTANCE_MID
+        );
+        double far = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceFar() : 0.0,
+                RESPAWN_DISTANCE_FAR
+        );
+        return new double[] {
+                Math.max(2.0, close),
+                Math.max(2.0, near),
+                Math.max(2.0, mid),
+                Math.max(2.0, far),
+                Math.max(2.0, fallbackDistance)
+        };
     }
 
     private Vector3d resolvePlayerLookDirection(Ref<EntityStore> playerRef, Store<EntityStore> store) {
