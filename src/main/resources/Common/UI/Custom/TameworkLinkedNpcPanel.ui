@@ -48,11 +48,11 @@ Group #TameworkLinkedPanelRoot {
     }
 
     Group #TameworkLinkedPanelCard0HealthFrame {
-      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
+      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard0HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
         Background: #6fc576;
       }
     }
@@ -82,11 +82,11 @@ Group #TameworkLinkedPanelRoot {
     }
 
     Group #TameworkLinkedPanelCard1HealthFrame {
-      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
+      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard1HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
         Background: #6fc576;
       }
     }
@@ -116,11 +116,11 @@ Group #TameworkLinkedPanelRoot {
     }
 
     Group #TameworkLinkedPanelCard2HealthFrame {
-      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
+      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard2HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
         Background: #6fc576;
       }
     }
@@ -150,11 +150,11 @@ Group #TameworkLinkedPanelRoot {
     }
 
     Group #TameworkLinkedPanelCard3HealthFrame {
-      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
+      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard3HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
         Background: #6fc576;
       }
     }
@@ -184,11 +184,11 @@ Group #TameworkLinkedPanelRoot {
     }
 
     Group #TameworkLinkedPanelCard4HealthFrame {
-      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
+      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard4HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
         Background: #6fc576;
       }
     }
@@ -218,11 +218,11 @@ Group #TameworkLinkedPanelRoot {
     }
 
     Group #TameworkLinkedPanelCard5HealthFrame {
-      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
+      Anchor: (Top: 30, Left: 0, Width: 286, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard5HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 284, Height: 12);
         Background: #6fc576;
       }
     }
