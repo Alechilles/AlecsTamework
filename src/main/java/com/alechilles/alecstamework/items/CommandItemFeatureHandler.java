@@ -1702,7 +1702,8 @@ public final class CommandItemFeatureHandler {
                         postRelocationState.state,
                         postRelocationState.subState,
                         0L,
-                        record.lastKnownPosition
+                        record.lastKnownPosition,
+                        record.homePosition
                 );
                 queued++;
                 continue;
@@ -1722,7 +1723,8 @@ public final class CommandItemFeatureHandler {
                     postRelocationState.state,
                     postRelocationState.subState,
                     0L,
-                    sourceHint
+                    sourceHint,
+                    record.homePosition
             );
             queued++;
         }
@@ -2088,7 +2090,8 @@ public final class CommandItemFeatureHandler {
                             postRelocationState.state,
                             postRelocationState.subState,
                             context.returnHomeTeleportDelayMs,
-                            start
+                            start,
+                            targetPosition
                     );
                 }
                 return applyHook("Tamework.Command.MoveToPosition." + source.name(), context, candidate.ref, intermediate);

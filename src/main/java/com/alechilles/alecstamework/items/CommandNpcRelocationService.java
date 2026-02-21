@@ -41,7 +41,8 @@ public final class CommandNpcRelocationService {
                                 @Nullable String state,
                                 @Nullable String subState,
                                 long delayMs,
-                                @Nullable Vector3d sourceHintPosition) {
+                                @Nullable Vector3d sourceHintPosition,
+                                @Nullable Vector3d alternateSourceHintPosition) {
         if (world == null || npcUuid == null || destination == null) {
             return;
         }
@@ -50,6 +51,7 @@ public final class CommandNpcRelocationService {
                 npcUuid,
                 new Vector3d(destination),
                 sourceHintPosition != null ? new Vector3d(sourceHintPosition) : null,
+                alternateSourceHintPosition != null ? new Vector3d(alternateSourceHintPosition) : null,
                 ownerUuid,
                 assignOwnerAsMasterTarget,
                 clearLockedTarget,
@@ -61,6 +63,8 @@ public final class CommandNpcRelocationService {
         if (sourceHintPosition != null) {
             // Do not overwrite an existing tracked position with a potentially stale metadata hint.
             lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(sourceHintPosition));
+        } else if (alternateSourceHintPosition != null) {
+            lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(alternateSourceHintPosition));
         }
         pendingByNpc.put(npcUuid, pending);
         requestChunksForPending(world, pending);
@@ -170,12 +174,18 @@ public final class CommandNpcRelocationService {
         }
         requestChunkLoad(world, pending, pending.destination);
         Vector3d hintedSource = pending.sourceHintPosition;
+        Vector3d alternateSource = pending.alternateSourceHintPosition;
         Vector3d cachedSource = lastKnownByNpc.get(pending.npcUuid);
         if (hintedSource != null) {
             requestChunkLoad(world, pending, hintedSource);
         }
+        if (alternateSource != null
+                && (hintedSource == null || !isNear(alternateSource, hintedSource, 0.5))) {
+            requestChunkLoad(world, pending, alternateSource);
+        }
         if (cachedSource != null
-                && (hintedSource == null || !isNear(cachedSource, hintedSource, 0.5))) {
+                && (hintedSource == null || !isNear(cachedSource, hintedSource, 0.5))
+                && (alternateSource == null || !isNear(cachedSource, alternateSource, 0.5))) {
             requestChunkLoad(world, pending, cachedSource);
         }
     }
@@ -321,6 +331,7 @@ public final class CommandNpcRelocationService {
         private final UUID npcUuid;
         private final Vector3d destination;
         private final Vector3d sourceHintPosition;
+        private final Vector3d alternateSourceHintPosition;
         private final UUID ownerUuid;
         private final boolean assignOwnerAsMasterTarget;
         private final boolean clearLockedTarget;
@@ -336,6 +347,7 @@ public final class CommandNpcRelocationService {
         private PendingRelocation(UUID npcUuid,
                                   Vector3d destination,
                                   Vector3d sourceHintPosition,
+                                  Vector3d alternateSourceHintPosition,
                                   UUID ownerUuid,
                                   boolean assignOwnerAsMasterTarget,
                                   boolean clearLockedTarget,
@@ -346,6 +358,7 @@ public final class CommandNpcRelocationService {
             this.npcUuid = Objects.requireNonNull(npcUuid, "npcUuid");
             this.destination = Objects.requireNonNull(destination, "destination");
             this.sourceHintPosition = sourceHintPosition;
+            this.alternateSourceHintPosition = alternateSourceHintPosition;
             this.ownerUuid = ownerUuid;
             this.assignOwnerAsMasterTarget = assignOwnerAsMasterTarget;
             this.clearLockedTarget = clearLockedTarget;
