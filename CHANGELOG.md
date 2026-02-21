@@ -40,6 +40,7 @@
 - Dead companion respawn placement now prioritizes nearby forward-facing in-view points and low-height surface probes, reducing outside-building spawns when the player is indoors.
 - Unloaded companion recall is now more reliable after a prior queued Return Home, because relocation source chunk preloading now uses both metadata hints and cached last-known positions without stale hint overwrite.
 - Unloaded companions in the linked panel now use cached identity fallback with priority `Display Name > Name Key > Role ID` instead of always showing `Unloaded companion (<uuid>)`.
+- Queued per-companion recalls now perform an additional short post-chunk apply probe, which fixes cases where first-click recall only loaded an unloaded companion and required a second click to actually relocate it.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.

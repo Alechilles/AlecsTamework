@@ -23,6 +23,7 @@ import javax.annotation.Nullable;
 public final class CommandNpcRelocationService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final int CHUNK_SIZE = 32;
+    private static final long INITIAL_APPLY_DELAY_MS = 250L;
     private static final long RETRY_INTERVAL_MS = 2000L;
     private static final long MAX_RELOCATION_WAIT_MS = 120000L;
     private static final int MAX_RETRY_ATTEMPTS = 60;
@@ -62,7 +63,12 @@ public final class CommandNpcRelocationService {
         }
         pendingByNpc.put(npcUuid, pending);
         requestChunksForPending(world, pending);
-        scheduleTryApply(world, npcUuid, Math.max(delayMs, resolveRetryIntervalMs()));
+        long initialDelay = Math.max(delayMs, INITIAL_APPLY_DELAY_MS);
+        scheduleTryApply(world, npcUuid, initialDelay);
+        long retryInterval = resolveRetryIntervalMs();
+        if (retryInterval > initialDelay) {
+            scheduleTryApply(world, npcUuid, retryInterval);
+        }
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -191,7 +197,11 @@ public final class CommandNpcRelocationService {
         int chunkX = toChunk(position.x);
         int chunkZ = toChunk(position.z);
         CompletableFuture<?> request = world.getChunkAsync(chunkX, chunkZ);
-        request.thenAccept(chunk -> world.execute(() -> tryApply(world, npcUuid)));
+        request.thenAccept(chunk -> world.execute(() -> {
+            tryApply(world, npcUuid);
+            // Some NPCs become available shortly after chunk completion; probe once more soon.
+            scheduleTryApply(world, npcUuid, INITIAL_APPLY_DELAY_MS);
+        }));
     }
 
     private void scheduleTryApply(World world, UUID npcUuid, long delayMs) {
