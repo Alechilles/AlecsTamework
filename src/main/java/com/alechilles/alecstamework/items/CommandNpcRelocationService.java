@@ -24,7 +24,7 @@ public final class CommandNpcRelocationService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final int CHUNK_SIZE = 32;
     private static final long INITIAL_APPLY_DELAY_MS = 250L;
-    private static final long[] APPLY_BURST_DELAYS_MS = {0L, 150L, 300L, 600L, 1000L, 1500L, 2200L, 3000L};
+    private static final long CHUNK_REQUEST_COOLDOWN_MS = 1500L;
     private static final long RETRY_INTERVAL_MS = 2000L;
     private static final long MAX_RELOCATION_WAIT_MS = 120000L;
     private static final int MAX_RETRY_ATTEMPTS = 60;
@@ -64,12 +64,7 @@ public final class CommandNpcRelocationService {
         }
         pendingByNpc.put(npcUuid, pending);
         requestChunksForPending(world, pending);
-        long initialDelay = Math.max(0L, delayMs);
-        scheduleTryApplyBurst(world, npcUuid, initialDelay);
-        long retryInterval = resolveRetryIntervalMs();
-        if (retryInterval > 0L && retryInterval > initialDelay) {
-            scheduleTryApply(world, npcUuid, retryInterval);
-        }
+        scheduleTryApply(world, npcUuid, Math.max(0L, delayMs));
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -126,7 +121,6 @@ public final class CommandNpcRelocationService {
         }
         NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
         if (npc == null) {
-            scheduleTryApply(world, npcUuid, INITIAL_APPLY_DELAY_MS);
             retryPending(world, npcUuid, pending);
             return false;
         }
@@ -174,15 +168,15 @@ public final class CommandNpcRelocationService {
         if (world == null || pending == null) {
             return;
         }
-        requestChunkLoad(world, pending.destination, pending.npcUuid);
+        requestChunkLoad(world, pending, pending.destination);
         Vector3d hintedSource = pending.sourceHintPosition;
         Vector3d cachedSource = lastKnownByNpc.get(pending.npcUuid);
         if (hintedSource != null) {
-            requestChunkLoad(world, hintedSource, pending.npcUuid);
+            requestChunkLoad(world, pending, hintedSource);
         }
         if (cachedSource != null
                 && (hintedSource == null || !isNear(cachedSource, hintedSource, 0.5))) {
-            requestChunkLoad(world, cachedSource, pending.npcUuid);
+            requestChunkLoad(world, pending, cachedSource);
         }
     }
 
@@ -196,39 +190,58 @@ public final class CommandNpcRelocationService {
         return (dx * dx + dy * dy + dz * dz) <= (tolerance * tolerance);
     }
 
-    private void requestChunkLoad(World world, Vector3d position, UUID npcUuid) {
-        if (world == null || position == null || npcUuid == null) {
+    private void requestChunkLoad(World world, PendingRelocation pending, Vector3d position) {
+        if (world == null || pending == null || position == null) {
             return;
         }
         int chunkX = toChunk(position.x);
         int chunkZ = toChunk(position.z);
+        long chunkKey = toChunkKey(chunkX, chunkZ);
+        long now = System.currentTimeMillis();
+        if (!pending.shouldRequestChunk(chunkKey, now, CHUNK_REQUEST_COOLDOWN_MS)) {
+            return;
+        }
         CompletableFuture<?> request = world.getChunkAsync(chunkX, chunkZ);
-        request.thenAccept(chunk -> world.execute(() -> {
-            tryApply(world, npcUuid);
-            // Some NPCs become available shortly after chunk completion; run short probe burst.
-            scheduleTryApplyBurst(world, npcUuid, INITIAL_APPLY_DELAY_MS);
-        }));
+        request.whenComplete((chunk, throwable) -> {
+            if (pendingByNpc.get(pending.npcUuid) != pending) {
+                return;
+            }
+            if (throwable == null) {
+                scheduleTryApply(world, pending.npcUuid, INITIAL_APPLY_DELAY_MS);
+            }
+        });
     }
 
     private void scheduleTryApply(World world, UUID npcUuid, long delayMs) {
         if (world == null || npcUuid == null) {
             return;
         }
+        PendingRelocation pending = pendingByNpc.get(npcUuid);
+        if (pending == null) {
+            return;
+        }
         long safeDelayMs = Math.max(0L, delayMs);
+        long dueAtMs = System.currentTimeMillis() + safeDelayMs;
+        if (!pending.reserveScheduledApply(dueAtMs)) {
+            return;
+        }
         CompletableFuture.runAsync(
-                () -> world.execute(() -> tryApply(world, npcUuid)),
+                () -> world.execute(() -> tryApplyIfScheduled(world, npcUuid, pending, dueAtMs)),
                 CompletableFuture.delayedExecutor(safeDelayMs, TimeUnit.MILLISECONDS)
         );
     }
 
-    private void scheduleTryApplyBurst(World world, UUID npcUuid, long baseDelayMs) {
-        if (world == null || npcUuid == null) {
+    private void tryApplyIfScheduled(World world, UUID npcUuid, PendingRelocation pending, long dueAtMs) {
+        if (world == null || npcUuid == null || pending == null) {
             return;
         }
-        long base = Math.max(0L, baseDelayMs);
-        for (long offset : APPLY_BURST_DELAYS_MS) {
-            scheduleTryApply(world, npcUuid, base + Math.max(0L, offset));
+        if (pendingByNpc.get(npcUuid) != pending) {
+            return;
         }
+        if (!pending.consumeScheduledApply(dueAtMs)) {
+            return;
+        }
+        tryApply(world, npcUuid);
     }
 
     private void applyState(Role role,
@@ -277,6 +290,10 @@ public final class CommandNpcRelocationService {
         return Math.floorDiv((int) Math.floor(coord), CHUNK_SIZE);
     }
 
+    private long toChunkKey(int chunkX, int chunkZ) {
+        return (((long) chunkX) << 32) ^ (chunkZ & 0xffffffffL);
+    }
+
     private NpcSnapshot resolveSnapshot(Ref<EntityStore> reference, Store<EntityStore> store) {
         if (reference == null || store == null) {
             return null;
@@ -311,6 +328,8 @@ public final class CommandNpcRelocationService {
         private final String subState;
         private final long executeAfterMs;
         private final long queuedAtMs;
+        private final ConcurrentHashMap<Long, Long> lastChunkRequestAtMsByChunk = new ConcurrentHashMap<>();
+        private long nextScheduledApplyAtMs;
         private int retryAttempts;
         private long lastRetryCountedAtMs;
 
@@ -334,8 +353,34 @@ public final class CommandNpcRelocationService {
             this.subState = subState;
             this.executeAfterMs = executeAfterMs;
             this.queuedAtMs = queuedAtMs;
+            this.nextScheduledApplyAtMs = Long.MAX_VALUE;
             this.retryAttempts = 0;
             this.lastRetryCountedAtMs = queuedAtMs;
+        }
+
+        private boolean shouldRequestChunk(long chunkKey, long nowMs, long cooldownMs) {
+            Long lastRequestAtMs = lastChunkRequestAtMsByChunk.get(chunkKey);
+            if (lastRequestAtMs != null && nowMs - lastRequestAtMs < cooldownMs) {
+                return false;
+            }
+            lastChunkRequestAtMsByChunk.put(chunkKey, nowMs);
+            return true;
+        }
+
+        private synchronized boolean reserveScheduledApply(long dueAtMs) {
+            if (dueAtMs >= nextScheduledApplyAtMs) {
+                return false;
+            }
+            nextScheduledApplyAtMs = dueAtMs;
+            return true;
+        }
+
+        private synchronized boolean consumeScheduledApply(long dueAtMs) {
+            if (nextScheduledApplyAtMs != dueAtMs) {
+                return false;
+            }
+            nextScheduledApplyAtMs = Long.MAX_VALUE;
+            return true;
         }
     }
 }
