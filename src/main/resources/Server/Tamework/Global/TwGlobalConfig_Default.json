@@ -19,7 +19,7 @@
   "CommandRelocationRetryIntervalMs": 2000,
   "CommandRelocationMaxWaitMs": 120000,
   "CommandRelocationMaxRetryAttempts": 60,
-  "CommandDeadRespawnEnabled": false,
+  "CommandDeadRespawnEnabled": true,
   "CommandDeadRespawnCooldownMs": 60000,
   "CommandLinkedPanelRequireUnlinkConfirm": true
 }
