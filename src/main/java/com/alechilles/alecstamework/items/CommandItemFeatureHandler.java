@@ -29,6 +29,7 @@ import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
@@ -40,6 +41,9 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
+import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
@@ -316,10 +320,14 @@ public final class CommandItemFeatureHandler {
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return false;
         }
+        List<TameworkCommandSelectionPage.LinkedNpcEntry> linkedNpcEntries =
+                buildLinkedPanelEntries(player, store, working);
         TameworkCommandSelectionPage page = new TameworkCommandSelectionPage(
                 uiPlayerRef,
                 config,
                 selectedId,
+                linkedNpcEntries,
+                npcUuid -> applyMenuUnlink(player, toolId, config, npcUuid),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
@@ -346,6 +354,126 @@ public final class CommandItemFeatureHandler {
         }
         String label = resolveCommandLabel(selected);
         sendDefaultMessage(player, "Selected: " + label);
+    }
+
+    private void applyMenuUnlink(Player player,
+                                 String toolId,
+                                 TwCommandItemConfig config,
+                                 UUID npcUuid) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            sendWarningMessage(player, "Unable to unlink right now.");
+            return;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            ItemStack updatedStack = removeLinkedNpcRecord(stack, npcUuid);
+            boolean itemChanged = updatedStack != stack;
+            boolean componentChanged = unlinkLoadedNpcFromTool(player, npcUuid, toolId);
+            if (!itemChanged && !componentChanged) {
+                sendWarningMessage(player, "That NPC is not linked to this tool.");
+            } else {
+                hotbar.setItemStackForSlot(slot, updatedStack);
+                inventory.markChanged();
+                player.sendInventory();
+                sendSuccessMessage(player, "Removed linked NPC.");
+            }
+            World world = player.getWorld();
+            if (world != null) {
+                Store<EntityStore> store = world.getEntityStore().getStore();
+                if (store != null) {
+                    openSelectionMenu(player, store, config, updatedStack, toolId);
+                }
+            }
+            return;
+        }
+        sendWarningMessage(player, "Unable to find that command item.");
+    }
+
+    private List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntries(Player player,
+                                                                                       Store<EntityStore> store,
+                                                                                       ItemStack stack) {
+        if (player == null || store == null || stack == null || stack.isEmpty()) {
+            return List.of();
+        }
+        List<LinkedNpcRecord> records = readLinkedNpcRecords(stack);
+        if (records.isEmpty()) {
+            return List.of();
+        }
+        World world = player.getWorld();
+        ArrayList<TameworkCommandSelectionPage.LinkedNpcEntry> entries = new ArrayList<>(records.size());
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            boolean loaded = false;
+            String displayName = "NPC (unloaded)";
+            int health = 0;
+            int maxHealth = 0;
+            if (world != null) {
+                Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
+                if (npcRef != null && npcRef.isValid()) {
+                    NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+                    if (npc != null) {
+                        loaded = true;
+                        displayName = resolveNpcDisplayName(npc);
+                        HealthSnapshot snapshot = readNpcHealthSnapshot(npcRef, store);
+                        if (snapshot != null) {
+                            health = snapshot.current;
+                            maxHealth = snapshot.max;
+                        }
+                    }
+                }
+            }
+            entries.add(new TameworkCommandSelectionPage.LinkedNpcEntry(
+                    record.npcUuid,
+                    displayName,
+                    health,
+                    maxHealth,
+                    loaded
+            ));
+        }
+        return entries;
+    }
+
+    private boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {
+        if (player == null || npcUuid == null || toolId == null || toolId.isBlank()) {
+            return false;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            return false;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        if (npcRef == null || !npcRef.isValid()) {
+            return false;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            return false;
+        }
+        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+        if (links == null || !links.containsToolId(toolId)) {
+            return false;
+        }
+        UUID owner = links.getOwnerId();
+        if (owner != null && !owner.equals(player.getUuid())) {
+            return false;
+        }
+        store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links.withToolIdRemoved(toolId));
+        return true;
     }
 
     private boolean setSelectedCommandOnTool(Player player, String toolId, String commandId) {
@@ -411,6 +539,48 @@ public final class CommandItemFeatureHandler {
             return command.getId();
         }
         return "Unknown";
+    }
+
+    private String resolveNpcDisplayName(NPCEntity npc) {
+        if (npc == null) {
+            return "NPC";
+        }
+        String name = npc.getLegacyDisplayName();
+        if (name == null || name.isBlank()) {
+            name = npc.getRoleName();
+        }
+        if (name == null || name.isBlank()) {
+            name = "NPC";
+        }
+        return name;
+    }
+
+    private HealthSnapshot readNpcHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, EntityStatMap> statType = EntityStatMap.getComponentType();
+        if (statType == null) {
+            return null;
+        }
+        EntityStatMap statMap = store.getComponent(npcRef, statType);
+        if (statMap == null) {
+            return null;
+        }
+        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
+        if (healthIndex < 0) {
+            return null;
+        }
+        EntityStatValue health = statMap.get(healthIndex);
+        if (health == null) {
+            return null;
+        }
+        int current = Math.max(0, Math.round(health.get()));
+        int max = Math.max(1, Math.round(health.getMax()));
+        if (current > max) {
+            current = max;
+        }
+        return new HealthSnapshot(current, max);
     }
 
     private TwCommandItemConfig resolveConfig(String itemId, String configIdOverride) {
@@ -1192,13 +1362,7 @@ public final class CommandItemFeatureHandler {
                 updatedItem = removeLinkedNpcRecord(updatedItem, npcUuid);
             }
         }
-        String name = npc.getLegacyDisplayName();
-        if (name == null || name.isBlank()) {
-            name = npc.getRoleName();
-        }
-        if (name == null || name.isBlank()) {
-            name = "NPC";
-        }
+        String name = resolveNpcDisplayName(npc);
         return new LinkToggleResult(true, linked, name, updatedItem);
     }
 
@@ -1642,6 +1806,16 @@ public final class CommandItemFeatureHandler {
         inventory.markChanged();
         player.sendInventory();
         return true;
+    }
+
+    private static final class HealthSnapshot {
+        private final int current;
+        private final int max;
+
+        private HealthSnapshot(int current, int max) {
+            this.current = current;
+            this.max = max;
+        }
     }
 
     private static final class ToolResolution {

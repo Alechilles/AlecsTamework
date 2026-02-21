@@ -17,6 +17,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 
@@ -30,19 +31,27 @@ public final class TameworkCommandSelectionPage
     public static final String LINKED_PANEL_UI_PATH = "TameworkLinkedNpcPanel.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String CLOSE_COMMAND_ID = "__close__";
+    private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
     private static final int MAX_COMMAND_BUTTONS = 8;
+    private static final int MAX_LINKED_PANEL_ROWS = 6;
 
     private final CommandOption[] options;
+    private final LinkedNpcEntry[] linkedNpcEntries;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
+    private final Consumer<UUID> unlinkCallback;
 
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
                                         String selectedCommandId,
+                                        List<LinkedNpcEntry> linkedNpcEntries,
+                                        @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
+        this.linkedNpcEntries = buildLinkedNpcEntries(linkedNpcEntries);
         this.selectedCommandId = selectedCommandId;
+        this.unlinkCallback = unlinkCallback;
         this.selectionCallback = selectionCallback;
     }
 
@@ -58,28 +67,11 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkCommandMenuSubtitle.Text", "Click a command to set it.");
         commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
         commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
+        commandBuilder.set("#TameworkLinkedPanelTitle.Text", "Linked Companions");
+        commandBuilder.set("#TameworkLinkedPanelSubtitle.Text", resolvePanelSubtitle());
 
-        for (int i = 0; i < MAX_COMMAND_BUTTONS; i++) {
-            String selector = "#CommandButton" + i;
-            String labelSelector = "#CommandLabel" + i;
-            if (i >= options.length) {
-                commandBuilder.set(selector + ".Visible", false);
-                commandBuilder.set(labelSelector + ".Visible", false);
-                continue;
-            }
-            CommandOption option = options[i];
-            String label = option.label;
-            commandBuilder.set(selector + ".Visible", true);
-            commandBuilder.set(selector + ".Text", "");
-            commandBuilder.set(labelSelector + ".Visible", true);
-            commandBuilder.set(labelSelector + ".Text", label);
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    selector,
-                    EventData.of(EVENT_COMMAND_ID, option.id),
-                    false
-            );
-        }
+        buildCommandButtons(commandBuilder, eventBuilder);
+        buildLinkedNpcPanel(commandBuilder, eventBuilder);
 
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
@@ -97,12 +89,91 @@ public final class TameworkCommandSelectionPage
             close();
             return;
         }
+        if (data.commandId.startsWith(UNLINK_COMMAND_PREFIX)) {
+            close();
+            if (unlinkCallback == null) {
+                return;
+            }
+            UUID npcUuid = parseUnlinkNpcUuid(data.commandId);
+            if (npcUuid != null) {
+                unlinkCallback.accept(npcUuid);
+            }
+            return;
+        }
         if (!containsOption(data.commandId)) {
             close();
             return;
         }
         close();
         selectionCallback.accept(data.commandId);
+    }
+
+    private void buildCommandButtons(@Nonnull UICommandBuilder commandBuilder,
+                                     @Nonnull UIEventBuilder eventBuilder) {
+        for (int i = 0; i < MAX_COMMAND_BUTTONS; i++) {
+            String selector = "#CommandButton" + i;
+            String labelSelector = "#CommandLabel" + i;
+            if (i >= options.length) {
+                commandBuilder.set(selector + ".Visible", false);
+                commandBuilder.set(labelSelector + ".Visible", false);
+                continue;
+            }
+            CommandOption option = options[i];
+            commandBuilder.set(selector + ".Visible", true);
+            commandBuilder.set(selector + ".Text", "");
+            commandBuilder.set(labelSelector + ".Visible", true);
+            commandBuilder.set(labelSelector + ".Text", option.label);
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    selector,
+                    EventData.of(EVENT_COMMAND_ID, option.id),
+                    false
+            );
+        }
+    }
+
+    private void buildLinkedNpcPanel(@Nonnull UICommandBuilder commandBuilder,
+                                     @Nonnull UIEventBuilder eventBuilder) {
+        for (int i = 0; i < MAX_LINKED_PANEL_ROWS; i++) {
+            String cardSelector = "#TameworkLinkedPanelCard" + i;
+            String nameSelector = "#TameworkLinkedPanelCard" + i + "Name";
+            String healthTextSelector = "#TameworkLinkedPanelCard" + i + "HealthText";
+            String healthFillSelector = "#TameworkLinkedPanelCard" + i + "HealthFill";
+            String removeSelector = "#TameworkLinkedPanelCard" + i + "RemoveButton";
+            if (i >= linkedNpcEntries.length) {
+                commandBuilder.set(cardSelector + ".Visible", false);
+                continue;
+            }
+            LinkedNpcEntry entry = linkedNpcEntries[i];
+            commandBuilder.set(cardSelector + ".Visible", true);
+            commandBuilder.set(nameSelector + ".Text", entry.displayName);
+            if (entry.hasHealth()) {
+                commandBuilder.set(healthTextSelector + ".Text", "Health: " + entry.currentHealth + "/" + entry.maxHealth);
+                commandBuilder.set(healthFillSelector + ".Visible", true);
+            } else {
+                commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
+                commandBuilder.set(healthFillSelector + ".Visible", false);
+            }
+            commandBuilder.set(removeSelector + ".Text", "Remove");
+            commandBuilder.set(removeSelector + ".Visible", true);
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    removeSelector,
+                    EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid),
+                    false
+            );
+        }
+    }
+
+    private String resolvePanelSubtitle() {
+        int total = linkedNpcEntries.length;
+        if (total <= 0) {
+            return "No linked companions";
+        }
+        if (total <= MAX_LINKED_PANEL_ROWS) {
+            return total + " linked companion" + (total == 1 ? "" : "s");
+        }
+        return "Showing first " + MAX_LINKED_PANEL_ROWS + " of " + total + " linked companions";
     }
 
     private boolean containsOption(String commandId) {
@@ -146,6 +217,26 @@ public final class TameworkCommandSelectionPage
         return out.toArray(new CommandOption[0]);
     }
 
+    private static LinkedNpcEntry[] buildLinkedNpcEntries(List<LinkedNpcEntry> entries) {
+        if (entries == null || entries.isEmpty()) {
+            return new LinkedNpcEntry[0];
+        }
+        List<LinkedNpcEntry> out = new ArrayList<>(entries.size());
+        for (LinkedNpcEntry entry : entries) {
+            if (entry == null || entry.npcUuid == null) {
+                continue;
+            }
+            String name = entry.displayName;
+            if (name == null || name.isBlank()) {
+                name = "NPC";
+            }
+            int current = Math.max(0, entry.currentHealth);
+            int max = Math.max(0, entry.maxHealth);
+            out.add(new LinkedNpcEntry(entry.npcUuid, name, current, max, entry.loaded));
+        }
+        return out.toArray(new LinkedNpcEntry[0]);
+    }
+
     private static String resolveLabel(CommandEntry entry) {
         if (entry.getDisplayName() != null && !entry.getDisplayName().isBlank()) {
             return entry.getDisplayName();
@@ -160,7 +251,43 @@ public final class TameworkCommandSelectionPage
         return left.trim().equalsIgnoreCase(right.trim());
     }
 
+    private UUID parseUnlinkNpcUuid(String commandId) {
+        if (commandId == null || !commandId.startsWith(UNLINK_COMMAND_PREFIX)) {
+            return null;
+        }
+        String raw = commandId.substring(UNLINK_COMMAND_PREFIX.length());
+        if (raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     private record CommandOption(String id, String label) { }
+
+    /** View model for one linked NPC row in the command radial side panel. */
+    public static final class LinkedNpcEntry {
+        private final UUID npcUuid;
+        private final String displayName;
+        private final int currentHealth;
+        private final int maxHealth;
+        private final boolean loaded;
+
+        public LinkedNpcEntry(UUID npcUuid, String displayName, int currentHealth, int maxHealth, boolean loaded) {
+            this.npcUuid = npcUuid;
+            this.displayName = displayName;
+            this.currentHealth = currentHealth;
+            this.maxHealth = maxHealth;
+            this.loaded = loaded;
+        }
+
+        public boolean hasHealth() {
+            return loaded && maxHealth > 0;
+        }
+    }
 
     /** Event payload emitted by command-button clicks in the command selection page. */
     public static final class CommandSelectionEventData {
