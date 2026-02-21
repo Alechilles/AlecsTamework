@@ -24,7 +24,7 @@ public final class CommandNpcRelocationService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final int CHUNK_SIZE = 32;
     private static final long INITIAL_APPLY_DELAY_MS = 250L;
-    private static final long[] APPLY_BURST_DELAYS_MS = {0L, 150L, 300L, 600L, 1000L};
+    private static final long[] APPLY_BURST_DELAYS_MS = {0L, 150L, 300L, 600L, 1000L, 1500L, 2200L, 3000L};
     private static final long RETRY_INTERVAL_MS = 2000L;
     private static final long MAX_RELOCATION_WAIT_MS = 120000L;
     private static final int MAX_RETRY_ATTEMPTS = 60;
@@ -126,6 +126,7 @@ public final class CommandNpcRelocationService {
         }
         NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
         if (npc == null) {
+            scheduleTryApply(world, npcUuid, INITIAL_APPLY_DELAY_MS);
             retryPending(world, npcUuid, pending);
             return false;
         }
@@ -155,14 +156,18 @@ public final class CommandNpcRelocationService {
             return;
         }
         long now = System.currentTimeMillis();
+        long retryInterval = Math.max(250L, resolveRetryIntervalMs());
+        if (now - pending.lastRetryCountedAtMs >= retryInterval) {
+            pending.retryAttempts++;
+            pending.lastRetryCountedAtMs = now;
+        }
         if (now - pending.queuedAtMs > resolveMaxRelocationWaitMs()
-                || pending.retryAttempts >= resolveMaxRetryAttempts()) {
+                || pending.retryAttempts > resolveMaxRetryAttempts()) {
             pendingByNpc.remove(npcUuid, pending);
             return;
         }
-        pending.retryAttempts++;
         requestChunksForPending(world, pending);
-        scheduleTryApply(world, npcUuid, resolveRetryIntervalMs());
+        scheduleTryApply(world, npcUuid, retryInterval);
     }
 
     private void requestChunksForPending(World world, PendingRelocation pending) {
@@ -307,6 +312,7 @@ public final class CommandNpcRelocationService {
         private final long executeAfterMs;
         private final long queuedAtMs;
         private int retryAttempts;
+        private long lastRetryCountedAtMs;
 
         private PendingRelocation(UUID npcUuid,
                                   Vector3d destination,
@@ -329,6 +335,7 @@ public final class CommandNpcRelocationService {
             this.executeAfterMs = executeAfterMs;
             this.queuedAtMs = queuedAtMs;
             this.retryAttempts = 0;
+            this.lastRetryCountedAtMs = queuedAtMs;
         }
     }
 }

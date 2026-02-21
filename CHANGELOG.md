@@ -44,6 +44,7 @@
 - Linked-panel per-companion `Recall` now reuses the same recall command execution pipeline as radial recall (including loaded/unloaded handling and relocation queue behavior), eliminating drift between command and button outcomes.
 - Unloaded recall queueing now falls back to stored home when last-known position is missing (common after relog), so recall can still load source chunks and relocate companions.
 - Relocation apply now uses a short burst of retry probes around queue/chunk-load events, improving first-click unloaded recall reliability when NPC components become available a few frames after chunk load.
+- Relocation retry accounting is now interval-based (instead of counting every rapid probe), and unloaded recall probes now cover a longer first-load window to reduce missed first-click recalls for companions that materialize slightly later after chunk load.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.
