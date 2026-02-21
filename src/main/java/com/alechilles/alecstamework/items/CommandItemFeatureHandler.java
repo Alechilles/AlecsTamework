@@ -68,6 +68,7 @@ import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -75,6 +76,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 
@@ -98,6 +100,11 @@ public final class CommandItemFeatureHandler {
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
     private static final double RESPAWN_DISTANCE_MID = 12.0;
     private static final double RESPAWN_DISTANCE_FAR = 16.0;
+    private static final double OUT_OF_VIEW_MIN_ANGLE_DEGREES = 70.0;
+    private static final double[] PLACEMENT_ANGLE_OFFSETS = {
+            180.0, 165.0, -165.0, 150.0, -150.0, 135.0, -135.0, 120.0, -120.0, 105.0, -105.0, 90.0, -90.0,
+            75.0, -75.0, 60.0, -60.0, 45.0, -45.0, 30.0, -30.0, 15.0, -15.0, 0.0
+    };
     private static final double COMMAND_PLACEMENT_MIN_RELATIVE_Y = -2.0;
     private static final double COMMAND_PLACEMENT_MAX_RELATIVE_Y = 4.0;
 
@@ -2166,7 +2173,7 @@ public final class CommandItemFeatureHandler {
         double baseAngle = Math.atan2(dirZ, dirX);
         double targetDistance = Math.max(2.0, safeSpawnDistance);
         double[] distanceCandidates = resolvePlacementDistanceCandidates(globalConfig, targetDistance);
-        double[] angleOffsets = {180.0, 150.0, -150.0, 120.0, -120.0, 90.0, -90.0, 60.0, -60.0, 45.0, -45.0, 30.0, -30.0, 15.0, -15.0, 0.0};
+        double[] angleOffsets = resolvePlacementAngleOffsets();
         for (double distance : distanceCandidates) {
             if (distance < 2.0) {
                 continue;
@@ -2244,6 +2251,30 @@ public final class CommandItemFeatureHandler {
                 Math.max(2.0, far),
                 Math.max(2.0, fallbackDistance)
         };
+    }
+
+    private double[] resolvePlacementAngleOffsets() {
+        List<Double> offCamera = new ArrayList<>();
+        List<Double> fallback = new ArrayList<>();
+        for (double angleOffset : PLACEMENT_ANGLE_OFFSETS) {
+            if (Math.abs(angleOffset) >= OUT_OF_VIEW_MIN_ANGLE_DEGREES) {
+                offCamera.add(angleOffset);
+                continue;
+            }
+            fallback.add(angleOffset);
+        }
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        Collections.shuffle(offCamera, random);
+        Collections.shuffle(fallback, random);
+        double[] ordered = new double[offCamera.size() + fallback.size()];
+        int index = 0;
+        for (double value : offCamera) {
+            ordered[index++] = value;
+        }
+        for (double value : fallback) {
+            ordered[index++] = value;
+        }
+        return ordered;
     }
 
     private double resolvePlacementMinRelativeY(TwGlobalConfig globalConfig) {

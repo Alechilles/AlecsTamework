@@ -30,6 +30,7 @@
 - Dead companion respawn follow bootstrap now prioritizes `Follow` state first, with `Idle` as fallback.
 - `TwGlobalConfig_Default.json` is now organized into top-level sections (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`), and `TwGlobalConfig` now reads the sectioned schema directly.
 - Recall and dead-companion respawn now share the same safe placement pipeline (surface projection + radial candidate sampling) and no longer use a separate recall-only placement path.
+- Recall and dead-companion respawn placement candidates are now randomized and sampled off-camera first, so companions no longer consistently appear directly behind the player.
 
 ### Fixed
 - Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.
