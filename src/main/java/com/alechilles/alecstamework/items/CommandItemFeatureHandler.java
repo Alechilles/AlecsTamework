@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandFeedback;
@@ -20,6 +21,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreHomeS
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
+import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
@@ -586,7 +588,10 @@ public final class CommandItemFeatureHandler {
         }
         String nameKey = resolveNpcNameKey(npc);
         if (nameKey != null && !nameKey.isBlank()) {
-            return nameKey;
+            String translated = translateNpcNameKey(nameKey);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
         }
         String roleId = resolveNpcRoleId(npc);
         if (roleId != null && !roleId.isBlank()) {
@@ -656,6 +661,58 @@ public final class CommandItemFeatureHandler {
             return false;
         }
         return value.indexOf('.') >= 0;
+    }
+
+    private String translateNpcNameKey(String nameKey) {
+        if (nameKey == null || nameKey.isBlank()) {
+            return null;
+        }
+        Tamework instance = Tamework.getInstance();
+        TranslationRegistry registry = instance != null ? instance.getTranslationRegistry() : null;
+        if (registry == null) {
+            return null;
+        }
+        for (String candidate : buildNameKeyCandidates(nameKey)) {
+            if (candidate == null || candidate.isBlank()) {
+                continue;
+            }
+            String translated = registry.get(candidate);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
+        }
+        return null;
+    }
+
+    private List<String> buildNameKeyCandidates(String nameKey) {
+        ArrayList<String> candidates = new ArrayList<>(8);
+        addCandidate(candidates, nameKey);
+        if (!nameKey.contains(".")) {
+            addCandidate(candidates, "npcRoles." + nameKey + ".name");
+            addCandidate(candidates, "server.npcRoles." + nameKey + ".name");
+            return candidates;
+        }
+        if (nameKey.startsWith("server.")) {
+            addCandidate(candidates, nameKey.substring("server.".length()));
+        } else {
+            addCandidate(candidates, "server." + nameKey);
+        }
+        addCandidate(candidates, nameKey.replace(".npcRole.", ".npcRoles."));
+        addCandidate(candidates, nameKey.replace(".npcRoles.", ".npcRole."));
+        if (nameKey.startsWith("npcRoles.")) {
+            addCandidate(candidates, "server." + nameKey);
+        }
+        if (nameKey.startsWith("server.npcRoles.")) {
+            addCandidate(candidates, nameKey.substring("server.".length()));
+        }
+        return candidates;
+    }
+
+    private void addCandidate(List<String> candidates, String key) {
+        if (key == null || key.isBlank() || candidates.contains(key)) {
+            return;
+        }
+        candidates.add(key);
     }
 
     private static String readScopeStringParam(Object scope, String... paramNames) {
