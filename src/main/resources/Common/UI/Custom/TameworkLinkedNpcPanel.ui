@@ -52,7 +52,7 @@ Group #TameworkLinkedPanelRoot {
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard0HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
         Background: #6fc576;
       }
     }
@@ -86,7 +86,7 @@ Group #TameworkLinkedPanelRoot {
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard1HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
         Background: #6fc576;
       }
     }
@@ -120,7 +120,7 @@ Group #TameworkLinkedPanelRoot {
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard2HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
         Background: #6fc576;
       }
     }
@@ -154,7 +154,7 @@ Group #TameworkLinkedPanelRoot {
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard3HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
         Background: #6fc576;
       }
     }
@@ -188,7 +188,7 @@ Group #TameworkLinkedPanelRoot {
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard4HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
         Background: #6fc576;
       }
     }
@@ -222,7 +222,7 @@ Group #TameworkLinkedPanelRoot {
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard5HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 406, Height: 12);
         Background: #6fc576;
       }
     }
