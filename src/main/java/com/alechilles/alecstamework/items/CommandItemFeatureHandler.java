@@ -620,15 +620,6 @@ public final class CommandItemFeatureHandler {
             sendWarningMessage(player, "Unable to recall right now.");
             return;
         }
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        double safeSpawnDistance = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
-                RECALL_SAFE_SPAWN_DISTANCE
-        );
-        double forceRelocateDistance = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandRecallForceRelocateDistance() : 0.0,
-                RECALL_FORCE_RELOCATE_DISTANCE
-        );
 
         ItemContainer hotbar = inventory.getHotbar();
         short capacity = hotbar.getCapacity();
@@ -651,74 +642,109 @@ public final class CommandItemFeatureHandler {
                 sendWarningMessage(player, "That companion is dead. Use Respawn when it is ready.");
                 return;
             }
-
+            TwCommandItemConfig config = resolveConfig(stack.getItemId(), null);
+            if (config == null || !config.isEnabled()) {
+                sendWarningMessage(player, "That command item is not configured.");
+                return;
+            }
+            CommandEntry recallCommand = resolvePanelRecallCommand(config, stack);
+            if (recallCommand == null) {
+                sendWarningMessage(player, "No recall command is configured for this item.");
+                return;
+            }
+            TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+            double returnHomeTeleportDistance = resolvePositiveDouble(
+                    globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDistance() : 0.0,
+                    HYBRID_TELEPORT_DISTANCE_THRESHOLD
+            );
+            double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
+                    globalConfig != null ? globalConfig.getCommandReturnHomePathDistanceBeforeTeleport() : 0.0,
+                    HYBRID_PATH_DISTANCE_BEFORE_TELEPORT
+            );
+            long returnHomeTeleportDelayMs = resolvePositiveLong(
+                    globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDelayMs() : 0L,
+                    HYBRID_TELEPORT_DELAY_MS
+            );
+            double recallSafeSpawnDistance = resolvePositiveDouble(
+                    globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
+                    RECALL_SAFE_SPAWN_DISTANCE
+            );
+            double recallForceRelocateDistance = resolvePositiveDouble(
+                    globalConfig != null ? globalConfig.getCommandRecallForceRelocateDistance() : 0.0,
+                    RECALL_FORCE_RELOCATE_DISTANCE
+            );
             Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
             NPCEntity npc = (npcRef != null && npcRef.isValid())
                     ? store.getComponent(npcRef, NPCEntity.getComponentType())
                     : null;
+            Ref<EntityStore> explicitTarget = npcRef != null && npcRef.isValid() ? npcRef : null;
+            Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, recallCommand, explicitTarget);
+            Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, recallCommand);
+            Context context = new Context(
+                    player,
+                    playerRef,
+                    store,
+                    config,
+                    recallCommand,
+                    stack.getItemId(),
+                    toolId,
+                    commandTarget,
+                    raycastPosition,
+                    stack,
+                    globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
+                    globalConfig != null && globalConfig.isInvulnerableIfOwned(),
+                    returnHomeTeleportDistance,
+                    returnHomePathDistanceBeforeTeleport,
+                    returnHomeTeleportDelayMs,
+                    recallSafeSpawnDistance,
+                    recallForceRelocateDistance
+            );
+
+            ArrayList<Candidate> loadedRecipients = new ArrayList<>(1);
             if (npc != null && npcRef != null && npcRef.isValid()) {
+                double distSq = 0.0;
                 TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
-                Vector3d currentPosition = npcTransform != null ? new Vector3d(npcTransform.getPosition()) : record.lastKnownPosition;
-                Vector3d safeDestination = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, currentPosition);
-                if (safeDestination == null) {
-                    sendWarningMessage(player, "Unable to find a safe recall position.");
-                    return;
-                }
-                boolean moved = false;
                 TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
-                if (playerTransform != null && currentPosition != null) {
+                if (npcTransform != null && playerTransform != null) {
+                    Vector3d npcPos = npcTransform.getPosition();
                     Vector3d playerPos = playerTransform.getPosition();
-                    double dx = currentPosition.x - playerPos.x;
-                    double dy = currentPosition.y - playerPos.y;
-                    double dz = currentPosition.z - playerPos.z;
-                    double distSq = dx * dx + dy * dy + dz * dz;
-                    if (distSq >= forceRelocateDistance * forceRelocateDistance) {
-                        npc.moveTo(npcRef, safeDestination.x, safeDestination.y, safeDestination.z, store);
-                        currentPosition = safeDestination;
-                        moved = true;
-                    }
+                    double dx = npcPos.x - playerPos.x;
+                    double dy = npcPos.y - playerPos.y;
+                    double dz = npcPos.z - playerPos.z;
+                    distSq = dx * dx + dy * dy + dz * dz;
                 }
-                applyRespawnFollowBootstrap(npcRef, npc, playerRef, store);
-                ItemStack updatedStack = upsertLinkedNpcRecord(
-                        stack,
-                        npcUuid,
-                        currentPosition,
-                        record.homePosition,
-                        resolveNpcDisplayNameFromComponents(npcRef, store),
-                        resolveNpcNameKey(npc),
-                        resolveNpcRoleId(npc)
-                );
-                hotbar.setItemStackForSlot(slot, updatedStack);
+                loadedRecipients.add(new Candidate(npcRef, npc, distSq));
+            }
+            List<LinkedNpcRecord> unloadedRecipients = loadedRecipients.isEmpty()
+                    ? List.of(record)
+                    : List.of();
+
+            int affected = 0;
+            for (Candidate candidate : loadedRecipients) {
+                StepResult stepResult = executeCommand(context, candidate);
+                if (stepResult.applied) {
+                    affected++;
+                }
+                if (stepResult.abortAll) {
+                    break;
+                }
+            }
+            ItemStack refreshedLinks = refreshLinkedNpcPositions(context.workingItem, loadedRecipients, store);
+            if (refreshedLinks != context.workingItem) {
+                context.workingItem = refreshedLinks;
+                context.itemChanged = true;
+            }
+            int queued = queueRelocationsForUnloaded(context, unloadedRecipients);
+            if (context.itemChanged) {
+                hotbar.setItemStackForSlot(slot, context.workingItem);
                 inventory.markChanged();
                 player.sendInventory();
-                String name = resolveNpcDisplayName(npcRef, store, npc);
-                sendSuccessMessage(player, (moved ? "Recalled " : "Issued recall for ") + name + ".");
+            }
+            if (affected <= 0 && queued <= 0) {
+                sendWarningMessage(player, "No NPCs could execute that command.");
                 return;
             }
-
-            if (relocationService == null) {
-                sendWarningMessage(player, "Unable to recall unloaded companions right now.");
-                return;
-            }
-            Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
-            Vector3d safeDestination = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourceHint);
-            if (safeDestination == null) {
-                sendWarningMessage(player, "Unable to find a safe recall position.");
-                return;
-            }
-            relocationService.queueRelocation(
-                    world,
-                    npcUuid,
-                    safeDestination,
-                    player.getUuid(),
-                    true,
-                    true,
-                    "Follow",
-                    null,
-                    0L,
-                    sourceHint
-            );
-            sendSuccessMessage(player, "Queued recall for unloaded companion.");
+            emitCommandExecutionFeedback(context, affected, queued);
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
@@ -1443,6 +1469,26 @@ public final class CommandItemFeatureHandler {
             }
         }
         return config.findDefaultCommand();
+    }
+
+    private CommandEntry resolvePanelRecallCommand(TwCommandItemConfig config, ItemStack itemStack) {
+        if (config == null) {
+            return null;
+        }
+        CommandEntry direct = config.findCommandById("Recall");
+        if (direct != null) {
+            return direct;
+        }
+        CommandEntry[] commands = config.getCommandList();
+        if (commands != null) {
+            for (CommandEntry entry : commands) {
+                if (isRecallCommand(entry)) {
+                    return entry;
+                }
+            }
+        }
+        CommandEntry fallback = resolveCommand(config, null, itemStack);
+        return isRecallCommand(fallback) ? fallback : null;
     }
 
     private Ref<EntityStore> resolveCommandTarget(Ref<EntityStore> playerRef,
