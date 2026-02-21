@@ -85,7 +85,7 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   Group #TameworkCommandMenuWheel {
-    Anchor: (Width: 1280, Height: 760);
+    Anchor: (Width: 920, Height: 760);
     Visible: false;
 
     Label #TameworkCommandMenuTitle {
@@ -109,114 +109,6 @@ $C.@PageOverlay {
         HorizontalAlignment: Center,
         VerticalAlignment: Center
       );
-    }
-
-    Group #LinkedNpcPanel {
-      Anchor: (Top: 96, Left: 810, Width: 430, Height: 640);
-      LayoutMode: Top;
-      Padding: (Horizontal: 14, Vertical: 12);
-      Background: #0b1a2c(0.78);
-
-      Label {
-        Anchor: (Height: 30);
-        Text: "Linked Companions";
-        Style: (
-          FontSize: 24,
-          RenderBold: true,
-          TextColor: #eef3f8,
-          HorizontalAlignment: Left,
-          VerticalAlignment: Center
-        );
-      }
-
-      Label {
-        Anchor: (Top: 2, Height: 20);
-        Text: "Preview panel (step 1)";
-        Style: (
-          FontSize: 14,
-          TextColor: #c4d2e1,
-          HorizontalAlignment: Left,
-          VerticalAlignment: Center
-        );
-      }
-
-      Group {
-        Anchor: (Top: 12, Height: 86);
-        Background: #13263c(0.86);
-        Padding: (Horizontal: 10, Vertical: 8);
-
-        Label {
-          Anchor: (Height: 22);
-          Text: "Companion Name";
-          Style: (
-            FontSize: 16,
-            RenderBold: true,
-            TextColor: #eff4fa,
-            HorizontalAlignment: Left,
-            VerticalAlignment: Center
-          );
-        }
-
-        Group {
-          Anchor: (Top: 8, Height: 14);
-          Background: #0a121b(0.95);
-
-          Group {
-            Anchor: (Left: 1, Top: 1, Width: 220, Height: 12);
-            Background: #6fc576;
-          }
-        }
-
-        Label {
-          Anchor: (Top: 8, Height: 16);
-          Text: "Health: 72/100";
-          Style: (
-            FontSize: 11,
-            TextColor: #bed0e3,
-            HorizontalAlignment: Left,
-            VerticalAlignment: Center
-          );
-        }
-      }
-
-      Group {
-        Anchor: (Top: 8, Height: 86);
-        Background: #13263c(0.86);
-        Padding: (Horizontal: 10, Vertical: 8);
-
-        Label {
-          Anchor: (Height: 22);
-          Text: "Companion Name";
-          Style: (
-            FontSize: 16,
-            RenderBold: true,
-            TextColor: #eff4fa,
-            HorizontalAlignment: Left,
-            VerticalAlignment: Center
-          );
-        }
-
-        Group {
-          Anchor: (Top: 8, Height: 14);
-          Background: #0a121b(0.95);
-
-          Group {
-            Anchor: (Left: 1, Top: 1, Width: 150, Height: 12);
-            Background: #6fc576;
-          }
-        }
-
-        Label {
-          Anchor: (Top: 8, Height: 16);
-          Text: "Health: 45/100";
-          Style: (
-            FontSize: 11,
-            TextColor: #bed0e3,
-            HorizontalAlignment: Left,
-            VerticalAlignment: Center
-          );
-        }
-      }
     }
 
     Group #CommandWheelOuterRing {
