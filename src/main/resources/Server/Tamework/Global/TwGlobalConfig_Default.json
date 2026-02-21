@@ -1,7 +1,7 @@
 {
   "Enabled": true,
   "Priority": 0,
-  "BlockOwnerDamage": true,
+  "BlockOwnerDamage": false,
   "BlockAllPlayerDamageIfOwned": false,
   "InvulnerableIfOwned": false,
   "InteractionConfigParam": "InteractionConfigId",
@@ -18,5 +18,6 @@
   "CommandRecallForceRelocateDistance": 80.0,
   "CommandRelocationRetryIntervalMs": 2000,
   "CommandRelocationMaxWaitMs": 120000,
-  "CommandRelocationMaxRetryAttempts": 60
+  "CommandRelocationMaxRetryAttempts": 60,
+  "CommandLinkedPanelRequireUnlinkConfirm": true
 }

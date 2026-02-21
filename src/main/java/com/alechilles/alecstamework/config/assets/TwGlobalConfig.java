@@ -168,6 +168,15 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .documentation("Maximum retry attempts for queued off-screen command relocations.")
             .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("CommandLinkedPanelRequireUnlinkConfirm", Codec.BOOLEAN),
+                    (asset, value) -> asset.commandLinkedPanelRequireUnlinkConfirm = value != null
+                            ? value
+                            : asset.commandLinkedPanelRequireUnlinkConfirm,
+                    asset -> asset.commandLinkedPanelRequireUnlinkConfirm
+            )
+            .documentation("When enabled, the linked-companions panel requires a second click to confirm unlink.")
+            .add()
             .build();
 
     private static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> ASSET_STORE;
@@ -197,6 +206,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private int commandRelocationRetryIntervalMs = 2000;
     private int commandRelocationMaxWaitMs = 120000;
     private int commandRelocationMaxRetryAttempts = 60;
+    private boolean commandLinkedPanelRequireUnlinkConfirm = true;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -363,6 +373,10 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     public int getCommandRelocationMaxRetryAttempts() {
         return commandRelocationMaxRetryAttempts;
+    }
+
+    public boolean isCommandLinkedPanelRequireUnlinkConfirm() {
+        return commandLinkedPanelRequireUnlinkConfirm;
     }
 
     // Returns the names of required string fields that are missing or blank.

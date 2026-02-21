@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.1 - Linked Companions Panel UX and Safety - 2026-02-21
+### Added
+- New `CommandLinkedPanelRequireUnlinkConfirm` global setting in `TwGlobalConfig` (default `true`) to control whether unlinking from the linked-companions panel requires a second confirm click.
+- Linked-companions panel empty state messaging when no NPCs are linked to the command tool.
+- Row-level loaded/unloaded/confirm status badges in the linked-companions panel.
+
+### Changed
+- Linked-companions rows now show clearer unloaded fallback text (`Unloaded companion (<uuid>)`) and unloaded health messaging.
+- Command radial panel subtitle now guides unlink confirmation when a remove action is armed.
+
+### Notes
+- Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.
+
 ## 2.1.0 - Command Items Beta and Asset Loading Fixes - 2026-02-19
 ### Added
 - New command item config asset type **TwCommandItemConfig** under `Server/Tamework/Items/Commands`, plus the `TameworkCommand` item interaction and example command whistle assets.

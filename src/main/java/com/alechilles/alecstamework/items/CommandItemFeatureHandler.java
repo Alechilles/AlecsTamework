@@ -320,10 +320,13 @@ public final class CommandItemFeatureHandler {
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return false;
         }
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        boolean requireUnlinkConfirm = globalConfig == null || globalConfig.isCommandLinkedPanelRequireUnlinkConfirm();
         TameworkCommandSelectionPage page = new TameworkCommandSelectionPage(
                 uiPlayerRef,
                 config,
                 selectedId,
+                requireUnlinkConfirm,
                 () -> buildLinkedPanelEntriesForTool(player, toolId),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
@@ -442,7 +445,7 @@ public final class CommandItemFeatureHandler {
                 continue;
             }
             boolean loaded = false;
-            String displayName = "NPC (unloaded)";
+            String displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
             int health = 0;
             int maxHealth = 0;
             if (world != null) {
@@ -469,6 +472,14 @@ public final class CommandItemFeatureHandler {
             ));
         }
         return entries;
+    }
+
+    private String abbreviateUuid(UUID uuid) {
+        if (uuid == null) {
+            return "unknown";
+        }
+        String raw = uuid.toString();
+        return raw.length() >= 8 ? raw.substring(0, 8) : raw;
     }
 
     private boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {

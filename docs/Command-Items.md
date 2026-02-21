@@ -95,6 +95,13 @@ Behavior:
 - Clicking a slice sets the selected command id in tool metadata.
 - The page supports up to 8 visible command buttons.
 
+Linked companions side panel (shown with the radial menu):
+- Displays linked NPCs in a dynamic scroll list (not fixed rows).
+- Shows loaded/unloaded row status and health snapshots when available.
+- Supports quick unlink per row.
+- Includes an empty-state prompt when no companions are linked.
+- Optional unlink safety confirmation can require a second click.
+
 ## Move/Home/Recall and Off-Screen Relocation
 Command relocation supports both loaded and unloaded NPCs.
 
@@ -120,6 +127,7 @@ Global tuning values come from `TwGlobalConfig`:
 - `CommandRelocationRetryIntervalMs`
 - `CommandRelocationMaxWaitMs`
 - `CommandRelocationMaxRetryAttempts`
+- `CommandLinkedPanelRequireUnlinkConfirm`
 
 ## Hook Bridge for Movement
 `MoveToPosition` emits hooks with ids like:

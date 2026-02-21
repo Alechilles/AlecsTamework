@@ -41,8 +41,10 @@ public final class TameworkCommandSelectionPage
     private static final int HEALTH_FILL_MAX_WIDTH = 358;
 
     private final CommandOption[] options;
+    private final boolean requireUnlinkConfirm;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier;
     private LinkedNpcEntry[] linkedNpcEntries;
+    private UUID pendingUnlinkNpcUuid;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
     private final Consumer<UUID> unlinkCallback;
@@ -50,13 +52,16 @@ public final class TameworkCommandSelectionPage
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
                                         String selectedCommandId,
+                                        boolean requireUnlinkConfirm,
                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier,
                                         @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
+        this.requireUnlinkConfirm = requireUnlinkConfirm;
         this.linkedNpcEntriesSupplier = linkedNpcEntriesSupplier;
         this.linkedNpcEntries = new LinkedNpcEntry[0];
+        this.pendingUnlinkNpcUuid = null;
         this.selectedCommandId = selectedCommandId;
         this.unlinkCallback = unlinkCallback;
         this.selectionCallback = selectionCallback;
@@ -94,6 +99,7 @@ public final class TameworkCommandSelectionPage
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
         if (data.commandId == null || data.commandId.isBlank() || CLOSE_COMMAND_ID.equals(data.commandId)) {
+            pendingUnlinkNpcUuid = null;
             close();
             return;
         }
@@ -103,16 +109,24 @@ public final class TameworkCommandSelectionPage
             }
             UUID npcUuid = parseUnlinkNpcUuid(data.commandId);
             if (npcUuid != null) {
+                if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
+                    pendingUnlinkNpcUuid = npcUuid;
+                    rebuild();
+                    return;
+                }
                 unlinkCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 rebuild();
             }
             return;
         }
         if (!containsOption(data.commandId)) {
+            pendingUnlinkNpcUuid = null;
             close();
             return;
         }
+        pendingUnlinkNpcUuid = null;
         close();
         selectionCallback.accept(data.commandId);
     }
@@ -144,16 +158,33 @@ public final class TameworkCommandSelectionPage
     private void buildLinkedNpcPanel(@Nonnull UICommandBuilder commandBuilder,
                                      @Nonnull UIEventBuilder eventBuilder) {
         commandBuilder.clear("#TameworkLinkedPanelList");
+        boolean hasEntries = linkedNpcEntries.length > 0;
+        commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
+        commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
+        if (!hasEntries) {
+            return;
+        }
         for (int i = 0; i < linkedNpcEntries.length; i++) {
             LinkedNpcEntry entry = linkedNpcEntries[i];
             String entrySelector = "#TameworkLinkedPanelList[" + i + "]";
             String nameSelector = entrySelector + " #Name";
+            String statusLoadedSelector = entrySelector + " #StatusLoaded";
+            String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
+            String statusConfirmSelector = entrySelector + " #StatusConfirm";
             String healthTextSelector = entrySelector + " #HealthText";
             String healthFillSelector = entrySelector + " #HealthFill";
+            String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
+            String tertiaryStatFrameSelector = entrySelector + " #FutureStatBFrame";
+            String futureActionBarSelector = entrySelector + " #FutureActionBar";
+            String traitsButtonSelector = entrySelector + " #TraitsButton";
+            String talentsButtonSelector = entrySelector + " #TalentsButton";
             String removeSelector = entrySelector + " #RemoveButton";
 
             commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
             commandBuilder.set(nameSelector + ".Text", entry.displayName());
+            commandBuilder.set(statusLoadedSelector + ".Visible", entry.loaded() && !isPendingUnlink(entry.npcUuid()));
+            commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !isPendingUnlink(entry.npcUuid()));
+            commandBuilder.set(statusConfirmSelector + ".Visible", isPendingUnlink(entry.npcUuid()));
             if (entry.hasHealth()) {
                 commandBuilder.set(
                         healthTextSelector + ".Text",
@@ -161,10 +192,20 @@ public final class TameworkCommandSelectionPage
                 );
                 commandBuilder.set(healthFillSelector + ".Visible", true);
                 commandBuilder.setObject(healthFillSelector + ".Anchor", buildHealthFillAnchor(entry.healthRatio()));
+            } else if (!entry.loaded()) {
+                commandBuilder.set(healthTextSelector + ".Text", "Unloaded (commands still queue).");
+                commandBuilder.set(healthFillSelector + ".Visible", false);
             } else {
                 commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
                 commandBuilder.set(healthFillSelector + ".Visible", false);
             }
+            commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
+            commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
+            commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
+            commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
+            commandBuilder.set(traitsButtonSelector + ".Enabled", entry.isTraitsActionEnabled());
+            commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
+            commandBuilder.set(talentsButtonSelector + ".Enabled", entry.isTalentsActionEnabled());
             commandBuilder.set(removeSelector + ".Text", "");
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -177,6 +218,13 @@ public final class TameworkCommandSelectionPage
 
     private String resolvePanelSubtitle() {
         int total = linkedNpcEntries.length;
+        if (pendingUnlinkNpcUuid != null) {
+            String pendingName = resolvePendingUnlinkName(pendingUnlinkNpcUuid);
+            if (pendingName == null || pendingName.isBlank()) {
+                pendingName = "this companion";
+            }
+            return "Click X again to remove " + pendingName;
+        }
         if (total <= 0) {
             return "No linked companions";
         }
@@ -186,6 +234,9 @@ public final class TameworkCommandSelectionPage
     private void refreshLinkedNpcEntries() {
         List<LinkedNpcEntry> entries = linkedNpcEntriesSupplier != null ? linkedNpcEntriesSupplier.get() : List.of();
         linkedNpcEntries = buildLinkedNpcEntries(entries);
+        if (pendingUnlinkNpcUuid != null && resolvePendingUnlinkName(pendingUnlinkNpcUuid) == null) {
+            pendingUnlinkNpcUuid = null;
+        }
     }
 
     private boolean containsOption(String commandId) {
@@ -244,7 +295,19 @@ public final class TameworkCommandSelectionPage
             }
             int current = Math.max(0, entry.currentHealth);
             int max = Math.max(0, entry.maxHealth);
-            out.add(new LinkedNpcEntry(entry.npcUuid, name, current, max, entry.loaded));
+            out.add(new LinkedNpcEntry(
+                    entry.npcUuid,
+                    name,
+                    current,
+                    max,
+                    entry.loaded,
+                    entry.futureStatA,
+                    entry.futureStatB,
+                    entry.traitsActionVisible,
+                    entry.traitsActionEnabled,
+                    entry.talentsActionVisible,
+                    entry.talentsActionEnabled
+            ));
         }
         out.sort(
                 Comparator.comparing(LinkedNpcEntry::loaded).reversed()
@@ -278,6 +341,25 @@ public final class TameworkCommandSelectionPage
         return left.trim().equalsIgnoreCase(right.trim());
     }
 
+    private boolean isPendingUnlink(UUID npcUuid) {
+        return npcUuid != null && pendingUnlinkNpcUuid != null && pendingUnlinkNpcUuid.equals(npcUuid);
+    }
+
+    private String resolvePendingUnlinkName(UUID pendingUuid) {
+        if (pendingUuid == null || linkedNpcEntries.length == 0) {
+            return null;
+        }
+        for (LinkedNpcEntry entry : linkedNpcEntries) {
+            if (entry == null || entry.npcUuid() == null) {
+                continue;
+            }
+            if (pendingUuid.equals(entry.npcUuid())) {
+                return entry.displayName();
+            }
+        }
+        return null;
+    }
+
     private UUID parseUnlinkNpcUuid(String commandId) {
         if (commandId == null || !commandId.startsWith(UNLINK_COMMAND_PREFIX)) {
             return null;
@@ -302,13 +384,51 @@ public final class TameworkCommandSelectionPage
         private final int currentHealth;
         private final int maxHealth;
         private final boolean loaded;
+        private final FutureStat futureStatA;
+        private final FutureStat futureStatB;
+        private final boolean traitsActionVisible;
+        private final boolean traitsActionEnabled;
+        private final boolean talentsActionVisible;
+        private final boolean talentsActionEnabled;
 
         public LinkedNpcEntry(UUID npcUuid, String displayName, int currentHealth, int maxHealth, boolean loaded) {
+            this(
+                    npcUuid,
+                    displayName,
+                    currentHealth,
+                    maxHealth,
+                    loaded,
+                    null,
+                    null,
+                    false,
+                    false,
+                    false,
+                    false
+            );
+        }
+
+        public LinkedNpcEntry(UUID npcUuid,
+                              String displayName,
+                              int currentHealth,
+                              int maxHealth,
+                              boolean loaded,
+                              FutureStat futureStatA,
+                              FutureStat futureStatB,
+                              boolean traitsActionVisible,
+                              boolean traitsActionEnabled,
+                              boolean talentsActionVisible,
+                              boolean talentsActionEnabled) {
             this.npcUuid = npcUuid;
             this.displayName = displayName;
             this.currentHealth = currentHealth;
             this.maxHealth = maxHealth;
             this.loaded = loaded;
+            this.futureStatA = futureStatA;
+            this.futureStatB = futureStatB;
+            this.traitsActionVisible = traitsActionVisible;
+            this.traitsActionEnabled = traitsActionEnabled;
+            this.talentsActionVisible = talentsActionVisible;
+            this.talentsActionEnabled = talentsActionEnabled;
         }
 
         public boolean hasHealth() {
@@ -340,6 +460,67 @@ public final class TameworkCommandSelectionPage
                 return 0.0;
             }
             return (double) currentHealth / (double) maxHealth;
+        }
+
+        public boolean hasFutureStatA() {
+            return futureStatA != null;
+        }
+
+        public boolean hasFutureStatB() {
+            return futureStatB != null;
+        }
+
+        public FutureStat futureStatA() {
+            return futureStatA;
+        }
+
+        public FutureStat futureStatB() {
+            return futureStatB;
+        }
+
+        public boolean hasAnyFutureAction() {
+            return traitsActionVisible || talentsActionVisible;
+        }
+
+        public boolean isTraitsActionVisible() {
+            return traitsActionVisible;
+        }
+
+        public boolean isTraitsActionEnabled() {
+            return traitsActionEnabled;
+        }
+
+        public boolean isTalentsActionVisible() {
+            return talentsActionVisible;
+        }
+
+        public boolean isTalentsActionEnabled() {
+            return talentsActionEnabled;
+        }
+    }
+
+    /** Placeholder stat entry used for future linked-panel bars (hunger/thirst/happiness/etc.). */
+    public static final class FutureStat {
+        private final String label;
+        private final int current;
+        private final int max;
+
+        public FutureStat(String label, int current, int max) {
+            this.label = label;
+            this.current = current;
+            this.max = max;
+        }
+
+        public String label() {
+            return label;
+        }
+
+        public int current() {
+            return current;
+        }
+
+        public int max() {
+            return max;
         }
     }
 

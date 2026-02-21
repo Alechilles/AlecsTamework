@@ -29,6 +29,45 @@ Group {
     );
   }
 
+  Label #StatusLoaded {
+    Anchor: (Top: 2, Right: 34, Width: 86, Height: 18);
+    Text: "LOADED";
+    Style: (
+      FontSize: 10,
+      RenderBold: true,
+      TextColor: #d8ffe0,
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center
+    );
+    Visible: false;
+  }
+
+  Label #StatusUnloaded {
+    Anchor: (Top: 2, Right: 34, Width: 86, Height: 18);
+    Text: "UNLOADED";
+    Style: (
+      FontSize: 10,
+      RenderBold: true,
+      TextColor: #ffe5b4,
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center
+    );
+    Visible: false;
+  }
+
+  Label #StatusConfirm {
+    Anchor: (Top: 2, Right: 34, Width: 124, Height: 18);
+    Text: "CONFIRM REMOVE";
+    Style: (
+      FontSize: 10,
+      RenderBold: true,
+      TextColor: #ffd3d3,
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center
+    );
+    Visible: false;
+  }
+
   TextButton #RemoveButton {
     Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
     Style: @RemoveIconButtonStyle;
@@ -54,5 +93,69 @@ Group {
       HorizontalAlignment: Start,
       VerticalAlignment: Center
     );
+  }
+
+  Group #FutureStatAFrame {
+    Anchor: (Top: 70, Left: 0, Width: 360, Height: 10);
+    Background: #0a121b(0.95);
+    Visible: false;
+
+    Group #FutureStatAFill {
+      Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
+      Background: #7cc6f2;
+    }
+
+    Label #FutureStatAText {
+      Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
+      Text: "Stat A: ?/?";
+      Style: (
+        FontSize: 10,
+        TextColor: #9fc2dd,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center
+      );
+    }
+  }
+
+  Group #FutureStatBFrame {
+    Anchor: (Top: 84, Left: 0, Width: 360, Height: 10);
+    Background: #0a121b(0.95);
+    Visible: false;
+
+    Group #FutureStatBFill {
+      Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
+      Background: #f2c97c;
+    }
+
+    Label #FutureStatBText {
+      Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
+      Text: "Stat B: ?/?";
+      Style: (
+        FontSize: 10,
+        TextColor: #9fc2dd,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center
+      );
+    }
+  }
+
+  Group #FutureActionBar {
+    Anchor: (Top: 98, Left: 0, Width: 360, Height: 24);
+    LayoutMode: Left;
+    Visible: false;
+
+    TextButton #TraitsButton {
+      Anchor: (Left: 0, Width: 108, Height: 22);
+      Text: "Traits";
+      Visible: false;
+      Enabled: false;
+    }
+
+    TextButton #TalentsButton {
+      Anchor: (Left: 6, Width: 108, Height: 22);
+      Text: "Talents";
+      Visible: false;
+      Enabled: false;
+    }
   }
 }

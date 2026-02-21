@@ -26,6 +26,8 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 - **Command Item System** - Build custom command tools with `TwCommandItemConfig` + `TameworkCommand`.
   - Link/unlink NPCs to each tool.
   - Left-click executes the selected command; right-click opens the radial command wheel.
+  - Radial menu includes a linked-companions side panel with loaded/unloaded status, health snapshot, and quick unlink actions.
+  - Unlink safety is configurable via `TwGlobalConfig.CommandLinkedPanelRequireUnlinkConfirm`.
   - Supports command steps like state changes, target assignment, move-to-ping, set/return-home, and hook triggers.
   - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation.
   - Command relocation tuning is configurable in `TwGlobalConfig`.
