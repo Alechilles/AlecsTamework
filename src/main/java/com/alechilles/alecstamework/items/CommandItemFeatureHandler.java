@@ -346,6 +346,7 @@ public final class CommandItemFeatureHandler {
                 requireUnlinkConfirm,
                 () -> buildLinkedPanelEntriesForTool(player, toolId),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
+                npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
@@ -412,6 +413,204 @@ public final class CommandItemFeatureHandler {
         sendWarningMessage(player, "Unable to find that command item.");
     }
 
+    private void applyMenuRespawn(Player player,
+                                  String toolId,
+                                  UUID npcUuid) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        if (globalConfig == null || !globalConfig.isCommandDeadRespawnEnabled()) {
+            sendWarningMessage(player, "Dead companion respawn is disabled.");
+            return;
+        }
+        if (deathService == null) {
+            sendWarningMessage(player, "Dead companion tracking is unavailable.");
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            sendWarningMessage(player, "Unable to respawn right now.");
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            sendWarningMessage(player, "Unable to respawn right now.");
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        Ref<EntityStore> playerRef = player.getReference();
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            sendWarningMessage(player, "Unable to respawn right now.");
+            return;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
+            if (record == null) {
+                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                return;
+            }
+            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
+                    deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid());
+            if (deadSnapshot == null) {
+                sendWarningMessage(player, "That companion is not marked as dead.");
+                return;
+            }
+            long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
+            if (remainingMs > 0L) {
+                sendWarningMessage(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
+                return;
+            }
+            ItemStack updatedStack = respawnDeadLinkedNpcForMenu(player, playerRef, store, toolId, stack, record, deadSnapshot);
+            if (updatedStack == null) {
+                sendWarningMessage(player, "Failed to respawn that companion.");
+                return;
+            }
+            hotbar.setItemStackForSlot(slot, updatedStack);
+            inventory.markChanged();
+            player.sendInventory();
+            String name = deadSnapshot.displayName();
+            if (name == null || name.isBlank()) {
+                name = "companion";
+            }
+            sendSuccessMessage(player, "Respawned " + name + ".");
+            return;
+        }
+        sendWarningMessage(player, "Unable to find that command item.");
+    }
+
+    private ItemStack respawnDeadLinkedNpcForMenu(Player player,
+                                                  Ref<EntityStore> playerRef,
+                                                  Store<EntityStore> store,
+                                                  String toolId,
+                                                  ItemStack stack,
+                                                  LinkedNpcRecord record,
+                                                  CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot) {
+        if (player == null || playerRef == null || !playerRef.isValid() || store == null || stack == null
+                || stack.isEmpty() || record == null || deadSnapshot == null) {
+            return null;
+        }
+        String roleId = deadSnapshot.roleId();
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        NPCPlugin npcPlugin = NPCPlugin.get();
+        if (npcPlugin == null) {
+            return null;
+        }
+        int roleIndex = npcPlugin.getIndex(roleId);
+        if (roleIndex < 0) {
+            return null;
+        }
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        double safeSpawnDistance = resolvePositiveDouble(
+                globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
+                RECALL_SAFE_SPAWN_DISTANCE
+        );
+        Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
+        Vector3d destination = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourceHint);
+        if (destination == null) {
+            return null;
+        }
+        Vector3f rotation = resolveRespawnRotation(store, playerRef, destination);
+        Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
+        if (spawned == null || spawned.first() == null || spawned.second() == null) {
+            return null;
+        }
+        Ref<EntityStore> spawnedRef = spawned.first();
+        NPCEntity spawnedNpc = spawned.second();
+        UUID ownerId = deadSnapshot.ownerId() != null ? deadSnapshot.ownerId() : player.getUuid();
+        Vector3d homePosition = record.homePosition != null ? record.homePosition : deadSnapshot.homePosition();
+        String[] toolIds = mergeToolIds(deadSnapshot.toolIds(), toolId);
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        if (linksType != null) {
+            store.putComponent(
+                    spawnedRef,
+                    linksType,
+                    new TameworkCommandLinksComponent(ownerId, toolIds, homePosition)
+            );
+        }
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        if (ownerType != null) {
+            store.putComponent(
+                    spawnedRef,
+                    ownerType,
+                    new TameworkOwnerComponent(ownerId, deadSnapshot.ownerName())
+            );
+        }
+        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
+        if (tamedType != null) {
+            store.putComponent(
+                    spawnedRef,
+                    tamedType,
+                    new TameworkTamedComponent(deadSnapshot.tamed())
+            );
+        }
+        if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
+            ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+            if (nameType != null) {
+                store.putComponent(
+                        spawnedRef,
+                        nameType,
+                        new TameworkNpcNameComponent(
+                                deadSnapshot.customName(),
+                                ownerId,
+                                System.currentTimeMillis(),
+                                TameworkNpcNameComponent.NameSource.System
+                        )
+                );
+            }
+            EntitySupport.setDisplayName(spawnedRef, deadSnapshot.customName(), store);
+        }
+        Role role = spawnedNpc.getRole();
+        if (role != null && role.getMarkedEntitySupport() != null) {
+            role.getMarkedEntitySupport().setMarkedEntity("LockedTarget", null);
+            role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, playerRef);
+        }
+        ItemStack updated = removeLinkedNpcRecord(stack, record.npcUuid);
+        updated = upsertLinkedNpcRecord(updated, spawnedNpc.getUuid(), destination, homePosition);
+        if (deathService != null) {
+            deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
+        }
+        return updated;
+    }
+
+    private LinkedNpcRecord findLinkedNpcRecord(List<LinkedNpcRecord> records, UUID npcUuid) {
+        if (records == null || records.isEmpty() || npcUuid == null) {
+            return null;
+        }
+        String key = npcUuid.toString().toLowerCase(Locale.ROOT);
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (key.equals(record.npcUuid.toString().toLowerCase(Locale.ROOT))) {
+                return record;
+            }
+        }
+        return null;
+    }
+
+    private String formatDuration(long remainingMs) {
+        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
+        long minutes = totalSeconds / 60L;
+        long seconds = totalSeconds % 60L;
+        if (minutes <= 0L) {
+            return seconds + "s";
+        }
+        return minutes + "m " + seconds + "s";
+    }
+
     private List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player,
                                                                                               String toolId) {
         if (player == null || toolId == null || toolId.isBlank()) {
@@ -456,6 +655,8 @@ public final class CommandItemFeatureHandler {
         if (records.isEmpty()) {
             return List.of();
         }
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        boolean deadRespawnEnabled = globalConfig != null && globalConfig.isCommandDeadRespawnEnabled();
         World world = player.getWorld();
         ArrayList<TameworkCommandSelectionPage.LinkedNpcEntry> entries = new ArrayList<>(records.size());
         for (LinkedNpcRecord record : records) {
@@ -495,7 +696,11 @@ public final class CommandItemFeatureHandler {
                     if (deadName != null && !deadName.isBlank()) {
                         displayName = deadName;
                     }
-                    deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
+                    if (deadRespawnEnabled) {
+                        deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
+                    } else {
+                        deadRespawnRemainingMs = -1L;
+                    }
                 }
             }
             entries.add(new TameworkCommandSelectionPage.LinkedNpcEntry(
@@ -1107,7 +1312,6 @@ public final class CommandItemFeatureHandler {
         if (!returnHome && !recall) {
             return 0;
         }
-        boolean deadRespawnEnabled = isDeadRespawnEnabled();
         RelocationState postRelocationState = resolveRelocationState(context.command, returnHome, recall);
         World world = context.player != null ? context.player.getWorld() : null;
         UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
@@ -1119,17 +1323,8 @@ public final class CommandItemFeatureHandler {
             if (record == null || record.npcUuid == null) {
                 continue;
             }
-            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot = deathService != null
-                    ? deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid)
-                    : null;
-            if (deadSnapshot != null) {
-                if (!deadRespawnEnabled || !deadSnapshot.isRespawnReady()) {
-                    continue;
-                }
-                boolean respawned = tryRespawnDeadLinkedNpc(context, record, deadSnapshot, returnHome, recall, postRelocationState);
-                if (respawned) {
-                    queued++;
-                }
+            if (deathService != null
+                    && deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid) != null) {
                 continue;
             }
             if (returnHome) {
@@ -1172,129 +1367,6 @@ public final class CommandItemFeatureHandler {
         return queued;
     }
 
-    private boolean isDeadRespawnEnabled() {
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        return globalConfig != null && globalConfig.isCommandDeadRespawnEnabled();
-    }
-
-    private boolean tryRespawnDeadLinkedNpc(Context context,
-                                            LinkedNpcRecord record,
-                                            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot,
-                                            boolean returnHome,
-                                            boolean recall,
-                                            RelocationState postRelocationState) {
-        if (context == null || record == null || deadSnapshot == null || context.store == null) {
-            return false;
-        }
-        String roleId = deadSnapshot.roleId();
-        if (roleId == null || roleId.isBlank()) {
-            return false;
-        }
-        Vector3d homePosition = record.homePosition != null ? record.homePosition : deadSnapshot.homePosition();
-        Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
-        Vector3d destination;
-        if (returnHome) {
-            if (homePosition == null) {
-                return false;
-            }
-            destination = homePosition;
-        } else if (recall) {
-            destination = computeSafeRecallPosition(context, sourceHint);
-            if (destination == null) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin == null) {
-            return false;
-        }
-        int roleIndex = npcPlugin.getIndex(roleId);
-        if (roleIndex < 0) {
-            return false;
-        }
-        Vector3f rotation = resolveRespawnRotation(context, destination);
-        Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(context.store, roleIndex, destination, rotation, null, null);
-        if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            return false;
-        }
-        Ref<EntityStore> spawnedRef = spawned.first();
-        NPCEntity spawnedNpc = spawned.second();
-        UUID ownerId = deadSnapshot.ownerId() != null
-                ? deadSnapshot.ownerId()
-                : (context.player != null ? context.player.getUuid() : null);
-        String[] toolIds = mergeToolIds(deadSnapshot.toolIds(), context.toolId);
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType != null) {
-            context.store.putComponent(
-                    spawnedRef,
-                    linksType,
-                    new TameworkCommandLinksComponent(ownerId, toolIds, homePosition)
-            );
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (ownerType != null) {
-            context.store.putComponent(
-                    spawnedRef,
-                    ownerType,
-                    new TameworkOwnerComponent(ownerId, deadSnapshot.ownerName())
-            );
-        }
-        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
-        if (tamedType != null) {
-            context.store.putComponent(
-                    spawnedRef,
-                    tamedType,
-                    new TameworkTamedComponent(deadSnapshot.tamed())
-            );
-        }
-        if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
-            ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
-            if (nameType != null) {
-                context.store.putComponent(
-                        spawnedRef,
-                        nameType,
-                        new TameworkNpcNameComponent(
-                                deadSnapshot.customName(),
-                                ownerId,
-                                System.currentTimeMillis(),
-                                TameworkNpcNameComponent.NameSource.System
-                        )
-                );
-            }
-            EntitySupport.setDisplayName(spawnedRef, deadSnapshot.customName(), context.store);
-        }
-        Role role = spawnedNpc.getRole();
-        if (role != null && role.getMarkedEntitySupport() != null) {
-            role.getMarkedEntitySupport().setMarkedEntity("LockedTarget", null);
-            if (recall && context.playerRef != null && context.playerRef.isValid()) {
-                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
-            }
-        }
-        if (postRelocationState != null && postRelocationState.state != null && !postRelocationState.state.isBlank()) {
-            applyState(
-                    spawnedRef,
-                    spawnedNpc,
-                    context.store,
-                    postRelocationState.state,
-                    postRelocationState.subState
-            );
-        }
-        if (context.workingItem != null && !context.workingItem.isEmpty() && spawnedNpc.getUuid() != null) {
-            ItemStack updated = removeLinkedNpcRecord(context.workingItem, record.npcUuid);
-            updated = upsertLinkedNpcRecord(updated, spawnedNpc.getUuid(), destination, homePosition);
-            if (updated != context.workingItem) {
-                context.workingItem = updated;
-                context.itemChanged = true;
-            }
-        }
-        if (deathService != null) {
-            deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
-        }
-        return true;
-    }
-
     private String[] mergeToolIds(String[] existing, String requiredToolId) {
         Set<String> out = new HashSet<>();
         if (existing != null) {
@@ -1311,11 +1383,13 @@ public final class CommandItemFeatureHandler {
         return out.toArray(new String[0]);
     }
 
-    private Vector3f resolveRespawnRotation(Context context, Vector3d spawnPosition) {
-        if (context == null || context.store == null || context.playerRef == null || !context.playerRef.isValid()) {
+    private Vector3f resolveRespawnRotation(Store<EntityStore> store,
+                                            Ref<EntityStore> playerRef,
+                                            Vector3d spawnPosition) {
+        if (store == null || playerRef == null || !playerRef.isValid()) {
             return new Vector3f();
         }
-        TransformComponent transform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
+        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform == null) {
             return new Vector3f();
         }
@@ -1951,10 +2025,25 @@ public final class CommandItemFeatureHandler {
     }
 
     private Vector3d computeSafeRecallPosition(Context context, Vector3d sourcePosition) {
-        if (context == null || context.store == null || context.playerRef == null || !context.playerRef.isValid()) {
+        if (context == null) {
             return null;
         }
-        TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
+        return computeSafeRecallPosition(
+                context.playerRef,
+                context.store,
+                context.recallSafeSpawnDistance,
+                sourcePosition
+        );
+    }
+
+    private Vector3d computeSafeRecallPosition(Ref<EntityStore> playerRef,
+                                               Store<EntityStore> store,
+                                               double safeSpawnDistance,
+                                               Vector3d sourcePosition) {
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            return null;
+        }
+        TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (playerTransform == null) {
             return null;
         }
@@ -1971,9 +2060,9 @@ public final class CommandItemFeatureHandler {
             }
         }
         return new Vector3d(
-                playerPos.x + dirX * context.recallSafeSpawnDistance,
+                playerPos.x + dirX * safeSpawnDistance,
                 playerPos.y,
-                playerPos.z + dirZ * context.recallSafeSpawnDistance
+                playerPos.z + dirZ * safeSpawnDistance
         );
     }
 

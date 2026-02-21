@@ -13,7 +13,8 @@
 ### Changed
 - Linked-companions rows now show clearer unloaded fallback text (`Unloaded companion (<uuid>)`) and unloaded health messaging.
 - Command radial panel subtitle now guides unlink confirmation when a remove action is armed.
-- Recall/Return Home now respawn dead linked companions after cooldown when dead-respawn is enabled, then relink the command tool to the newly spawned NPC.
+- Dead linked companions are no longer treated as generic unloaded targets for Recall/Return Home queueing.
+- Dead companion recovery is now explicit via a linked-panel `Respawn` button (shown when cooldown is ready and dead respawn is enabled), and relinks the command tool to the newly spawned NPC.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.

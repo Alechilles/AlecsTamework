@@ -37,6 +37,7 @@ public final class TameworkCommandSelectionPage
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
+    private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final int HEALTH_FILL_MAX_WIDTH = 358;
 
@@ -48,6 +49,7 @@ public final class TameworkCommandSelectionPage
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
     private final Consumer<UUID> unlinkCallback;
+    private final Consumer<UUID> respawnCallback;
 
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
@@ -55,6 +57,7 @@ public final class TameworkCommandSelectionPage
                                         boolean requireUnlinkConfirm,
                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier,
                                         @Nonnull Consumer<UUID> unlinkCallback,
+                                        @Nonnull Consumer<UUID> respawnCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
@@ -64,6 +67,7 @@ public final class TameworkCommandSelectionPage
         this.pendingUnlinkNpcUuid = null;
         this.selectedCommandId = selectedCommandId;
         this.unlinkCallback = unlinkCallback;
+        this.respawnCallback = respawnCallback;
         this.selectionCallback = selectionCallback;
     }
 
@@ -115,6 +119,19 @@ public final class TameworkCommandSelectionPage
                     return;
                 }
                 unlinkCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                rebuild();
+            }
+            return;
+        }
+        if (data.commandId.startsWith(RESPAWN_COMMAND_PREFIX)) {
+            if (respawnCallback == null) {
+                return;
+            }
+            UUID npcUuid = parseRespawnNpcUuid(data.commandId);
+            if (npcUuid != null) {
+                respawnCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 rebuild();
@@ -178,11 +195,13 @@ public final class TameworkCommandSelectionPage
             String traitsButtonSelector = entrySelector + " #TraitsButton";
             String talentsButtonSelector = entrySelector + " #TalentsButton";
             String removeSelector = entrySelector + " #RemoveButton";
+            String respawnSelector = entrySelector + " #RespawnButton";
 
             commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
             commandBuilder.set(nameSelector + ".Text", entry.displayName());
             boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
-            commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink);
+            boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
+            commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
             commandBuilder.set(statusUnloadedSelector + ".Text", entry.dead() ? "DEAD" : "UNLOADED");
             commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
             if (entry.hasHealth()) {
@@ -207,6 +226,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
             commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
             commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
+            commandBuilder.set(respawnSelector + ".Visible", showRespawn);
             commandBuilder.set(removeSelector + ".Text", "");
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -214,6 +234,14 @@ public final class TameworkCommandSelectionPage
                     EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid()),
                     false
             );
+            if (showRespawn) {
+                eventBuilder.addEventBinding(
+                        CustomUIEventBindingType.Activating,
+                        respawnSelector,
+                        EventData.of(EVENT_COMMAND_ID, RESPAWN_COMMAND_PREFIX + entry.npcUuid()),
+                        false
+                );
+            }
         }
     }
 
@@ -335,9 +363,12 @@ public final class TameworkCommandSelectionPage
         if (entry == null || !entry.dead()) {
             return "Dead";
         }
+        if (entry.deadRespawnRemainingMs() < 0L) {
+            return "Dead: respawn disabled.";
+        }
         long remainingMs = Math.max(0L, entry.deadRespawnRemainingMs());
         if (remainingMs <= 0L) {
-            return "Dead: ready to respawn (Recall or Return Home).";
+            return "Dead: ready to respawn.";
         }
         return "Dead: respawn in " + formatRemainingTime(remainingMs) + ".";
     }
@@ -390,6 +421,21 @@ public final class TameworkCommandSelectionPage
             return null;
         }
         String raw = commandId.substring(UNLINK_COMMAND_PREFIX.length());
+        if (raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private UUID parseRespawnNpcUuid(String commandId) {
+        if (commandId == null || !commandId.startsWith(RESPAWN_COMMAND_PREFIX)) {
+            return null;
+        }
+        String raw = commandId.substring(RESPAWN_COMMAND_PREFIX.length());
         if (raw.isBlank()) {
             return null;
         }

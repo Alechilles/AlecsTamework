@@ -55,6 +55,12 @@ Group {
     Visible: false;
   }
 
+  TextButton #RespawnButton {
+    Anchor: (Top: 1, Right: 34, Width: 86, Height: 20);
+    Text: "Respawn";
+    Visible: false;
+  }
+
   TextButton #RemoveButton {
     Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
     Style: @RemoveIconButtonStyle;
