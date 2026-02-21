@@ -67,7 +67,9 @@ import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -578,7 +580,15 @@ public final class CommandItemFeatureHandler {
             }
             links.setHomePosition(home);
             store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links);
-            ItemStack updatedStack = upsertLinkedNpcRecord(stack, npcUuid, home, home);
+            ItemStack updatedStack = upsertLinkedNpcRecord(
+                    stack,
+                    npcUuid,
+                    home,
+                    home,
+                    resolveNpcDisplayNameFromComponents(npcRef, store),
+                    resolveNpcNameKey(npc),
+                    resolveNpcRoleId(npc)
+            );
             hotbar.setItemStackForSlot(slot, updatedStack);
             inventory.markChanged();
             player.sendInventory();
@@ -669,7 +679,15 @@ public final class CommandItemFeatureHandler {
                     }
                 }
                 applyRespawnFollowBootstrap(npcRef, npc, playerRef, store);
-                ItemStack updatedStack = upsertLinkedNpcRecord(stack, npcUuid, currentPosition, record.homePosition);
+                ItemStack updatedStack = upsertLinkedNpcRecord(
+                        stack,
+                        npcUuid,
+                        currentPosition,
+                        record.homePosition,
+                        resolveNpcDisplayNameFromComponents(npcRef, store),
+                        resolveNpcNameKey(npc),
+                        resolveNpcRoleId(npc)
+                );
                 hotbar.setItemStackForSlot(slot, updatedStack);
                 inventory.markChanged();
                 player.sendInventory();
@@ -796,7 +814,15 @@ public final class CommandItemFeatureHandler {
         );
         scheduleRespawnFollowRetry(player.getWorld(), spawnedNpc.getUuid(), playerRef, followRetryDelayMs);
         ItemStack updated = removeLinkedNpcRecord(stack, record.npcUuid);
-        updated = upsertLinkedNpcRecord(updated, spawnedNpc.getUuid(), destination, homePosition);
+        updated = upsertLinkedNpcRecord(
+                updated,
+                spawnedNpc.getUuid(),
+                destination,
+                homePosition,
+                resolveNpcDisplayNameFromComponents(spawnedRef, store),
+                resolveNpcNameKey(spawnedNpc),
+                resolveNpcRoleId(spawnedNpc)
+        );
         if (deathService != null) {
             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
         }
@@ -932,7 +958,10 @@ public final class CommandItemFeatureHandler {
             boolean loaded = false;
             boolean dead = false;
             long deadRespawnRemainingMs = 0L;
-            String displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
+            String displayName = resolveCachedUnloadedDisplayName(record);
+            if (displayName == null || displayName.isBlank()) {
+                displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
+            }
             int health = 0;
             int maxHealth = 0;
             if (world != null) {
@@ -1107,6 +1136,26 @@ public final class CommandItemFeatureHandler {
             return roleId;
         }
         return "NPC";
+    }
+
+    private String resolveCachedUnloadedDisplayName(LinkedNpcRecord record) {
+        if (record == null) {
+            return null;
+        }
+        if (record.cachedDisplayName != null && !record.cachedDisplayName.isBlank()) {
+            return record.cachedDisplayName;
+        }
+        if (record.cachedNameKey != null && !record.cachedNameKey.isBlank()) {
+            String translated = translateNpcNameKey(record.cachedNameKey);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
+            return record.cachedNameKey;
+        }
+        if (record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+            return record.cachedRoleId;
+        }
+        return null;
     }
 
     private String resolveNpcDisplayNameFromComponents(Ref<EntityStore> npcRef, Store<EntityStore> store) {
@@ -2045,7 +2094,15 @@ public final class CommandItemFeatureHandler {
         if (context.workingItem != null && !context.workingItem.isEmpty() && candidate.npc.getUuid() != null) {
             TransformComponent transform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
             Vector3d currentPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
-            ItemStack updated = upsertLinkedNpcRecord(context.workingItem, candidate.npc.getUuid(), currentPosition, home);
+            ItemStack updated = upsertLinkedNpcRecord(
+                    context.workingItem,
+                    candidate.npc.getUuid(),
+                    currentPosition,
+                    home,
+                    resolveNpcDisplayNameFromComponents(candidate.ref, context.store),
+                    resolveNpcNameKey(candidate.npc),
+                    resolveNpcRoleId(candidate.npc)
+            );
             if (updated != context.workingItem) {
                 context.workingItem = updated;
                 context.itemChanged = true;
@@ -2169,7 +2226,15 @@ public final class CommandItemFeatureHandler {
                 TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
                 Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
                 Vector3d homePosition = updated != null && updated.hasHome() ? updated.getHomePosition() : null;
-                updatedItem = upsertLinkedNpcRecord(updatedItem, npcUuid, lastKnown, homePosition);
+                updatedItem = upsertLinkedNpcRecord(
+                        updatedItem,
+                        npcUuid,
+                        lastKnown,
+                        homePosition,
+                        resolveNpcDisplayNameFromComponents(targetRef, store),
+                        resolveNpcNameKey(npc),
+                        resolveNpcRoleId(npc)
+                );
             } else {
                 updatedItem = removeLinkedNpcRecord(updatedItem, npcUuid);
             }
@@ -2569,6 +2634,16 @@ public final class CommandItemFeatureHandler {
     }
 
     private ItemStack upsertLinkedNpcRecord(ItemStack stack, UUID npcUuid, Vector3d position, Vector3d homePosition) {
+        return upsertLinkedNpcRecord(stack, npcUuid, position, homePosition, null, null, null);
+    }
+
+    private ItemStack upsertLinkedNpcRecord(ItemStack stack,
+                                            UUID npcUuid,
+                                            Vector3d position,
+                                            Vector3d homePosition,
+                                            String cachedDisplayName,
+                                            String cachedNameKey,
+                                            String cachedRoleId) {
         if (stack == null || stack.isEmpty() || npcUuid == null) {
             return stack;
         }
@@ -2585,12 +2660,29 @@ public final class CommandItemFeatureHandler {
             }
             Vector3d mergedLastKnown = position != null ? position : record.lastKnownPosition;
             Vector3d mergedHome = homePosition != null ? homePosition : record.homePosition;
-            records.set(i, new LinkedNpcRecord(npcUuid, mergedLastKnown, mergedHome));
+            String mergedDisplayName = firstNonBlank(cachedDisplayName, record.cachedDisplayName);
+            String mergedNameKey = firstNonBlank(cachedNameKey, record.cachedNameKey);
+            String mergedRoleId = firstNonBlank(cachedRoleId, record.cachedRoleId);
+            records.set(i, new LinkedNpcRecord(
+                    npcUuid,
+                    mergedLastKnown,
+                    mergedHome,
+                    mergedDisplayName,
+                    mergedNameKey,
+                    mergedRoleId
+            ));
             updated = true;
             break;
         }
         if (!updated) {
-            records.add(new LinkedNpcRecord(npcUuid, position, homePosition));
+            records.add(new LinkedNpcRecord(
+                    npcUuid,
+                    position,
+                    homePosition,
+                    firstNonBlank(cachedDisplayName, null),
+                    firstNonBlank(cachedNameKey, null),
+                    firstNonBlank(cachedRoleId, null)
+            ));
         }
         return writeLinkedNpcRecords(stack, records);
     }
@@ -2607,7 +2699,15 @@ public final class CommandItemFeatureHandler {
             TransformComponent transform = store.getComponent(candidate.ref, TransformComponent.getComponentType());
             Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
             Vector3d homePosition = readStoredHomePosition(candidate.ref, store);
-            updated = upsertLinkedNpcRecord(updated, candidate.npc.getUuid(), position, homePosition);
+            updated = upsertLinkedNpcRecord(
+                    updated,
+                    candidate.npc.getUuid(),
+                    position,
+                    homePosition,
+                    resolveNpcDisplayNameFromComponents(candidate.ref, store),
+                    resolveNpcNameKey(candidate.npc),
+                    resolveNpcRoleId(candidate.npc)
+            );
         }
         return updated;
     }
@@ -2685,6 +2785,15 @@ public final class CommandItemFeatureHandler {
                 builder.append('|').append(record.homePosition.y);
                 builder.append('|').append(record.homePosition.z);
             }
+            if (record.cachedDisplayName != null && !record.cachedDisplayName.isBlank()) {
+                builder.append('|').append("dn=").append(encodeRecordText(record.cachedDisplayName));
+            }
+            if (record.cachedNameKey != null && !record.cachedNameKey.isBlank()) {
+                builder.append('|').append("nk=").append(encodeRecordText(record.cachedNameKey));
+            }
+            if (record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+                builder.append('|').append("rid=").append(encodeRecordText(record.cachedRoleId));
+            }
         }
         return stack.withMetadata(TameworkMetadataKeys.COMMAND_LINKED_NPCS, Codec.STRING, builder.toString());
     }
@@ -2705,6 +2814,10 @@ public final class CommandItemFeatureHandler {
         }
         Vector3d position = null;
         Vector3d homePosition = null;
+        String cachedDisplayName = null;
+        String cachedNameKey = null;
+        String cachedRoleId = null;
+        int index = 1;
         if (parts.length >= 4) {
             try {
                 position = new Vector3d(
@@ -2712,22 +2825,62 @@ public final class CommandItemFeatureHandler {
                         Double.parseDouble(parts[2]),
                         Double.parseDouble(parts[3])
                 );
+                index = 4;
             } catch (NumberFormatException ignored) {
                 position = null;
+                index = 1;
             }
         }
-        if (parts.length >= 7) {
+        if (parts.length >= index + 3) {
             try {
                 homePosition = new Vector3d(
-                        Double.parseDouble(parts[4]),
-                        Double.parseDouble(parts[5]),
-                        Double.parseDouble(parts[6])
+                        Double.parseDouble(parts[index]),
+                        Double.parseDouble(parts[index + 1]),
+                        Double.parseDouble(parts[index + 2])
                 );
+                index += 3;
             } catch (NumberFormatException ignored) {
                 homePosition = null;
             }
         }
-        return new LinkedNpcRecord(uuid, position, homePosition);
+        for (int i = index; i < parts.length; i++) {
+            String token = parts[i];
+            if (token == null || token.isBlank()) {
+                continue;
+            }
+            if (token.startsWith("dn=")) {
+                cachedDisplayName = decodeRecordText(token.substring(3));
+                continue;
+            }
+            if (token.startsWith("nk=")) {
+                cachedNameKey = decodeRecordText(token.substring(3));
+                continue;
+            }
+            if (token.startsWith("rid=")) {
+                cachedRoleId = decodeRecordText(token.substring(4));
+            }
+        }
+        return new LinkedNpcRecord(uuid, position, homePosition, cachedDisplayName, cachedNameKey, cachedRoleId);
+    }
+
+    private String encodeRecordText(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String decodeRecordText(String encoded) {
+        if (encoded == null || encoded.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] bytes = Base64.getUrlDecoder().decode(encoded);
+            String decoded = new String(bytes, StandardCharsets.UTF_8);
+            return decoded.isBlank() ? null : decoded;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private void emitCommandExecutionFeedback(Context context, int affected, int queued) {
@@ -2854,6 +3007,16 @@ public final class CommandItemFeatureHandler {
 
     private long resolvePositiveLong(long configured, long fallback) {
         return configured > 0L ? configured : fallback;
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 
     private boolean updateHeldItem(Player player, ItemStack updated) {
@@ -2996,11 +3159,26 @@ public final class CommandItemFeatureHandler {
         private final UUID npcUuid;
         private final Vector3d lastKnownPosition;
         private final Vector3d homePosition;
+        private final String cachedDisplayName;
+        private final String cachedNameKey;
+        private final String cachedRoleId;
 
         private LinkedNpcRecord(UUID npcUuid, Vector3d lastKnownPosition, Vector3d homePosition) {
+            this(npcUuid, lastKnownPosition, homePosition, null, null, null);
+        }
+
+        private LinkedNpcRecord(UUID npcUuid,
+                                Vector3d lastKnownPosition,
+                                Vector3d homePosition,
+                                String cachedDisplayName,
+                                String cachedNameKey,
+                                String cachedRoleId) {
             this.npcUuid = npcUuid;
             this.lastKnownPosition = lastKnownPosition != null ? new Vector3d(lastKnownPosition) : null;
             this.homePosition = homePosition != null ? new Vector3d(homePosition) : null;
+            this.cachedDisplayName = (cachedDisplayName != null && !cachedDisplayName.isBlank()) ? cachedDisplayName : null;
+            this.cachedNameKey = (cachedNameKey != null && !cachedNameKey.isBlank()) ? cachedNameKey : null;
+            this.cachedRoleId = (cachedRoleId != null && !cachedRoleId.isBlank()) ? cachedRoleId : null;
         }
     }
 
