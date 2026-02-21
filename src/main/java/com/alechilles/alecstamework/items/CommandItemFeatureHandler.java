@@ -41,11 +41,13 @@ import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
@@ -518,7 +520,7 @@ public final class CommandItemFeatureHandler {
                 RECALL_SAFE_SPAWN_DISTANCE
         );
         Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
-        Vector3d destination = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourceHint);
+        Vector3d destination = computeSafeRespawnPosition(playerRef, store, safeSpawnDistance, sourceHint);
         if (destination == null) {
             return null;
         }
@@ -572,17 +574,33 @@ public final class CommandItemFeatureHandler {
             }
             EntitySupport.setDisplayName(spawnedRef, deadSnapshot.customName(), store);
         }
-        Role role = spawnedNpc.getRole();
-        if (role != null && role.getMarkedEntitySupport() != null) {
-            role.getMarkedEntitySupport().setMarkedEntity("LockedTarget", null);
-            role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, playerRef);
-        }
+        applyRespawnFollowBootstrap(spawnedRef, spawnedNpc, playerRef, store);
         ItemStack updated = removeLinkedNpcRecord(stack, record.npcUuid);
         updated = upsertLinkedNpcRecord(updated, spawnedNpc.getUuid(), destination, homePosition);
         if (deathService != null) {
             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
         }
         return updated;
+    }
+
+    private void applyRespawnFollowBootstrap(Ref<EntityStore> npcRef,
+                                             NPCEntity npc,
+                                             Ref<EntityStore> playerRef,
+                                             Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || npc == null || store == null) {
+            return;
+        }
+        Role role = npc.getRole();
+        if (role != null && role.getMarkedEntitySupport() != null) {
+            role.getMarkedEntitySupport().setMarkedEntity("LockedTarget", null);
+            if (playerRef != null && playerRef.isValid()) {
+                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, playerRef);
+            }
+        }
+        // Match default Follow behavior (Idle + MasterTarget owner) after respawn.
+        if (!applyState(npcRef, npc, store, "Idle", null)) {
+            applyState(npcRef, npc, store, "Follow", null);
+        }
     }
 
     private LinkedNpcRecord findLinkedNpcRecord(List<LinkedNpcRecord> records, UUID npcUuid) {
@@ -2064,6 +2082,107 @@ public final class CommandItemFeatureHandler {
                 playerPos.y,
                 playerPos.z + dirZ * safeSpawnDistance
         );
+    }
+
+    private Vector3d computeSafeRespawnPosition(Ref<EntityStore> playerRef,
+                                                Store<EntityStore> store,
+                                                double safeSpawnDistance,
+                                                Vector3d sourcePosition) {
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            return null;
+        }
+        TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
+        if (playerTransform == null) {
+            return computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourcePosition);
+        }
+        Vector3d playerPos = new Vector3d(playerTransform.getPosition());
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        if (world == null) {
+            Vector3d fallback = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourcePosition);
+            if (fallback != null) {
+                return new Vector3d(fallback.x, playerPos.y + 1.0, fallback.z);
+            }
+            return new Vector3d(playerPos.x, playerPos.y + 1.0, playerPos.z);
+        }
+
+        Vector3d desired = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourcePosition);
+        double dirX = 1.0;
+        double dirZ = 0.0;
+        if (desired != null) {
+            double dx = desired.x - playerPos.x;
+            double dz = desired.z - playerPos.z;
+            double len = Math.sqrt(dx * dx + dz * dz);
+            if (len > 0.001) {
+                dirX = dx / len;
+                dirZ = dz / len;
+            }
+        }
+        double baseAngle = Math.atan2(dirZ, dirX);
+        double targetDistance = Math.max(2.0, safeSpawnDistance);
+        double[] distanceMultipliers = {1.0, 0.8, 0.6, 0.4, 0.25};
+        double[] angleOffsets = {0.0, 30.0, -30.0, 60.0, -60.0, 90.0, -90.0, 120.0, -120.0, 150.0, -150.0, 180.0};
+        for (double distanceMultiplier : distanceMultipliers) {
+            double distance = Math.max(2.0, targetDistance * distanceMultiplier);
+            for (double angleOffset : angleOffsets) {
+                double radians = baseAngle + Math.toRadians(angleOffset);
+                double x = playerPos.x + Math.cos(radians) * distance;
+                double z = playerPos.z + Math.sin(radians) * distance;
+                Vector3d surface = projectToSurface(world, x, playerPos.y + 16.0, z, 64.0);
+                if (surface != null) {
+                    return surface;
+                }
+            }
+        }
+
+        Vector3d nearPlayer = projectToSurface(world, playerPos.x, playerPos.y + 8.0, playerPos.z, 48.0);
+        if (nearPlayer != null) {
+            return nearPlayer;
+        }
+        if (desired != null) {
+            return new Vector3d(desired.x, playerPos.y + 1.0, desired.z);
+        }
+        return new Vector3d(playerPos.x, playerPos.y + 1.0, playerPos.z);
+    }
+
+    private Vector3d projectToSurface(World world,
+                                      double x,
+                                      double y,
+                                      double z,
+                                      double maxDistance) {
+        if (world == null || maxDistance <= 0.0) {
+            return null;
+        }
+        Vector3d target = TargetUtil.getTargetLocation(
+                world,
+                this::isBlockingSpawnBlock,
+                x,
+                y,
+                z,
+                0.0,
+                -1.0,
+                0.0,
+                maxDistance
+        );
+        if (target == null) {
+            return null;
+        }
+        int blockY = (int) Math.floor(target.y);
+        double surfaceY = blockY + 1.0 + 0.05;
+        if (surfaceY < target.y + 0.02) {
+            surfaceY = target.y + 0.02;
+        }
+        return new Vector3d(x, surfaceY, z);
+    }
+
+    private boolean isBlockingSpawnBlock(int blockId) {
+        if (blockId == 0) {
+            return false;
+        }
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
+        if (blockType == null || blockType == BlockType.UNKNOWN) {
+            return false;
+        }
+        return WorldUtil.isSolidOnlyBlock(blockType, 0);
     }
 
     private ItemStack upsertLinkedNpcRecord(ItemStack stack, UUID npcUuid, Vector3d position, Vector3d homePosition) {

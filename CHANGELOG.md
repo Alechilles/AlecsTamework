@@ -17,9 +17,11 @@
 - Dead companion recovery is now explicit via a linked-panel `Respawn` button (shown when cooldown is ready and dead respawn is enabled), and relinks the command tool to the newly spawned NPC.
 - Linked-companions panel now updates row health/cooldown/status once per second while open via incremental UI selector updates (no full page rebuild).
 - Linked-panel `Respawn` button now uses the shared secondary button style for clearer outline/hover/pressed feedback.
+- Dead companion respawns now re-enter follow behavior immediately by clearing combat lock, restoring owner as `MasterTarget`, and applying follow-compatible state fallback.
 
 ### Fixed
 - Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.
+- Dead companion respawns now sample nearby surface positions and avoid spawning inside terrain blocks in common recall/respawn cases.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.
