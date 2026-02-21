@@ -98,6 +98,8 @@ public final class CommandItemFeatureHandler {
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
     private static final double RESPAWN_DISTANCE_MID = 12.0;
     private static final double RESPAWN_DISTANCE_FAR = 16.0;
+    private static final double COMMAND_PLACEMENT_MIN_RELATIVE_Y = -2.0;
+    private static final double COMMAND_PLACEMENT_MAX_RELATIVE_Y = 4.0;
 
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
@@ -2087,11 +2089,13 @@ public final class CommandItemFeatureHandler {
         if (context == null) {
             return null;
         }
-        return computeSafeRecallPosition(
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        return computeSafeCompanionPlacementPosition(
                 context.playerRef,
                 context.store,
                 context.recallSafeSpawnDistance,
-                sourcePosition
+                sourcePosition,
+                globalConfig
         );
     }
 
@@ -2099,29 +2103,13 @@ public final class CommandItemFeatureHandler {
                                                Store<EntityStore> store,
                                                double safeSpawnDistance,
                                                Vector3d sourcePosition) {
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            return null;
-        }
-        TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (playerTransform == null) {
-            return null;
-        }
-        Vector3d playerPos = playerTransform.getPosition();
-        double dirX = 1.0;
-        double dirZ = 0.0;
-        if (sourcePosition != null) {
-            double sx = sourcePosition.x - playerPos.x;
-            double sz = sourcePosition.z - playerPos.z;
-            double len = Math.sqrt(sx * sx + sz * sz);
-            if (len > 0.001) {
-                dirX = sx / len;
-                dirZ = sz / len;
-            }
-        }
-        return new Vector3d(
-                playerPos.x + dirX * safeSpawnDistance,
-                playerPos.y,
-                playerPos.z + dirZ * safeSpawnDistance
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        return computeSafeCompanionPlacementPosition(
+                playerRef,
+                store,
+                safeSpawnDistance,
+                sourcePosition,
+                globalConfig
         );
     }
 
@@ -2129,24 +2117,40 @@ public final class CommandItemFeatureHandler {
                                                 Store<EntityStore> store,
                                                 double safeSpawnDistance,
                                                 Vector3d sourcePosition) {
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        return computeSafeCompanionPlacementPosition(
+                playerRef,
+                store,
+                safeSpawnDistance,
+                sourcePosition,
+                globalConfig
+        );
+    }
+
+    private Vector3d computeSafeCompanionPlacementPosition(Ref<EntityStore> playerRef,
+                                                           Store<EntityStore> store,
+                                                           double safeSpawnDistance,
+                                                           Vector3d sourcePosition,
+                                                           TwGlobalConfig globalConfig) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
             return null;
         }
         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (playerTransform == null) {
-            return computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourcePosition);
+            return null;
         }
         Vector3d playerPos = new Vector3d(playerTransform.getPosition());
+        Vector3d desired = computeDesiredPlacementPosition(playerPos, safeSpawnDistance, sourcePosition);
+        double minRelativeY = resolvePlacementMinRelativeY(globalConfig);
+        double maxRelativeY = resolvePlacementMaxRelativeY(globalConfig, minRelativeY);
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null) {
-            Vector3d fallback = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourcePosition);
-            if (fallback != null) {
-                return new Vector3d(fallback.x, playerPos.y + 1.0, fallback.z);
+            if (desired != null) {
+                return new Vector3d(desired.x, playerPos.y + 1.0, desired.z);
             }
             return new Vector3d(playerPos.x, playerPos.y + 1.0, playerPos.z);
         }
 
-        Vector3d desired = computeSafeRecallPosition(playerRef, store, safeSpawnDistance, sourcePosition);
         Vector3d lookDirection = resolvePlayerLookDirection(playerRef, store);
         double dirX = lookDirection != null ? lookDirection.x : 1.0;
         double dirZ = lookDirection != null ? lookDirection.z : 0.0;
@@ -2161,9 +2165,8 @@ public final class CommandItemFeatureHandler {
         }
         double baseAngle = Math.atan2(dirZ, dirX);
         double targetDistance = Math.max(2.0, safeSpawnDistance);
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        double[] distanceCandidates = resolveRespawnDistanceCandidates(globalConfig, targetDistance);
-        double[] angleOffsets = {0.0, 15.0, -15.0, 30.0, -30.0, 45.0, -45.0, 60.0, -60.0, 90.0, -90.0, 120.0, -120.0, 180.0};
+        double[] distanceCandidates = resolvePlacementDistanceCandidates(globalConfig, targetDistance);
+        double[] angleOffsets = {180.0, 150.0, -150.0, 120.0, -120.0, 90.0, -90.0, 60.0, -60.0, 45.0, -45.0, 30.0, -30.0, 15.0, -15.0, 0.0};
         for (double distance : distanceCandidates) {
             if (distance < 2.0) {
                 continue;
@@ -2176,14 +2179,14 @@ public final class CommandItemFeatureHandler {
                 if (surface == null) {
                     surface = projectToSurface(world, x, playerPos.y + 24.0, z, 64.0);
                 }
-                if (surface != null) {
+                if (surface != null && isWithinPlacementVerticalBand(surface.y, playerPos.y, minRelativeY, maxRelativeY)) {
                     return surface;
                 }
             }
         }
 
         Vector3d nearPlayer = projectToSurface(world, playerPos.x, playerPos.y + 8.0, playerPos.z, 48.0);
-        if (nearPlayer != null) {
+        if (nearPlayer != null && isWithinPlacementVerticalBand(nearPlayer.y, playerPos.y, minRelativeY, maxRelativeY)) {
             return nearPlayer;
         }
         if (desired != null) {
@@ -2192,7 +2195,32 @@ public final class CommandItemFeatureHandler {
         return new Vector3d(playerPos.x, playerPos.y + 1.0, playerPos.z);
     }
 
-    private double[] resolveRespawnDistanceCandidates(TwGlobalConfig globalConfig, double fallbackDistance) {
+    private Vector3d computeDesiredPlacementPosition(Vector3d playerPos,
+                                                     double safeSpawnDistance,
+                                                     Vector3d sourcePosition) {
+        if (playerPos == null) {
+            return null;
+        }
+        double dirX = 1.0;
+        double dirZ = 0.0;
+        if (sourcePosition != null) {
+            double sx = sourcePosition.x - playerPos.x;
+            double sz = sourcePosition.z - playerPos.z;
+            double len = Math.sqrt(sx * sx + sz * sz);
+            if (len > 0.001) {
+                dirX = sx / len;
+                dirZ = sz / len;
+            }
+        }
+        double distance = Math.max(2.0, safeSpawnDistance);
+        return new Vector3d(
+                playerPos.x + dirX * distance,
+                playerPos.y + 1.0,
+                playerPos.z + dirZ * distance
+        );
+    }
+
+    private double[] resolvePlacementDistanceCandidates(TwGlobalConfig globalConfig, double fallbackDistance) {
         double close = resolvePositiveDouble(
                 globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceClose() : 0.0,
                 RESPAWN_DISTANCE_CLOSE
@@ -2216,6 +2244,30 @@ public final class CommandItemFeatureHandler {
                 Math.max(2.0, far),
                 Math.max(2.0, fallbackDistance)
         };
+    }
+
+    private double resolvePlacementMinRelativeY(TwGlobalConfig globalConfig) {
+        return resolveFiniteDouble(
+                globalConfig != null ? globalConfig.getCommandPlacementMinRelativeY() : Double.NaN,
+                COMMAND_PLACEMENT_MIN_RELATIVE_Y
+        );
+    }
+
+    private double resolvePlacementMaxRelativeY(TwGlobalConfig globalConfig, double minRelativeY) {
+        double maxRelativeY = resolveFiniteDouble(
+                globalConfig != null ? globalConfig.getCommandPlacementMaxRelativeY() : Double.NaN,
+                COMMAND_PLACEMENT_MAX_RELATIVE_Y
+        );
+        return maxRelativeY < minRelativeY ? minRelativeY : maxRelativeY;
+    }
+
+    private boolean isWithinPlacementVerticalBand(double surfaceY,
+                                                  double playerY,
+                                                  double minRelativeY,
+                                                  double maxRelativeY) {
+        double minY = playerY + minRelativeY;
+        double maxY = playerY + maxRelativeY;
+        return surfaceY >= minY && surfaceY <= maxY;
     }
 
     private Vector3d resolvePlayerLookDirection(Ref<EntityStore> playerRef, Store<EntityStore> store) {
@@ -2565,6 +2617,10 @@ public final class CommandItemFeatureHandler {
 
     private double resolvePositiveDouble(double configured, double fallback) {
         return configured > 0.0 ? configured : fallback;
+    }
+
+    private double resolveFiniteDouble(double configured, double fallback) {
+        return Double.isFinite(configured) ? configured : fallback;
     }
 
     private long resolvePositiveLong(long configured, long fallback) {

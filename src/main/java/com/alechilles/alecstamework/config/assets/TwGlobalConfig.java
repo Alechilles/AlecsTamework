@@ -198,6 +198,18 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     section -> section.deadRespawnDistanceFar
             )
             .add()
+            .<Double>append(
+                    new KeyedCodec<>("PlacementMinRelativeY", Codec.DOUBLE),
+                    (section, value) -> section.placementMinRelativeY = value,
+                    section -> section.placementMinRelativeY
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("PlacementMaxRelativeY", Codec.DOUBLE),
+                    (section, value) -> section.placementMaxRelativeY = value,
+                    section -> section.placementMaxRelativeY
+            )
+            .add()
             .<Boolean>append(
                     new KeyedCodec<>("LinkedPanelRequireUnlinkConfirm", Codec.BOOLEAN),
                     (section, value) -> section.linkedPanelRequireUnlinkConfirm = value,
@@ -281,6 +293,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private double commandDeadRespawnDistanceNear = 8.0;
     private double commandDeadRespawnDistanceMid = 12.0;
     private double commandDeadRespawnDistanceFar = 16.0;
+    private double commandPlacementMinRelativeY = -2.0;
+    private double commandPlacementMaxRelativeY = 4.0;
     private boolean commandLinkedPanelRequireUnlinkConfirm = true;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
@@ -478,6 +492,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return commandDeadRespawnDistanceFar;
     }
 
+    public double getCommandPlacementMinRelativeY() {
+        return commandPlacementMinRelativeY;
+    }
+
+    public double getCommandPlacementMaxRelativeY() {
+        return commandPlacementMaxRelativeY;
+    }
+
     public boolean isCommandLinkedPanelRequireUnlinkConfirm() {
         return commandLinkedPanelRequireUnlinkConfirm;
     }
@@ -612,6 +634,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.deadRespawnDistanceFar != null) {
             commandDeadRespawnDistanceFar = section.deadRespawnDistanceFar;
         }
+        if (section.placementMinRelativeY != null) {
+            commandPlacementMinRelativeY = section.placementMinRelativeY;
+        }
+        if (section.placementMaxRelativeY != null) {
+            commandPlacementMaxRelativeY = section.placementMaxRelativeY;
+        }
         if (section.linkedPanelRequireUnlinkConfirm != null) {
             commandLinkedPanelRequireUnlinkConfirm = section.linkedPanelRequireUnlinkConfirm;
         }
@@ -634,6 +662,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.deadRespawnDistanceNear = commandDeadRespawnDistanceNear;
         section.deadRespawnDistanceMid = commandDeadRespawnDistanceMid;
         section.deadRespawnDistanceFar = commandDeadRespawnDistanceFar;
+        section.placementMinRelativeY = commandPlacementMinRelativeY;
+        section.placementMaxRelativeY = commandPlacementMaxRelativeY;
         section.linkedPanelRequireUnlinkConfirm = commandLinkedPanelRequireUnlinkConfirm;
         return section;
     }
@@ -694,6 +724,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Double deadRespawnDistanceNear;
         private Double deadRespawnDistanceMid;
         private Double deadRespawnDistanceFar;
+        private Double placementMinRelativeY;
+        private Double placementMaxRelativeY;
         private Boolean linkedPanelRequireUnlinkConfirm;
     }
 }

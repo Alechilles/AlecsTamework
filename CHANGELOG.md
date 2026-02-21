@@ -15,6 +15,9 @@
   - `CommandDeadRespawnDistanceNear`
   - `CommandDeadRespawnDistanceMid`
   - `CommandDeadRespawnDistanceFar`
+- New `TwGlobalConfig` command placement vertical-band values used by Recall and dead respawn:
+  - `CommandPlacementMinRelativeY`
+  - `CommandPlacementMaxRelativeY`
 
 ### Changed
 - Linked-companions rows now show clearer unloaded fallback text (`Unloaded companion (<uuid>)`) and unloaded health messaging.
@@ -26,6 +29,7 @@
 - Dead companion respawns now re-enter follow behavior immediately by clearing combat lock, restoring owner as `MasterTarget`, and applying follow-compatible state fallback.
 - Dead companion respawn follow bootstrap now prioritizes `Follow` state first, with `Idle` as fallback.
 - `TwGlobalConfig_Default.json` is now organized into top-level sections (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`), and `TwGlobalConfig` now reads the sectioned schema directly.
+- Recall and dead-companion respawn now share the same safe placement pipeline (surface projection + radial candidate sampling) and no longer use a separate recall-only placement path.
 
 ### Fixed
 - Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.

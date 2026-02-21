@@ -33,6 +33,8 @@
     "DeadRespawnDistanceNear": 8.0,
     "DeadRespawnDistanceMid": 12.0,
     "DeadRespawnDistanceFar": 16.0,
+    "PlacementMinRelativeY": -2.0,
+    "PlacementMaxRelativeY": 4.0,
     "LinkedPanelRequireUnlinkConfirm": true
   }
 }
