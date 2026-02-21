@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
@@ -93,6 +94,7 @@ public class Tamework extends JavaPlugin {
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
     private CommandNpcRelocationService commandNpcRelocationService;
+    private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
     private boolean npcActionsRegistered;
     private boolean globalAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -171,8 +173,9 @@ public class Tamework extends JavaPlugin {
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
         commandNpcRelocationService = new CommandNpcRelocationService();
+        commandLinkedNpcDeathService = new CommandLinkedNpcDeathService();
         getEntityStoreRegistry().registerSystem(
-                new CommandNpcRelocationOnLoadSystem(commandNpcRelocationService)
+                new CommandNpcRelocationOnLoadSystem(commandNpcRelocationService, commandLinkedNpcDeathService)
         );
 
         // Damage event is needed for owner damage filtering; avoid double-registration.
@@ -208,7 +211,11 @@ public class Tamework extends JavaPlugin {
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
-        commandItemFeatureHandler = new CommandItemFeatureHandler(commandItemRegistry, commandNpcRelocationService);
+        commandItemFeatureHandler = new CommandItemFeatureHandler(
+                commandItemRegistry,
+                commandNpcRelocationService,
+                commandLinkedNpcDeathService
+        );
 
         // Register /tw commands if the server supports it.
         if (getCommandRegistry() != null) {

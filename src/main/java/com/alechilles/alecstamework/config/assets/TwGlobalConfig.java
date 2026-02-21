@@ -169,6 +169,24 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .documentation("Maximum retry attempts for queued off-screen command relocations.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("CommandDeadRespawnEnabled", Codec.BOOLEAN),
+                    (asset, value) -> asset.commandDeadRespawnEnabled = value != null
+                            ? value
+                            : asset.commandDeadRespawnEnabled,
+                    asset -> asset.commandDeadRespawnEnabled
+            )
+            .documentation("Allow dead linked companions to respawn from command actions (Recall/Return Home) after cooldown.")
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("CommandDeadRespawnCooldownMs", Codec.INTEGER),
+                    (asset, value) -> asset.commandDeadRespawnCooldownMs = value != null
+                            ? value
+                            : asset.commandDeadRespawnCooldownMs,
+                    asset -> asset.commandDeadRespawnCooldownMs
+            )
+            .documentation("Cooldown before a dead linked companion can be respawned by command actions.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("CommandLinkedPanelRequireUnlinkConfirm", Codec.BOOLEAN),
                     (asset, value) -> asset.commandLinkedPanelRequireUnlinkConfirm = value != null
                             ? value
@@ -206,6 +224,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private int commandRelocationRetryIntervalMs = 2000;
     private int commandRelocationMaxWaitMs = 120000;
     private int commandRelocationMaxRetryAttempts = 60;
+    private boolean commandDeadRespawnEnabled;
+    private int commandDeadRespawnCooldownMs = 60000;
     private boolean commandLinkedPanelRequireUnlinkConfirm = true;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
@@ -373,6 +393,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     public int getCommandRelocationMaxRetryAttempts() {
         return commandRelocationMaxRetryAttempts;
+    }
+
+    public boolean isCommandDeadRespawnEnabled() {
+        return commandDeadRespawnEnabled;
+    }
+
+    public int getCommandDeadRespawnCooldownMs() {
+        return commandDeadRespawnCooldownMs;
     }
 
     public boolean isCommandLinkedPanelRequireUnlinkConfirm() {

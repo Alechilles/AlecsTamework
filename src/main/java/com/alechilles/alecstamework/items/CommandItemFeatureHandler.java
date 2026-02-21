@@ -27,6 +27,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
@@ -37,6 +38,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
@@ -58,7 +60,9 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -87,11 +91,15 @@ public final class CommandItemFeatureHandler {
 
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
+    private final CommandLinkedNpcDeathService deathService;
     private final TameworkUiMessageService uiMessageService = new TameworkUiMessageService();
 
-    public CommandItemFeatureHandler(CommandItemRegistry registry, CommandNpcRelocationService relocationService) {
+    public CommandItemFeatureHandler(CommandItemRegistry registry,
+                                     CommandNpcRelocationService relocationService,
+                                     CommandLinkedNpcDeathService deathService) {
         this.registry = registry;
         this.relocationService = relocationService;
+        this.deathService = deathService;
     }
 
     // Handles a single command-item use.
@@ -260,6 +268,10 @@ public final class CommandItemFeatureHandler {
             updateHeldItem = true;
         }
         int queued = queueRelocationsForUnloaded(context, unloadedLinked);
+        if (context.workingItem != working) {
+            working = context.workingItem;
+            updateHeldItem = true;
+        }
         if (affected <= 0 && queued <= 0) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
@@ -428,14 +440,15 @@ public final class CommandItemFeatureHandler {
             if (store == null) {
                 return List.of();
             }
-            return buildLinkedPanelEntries(player, store, stack);
+            return buildLinkedPanelEntries(player, store, stack, toolId);
         }
         return List.of();
     }
 
     private List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntries(Player player,
                                                                                        Store<EntityStore> store,
-                                                                                       ItemStack stack) {
+                                                                                       ItemStack stack,
+                                                                                       String toolId) {
         if (player == null || store == null || stack == null || stack.isEmpty()) {
             return List.of();
         }
@@ -450,6 +463,8 @@ public final class CommandItemFeatureHandler {
                 continue;
             }
             boolean loaded = false;
+            boolean dead = false;
+            long deadRespawnRemainingMs = 0L;
             String displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
             int health = 0;
             int maxHealth = 0;
@@ -468,12 +483,29 @@ public final class CommandItemFeatureHandler {
                     }
                 }
             }
+            if (!loaded && deathService != null) {
+                CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot = deathService.getDeadSnapshotForTool(
+                        record.npcUuid,
+                        toolId,
+                        player.getUuid()
+                );
+                if (deadSnapshot != null) {
+                    dead = true;
+                    String deadName = deadSnapshot.displayName();
+                    if (deadName != null && !deadName.isBlank()) {
+                        displayName = deadName;
+                    }
+                    deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
+                }
+            }
             entries.add(new TameworkCommandSelectionPage.LinkedNpcEntry(
                     record.npcUuid,
                     displayName,
                     health,
                     maxHealth,
-                    loaded
+                    loaded,
+                    dead,
+                    deadRespawnRemainingMs
             ));
         }
         return entries;
@@ -1075,6 +1107,7 @@ public final class CommandItemFeatureHandler {
         if (!returnHome && !recall) {
             return 0;
         }
+        boolean deadRespawnEnabled = isDeadRespawnEnabled();
         RelocationState postRelocationState = resolveRelocationState(context.command, returnHome, recall);
         World world = context.player != null ? context.player.getWorld() : null;
         UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
@@ -1084,6 +1117,19 @@ public final class CommandItemFeatureHandler {
         int queued = 0;
         for (LinkedNpcRecord record : unloadedLinked) {
             if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot = deathService != null
+                    ? deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid)
+                    : null;
+            if (deadSnapshot != null) {
+                if (!deadRespawnEnabled || !deadSnapshot.isRespawnReady()) {
+                    continue;
+                }
+                boolean respawned = tryRespawnDeadLinkedNpc(context, record, deadSnapshot, returnHome, recall, postRelocationState);
+                if (respawned) {
+                    queued++;
+                }
                 continue;
             }
             if (returnHome) {
@@ -1124,6 +1170,167 @@ public final class CommandItemFeatureHandler {
             queued++;
         }
         return queued;
+    }
+
+    private boolean isDeadRespawnEnabled() {
+        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        return globalConfig != null && globalConfig.isCommandDeadRespawnEnabled();
+    }
+
+    private boolean tryRespawnDeadLinkedNpc(Context context,
+                                            LinkedNpcRecord record,
+                                            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot,
+                                            boolean returnHome,
+                                            boolean recall,
+                                            RelocationState postRelocationState) {
+        if (context == null || record == null || deadSnapshot == null || context.store == null) {
+            return false;
+        }
+        String roleId = deadSnapshot.roleId();
+        if (roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        Vector3d homePosition = record.homePosition != null ? record.homePosition : deadSnapshot.homePosition();
+        Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
+        Vector3d destination;
+        if (returnHome) {
+            if (homePosition == null) {
+                return false;
+            }
+            destination = homePosition;
+        } else if (recall) {
+            destination = computeSafeRecallPosition(context, sourceHint);
+            if (destination == null) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        NPCPlugin npcPlugin = NPCPlugin.get();
+        if (npcPlugin == null) {
+            return false;
+        }
+        int roleIndex = npcPlugin.getIndex(roleId);
+        if (roleIndex < 0) {
+            return false;
+        }
+        Vector3f rotation = resolveRespawnRotation(context, destination);
+        Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(context.store, roleIndex, destination, rotation, null, null);
+        if (spawned == null || spawned.first() == null || spawned.second() == null) {
+            return false;
+        }
+        Ref<EntityStore> spawnedRef = spawned.first();
+        NPCEntity spawnedNpc = spawned.second();
+        UUID ownerId = deadSnapshot.ownerId() != null
+                ? deadSnapshot.ownerId()
+                : (context.player != null ? context.player.getUuid() : null);
+        String[] toolIds = mergeToolIds(deadSnapshot.toolIds(), context.toolId);
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        if (linksType != null) {
+            context.store.putComponent(
+                    spawnedRef,
+                    linksType,
+                    new TameworkCommandLinksComponent(ownerId, toolIds, homePosition)
+            );
+        }
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        if (ownerType != null) {
+            context.store.putComponent(
+                    spawnedRef,
+                    ownerType,
+                    new TameworkOwnerComponent(ownerId, deadSnapshot.ownerName())
+            );
+        }
+        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
+        if (tamedType != null) {
+            context.store.putComponent(
+                    spawnedRef,
+                    tamedType,
+                    new TameworkTamedComponent(deadSnapshot.tamed())
+            );
+        }
+        if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
+            ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+            if (nameType != null) {
+                context.store.putComponent(
+                        spawnedRef,
+                        nameType,
+                        new TameworkNpcNameComponent(
+                                deadSnapshot.customName(),
+                                ownerId,
+                                System.currentTimeMillis(),
+                                TameworkNpcNameComponent.NameSource.System
+                        )
+                );
+            }
+            EntitySupport.setDisplayName(spawnedRef, deadSnapshot.customName(), context.store);
+        }
+        Role role = spawnedNpc.getRole();
+        if (role != null && role.getMarkedEntitySupport() != null) {
+            role.getMarkedEntitySupport().setMarkedEntity("LockedTarget", null);
+            if (recall && context.playerRef != null && context.playerRef.isValid()) {
+                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
+            }
+        }
+        if (postRelocationState != null && postRelocationState.state != null && !postRelocationState.state.isBlank()) {
+            applyState(
+                    spawnedRef,
+                    spawnedNpc,
+                    context.store,
+                    postRelocationState.state,
+                    postRelocationState.subState
+            );
+        }
+        if (context.workingItem != null && !context.workingItem.isEmpty() && spawnedNpc.getUuid() != null) {
+            ItemStack updated = removeLinkedNpcRecord(context.workingItem, record.npcUuid);
+            updated = upsertLinkedNpcRecord(updated, spawnedNpc.getUuid(), destination, homePosition);
+            if (updated != context.workingItem) {
+                context.workingItem = updated;
+                context.itemChanged = true;
+            }
+        }
+        if (deathService != null) {
+            deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
+        }
+        return true;
+    }
+
+    private String[] mergeToolIds(String[] existing, String requiredToolId) {
+        Set<String> out = new HashSet<>();
+        if (existing != null) {
+            for (String value : existing) {
+                if (value == null || value.isBlank()) {
+                    continue;
+                }
+                out.add(value);
+            }
+        }
+        if (requiredToolId != null && !requiredToolId.isBlank()) {
+            out.add(requiredToolId);
+        }
+        return out.toArray(new String[0]);
+    }
+
+    private Vector3f resolveRespawnRotation(Context context, Vector3d spawnPosition) {
+        if (context == null || context.store == null || context.playerRef == null || !context.playerRef.isValid()) {
+            return new Vector3f();
+        }
+        TransformComponent transform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
+        if (transform == null) {
+            return new Vector3f();
+        }
+        Vector3d playerPos = new Vector3d(transform.getPosition());
+        if (spawnPosition != null) {
+            Vector3d relative = new Vector3d(
+                    playerPos.x - spawnPosition.x,
+                    0.0,
+                    playerPos.z - spawnPosition.z
+            );
+            if (relative.squaredLength() > 0.0001) {
+                return Vector3f.lookAt(relative);
+            }
+        }
+        return new Vector3f(transform.getRotation());
     }
 
     private boolean matchesMembership(Context context, Ref<EntityStore> npcRef, NPCEntity npc, UUID playerUuid) {

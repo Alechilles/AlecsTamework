@@ -181,8 +181,10 @@ public final class TameworkCommandSelectionPage
 
             commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
             commandBuilder.set(nameSelector + ".Text", entry.displayName());
-            commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !isPendingUnlink(entry.npcUuid()));
-            commandBuilder.set(statusConfirmSelector + ".Visible", isPendingUnlink(entry.npcUuid()));
+            boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
+            commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink);
+            commandBuilder.set(statusUnloadedSelector + ".Text", entry.dead() ? "DEAD" : "UNLOADED");
+            commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
             if (entry.hasHealth()) {
                 commandBuilder.set(
                         healthTextSelector + ".Text",
@@ -190,6 +192,9 @@ public final class TameworkCommandSelectionPage
                 );
                 commandBuilder.set(healthFillSelector + ".Visible", true);
                 commandBuilder.setObject(healthFillSelector + ".Anchor", buildHealthFillAnchor(entry.healthRatio()));
+            } else if (entry.dead()) {
+                commandBuilder.set(healthTextSelector + ".Text", resolveDeadHealthText(entry));
+                commandBuilder.set(healthFillSelector + ".Visible", false);
             } else if (!entry.loaded()) {
                 commandBuilder.set(healthTextSelector + ".Text", "Unloaded (commands still queue).");
                 commandBuilder.set(healthFillSelector + ".Visible", false);
@@ -297,6 +302,8 @@ public final class TameworkCommandSelectionPage
                     current,
                     max,
                     entry.loaded,
+                    entry.dead,
+                    entry.deadRespawnRemainingMs,
                     entry.futureStatA,
                     entry.futureStatB,
                     entry.traitsActionVisible,
@@ -307,6 +314,7 @@ public final class TameworkCommandSelectionPage
         }
         out.sort(
                 Comparator.comparing(LinkedNpcEntry::loaded).reversed()
+                        .thenComparing(LinkedNpcEntry::dead).reversed()
                         .thenComparing(LinkedNpcEntry::displayName, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(entry -> entry.npcUuid.toString())
         );
@@ -321,6 +329,27 @@ public final class TameworkCommandSelectionPage
         anchor.setWidth(Value.of(width));
         anchor.setHeight(Value.of(12));
         return anchor;
+    }
+
+    private String resolveDeadHealthText(LinkedNpcEntry entry) {
+        if (entry == null || !entry.dead()) {
+            return "Dead";
+        }
+        long remainingMs = Math.max(0L, entry.deadRespawnRemainingMs());
+        if (remainingMs <= 0L) {
+            return "Dead: ready to respawn (Recall or Return Home).";
+        }
+        return "Dead: respawn in " + formatRemainingTime(remainingMs) + ".";
+    }
+
+    private String formatRemainingTime(long remainingMs) {
+        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
+        long minutes = totalSeconds / 60L;
+        long seconds = totalSeconds % 60L;
+        if (minutes <= 0L) {
+            return seconds + "s";
+        }
+        return minutes + "m " + seconds + "s";
     }
 
     private static String resolveLabel(CommandEntry entry) {
@@ -380,6 +409,8 @@ public final class TameworkCommandSelectionPage
         private final int currentHealth;
         private final int maxHealth;
         private final boolean loaded;
+        private final boolean dead;
+        private final long deadRespawnRemainingMs;
         private final FutureStat futureStatA;
         private final FutureStat futureStatB;
         private final boolean traitsActionVisible;
@@ -388,12 +419,24 @@ public final class TameworkCommandSelectionPage
         private final boolean talentsActionEnabled;
 
         public LinkedNpcEntry(UUID npcUuid, String displayName, int currentHealth, int maxHealth, boolean loaded) {
+            this(npcUuid, displayName, currentHealth, maxHealth, loaded, false, 0L);
+        }
+
+        public LinkedNpcEntry(UUID npcUuid,
+                              String displayName,
+                              int currentHealth,
+                              int maxHealth,
+                              boolean loaded,
+                              boolean dead,
+                              long deadRespawnRemainingMs) {
             this(
                     npcUuid,
                     displayName,
                     currentHealth,
                     maxHealth,
                     loaded,
+                    dead,
+                    deadRespawnRemainingMs,
                     null,
                     null,
                     false,
@@ -408,6 +451,8 @@ public final class TameworkCommandSelectionPage
                               int currentHealth,
                               int maxHealth,
                               boolean loaded,
+                              boolean dead,
+                              long deadRespawnRemainingMs,
                               FutureStat futureStatA,
                               FutureStat futureStatB,
                               boolean traitsActionVisible,
@@ -419,6 +464,8 @@ public final class TameworkCommandSelectionPage
             this.currentHealth = currentHealth;
             this.maxHealth = maxHealth;
             this.loaded = loaded;
+            this.dead = dead;
+            this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
             this.futureStatA = futureStatA;
             this.futureStatB = futureStatB;
             this.traitsActionVisible = traitsActionVisible;
@@ -449,6 +496,14 @@ public final class TameworkCommandSelectionPage
 
         public boolean loaded() {
             return loaded;
+        }
+
+        public boolean dead() {
+            return dead;
+        }
+
+        public long deadRespawnRemainingMs() {
+            return deadRespawnRemainingMs;
         }
 
         public double healthRatio() {

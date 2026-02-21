@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -16,9 +17,12 @@ import javax.annotation.Nonnull;
  */
 public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStore> {
     private final CommandNpcRelocationService relocationService;
+    private final CommandLinkedNpcDeathService deathService;
 
-    public CommandNpcRelocationOnLoadSystem(CommandNpcRelocationService relocationService) {
+    public CommandNpcRelocationOnLoadSystem(CommandNpcRelocationService relocationService,
+                                            CommandLinkedNpcDeathService deathService) {
         this.relocationService = relocationService;
+        this.deathService = deathService;
     }
 
     @Override
@@ -27,9 +31,15 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         if (relocationService == null) {
+            if (deathService != null) {
+                deathService.onNpcAdded(reference, store);
+            }
             return;
         }
         relocationService.onNpcAdded(reference, store);
+        if (deathService != null) {
+            deathService.onNpcAdded(reference, store);
+        }
     }
 
     @Override
@@ -37,10 +47,12 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                                @Nonnull RemoveReason reason,
                                @Nonnull Store<EntityStore> store,
                                @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        if (relocationService == null) {
-            return;
+        if (relocationService != null) {
+            relocationService.onNpcRemoved(reference, store);
         }
-        relocationService.onNpcRemoved(reference, store);
+        if (deathService != null) {
+            deathService.onNpcRemoved(reference, reason, store);
+        }
     }
 
     @Override

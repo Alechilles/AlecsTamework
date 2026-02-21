@@ -5,10 +5,15 @@
 - New `CommandLinkedPanelRequireUnlinkConfirm` global setting in `TwGlobalConfig` (default `true`) to control whether unlinking from the linked-companions panel requires a second confirm click.
 - Linked-companions panel empty state messaging when no NPCs are linked to the command tool.
 - Row-level loaded/unloaded/confirm status badges in the linked-companions panel.
+- New dead-linked companion tracking so linked NPC deaths are surfaced as `DEAD` in the linked-companions panel instead of being treated as generic unloaded records.
+- New `TwGlobalConfig` options for dead companion recovery:
+  - `CommandDeadRespawnEnabled` (default `false`)
+  - `CommandDeadRespawnCooldownMs` (default `60000`)
 
 ### Changed
 - Linked-companions rows now show clearer unloaded fallback text (`Unloaded companion (<uuid>)`) and unloaded health messaging.
 - Command radial panel subtitle now guides unlink confirmation when a remove action is armed.
+- Recall/Return Home now respawn dead linked companions after cooldown when dead-respawn is enabled, then relink the command tool to the newly spawned NPC.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.
