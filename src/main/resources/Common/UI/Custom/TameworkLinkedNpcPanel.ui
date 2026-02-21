@@ -12,7 +12,7 @@ Group #TameworkLinkedPanelRoot {
       FontSize: 24,
       RenderBold: true,
       TextColor: #eef3f8,
-      HorizontalAlignment: Left,
+      HorizontalAlignment: Start,
       VerticalAlignment: Center
     );
   }
@@ -23,7 +23,7 @@ Group #TameworkLinkedPanelRoot {
     Style: (
       FontSize: 14,
       TextColor: #c4d2e1,
-      HorizontalAlignment: Left,
+      HorizontalAlignment: Start,
       VerticalAlignment: Center
     );
   }
@@ -40,7 +40,7 @@ Group #TameworkLinkedPanelRoot {
         FontSize: 16,
         RenderBold: true,
         TextColor: #eff4fa,
-        HorizontalAlignment: Left,
+        HorizontalAlignment: Start,
         VerticalAlignment: Center
       );
     }
@@ -61,7 +61,7 @@ Group #TameworkLinkedPanelRoot {
       Style: (
         FontSize: 11,
         TextColor: #bed0e3,
-        HorizontalAlignment: Left,
+        HorizontalAlignment: Start,
         VerticalAlignment: Center
       );
     }
@@ -79,7 +79,7 @@ Group #TameworkLinkedPanelRoot {
         FontSize: 16,
         RenderBold: true,
         TextColor: #eff4fa,
-        HorizontalAlignment: Left,
+        HorizontalAlignment: Start,
         VerticalAlignment: Center
       );
     }
@@ -100,7 +100,7 @@ Group #TameworkLinkedPanelRoot {
       Style: (
         FontSize: 11,
         TextColor: #bed0e3,
-        HorizontalAlignment: Left,
+        HorizontalAlignment: Start,
         VerticalAlignment: Center
       );
     }
