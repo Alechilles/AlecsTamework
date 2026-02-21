@@ -32,7 +32,7 @@ Group #TameworkLinkedPanelRoot {
 
   Label #TameworkLinkedPanelEmptyState {
     Anchor: (Top: 16, Height: 48);
-    Text: "No linked companions yet.\nPrimary-use on an owned NPC to link it.";
+    Text: "No linked companions yet. Primary-use on an owned NPC to link it.";
     Style: (
       FontSize: 14,
       TextColor: #b2c3d6,
