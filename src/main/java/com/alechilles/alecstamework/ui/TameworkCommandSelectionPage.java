@@ -154,7 +154,7 @@ public final class TameworkCommandSelectionPage
                 commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
                 commandBuilder.set(healthFillSelector + ".Visible", false);
             }
-            commandBuilder.set(removeSelector + ".Text", "Remove");
+            commandBuilder.set(removeSelector + ".Text", "");
             commandBuilder.set(removeSelector + ".Visible", true);
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,

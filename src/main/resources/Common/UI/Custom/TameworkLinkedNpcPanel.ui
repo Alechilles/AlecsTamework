@@ -1,5 +1,17 @@
 $C = "Common.ui";
 
+@RemoveIconButtonLabelStyle = LabelStyle(
+  FontSize: 1,
+  TextColor: #00000000
+);
+
+@RemoveIconButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png"), LabelStyle: @RemoveIconButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png", Color: #ffffff(0.9)), LabelStyle: @RemoveIconButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png", Color: #ffffff(0.8)), LabelStyle: @RemoveIconButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png", Color: #ffffff(0.5)), LabelStyle: @RemoveIconButtonLabelStyle)
+);
+
 Group #TameworkLinkedPanelRoot {
   Anchor: (Top: 240, Left: 160, Width: 430, Height: 640);
   LayoutMode: Top;
@@ -42,9 +54,10 @@ Group #TameworkLinkedPanelRoot {
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
-    $C.@SecondaryTextButton #TameworkLinkedPanelCard0RemoveButton {
-      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
-      Text: "Remove";
+    TextButton #TameworkLinkedPanelCard0RemoveButton {
+      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+      Style: @RemoveIconButtonStyle;
+      Text: "";
     }
 
     Group #TameworkLinkedPanelCard0HealthFrame {
@@ -76,9 +89,10 @@ Group #TameworkLinkedPanelRoot {
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
-    $C.@SecondaryTextButton #TameworkLinkedPanelCard1RemoveButton {
-      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
-      Text: "Remove";
+    TextButton #TameworkLinkedPanelCard1RemoveButton {
+      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+      Style: @RemoveIconButtonStyle;
+      Text: "";
     }
 
     Group #TameworkLinkedPanelCard1HealthFrame {
@@ -110,9 +124,10 @@ Group #TameworkLinkedPanelRoot {
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
-    $C.@SecondaryTextButton #TameworkLinkedPanelCard2RemoveButton {
-      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
-      Text: "Remove";
+    TextButton #TameworkLinkedPanelCard2RemoveButton {
+      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+      Style: @RemoveIconButtonStyle;
+      Text: "";
     }
 
     Group #TameworkLinkedPanelCard2HealthFrame {
@@ -144,9 +159,10 @@ Group #TameworkLinkedPanelRoot {
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
-    $C.@SecondaryTextButton #TameworkLinkedPanelCard3RemoveButton {
-      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
-      Text: "Remove";
+    TextButton #TameworkLinkedPanelCard3RemoveButton {
+      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+      Style: @RemoveIconButtonStyle;
+      Text: "";
     }
 
     Group #TameworkLinkedPanelCard3HealthFrame {
@@ -178,9 +194,10 @@ Group #TameworkLinkedPanelRoot {
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
-    $C.@SecondaryTextButton #TameworkLinkedPanelCard4RemoveButton {
-      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
-      Text: "Remove";
+    TextButton #TameworkLinkedPanelCard4RemoveButton {
+      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+      Style: @RemoveIconButtonStyle;
+      Text: "";
     }
 
     Group #TameworkLinkedPanelCard4HealthFrame {
@@ -212,9 +229,10 @@ Group #TameworkLinkedPanelRoot {
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
-    $C.@SecondaryTextButton #TameworkLinkedPanelCard5RemoveButton {
-      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
-      Text: "Remove";
+    TextButton #TameworkLinkedPanelCard5RemoveButton {
+      Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+      Style: @RemoveIconButtonStyle;
+      Text: "";
     }
 
     Group #TameworkLinkedPanelCard5HealthFrame {
