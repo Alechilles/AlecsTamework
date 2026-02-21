@@ -55,7 +55,7 @@ Group {
     Visible: false;
   }
 
-  TextButton #RespawnButton {
+  $C.@SecondaryTextButton #RespawnButton {
     Anchor: (Top: 1, Right: 34, Width: 86, Height: 20);
     Text: "Respawn";
     Visible: false;

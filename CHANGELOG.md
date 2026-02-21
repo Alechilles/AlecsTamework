@@ -15,6 +15,11 @@
 - Command radial panel subtitle now guides unlink confirmation when a remove action is armed.
 - Dead linked companions are no longer treated as generic unloaded targets for Recall/Return Home queueing.
 - Dead companion recovery is now explicit via a linked-panel `Respawn` button (shown when cooldown is ready and dead respawn is enabled), and relinks the command tool to the newly spawned NPC.
+- Linked-companions panel now updates row health/cooldown/status once per second while open via incremental UI selector updates (no full page rebuild).
+- Linked-panel `Respawn` button now uses the shared secondary button style for clearer outline/hover/pressed feedback.
+
+### Fixed
+- Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.
