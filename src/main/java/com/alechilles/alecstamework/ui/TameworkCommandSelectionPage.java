@@ -27,6 +27,7 @@ import javax.annotation.Nonnull;
 public final class TameworkCommandSelectionPage
         extends InteractiveCustomUIPage<TameworkCommandSelectionPage.CommandSelectionEventData> {
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
+    public static final String LINKED_PANEL_UI_PATH = "TameworkLinkedNpcPanel.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final int MAX_COMMAND_BUTTONS = 8;
@@ -51,10 +52,12 @@ public final class TameworkCommandSelectionPage
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
         commandBuilder.append(UI_PATH);
+        commandBuilder.append(LINKED_PANEL_UI_PATH);
         commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
         commandBuilder.set("#TameworkCommandMenuTitle.Text", "Select Command");
         commandBuilder.set("#TameworkCommandMenuSubtitle.Text", "Click a command to set it.");
         commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
+        commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
 
         for (int i = 0; i < MAX_COMMAND_BUTTONS; i++) {
             String selector = "#CommandButton" + i;
