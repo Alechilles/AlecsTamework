@@ -25,6 +25,7 @@ import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
@@ -46,6 +47,7 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
+import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
@@ -457,7 +459,7 @@ public final class CommandItemFeatureHandler {
                     NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
                     if (npc != null) {
                         loaded = true;
-                        displayName = resolveNpcDisplayName(npc);
+                        displayName = resolveNpcDisplayName(npcRef, store, npc);
                         HealthSnapshot snapshot = readNpcHealthSnapshot(npcRef, store);
                         if (snapshot != null) {
                             health = snapshot.current;
@@ -578,9 +580,13 @@ public final class CommandItemFeatureHandler {
         return "Unknown";
     }
 
-    private String resolveNpcDisplayName(NPCEntity npc) {
+    private String resolveNpcDisplayName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
         if (npc == null) {
             return "NPC";
+        }
+        String componentDisplayName = resolveNpcDisplayNameFromComponents(npcRef, store);
+        if (componentDisplayName != null && !componentDisplayName.isBlank()) {
+            return componentDisplayName;
         }
         String displayName = npc.getLegacyDisplayName();
         if (displayName != null && !displayName.isBlank()) {
@@ -598,6 +604,27 @@ public final class CommandItemFeatureHandler {
             return roleId;
         }
         return "NPC";
+    }
+
+    private String resolveNpcDisplayNameFromComponents(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+        if (nameType != null) {
+            TameworkNpcNameComponent nameComponent = store.getComponent(npcRef, nameType);
+            if (nameComponent != null && nameComponent.getName() != null && !nameComponent.getName().isBlank()) {
+                return nameComponent.getName();
+            }
+        }
+        DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
+        if (displayName != null && displayName.getDisplayName() != null) {
+            String ansi = displayName.getDisplayName().getAnsiMessage();
+            if (ansi != null && !ansi.isBlank()) {
+                return ansi;
+            }
+        }
+        return null;
     }
 
     private String resolveNpcNameKey(NPCEntity npc) {
@@ -1600,7 +1627,7 @@ public final class CommandItemFeatureHandler {
                 updatedItem = removeLinkedNpcRecord(updatedItem, npcUuid);
             }
         }
-        String name = resolveNpcDisplayName(npc);
+        String name = resolveNpcDisplayName(targetRef, store, npc);
         return new LinkToggleResult(true, linked, name, updatedItem);
     }
 
