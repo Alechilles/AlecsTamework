@@ -37,28 +37,28 @@ Group #TameworkLinkedPanelRoot {
     Visible: false;
 
     Label #TameworkLinkedPanelCard0Name {
-      Anchor: (Height: 22, Width: 286);
+      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
       Text: "Companion";
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     $C.@SecondaryTextButton #TameworkLinkedPanelCard0RemoveButton {
-      @Anchor = (Left: 296, Top: 0, Width: 108, Height: 24);
+      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
       Text: "Remove";
     }
 
     Group #TameworkLinkedPanelCard0HealthFrame {
-      Anchor: (Top: 8, Height: 14);
+      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard0HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 388, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
         Background: #6fc576;
       }
     }
 
     Label #TameworkLinkedPanelCard0HealthText {
-      Anchor: (Top: 8, Height: 16);
+      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
       Text: "Health: ?/?";
       Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -71,28 +71,28 @@ Group #TameworkLinkedPanelRoot {
     Visible: false;
 
     Label #TameworkLinkedPanelCard1Name {
-      Anchor: (Height: 22, Width: 286);
+      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
       Text: "Companion";
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     $C.@SecondaryTextButton #TameworkLinkedPanelCard1RemoveButton {
-      @Anchor = (Left: 296, Top: 0, Width: 108, Height: 24);
+      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
       Text: "Remove";
     }
 
     Group #TameworkLinkedPanelCard1HealthFrame {
-      Anchor: (Top: 8, Height: 14);
+      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard1HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 388, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
         Background: #6fc576;
       }
     }
 
     Label #TameworkLinkedPanelCard1HealthText {
-      Anchor: (Top: 8, Height: 16);
+      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
       Text: "Health: ?/?";
       Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -105,28 +105,28 @@ Group #TameworkLinkedPanelRoot {
     Visible: false;
 
     Label #TameworkLinkedPanelCard2Name {
-      Anchor: (Height: 22, Width: 286);
+      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
       Text: "Companion";
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     $C.@SecondaryTextButton #TameworkLinkedPanelCard2RemoveButton {
-      @Anchor = (Left: 296, Top: 0, Width: 108, Height: 24);
+      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
       Text: "Remove";
     }
 
     Group #TameworkLinkedPanelCard2HealthFrame {
-      Anchor: (Top: 8, Height: 14);
+      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard2HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 388, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
         Background: #6fc576;
       }
     }
 
     Label #TameworkLinkedPanelCard2HealthText {
-      Anchor: (Top: 8, Height: 16);
+      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
       Text: "Health: ?/?";
       Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -139,28 +139,28 @@ Group #TameworkLinkedPanelRoot {
     Visible: false;
 
     Label #TameworkLinkedPanelCard3Name {
-      Anchor: (Height: 22, Width: 286);
+      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
       Text: "Companion";
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     $C.@SecondaryTextButton #TameworkLinkedPanelCard3RemoveButton {
-      @Anchor = (Left: 296, Top: 0, Width: 108, Height: 24);
+      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
       Text: "Remove";
     }
 
     Group #TameworkLinkedPanelCard3HealthFrame {
-      Anchor: (Top: 8, Height: 14);
+      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard3HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 388, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
         Background: #6fc576;
       }
     }
 
     Label #TameworkLinkedPanelCard3HealthText {
-      Anchor: (Top: 8, Height: 16);
+      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
       Text: "Health: ?/?";
       Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -173,28 +173,28 @@ Group #TameworkLinkedPanelRoot {
     Visible: false;
 
     Label #TameworkLinkedPanelCard4Name {
-      Anchor: (Height: 22, Width: 286);
+      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
       Text: "Companion";
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     $C.@SecondaryTextButton #TameworkLinkedPanelCard4RemoveButton {
-      @Anchor = (Left: 296, Top: 0, Width: 108, Height: 24);
+      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
       Text: "Remove";
     }
 
     Group #TameworkLinkedPanelCard4HealthFrame {
-      Anchor: (Top: 8, Height: 14);
+      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard4HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 388, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
         Background: #6fc576;
       }
     }
 
     Label #TameworkLinkedPanelCard4HealthText {
-      Anchor: (Top: 8, Height: 16);
+      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
       Text: "Health: ?/?";
       Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -207,28 +207,28 @@ Group #TameworkLinkedPanelRoot {
     Visible: false;
 
     Label #TameworkLinkedPanelCard5Name {
-      Anchor: (Height: 22, Width: 286);
+      Anchor: (Top: 0, Left: 0, Width: 286, Height: 22);
       Text: "Companion";
       Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     $C.@SecondaryTextButton #TameworkLinkedPanelCard5RemoveButton {
-      @Anchor = (Left: 296, Top: 0, Width: 108, Height: 24);
+      @Anchor = (Top: 0, Right: 0, Width: 108, Height: 24);
       Text: "Remove";
     }
 
     Group #TameworkLinkedPanelCard5HealthFrame {
-      Anchor: (Top: 8, Height: 14);
+      Anchor: (Top: 30, Left: 0, Right: 0, Height: 14);
       Background: #0a121b(0.95);
 
       Group #TameworkLinkedPanelCard5HealthFill {
-        Anchor: (Left: 1, Top: 1, Width: 388, Height: 12);
+        Anchor: (Left: 1, Top: 1, Width: 0, Height: 12);
         Background: #6fc576;
       }
     }
 
     Label #TameworkLinkedPanelCard5HealthText {
-      Anchor: (Top: 8, Height: 16);
+      Anchor: (Top: 50, Left: 0, Width: 286, Height: 16);
       Text: "Health: ?/?";
       Style: (FontSize: 11, TextColor: #bed0e3, HorizontalAlignment: Start, VerticalAlignment: Center);
     }

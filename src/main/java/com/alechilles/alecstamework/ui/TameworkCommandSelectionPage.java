@@ -34,6 +34,7 @@ public final class TameworkCommandSelectionPage
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final int MAX_LINKED_PANEL_ROWS = 6;
+    private static final int HEALTH_BAR_FILL_MAX_WIDTH = 406;
 
     private final CommandOption[] options;
     private final LinkedNpcEntry[] linkedNpcEntries;
@@ -148,11 +149,15 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set(cardSelector + ".Visible", true);
             commandBuilder.set(nameSelector + ".Text", entry.displayName);
             if (entry.hasHealth()) {
+                float ratio = Math.max(0.0f, Math.min(1.0f, (float) entry.currentHealth / (float) entry.maxHealth));
+                int fillWidth = Math.max(1, Math.round(HEALTH_BAR_FILL_MAX_WIDTH * ratio));
                 commandBuilder.set(healthTextSelector + ".Text", "Health: " + entry.currentHealth + "/" + entry.maxHealth);
                 commandBuilder.set(healthFillSelector + ".Visible", true);
+                commandBuilder.set(healthFillSelector + ".Width", fillWidth);
             } else {
                 commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
                 commandBuilder.set(healthFillSelector + ".Visible", false);
+                commandBuilder.set(healthFillSelector + ".Width", 0);
             }
             commandBuilder.set(removeSelector + ".Text", "Remove");
             commandBuilder.set(removeSelector + ".Visible", true);
