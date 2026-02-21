@@ -579,14 +579,86 @@ public final class CommandItemFeatureHandler {
         if (npc == null) {
             return "NPC";
         }
-        String name = npc.getLegacyDisplayName();
-        if (name == null || name.isBlank()) {
-            name = npc.getRoleName();
+        String displayName = npc.getLegacyDisplayName();
+        if (displayName != null && !displayName.isBlank()) {
+            return displayName;
         }
-        if (name == null || name.isBlank()) {
-            name = "NPC";
+        String nameKey = resolveNpcNameKey(npc);
+        if (nameKey != null && !nameKey.isBlank()) {
+            return nameKey;
         }
-        return name;
+        String roleId = resolveNpcRoleId(npc);
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
+        }
+        return "NPC";
+    }
+
+    private String resolveNpcNameKey(NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        String nameKey = readStringGetter(
+                npc,
+                "getRoleNameKey",
+                "getNpcNameKey",
+                "getNameKey"
+        );
+        if (nameKey != null && !nameKey.isBlank()) {
+            return nameKey;
+        }
+        int roleIndex = npc.getRoleIndex();
+        if (roleIndex >= 0) {
+            NPCPlugin plugin = NPCPlugin.get();
+            if (plugin != null) {
+                String indexedNameKey = plugin.getName(roleIndex);
+                if (indexedNameKey != null && !indexedNameKey.isBlank()) {
+                    return indexedNameKey;
+                }
+            }
+        }
+        return null;
+    }
+
+    private String resolveNpcRoleId(NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        String roleName = npc.getRoleName();
+        if (roleName != null && !roleName.isBlank()) {
+            return roleName;
+        }
+        return readStringGetter(
+                npc,
+                "getRoleId",
+                "getRoleKey"
+        );
+    }
+
+    private static String readStringGetter(Object target, String... methodNames) {
+        if (target == null || methodNames == null) {
+            return null;
+        }
+        for (String methodName : methodNames) {
+            String value = invokeStringGetter(target, methodName);
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    private static String invokeStringGetter(Object target, String methodName) {
+        if (target == null || methodName == null) {
+            return null;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            Object value = method.invoke(target);
+            return value instanceof String ? (String) value : null;
+        } catch (Exception | LinkageError ex) {
+            return null;
+        }
     }
 
     private HealthSnapshot readNpcHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {

@@ -29,19 +29,6 @@ Group {
     );
   }
 
-  Label #StatusLoaded {
-    Anchor: (Top: 2, Right: 34, Width: 86, Height: 18);
-    Text: "LOADED";
-    Style: (
-      FontSize: 10,
-      RenderBold: true,
-      TextColor: #d8ffe0,
-      HorizontalAlignment: Center,
-      VerticalAlignment: Center
-    );
-    Visible: false;
-  }
-
   Label #StatusUnloaded {
     Anchor: (Top: 2, Right: 34, Width: 86, Height: 18);
     Text: "UNLOADED";

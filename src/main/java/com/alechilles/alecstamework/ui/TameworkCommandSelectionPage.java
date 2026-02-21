@@ -168,7 +168,6 @@ public final class TameworkCommandSelectionPage
             LinkedNpcEntry entry = linkedNpcEntries[i];
             String entrySelector = "#TameworkLinkedPanelList[" + i + "]";
             String nameSelector = entrySelector + " #Name";
-            String statusLoadedSelector = entrySelector + " #StatusLoaded";
             String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
             String statusConfirmSelector = entrySelector + " #StatusConfirm";
             String healthTextSelector = entrySelector + " #HealthText";
@@ -182,7 +181,6 @@ public final class TameworkCommandSelectionPage
 
             commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
             commandBuilder.set(nameSelector + ".Text", entry.displayName());
-            commandBuilder.set(statusLoadedSelector + ".Visible", entry.loaded() && !isPendingUnlink(entry.npcUuid()));
             commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !isPendingUnlink(entry.npcUuid()));
             commandBuilder.set(statusConfirmSelector + ".Visible", isPendingUnlink(entry.npcUuid()));
             if (entry.hasHealth()) {
