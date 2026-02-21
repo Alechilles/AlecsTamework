@@ -55,15 +55,10 @@ Group {
     Visible: false;
   }
 
-  $C.@SecondaryTextButton #RespawnButton {
-    Anchor: (Top: 1, Right: 34, Width: 86, Height: 20);
+  $C.@SmallSecondaryTextButton #RespawnButton {
+    Anchor: (Top: 0, Right: 34, Width: 104, Height: 22);
+    Padding: (Horizontal: 8);
     Text: "Respawn";
-    Style: (
-      Default: (LabelStyle: (FontSize: 10, HorizontalAlignment: Center, VerticalAlignment: Center)),
-      Hovered: (LabelStyle: (FontSize: 10, HorizontalAlignment: Center, VerticalAlignment: Center)),
-      Pressed: (LabelStyle: (FontSize: 10, HorizontalAlignment: Center, VerticalAlignment: Center)),
-      Disabled: (LabelStyle: (FontSize: 10, HorizontalAlignment: Center, VerticalAlignment: Center))
-    );
     Visible: false;
   }
 
