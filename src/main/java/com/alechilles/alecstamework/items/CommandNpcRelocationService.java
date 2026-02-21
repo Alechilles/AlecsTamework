@@ -57,7 +57,8 @@ public final class CommandNpcRelocationService {
                 System.currentTimeMillis()
         );
         if (sourceHintPosition != null) {
-            lastKnownByNpc.put(npcUuid, new Vector3d(sourceHintPosition));
+            // Do not overwrite an existing tracked position with a potentially stale metadata hint.
+            lastKnownByNpc.putIfAbsent(npcUuid, new Vector3d(sourceHintPosition));
         }
         pendingByNpc.put(npcUuid, pending);
         requestChunksForPending(world, pending);
@@ -162,13 +163,25 @@ public final class CommandNpcRelocationService {
             return;
         }
         requestChunkLoad(world, pending.destination, pending.npcUuid);
-        Vector3d source = pending.sourceHintPosition;
-        if (source == null) {
-            source = lastKnownByNpc.get(pending.npcUuid);
+        Vector3d hintedSource = pending.sourceHintPosition;
+        Vector3d cachedSource = lastKnownByNpc.get(pending.npcUuid);
+        if (hintedSource != null) {
+            requestChunkLoad(world, hintedSource, pending.npcUuid);
         }
-        if (source != null) {
-            requestChunkLoad(world, source, pending.npcUuid);
+        if (cachedSource != null
+                && (hintedSource == null || !isNear(cachedSource, hintedSource, 0.5))) {
+            requestChunkLoad(world, cachedSource, pending.npcUuid);
         }
+    }
+
+    private boolean isNear(Vector3d left, Vector3d right, double tolerance) {
+        if (left == null || right == null) {
+            return false;
+        }
+        double dx = left.x - right.x;
+        double dy = left.y - right.y;
+        double dz = left.z - right.z;
+        return (dx * dx + dy * dy + dz * dz) <= (tolerance * tolerance);
     }
 
     private void requestChunkLoad(World world, Vector3d position, UUID npcUuid) {
