@@ -6,10 +6,10 @@ $C = "Common.ui";
 );
 
 @RemoveIconButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png", Color: #ffffff(0.9)), LabelStyle: @RemoveIconButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png", Color: #ffffff(0.8)), LabelStyle: @RemoveIconButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon.png", Color: #ffffff(0.5)), LabelStyle: @RemoveIconButtonLabelStyle)
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon_v2.png"), LabelStyle: @RemoveIconButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon_v2.png", Color: #ffffff(0.9)), LabelStyle: @RemoveIconButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon_v2.png", Color: #ffffff(0.8)), LabelStyle: @RemoveIconButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveIcon_v2.png", Color: #ffffff(0.5)), LabelStyle: @RemoveIconButtonLabelStyle)
 );
 
 Group #TameworkLinkedPanelRoot {
