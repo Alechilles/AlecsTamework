@@ -1,5 +1,5 @@
 Group #TameworkLinkedPanelRoot {
-  Anchor: (Top: 96, Right: 40, Width: 430, Height: 640);
+  Anchor: (Top: 200, Left: 100, Width: 430, Height: 640);
   LayoutMode: Top;
   Padding: (Horizontal: 14, Vertical: 12);
   Background: #0b1a2c(0.78);
