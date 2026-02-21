@@ -173,7 +173,9 @@ public class Tamework extends JavaPlugin {
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
         commandNpcRelocationService = new CommandNpcRelocationService();
-        commandLinkedNpcDeathService = new CommandLinkedNpcDeathService();
+        commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
+                getDataDirectory().resolve("CommandLinkedNpcDeaths.dat")
+        );
         getEntityStoreRegistry().registerSystem(
                 new CommandNpcRelocationOnLoadSystem(commandNpcRelocationService, commandLinkedNpcDeathService)
         );

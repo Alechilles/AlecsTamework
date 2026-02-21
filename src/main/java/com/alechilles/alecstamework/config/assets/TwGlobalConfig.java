@@ -175,7 +175,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                             : asset.commandDeadRespawnEnabled,
                     asset -> asset.commandDeadRespawnEnabled
             )
-            .documentation("Allow dead linked companions to respawn from command actions (Recall/Return Home) after cooldown.")
+            .documentation("Allow dead linked companions to respawn from the linked-companions panel after cooldown.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("CommandDeadRespawnCooldownMs", Codec.INTEGER),
@@ -184,7 +184,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                             : asset.commandDeadRespawnCooldownMs,
                     asset -> asset.commandDeadRespawnCooldownMs
             )
-            .documentation("Cooldown before a dead linked companion can be respawned by command actions.")
+            .documentation("Cooldown before a dead linked companion can be respawned from the linked-companions panel.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("CommandLinkedPanelRequireUnlinkConfirm", Codec.BOOLEAN),

@@ -16,7 +16,13 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,7 +32,24 @@ import javax.annotation.Nullable;
  * Tracks linked NPC deaths so command tools can distinguish dead companions from unloaded companions.
  */
 public final class CommandLinkedNpcDeathService {
+    private static final String FIELD_SEPARATOR = "\t";
+    private static final String VECTOR_SEPARATOR = ",";
+    private static final String ARRAY_SEPARATOR = ";";
+
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
+    private final Path persistencePath;
+    private final Object persistenceLock = new Object();
+
+    public CommandLinkedNpcDeathService() {
+        this(null);
+    }
+
+    public CommandLinkedNpcDeathService(@Nullable Path persistencePath) {
+        this.persistencePath = persistencePath != null
+                ? persistencePath.toAbsolutePath().normalize()
+                : null;
+        loadPersistedSnapshots();
+    }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
         if (reference == null || !reference.isValid() || store == null) {
@@ -35,7 +58,9 @@ public final class CommandLinkedNpcDeathService {
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
         UUID npcUuid = npc != null ? npc.getUuid() : null;
         if (npcUuid != null) {
-            deadByNpc.remove(npcUuid);
+            if (deadByNpc.remove(npcUuid) != null) {
+                persistSnapshots();
+            }
         }
     }
 
@@ -49,12 +74,16 @@ public final class CommandLinkedNpcDeathService {
         }
         UUID npcUuid = npc.getUuid();
         if (!wasDeathRemoval(reference, reason, store)) {
-            deadByNpc.remove(npcUuid);
+            if (deadByNpc.remove(npcUuid) != null) {
+                persistSnapshots();
+            }
             return;
         }
         TameworkCommandLinksComponent links = store.getComponent(reference, TameworkCommandLinksComponent.getComponentType());
         if (links == null || links.getToolIds() == null || links.getToolIds().length == 0) {
-            deadByNpc.remove(npcUuid);
+            if (deadByNpc.remove(npcUuid) != null) {
+                persistSnapshots();
+            }
             return;
         }
 
@@ -92,6 +121,7 @@ public final class CommandLinkedNpcDeathService {
                         respawnAvailableAtMs
                 )
         );
+        persistSnapshots();
     }
 
     @Nullable
@@ -121,7 +151,226 @@ public final class CommandLinkedNpcDeathService {
         if (npcUuid == null) {
             return;
         }
-        deadByNpc.remove(npcUuid);
+        if (deadByNpc.remove(npcUuid) != null) {
+            persistSnapshots();
+        }
+    }
+
+    private void loadPersistedSnapshots() {
+        if (persistencePath == null) {
+            return;
+        }
+        synchronized (persistenceLock) {
+            if (!Files.exists(persistencePath)) {
+                return;
+            }
+            try {
+                List<String> lines = Files.readAllLines(persistencePath, StandardCharsets.UTF_8);
+                for (String line : lines) {
+                    DeadLinkedNpcSnapshot snapshot = parseSnapshot(line);
+                    if (snapshot == null || snapshot.npcUuid() == null) {
+                        continue;
+                    }
+                    deadByNpc.put(snapshot.npcUuid(), snapshot);
+                }
+            } catch (Exception ignored) {
+                // Ignore persistence read issues; runtime tracking still works for newly dead NPCs.
+            }
+        }
+    }
+
+    private void persistSnapshots() {
+        if (persistencePath == null) {
+            return;
+        }
+        synchronized (persistenceLock) {
+            try {
+                if (deadByNpc.isEmpty()) {
+                    Files.deleteIfExists(persistencePath);
+                    return;
+                }
+                Path parent = persistencePath.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                StringBuilder builder = new StringBuilder();
+                for (DeadLinkedNpcSnapshot snapshot : deadByNpc.values()) {
+                    if (snapshot == null || snapshot.npcUuid() == null) {
+                        continue;
+                    }
+                    if (builder.length() > 0) {
+                        builder.append('\n');
+                    }
+                    builder.append(encodeSnapshot(snapshot));
+                }
+                Files.writeString(persistencePath, builder.toString(), StandardCharsets.UTF_8);
+            } catch (Exception ignored) {
+                // Ignore persistence write issues; runtime tracking remains available.
+            }
+        }
+    }
+
+    private String encodeSnapshot(DeadLinkedNpcSnapshot snapshot) {
+        return snapshot.npcUuid()
+                + FIELD_SEPARATOR + encodeNullableUuid(snapshot.ownerId())
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.ownerName())
+                + FIELD_SEPARATOR + encodeStringArray(snapshot.toolIds())
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.roleId())
+                + FIELD_SEPARATOR + snapshot.tamed()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.customName())
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.displayName())
+                + FIELD_SEPARATOR + encodeVector(snapshot.lastKnownPosition())
+                + FIELD_SEPARATOR + encodeVector(snapshot.homePosition())
+                + FIELD_SEPARATOR + snapshot.diedAtMs()
+                + FIELD_SEPARATOR + snapshot.respawnAvailableAtMs();
+    }
+
+    @Nullable
+    private DeadLinkedNpcSnapshot parseSnapshot(String line) {
+        if (line == null || line.isBlank()) {
+            return null;
+        }
+        String[] parts = line.split(FIELD_SEPARATOR, -1);
+        if (parts.length < 12) {
+            return null;
+        }
+        UUID npcUuid = decodeNullableUuid(parts[0]);
+        if (npcUuid == null) {
+            return null;
+        }
+        UUID ownerId = decodeNullableUuid(parts[1]);
+        String ownerName = decodeNullableString(parts[2]);
+        String[] toolIds = sanitizeToolIds(decodeStringArray(parts[3]));
+        String roleId = decodeNullableString(parts[4]);
+        boolean tamed = Boolean.parseBoolean(parts[5]);
+        String customName = decodeNullableString(parts[6]);
+        String displayName = decodeNullableString(parts[7]);
+        Vector3d lastKnownPosition = decodeVector(parts[8]);
+        Vector3d homePosition = decodeVector(parts[9]);
+        long diedAtMs = parseLong(parts[10], System.currentTimeMillis());
+        long respawnAvailableAtMs = parseLong(parts[11], diedAtMs);
+        return new DeadLinkedNpcSnapshot(
+                npcUuid,
+                ownerId,
+                ownerName,
+                toolIds,
+                roleId,
+                tamed,
+                customName,
+                displayName,
+                lastKnownPosition,
+                homePosition,
+                diedAtMs,
+                respawnAvailableAtMs
+        );
+    }
+
+    private String encodeNullableUuid(@Nullable UUID uuid) {
+        return uuid == null ? "" : uuid.toString();
+    }
+
+    @Nullable
+    private UUID decodeNullableUuid(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(value.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private String encodeNullableString(@Nullable String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return Base64.getUrlEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Nullable
+    private String decodeNullableString(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] decoded = Base64.getUrlDecoder().decode(value);
+            String out = new String(decoded, StandardCharsets.UTF_8);
+            return out.isBlank() ? null : out;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private String encodeStringArray(String[] values) {
+        if (values == null || values.length == 0) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder();
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(ARRAY_SEPARATOR);
+            }
+            builder.append(encodeNullableString(value));
+        }
+        return builder.toString();
+    }
+
+    private String[] decodeStringArray(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return new String[0];
+        }
+        String[] parts = raw.split(ARRAY_SEPARATOR);
+        ArrayList<String> out = new ArrayList<>(parts.length);
+        for (String value : parts) {
+            String decoded = decodeNullableString(value);
+            if (decoded == null || decoded.isBlank()) {
+                continue;
+            }
+            out.add(decoded);
+        }
+        return out.toArray(new String[0]);
+    }
+
+    private String encodeVector(@Nullable Vector3d vector) {
+        if (vector == null) {
+            return "";
+        }
+        return vector.x + VECTOR_SEPARATOR + vector.y + VECTOR_SEPARATOR + vector.z;
+    }
+
+    @Nullable
+    private Vector3d decodeVector(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        String[] values = raw.split(VECTOR_SEPARATOR, -1);
+        if (values.length < 3) {
+            return null;
+        }
+        try {
+            return new Vector3d(
+                    Double.parseDouble(values[0]),
+                    Double.parseDouble(values[1]),
+                    Double.parseDouble(values[2])
+            );
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+    }
+
+    private long parseLong(String value, long fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
     }
 
     private boolean wasDeathRemoval(Ref<EntityStore> reference, RemoveReason reason, Store<EntityStore> store) {
