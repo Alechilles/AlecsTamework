@@ -1707,7 +1707,8 @@ public final class CommandItemFeatureHandler {
                 queued++;
                 continue;
             }
-            Vector3d safeDestination = computeSafeRecallPosition(context, record.lastKnownPosition);
+            Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
+            Vector3d safeDestination = computeSafeRecallPosition(context, sourceHint);
             if (safeDestination == null) {
                 continue;
             }
@@ -1721,7 +1722,7 @@ public final class CommandItemFeatureHandler {
                     postRelocationState.state,
                     postRelocationState.subState,
                     0L,
-                    record.lastKnownPosition
+                    sourceHint
             );
             queued++;
         }

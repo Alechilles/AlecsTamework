@@ -42,6 +42,8 @@
 - Unloaded companions in the linked panel now use cached identity fallback with priority `Display Name > Name Key > Role ID` instead of always showing `Unloaded companion (<uuid>)`.
 - Queued per-companion recalls now perform an additional short post-chunk apply probe, which fixes cases where first-click recall only loaded an unloaded companion and required a second click to actually relocate it.
 - Linked-panel per-companion `Recall` now reuses the same recall command execution pipeline as radial recall (including loaded/unloaded handling and relocation queue behavior), eliminating drift between command and button outcomes.
+- Unloaded recall queueing now falls back to stored home when last-known position is missing (common after relog), so recall can still load source chunks and relocate companions.
+- Relocation apply now uses a short burst of retry probes around queue/chunk-load events, improving first-click unloaded recall reliability when NPC components become available a few frames after chunk load.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.

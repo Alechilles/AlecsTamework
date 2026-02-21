@@ -24,6 +24,7 @@ public final class CommandNpcRelocationService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final int CHUNK_SIZE = 32;
     private static final long INITIAL_APPLY_DELAY_MS = 250L;
+    private static final long[] APPLY_BURST_DELAYS_MS = {0L, 150L, 300L, 600L, 1000L};
     private static final long RETRY_INTERVAL_MS = 2000L;
     private static final long MAX_RELOCATION_WAIT_MS = 120000L;
     private static final int MAX_RETRY_ATTEMPTS = 60;
@@ -63,10 +64,10 @@ public final class CommandNpcRelocationService {
         }
         pendingByNpc.put(npcUuid, pending);
         requestChunksForPending(world, pending);
-        long initialDelay = Math.max(delayMs, INITIAL_APPLY_DELAY_MS);
-        scheduleTryApply(world, npcUuid, initialDelay);
+        long initialDelay = Math.max(0L, delayMs);
+        scheduleTryApplyBurst(world, npcUuid, initialDelay);
         long retryInterval = resolveRetryIntervalMs();
-        if (retryInterval > initialDelay) {
+        if (retryInterval > 0L && retryInterval > initialDelay) {
             scheduleTryApply(world, npcUuid, retryInterval);
         }
     }
@@ -199,8 +200,8 @@ public final class CommandNpcRelocationService {
         CompletableFuture<?> request = world.getChunkAsync(chunkX, chunkZ);
         request.thenAccept(chunk -> world.execute(() -> {
             tryApply(world, npcUuid);
-            // Some NPCs become available shortly after chunk completion; probe once more soon.
-            scheduleTryApply(world, npcUuid, INITIAL_APPLY_DELAY_MS);
+            // Some NPCs become available shortly after chunk completion; run short probe burst.
+            scheduleTryApplyBurst(world, npcUuid, INITIAL_APPLY_DELAY_MS);
         }));
     }
 
@@ -213,6 +214,16 @@ public final class CommandNpcRelocationService {
                 () -> world.execute(() -> tryApply(world, npcUuid)),
                 CompletableFuture.delayedExecutor(safeDelayMs, TimeUnit.MILLISECONDS)
         );
+    }
+
+    private void scheduleTryApplyBurst(World world, UUID npcUuid, long baseDelayMs) {
+        if (world == null || npcUuid == null) {
+            return;
+        }
+        long base = Math.max(0L, baseDelayMs);
+        for (long offset : APPLY_BURST_DELAYS_MS) {
+            scheduleTryApply(world, npcUuid, base + Math.max(0L, offset));
+        }
     }
 
     private void applyState(Role role,
