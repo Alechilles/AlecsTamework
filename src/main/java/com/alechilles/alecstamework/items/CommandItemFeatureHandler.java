@@ -94,13 +94,6 @@ public final class CommandItemFeatureHandler {
     private static final double RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
-    private static final String DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID = "SFX_Creative_Play_Brush_Mode";
-    private static final Set<String> LEGACY_LOW_AUDIBILITY_FEEDBACK_SOUND_EVENT_IDS = Set.of(
-            "SFX_Creative_Play_Selection_Widget",
-            "SFX_Creative_Play_Selection_Place",
-            "SFX_Creative_Play_Selection_Drag",
-            "SFX_Creative_Play_Selection_Scale"
-    );
     private static final float DEFAULT_COMMAND_FEEDBACK_VOLUME = 1.0f;
     private static final float DEFAULT_COMMAND_FEEDBACK_PITCH = 1.0f;
     private static final boolean SOUND_DIAGNOSTICS_ENABLED = false;
@@ -193,7 +186,6 @@ public final class CommandItemFeatureHandler {
             }
             String label = resolveCommandLabel(selection.command);
             sendDefaultMessage(player, "Selected: " + label);
-            emitUiClickSound(player);
             return true;
         }
 
@@ -208,7 +200,6 @@ public final class CommandItemFeatureHandler {
                     updateHeldItem(player, working);
                 }
                 sendSuccessMessage(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
-                emitUiClickSound(player);
                 return true;
             }
         }
@@ -396,7 +387,6 @@ public final class CommandItemFeatureHandler {
                                     String toolId,
                                     TwCommandItemConfig config,
                                     String commandId) {
-        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || config == null
                 || commandId == null || commandId.isBlank()) {
             return;
@@ -418,7 +408,6 @@ public final class CommandItemFeatureHandler {
     private void applyMenuUnlink(Player player,
                                  String toolId,
                                  UUID npcUuid) {
-        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -457,7 +446,6 @@ public final class CommandItemFeatureHandler {
     private void applyMenuRespawn(Player player,
                                   String toolId,
                                   UUID npcUuid) {
-        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -534,7 +522,6 @@ public final class CommandItemFeatureHandler {
     private void applyMenuSetHome(Player player,
                                   String toolId,
                                   UUID npcUuid) {
-        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -634,7 +621,6 @@ public final class CommandItemFeatureHandler {
                                       String toolId,
                                       UUID npcUuid,
                                       boolean returnHome) {
-        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -2849,12 +2835,10 @@ public final class CommandItemFeatureHandler {
         if (hudMessage != null && !hudMessage.isBlank()) {
             sendSuccessMessage(context.player, hudMessage);
         }
-        if (feedback == null) {
-            emitFeedbackSound(null, context.playerRef, context.store);
-            return;
+        if (feedback != null) {
+            emitFeedbackSound(feedback.getSoundEvent(), context.playerRef, context.store);
+            emitFeedbackParticles(feedback.getParticleSystem(), feedback.getParticleOffset(), context.playerRef, context.store);
         }
-        emitFeedbackSound(feedback.getSoundEvent(), context.playerRef, context.store);
-        emitFeedbackParticles(feedback.getParticleSystem(), feedback.getParticleOffset(), context.playerRef, context.store);
     }
 
     private String resolveFeedbackText(String template,
@@ -2876,32 +2860,14 @@ public final class CommandItemFeatureHandler {
     private void emitFeedbackSound(String soundEventId,
                                    Ref<EntityStore> playerRef,
                                    Store<EntityStore> store) {
-        emitFeedbackSound(soundEventId, playerRef, store, true);
-    }
-
-    /**
-     * Plays command feedback sound.
-     * <p>
-     * Command execution feedback should be audible to nearby players (world SFX) and reliably audible
-     * to the issuer (2D SFX), while UI click sounds should stay local-only to the issuer.
-     */
-    private void emitFeedbackSound(String soundEventId,
-                                   Ref<EntityStore> playerRef,
-                                   Store<EntityStore> store,
-                                   boolean includeWorldPlayback) {
         if (playerRef == null || !playerRef.isValid() || store == null) {
             return;
         }
-        String resolvedSoundEventId = (soundEventId != null && !soundEventId.isBlank())
-                ? soundEventId
-                : DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID;
-        if (LEGACY_LOW_AUDIBILITY_FEEDBACK_SOUND_EVENT_IDS.contains(resolvedSoundEventId)) {
-            resolvedSoundEventId = DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID;
+        if (soundEventId == null || soundEventId.isBlank()) {
+            return;
         }
+        String resolvedSoundEventId = soundEventId;
         int soundEventIndex = SoundEvent.getAssetMap().getIndex(resolvedSoundEventId);
-        if (soundEventIndex <= 0 && !DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID.equals(resolvedSoundEventId)) {
-            soundEventIndex = SoundEvent.getAssetMap().getIndex(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID);
-        }
         if (soundEventIndex <= 0) {
             logSoundDiagnostic("Failed to resolve sound event index. requested="
                     + soundEventId + ", resolved=" + resolvedSoundEventId);
@@ -2910,7 +2876,7 @@ public final class CommandItemFeatureHandler {
         logSoundDiagnostic("Playing feedback sound. requested="
                 + soundEventId + ", resolved=" + resolvedSoundEventId + ", index=" + soundEventIndex);
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (includeWorldPlayback && transform != null) {
+        if (transform != null) {
             Vector3d position = transform.getPosition();
             SoundUtil.playSoundEvent3d(
                     soundEventIndex,
@@ -2922,6 +2888,8 @@ public final class CommandItemFeatureHandler {
                     DEFAULT_COMMAND_FEEDBACK_PITCH,
                     store
             );
+            emitDiagnosticProbeSound(playerRef, store);
+            return;
         }
         SoundUtil.playSoundEvent2d(
             playerRef,
@@ -2932,16 +2900,6 @@ public final class CommandItemFeatureHandler {
             store
         );
         emitDiagnosticProbeSound(playerRef, store);
-    }
-
-    private void emitUiClickSound(Player player) {
-        if (player == null) {
-            return;
-        }
-        Ref<EntityStore> playerRef = player.getReference();
-        World world = player.getWorld();
-        Store<EntityStore> store = world != null ? world.getEntityStore().getStore() : null;
-        emitFeedbackSound(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID, playerRef, store, false);
     }
 
     private void emitDiagnosticProbeSound(Ref<EntityStore> playerRef, Store<EntityStore> store) {
