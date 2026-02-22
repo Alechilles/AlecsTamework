@@ -50,7 +50,6 @@ import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -91,6 +90,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkMutationService linkMutationService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandRespawnService respawnService;
+    private final CommandMenuMoveService menuMoveService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -138,6 +138,19 @@ public final class CommandItemFeatureHandler {
                 npcNameResolver,
                 deathService,
                 stepExecutionService
+        );
+        this.menuMoveService = new CommandMenuMoveService(
+                resolutionService,
+                linkMutationService,
+                deathService,
+                relocationDispatchService,
+                stepExecutionService,
+                feedbackService,
+                HYBRID_TELEPORT_DISTANCE_THRESHOLD,
+                HYBRID_PATH_DISTANCE_BEFORE_TELEPORT,
+                HYBRID_TELEPORT_DELAY_MS,
+                RECALL_SAFE_SPAWN_DISTANCE,
+                RECALL_FORCE_RELOCATE_DISTANCE
         );
     }
 
@@ -651,173 +664,7 @@ public final class CommandItemFeatureHandler {
                                       String toolId,
                                       UUID npcUuid,
                                       boolean returnHome) {
-        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
-            return;
-        }
-        String actionLabel = returnHome ? "send home" : "recall";
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
-            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
-            return;
-        }
-
-        ItemContainer hotbar = inventory.getHotbar();
-        short capacity = hotbar.getCapacity();
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack stack = hotbar.getItemStack(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-            if (stackToolId == null || !stackToolId.equals(toolId)) {
-                continue;
-            }
-            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
-            if (record == null) {
-                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
-                return;
-            }
-            if (deathService != null
-                    && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
-                feedbackService.showWarning(player, "That companion is dead. Use Respawn when it is ready.");
-                return;
-            }
-            TwCommandItemConfig config = resolutionService.resolveConfig(stack.getItemId(), null);
-            if (config == null || !config.isEnabled()) {
-                feedbackService.showWarning(player, "That command item is not configured.");
-                return;
-            }
-            CommandEntry panelCommand = returnHome
-                    ? resolutionService.resolvePanelReturnHomeCommand(config, stack)
-                    : resolutionService.resolvePanelRecallCommand(config, stack);
-            if (panelCommand == null) {
-                feedbackService.showWarning(
-                        player,
-                        returnHome
-                                ? "No return-home command is configured for this item."
-                                : "No recall command is configured for this item."
-                );
-                return;
-            }
-            TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-            double returnHomeTeleportDistance = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDistance() : 0.0,
-                    HYBRID_TELEPORT_DISTANCE_THRESHOLD
-            );
-            double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandReturnHomePathDistanceBeforeTeleport() : 0.0,
-                    HYBRID_PATH_DISTANCE_BEFORE_TELEPORT
-            );
-            long returnHomeTeleportDelayMs = resolvePositiveLong(
-                    globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDelayMs() : 0L,
-                    HYBRID_TELEPORT_DELAY_MS
-            );
-            double recallSafeSpawnDistance = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
-                    RECALL_SAFE_SPAWN_DISTANCE
-            );
-            double recallForceRelocateDistance = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandRecallForceRelocateDistance() : 0.0,
-                    RECALL_FORCE_RELOCATE_DISTANCE
-            );
-            Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-            NPCEntity npc = (npcRef != null && npcRef.isValid())
-                    ? store.getComponent(npcRef, NPCEntity.getComponentType())
-                    : null;
-            if (returnHome) {
-                boolean hasHome = record.homePosition != null;
-                if (!hasHome && npcRef != null && npcRef.isValid()) {
-                    TameworkCommandLinksComponent links =
-                            store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-                    hasHome = links != null && links.hasHome();
-                }
-                if (!hasHome) {
-                    feedbackService.showWarning(player, "No home is set for that companion.");
-                    return;
-                }
-            }
-            Ref<EntityStore> explicitTarget = npcRef != null && npcRef.isValid() ? npcRef : null;
-            Ref<EntityStore> commandTarget = resolutionService.resolveCommandTarget(playerRef, store, config, panelCommand, explicitTarget);
-            Vector3d raycastPosition = resolutionService.resolveRaycastPosition(playerRef, store, config, panelCommand);
-            Context context = new Context(
-                    player,
-                    playerRef,
-                    store,
-                    config,
-                    panelCommand,
-                    stack.getItemId(),
-                    toolId,
-                    commandTarget,
-                    raycastPosition,
-                    stack,
-                    globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
-                    globalConfig != null && globalConfig.isInvulnerableIfOwned(),
-                    returnHomeTeleportDistance,
-                    returnHomePathDistanceBeforeTeleport,
-                    returnHomeTeleportDelayMs,
-                    recallSafeSpawnDistance,
-                    recallForceRelocateDistance
-            );
-
-            ArrayList<Candidate> loadedRecipients = new ArrayList<>(1);
-            if (npc != null && npcRef != null && npcRef.isValid()) {
-                double distSq = 0.0;
-                TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
-                TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
-                if (npcTransform != null && playerTransform != null) {
-                    Vector3d npcPos = npcTransform.getPosition();
-                    Vector3d playerPos = playerTransform.getPosition();
-                    double dx = npcPos.x - playerPos.x;
-                    double dy = npcPos.y - playerPos.y;
-                    double dz = npcPos.z - playerPos.z;
-                    distSq = dx * dx + dy * dy + dz * dz;
-                }
-                loadedRecipients.add(new Candidate(npcRef, npc, distSq));
-            }
-            List<LinkedNpcRecord> unloadedRecipients = loadedRecipients.isEmpty()
-                    ? List.of(record)
-                    : List.of();
-
-            int affected = 0;
-            for (Candidate candidate : loadedRecipients) {
-                StepResult stepResult = executeCommand(context, candidate);
-                if (stepResult.applied) {
-                    affected++;
-                }
-                if (stepResult.abortAll) {
-                    break;
-                }
-            }
-            ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(context.workingItem, loadedRecipients, store);
-            if (refreshedLinks != context.workingItem) {
-                context.workingItem = refreshedLinks;
-                context.itemChanged = true;
-            }
-            int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloadedRecipients);
-            if (context.itemChanged) {
-                hotbar.setItemStackForSlot(slot, context.workingItem);
-                inventory.markChanged();
-                player.sendInventory();
-            }
-            if (affected <= 0 && queued <= 0) {
-                feedbackService.showWarning(player, returnHome ? "No companions could return home." : "No NPCs could execute that command.");
-                return;
-            }
-            feedbackService.emitCommandExecutionFeedback(context.player, context.playerRef, context.store, context.command, affected, queued, this::resolveCommandLabel);
-            return;
-        }
-        feedbackService.showWarning(player, "Unable to find that command item.");
+        menuMoveService.applyMenuMoveCommand(player, toolId, npcUuid, returnHome, this::resolveCommandLabel);
     }
 
     private String formatDuration(long remainingMs) {
