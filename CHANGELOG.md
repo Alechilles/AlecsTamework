@@ -33,6 +33,7 @@
 - Recall and dead-companion respawn now share the same safe placement pipeline (surface projection + radial candidate sampling) and no longer use a separate recall-only placement path.
 - Recall and dead-companion respawn placement candidates are now randomized and sampled off-camera first, so companions no longer consistently appear directly behind the player.
 - Linked-panel per-NPC `Recall`, `Set Home`, and `Return Home` actions now use compact icon buttons (with distinct default/hover/pressed/disabled textures) for denser card layouts.
+- Linked-panel per-NPC action icons are now arranged in a horizontal bottom-right row on each companion card.
 
 ### Fixed
 - Linked-panel action icon textures now load from `Common/UI/Custom/Tamework`, fixing missing-texture placeholder icons for per-card `Recall`, `Set Home`, and `Return Home` buttons.

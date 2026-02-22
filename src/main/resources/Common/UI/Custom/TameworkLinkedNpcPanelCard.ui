@@ -89,21 +89,21 @@ Group {
   }
 
   TextButton #RecallButton {
-    Anchor: (Top: 24, Right: 36, Width: 24, Height: 24);
+    Anchor: (Top: 62, Right: 64, Width: 24, Height: 24);
     Style: @LinkedActionRecallButtonStyle;
     Text: "";
     Visible: false;
   }
 
   TextButton #SetHomeButton {
-    Anchor: (Top: 48, Right: 36, Width: 24, Height: 24);
+    Anchor: (Top: 62, Right: 36, Width: 24, Height: 24);
     Style: @LinkedActionSetHomeButtonStyle;
     Text: "";
     Visible: false;
   }
 
   TextButton #ReturnHomeButton {
-    Anchor: (Top: 68, Right: 36, Width: 24, Height: 24);
+    Anchor: (Top: 62, Right: 8, Width: 24, Height: 24);
     Style: @LinkedActionReturnHomeButtonStyle;
     Text: "";
     Visible: false;
