@@ -270,7 +270,7 @@ public final class TameworkCommandSelectionPage
             boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
             boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
             commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-            commandBuilder.set(statusUnloadedSelector + ".Text", resolveAvailabilityStatusText(entry));
+            commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
             commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
             if (entry.hasHealth()) {
                 commandBuilder.set(
@@ -280,10 +280,10 @@ public final class TameworkCommandSelectionPage
                 commandBuilder.set(healthFillSelector + ".Visible", true);
                 commandBuilder.setObject(healthFillSelector + ".Anchor", buildHealthFillAnchor(entry.healthRatio()));
             } else if (entry.dead()) {
-                commandBuilder.set(healthTextSelector + ".Text", resolveDeadHealthText(entry));
+                commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry));
                 commandBuilder.set(healthFillSelector + ".Visible", false);
             } else if (!entry.loaded()) {
-                commandBuilder.set(healthTextSelector + ".Text", resolveUnavailableHealthText(entry));
+                commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(entry));
                 commandBuilder.set(healthFillSelector + ".Visible", false);
             } else {
                 commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
@@ -423,7 +423,7 @@ public final class TameworkCommandSelectionPage
                 boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
                 boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
                 commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-                commandBuilder.set(statusUnloadedSelector + ".Text", resolveAvailabilityStatusText(entry));
+                commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
                 commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
                 if (entry.hasHealth()) {
                     commandBuilder.set(
@@ -433,10 +433,10 @@ public final class TameworkCommandSelectionPage
                     commandBuilder.set(healthFillSelector + ".Visible", true);
                     commandBuilder.setObject(healthFillSelector + ".Anchor", buildHealthFillAnchor(entry.healthRatio()));
                 } else if (entry.dead()) {
-                    commandBuilder.set(healthTextSelector + ".Text", resolveDeadHealthText(entry));
+                    commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry));
                     commandBuilder.set(healthFillSelector + ".Visible", false);
                 } else if (!entry.loaded()) {
-                    commandBuilder.set(healthTextSelector + ".Text", resolveUnavailableHealthText(entry));
+                    commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(entry));
                     commandBuilder.set(healthFillSelector + ".Visible", false);
                 } else {
                     commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
@@ -636,50 +636,6 @@ public final class TameworkCommandSelectionPage
         anchor.setWidth(Value.of(width));
         anchor.setHeight(Value.of(12));
         return anchor;
-    }
-
-    private String resolveDeadHealthText(LinkedNpcEntry entry) {
-        if (entry == null || !entry.dead()) {
-            return "Dead";
-        }
-        if (entry.deadRespawnRemainingMs() < 0L) {
-            return "Dead: respawn disabled.";
-        }
-        long remainingMs = Math.max(0L, entry.deadRespawnRemainingMs());
-        if (remainingMs <= 0L) {
-            return "Dead: ready to respawn.";
-        }
-        return "Dead: respawn in " + formatRemainingTime(remainingMs) + ".";
-    }
-
-    private String resolveAvailabilityStatusText(LinkedNpcEntry entry) {
-        if (entry == null) {
-            return "UNLOADED";
-        }
-        if (entry.dead()) {
-            return "DEAD";
-        }
-        if (entry.captured()) {
-            return "CAPTURED";
-        }
-        return "UNLOADED";
-    }
-
-    private String resolveUnavailableHealthText(LinkedNpcEntry entry) {
-        if (entry != null && entry.captured()) {
-            return "Captured in item.";
-        }
-        return "Unloaded (commands still queue).";
-    }
-
-    private String formatRemainingTime(long remainingMs) {
-        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        if (minutes <= 0L) {
-            return seconds + "s";
-        }
-        return minutes + "m " + seconds + "s";
     }
 
     private static String resolveLabel(CommandEntry entry) {
