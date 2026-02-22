@@ -38,6 +38,13 @@ $C = "Common.ui";
   Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
 );
 
+@LinkedActionRespawnButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+);
+
 Group {
   Anchor: (Top: 8, Height: 92);
   Background: #13263c(0.86);
@@ -81,10 +88,12 @@ Group {
     Visible: false;
   }
 
-  $C.@SmallSecondaryTextButton #RespawnButton {
-    Anchor: (Top: 0, Right: 34, Width: 76, Height: 22);
-    Padding: (Horizontal: 8);
-    Text: "Respawn";
+  TextButton #RespawnButton {
+    Anchor: (Top: 62, Right: 64, Width: 24, Height: 24);
+    Style: @LinkedActionRespawnButtonStyle;
+    Text: "";
+    TooltipText: "Respawn companion";
+    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
     Visible: false;
   }
 
@@ -92,6 +101,8 @@ Group {
     Anchor: (Top: 62, Right: 64, Width: 24, Height: 24);
     Style: @LinkedActionRecallButtonStyle;
     Text: "";
+    TooltipText: "Recall companion";
+    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
     Visible: false;
   }
 
@@ -99,6 +110,8 @@ Group {
     Anchor: (Top: 62, Right: 8, Width: 24, Height: 24);
     Style: @LinkedActionSetHomeButtonStyle;
     Text: "";
+    TooltipText: "Set companion home";
+    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
     Visible: false;
   }
 
@@ -106,6 +119,8 @@ Group {
     Anchor: (Top: 62, Right: 36, Width: 24, Height: 24);
     Style: @LinkedActionReturnHomeButtonStyle;
     Text: "";
+    TooltipText: "Send companion home";
+    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
     Visible: false;
   }
 
@@ -113,6 +128,8 @@ Group {
     Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
     Style: @RemoveIconButtonStyle;
     Text: "";
+    TooltipText: "Unlink companion";
+    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
   }
 
   Group #HealthFrame {
