@@ -93,6 +93,9 @@ public final class CommandItemFeatureHandler {
     private static final double RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
+    private static final String DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID = "SFX_Creative_Play_Selection_Widget";
+    private static final float DEFAULT_COMMAND_FEEDBACK_VOLUME = 1.0f;
+    private static final float DEFAULT_COMMAND_FEEDBACK_PITCH = 1.0f;
     private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
     private static final double RESPAWN_DISTANCE_CLOSE = 5.0;
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
@@ -181,6 +184,7 @@ public final class CommandItemFeatureHandler {
             }
             String label = resolveCommandLabel(selection.command);
             sendDefaultMessage(player, "Selected: " + label);
+            emitUiClickSound(player);
             return true;
         }
 
@@ -195,6 +199,7 @@ public final class CommandItemFeatureHandler {
                     updateHeldItem(player, working);
                 }
                 sendSuccessMessage(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
+                emitUiClickSound(player);
                 return true;
             }
         }
@@ -398,6 +403,7 @@ public final class CommandItemFeatureHandler {
         }
         String label = resolveCommandLabel(selected);
         sendDefaultMessage(player, "Selected: " + label);
+        emitUiClickSound(player);
     }
 
     private void applyMenuUnlink(Player player,
@@ -432,6 +438,7 @@ public final class CommandItemFeatureHandler {
                 inventory.markChanged();
                 player.sendInventory();
                 sendSuccessMessage(player, "Removed linked NPC.");
+                emitUiClickSound(player);
             }
             return;
         }
@@ -509,6 +516,7 @@ public final class CommandItemFeatureHandler {
                 name = "companion";
             }
             sendSuccessMessage(player, "Respawned " + name + ".");
+            emitUiClickSound(player);
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
@@ -595,6 +603,7 @@ public final class CommandItemFeatureHandler {
             inventory.markChanged();
             player.sendInventory();
             sendSuccessMessage(player, "Set home for " + resolveNpcDisplayName(npcRef, store, npc) + ".");
+            emitUiClickSound(player);
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
@@ -2831,6 +2840,7 @@ public final class CommandItemFeatureHandler {
             sendSuccessMessage(context.player, hudMessage);
         }
         if (feedback == null) {
+            emitFeedbackSound(null, context.playerRef, context.store);
             return;
         }
         emitFeedbackSound(feedback.getSoundEvent(), context.playerRef, context.store);
@@ -2856,18 +2866,37 @@ public final class CommandItemFeatureHandler {
     private void emitFeedbackSound(String soundEventId,
                                    Ref<EntityStore> playerRef,
                                    Store<EntityStore> store) {
-        if (soundEventId == null || soundEventId.isBlank() || playerRef == null || !playerRef.isValid() || store == null) {
+        if (playerRef == null || !playerRef.isValid() || store == null) {
             return;
         }
-        int soundEventIndex = SoundEvent.getAssetMap().getIndex(soundEventId);
+        String resolvedSoundEventId = (soundEventId != null && !soundEventId.isBlank())
+                ? soundEventId
+                : DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID;
+        int soundEventIndex = SoundEvent.getAssetMap().getIndex(resolvedSoundEventId);
+        if (soundEventIndex <= 0 && !DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID.equals(resolvedSoundEventId)) {
+            soundEventIndex = SoundEvent.getAssetMap().getIndex(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID);
+        }
         if (soundEventIndex <= 0) {
             return;
         }
-        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform == null) {
+        SoundUtil.playSoundEvent2d(
+                playerRef,
+                soundEventIndex,
+                SoundCategory.SFX,
+                DEFAULT_COMMAND_FEEDBACK_VOLUME,
+                DEFAULT_COMMAND_FEEDBACK_PITCH,
+                store
+        );
+    }
+
+    private void emitUiClickSound(Player player) {
+        if (player == null) {
             return;
         }
-        SoundUtil.playSoundEvent3d(soundEventIndex, SoundCategory.SFX, transform.getPosition(), store);
+        Ref<EntityStore> playerRef = player.getReference();
+        World world = player.getWorld();
+        Store<EntityStore> store = world != null ? world.getEntityStore().getStore() : null;
+        emitFeedbackSound(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID, playerRef, store);
     }
 
     private void emitFeedbackParticles(String particleSystem,
