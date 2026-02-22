@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+### Added
+- New `Component_Tamework_Instruction_Wander` component for reusable random wandering within a configurable radius.
+
 ## 2.1.1 - Linked Companions Panel UX and Safety - 2026-02-21
 ### Added
 - Linked Companions side panel with per-NPC actions: `Recall`, `Set Home`, `Return Home`, and `Unlink`.

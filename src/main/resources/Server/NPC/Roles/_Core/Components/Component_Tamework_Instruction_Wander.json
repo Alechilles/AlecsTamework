@@ -1,0 +1,71 @@
+{
+  "$Comment": "Reusable random wander behavior for idle-style states.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.Wander",
+  "DefaultState": ".Default",
+  "Parameters": {
+    "WanderRadius": {
+      "Value": 8,
+      "Description": "Radius used by WanderInCircle movement."
+    },
+    "WanderMaxHeadingChange": {
+      "Value": 60,
+      "Description": "Maximum heading change for each wander update."
+    },
+    "WanderRelativeSpeed": {
+      "Value": 0.3,
+      "Description": "Relative movement speed while wandering."
+    }
+  },
+  "Content": {
+    "$Comment": "Default Wander State: move in short random bursts with brief idle pauses.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "Sensor": {
+          "Type": "State",
+          "State": ".Default"
+        },
+        "BodyMotion": {
+          "Type": "Sequence",
+          "Looped": true,
+          "Motions": [
+            {
+              "Type": "Timer",
+              "Time": [
+                1,
+                4
+              ],
+              "Motion": {
+                "Type": "WanderInCircle",
+                "Radius": {
+                  "Compute": "WanderRadius"
+                },
+                "MaxHeadingChange": {
+                  "Compute": "WanderMaxHeadingChange"
+                },
+                "RelativeSpeed": {
+                  "Compute": "WanderRelativeSpeed"
+                }
+              }
+            },
+            {
+              "Type": "Timer",
+              "Time": [
+                1,
+                2
+              ],
+              "Motion": {
+                "Type": "Nothing"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}
