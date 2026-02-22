@@ -370,6 +370,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
+                npcUuid -> applyMenuReturnHome(player, toolId, npcUuid),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
@@ -601,23 +602,37 @@ public final class CommandItemFeatureHandler {
     private void applyMenuRecall(Player player,
                                  String toolId,
                                  UUID npcUuid) {
+        applyMenuMoveCommand(player, toolId, npcUuid, false);
+    }
+
+    private void applyMenuReturnHome(Player player,
+                                     String toolId,
+                                     UUID npcUuid) {
+        applyMenuMoveCommand(player, toolId, npcUuid, true);
+    }
+
+    private void applyMenuMoveCommand(Player player,
+                                      String toolId,
+                                      UUID npcUuid,
+                                      boolean returnHome) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
+        String actionLabel = returnHome ? "send home" : "recall";
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            sendWarningMessage(player, "Unable to recall right now.");
+            sendWarningMessage(player, "Unable to " + actionLabel + " right now.");
             return;
         }
         World world = player.getWorld();
         if (world == null) {
-            sendWarningMessage(player, "Unable to recall right now.");
+            sendWarningMessage(player, "Unable to " + actionLabel + " right now.");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> playerRef = player.getReference();
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            sendWarningMessage(player, "Unable to recall right now.");
+            sendWarningMessage(player, "Unable to " + actionLabel + " right now.");
             return;
         }
 
@@ -647,9 +662,16 @@ public final class CommandItemFeatureHandler {
                 sendWarningMessage(player, "That command item is not configured.");
                 return;
             }
-            CommandEntry recallCommand = resolvePanelRecallCommand(config, stack);
-            if (recallCommand == null) {
-                sendWarningMessage(player, "No recall command is configured for this item.");
+            CommandEntry panelCommand = returnHome
+                    ? resolvePanelReturnHomeCommand(config, stack)
+                    : resolvePanelRecallCommand(config, stack);
+            if (panelCommand == null) {
+                sendWarningMessage(
+                        player,
+                        returnHome
+                                ? "No return-home command is configured for this item."
+                                : "No recall command is configured for this item."
+                );
                 return;
             }
             TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
@@ -677,15 +699,27 @@ public final class CommandItemFeatureHandler {
             NPCEntity npc = (npcRef != null && npcRef.isValid())
                     ? store.getComponent(npcRef, NPCEntity.getComponentType())
                     : null;
+            if (returnHome) {
+                boolean hasHome = record.homePosition != null;
+                if (!hasHome && npcRef != null && npcRef.isValid()) {
+                    TameworkCommandLinksComponent links =
+                            store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+                    hasHome = links != null && links.hasHome();
+                }
+                if (!hasHome) {
+                    sendWarningMessage(player, "No home is set for that companion.");
+                    return;
+                }
+            }
             Ref<EntityStore> explicitTarget = npcRef != null && npcRef.isValid() ? npcRef : null;
-            Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, recallCommand, explicitTarget);
-            Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, recallCommand);
+            Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, panelCommand, explicitTarget);
+            Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, panelCommand);
             Context context = new Context(
                     player,
                     playerRef,
                     store,
                     config,
-                    recallCommand,
+                    panelCommand,
                     stack.getItemId(),
                     toolId,
                     commandTarget,
@@ -741,7 +775,7 @@ public final class CommandItemFeatureHandler {
                 player.sendInventory();
             }
             if (affected <= 0 && queued <= 0) {
-                sendWarningMessage(player, "No NPCs could execute that command.");
+                sendWarningMessage(player, returnHome ? "No companions could return home." : "No NPCs could execute that command.");
                 return;
             }
             emitCommandExecutionFeedback(context, affected, queued);
@@ -984,6 +1018,7 @@ public final class CommandItemFeatureHandler {
             boolean loaded = false;
             boolean dead = false;
             long deadRespawnRemainingMs = 0L;
+            boolean hasHome = record.homePosition != null;
             String displayName = resolveCachedUnloadedDisplayName(record);
             if (displayName == null || displayName.isBlank()) {
                 displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
@@ -997,6 +1032,11 @@ public final class CommandItemFeatureHandler {
                     if (npc != null) {
                         loaded = true;
                         displayName = resolveNpcDisplayName(npcRef, store, npc);
+                        TameworkCommandLinksComponent links =
+                                store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+                        if (links != null && links.hasHome()) {
+                            hasHome = true;
+                        }
                         HealthSnapshot snapshot = readNpcHealthSnapshot(npcRef, store);
                         if (snapshot != null) {
                             health = snapshot.current;
@@ -1030,6 +1070,7 @@ public final class CommandItemFeatureHandler {
                     health,
                     maxHealth,
                     loaded,
+                    hasHome,
                     dead,
                     deadRespawnRemainingMs
             ));
@@ -1489,6 +1530,26 @@ public final class CommandItemFeatureHandler {
         }
         CommandEntry fallback = resolveCommand(config, null, itemStack);
         return isRecallCommand(fallback) ? fallback : null;
+    }
+
+    private CommandEntry resolvePanelReturnHomeCommand(TwCommandItemConfig config, ItemStack itemStack) {
+        if (config == null) {
+            return null;
+        }
+        CommandEntry direct = config.findCommandById("ReturnHome");
+        if (direct != null) {
+            return direct;
+        }
+        CommandEntry[] commands = config.getCommandList();
+        if (commands != null) {
+            for (CommandEntry entry : commands) {
+                if (isReturnHomeCommand(entry)) {
+                    return entry;
+                }
+            }
+        }
+        CommandEntry fallback = resolveCommand(config, null, itemStack);
+        return isReturnHomeCommand(fallback) ? fallback : null;
     }
 
     private Ref<EntityStore> resolveCommandTarget(Ref<EntityStore> playerRef,

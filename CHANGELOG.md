@@ -5,7 +5,7 @@
 - New `CommandLinkedPanelRequireUnlinkConfirm` global setting in `TwGlobalConfig` (default `true`) to control whether unlinking from the linked-companions panel requires a second confirm click.
 - Linked-companions panel empty state messaging when no NPCs are linked to the command tool.
 - Row-level loaded/unloaded/confirm status badges in the linked-companions panel.
-- Linked-companions card action buttons for per-NPC `Recall` and `Set Home`, so individual companions can be managed directly from the side panel without changing the currently selected radial command.
+- Linked-companions card action buttons for per-NPC `Recall`, `Set Home`, and `Return Home`, so individual companions can be managed directly from the side panel without changing the currently selected radial command.
 - New dead-linked companion tracking so linked NPC deaths are surfaced as `DEAD` in the linked-companions panel instead of being treated as generic unloaded records.
 - New `TwGlobalConfig` options for dead companion recovery:
   - `CommandDeadRespawnEnabled` (default `false`)

@@ -43,6 +43,7 @@ public final class TameworkCommandSelectionPage
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
+    private static final String RETURN_HOME_COMMAND_PREFIX = "__returnhome__:";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final int HEALTH_FILL_MAX_WIDTH = 204;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
@@ -59,6 +60,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> respawnCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
+    private final Consumer<UUID> returnHomeCallback;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
 
@@ -71,6 +73,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<UUID> respawnCallback,
                                         @Nonnull Consumer<UUID> recallCallback,
                                         @Nonnull Consumer<UUID> setHomeCallback,
+                                        @Nonnull Consumer<UUID> returnHomeCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
@@ -84,6 +87,7 @@ public final class TameworkCommandSelectionPage
         this.respawnCallback = respawnCallback;
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
+        this.returnHomeCallback = returnHomeCallback;
         this.selectionCallback = selectionCallback;
         this.refreshLoopStarted = false;
         this.dismissed = false;
@@ -177,6 +181,19 @@ public final class TameworkCommandSelectionPage
             }
             return;
         }
+        if (data.commandId.startsWith(RETURN_HOME_COMMAND_PREFIX)) {
+            if (returnHomeCallback == null) {
+                return;
+            }
+            UUID npcUuid = parseReturnHomeNpcUuid(data.commandId);
+            if (npcUuid != null) {
+                returnHomeCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                rebuild();
+            }
+            return;
+        }
         if (!containsOption(data.commandId)) {
             pendingUnlinkNpcUuid = null;
             close();
@@ -243,6 +260,7 @@ public final class TameworkCommandSelectionPage
             String respawnSelector = entrySelector + " #RespawnButton";
             String recallSelector = entrySelector + " #RecallButton";
             String setHomeSelector = entrySelector + " #SetHomeButton";
+            String returnHomeSelector = entrySelector + " #ReturnHomeButton";
 
             commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
             commandBuilder.set(nameSelector + ".Text", entry.displayName());
@@ -250,6 +268,7 @@ public final class TameworkCommandSelectionPage
             boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
             boolean showRecall = !entry.dead() && !pendingUnlink;
             boolean showSetHome = entry.loaded() && !entry.dead() && !pendingUnlink;
+            boolean showReturnHome = !entry.dead() && entry.hasHome() && !pendingUnlink;
             commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
             commandBuilder.set(statusUnloadedSelector + ".Text", entry.dead() ? "DEAD" : "UNLOADED");
             commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
@@ -278,6 +297,7 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set(respawnSelector + ".Visible", showRespawn);
             commandBuilder.set(recallSelector + ".Visible", showRecall);
             commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
+            commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
             commandBuilder.set(removeSelector + ".Text", "");
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -306,6 +326,14 @@ public final class TameworkCommandSelectionPage
                         CustomUIEventBindingType.Activating,
                         setHomeSelector,
                         EventData.of(EVENT_COMMAND_ID, SET_HOME_COMMAND_PREFIX + entry.npcUuid()),
+                        false
+                );
+            }
+            if (showReturnHome) {
+                eventBuilder.addEventBinding(
+                        CustomUIEventBindingType.Activating,
+                        returnHomeSelector,
+                        EventData.of(EVENT_COMMAND_ID, RETURN_HOME_COMMAND_PREFIX + entry.npcUuid()),
                         false
                 );
             }
@@ -386,12 +414,14 @@ public final class TameworkCommandSelectionPage
                 String respawnSelector = entrySelector + " #RespawnButton";
                 String recallSelector = entrySelector + " #RecallButton";
                 String setHomeSelector = entrySelector + " #SetHomeButton";
+                String returnHomeSelector = entrySelector + " #ReturnHomeButton";
 
                 commandBuilder.set(nameSelector + ".Text", entry.displayName());
                 boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
                 boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
                 boolean showRecall = !entry.dead() && !pendingUnlink;
                 boolean showSetHome = entry.loaded() && !entry.dead() && !pendingUnlink;
+                boolean showReturnHome = !entry.dead() && entry.hasHome() && !pendingUnlink;
                 commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
                 commandBuilder.set(statusUnloadedSelector + ".Text", entry.dead() ? "DEAD" : "UNLOADED");
                 commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
@@ -420,6 +450,7 @@ public final class TameworkCommandSelectionPage
                 commandBuilder.set(respawnSelector + ".Visible", showRespawn);
                 commandBuilder.set(recallSelector + ".Visible", showRecall);
                 commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
+                commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
                 commandBuilder.set(removeSelector + ".Text", "");
                 eventBuilder.addEventBinding(
                         CustomUIEventBindingType.Activating,
@@ -448,6 +479,14 @@ public final class TameworkCommandSelectionPage
                             CustomUIEventBindingType.Activating,
                             setHomeSelector,
                             EventData.of(EVENT_COMMAND_ID, SET_HOME_COMMAND_PREFIX + entry.npcUuid()),
+                            false
+                    );
+                }
+                if (showReturnHome) {
+                    eventBuilder.addEventBinding(
+                            CustomUIEventBindingType.Activating,
+                            returnHomeSelector,
+                            EventData.of(EVENT_COMMAND_ID, RETURN_HOME_COMMAND_PREFIX + entry.npcUuid()),
                             false
                     );
                 }
@@ -567,6 +606,7 @@ public final class TameworkCommandSelectionPage
                     current,
                     max,
                     entry.loaded,
+                    entry.hasHome,
                     entry.dead,
                     entry.deadRespawnRemainingMs,
                     entry.futureStatA,
@@ -713,6 +753,21 @@ public final class TameworkCommandSelectionPage
         }
     }
 
+    private UUID parseReturnHomeNpcUuid(String commandId) {
+        if (commandId == null || !commandId.startsWith(RETURN_HOME_COMMAND_PREFIX)) {
+            return null;
+        }
+        String raw = commandId.substring(RETURN_HOME_COMMAND_PREFIX.length());
+        if (raw.isBlank()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
     private record CommandOption(String id, String label) { }
 
     /** View model for one linked NPC row in the command radial side panel. */
@@ -723,6 +778,7 @@ public final class TameworkCommandSelectionPage
         private final int maxHealth;
         private final boolean loaded;
         private final boolean dead;
+        private final boolean hasHome;
         private final long deadRespawnRemainingMs;
         private final FutureStat futureStatA;
         private final FutureStat futureStatB;
@@ -732,7 +788,7 @@ public final class TameworkCommandSelectionPage
         private final boolean talentsActionEnabled;
 
         public LinkedNpcEntry(UUID npcUuid, String displayName, int currentHealth, int maxHealth, boolean loaded) {
-            this(npcUuid, displayName, currentHealth, maxHealth, loaded, false, 0L);
+            this(npcUuid, displayName, currentHealth, maxHealth, loaded, false, false, 0L);
         }
 
         public LinkedNpcEntry(UUID npcUuid,
@@ -740,6 +796,7 @@ public final class TameworkCommandSelectionPage
                               int currentHealth,
                               int maxHealth,
                               boolean loaded,
+                              boolean hasHome,
                               boolean dead,
                               long deadRespawnRemainingMs) {
             this(
@@ -748,6 +805,7 @@ public final class TameworkCommandSelectionPage
                     currentHealth,
                     maxHealth,
                     loaded,
+                    hasHome,
                     dead,
                     deadRespawnRemainingMs,
                     null,
@@ -764,6 +822,7 @@ public final class TameworkCommandSelectionPage
                               int currentHealth,
                               int maxHealth,
                               boolean loaded,
+                              boolean hasHome,
                               boolean dead,
                               long deadRespawnRemainingMs,
                               FutureStat futureStatA,
@@ -777,6 +836,7 @@ public final class TameworkCommandSelectionPage
             this.currentHealth = currentHealth;
             this.maxHealth = maxHealth;
             this.loaded = loaded;
+            this.hasHome = hasHome;
             this.dead = dead;
             this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
             this.futureStatA = futureStatA;
@@ -813,6 +873,10 @@ public final class TameworkCommandSelectionPage
 
         public boolean dead() {
             return dead;
+        }
+
+        public boolean hasHome() {
+            return hasHome;
         }
 
         public long deadRespawnRemainingMs() {

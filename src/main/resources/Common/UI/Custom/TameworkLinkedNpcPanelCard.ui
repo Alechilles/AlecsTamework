@@ -76,6 +76,13 @@ Group {
     Visible: false;
   }
 
+  $C.@SmallSecondaryTextButton #ReturnHomeButton {
+    Anchor: (Top: 68, Right: 34, Width: 76, Height: 22);
+    Padding: (Horizontal: 8);
+    Text: "Return";
+    Visible: false;
+  }
+
   TextButton #RemoveButton {
     Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
     Style: @RemoveIconButtonStyle;
