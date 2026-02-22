@@ -106,6 +106,7 @@ public final class CommandItemFeatureHandler {
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkedPanelEntryService panelEntryService;
     private final CommandToolInventoryService toolInventoryService;
+    private final CommandResolutionService resolutionService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -125,6 +126,7 @@ public final class CommandItemFeatureHandler {
                 npcNameResolver
         );
         this.toolInventoryService = new CommandToolInventoryService(panelEntryService);
+        this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
     }
 
     // Handles a single command-item use.
@@ -146,7 +148,7 @@ public final class CommandItemFeatureHandler {
             return false;
         }
 
-        TwCommandItemConfig config = resolveConfig(itemStack.getItemId(), configIdOverride);
+        TwCommandItemConfig config = resolutionService.resolveConfig(itemStack.getItemId(), configIdOverride);
         if (config == null || !config.isEnabled()) {
             return false;
         }
@@ -211,7 +213,7 @@ public final class CommandItemFeatureHandler {
             return false;
         }
 
-        CommandEntry command = resolveCommand(config, commandIdOverride, working);
+        CommandEntry command = resolutionService.resolveCommand(config, commandIdOverride, working);
         if (command == null) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
@@ -220,8 +222,8 @@ public final class CommandItemFeatureHandler {
             return false;
         }
 
-        Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, command, targetRef);
-        Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, command);
+        Ref<EntityStore> commandTarget = resolutionService.resolveCommandTarget(playerRef, store, config, command, targetRef);
+        Vector3d raycastPosition = resolutionService.resolveRaycastPosition(playerRef, store, config, command);
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         double returnHomeTeleportDistance = resolvePositiveDouble(
                 globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDistance() : 0.0,
@@ -661,14 +663,14 @@ public final class CommandItemFeatureHandler {
                 sendWarningMessage(player, "That companion is dead. Use Respawn when it is ready.");
                 return;
             }
-            TwCommandItemConfig config = resolveConfig(stack.getItemId(), null);
+            TwCommandItemConfig config = resolutionService.resolveConfig(stack.getItemId(), null);
             if (config == null || !config.isEnabled()) {
                 sendWarningMessage(player, "That command item is not configured.");
                 return;
             }
             CommandEntry panelCommand = returnHome
-                    ? resolvePanelReturnHomeCommand(config, stack)
-                    : resolvePanelRecallCommand(config, stack);
+                    ? resolutionService.resolvePanelReturnHomeCommand(config, stack)
+                    : resolutionService.resolvePanelRecallCommand(config, stack);
             if (panelCommand == null) {
                 sendWarningMessage(
                         player,
@@ -716,8 +718,8 @@ public final class CommandItemFeatureHandler {
                 }
             }
             Ref<EntityStore> explicitTarget = npcRef != null && npcRef.isValid() ? npcRef : null;
-            Ref<EntityStore> commandTarget = resolveCommandTarget(playerRef, store, config, panelCommand, explicitTarget);
-            Vector3d raycastPosition = resolveRaycastPosition(playerRef, store, config, panelCommand);
+            Ref<EntityStore> commandTarget = resolutionService.resolveCommandTarget(playerRef, store, config, panelCommand, explicitTarget);
+            Vector3d raycastPosition = resolutionService.resolveRaycastPosition(playerRef, store, config, panelCommand);
             Context context = new Context(
                     player,
                     playerRef,
@@ -1020,150 +1022,6 @@ public final class CommandItemFeatureHandler {
         return "Unknown";
     }
 
-    private TwCommandItemConfig resolveConfig(String itemId, String configIdOverride) {
-        if (configIdOverride != null && !configIdOverride.isBlank()
-                && TwCommandItemConfig.getAssetMap() != null) {
-            TwCommandItemConfig override = TwCommandItemConfig.getAssetMap().getAsset(configIdOverride);
-            if (override != null) {
-                return override;
-            }
-        }
-        if (registry == null || itemId == null || itemId.isBlank()) {
-            return null;
-        }
-        return registry.get(itemId);
-    }
-
-    private CommandEntry resolveCommand(TwCommandItemConfig config, String commandIdOverride, ItemStack itemStack) {
-        if (config == null) {
-            return null;
-        }
-        CommandEntry direct = config.findCommandById(commandIdOverride);
-        if (direct != null) {
-            return direct;
-        }
-        if (itemStack != null) {
-            String selectedId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING);
-            CommandEntry selected = config.findCommandById(selectedId);
-            if (selected != null) {
-                return selected;
-            }
-        }
-        return config.findDefaultCommand();
-    }
-
-    private CommandEntry resolvePanelRecallCommand(TwCommandItemConfig config, ItemStack itemStack) {
-        if (config == null) {
-            return null;
-        }
-        CommandEntry direct = config.findCommandById("Recall");
-        if (direct != null) {
-            return direct;
-        }
-        CommandEntry[] commands = config.getCommandList();
-        if (commands != null) {
-            for (CommandEntry entry : commands) {
-                if (isRecallCommand(entry)) {
-                    return entry;
-                }
-            }
-        }
-        CommandEntry fallback = resolveCommand(config, null, itemStack);
-        return isRecallCommand(fallback) ? fallback : null;
-    }
-
-    private CommandEntry resolvePanelReturnHomeCommand(TwCommandItemConfig config, ItemStack itemStack) {
-        if (config == null) {
-            return null;
-        }
-        CommandEntry direct = config.findCommandById("ReturnHome");
-        if (direct != null) {
-            return direct;
-        }
-        CommandEntry[] commands = config.getCommandList();
-        if (commands != null) {
-            for (CommandEntry entry : commands) {
-                if (isReturnHomeCommand(entry)) {
-                    return entry;
-                }
-            }
-        }
-        CommandEntry fallback = resolveCommand(config, null, itemStack);
-        return isReturnHomeCommand(fallback) ? fallback : null;
-    }
-
-    private Ref<EntityStore> resolveCommandTarget(Ref<EntityStore> playerRef,
-                                                  Store<EntityStore> store,
-                                                  TwCommandItemConfig config,
-                                                  CommandEntry command,
-                                                  Ref<EntityStore> explicitTarget) {
-        if (playerRef == null || !playerRef.isValid() || store == null) {
-            return null;
-        }
-        if (explicitTarget != null && explicitTarget.isValid() && !explicitTarget.equals(playerRef)) {
-            return explicitTarget;
-        }
-        if (!needsEntityTarget(command)) {
-            return null;
-        }
-        float radius = resolveTargetEntityRadius(config);
-        Ref<EntityStore> raycastTarget = TargetUtil.getTargetEntity(playerRef, radius, store);
-        if (raycastTarget == null || !raycastTarget.isValid() || raycastTarget.equals(playerRef)) {
-            return null;
-        }
-        return raycastTarget;
-    }
-
-    private boolean needsEntityTarget(CommandEntry command) {
-        if (command == null || command.getSteps() == null) {
-            return false;
-        }
-        for (CommandStep step : command.getSteps()) {
-            if (step instanceof SetTargetStep targetStep) {
-                TargetSource source = targetStep.getSource() != null
-                        ? targetStep.getSource()
-                        : TargetSource.CrosshairTarget;
-                if (source == TargetSource.CrosshairTarget || source == TargetSource.LastAttackTarget) {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
-
-    private float resolveTargetEntityRadius(TwCommandItemConfig config) {
-        double distance = config != null && config.getRadius() > 0 ? config.getRadius() : DEFAULT_RAYCAST_DISTANCE;
-        distance = Math.max(1.0, Math.min(distance, Float.MAX_VALUE));
-        return (float) distance;
-    }
-
-    private Vector3d resolveRaycastPosition(Ref<EntityStore> playerRef,
-                                            Store<EntityStore> store,
-                                            TwCommandItemConfig config,
-                                            CommandEntry command) {
-        if (!needsRaycast(command) || playerRef == null || !playerRef.isValid()) {
-            return null;
-        }
-        double distance = config != null && config.getRadius() > 0 ? config.getRadius() : DEFAULT_RAYCAST_DISTANCE;
-        return TargetUtil.getTargetLocation(playerRef, blockId -> blockId != 0, distance, store);
-    }
-
-    private boolean needsRaycast(CommandEntry command) {
-        if (command == null || command.getSteps() == null) {
-            return false;
-        }
-        for (CommandStep step : command.getSteps()) {
-            if (step instanceof MoveToPositionStep moveStep && moveStep.getSource() == MoveSource.RaycastHit) {
-                return true;
-            }
-            if (step instanceof StoreHomeStep storeHomeStep
-                    && storeHomeStep.getSource() == StoreSource.RaycastHit) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private List<Candidate> queryRecipients(Context context) {
         ArrayList<Candidate> out = new ArrayList<>();
         TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
@@ -1269,8 +1127,8 @@ public final class CommandItemFeatureHandler {
         if (context == null || unloadedLinked == null || unloadedLinked.isEmpty() || relocationService == null) {
             return 0;
         }
-        boolean returnHome = isReturnHomeCommand(context.command);
-        boolean recall = isRecallCommand(context.command);
+        boolean returnHome = resolutionService.isReturnHomeCommand(context.command);
+        boolean recall = resolutionService.isRecallCommand(context.command);
         if (!returnHome && !recall) {
             return 0;
         }
@@ -1898,7 +1756,7 @@ public final class CommandItemFeatureHandler {
         if (context == null || candidate == null || candidate.ref == null || candidate.npc == null) {
             return;
         }
-        if (!isRecallCommand(context.command)) {
+        if (!resolutionService.isRecallCommand(context.command)) {
             return;
         }
         TransformComponent npcTransform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
@@ -1920,40 +1778,6 @@ public final class CommandItemFeatureHandler {
             return;
         }
         candidate.npc.moveTo(candidate.ref, safePosition.x, safePosition.y, safePosition.z, context.store);
-    }
-
-    private boolean isReturnHomeCommand(CommandEntry command) {
-        if (command == null || command.getSteps() == null) {
-            return false;
-        }
-        for (CommandStep step : command.getSteps()) {
-            if (!(step instanceof MoveToPositionStep moveStep)) {
-                continue;
-            }
-            MoveSource source = moveStep.getSource() != null ? moveStep.getSource() : MoveSource.RaycastHit;
-            if (source == MoveSource.StoredHome) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean isRecallCommand(CommandEntry command) {
-        if (command == null) {
-            return false;
-        }
-        if (command.getId() != null && "recall".equalsIgnoreCase(command.getId().trim())) {
-            return true;
-        }
-        if (command.getSteps() == null) {
-            return false;
-        }
-        for (CommandStep step : command.getSteps()) {
-            if (step instanceof ClearCombatStep clearCombatStep && clearCombatStep.isAssignOwnerAsMasterTarget()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private Vector3d computeIntermediatePoint(Vector3d from, Vector3d to, double distance) {
