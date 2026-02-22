@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -20,7 +19,6 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreHomeS
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
-import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
@@ -48,7 +46,6 @@ import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -106,6 +103,8 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkedNpcCaptureService captureService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandFeedbackService feedbackService;
+    private final CommandNpcNameResolver npcNameResolver;
+    private final CommandLinkedPanelEntryService panelEntryService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -117,6 +116,13 @@ public final class CommandItemFeatureHandler {
         this.captureService = captureService;
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
+        this.npcNameResolver = new CommandNpcNameResolver();
+        this.panelEntryService = new CommandLinkedPanelEntryService(
+                linkedNpcRecordStore,
+                deathService,
+                captureService,
+                npcNameResolver
+        );
     }
 
     // Handles a single command-item use.
@@ -582,14 +588,14 @@ public final class CommandItemFeatureHandler {
                     npcUuid,
                     home,
                     home,
-                    resolveNpcDisplayNameFromComponents(npcRef, store),
-                    resolveNpcNameKey(npc),
-                    resolveNpcRoleId(npc)
+                    npcNameResolver.resolveNpcDisplayNameFromComponents(npcRef, store),
+                    npcNameResolver.resolveNpcNameKey(npc),
+                    npcNameResolver.resolveNpcRoleId(npc)
             );
             hotbar.setItemStackForSlot(slot, updatedStack);
             inventory.markChanged();
             player.sendInventory();
-            sendSuccessMessage(player, "Set home for " + resolveNpcDisplayName(npcRef, store, npc) + ".");
+            sendSuccessMessage(player, "Set home for " + npcNameResolver.resolveNpcDisplayName(npcRef, store, npc) + ".");
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
@@ -875,9 +881,9 @@ public final class CommandItemFeatureHandler {
                 spawnedNpc.getUuid(),
                 destination,
                 homePosition,
-                resolveNpcDisplayNameFromComponents(spawnedRef, store),
-                resolveNpcNameKey(spawnedNpc),
-                resolveNpcRoleId(spawnedNpc)
+                npcNameResolver.resolveNpcDisplayNameFromComponents(spawnedRef, store),
+                npcNameResolver.resolveNpcNameKey(spawnedNpc),
+                npcNameResolver.resolveNpcRoleId(spawnedNpc)
         );
         if (deathService != null) {
             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
@@ -975,112 +981,9 @@ public final class CommandItemFeatureHandler {
             if (store == null) {
                 return List.of();
             }
-            return buildLinkedPanelEntries(player, store, stack, toolId);
+            return panelEntryService.buildEntries(player, store, stack, toolId);
         }
         return List.of();
-    }
-
-    private List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntries(Player player,
-                                                                                       Store<EntityStore> store,
-                                                                                       ItemStack stack,
-                                                                                       String toolId) {
-        if (player == null || store == null || stack == null || stack.isEmpty()) {
-            return List.of();
-        }
-        List<LinkedNpcRecord> records = readLinkedNpcRecords(stack);
-        if (records.isEmpty()) {
-            return List.of();
-        }
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        boolean deadRespawnEnabled = globalConfig != null && globalConfig.isCommandDeadRespawnEnabled();
-        World world = player.getWorld();
-        ArrayList<TameworkCommandSelectionPage.LinkedNpcEntry> entries = new ArrayList<>(records.size());
-        for (LinkedNpcRecord record : records) {
-            if (record == null || record.npcUuid == null) {
-                continue;
-            }
-            boolean loaded = false;
-            boolean dead = false;
-            boolean captured = false;
-            long deadRespawnRemainingMs = 0L;
-            boolean hasHome = record.homePosition != null;
-            String displayName = resolveCachedUnloadedDisplayName(record);
-            if (displayName == null || displayName.isBlank()) {
-                displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
-            }
-            int health = 0;
-            int maxHealth = 0;
-            if (world != null) {
-                Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
-                if (npcRef != null && npcRef.isValid()) {
-                    NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-                    if (npc != null) {
-                        loaded = true;
-                        displayName = resolveNpcDisplayName(npcRef, store, npc);
-                        TameworkCommandLinksComponent links =
-                                store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-                        if (links != null && links.hasHome()) {
-                            hasHome = true;
-                        }
-                        HealthSnapshot snapshot = readNpcHealthSnapshot(npcRef, store);
-                        if (snapshot != null) {
-                            health = snapshot.current;
-                            maxHealth = snapshot.max;
-                        }
-                    }
-                }
-            }
-            if (!loaded && deathService != null) {
-                CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot = deathService.getDeadSnapshotForTool(
-                        record.npcUuid,
-                        toolId,
-                        player.getUuid()
-                );
-                if (deadSnapshot != null) {
-                    dead = true;
-                    String deadName = deadSnapshot.displayName();
-                    if (deadName != null && !deadName.isBlank()) {
-                        displayName = deadName;
-                    }
-                    if (deadRespawnEnabled) {
-                        deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
-                    } else {
-                        deadRespawnRemainingMs = -1L;
-                    }
-                }
-            }
-            if (!loaded && !dead && captureService != null) {
-                CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
-                        captureService.getCapturedSnapshotForTool(record.npcUuid, toolId, player.getUuid());
-                if (capturedSnapshot != null) {
-                    captured = true;
-                    String capturedName = capturedSnapshot.displayName();
-                    if (capturedName != null && !capturedName.isBlank()) {
-                        displayName = capturedName;
-                    }
-                }
-            }
-            entries.add(new TameworkCommandSelectionPage.LinkedNpcEntry(
-                    record.npcUuid,
-                    displayName,
-                    health,
-                    maxHealth,
-                    loaded,
-                    hasHome,
-                    dead,
-                    captured,
-                    deadRespawnRemainingMs
-            ));
-        }
-        return entries;
-    }
-
-    private String abbreviateUuid(UUID uuid) {
-        if (uuid == null) {
-            return "unknown";
-        }
-        String raw = uuid.toString();
-        return raw.length() >= 8 ? raw.substring(0, 8) : raw;
     }
 
     private boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {
@@ -1174,294 +1077,6 @@ public final class CommandItemFeatureHandler {
             return command.getId();
         }
         return "Unknown";
-    }
-
-    private String resolveNpcDisplayName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
-        if (npc == null) {
-            return "NPC";
-        }
-        String componentDisplayName = resolveNpcDisplayNameFromComponents(npcRef, store);
-        if (componentDisplayName != null && !componentDisplayName.isBlank()) {
-            return componentDisplayName;
-        }
-        String displayName = npc.getLegacyDisplayName();
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName;
-        }
-        String nameKey = resolveNpcNameKey(npc);
-        if (nameKey != null && !nameKey.isBlank()) {
-            String translated = translateNpcNameKey(nameKey);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-        }
-        String roleId = resolveNpcRoleId(npc);
-        if (roleId != null && !roleId.isBlank()) {
-            return roleId;
-        }
-        return "NPC";
-    }
-
-    private String resolveCachedUnloadedDisplayName(LinkedNpcRecord record) {
-        if (record == null) {
-            return null;
-        }
-        if (record.cachedDisplayName != null && !record.cachedDisplayName.isBlank()) {
-            return record.cachedDisplayName;
-        }
-        if (record.cachedNameKey != null && !record.cachedNameKey.isBlank()) {
-            String translated = translateNpcNameKey(record.cachedNameKey);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-            return record.cachedNameKey;
-        }
-        if (record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
-            return record.cachedRoleId;
-        }
-        return null;
-    }
-
-    private String resolveNpcDisplayNameFromComponents(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return null;
-        }
-        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
-        if (nameType != null) {
-            TameworkNpcNameComponent nameComponent = store.getComponent(npcRef, nameType);
-            if (nameComponent != null && nameComponent.getName() != null && !nameComponent.getName().isBlank()) {
-                return nameComponent.getName();
-            }
-        }
-        DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
-        if (displayName != null && displayName.getDisplayName() != null) {
-            String ansi = displayName.getDisplayName().getAnsiMessage();
-            if (ansi != null && !ansi.isBlank()) {
-                return ansi;
-            }
-        }
-        return null;
-    }
-
-    private String resolveNpcNameKey(NPCEntity npc) {
-        if (npc == null) {
-            return null;
-        }
-        String roleParamNameKey = resolveRoleNameKeyFromParams(npc.getRole());
-        if (roleParamNameKey != null && !roleParamNameKey.isBlank()) {
-            return roleParamNameKey;
-        }
-        String nameKey = readStringGetter(
-                npc,
-                "getRoleNameKey",
-                "getNpcNameKey",
-                "getNameKey"
-        );
-        if (nameKey != null && !nameKey.isBlank()) {
-            return nameKey;
-        }
-        int roleIndex = npc.getRoleIndex();
-        if (roleIndex >= 0) {
-            NPCPlugin plugin = NPCPlugin.get();
-            if (plugin != null) {
-                String indexedNameKey = plugin.getName(roleIndex);
-                if (looksLikeTranslationKey(indexedNameKey)) {
-                    return indexedNameKey;
-                }
-            }
-        }
-        return null;
-    }
-
-    private String resolveRoleNameKeyFromParams(Role role) {
-        if (role == null) {
-            return null;
-        }
-        String direct = readStringGetter(
-                role,
-                "getRoleNameKey",
-                "getNpcNameKey",
-                "getNameKey",
-                "getNameTranslationKey"
-        );
-        if (direct != null && !direct.isBlank()) {
-            return direct;
-        }
-        Object entitySupport = invokeObjectGetter(role, "getEntitySupport");
-        Object sensorScope = invokeObjectGetter(entitySupport, "getSensorScope");
-        return readScopeStringParam(
-                sensorScope,
-                "NameTranslationKey",
-                "RoleNameTranslationKey",
-                "NameKey",
-                "RoleNameKey",
-                "NpcNameKey"
-        );
-    }
-
-    private static boolean looksLikeTranslationKey(String value) {
-        if (value == null || value.isBlank()) {
-            return false;
-        }
-        return value.indexOf('.') >= 0;
-    }
-
-    private String translateNpcNameKey(String nameKey) {
-        if (nameKey == null || nameKey.isBlank()) {
-            return null;
-        }
-        Tamework instance = Tamework.getInstance();
-        TranslationRegistry registry = instance != null ? instance.getTranslationRegistry() : null;
-        if (registry == null) {
-            return null;
-        }
-        for (String candidate : buildNameKeyCandidates(nameKey)) {
-            if (candidate == null || candidate.isBlank()) {
-                continue;
-            }
-            String translated = registry.get(candidate);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-        }
-        return null;
-    }
-
-    private List<String> buildNameKeyCandidates(String nameKey) {
-        ArrayList<String> candidates = new ArrayList<>(8);
-        addCandidate(candidates, nameKey);
-        if (!nameKey.contains(".")) {
-            addCandidate(candidates, "npcRoles." + nameKey + ".name");
-            addCandidate(candidates, "server.npcRoles." + nameKey + ".name");
-            return candidates;
-        }
-        if (nameKey.startsWith("server.")) {
-            addCandidate(candidates, nameKey.substring("server.".length()));
-        } else {
-            addCandidate(candidates, "server." + nameKey);
-        }
-        addCandidate(candidates, nameKey.replace(".npcRole.", ".npcRoles."));
-        addCandidate(candidates, nameKey.replace(".npcRoles.", ".npcRole."));
-        if (nameKey.startsWith("npcRoles.")) {
-            addCandidate(candidates, "server." + nameKey);
-        }
-        if (nameKey.startsWith("server.npcRoles.")) {
-            addCandidate(candidates, nameKey.substring("server.".length()));
-        }
-        return candidates;
-    }
-
-    private void addCandidate(List<String> candidates, String key) {
-        if (key == null || key.isBlank() || candidates.contains(key)) {
-            return;
-        }
-        candidates.add(key);
-    }
-
-    private static String readScopeStringParam(Object scope, String... paramNames) {
-        if (scope == null || paramNames == null) {
-            return null;
-        }
-        for (String paramName : paramNames) {
-            if (paramName == null || paramName.isBlank()) {
-                continue;
-            }
-            try {
-                Method supplierMethod = scope.getClass().getMethod("getStringSupplier", String.class);
-                Object supplierObj = supplierMethod.invoke(scope, paramName);
-                if (!(supplierObj instanceof Supplier<?> supplier)) {
-                    continue;
-                }
-                Object value = supplier.get();
-                if (value instanceof String stringValue && !stringValue.isBlank()) {
-                    return stringValue;
-                }
-            } catch (Exception | LinkageError ignored) {
-                // Continue trying alternate parameter names and compatibility paths.
-            }
-        }
-        return null;
-    }
-
-    private String resolveNpcRoleId(NPCEntity npc) {
-        if (npc == null) {
-            return null;
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
-        return readStringGetter(
-                npc,
-                "getRoleId",
-                "getRoleKey"
-        );
-    }
-
-    private static String readStringGetter(Object target, String... methodNames) {
-        if (target == null || methodNames == null) {
-            return null;
-        }
-        for (String methodName : methodNames) {
-            String value = invokeStringGetter(target, methodName);
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private static String invokeStringGetter(Object target, String methodName) {
-        if (target == null || methodName == null) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            Object value = method.invoke(target);
-            return value instanceof String ? (String) value : null;
-        } catch (Exception | LinkageError ex) {
-            return null;
-        }
-    }
-
-    private static Object invokeObjectGetter(Object target, String methodName) {
-        if (target == null || methodName == null) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
-        } catch (Exception | LinkageError ex) {
-            return null;
-        }
-    }
-
-    private HealthSnapshot readNpcHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return null;
-        }
-        ComponentType<EntityStore, EntityStatMap> statType = EntityStatMap.getComponentType();
-        if (statType == null) {
-            return null;
-        }
-        EntityStatMap statMap = store.getComponent(npcRef, statType);
-        if (statMap == null) {
-            return null;
-        }
-        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
-        if (healthIndex < 0) {
-            return null;
-        }
-        EntityStatValue health = statMap.get(healthIndex);
-        if (health == null) {
-            return null;
-        }
-        int current = Math.max(0, Math.round(health.get()));
-        int max = Math.max(1, Math.round(health.getMax()));
-        if (current > max) {
-            current = max;
-        }
-        return new HealthSnapshot(current, max);
     }
 
     private TwCommandItemConfig resolveConfig(String itemId, String configIdOverride) {
@@ -2207,9 +1822,9 @@ public final class CommandItemFeatureHandler {
                     candidate.npc.getUuid(),
                     currentPosition,
                     home,
-                    resolveNpcDisplayNameFromComponents(candidate.ref, context.store),
-                    resolveNpcNameKey(candidate.npc),
-                    resolveNpcRoleId(candidate.npc)
+                    npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, context.store),
+                    npcNameResolver.resolveNpcNameKey(candidate.npc),
+                    npcNameResolver.resolveNpcRoleId(candidate.npc)
             );
             if (updated != context.workingItem) {
                 context.workingItem = updated;
@@ -2339,15 +1954,15 @@ public final class CommandItemFeatureHandler {
                         npcUuid,
                         lastKnown,
                         homePosition,
-                        resolveNpcDisplayNameFromComponents(targetRef, store),
-                        resolveNpcNameKey(npc),
-                        resolveNpcRoleId(npc)
+                        npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
+                        npcNameResolver.resolveNpcNameKey(npc),
+                        npcNameResolver.resolveNpcRoleId(npc)
                 );
             } else {
                 updatedItem = removeLinkedNpcRecord(updatedItem, npcUuid);
             }
         }
-        String name = resolveNpcDisplayName(targetRef, store, npc);
+        String name = npcNameResolver.resolveNpcDisplayName(targetRef, store, npc);
         return new LinkToggleResult(true, linked, name, updatedItem);
     }
 
@@ -2780,9 +2395,9 @@ public final class CommandItemFeatureHandler {
                     candidate.npc.getUuid(),
                     position,
                     homePosition,
-                    resolveNpcDisplayNameFromComponents(candidate.ref, store),
-                    resolveNpcNameKey(candidate.npc),
-                    resolveNpcRoleId(candidate.npc)
+                    npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, store),
+                    npcNameResolver.resolveNpcNameKey(candidate.npc),
+                    npcNameResolver.resolveNpcRoleId(candidate.npc)
             );
         }
         return updated;
@@ -2864,16 +2479,6 @@ public final class CommandItemFeatureHandler {
         inventory.markChanged();
         player.sendInventory();
         return true;
-    }
-
-    private static final class HealthSnapshot {
-        private final int current;
-        private final int max;
-
-        private HealthSnapshot(int current, int max) {
-            this.current = current;
-            this.max = max;
-        }
     }
 
     private static final class ToolResolution {
