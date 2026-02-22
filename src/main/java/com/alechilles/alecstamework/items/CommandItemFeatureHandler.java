@@ -3,7 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
-import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandFeedback;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearCombatStep;
@@ -39,10 +38,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
-import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
-import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
-import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -55,8 +51,6 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.util.TargetUtil;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
-import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -79,7 +73,6 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
-import java.util.logging.Level;
 
 /**
  * Handles command-item linking and command dispatch.
@@ -94,10 +87,6 @@ public final class CommandItemFeatureHandler {
     private static final double RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
-    private static final float DEFAULT_COMMAND_FEEDBACK_VOLUME = 1.0f;
-    private static final float DEFAULT_COMMAND_FEEDBACK_PITCH = 1.0f;
-    private static final boolean SOUND_DIAGNOSTICS_ENABLED = false;
-    private static final String SOUND_DIAGNOSTIC_PROBE_EVENT_ID = "SFX_Creative_Play_Error";
     private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
     private static final double RESPAWN_DISTANCE_CLOSE = 5.0;
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
@@ -116,7 +105,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
-    private final TameworkUiMessageService uiMessageService = new TameworkUiMessageService();
+    private final CommandFeedbackService feedbackService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -127,6 +116,7 @@ public final class CommandItemFeatureHandler {
         this.deathService = deathService;
         this.captureService = captureService;
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
+        this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
     }
 
     // Handles a single command-item use.
@@ -2811,147 +2801,18 @@ public final class CommandItemFeatureHandler {
     }
 
     private void emitCommandExecutionFeedback(Context context, int affected, int queued) {
-        if (context == null || context.player == null || context.command == null) {
+        if (context == null) {
             return;
         }
-        String defaultMessage;
-        if (affected > 0 && queued > 0) {
-            defaultMessage = "Command " + resolveCommandLabel(context.command)
-                    + " applied to " + affected + " NPC(s), queued for " + queued + " unloaded NPC(s).";
-        } else if (affected > 0) {
-            defaultMessage = "Command " + resolveCommandLabel(context.command) + " applied to " + affected + " NPC(s).";
-        } else if (queued > 0) {
-            defaultMessage = "Command " + resolveCommandLabel(context.command) + " queued for " + queued + " unloaded NPC(s).";
-        } else {
-            defaultMessage = "No NPCs could execute that command.";
-        }
-        CommandFeedback feedback = context.command.getFeedback();
-        String hudMessage = resolveFeedbackText(
-                feedback != null ? feedback.getHudMessage() : null,
+        feedbackService.emitCommandExecutionFeedback(
+                context.player,
+                context.playerRef,
+                context.store,
                 context.command,
                 affected,
-                defaultMessage
+                queued,
+                this::resolveCommandLabel
         );
-        if (hudMessage != null && !hudMessage.isBlank()) {
-            sendSuccessMessage(context.player, hudMessage);
-        }
-        if (feedback != null) {
-            emitFeedbackSound(feedback.getSoundEvent(), context.playerRef, context.store);
-            emitFeedbackParticles(feedback.getParticleSystem(), feedback.getParticleOffset(), context.playerRef, context.store);
-        }
-    }
-
-    private String resolveFeedbackText(String template,
-                                       CommandEntry command,
-                                       int affected,
-                                       String fallback) {
-        String value = (template != null && !template.isBlank()) ? template : fallback;
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        String commandLabel = resolveCommandLabel(command);
-        return value
-                .replace("%count%", Integer.toString(affected))
-                .replace("%command%", commandLabel)
-                .replace("{count}", Integer.toString(affected))
-                .replace("{command}", commandLabel);
-    }
-
-    private void emitFeedbackSound(String soundEventId,
-                                   Ref<EntityStore> playerRef,
-                                   Store<EntityStore> store) {
-        if (playerRef == null || !playerRef.isValid() || store == null) {
-            return;
-        }
-        if (soundEventId == null || soundEventId.isBlank()) {
-            return;
-        }
-        String resolvedSoundEventId = soundEventId;
-        int soundEventIndex = SoundEvent.getAssetMap().getIndex(resolvedSoundEventId);
-        if (soundEventIndex <= 0) {
-            logSoundDiagnostic("Failed to resolve sound event index. requested="
-                    + soundEventId + ", resolved=" + resolvedSoundEventId);
-            return;
-        }
-        logSoundDiagnostic("Playing feedback sound. requested="
-                + soundEventId + ", resolved=" + resolvedSoundEventId + ", index=" + soundEventIndex);
-        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform != null) {
-            Vector3d position = transform.getPosition();
-            SoundUtil.playSoundEvent3d(
-                    soundEventIndex,
-                    SoundCategory.SFX,
-                    position.x,
-                    position.y,
-                    position.z,
-                    DEFAULT_COMMAND_FEEDBACK_VOLUME,
-                    DEFAULT_COMMAND_FEEDBACK_PITCH,
-                    store
-            );
-            emitDiagnosticProbeSound(playerRef, store);
-            return;
-        }
-        SoundUtil.playSoundEvent2d(
-            playerRef,
-            soundEventIndex,
-            SoundCategory.SFX,
-            DEFAULT_COMMAND_FEEDBACK_VOLUME,
-            DEFAULT_COMMAND_FEEDBACK_PITCH,
-            store
-        );
-        emitDiagnosticProbeSound(playerRef, store);
-    }
-
-    private void emitDiagnosticProbeSound(Ref<EntityStore> playerRef, Store<EntityStore> store) {
-        if (!SOUND_DIAGNOSTICS_ENABLED || playerRef == null || !playerRef.isValid() || store == null) {
-            return;
-        }
-        int probeIndex = SoundEvent.getAssetMap().getIndex(SOUND_DIAGNOSTIC_PROBE_EVENT_ID);
-        if (probeIndex <= 0) {
-            logSoundDiagnostic("Diagnostic probe sound failed to resolve: " + SOUND_DIAGNOSTIC_PROBE_EVENT_ID);
-            return;
-        }
-        SoundUtil.playSoundEvent2d(
-                playerRef,
-                probeIndex,
-                SoundCategory.SFX,
-                DEFAULT_COMMAND_FEEDBACK_VOLUME,
-                DEFAULT_COMMAND_FEEDBACK_PITCH,
-                store
-        );
-        logSoundDiagnostic("Played diagnostic probe sound. id="
-                + SOUND_DIAGNOSTIC_PROBE_EVENT_ID + ", index=" + probeIndex);
-    }
-
-    private void logSoundDiagnostic(String message) {
-        if (!SOUND_DIAGNOSTICS_ENABLED || message == null || message.isBlank()) {
-            return;
-        }
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getLogger() == null) {
-            return;
-        }
-        plugin.getLogger().at(Level.INFO).log("[CommandSoundDebug] " + message);
-    }
-
-    private void emitFeedbackParticles(String particleSystem,
-                                       Vector3d offset,
-                                       Ref<EntityStore> playerRef,
-                                       Store<EntityStore> store) {
-        if (particleSystem == null || particleSystem.isBlank() || playerRef == null || !playerRef.isValid() || store == null) {
-            return;
-        }
-        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform == null) {
-            return;
-        }
-        Vector3d position = new Vector3d(transform.getPosition());
-        if (offset != null) {
-            position.x += offset.x;
-            position.y += offset.y;
-            position.z += offset.z;
-        }
-        ParticleUtil.spawnParticleEffect(particleSystem, position, store);
     }
 
     private boolean isCooldownActive(ItemStack stack, int cooldownMs) {
@@ -2963,24 +2824,15 @@ public final class CommandItemFeatureHandler {
     }
 
     private void sendDefaultMessage(Player player, String text) {
-        if (player == null || text == null || text.isBlank()) {
-            return;
-        }
-        uiMessageService.show(player, text, NotificationStyle.Default);
+        feedbackService.showDefault(player, text);
     }
 
     private void sendSuccessMessage(Player player, String text) {
-        if (player == null || text == null || text.isBlank()) {
-            return;
-        }
-        uiMessageService.show(player, text, NotificationStyle.Success);
+        feedbackService.showSuccess(player, text);
     }
 
     private void sendWarningMessage(Player player, String text) {
-        if (player == null || text == null || text.isBlank()) {
-            return;
-        }
-        uiMessageService.show(player, text, NotificationStyle.Warning);
+        feedbackService.showWarning(player, text);
     }
 
     private double resolvePositiveDouble(double configured, double fallback) {
