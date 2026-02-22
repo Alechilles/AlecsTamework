@@ -2871,6 +2871,19 @@ public final class CommandItemFeatureHandler {
     private void emitFeedbackSound(String soundEventId,
                                    Ref<EntityStore> playerRef,
                                    Store<EntityStore> store) {
+        emitFeedbackSound(soundEventId, playerRef, store, true);
+    }
+
+    /**
+     * Plays command feedback sound.
+     * <p>
+     * Command execution feedback should be audible to nearby players (world SFX) and reliably audible
+     * to the issuer (2D SFX), while UI click sounds should stay local-only to the issuer.
+     */
+    private void emitFeedbackSound(String soundEventId,
+                                   Ref<EntityStore> playerRef,
+                                   Store<EntityStore> store,
+                                   boolean includeWorldPlayback) {
         if (playerRef == null || !playerRef.isValid() || store == null) {
             return;
         }
@@ -2892,10 +2905,9 @@ public final class CommandItemFeatureHandler {
         logSoundDiagnostic("Playing feedback sound. requested="
                 + soundEventId + ", resolved=" + resolvedSoundEventId + ", index=" + soundEventIndex);
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform != null) {
+        if (includeWorldPlayback && transform != null) {
             Vector3d position = transform.getPosition();
-            SoundUtil.playSoundEvent3dToPlayer(
-                    playerRef,
+            SoundUtil.playSoundEvent3d(
                     soundEventIndex,
                     SoundCategory.SFX,
                     position.x,
@@ -2905,8 +2917,6 @@ public final class CommandItemFeatureHandler {
                     DEFAULT_COMMAND_FEEDBACK_PITCH,
                     store
             );
-            emitDiagnosticProbeSound(playerRef, store);
-            return;
         }
         SoundUtil.playSoundEvent2d(
             playerRef,
@@ -2926,7 +2936,7 @@ public final class CommandItemFeatureHandler {
         Ref<EntityStore> playerRef = player.getReference();
         World world = player.getWorld();
         Store<EntityStore> store = world != null ? world.getEntityStore().getStore() : null;
-        emitFeedbackSound(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID, playerRef, store);
+        emitFeedbackSound(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID, playerRef, store, false);
     }
 
     private void emitDiagnosticProbeSound(Ref<EntityStore> playerRef, Store<EntityStore> store) {
