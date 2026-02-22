@@ -90,6 +90,7 @@ public final class CommandItemFeatureHandler {
     private final CommandRecipientService recipientService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandLinkMutationService linkMutationService;
+    private final CommandRelocationDispatchService relocationDispatchService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -122,6 +123,13 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 linkPolicyService,
                 npcNameResolver
+        );
+        this.relocationDispatchService = new CommandRelocationDispatchService(
+                relocationService,
+                deathService,
+                resolutionService,
+                stepExecutionService,
+                companionPlacementService
         );
     }
 
@@ -290,7 +298,7 @@ public final class CommandItemFeatureHandler {
             working = refreshedLinks;
             updateHeldItem = true;
         }
-        int queued = queueRelocationsForUnloaded(context, unloadedLinked);
+        int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloadedLinked);
         if (context.workingItem != working) {
             working = context.workingItem;
             updateHeldItem = true;
@@ -770,7 +778,7 @@ public final class CommandItemFeatureHandler {
                 context.workingItem = refreshedLinks;
                 context.itemChanged = true;
             }
-            int queued = queueRelocationsForUnloaded(context, unloadedRecipients);
+            int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloadedRecipients);
             if (context.itemChanged) {
                 hotbar.setItemStackForSlot(slot, context.workingItem);
                 inventory.markChanged();
@@ -991,73 +999,6 @@ public final class CommandItemFeatureHandler {
         return "Unknown";
     }
 
-    private int queueRelocationsForUnloaded(Context context, List<LinkedNpcRecord> unloadedLinked) {
-        if (context == null || unloadedLinked == null || unloadedLinked.isEmpty() || relocationService == null) {
-            return 0;
-        }
-        boolean returnHome = resolutionService.isReturnHomeCommand(context.command);
-        boolean recall = resolutionService.isRecallCommand(context.command);
-        if (!returnHome && !recall) {
-            return 0;
-        }
-        RelocationState postRelocationState = stepExecutionService.resolveRelocationState(context.command, returnHome, recall);
-        World world = context.player != null ? context.player.getWorld() : null;
-        UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
-        if (world == null) {
-            return 0;
-        }
-        int queued = 0;
-        for (LinkedNpcRecord record : unloadedLinked) {
-            if (record == null || record.npcUuid == null) {
-                continue;
-            }
-            if (deathService != null
-                    && deathService.getDeadSnapshotForTool(record.npcUuid, context.toolId, ownerUuid) != null) {
-                continue;
-            }
-            if (returnHome) {
-                if (record.homePosition == null) {
-                    continue;
-                }
-                relocationService.queueRelocation(
-                        world,
-                        record.npcUuid,
-                        record.homePosition,
-                        ownerUuid,
-                        false,
-                        true,
-                        postRelocationState.state,
-                        postRelocationState.subState,
-                        0L,
-                        record.lastKnownPosition,
-                        record.homePosition
-                );
-                queued++;
-                continue;
-            }
-            Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
-            Vector3d safeDestination = companionPlacementService.computeSafeRecallPosition(context, sourceHint);
-            if (safeDestination == null) {
-                continue;
-            }
-            relocationService.queueRelocation(
-                    world,
-                    record.npcUuid,
-                    safeDestination,
-                    ownerUuid,
-                    true,
-                    true,
-                    postRelocationState.state,
-                    postRelocationState.subState,
-                    0L,
-                    sourceHint,
-                    record.homePosition
-            );
-            queued++;
-        }
-        return queued;
-    }
-
     private Vector3f resolveRespawnRotation(Store<EntityStore> store,
                                             Ref<EntityStore> playerRef,
                                             Vector3d spawnPosition) {
@@ -1083,7 +1024,7 @@ public final class CommandItemFeatureHandler {
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {
-        maybeRelocateLoadedRecallCandidate(context, candidate);
+        relocationDispatchService.maybeRelocateLoadedRecallCandidate(context, candidate);
         return stepExecutionService.executeCommand(context, candidate);
     }
 
@@ -1097,39 +1038,6 @@ public final class CommandItemFeatureHandler {
         }
         return links.getHomePosition();
     }
-
-
-    private void maybeRelocateLoadedRecallCandidate(Context context, Candidate candidate) {
-        if (context == null || candidate == null || candidate.ref == null || candidate.npc == null) {
-            return;
-        }
-        if (!resolutionService.isRecallCommand(context.command)) {
-            return;
-        }
-        TransformComponent npcTransform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
-        TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
-        if (npcTransform == null || playerTransform == null) {
-            return;
-        }
-        Vector3d npcPos = npcTransform.getPosition();
-        Vector3d playerPos = playerTransform.getPosition();
-        double dx = npcPos.x - playerPos.x;
-        double dy = npcPos.y - playerPos.y;
-        double dz = npcPos.z - playerPos.z;
-        double distSq = dx * dx + dy * dy + dz * dz;
-        if (distSq < context.recallForceRelocateDistance * context.recallForceRelocateDistance) {
-            return;
-        }
-        Vector3d safePosition = companionPlacementService.computeSafeRecallPosition(
-                context,
-                new Vector3d(npcPos)
-        );
-        if (safePosition == null) {
-            return;
-        }
-        candidate.npc.moveTo(candidate.ref, safePosition.x, safePosition.y, safePosition.z, context.store);
-    }
-
     private boolean isCooldownActive(ItemStack stack, int cooldownMs) {
         if (cooldownMs <= 0) {
             return false;
