@@ -25,6 +25,9 @@ public final class CommandNpcRelocationService {
     private static final int CHUNK_SIZE = 32;
     private static final long INITIAL_APPLY_DELAY_MS = 250L;
     private static final long CHUNK_REQUEST_COOLDOWN_MS = 1500L;
+    private static final long RELOCATION_CONFIRMATION_DELAY_MS = 250L;
+    private static final long RELOCATION_CONFIRMATION_TIMEOUT_MS = 5000L;
+    private static final double DESTINATION_CONFIRM_TOLERANCE = 4.0;
     private static final long RETRY_INTERVAL_MS = 2000L;
     private static final long MAX_RELOCATION_WAIT_MS = 120000L;
     private static final int MAX_RETRY_ATTEMPTS = 60;
@@ -115,20 +118,44 @@ public final class CommandNpcRelocationService {
         }
         Ref<EntityStore> ref = world.getEntityRef(npcUuid);
         if (ref == null || !ref.isValid()) {
+            pending.resetRelocationIssue();
             retryPending(world, npcUuid, pending);
             return false;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
+            pending.resetRelocationIssue();
             retryPending(world, npcUuid, pending);
             return false;
         }
         NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
         if (npc == null) {
+            pending.resetRelocationIssue();
             retryPending(world, npcUuid, pending);
             return false;
         }
-        npc.moveTo(ref, pending.destination.x, pending.destination.y, pending.destination.z, store);
+        TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+        if (transform == null) {
+            pending.resetRelocationIssue();
+            retryPending(world, npcUuid, pending);
+            return false;
+        }
+        if (!pending.relocationIssued) {
+            npc.moveTo(ref, pending.destination.x, pending.destination.y, pending.destination.z, store);
+            pending.markRelocationIssued(now);
+            scheduleTryApply(world, npcUuid, RELOCATION_CONFIRMATION_DELAY_MS);
+            return false;
+        }
+        Vector3d currentPosition = new Vector3d(transform.getPosition());
+        if (!isAtDestination(currentPosition, pending.destination, DESTINATION_CONFIRM_TOLERANCE)) {
+            if (now - pending.relocationIssuedAtMs > RELOCATION_CONFIRMATION_TIMEOUT_MS) {
+                pending.resetRelocationIssue();
+                retryPending(world, npcUuid, pending);
+            } else {
+                scheduleTryApply(world, npcUuid, RELOCATION_CONFIRMATION_DELAY_MS);
+            }
+            return false;
+        }
         Role role = npc.getRole();
         if (role != null && role.getMarkedEntitySupport() != null) {
             if (pending.clearLockedTarget) {
@@ -198,6 +225,13 @@ public final class CommandNpcRelocationService {
         double dy = left.y - right.y;
         double dz = left.z - right.z;
         return (dx * dx + dy * dy + dz * dz) <= (tolerance * tolerance);
+    }
+
+    private boolean isAtDestination(Vector3d current, Vector3d destination, double tolerance) {
+        if (current == null || destination == null) {
+            return false;
+        }
+        return isNear(current, destination, tolerance);
     }
 
     private void requestChunkLoad(World world, PendingRelocation pending, Vector3d position) {
@@ -341,6 +375,8 @@ public final class CommandNpcRelocationService {
         private final long queuedAtMs;
         private final ConcurrentHashMap<Long, Long> lastChunkRequestAtMsByChunk = new ConcurrentHashMap<>();
         private long nextScheduledApplyAtMs;
+        private boolean relocationIssued;
+        private long relocationIssuedAtMs;
         private int retryAttempts;
         private long lastRetryCountedAtMs;
 
@@ -367,6 +403,8 @@ public final class CommandNpcRelocationService {
             this.executeAfterMs = executeAfterMs;
             this.queuedAtMs = queuedAtMs;
             this.nextScheduledApplyAtMs = Long.MAX_VALUE;
+            this.relocationIssued = false;
+            this.relocationIssuedAtMs = 0L;
             this.retryAttempts = 0;
             this.lastRetryCountedAtMs = queuedAtMs;
         }
@@ -394,6 +432,16 @@ public final class CommandNpcRelocationService {
             }
             nextScheduledApplyAtMs = Long.MAX_VALUE;
             return true;
+        }
+
+        private void markRelocationIssued(long nowMs) {
+            this.relocationIssued = true;
+            this.relocationIssuedAtMs = nowMs;
+        }
+
+        private void resetRelocationIssue() {
+            this.relocationIssued = false;
+            this.relocationIssuedAtMs = 0L;
         }
     }
 }

@@ -47,6 +47,7 @@
 - Relocation retry accounting is now interval-based (instead of counting every rapid probe), and unloaded recall probes now cover a longer first-load window to reduce missed first-click recalls for companions that materialize slightly later after chunk load.
 - Relocation scheduling is now single-flight per NPC with per-chunk request throttling, preventing relocation probe floods that could stall the world thread during unloaded recall failures.
 - Unloaded recall now probes both persisted `lastKnownPosition` and persisted `homePosition` source chunks for linked records, fixing relog cases where stale last-known metadata prevented recalls until a manual Return Home refreshed in-memory tracking.
+- Queued unloaded relocations now use two-phase apply confirmation (issue move, then confirm arrival before clearing pending), preventing first-attempt recalls from being marked complete before the NPC is fully ready after relog/chunk activation.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.
