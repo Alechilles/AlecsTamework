@@ -3,7 +3,7 @@ $C = "Common.ui";
 Group #TameworkLinkedPanelRoot {
   Anchor: (Top: 290, Left: 132, Width: 430, Height: 640);
   LayoutMode: Top;
-  Padding: (Horizontal: 14, Vertical: 12);
+  Padding: (Left: 14, Right: 6, Top: 12, Bottom: 12);
   Background: #0b1a2c(0.78);
   Visible: false;
 
@@ -51,7 +51,7 @@ Group #TameworkLinkedPanelRoot {
     Group #TameworkLinkedPanelList {
       LayoutMode: Top;
       Anchor: (Bottom: 6);
-      Padding: (Right: 8);
+      Padding: (Right: 0);
     }
   }
 }
