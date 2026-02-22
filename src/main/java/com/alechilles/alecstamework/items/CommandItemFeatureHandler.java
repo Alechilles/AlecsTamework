@@ -64,7 +64,6 @@ import java.util.function.Supplier;
  * Handles command-item linking and command dispatch.
  */
 public final class CommandItemFeatureHandler {
-    private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final double DEFAULT_RAYCAST_DISTANCE = 64.0;
     private static final double HYBRID_TELEPORT_DISTANCE_THRESHOLD = 96.0;
     private static final double HYBRID_PATH_DISTANCE_BEFORE_TELEPORT = 24.0;
@@ -91,6 +90,7 @@ public final class CommandItemFeatureHandler {
     private final CommandStepExecutionService stepExecutionService;
     private final CommandLinkMutationService linkMutationService;
     private final CommandRelocationDispatchService relocationDispatchService;
+    private final CommandRespawnService respawnService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -130,6 +130,14 @@ public final class CommandItemFeatureHandler {
                 resolutionService,
                 stepExecutionService,
                 companionPlacementService
+        );
+        this.respawnService = new CommandRespawnService(
+                companionPlacementService,
+                linkPolicyService,
+                linkMutationService,
+                npcNameResolver,
+                deathService,
+                stepExecutionService
         );
     }
 
@@ -505,7 +513,25 @@ public final class CommandItemFeatureHandler {
                 feedbackService.showWarning(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
                 return;
             }
-            ItemStack updatedStack = respawnDeadLinkedNpcForMenu(player, playerRef, store, toolId, stack, record, deadSnapshot);
+            double safeSpawnDistance = resolvePositiveDouble(
+                    globalConfig.getCommandRecallSafeSpawnDistance(),
+                    RECALL_SAFE_SPAWN_DISTANCE
+            );
+            long followRetryDelayMs = resolvePositiveLong(
+                    globalConfig.getCommandDeadRespawnFollowRetryDelayMs(),
+                    RESPAWN_FOLLOW_RETRY_DELAY_MS
+            );
+            ItemStack updatedStack = respawnService.respawnDeadLinkedNpc(
+                    player,
+                    playerRef,
+                    store,
+                    toolId,
+                    stack,
+                    record,
+                    deadSnapshot,
+                    safeSpawnDistance,
+                    followRetryDelayMs
+            );
             if (updatedStack == null) {
                 feedbackService.showWarning(player, "Failed to respawn that companion.");
                 return;
@@ -794,164 +820,6 @@ public final class CommandItemFeatureHandler {
         feedbackService.showWarning(player, "Unable to find that command item.");
     }
 
-    private ItemStack respawnDeadLinkedNpcForMenu(Player player,
-                                                  Ref<EntityStore> playerRef,
-                                                  Store<EntityStore> store,
-                                                  String toolId,
-                                                  ItemStack stack,
-                                                  LinkedNpcRecord record,
-                                                  CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot) {
-        if (player == null || playerRef == null || !playerRef.isValid() || store == null || stack == null
-                || stack.isEmpty() || record == null || deadSnapshot == null) {
-            return null;
-        }
-        String roleId = deadSnapshot.roleId();
-        if (roleId == null || roleId.isBlank()) {
-            return null;
-        }
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin == null) {
-            return null;
-        }
-        int roleIndex = npcPlugin.getIndex(roleId);
-        if (roleIndex < 0) {
-            return null;
-        }
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        double safeSpawnDistance = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
-                RECALL_SAFE_SPAWN_DISTANCE
-        );
-        Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
-        Vector3d destination = companionPlacementService.computeSafeRespawnPosition(
-                playerRef,
-                store,
-                safeSpawnDistance,
-                sourceHint
-        );
-        if (destination == null) {
-            return null;
-        }
-        Vector3f rotation = resolveRespawnRotation(store, playerRef, destination);
-        Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
-        if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            return null;
-        }
-        Ref<EntityStore> spawnedRef = spawned.first();
-        NPCEntity spawnedNpc = spawned.second();
-        UUID ownerId = deadSnapshot.ownerId() != null ? deadSnapshot.ownerId() : player.getUuid();
-        Vector3d homePosition = record.homePosition != null ? record.homePosition : deadSnapshot.homePosition();
-        String[] toolIds = linkPolicyService.mergeToolIds(deadSnapshot.toolIds(), toolId);
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType != null) {
-            store.putComponent(
-                    spawnedRef,
-                    linksType,
-                    new TameworkCommandLinksComponent(ownerId, toolIds, homePosition)
-            );
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (ownerType != null) {
-            store.putComponent(
-                    spawnedRef,
-                    ownerType,
-                    new TameworkOwnerComponent(ownerId, deadSnapshot.ownerName())
-            );
-        }
-        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
-        if (tamedType != null) {
-            store.putComponent(
-                    spawnedRef,
-                    tamedType,
-                    new TameworkTamedComponent(deadSnapshot.tamed())
-            );
-        }
-        if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
-            ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
-            if (nameType != null) {
-                store.putComponent(
-                        spawnedRef,
-                        nameType,
-                        new TameworkNpcNameComponent(
-                                deadSnapshot.customName(),
-                                ownerId,
-                                System.currentTimeMillis(),
-                                TameworkNpcNameComponent.NameSource.System
-                        )
-                );
-            }
-            EntitySupport.setDisplayName(spawnedRef, deadSnapshot.customName(), store);
-        }
-        applyRespawnFollowBootstrap(spawnedRef, spawnedNpc, playerRef, store);
-        long followRetryDelayMs = resolvePositiveLong(
-                globalConfig != null ? globalConfig.getCommandDeadRespawnFollowRetryDelayMs() : 0L,
-                RESPAWN_FOLLOW_RETRY_DELAY_MS
-        );
-        scheduleRespawnFollowRetry(player.getWorld(), spawnedNpc.getUuid(), playerRef, followRetryDelayMs);
-        ItemStack updated = linkMutationService.removeLinkedNpcRecord(stack, record.npcUuid);
-        updated = linkMutationService.upsertLinkedNpcRecord(
-                updated,
-                spawnedNpc.getUuid(),
-                destination,
-                homePosition,
-                npcNameResolver.resolveNpcDisplayNameFromComponents(spawnedRef, store),
-                npcNameResolver.resolveNpcNameKey(spawnedNpc),
-                npcNameResolver.resolveNpcRoleId(spawnedNpc)
-        );
-        if (deathService != null) {
-            deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
-        }
-        return updated;
-    }
-
-    private void applyRespawnFollowBootstrap(Ref<EntityStore> npcRef,
-                                             NPCEntity npc,
-                                             Ref<EntityStore> playerRef,
-                                             Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || npc == null || store == null) {
-            return;
-        }
-        Role role = npc.getRole();
-        if (role != null && role.getMarkedEntitySupport() != null) {
-            role.getMarkedEntitySupport().setMarkedEntity("LockedTarget", null);
-            if (playerRef != null && playerRef.isValid()) {
-                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, playerRef);
-            }
-        }
-        // Match default Follow behavior after respawn.
-        if (!stepExecutionService.applyState(npcRef, npc, store, "Follow", null)) {
-            stepExecutionService.applyState(npcRef, npc, store, "Idle", null);
-        }
-    }
-
-    private void scheduleRespawnFollowRetry(World world,
-                                            UUID npcUuid,
-                                            Ref<EntityStore> playerRef,
-                                            long delayMs) {
-        if (world == null || npcUuid == null) {
-            return;
-        }
-        long safeDelayMs = Math.max(0L, delayMs);
-        CompletableFuture.runAsync(
-                () -> world.execute(() -> {
-                    Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-                    if (npcRef == null || !npcRef.isValid()) {
-                        return;
-                    }
-                    Store<EntityStore> store = world.getEntityStore().getStore();
-                    if (store == null) {
-                        return;
-                    }
-                    NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-                    if (npc == null) {
-                        return;
-                    }
-                    applyRespawnFollowBootstrap(npcRef, npc, playerRef, store);
-                }),
-                CompletableFuture.delayedExecutor(safeDelayMs, TimeUnit.MILLISECONDS)
-        );
-    }
-
     private String formatDuration(long remainingMs) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long minutes = totalSeconds / 60L;
@@ -997,30 +865,6 @@ public final class CommandItemFeatureHandler {
             return command.getId();
         }
         return "Unknown";
-    }
-
-    private Vector3f resolveRespawnRotation(Store<EntityStore> store,
-                                            Ref<EntityStore> playerRef,
-                                            Vector3d spawnPosition) {
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            return new Vector3f();
-        }
-        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform == null) {
-            return new Vector3f();
-        }
-        Vector3d playerPos = new Vector3d(transform.getPosition());
-        if (spawnPosition != null) {
-            Vector3d relative = new Vector3d(
-                    playerPos.x - spawnPosition.x,
-                    0.0,
-                    playerPos.z - spawnPosition.z
-            );
-            if (relative.squaredLength() > 0.0001) {
-                return Vector3f.lookAt(relative);
-            }
-        }
-        return new Vector3f(transform.getRotation());
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {
