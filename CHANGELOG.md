@@ -35,6 +35,7 @@
 - Linked-panel per-NPC `Recall`, `Set Home`, and `Return Home` actions now use compact icon buttons (with distinct default/hover/pressed/disabled textures) for denser card layouts.
 
 ### Fixed
+- Linked-panel action icon textures now load from `Common/UI/Custom/Tamework`, fixing missing-texture placeholder icons for per-card `Recall`, `Set Home`, and `Return Home` buttons.
 - Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.
 - Dead companion respawns now sample nearby surface positions and avoid spawning inside terrain blocks in common recall/respawn cases.
 - Dead companion respawns now retry follow bootstrap shortly after spawn to avoid race conditions where state/target supports are not yet ready on the first frame.
