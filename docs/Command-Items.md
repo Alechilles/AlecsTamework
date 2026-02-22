@@ -97,8 +97,10 @@ Behavior:
 
 Linked companions side panel (shown with the radial menu):
 - Displays linked NPCs in a dynamic scroll list (not fixed rows).
-- Shows loaded/unloaded row status and health snapshots when available.
-- Supports quick unlink per row.
+- Shows loaded/unloaded/dead row status and health snapshots when available.
+- Supports per-row `Recall`, `Set Home`, `Return Home`, and `Unlink` actions.
+- Shows `Revive` on dead companions when dead respawn is enabled and cooldown is ready.
+- Refreshes row status/health/cooldowns in-place once per second while open.
 - Includes an empty-state prompt when no companions are linked.
 - Optional unlink safety confirmation can require a second click.
 
@@ -117,17 +119,27 @@ Unloaded flow:
 - Source/destination chunks are requested asynchronously.
 - Retries run on a bounded interval/time window.
 - Pending relocations are also retried on NPC add/remove events.
+- Unloaded identities shown in the linked panel use fallback priority: `Display Name > Name Key > Role ID`.
 
-Global tuning values come from `TwGlobalConfig`:
-- `CommandReturnHomeTeleportDistance`
-- `CommandReturnHomePathDistanceBeforeTeleport`
-- `CommandReturnHomeTeleportDelayMs`
-- `CommandRecallSafeSpawnDistance`
-- `CommandRecallForceRelocateDistance`
-- `CommandRelocationRetryIntervalMs`
-- `CommandRelocationMaxWaitMs`
-- `CommandRelocationMaxRetryAttempts`
-- `CommandLinkedPanelRequireUnlinkConfirm`
+Global tuning values come from `TwGlobalConfig.Command`:
+- `ReturnHomeTeleportDistance`
+- `ReturnHomePathDistanceBeforeTeleport`
+- `ReturnHomeTeleportDelayMs`
+- `RecallSafeSpawnDistance`
+- `RecallForceRelocateDistance`
+- `RelocationRetryIntervalMs`
+- `RelocationMaxWaitMs`
+- `RelocationMaxRetryAttempts`
+- `DeadRespawnEnabled`
+- `DeadRespawnCooldownMs`
+- `DeadRespawnFollowRetryDelayMs`
+- `DeadRespawnDistanceClose`
+- `DeadRespawnDistanceNear`
+- `DeadRespawnDistanceMid`
+- `DeadRespawnDistanceFar`
+- `PlacementMinRelativeY`
+- `PlacementMaxRelativeY`
+- `LinkedPanelRequireUnlinkConfirm`
 
 ## Hook Bridge for Movement
 `MoveToPosition` emits hooks with ids like:

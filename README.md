@@ -26,11 +26,12 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 - **Command Item System** - Build custom command tools with `TwCommandItemConfig` + `TameworkCommand`.
   - Link/unlink NPCs to each tool.
   - Left-click executes the selected command; right-click opens the radial command wheel.
-  - Radial menu includes a linked-companions side panel with loaded/unloaded status, health snapshot, and quick unlink actions.
-  - Unlink safety is configurable via `TwGlobalConfig.CommandLinkedPanelRequireUnlinkConfirm`.
+  - Radial menu includes a linked-companions side panel with loaded/unloaded/dead status and per-NPC actions (`Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` when enabled and ready).
+  - Linked panel rows update status/health/cooldowns in-place while open.
+  - Unlink safety is configurable via `TwGlobalConfig.Command.LinkedPanelRequireUnlinkConfirm`.
   - Supports command steps like state changes, target assignment, move-to-ping, set/return-home, and hook triggers.
-  - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation.
-  - Command relocation tuning is configurable in `TwGlobalConfig`.
+  - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation with safer placement for recall/revive.
+  - Command relocation and revive tuning is configurable in `TwGlobalConfig.Command`.
 - **Examples and Documentation** - Plenty of examples and thorough documentation to help you integrate Tamework.
   - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
@@ -56,7 +57,7 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.1.0"
+  "Alechilles:Alec's Tamework!": "2.1.1"
 },
 "IncludesAssetPack": true
 ```
@@ -125,7 +126,7 @@ Optional prompt updater (see the example template for full usage):
 11. Add translations in `Server/Languages/en-US/server.lang`.
 
 ## Configuration Overview
-- **TwGlobalConfig**: default parameter names + interaction defaults.
+- **TwGlobalConfig**: sectioned global defaults and runtime tuning (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`).
   Location: `<ModRoot>/Server/Tamework/Global/*.json`
 - **TwSpawnerConfig**: spawner capture/spawn behavior.
   Location: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`

@@ -14,6 +14,7 @@ This document is a high level map of how Alec's Tamework is organized and why th
 - Spawner items (TwSpawnerConfig assets + SpawnerFeatureHandler + TameworkSpawn interaction)
 - Command items (TwCommandItemConfig assets + CommandItemFeatureHandler + TameworkCommand interaction)
 - Command relocation pipeline (CommandNpcRelocationService + CommandNpcRelocationOnLoadSystem)
+- Linked companions panel runtime (TameworkCommandSelectionPage + per-row action routing)
 - Ownership and taming (components, owner interaction blocking, damage filters)
 - Localization and messages (translation discovery + owner denial messages)
 - Asset-pack ordering and legacy-pack replacement at early `LoadAssetEvent`
@@ -25,7 +26,9 @@ This document is a high level map of how Alec's Tamework is organized and why th
 - The hook system allows interaction effects to emit a hook signal that can be consumed by NPC instruction sensors.
 - TwSpawnerConfig assets are converted into per item feature configs and are used for capture and spawn logic.
 - TwCommandItemConfig assets are indexed by item id and drive command linking, selection, step execution, and UI.
-- Recall/return-home commands use hybrid relocation and queue for unloaded linked NPCs with chunk preload retries.
+- Linked companions panel provides per-NPC actions (`Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive`) with incremental row refresh while open.
+- Recall/return-home/revive use shared safe placement + relocation queueing for unloaded linked NPCs with chunk preload retries.
+- Dead linked NPC snapshots persist so dead/revive state survives relog and restart.
 - Owner protection can block owner damage, all player damage, or make owned NPCs invulnerable via settings.
 
 ## Where to look

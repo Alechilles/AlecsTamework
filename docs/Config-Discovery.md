@@ -27,28 +27,32 @@ These asset types are registered with the asset registry and are available to an
 - TwGlobalConfig resolves to the highest priority enabled asset. If multiple configs share the same priority, the lowest asset id (case-insensitive) is selected.
 
 ## Global config asset
-TwGlobalConfig replaces the old settings file and controls owner damage filtering plus interaction defaults:
-- `BlockOwnerDamage`
-- `BlockAllPlayerDamageIfOwned`
-- `InvulnerableIfOwned`
-- `InteractionConfigParam`
-- `LovedItemsParam`
-- `IsHarvestableParam`
-- `IsMountableParam`
-- `HarvestContextParam`
-- `HarvestAlarmName`
-- `InteractionCooldownAlarmPrefix`
-- `CommandReturnHomeTeleportDistance`
-- `CommandReturnHomePathDistanceBeforeTeleport`
-- `CommandReturnHomeTeleportDelayMs`
-- `CommandRecallSafeSpawnDistance`
-- `CommandRecallForceRelocateDistance`
-- `CommandRelocationRetryIntervalMs`
-- `CommandRelocationMaxWaitMs`
-- `CommandRelocationMaxRetryAttempts`
+TwGlobalConfig replaces the old settings file and is organized into top-level sections:
+- `General` (`Enabled`, `Priority`)
+- `OwnershipProtection` (`BlockOwnerDamage`, `BlockAllPlayerDamageIfOwned`, `InvulnerableIfOwned`)
+- `InteractionDefaults` (`InteractionConfigParam`, `LovedItemsParam`, `IsHarvestableParam`, `IsMountableParam`, `HarvestContextParam`, `HarvestAlarmName`, `InteractionCooldownAlarmPrefix`)
+- `Command`:
+  - `ReturnHomeTeleportDistance`
+  - `ReturnHomePathDistanceBeforeTeleport`
+  - `ReturnHomeTeleportDelayMs`
+  - `RecallSafeSpawnDistance`
+  - `RecallForceRelocateDistance`
+  - `RelocationRetryIntervalMs`
+  - `RelocationMaxWaitMs`
+  - `RelocationMaxRetryAttempts`
+  - `DeadRespawnEnabled`
+  - `DeadRespawnCooldownMs`
+  - `DeadRespawnFollowRetryDelayMs`
+  - `DeadRespawnDistanceClose`
+  - `DeadRespawnDistanceNear`
+  - `DeadRespawnDistanceMid`
+  - `DeadRespawnDistanceFar`
+  - `PlacementMinRelativeY`
+  - `PlacementMaxRelativeY`
+  - `LinkedPanelRequireUnlinkConfirm`
 
-String parameter-name fields are required; missing or blank values emit a warning on startup.
-Numeric command-tuning fields are optional and fall back to built-in defaults when omitted or invalid.
+String parameter-name fields in `InteractionDefaults` are required; missing or blank values emit a warning on startup.
+Command tuning fields are optional and fall back to built-in defaults when omitted or invalid.
 
 ## Reloading
 - `/tw reloadconfig` reloads spawner + naming + command item configs from disk
