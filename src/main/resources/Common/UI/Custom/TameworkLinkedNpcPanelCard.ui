@@ -103,7 +103,7 @@ Group {
     Anchor: (Top: 62, Right: 64, Width: 24, Height: 24);
     Style: @LinkedActionRespawnButtonStyle;
     Text: "";
-    TooltipText: "Respawn companion";
+    TooltipText: "Revive";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
@@ -112,7 +112,7 @@ Group {
     Anchor: (Top: 62, Right: 64, Width: 24, Height: 24);
     Style: @LinkedActionRecallButtonStyle;
     Text: "";
-    TooltipText: "Recall companion";
+    TooltipText: "Recall";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
@@ -121,7 +121,7 @@ Group {
     Anchor: (Top: 62, Right: 8, Width: 24, Height: 24);
     Style: @LinkedActionSetHomeButtonStyle;
     Text: "";
-    TooltipText: "Set companion home";
+    TooltipText: "Set Home";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
@@ -130,7 +130,7 @@ Group {
     Anchor: (Top: 62, Right: 36, Width: 24, Height: 24);
     Style: @LinkedActionReturnHomeButtonStyle;
     Text: "";
-    TooltipText: "Send companion home";
+    TooltipText: "Return Home";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
@@ -139,7 +139,7 @@ Group {
     Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
     Style: @RemoveIconButtonStyle;
     Text: "";
-    TooltipText: "Unlink companion";
+    TooltipText: "Unlink";
     TextTooltipStyle: @LinkedActionTooltipStyle;
   }
 
