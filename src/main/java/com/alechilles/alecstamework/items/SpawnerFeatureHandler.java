@@ -54,12 +54,9 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.HashSet;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -116,14 +113,14 @@ public final class SpawnerFeatureHandler {
 
     private final HytaleLogger logger;
     private final ItemFeatureRegistry registry;
-    private final CommandLinkedNpcCaptureService captureService;
+    private final SpawnerLinkedNpcSyncService linkedNpcSyncService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
                                  CommandLinkedNpcCaptureService captureService) {
         this.logger = logger;
         this.registry = registry;
-        this.captureService = captureService;
+        this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -333,9 +330,7 @@ public final class SpawnerFeatureHandler {
         }
         UUID capturedNpcUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING);
         CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
-                captureService != null && capturedNpcUuid != null
-                        ? captureService.getCapturedSnapshot(capturedNpcUuid)
-                        : null;
+                linkedNpcSyncService.getCapturedSnapshot(capturedNpcUuid);
 
         String roleId = resolveSpawnRoleId(itemStack, config);
         if (roleId == null || roleId.isBlank()) {
@@ -393,12 +388,12 @@ public final class SpawnerFeatureHandler {
         applyOwner(config, npcRef, npc, playerRef, ownerUuid, world);
         applyTamed(npcRef, tamed, world);
         applyCapturedName(itemStack, npcRef, store);
-        restoreCommandLinksFromCapturedSnapshot(npcRef, store, ownerUuid, capturedSnapshot);
+        linkedNpcSyncService.restoreCommandLinksFromCapturedSnapshot(npcRef, store, ownerUuid, capturedSnapshot);
         UUID spawnedNpcUuid = npc.getUuid();
         if (capturedNpcUuid != null && spawnedNpcUuid != null) {
-            remapLinkedNpcRecordsAfterRespawn(player, capturedNpcUuid, spawnedNpcUuid);
+            linkedNpcSyncService.remapLinkedNpcRecordsAfterRespawn(player, capturedNpcUuid, spawnedNpcUuid);
         }
-        clearCapturedSnapshotIfPresent(capturedNpcUuid);
+        linkedNpcSyncService.clearCapturedSnapshotIfPresent(capturedNpcUuid);
 
         ItemStack updated = itemStack;
         if (isAlreadyCaptured(itemStack)) {
@@ -650,13 +645,37 @@ public final class SpawnerFeatureHandler {
         );
         String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId(), captureInfo.npcNameKey);
 
-        UUID targetUuid = resolveEntityUuid(player, targetRef);
-        UUID existingOwner = resolveOwnerFromComponent(targetRef, player.getWorld());
+        World world = player.getWorld();
+        UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
+        UUID existingOwner = resolveOwnerFromComponent(targetRef, world);
         UUID ownerToStore = null;
         if (!config.isCaptureClearsOwner()) {
             ownerToStore = existingOwner != null ? existingOwner : player.getUuid();
         }
-        publishCapturedLinkedNpcSnapshot(targetRef, player.getWorld(), targetUuid, captureInfo);
+        String snapshotDisplayName = (captureInfo.capturedName != null
+                && captureInfo.capturedName.name != null
+                && !captureInfo.capturedName.name.isBlank())
+                ? captureInfo.capturedName.name
+                : null;
+        String snapshotRoleId = null;
+        if (world != null) {
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
+            if (npc != null) {
+                snapshotRoleId = resolveRoleId(npc);
+                if (snapshotDisplayName == null || snapshotDisplayName.isBlank()) {
+                    snapshotDisplayName = resolveNpcDisplayName(targetRef, store, npc);
+                }
+            }
+        }
+        linkedNpcSyncService.publishCapturedLinkedNpcSnapshot(
+                targetRef,
+                world,
+                targetUuid,
+                existingOwner,
+                snapshotRoleId,
+                snapshotDisplayName
+        );
 
         ItemStack updated = swapItemId(itemStack, config.getSpawnerFilledItemId())
                 .withMetadata(TameworkMetadataKeys.CAPTURED, Codec.BOOLEAN, true)
@@ -664,7 +683,7 @@ public final class SpawnerFeatureHandler {
         if (attachmentsJson != null) {
             updated = updated.withMetadata(TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, attachmentsJson);
         }
-        boolean tamed = resolveTamedState(targetRef, player.getWorld());
+        boolean tamed = resolveTamedState(targetRef, world);
         if (tamed) {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
@@ -682,7 +701,7 @@ public final class SpawnerFeatureHandler {
             logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
             return false;
         }
-        spawnCaptureParticles(player.getWorld(), targetRef, config);
+        spawnCaptureParticles(world, targetRef, config);
         clearOwnerIfConfigured(player, config, targetRef);
         despawnNpc(player, targetRef, null);
 
@@ -1764,196 +1783,6 @@ public final class SpawnerFeatureHandler {
             return roleName;
         }
         return null;
-    }
-
-    private UUID resolveEntityUuid(Player player, Ref<EntityStore> targetRef) {
-        if (player == null || targetRef == null || !targetRef.isValid()) {
-            return null;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return null;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
-        return npc != null ? npc.getUuid() : null;
-    }
-
-    private void publishCapturedLinkedNpcSnapshot(Ref<EntityStore> targetRef,
-                                                  World world,
-                                                  UUID targetUuid,
-                                                  CaptureInfo captureInfo) {
-        if (captureService == null || targetUuid == null || targetRef == null || !targetRef.isValid() || world == null) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        if (store == null) {
-            return;
-        }
-        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            return;
-        }
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType == null) {
-            return;
-        }
-        TameworkCommandLinksComponent links = store.getComponent(targetRef, linksType);
-        String[] toolIds = links != null ? links.getToolIds() : null;
-        if (toolIds == null || toolIds.length == 0) {
-            captureService.clearCapturedSnapshot(targetUuid);
-            return;
-        }
-        UUID ownerId = links.getOwnerId();
-        if (ownerId == null) {
-            ownerId = resolveOwnerFromComponent(targetRef, world);
-        }
-        String roleId = resolveRoleId(npc);
-        String displayName = (captureInfo != null
-                && captureInfo.capturedName != null
-                && captureInfo.capturedName.name != null
-                && !captureInfo.capturedName.name.isBlank())
-                ? captureInfo.capturedName.name
-                : resolveNpcDisplayName(targetRef, store, npc);
-        TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
-        Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
-        Vector3d homePosition = links != null && links.hasHome() ? links.getHomePosition() : null;
-        captureService.recordCapturedSnapshot(
-                new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
-                        targetUuid,
-                        ownerId,
-                        toolIds,
-                        roleId,
-                        displayName,
-                        lastKnownPosition,
-                        homePosition,
-                        System.currentTimeMillis()
-                )
-        );
-    }
-
-    private void clearCapturedSnapshotIfPresent(UUID capturedNpcUuid) {
-        if (captureService == null || capturedNpcUuid == null) {
-            return;
-        }
-        captureService.clearCapturedSnapshot(capturedNpcUuid);
-    }
-
-    private void restoreCommandLinksFromCapturedSnapshot(Ref<EntityStore> npcRef,
-                                                         Store<EntityStore> store,
-                                                         UUID fallbackOwnerId,
-                                                         CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot snapshot) {
-        if (npcRef == null || !npcRef.isValid() || store == null || snapshot == null) {
-            return;
-        }
-        String[] toolIds = snapshot.toolIds();
-        if (toolIds == null || toolIds.length == 0) {
-            return;
-        }
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType == null) {
-            return;
-        }
-        UUID ownerId = snapshot.ownerId() != null ? snapshot.ownerId() : fallbackOwnerId;
-        TameworkCommandLinksComponent links = new TameworkCommandLinksComponent(ownerId, toolIds);
-        if (snapshot.homePosition() != null) {
-            links.setHomePosition(snapshot.homePosition());
-        }
-        store.putComponent(npcRef, linksType, links);
-    }
-
-    private void remapLinkedNpcRecordsAfterRespawn(Player player, UUID oldNpcUuid, UUID newNpcUuid) {
-        if (player == null || oldNpcUuid == null || newNpcUuid == null || oldNpcUuid.equals(newNpcUuid)) {
-            return;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        if (hotbar == null) {
-            return;
-        }
-        boolean changedAny = false;
-        short capacity = hotbar.getCapacity();
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack slotStack = hotbar.getItemStack(slot);
-            if (slotStack == null || slotStack.isEmpty()) {
-                continue;
-            }
-            String encodedLinks = slotStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_LINKED_NPCS, Codec.STRING);
-            if (encodedLinks == null || encodedLinks.isBlank()) {
-                continue;
-            }
-            String rewritten = rewriteLinkedNpcUuidRecords(encodedLinks, oldNpcUuid, newNpcUuid);
-            if (rewritten == null || rewritten.equals(encodedLinks)) {
-                continue;
-            }
-            hotbar.setItemStackForSlot(
-                    slot,
-                    slotStack.withMetadata(TameworkMetadataKeys.COMMAND_LINKED_NPCS, Codec.STRING, rewritten)
-            );
-            changedAny = true;
-        }
-        if (changedAny) {
-            inventory.markChanged();
-            player.sendInventory();
-        }
-    }
-
-    private String rewriteLinkedNpcUuidRecords(String encodedLinks, UUID oldNpcUuid, UUID newNpcUuid) {
-        if (encodedLinks == null || encodedLinks.isBlank() || oldNpcUuid == null || newNpcUuid == null) {
-            return encodedLinks;
-        }
-        String oldKey = oldNpcUuid.toString();
-        String newKey = newNpcUuid.toString();
-        String[] lines = encodedLinks.split("\\R");
-        LinkedHashMap<String, String> dedupedLines = new LinkedHashMap<>();
-        Set<String> seenUuids = new HashSet<>();
-        boolean changed = false;
-        int rawCounter = 0;
-
-        for (String line : lines) {
-            if (line == null || line.isBlank()) {
-                continue;
-            }
-            String trimmed = line.trim();
-            int separator = trimmed.indexOf('|');
-            String prefix = separator >= 0 ? trimmed.substring(0, separator) : trimmed;
-            String suffix = separator >= 0 ? trimmed.substring(separator) : "";
-
-            String rewrittenPrefix = prefix;
-            if (prefix.equalsIgnoreCase(oldKey)) {
-                rewrittenPrefix = newKey;
-                changed = true;
-            }
-            String rewritten = rewrittenPrefix + suffix;
-
-            String dedupeKey;
-            try {
-                dedupeKey = UUID.fromString(rewrittenPrefix).toString().toLowerCase(Locale.ROOT);
-                if (!seenUuids.add(dedupeKey)) {
-                    changed = true;
-                    continue;
-                }
-            } catch (IllegalArgumentException ignored) {
-                dedupeKey = "__raw__" + (rawCounter++);
-            }
-            dedupedLines.putIfAbsent(dedupeKey, rewritten);
-        }
-
-        if (!changed) {
-            return encodedLinks;
-        }
-
-        StringBuilder builder = new StringBuilder();
-        for (String line : dedupedLines.values()) {
-            if (builder.length() > 0) {
-                builder.append('\n');
-            }
-            builder.append(line);
-        }
-        return builder.toString();
     }
 
     private String resolveRoleId(NPCEntity npc) {
