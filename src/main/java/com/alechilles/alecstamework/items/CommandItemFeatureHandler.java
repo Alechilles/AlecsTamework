@@ -88,6 +88,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandCompanionPlacementService companionPlacementService;
     private final CommandRecipientService recipientService;
+    private final CommandStepExecutionService stepExecutionService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -111,6 +112,11 @@ public final class CommandItemFeatureHandler {
         this.linkPolicyService = new CommandLinkPolicyService();
         this.companionPlacementService = new CommandCompanionPlacementService();
         this.recipientService = new CommandRecipientService(linkPolicyService, linkedNpcRecordStore);
+        this.stepExecutionService = new CommandStepExecutionService(
+                relocationService,
+                linkedNpcRecordStore,
+                npcNameResolver
+        );
     }
 
     // Handles a single command-item use.
@@ -899,8 +905,8 @@ public final class CommandItemFeatureHandler {
             }
         }
         // Match default Follow behavior after respawn.
-        if (!applyState(npcRef, npc, store, "Follow", null)) {
-            applyState(npcRef, npc, store, "Idle", null);
+        if (!stepExecutionService.applyState(npcRef, npc, store, "Follow", null)) {
+            stepExecutionService.applyState(npcRef, npc, store, "Idle", null);
         }
     }
 
@@ -1020,7 +1026,7 @@ public final class CommandItemFeatureHandler {
         if (!returnHome && !recall) {
             return 0;
         }
-        RelocationState postRelocationState = resolveRelocationState(context.command, returnHome, recall);
+        RelocationState postRelocationState = stepExecutionService.resolveRelocationState(context.command, returnHome, recall);
         World world = context.player != null ? context.player.getWorld() : null;
         UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
         if (world == null) {
@@ -1104,227 +1110,7 @@ public final class CommandItemFeatureHandler {
 
     private StepResult executeCommand(Context context, Candidate candidate) {
         maybeRelocateLoadedRecallCandidate(context, candidate);
-        CommandStep[] steps = context.command.getSteps();
-        if (steps == null || steps.length == 0) {
-            return executeModeMapping(context, candidate);
-        }
-        boolean applied = false;
-        for (CommandStep step : steps) {
-            if (step == null) {
-                continue;
-            }
-            boolean ok = applyStep(step, context, candidate);
-            if (ok) {
-                applied = true;
-                continue;
-            }
-            if (step.isOptional()) {
-                continue;
-            }
-            FailurePolicy policy = step.getFailurePolicy() != null ? step.getFailurePolicy() : FailurePolicy.Continue;
-            if (policy == FailurePolicy.AbortAll) {
-                return new StepResult(applied, true);
-            }
-            if (policy == FailurePolicy.AbortCommandForNpc) {
-                return new StepResult(applied, false);
-            }
-        }
-        return new StepResult(applied, false);
-    }
-
-    private StepResult executeModeMapping(Context context, Candidate candidate) {
-        ModeMapping mode = context.command.getModeMapping();
-        if (mode == null || mode.getState() == null || mode.getState().isBlank()) {
-            return new StepResult(false, false);
-        }
-        boolean ok = applyState(candidate.ref, candidate.npc, context.store, mode.getState(), mode.getSubState());
-        return new StepResult(ok, false);
-    }
-
-    private boolean applyStep(CommandStep step, Context context, Candidate candidate) {
-        if (step instanceof SetStateStep stateStep) {
-            return applyState(candidate.ref, candidate.npc, context.store, stateStep.getState(), stateStep.getSubState());
-        }
-        if (step instanceof SetTargetStep targetStep) {
-            return applySetTarget(targetStep, context, candidate);
-        }
-        if (step instanceof ClearTargetStep clearStep) {
-            String slot = clearStep.getTargetSlot();
-            if (slot == null || slot.isBlank()) {
-                slot = MASTER_TARGET_SLOT;
-            }
-            Role role = candidate.npc.getRole();
-            if (role == null || role.getMarkedEntitySupport() == null) {
-                return false;
-            }
-            role.getMarkedEntitySupport().setMarkedEntity(slot, null);
-            return true;
-        }
-        if (step instanceof ClearCombatStep clearCombatStep) {
-            return applyClearCombat(clearCombatStep, context, candidate);
-        }
-        if (step instanceof MoveToPositionStep moveStep) {
-            return applyMove(moveStep, context, candidate);
-        }
-        if (step instanceof StoreHomeStep storeHomeStep) {
-            return applyStoreHome(storeHomeStep, context, candidate);
-        }
-        if (step instanceof TriggerHookStep hookStep) {
-            return applyHook(hookStep.getHookId(), context, candidate.ref);
-        }
-        return false;
-    }
-
-    private boolean applyState(Ref<EntityStore> npcRef,
-                               NPCEntity npc,
-                               Store<EntityStore> store,
-                               String state,
-                               String subState) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getStateSupport() == null) {
-            return false;
-        }
-        if (state == null || state.isBlank()) {
-            return false;
-        }
-        StateSupport support = npc.getRole().getStateSupport();
-        String resolvedSub = subState;
-        if (support.getStateHelper() != null) {
-            int stateIndex = support.getStateHelper().getStateIndex(state);
-            if (stateIndex == StateSupport.NO_STATE) {
-                return false;
-            }
-            if (resolvedSub == null || resolvedSub.isBlank()) {
-                resolvedSub = support.getStateHelper().getDefaultSubState();
-            } else if (support.getStateHelper().getSubStateIndex(stateIndex, resolvedSub) == StateSupport.NO_STATE) {
-                return false;
-            }
-        }
-        support.setState(npcRef, state, resolvedSub == null ? "" : resolvedSub, store);
-        return true;
-    }
-
-    private boolean applySetTarget(SetTargetStep targetStep, Context context, Candidate candidate) {
-        Role role = candidate.npc.getRole();
-        if (role == null || role.getMarkedEntitySupport() == null) {
-            return false;
-        }
-        String slot = targetStep.getTargetSlot();
-        if (slot == null || slot.isBlank()) {
-            slot = MASTER_TARGET_SLOT;
-        }
-        TargetSource source = targetStep.getSource() != null ? targetStep.getSource() : TargetSource.CrosshairTarget;
-        Ref<EntityStore> target = switch (source) {
-            case OwnerPlayer -> context.playerRef;
-            case StoredTarget -> readMarkedEntity(role, slot);
-            case LastAttackTarget, CrosshairTarget -> context.commandTarget;
-        };
-        if (target == null || !target.isValid()) {
-            return false;
-        }
-        if ((source == TargetSource.CrosshairTarget || source == TargetSource.LastAttackTarget)
-                && !isHostileTargetAllowed(target, context, candidate)) {
-            return false;
-        }
-        role.getMarkedEntitySupport().setMarkedEntity(slot, target);
-        return true;
-    }
-
-    private boolean isHostileTargetAllowed(Ref<EntityStore> target, Context context, Candidate candidate) {
-        if (target == null || !target.isValid()) {
-            return false;
-        }
-        UUID commanderId = context.player != null ? context.player.getUuid() : null;
-        TameworkOwnerComponent targetOwner = context.store.getComponent(target, TameworkOwnerComponent.getComponentType());
-        UUID targetOwnerId = targetOwner != null ? targetOwner.getOwnerId() : null;
-        boolean targetOwnedByCommander = commanderId != null && targetOwnerId != null && commanderId.equals(targetOwnerId);
-        Player targetPlayer = context.store.getComponent(target, Player.getComponentType());
-        boolean targetIsPlayer = targetPlayer != null;
-        boolean playerTargetingAllowed = !targetIsPlayer || isPlayerTargetAllowed(context.player.getWorld());
-        boolean targetPlayerSpawnProtected = targetIsPlayer && targetPlayer.hasSpawnProtection();
-        return CommandTargetPermission.isAllowed(
-                target.equals(context.playerRef),
-                target.equals(candidate.ref),
-                targetOwnedByCommander,
-                targetIsPlayer,
-                playerTargetingAllowed,
-                targetPlayerSpawnProtected,
-                targetOwnerId != null,
-                context.blockAllPlayerDamageIfOwned,
-                context.invulnerableIfOwned
-        );
-    }
-
-    private boolean isPlayerTargetAllowed(World world) {
-        if (world == null || world.getWorldConfig() == null) {
-            return true;
-        }
-        return world.getWorldConfig().isPvpEnabled();
-    }
-
-    @SuppressWarnings("unchecked")
-    private Ref<EntityStore> readMarkedEntity(Role role, String slot) {
-        if (role == null || role.getMarkedEntitySupport() == null) {
-            return null;
-        }
-        try {
-            Method method = role.getMarkedEntitySupport().getClass().getMethod("getMarkedEntity", String.class);
-            Object value = method.invoke(role.getMarkedEntitySupport(), slot);
-            if (value instanceof Ref<?>) {
-                return (Ref<EntityStore>) value;
-            }
-        } catch (Exception ignored) {
-            return null;
-        }
-        return null;
-    }
-
-    private boolean applyMove(MoveToPositionStep moveStep, Context context, Candidate candidate) {
-        MoveSource source = moveStep.getSource() != null ? moveStep.getSource() : MoveSource.RaycastHit;
-        Vector3d targetPosition = null;
-        if (source == MoveSource.RaycastHit) {
-            targetPosition = context.raycastPosition;
-            if (targetPosition == null) {
-                return false;
-            }
-        } else if (source == MoveSource.StoredHome) {
-            targetPosition = readStoredHomePosition(candidate.ref, context.store);
-            if (targetPosition == null) {
-                return false;
-            }
-        } else if (source == MoveSource.OwnerPosition && candidate.npc.getRole() != null
-                && candidate.npc.getRole().getMarkedEntitySupport() != null
-                && context.playerRef != null
-                && context.playerRef.isValid()) {
-            candidate.npc.getRole().getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
-        }
-        if (source == MoveSource.StoredHome && targetPosition != null) {
-            TransformComponent npcTransform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
-            Vector3d start = npcTransform != null ? new Vector3d(npcTransform.getPosition()) : null;
-            if (start != null && start.distanceTo(targetPosition) > context.returnHomeTeleportDistance) {
-                Vector3d intermediate = computeIntermediatePoint(start, targetPosition, context.returnHomePathDistanceBeforeTeleport);
-                RelocationState postRelocationState = resolveRelocationState(context.command, true, false);
-                World world = context.player != null ? context.player.getWorld() : null;
-                UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
-                UUID npcUuid = candidate.npc != null ? candidate.npc.getUuid() : null;
-                if (world != null && npcUuid != null && relocationService != null) {
-                    relocationService.queueRelocation(
-                            world,
-                            npcUuid,
-                            targetPosition,
-                            ownerUuid,
-                            false,
-                            true,
-                            postRelocationState.state,
-                            postRelocationState.subState,
-                            context.returnHomeTeleportDelayMs,
-                            start,
-                            targetPosition
-                    );
-                }
-                return applyHook("Tamework.Command.MoveToPosition." + source.name(), context, candidate.ref, intermediate);
-            }
-        }
-        return applyHook("Tamework.Command.MoveToPosition." + source.name(), context, candidate.ref, targetPosition);
+        return stepExecutionService.executeCommand(context, candidate);
     }
 
     private Vector3d readStoredHomePosition(Ref<EntityStore> npcRef, Store<EntityStore> store) {
@@ -1336,118 +1122,6 @@ public final class CommandItemFeatureHandler {
             return null;
         }
         return links.getHomePosition();
-    }
-
-    private boolean applyStoreHome(StoreHomeStep step, Context context, Candidate candidate) {
-        if (step == null || context == null || candidate == null || candidate.ref == null || candidate.npc == null) {
-            return false;
-        }
-        Vector3d home = null;
-        StoreSource source = step.getSource() != null ? step.getSource() : StoreSource.RaycastHit;
-        if (source == StoreSource.RaycastHit) {
-            home = context.raycastPosition;
-        } else if (source == StoreSource.OwnerPosition) {
-            TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
-            if (playerTransform != null) {
-                home = new Vector3d(playerTransform.getPosition());
-            }
-        }
-        if (home == null) {
-            return false;
-        }
-        TameworkCommandLinksComponent links = context.store.getComponent(
-                candidate.ref,
-                TameworkCommandLinksComponent.getComponentType()
-        );
-        if (links == null) {
-            links = new TameworkCommandLinksComponent();
-        }
-        if (links.getOwnerId() == null && context.player != null && context.player.getUuid() != null) {
-            links.setOwnerId(context.player.getUuid());
-        }
-        links.setHomePosition(home);
-        context.store.putComponent(candidate.ref, TameworkCommandLinksComponent.getComponentType(), links);
-
-        if (context.workingItem != null && !context.workingItem.isEmpty() && candidate.npc.getUuid() != null) {
-            TransformComponent transform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
-            Vector3d currentPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
-            ItemStack updated = upsertLinkedNpcRecord(
-                    context.workingItem,
-                    candidate.npc.getUuid(),
-                    currentPosition,
-                    home,
-                    npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, context.store),
-                    npcNameResolver.resolveNpcNameKey(candidate.npc),
-                    npcNameResolver.resolveNpcRoleId(candidate.npc)
-            );
-            if (updated != context.workingItem) {
-                context.workingItem = updated;
-                context.itemChanged = true;
-            }
-        }
-        return true;
-    }
-
-    private boolean applyClearCombat(ClearCombatStep step, Context context, Candidate candidate) {
-        if (step == null || candidate == null || candidate.npc == null) {
-            return false;
-        }
-        boolean applied = false;
-        Role role = candidate.npc.getRole();
-        if (role != null && role.getMarkedEntitySupport() != null) {
-            String[] slots = step.getTargetSlots();
-            if (slots == null || slots.length == 0) {
-                slots = new String[] { "LockedTarget" };
-            }
-            for (String slot : slots) {
-                if (slot == null || slot.isBlank()) {
-                    continue;
-                }
-                role.getMarkedEntitySupport().setMarkedEntity(slot, null);
-                applied = true;
-            }
-            if (step.isAssignOwnerAsMasterTarget()
-                    && context.playerRef != null
-                    && context.playerRef.isValid()) {
-                role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, context.playerRef);
-                applied = true;
-            }
-        }
-        String state = step.getState();
-        if (state == null || state.isBlank()) {
-            return applied;
-        }
-        boolean stateApplied = applyState(candidate.ref, candidate.npc, context.store, state, step.getSubState());
-        return applied || stateApplied;
-    }
-
-    private boolean applyHook(String hookId, Context context, Ref<EntityStore> npcRef) {
-        return applyHook(hookId, context, npcRef, null);
-    }
-
-    private boolean applyHook(String hookId,
-                              Context context,
-                              Ref<EntityStore> npcRef,
-                              Vector3d targetPosition) {
-        if (hookId == null || hookId.isBlank() || npcRef == null || !npcRef.isValid()) {
-            return false;
-        }
-        UUID playerId = context.player.getUuid();
-        String playerName = context.player.getPlayerRef() != null ? context.player.getPlayerRef().getUsername() : null;
-        context.store.putComponent(
-                npcRef,
-                TameworkHookComponent.getComponentType(),
-                new TameworkHookComponent(
-                        hookId,
-                        playerId,
-                        playerName,
-                        context.itemId,
-                        System.currentTimeMillis(),
-                        true,
-                        targetPosition
-                )
-        );
-        return true;
     }
 
     private LinkToggleResult tryToggleLink(Player player,
@@ -1549,56 +1223,6 @@ public final class CommandItemFeatureHandler {
             return;
         }
         candidate.npc.moveTo(candidate.ref, safePosition.x, safePosition.y, safePosition.z, context.store);
-    }
-
-    private Vector3d computeIntermediatePoint(Vector3d from, Vector3d to, double distance) {
-        if (from == null || to == null) {
-            return to;
-        }
-        double dx = to.x - from.x;
-        double dy = to.y - from.y;
-        double dz = to.z - from.z;
-        double length = Math.sqrt(dx * dx + dy * dy + dz * dz);
-        if (length <= distance || length <= 0.001) {
-            return new Vector3d(to);
-        }
-        double scale = distance / length;
-        return new Vector3d(
-                from.x + dx * scale,
-                from.y + dy * scale,
-                from.z + dz * scale
-        );
-    }
-
-    private RelocationState resolveRelocationState(CommandEntry command, boolean returnHome, boolean recall) {
-        String state = null;
-        String subState = null;
-        if (command != null && command.getSteps() != null) {
-            for (CommandStep step : command.getSteps()) {
-                if (step instanceof SetStateStep setStateStep) {
-                    if (setStateStep.getState() == null || setStateStep.getState().isBlank()) {
-                        continue;
-                    }
-                    state = setStateStep.getState();
-                    subState = setStateStep.getSubState();
-                    continue;
-                }
-                if (step instanceof ClearCombatStep clearCombatStep) {
-                    if (clearCombatStep.getState() == null || clearCombatStep.getState().isBlank()) {
-                        continue;
-                    }
-                    state = clearCombatStep.getState();
-                    subState = clearCombatStep.getSubState();
-                }
-            }
-        }
-        if ((state == null || state.isBlank()) && returnHome) {
-            state = "Hold";
-        }
-        if ((state == null || state.isBlank()) && recall) {
-            state = "Idle";
-        }
-        return new RelocationState(state, subState);
     }
 
     private ItemStack upsertLinkedNpcRecord(ItemStack stack, UUID npcUuid, Vector3d position, Vector3d homePosition) {
