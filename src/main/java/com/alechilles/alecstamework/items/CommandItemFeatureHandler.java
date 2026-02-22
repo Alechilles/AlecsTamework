@@ -150,7 +150,7 @@ public final class CommandItemFeatureHandler {
             }
             boolean opened = openSelectionMenu(player, store, config, working, tool.toolId);
             if (!opened) {
-                sendWarningMessage(player, "No command choices are available for this item.");
+                feedbackService.showWarning(player, "No command choices are available for this item.");
             }
             return opened;
         }
@@ -165,11 +165,11 @@ public final class CommandItemFeatureHandler {
                 updateHeldItem(player, working);
             }
             if (selection.command == null) {
-                sendWarningMessage(player, "No command is configured for this item.");
+                feedbackService.showWarning(player, "No command is configured for this item.");
                 return false;
             }
             String label = resolveCommandLabel(selection.command);
-            sendDefaultMessage(player, "Selected: " + label);
+            feedbackService.showDefault(player, "Selected: " + label);
             return true;
         }
 
@@ -183,7 +183,7 @@ public final class CommandItemFeatureHandler {
                 if (updateHeldItem) {
                     updateHeldItem(player, working);
                 }
-                sendSuccessMessage(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
+                feedbackService.showSuccess(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
                 return true;
             }
         }
@@ -193,7 +193,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendWarningMessage(player, "That command item is on cooldown.");
+            feedbackService.showWarning(player, "That command item is on cooldown.");
             return false;
         }
 
@@ -202,7 +202,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendWarningMessage(player, "No command is configured for this item.");
+            feedbackService.showWarning(player, "No command is configured for this item.");
             return false;
         }
 
@@ -255,7 +255,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendWarningMessage(player, "No linked NPCs matched this command.");
+            feedbackService.showWarning(player, "No linked NPCs matched this command.");
             return false;
         }
 
@@ -287,7 +287,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            sendWarningMessage(player, "No NPCs could execute that command.");
+            feedbackService.showWarning(player, "No NPCs could execute that command.");
             return false;
         }
 
@@ -304,7 +304,7 @@ public final class CommandItemFeatureHandler {
         if (updateHeldItem) {
             updateHeldItem(player, working);
         }
-        emitCommandExecutionFeedback(context, affected, queued);
+        feedbackService.emitCommandExecutionFeedback(context.player, context.playerRef, context.store, context.command, affected, queued, this::resolveCommandLabel);
         return true;
     }
 
@@ -377,16 +377,16 @@ public final class CommandItemFeatureHandler {
         }
         CommandEntry selected = config.findCommandById(commandId);
         if (selected == null) {
-            sendWarningMessage(player, "That command is no longer available.");
+            feedbackService.showWarning(player, "That command is no longer available.");
             return;
         }
         boolean updated = toolInventoryService.setSelectedCommandOnTool(player, toolId, selected.getId());
         if (!updated) {
-            sendWarningMessage(player, "Unable to apply the selected command.");
+            feedbackService.showWarning(player, "Unable to apply the selected command.");
             return;
         }
         String label = resolveCommandLabel(selected);
-        sendDefaultMessage(player, "Selected: " + label);
+        feedbackService.showDefault(player, "Selected: " + label);
     }
 
     private void applyMenuUnlink(Player player,
@@ -397,7 +397,7 @@ public final class CommandItemFeatureHandler {
         }
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            sendWarningMessage(player, "Unable to unlink right now.");
+            feedbackService.showWarning(player, "Unable to unlink right now.");
             return;
         }
         ItemContainer hotbar = inventory.getHotbar();
@@ -415,16 +415,16 @@ public final class CommandItemFeatureHandler {
             boolean itemChanged = updatedStack != stack;
             boolean componentChanged = unlinkLoadedNpcFromTool(player, npcUuid, toolId);
             if (!itemChanged && !componentChanged) {
-                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
             } else {
                 hotbar.setItemStackForSlot(slot, updatedStack);
                 inventory.markChanged();
                 player.sendInventory();
-                sendSuccessMessage(player, "Removed linked NPC.");
+                feedbackService.showSuccess(player, "Removed linked NPC.");
             }
             return;
         }
-        sendWarningMessage(player, "Unable to find that command item.");
+        feedbackService.showWarning(player, "Unable to find that command item.");
     }
 
     private void applyMenuRespawn(Player player,
@@ -435,27 +435,27 @@ public final class CommandItemFeatureHandler {
         }
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         if (globalConfig == null || !globalConfig.isCommandDeadRespawnEnabled()) {
-            sendWarningMessage(player, "Dead companion respawn is disabled.");
+            feedbackService.showWarning(player, "Dead companion respawn is disabled.");
             return;
         }
         if (deathService == null) {
-            sendWarningMessage(player, "Dead companion tracking is unavailable.");
+            feedbackService.showWarning(player, "Dead companion tracking is unavailable.");
             return;
         }
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            sendWarningMessage(player, "Unable to respawn right now.");
+            feedbackService.showWarning(player, "Unable to respawn right now.");
             return;
         }
         World world = player.getWorld();
         if (world == null) {
-            sendWarningMessage(player, "Unable to respawn right now.");
+            feedbackService.showWarning(player, "Unable to respawn right now.");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> playerRef = player.getReference();
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            sendWarningMessage(player, "Unable to respawn right now.");
+            feedbackService.showWarning(player, "Unable to respawn right now.");
             return;
         }
         ItemContainer hotbar = inventory.getHotbar();
@@ -471,23 +471,23 @@ public final class CommandItemFeatureHandler {
             }
             LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
-                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
                 return;
             }
             CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
                     deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid());
             if (deadSnapshot == null) {
-                sendWarningMessage(player, "That companion is not marked as dead.");
+                feedbackService.showWarning(player, "That companion is not marked as dead.");
                 return;
             }
             long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
             if (remainingMs > 0L) {
-                sendWarningMessage(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
+                feedbackService.showWarning(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
                 return;
             }
             ItemStack updatedStack = respawnDeadLinkedNpcForMenu(player, playerRef, store, toolId, stack, record, deadSnapshot);
             if (updatedStack == null) {
-                sendWarningMessage(player, "Failed to respawn that companion.");
+                feedbackService.showWarning(player, "Failed to respawn that companion.");
                 return;
             }
             hotbar.setItemStackForSlot(slot, updatedStack);
@@ -497,10 +497,10 @@ public final class CommandItemFeatureHandler {
             if (name == null || name.isBlank()) {
                 name = "companion";
             }
-            sendSuccessMessage(player, "Respawned " + name + ".");
+            feedbackService.showSuccess(player, "Respawned " + name + ".");
             return;
         }
-        sendWarningMessage(player, "Unable to find that command item.");
+        feedbackService.showWarning(player, "Unable to find that command item.");
     }
 
     private void applyMenuSetHome(Player player,
@@ -511,17 +511,17 @@ public final class CommandItemFeatureHandler {
         }
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            sendWarningMessage(player, "Unable to set home right now.");
+            feedbackService.showWarning(player, "Unable to set home right now.");
             return;
         }
         World world = player.getWorld();
         if (world == null) {
-            sendWarningMessage(player, "Unable to set home right now.");
+            feedbackService.showWarning(player, "Unable to set home right now.");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
-            sendWarningMessage(player, "Unable to set home right now.");
+            feedbackService.showWarning(player, "Unable to set home right now.");
             return;
         }
         ItemContainer hotbar = inventory.getHotbar();
@@ -537,32 +537,32 @@ public final class CommandItemFeatureHandler {
             }
             LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
-                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
                 return;
             }
             Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
             if (npcRef == null || !npcRef.isValid()) {
-                sendWarningMessage(player, "That companion must be loaded to set home.");
+                feedbackService.showWarning(player, "That companion must be loaded to set home.");
                 return;
             }
             NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
             if (npc == null) {
-                sendWarningMessage(player, "That companion must be loaded to set home.");
+                feedbackService.showWarning(player, "That companion must be loaded to set home.");
                 return;
             }
             TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
             if (links == null || !links.containsToolId(toolId)) {
-                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
                 return;
             }
             UUID ownerId = links.getOwnerId();
             if (ownerId != null && !ownerId.equals(player.getUuid())) {
-                sendWarningMessage(player, "You cannot set home for that companion.");
+                feedbackService.showWarning(player, "You cannot set home for that companion.");
                 return;
             }
             TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
             if (transform == null) {
-                sendWarningMessage(player, "Unable to read that companion's position.");
+                feedbackService.showWarning(player, "Unable to read that companion's position.");
                 return;
             }
             Vector3d home = new Vector3d(transform.getPosition());
@@ -583,10 +583,10 @@ public final class CommandItemFeatureHandler {
             hotbar.setItemStackForSlot(slot, updatedStack);
             inventory.markChanged();
             player.sendInventory();
-            sendSuccessMessage(player, "Set home for " + npcNameResolver.resolveNpcDisplayName(npcRef, store, npc) + ".");
+            feedbackService.showSuccess(player, "Set home for " + npcNameResolver.resolveNpcDisplayName(npcRef, store, npc) + ".");
             return;
         }
-        sendWarningMessage(player, "Unable to find that command item.");
+        feedbackService.showWarning(player, "Unable to find that command item.");
     }
 
     private void applyMenuRecall(Player player,
@@ -611,18 +611,18 @@ public final class CommandItemFeatureHandler {
         String actionLabel = returnHome ? "send home" : "recall";
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            sendWarningMessage(player, "Unable to " + actionLabel + " right now.");
+            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
             return;
         }
         World world = player.getWorld();
         if (world == null) {
-            sendWarningMessage(player, "Unable to " + actionLabel + " right now.");
+            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> playerRef = player.getReference();
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            sendWarningMessage(player, "Unable to " + actionLabel + " right now.");
+            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
             return;
         }
 
@@ -639,24 +639,24 @@ public final class CommandItemFeatureHandler {
             }
             LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
-                sendWarningMessage(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
                 return;
             }
             if (deathService != null
                     && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
-                sendWarningMessage(player, "That companion is dead. Use Respawn when it is ready.");
+                feedbackService.showWarning(player, "That companion is dead. Use Respawn when it is ready.");
                 return;
             }
             TwCommandItemConfig config = resolutionService.resolveConfig(stack.getItemId(), null);
             if (config == null || !config.isEnabled()) {
-                sendWarningMessage(player, "That command item is not configured.");
+                feedbackService.showWarning(player, "That command item is not configured.");
                 return;
             }
             CommandEntry panelCommand = returnHome
                     ? resolutionService.resolvePanelReturnHomeCommand(config, stack)
                     : resolutionService.resolvePanelRecallCommand(config, stack);
             if (panelCommand == null) {
-                sendWarningMessage(
+                feedbackService.showWarning(
                         player,
                         returnHome
                                 ? "No return-home command is configured for this item."
@@ -697,7 +697,7 @@ public final class CommandItemFeatureHandler {
                     hasHome = links != null && links.hasHome();
                 }
                 if (!hasHome) {
-                    sendWarningMessage(player, "No home is set for that companion.");
+                    feedbackService.showWarning(player, "No home is set for that companion.");
                     return;
                 }
             }
@@ -765,13 +765,13 @@ public final class CommandItemFeatureHandler {
                 player.sendInventory();
             }
             if (affected <= 0 && queued <= 0) {
-                sendWarningMessage(player, returnHome ? "No companions could return home." : "No NPCs could execute that command.");
+                feedbackService.showWarning(player, returnHome ? "No companions could return home." : "No NPCs could execute that command.");
                 return;
             }
-            emitCommandExecutionFeedback(context, affected, queued);
+            feedbackService.emitCommandExecutionFeedback(context.player, context.playerRef, context.store, context.command, affected, queued, this::resolveCommandLabel);
             return;
         }
-        sendWarningMessage(player, "Unable to find that command item.");
+        feedbackService.showWarning(player, "Unable to find that command item.");
     }
 
     private ItemStack respawnDeadLinkedNpcForMenu(Player player,
@@ -1660,39 +1660,12 @@ public final class CommandItemFeatureHandler {
         return linkedNpcRecordStore.write(stack, records);
     }
 
-    private void emitCommandExecutionFeedback(Context context, int affected, int queued) {
-        if (context == null) {
-            return;
-        }
-        feedbackService.emitCommandExecutionFeedback(
-                context.player,
-                context.playerRef,
-                context.store,
-                context.command,
-                affected,
-                queued,
-                this::resolveCommandLabel
-        );
-    }
-
     private boolean isCooldownActive(ItemStack stack, int cooldownMs) {
         if (cooldownMs <= 0) {
             return false;
         }
         Long until = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_COOLDOWN_UNTIL, Codec.LONG);
         return until != null && until > System.currentTimeMillis();
-    }
-
-    private void sendDefaultMessage(Player player, String text) {
-        feedbackService.showDefault(player, text);
-    }
-
-    private void sendSuccessMessage(Player player, String text) {
-        feedbackService.showSuccess(player, text);
-    }
-
-    private void sendWarningMessage(Player player, String text) {
-        feedbackService.showWarning(player, text);
     }
 
     private double resolvePositiveDouble(double configured, double fallback) {
@@ -1712,3 +1685,4 @@ public final class CommandItemFeatureHandler {
     }
 
 }
+
