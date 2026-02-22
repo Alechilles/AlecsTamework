@@ -128,7 +128,7 @@ public final class TameworkCommandSelectionPage
             if (unlinkCallback == null) {
                 return;
             }
-            UUID npcUuid = parseUnlinkNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, UNLINK_COMMAND_PREFIX);
             if (npcUuid != null) {
                 if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
                     pendingUnlinkNpcUuid = npcUuid;
@@ -146,7 +146,7 @@ public final class TameworkCommandSelectionPage
             if (respawnCallback == null) {
                 return;
             }
-            UUID npcUuid = parseRespawnNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, RESPAWN_COMMAND_PREFIX);
             if (npcUuid != null) {
                 respawnCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -159,7 +159,7 @@ public final class TameworkCommandSelectionPage
             if (recallCallback == null) {
                 return;
             }
-            UUID npcUuid = parseRecallNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, RECALL_COMMAND_PREFIX);
             if (npcUuid != null) {
                 recallCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -172,7 +172,7 @@ public final class TameworkCommandSelectionPage
             if (setHomeCallback == null) {
                 return;
             }
-            UUID npcUuid = parseSetHomeNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, SET_HOME_COMMAND_PREFIX);
             if (npcUuid != null) {
                 setHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -185,7 +185,7 @@ public final class TameworkCommandSelectionPage
             if (returnHomeCallback == null) {
                 return;
             }
-            UUID npcUuid = parseReturnHomeNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, RETURN_HOME_COMMAND_PREFIX);
             if (npcUuid != null) {
                 returnHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -549,7 +549,7 @@ public final class TameworkCommandSelectionPage
             return false;
         }
         for (CommandOption option : options) {
-            if (option != null && commandIdEquals(option.id, commandId)) {
+            if (option != null && CommandUiIdParser.commandIdEquals(option.id, commandId)) {
                 return true;
             }
         }
@@ -561,7 +561,7 @@ public final class TameworkCommandSelectionPage
             return "Current: none";
         }
         for (CommandOption option : options) {
-            if (option != null && commandIdEquals(option.id, selectedCommandId)) {
+            if (option != null && CommandUiIdParser.commandIdEquals(option.id, selectedCommandId)) {
                 return "Current: " + option.label;
             }
         }
@@ -689,13 +689,6 @@ public final class TameworkCommandSelectionPage
         return entry.getId();
     }
 
-    private static boolean commandIdEquals(String left, String right) {
-        if (left == null || right == null || left.isBlank() || right.isBlank()) {
-            return false;
-        }
-        return left.trim().equalsIgnoreCase(right.trim());
-    }
-
     private boolean isPendingUnlink(UUID npcUuid) {
         return npcUuid != null && pendingUnlinkNpcUuid != null && pendingUnlinkNpcUuid.equals(npcUuid);
     }
@@ -713,81 +706,6 @@ public final class TameworkCommandSelectionPage
             }
         }
         return null;
-    }
-
-    private UUID parseUnlinkNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(UNLINK_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(UNLINK_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseRespawnNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(RESPAWN_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(RESPAWN_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseRecallNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(RECALL_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(RECALL_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseSetHomeNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(SET_HOME_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(SET_HOME_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseReturnHomeNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(RETURN_HOME_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(RETURN_HOME_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
     }
 
     private record CommandOption(String id, String label) { }
