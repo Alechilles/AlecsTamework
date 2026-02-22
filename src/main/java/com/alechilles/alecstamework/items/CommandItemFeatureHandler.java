@@ -113,14 +113,17 @@ public final class CommandItemFeatureHandler {
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
+    private final CommandLinkedNpcCaptureService captureService;
     private final TameworkUiMessageService uiMessageService = new TameworkUiMessageService();
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
-                                     CommandLinkedNpcDeathService deathService) {
+                                     CommandLinkedNpcDeathService deathService,
+                                     CommandLinkedNpcCaptureService captureService) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.deathService = deathService;
+        this.captureService = captureService;
     }
 
     // Handles a single command-item use.
@@ -1017,6 +1020,7 @@ public final class CommandItemFeatureHandler {
             }
             boolean loaded = false;
             boolean dead = false;
+            boolean captured = false;
             long deadRespawnRemainingMs = 0L;
             boolean hasHome = record.homePosition != null;
             String displayName = resolveCachedUnloadedDisplayName(record);
@@ -1064,6 +1068,17 @@ public final class CommandItemFeatureHandler {
                     }
                 }
             }
+            if (!loaded && !dead && captureService != null) {
+                CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
+                        captureService.getCapturedSnapshotForTool(record.npcUuid, toolId, player.getUuid());
+                if (capturedSnapshot != null) {
+                    captured = true;
+                    String capturedName = capturedSnapshot.displayName();
+                    if (capturedName != null && !capturedName.isBlank()) {
+                        displayName = capturedName;
+                    }
+                }
+            }
             entries.add(new TameworkCommandSelectionPage.LinkedNpcEntry(
                     record.npcUuid,
                     displayName,
@@ -1072,6 +1087,7 @@ public final class CommandItemFeatureHandler {
                     loaded,
                     hasHome,
                     dead,
+                    captured,
                     deadRespawnRemainingMs
             ));
         }

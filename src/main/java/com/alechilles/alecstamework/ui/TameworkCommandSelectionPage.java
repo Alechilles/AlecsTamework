@@ -266,11 +266,11 @@ public final class TameworkCommandSelectionPage
             commandBuilder.set(nameSelector + ".Text", entry.displayName());
             boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
             boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
-            boolean showRecall = !entry.dead() && !pendingUnlink;
-            boolean showSetHome = entry.loaded() && !entry.dead() && !pendingUnlink;
-            boolean showReturnHome = !entry.dead() && entry.hasHome() && !pendingUnlink;
+            boolean showRecall = !entry.dead() && !entry.captured() && !pendingUnlink;
+            boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
+            boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
             commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-            commandBuilder.set(statusUnloadedSelector + ".Text", entry.dead() ? "DEAD" : "UNLOADED");
+            commandBuilder.set(statusUnloadedSelector + ".Text", resolveAvailabilityStatusText(entry));
             commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
             if (entry.hasHealth()) {
                 commandBuilder.set(
@@ -283,7 +283,7 @@ public final class TameworkCommandSelectionPage
                 commandBuilder.set(healthTextSelector + ".Text", resolveDeadHealthText(entry));
                 commandBuilder.set(healthFillSelector + ".Visible", false);
             } else if (!entry.loaded()) {
-                commandBuilder.set(healthTextSelector + ".Text", "Unloaded (commands still queue).");
+                commandBuilder.set(healthTextSelector + ".Text", resolveUnavailableHealthText(entry));
                 commandBuilder.set(healthFillSelector + ".Visible", false);
             } else {
                 commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
@@ -419,11 +419,11 @@ public final class TameworkCommandSelectionPage
                 commandBuilder.set(nameSelector + ".Text", entry.displayName());
                 boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
                 boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
-                boolean showRecall = !entry.dead() && !pendingUnlink;
-                boolean showSetHome = entry.loaded() && !entry.dead() && !pendingUnlink;
-                boolean showReturnHome = !entry.dead() && entry.hasHome() && !pendingUnlink;
+                boolean showRecall = !entry.dead() && !entry.captured() && !pendingUnlink;
+                boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
+                boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
                 commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-                commandBuilder.set(statusUnloadedSelector + ".Text", entry.dead() ? "DEAD" : "UNLOADED");
+                commandBuilder.set(statusUnloadedSelector + ".Text", resolveAvailabilityStatusText(entry));
                 commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
                 if (entry.hasHealth()) {
                     commandBuilder.set(
@@ -436,7 +436,7 @@ public final class TameworkCommandSelectionPage
                     commandBuilder.set(healthTextSelector + ".Text", resolveDeadHealthText(entry));
                     commandBuilder.set(healthFillSelector + ".Visible", false);
                 } else if (!entry.loaded()) {
-                    commandBuilder.set(healthTextSelector + ".Text", "Unloaded (commands still queue).");
+                    commandBuilder.set(healthTextSelector + ".Text", resolveUnavailableHealthText(entry));
                     commandBuilder.set(healthFillSelector + ".Visible", false);
                 } else {
                     commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
@@ -608,6 +608,7 @@ public final class TameworkCommandSelectionPage
                     entry.loaded,
                     entry.hasHome,
                     entry.dead,
+                    entry.captured,
                     entry.deadRespawnRemainingMs,
                     entry.futureStatA,
                     entry.futureStatB,
@@ -620,6 +621,7 @@ public final class TameworkCommandSelectionPage
         out.sort(
                 Comparator.comparing(LinkedNpcEntry::loaded).reversed()
                         .thenComparing(LinkedNpcEntry::dead).reversed()
+                        .thenComparing(LinkedNpcEntry::captured).reversed()
                         .thenComparing(LinkedNpcEntry::displayName, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(entry -> entry.npcUuid.toString())
         );
@@ -648,6 +650,26 @@ public final class TameworkCommandSelectionPage
             return "Dead: ready to respawn.";
         }
         return "Dead: respawn in " + formatRemainingTime(remainingMs) + ".";
+    }
+
+    private String resolveAvailabilityStatusText(LinkedNpcEntry entry) {
+        if (entry == null) {
+            return "UNLOADED";
+        }
+        if (entry.dead()) {
+            return "DEAD";
+        }
+        if (entry.captured()) {
+            return "CAPTURED";
+        }
+        return "UNLOADED";
+    }
+
+    private String resolveUnavailableHealthText(LinkedNpcEntry entry) {
+        if (entry != null && entry.captured()) {
+            return "Captured in item.";
+        }
+        return "Unloaded (commands still queue).";
     }
 
     private String formatRemainingTime(long remainingMs) {
@@ -778,6 +800,7 @@ public final class TameworkCommandSelectionPage
         private final int maxHealth;
         private final boolean loaded;
         private final boolean dead;
+        private final boolean captured;
         private final boolean hasHome;
         private final long deadRespawnRemainingMs;
         private final FutureStat futureStatA;
@@ -807,6 +830,29 @@ public final class TameworkCommandSelectionPage
                     loaded,
                     hasHome,
                     dead,
+                    false,
+                    deadRespawnRemainingMs
+            );
+        }
+
+        public LinkedNpcEntry(UUID npcUuid,
+                              String displayName,
+                              int currentHealth,
+                              int maxHealth,
+                              boolean loaded,
+                              boolean hasHome,
+                              boolean dead,
+                              boolean captured,
+                              long deadRespawnRemainingMs) {
+            this(
+                    npcUuid,
+                    displayName,
+                    currentHealth,
+                    maxHealth,
+                    loaded,
+                    hasHome,
+                    dead,
+                    captured,
                     deadRespawnRemainingMs,
                     null,
                     null,
@@ -824,6 +870,7 @@ public final class TameworkCommandSelectionPage
                               boolean loaded,
                               boolean hasHome,
                               boolean dead,
+                              boolean captured,
                               long deadRespawnRemainingMs,
                               FutureStat futureStatA,
                               FutureStat futureStatB,
@@ -838,6 +885,7 @@ public final class TameworkCommandSelectionPage
             this.loaded = loaded;
             this.hasHome = hasHome;
             this.dead = dead;
+            this.captured = captured;
             this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
             this.futureStatA = futureStatA;
             this.futureStatB = futureStatB;
@@ -873,6 +921,10 @@ public final class TameworkCommandSelectionPage
 
         public boolean dead() {
             return dead;
+        }
+
+        public boolean captured() {
+            return captured;
         }
 
         public boolean hasHome() {
