@@ -36,6 +36,7 @@
 - Linked-panel per-NPC action icons are now arranged in a horizontal bottom-right row on each companion card.
 - Linked-panel icon actions now include hover tooltips for `Recall`, `Set Home`, `Return Home`, `Respawn`, and `Remove` to clarify icon meaning without adding button text clutter.
 - Dead companion recovery now uses a dedicated respawn action icon (heart-plus) in the same slot as recall, instead of a separate text button.
+- Linked-panel `Revive` icon now uses heart-rate artwork while preserving the same badge/button styling as the other per-card action icons.
 
 ### Fixed
 - Linked-panel action icon textures now load from `Common/UI/Custom/Tamework`, fixing missing-texture placeholder icons for per-card `Recall`, `Set Home`, and `Return Home` buttons.
