@@ -21,6 +21,17 @@
       ],
       "Description": "Minimum delay before Hold can transition to sleep after waking from sleep."
     },
+    "HoldStillWeight": {
+      "Value": 3,
+      "Description": "Random weight for simply staying in the hold posture without playing a flavor animation."
+    },
+    "HoldStillDurationRange": {
+      "Value": [
+        2,
+        5
+      ],
+      "Description": "How long to stay in the hold posture when the hold-still branch is selected."
+    },
     "DayFlavorAnimation": {
       "Value": "Idle",
       "Description": "A flavor animation to play during the day. Ignored if null or empty."
@@ -166,6 +177,7 @@
       },
       {
         "$Comment": "Execute daytime idle behaviors.",
+        "Name": "Hold_Day_Behavior_Random",
         "Type": "Random",
         "ExecuteFor": [
           30,
@@ -179,6 +191,30 @@
           "CheckDay": true
         },
         "Instructions": [
+          {
+            "$Comment": "Stay in hold posture with no extra flavor animation.",
+            "Enabled": {
+              "Compute": "HoldStillWeight > 0"
+            },
+            "Weight": {
+              "Compute": "HoldStillWeight"
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "HoldStillDurationRange"
+                }
+              },
+              {
+                "Type": "ResetInstructions",
+                "Instructions": [
+                  "Hold_Day_Behavior_Random"
+                ]
+              }
+            ]
+          },
           {
             "$Comment": "Play a daytime flavor animation (with optional follow-up).",
             "Enabled": {
@@ -204,10 +240,6 @@
                   },
                   {
                     "Type": "PlayAnimation",
-                    "Slot": "Status"
-                  },
-                  {
-                    "Type": "PlayAnimation",
                     "Slot": "Status",
                     "Animation": {
                       "Compute": "DayFlavorAnimationAfter"
@@ -222,17 +254,16 @@
                   },
                   {
                     "Type": "PlayAnimation",
-                    "Slot": "Status"
-                  },
-                  {
-                    "Type": "PlayAnimation",
                     "Slot": "Status",
                     "Animation": {
                       "Compute": "HoldBaseAnimation"
                     }
                   },
                   {
-                    "Type": "ResetInstructions"
+                    "Type": "ResetInstructions",
+                    "Instructions": [
+                      "Hold_Day_Behavior_Random"
+                    ]
                   }
                 ]
               }
@@ -269,7 +300,10 @@
                     }
                   },
                   {
-                    "Type": "ResetInstructions"
+                    "Type": "ResetInstructions",
+                    "Instructions": [
+                      "Hold_Day_Behavior_Random"
+                    ]
                   }
                 ]
               }
@@ -436,12 +470,37 @@
       },
       {
         "$Comment": "Execute nighttime idle behaviors if we're an NPC that doesn't always sleep at night.",
+        "Name": "Hold_Night_Behavior_Random",
         "Type": "Random",
         "ExecuteFor": [
           15,
           20
         ],
         "Instructions": [
+          {
+            "$Comment": "Stay in hold posture with no extra flavor animation.",
+            "Enabled": {
+              "Compute": "HoldStillWeight > 0"
+            },
+            "Weight": {
+              "Compute": "HoldStillWeight"
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "HoldStillDurationRange"
+                }
+              },
+              {
+                "Type": "ResetInstructions",
+                "Instructions": [
+                  "Hold_Night_Behavior_Random"
+                ]
+              }
+            ]
+          },
           {
             "$Comment": "Play a night-time flavor animation (with optional follow-up).",
             "Enabled": {
@@ -467,10 +526,6 @@
                   },
                   {
                     "Type": "PlayAnimation",
-                    "Slot": "Status"
-                  },
-                  {
-                    "Type": "PlayAnimation",
                     "Slot": "Status",
                     "Animation": {
                       "Compute": "NightFlavorAnimationAfter"
@@ -485,17 +540,16 @@
                   },
                   {
                     "Type": "PlayAnimation",
-                    "Slot": "Status"
-                  },
-                  {
-                    "Type": "PlayAnimation",
                     "Slot": "Status",
                     "Animation": {
                       "Compute": "HoldBaseAnimation"
                     }
                   },
                   {
-                    "Type": "ResetInstructions"
+                    "Type": "ResetInstructions",
+                    "Instructions": [
+                      "Hold_Night_Behavior_Random"
+                    ]
                   }
                 ]
               }
@@ -532,7 +586,10 @@
                     }
                   },
                   {
-                    "Type": "ResetInstructions"
+                    "Type": "ResetInstructions",
+                    "Instructions": [
+                      "Hold_Night_Behavior_Random"
+                    ]
                   }
                 ]
               }
