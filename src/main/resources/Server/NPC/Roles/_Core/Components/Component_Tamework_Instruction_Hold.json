@@ -1,8 +1,26 @@
 {
-  "$Comment": "Handles the Hold state for a Cat NPC, playing idle animations based on time of day.",
+  "$Comment": "Handles Hold behavior with a persistent base posture plus optional daytime/nighttime flavor animations.",
   "Type": "Component",
   "Class": "Instruction",
   "Parameters": {
+    "HoldBaseAnimation": {
+      "Value": "Idle",
+      "Description": "Animation to persist while in Hold when no transient flavor animation is running."
+    },
+    "SleepDelayAfterHoldEnterRange": {
+      "Value": [
+        10,
+        10
+      ],
+      "Description": "Minimum delay before Hold can transition to sleep after entering Hold."
+    },
+    "SleepDelayAfterLastSleepRange": {
+      "Value": [
+        15,
+        15
+      ],
+      "Description": "Minimum delay before Hold can transition to sleep after waking from sleep."
+    },
     "DayFlavorAnimation": {
       "Value": "Idle",
       "Description": "A flavor animation to play during the day. Ignored if null or empty."
@@ -72,7 +90,7 @@
     }
   },
   "Content": {
-    "$Comment": "Hold State: Cat will sit still and sometimes play idle animations.",
+    "$Comment": "Hold State: NPC stays in a base hold posture and intermittently plays flavor/sleep behaviors.",
     "Continue": true,
     "Sensor": {
       "Type": "Any"
@@ -89,6 +107,54 @@
           {
             "Type": "ReleaseTarget",
             "TargetSlot": "LockedTarget"
+          }
+        ]
+      },
+      {
+        "$Comment": "Apply base hold posture when entering Hold.",
+        "Enabled": {
+          "Compute": "!isEmpty(HoldBaseAnimation)"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "HoldBaseAnimation"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Refresh hold-entry sleep delay and resume any pending post-sleep cooldown.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "TimerStart",
+            "Name": "Hold_Entry_Sleep_Gate",
+            "StartValueRange": {
+              "Compute": "SleepDelayAfterHoldEnterRange"
+            },
+            "RestartValueRange": {
+              "Compute": "SleepDelayAfterHoldEnterRange"
+            }
+          },
+          {
+            "Type": "TimerRestart",
+            "Name": "Hold_Entry_Sleep_Gate"
+          },
+          {
+            "Type": "TimerContinue",
+            "Name": "Hold_PostSleep_Cooldown"
           }
         ]
       },
@@ -159,6 +225,13 @@
                     "Slot": "Status"
                   },
                   {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "HoldBaseAnimation"
+                    }
+                  },
+                  {
                     "Type": "ResetInstructions"
                   }
                 ]
@@ -190,7 +263,10 @@
                   },
                   {
                     "Type": "PlayAnimation",
-                    "Slot": "Status"
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "HoldBaseAnimation"
+                    }
                   },
                   {
                     "Type": "ResetInstructions"
@@ -204,34 +280,67 @@
             "Enabled": {
               "Compute": "DayTimeNapWeight > 0"
             },
-          "Weight": {
-            "Compute": "DayTimeNapWeight"
-          },
-          "Sensor": {
-            "Type": "Not",
+            "Weight": {
+              "Compute": "DayTimeNapWeight"
+            },
             "Sensor": {
-              "Reference": "Component_Sensor_Sound_By_Attitude",
-              "Modify": {
-                "Enabled": {
-                  "Compute": "CanHear"
-                },
-                "HearingRange": {
-                  "Compute": "HearingRange"
-                },
-                "GetNPCs": {
-                  "Compute": "ReactToNPCs"
-                },
-                "Attitudes": {
-                  "Compute": "Attitudes"
-                }
-              }
-            }
-          },
-          "Instructions": [
-            {
-              "Actions": [
+              "Type": "And",
+              "Sensors": [
                 {
-                  "Type": "ParentState",
+                  "Type": "Not",
+                  "Sensor": {
+                    "Reference": "Component_Sensor_Sound_By_Attitude",
+                    "Modify": {
+                      "Enabled": {
+                        "Compute": "CanHear"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "GetNPCs": {
+                        "Compute": "ReactToNPCs"
+                      },
+                      "Attitudes": {
+                        "Compute": "Attitudes"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Hold_Entry_Sleep_Gate",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Hold_PostSleep_Cooldown",
+                  "State": "Stopped"
+                }
+              ]
+            },
+            "Instructions": [
+              {
+                "Actions": [
+                  {
+                    "Type": "TimerStart",
+                    "Name": "Hold_PostSleep_Cooldown",
+                    "StartValueRange": {
+                      "Compute": "SleepDelayAfterLastSleepRange"
+                    },
+                    "RestartValueRange": {
+                      "Compute": "SleepDelayAfterLastSleepRange"
+                    }
+                  },
+                  {
+                    "Type": "TimerRestart",
+                    "Name": "Hold_PostSleep_Cooldown"
+                  },
+                  {
+                    "Type": "TimerPause",
+                    "Name": "Hold_PostSleep_Cooldown"
+                  },
+                  {
+                    "Type": "ParentState",
                     "State": "GoSleep"
                   },
                   {
@@ -254,24 +363,39 @@
           "Compute": "AlwaysSleepAtNight"
         },
         "Sensor": {
-          "Type": "Not",
-          "Sensor": {
-            "Reference": "Component_Sensor_Sound_By_Attitude",
-            "Modify": {
-              "Enabled": {
-                "Compute": "CanHear"
-              },
-              "HearingRange": {
-                "Compute": "HearingRange"
-              },
-              "GetNPCs": {
-                "Compute": "ReactToNPCs"
-              },
-              "Attitudes": {
-                "Compute": "Attitudes"
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Reference": "Component_Sensor_Sound_By_Attitude",
+                "Modify": {
+                  "Enabled": {
+                    "Compute": "CanHear"
+                  },
+                  "HearingRange": {
+                    "Compute": "HearingRange"
+                  },
+                  "GetNPCs": {
+                    "Compute": "ReactToNPCs"
+                  },
+                  "Attitudes": {
+                    "Compute": "Attitudes"
+                  }
+                }
               }
+            },
+            {
+              "Type": "Timer",
+              "Name": "Hold_Entry_Sleep_Gate",
+              "State": "Stopped"
+            },
+            {
+              "Type": "Timer",
+              "Name": "Hold_PostSleep_Cooldown",
+              "State": "Stopped"
             }
-          }
+          ]
         },
         "Actions": [
           {
@@ -283,6 +407,24 @@
             "Action": {
               "Type": "Sequence",
               "Actions": [
+                {
+                  "Type": "TimerStart",
+                  "Name": "Hold_PostSleep_Cooldown",
+                  "StartValueRange": {
+                    "Compute": "SleepDelayAfterLastSleepRange"
+                  },
+                  "RestartValueRange": {
+                    "Compute": "SleepDelayAfterLastSleepRange"
+                  }
+                },
+                {
+                  "Type": "TimerRestart",
+                  "Name": "Hold_PostSleep_Cooldown"
+                },
+                {
+                  "Type": "TimerPause",
+                  "Name": "Hold_PostSleep_Cooldown"
+                },
                 {
                   "Type": "ParentState",
                   "State": "GoSleep"
@@ -346,6 +488,13 @@
                     "Slot": "Status"
                   },
                   {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "HoldBaseAnimation"
+                    }
+                  },
+                  {
                     "Type": "ResetInstructions"
                   }
                 ]
@@ -377,7 +526,10 @@
                   },
                   {
                     "Type": "PlayAnimation",
-                    "Slot": "Status"
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "HoldBaseAnimation"
+                    }
                   },
                   {
                     "Type": "ResetInstructions"
@@ -390,24 +542,39 @@
             "$Comment": "Very low chance of sleeping at night since they'll stay asleep all night then.",
             "Weight": 1,
             "Sensor": {
-              "Type": "Not",
-              "Sensor": {
-                "Reference": "Component_Sensor_Sound_By_Attitude",
-                "Modify": {
-                  "Enabled": {
-                    "Compute": "CanHear"
-                  },
-                  "HearingRange": {
-                    "Compute": "HearingRange"
-                  },
-                  "GetNPCs": {
-                    "Compute": "ReactToNPCs"
-                  },
-                  "Attitudes": {
-                    "Compute": "Attitudes"
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Reference": "Component_Sensor_Sound_By_Attitude",
+                    "Modify": {
+                      "Enabled": {
+                        "Compute": "CanHear"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "GetNPCs": {
+                        "Compute": "ReactToNPCs"
+                      },
+                      "Attitudes": {
+                        "Compute": "Attitudes"
+                      }
+                    }
                   }
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Hold_Entry_Sleep_Gate",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Hold_PostSleep_Cooldown",
+                  "State": "Stopped"
                 }
-              }
+              ]
             },
             "Actions": [
               {
@@ -419,6 +586,24 @@
                 "Action": {
                   "Type": "Sequence",
                   "Actions": [
+                    {
+                      "Type": "TimerStart",
+                      "Name": "Hold_PostSleep_Cooldown",
+                      "StartValueRange": {
+                        "Compute": "SleepDelayAfterLastSleepRange"
+                      },
+                      "RestartValueRange": {
+                        "Compute": "SleepDelayAfterLastSleepRange"
+                      }
+                    },
+                    {
+                      "Type": "TimerRestart",
+                      "Name": "Hold_PostSleep_Cooldown"
+                    },
+                    {
+                      "Type": "TimerPause",
+                      "Name": "Hold_PostSleep_Cooldown"
+                    },
                     {
                       "Type": "ParentState",
                       "State": "GoSleep"
