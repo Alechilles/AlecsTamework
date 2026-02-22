@@ -22,7 +22,7 @@
       "Default": true,
       "Feedback": {
         "HudMessage": "Follow: {count}",
-        "SoundEvent": "SFX_Creative_Play_Selection_Place",
+        "SoundEvent": "SFX_Creative_Play_Brush_Mode",
         "ParticleSystem": "Follow"
       },
       "Steps": [
@@ -46,7 +46,7 @@
       "DisplayName": "Hold",
       "Feedback": {
         "HudMessage": "Hold: {count}",
-        "SoundEvent": "SFX_Creative_Play_Selection_Place",
+        "SoundEvent": "SFX_Creative_Play_Brush_Mode",
         "ParticleSystem": "Hold"
       },
       "Steps": [
@@ -65,7 +65,7 @@
       "DisplayName": "Recall",
       "Feedback": {
         "HudMessage": "Recall: {count}",
-        "SoundEvent": "SFX_Creative_Play_Selection_Place",
+        "SoundEvent": "SFX_Creative_Play_Brush_Mode",
         "ParticleSystem": "Poof_Small"
       },
       "Steps": [
@@ -84,7 +84,7 @@
       "DisplayName": "Move To Ping",
       "Feedback": {
         "HudMessage": "Move To Ping: {count}",
-        "SoundEvent": "SFX_Creative_Play_Selection_Place",
+        "SoundEvent": "SFX_Creative_Play_Brush_Mode",
         "ParticleSystem": "Alerted"
       },
       "Steps": [
@@ -100,7 +100,7 @@
       "Feedback": {
         "ChatMessage": "Home set for linked NPC(s).",
         "HudMessage": "Home Set",
-        "SoundEvent": "SFX_Creative_Play_Selection_Place",
+        "SoundEvent": "SFX_Creative_Play_Brush_Mode",
         "ParticleSystem": "Poof_Small"
       },
       "Steps": [
@@ -116,7 +116,7 @@
       "DisplayName": "Return Home",
       "Feedback": {
         "HudMessage": "Return Home: {count}",
-        "SoundEvent": "SFX_Creative_Play_Selection_Place",
+        "SoundEvent": "SFX_Creative_Play_Brush_Mode",
         "ParticleSystem": "Follow"
       },
       "Steps": [
@@ -132,7 +132,7 @@
       "DisplayName": "Attack Target",
       "Feedback": {
         "HudMessage": "Attack Target: {count}",
-        "SoundEvent": "SFX_Creative_Play_Selection_Place",
+        "SoundEvent": "SFX_Creative_Play_Brush_Mode",
         "ParticleSystem": "Defend"
       },
       "Steps": [
