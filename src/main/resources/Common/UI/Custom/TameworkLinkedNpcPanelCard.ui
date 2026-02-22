@@ -57,7 +57,7 @@ $C = "Common.ui";
 );
 
 Group {
-  Anchor: (Top: 8, Height: 92);
+  Anchor: (Top: 8, Left: 0, Right: 0, Height: 92);
   Background: #13263c(0.86);
   Padding: (Horizontal: 10, Vertical: 8);
 
@@ -100,7 +100,7 @@ Group {
   }
 
   TextButton #RespawnButton {
-    Anchor: (Top: 62, Right: 64, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRespawnButtonStyle;
     Text: "";
     TooltipText: "Revive";
@@ -109,7 +109,7 @@ Group {
   }
 
   TextButton #RecallButton {
-    Anchor: (Top: 62, Right: 64, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRecallButtonStyle;
     Text: "";
     TooltipText: "Recall";
@@ -118,7 +118,7 @@ Group {
   }
 
   TextButton #SetHomeButton {
-    Anchor: (Top: 62, Right: 8, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 0, Width: 24, Height: 24);
     Style: @LinkedActionSetHomeButtonStyle;
     Text: "";
     TooltipText: "Set Home";
@@ -127,7 +127,7 @@ Group {
   }
 
   TextButton #ReturnHomeButton {
-    Anchor: (Top: 62, Right: 36, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 28, Width: 24, Height: 24);
     Style: @LinkedActionReturnHomeButtonStyle;
     Text: "";
     TooltipText: "Return Home";
@@ -136,7 +136,7 @@ Group {
   }
 
   TextButton #RemoveButton {
-    Anchor: (Top: -2, Right: 2, Width: 28, Height: 28);
+    Anchor: (Top: -2, Right: 0, Width: 28, Height: 28);
     Style: @RemoveIconButtonStyle;
     Text: "";
     TooltipText: "Unlink";
