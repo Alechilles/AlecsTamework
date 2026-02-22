@@ -255,7 +255,7 @@ $C.@PageOverlay {
     }
 
     $C.@SecondaryTextButton #CommandMenuCloseButton {
-      @Anchor = (Bottom: -8, Width: 180, Left: 370);
+      @Anchor = (Bottom: -16, Width: 180, Left: 370);
       Text: "Close";
     }
   }
