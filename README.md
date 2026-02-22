@@ -1,5 +1,5 @@
 [![CurseForge Downloads](https://img.shields.io/curseforge/dt/1447962?style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-tamework)
-[![Discord](https://img.shields.io/discord/1468261809739005996?style=for-the-badge&logo=discord&logoColor=%23ffffff&logoSize=auto&label=Alec%27s%20Mods%20Discord&color=%235865F2)](https://discord.gg/E8n8RgTTdq)
+[![Discord](https://img.shields.io/discord/1468261809739005996?style=for-the-badge&logo=discord&logoColor=white&label=Join%20Discord&color=rgb(88,101,242))](https://discord.gg/E8n8RgTTdq)
 [![GitHub Repo stars](https://img.shields.io/github/stars/Alechilles/AlecsCats?style=for-the-badge&logo=github&label=GitHub)](https://github.com/Alechilles/AlecsTamework)
 
 # Alec's Tamework!
