@@ -387,6 +387,7 @@ public final class CommandItemFeatureHandler {
                                     String toolId,
                                     TwCommandItemConfig config,
                                     String commandId) {
+        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || config == null
                 || commandId == null || commandId.isBlank()) {
             return;
@@ -403,12 +404,12 @@ public final class CommandItemFeatureHandler {
         }
         String label = resolveCommandLabel(selected);
         sendDefaultMessage(player, "Selected: " + label);
-        emitUiClickSound(player);
     }
 
     private void applyMenuUnlink(Player player,
                                  String toolId,
                                  UUID npcUuid) {
+        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -438,7 +439,6 @@ public final class CommandItemFeatureHandler {
                 inventory.markChanged();
                 player.sendInventory();
                 sendSuccessMessage(player, "Removed linked NPC.");
-                emitUiClickSound(player);
             }
             return;
         }
@@ -448,6 +448,7 @@ public final class CommandItemFeatureHandler {
     private void applyMenuRespawn(Player player,
                                   String toolId,
                                   UUID npcUuid) {
+        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -516,7 +517,6 @@ public final class CommandItemFeatureHandler {
                 name = "companion";
             }
             sendSuccessMessage(player, "Respawned " + name + ".");
-            emitUiClickSound(player);
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
@@ -525,6 +525,7 @@ public final class CommandItemFeatureHandler {
     private void applyMenuSetHome(Player player,
                                   String toolId,
                                   UUID npcUuid) {
+        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -603,7 +604,6 @@ public final class CommandItemFeatureHandler {
             inventory.markChanged();
             player.sendInventory();
             sendSuccessMessage(player, "Set home for " + resolveNpcDisplayName(npcRef, store, npc) + ".");
-            emitUiClickSound(player);
             return;
         }
         sendWarningMessage(player, "Unable to find that command item.");
@@ -625,6 +625,7 @@ public final class CommandItemFeatureHandler {
                                       String toolId,
                                       UUID npcUuid,
                                       boolean returnHome) {
+        emitUiClickSound(player);
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
@@ -2879,13 +2880,29 @@ public final class CommandItemFeatureHandler {
         if (soundEventIndex <= 0) {
             return;
         }
+        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+        if (transform != null) {
+            Vector3d position = transform.getPosition();
+            SoundUtil.playSoundEvent3dToPlayer(
+                    playerRef,
+                    soundEventIndex,
+                    SoundCategory.SFX,
+                    position.x,
+                    position.y,
+                    position.z,
+                    DEFAULT_COMMAND_FEEDBACK_VOLUME,
+                    DEFAULT_COMMAND_FEEDBACK_PITCH,
+                    store
+            );
+            return;
+        }
         SoundUtil.playSoundEvent2d(
-                playerRef,
-                soundEventIndex,
-                SoundCategory.SFX,
-                DEFAULT_COMMAND_FEEDBACK_VOLUME,
-                DEFAULT_COMMAND_FEEDBACK_PITCH,
-                store
+            playerRef,
+            soundEventIndex,
+            SoundCategory.SFX,
+            DEFAULT_COMMAND_FEEDBACK_VOLUME,
+            DEFAULT_COMMAND_FEEDBACK_PITCH,
+            store
         );
     }
 
