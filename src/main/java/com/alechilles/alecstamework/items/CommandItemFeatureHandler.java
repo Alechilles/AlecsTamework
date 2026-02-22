@@ -107,6 +107,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkedPanelEntryService panelEntryService;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandResolutionService resolutionService;
+    private final CommandLinkPolicyService linkPolicyService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -127,6 +128,7 @@ public final class CommandItemFeatureHandler {
         );
         this.toolInventoryService = new CommandToolInventoryService(panelEntryService);
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
+        this.linkPolicyService = new CommandLinkPolicyService();
     }
 
     // Handles a single command-item use.
@@ -832,7 +834,7 @@ public final class CommandItemFeatureHandler {
         NPCEntity spawnedNpc = spawned.second();
         UUID ownerId = deadSnapshot.ownerId() != null ? deadSnapshot.ownerId() : player.getUuid();
         Vector3d homePosition = record.homePosition != null ? record.homePosition : deadSnapshot.homePosition();
-        String[] toolIds = mergeToolIds(deadSnapshot.toolIds(), toolId);
+        String[] toolIds = linkPolicyService.mergeToolIds(deadSnapshot.toolIds(), toolId);
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
         if (linksType != null) {
             store.putComponent(
@@ -1040,13 +1042,27 @@ public final class CommandItemFeatureHandler {
                 if (npcRef == null || !npcRef.isValid()) {
                     continue;
                 }
-                if (!matchesMembership(context, npcRef, npc, playerUuid)) {
+                if (!linkPolicyService.matchesMembership(
+                        context.config.getMembershipMode(),
+                        npcRef,
+                        npc,
+                        context.playerRef,
+                        playerUuid,
+                        context.toolId,
+                        context.store
+                )) {
                     continue;
                 }
-                if (!passesOwnerAndTamed(context, npcRef, playerUuid)) {
+                if (!linkPolicyService.passesOwnerAndTamed(
+                        context.config.isRequireOwner(),
+                        context.config.isRequireTamed(),
+                        npcRef,
+                        playerUuid,
+                        context.store
+                )) {
                     continue;
                 }
-                if (!isRoleAllowed(resolveRoleId(npc), context.config)) {
+                if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
                     continue;
                 }
                 TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
@@ -1190,22 +1206,6 @@ public final class CommandItemFeatureHandler {
         return queued;
     }
 
-    private String[] mergeToolIds(String[] existing, String requiredToolId) {
-        Set<String> out = new HashSet<>();
-        if (existing != null) {
-            for (String value : existing) {
-                if (value == null || value.isBlank()) {
-                    continue;
-                }
-                out.add(value);
-            }
-        }
-        if (requiredToolId != null && !requiredToolId.isBlank()) {
-            out.add(requiredToolId);
-        }
-        return out.toArray(new String[0]);
-    }
-
     private Vector3f resolveRespawnRotation(Store<EntityStore> store,
                                             Ref<EntityStore> playerRef,
                                             Vector3d spawnPosition) {
@@ -1228,110 +1228,6 @@ public final class CommandItemFeatureHandler {
             }
         }
         return new Vector3f(transform.getRotation());
-    }
-
-    private boolean matchesMembership(Context context, Ref<EntityStore> npcRef, NPCEntity npc, UUID playerUuid) {
-        MembershipMode mode = context.config.getMembershipMode() != null
-                ? context.config.getMembershipMode()
-                : MembershipMode.LinkedOnly;
-        boolean linked = isLinked(npcRef, playerUuid, context.toolId, context.store);
-        boolean owner = isOwnedByPlayer(npcRef, playerUuid, context.store);
-        boolean master = isMasterTargetedToPlayer(npc, context.playerRef);
-        return switch (mode) {
-            case OwnerScope -> owner;
-            case MasterTarget -> master;
-            case LinkedOrMasterTarget -> linked || master;
-            case LinkedOnly -> linked;
-        };
-    }
-
-    private boolean isLinked(Ref<EntityStore> npcRef, UUID playerUuid, String toolId, Store<EntityStore> store) {
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        if (links == null || toolId == null || toolId.isBlank()) {
-            return false;
-        }
-        UUID ownerId = links.getOwnerId();
-        if (ownerId != null && !ownerId.equals(playerUuid)) {
-            return false;
-        }
-        return links.containsToolId(toolId);
-    }
-
-    private boolean isOwnedByPlayer(Ref<EntityStore> npcRef, UUID playerUuid, Store<EntityStore> store) {
-        UUID ownerId = resolveOwnerId(npcRef, store);
-        return ownerId != null && ownerId.equals(playerUuid);
-    }
-
-    private boolean passesOwnerAndTamed(Context context, Ref<EntityStore> npcRef, UUID playerUuid) {
-        UUID ownerId = resolveOwnerId(npcRef, context.store);
-        if (ownerId != null && !ownerId.equals(playerUuid)) {
-            return false;
-        }
-        if (context.config.isRequireOwner() && ownerId == null) {
-            return false;
-        }
-        if (context.config.isRequireTamed() && !TamedStateResolver.isTamed(npcRef, context.store)) {
-            return false;
-        }
-        return true;
-    }
-
-    private UUID resolveOwnerId(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        TameworkOwnerComponent owner = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
-        return owner != null ? owner.getOwnerId() : null;
-    }
-
-    private boolean isMasterTargetedToPlayer(NPCEntity npc, Ref<EntityStore> playerRef) {
-        if (npc == null || npc.getRole() == null || npc.getRole().getMarkedEntitySupport() == null) {
-            return false;
-        }
-        try {
-            Method method = npc.getRole().getMarkedEntitySupport().getClass().getMethod("getMarkedEntity", String.class);
-            Object value = method.invoke(npc.getRole().getMarkedEntitySupport(), MASTER_TARGET_SLOT);
-            if (!(value instanceof Ref<?> marked)) {
-                return false;
-            }
-            return marked.isValid() && marked.equals(playerRef);
-        } catch (Exception ignored) {
-            return false;
-        }
-    }
-
-    private String resolveRoleId(NPCEntity npc) {
-        if (npc == null) {
-            return null;
-        }
-        if (npc.getRoleName() != null && !npc.getRoleName().isBlank()) {
-            return npc.getRoleName();
-        }
-        if (npc.getRoleIndex() >= 0 && NPCPlugin.get() != null) {
-            return NPCPlugin.get().getName(npc.getRoleIndex());
-        }
-        return null;
-    }
-
-    private boolean isRoleAllowed(String roleId, TwCommandItemConfig config) {
-        TwCommandItemConfig.AllowedRoles allowed = config.getAllowedRoles();
-        if (allowed == null || allowed.getMode() == null) {
-            return true;
-        }
-        return switch (allowed.getMode()) {
-            case AllowAll -> true;
-            case Allowlist -> contains(allowed.getAllowlist(), roleId);
-            case Denylist -> !contains(allowed.getDenylist(), roleId);
-        };
-    }
-
-    private boolean contains(String[] values, String expected) {
-        if (values == null || values.length == 0 || expected == null || expected.isBlank()) {
-            return false;
-        }
-        for (String value : values) {
-            if (expected.equals(value)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {
@@ -1696,7 +1592,7 @@ public final class CommandItemFeatureHandler {
         if (playerId == null) {
             return LinkToggleResult.notToggled();
         }
-        UUID ownerId = resolveOwnerId(targetRef, store);
+        UUID ownerId = linkPolicyService.resolveOwnerId(targetRef, store);
         if (ownerId != null && !ownerId.equals(playerId)) {
             return LinkToggleResult.notToggled();
         }
@@ -1706,7 +1602,7 @@ public final class CommandItemFeatureHandler {
         if (config.isRequireTamed() && !TamedStateResolver.isTamed(targetRef, store)) {
             return LinkToggleResult.notToggled();
         }
-        if (!isRoleAllowed(resolveRoleId(npc), config)) {
+        if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
             return LinkToggleResult.notToggled();
         }
         TameworkCommandLinksComponent current = store.getComponent(targetRef, TameworkCommandLinksComponent.getComponentType());
