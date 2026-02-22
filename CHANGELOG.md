@@ -2,58 +2,23 @@
 
 ## 2.1.1 - Linked Companions Panel UX and Safety - 2026-02-21
 ### Added
-- New `CommandLinkedPanelRequireUnlinkConfirm` global setting in `TwGlobalConfig` (default `true`) to control whether unlinking from the linked-companions panel requires a second confirm click.
-- Linked-companions panel empty state messaging when no NPCs are linked to the command tool.
-- Row-level loaded/unloaded/confirm status badges in the linked-companions panel.
-- Linked-companions card action buttons for per-NPC `Recall`, `Set Home`, and `Return Home`, so individual companions can be managed directly from the side panel without changing the currently selected radial command.
-- New dead-linked companion tracking so linked NPC deaths are surfaced as `DEAD` in the linked-companions panel instead of being treated as generic unloaded records.
-- New `TwGlobalConfig` options for dead companion recovery:
-  - `CommandDeadRespawnEnabled` (default `false`)
-  - `CommandDeadRespawnCooldownMs` (default `60000`)
-- New `TwGlobalConfig` respawn tuning values:
-  - `CommandDeadRespawnFollowRetryDelayMs`
-  - `CommandDeadRespawnDistanceClose`
-  - `CommandDeadRespawnDistanceNear`
-  - `CommandDeadRespawnDistanceMid`
-  - `CommandDeadRespawnDistanceFar`
-- New `TwGlobalConfig` command placement vertical-band values used by Recall and dead respawn:
-  - `CommandPlacementMinRelativeY`
-  - `CommandPlacementMaxRelativeY`
+- Linked Companions side panel with per-NPC actions: `Recall`, `Set Home`, `Return Home`, and `Unlink`.
+- Dead companion state tracking with cooldown-based `Revive` action from the linked panel.
+- New command/dead-recovery config options in `TwGlobalConfig` (unlink confirmation, revive enable/cooldown, respawn/follow retry tuning, and placement tuning).
 
 ### Changed
-- Linked-companions rows now show clearer unloaded fallback text (`Unloaded companion (<uuid>)`) and unloaded health messaging.
-- Command radial panel subtitle now guides unlink confirmation when a remove action is armed.
-- Dead linked companions are no longer treated as generic unloaded targets for Recall/Return Home queueing.
-- Dead companion recovery is now explicit via a linked-panel `Respawn` button (shown when cooldown is ready and dead respawn is enabled), and relinks the command tool to the newly spawned NPC.
-- Linked-companions panel now updates row health/cooldown/status once per second while open via incremental UI selector updates (no full page rebuild).
-- Linked-panel `Respawn` button now uses the shared secondary button style for clearer outline/hover/pressed feedback.
-- Dead companion respawns now re-enter follow behavior immediately by clearing combat lock, restoring owner as `MasterTarget`, and applying follow-compatible state fallback.
-- Dead companion respawn follow bootstrap now prioritizes `Follow` state first, with `Idle` as fallback.
-- `TwGlobalConfig_Default.json` is now organized into top-level sections (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`), and `TwGlobalConfig` now reads the sectioned schema directly.
-- Recall and dead-companion respawn now share the same safe placement pipeline (surface projection + radial candidate sampling) and no longer use a separate recall-only placement path.
-- Recall and dead-companion respawn placement candidates are now randomized and sampled off-camera first, so companions no longer consistently appear directly behind the player.
-- Linked-panel per-NPC `Recall`, `Set Home`, and `Return Home` actions now use compact icon buttons (with distinct default/hover/pressed/disabled textures) for denser card layouts.
-- Linked-panel per-NPC action icons are now arranged in a horizontal bottom-right row on each companion card.
-- Linked-panel icon actions now include hover tooltips for `Recall`, `Set Home`, `Return Home`, `Respawn`, and `Remove` to clarify icon meaning without adding button text clutter.
-- Dead companion recovery now uses a dedicated respawn action icon (heart-plus) in the same slot as recall, instead of a separate text button.
-- Linked-panel `Revive` icon now uses heart-rate artwork while preserving the same badge/button styling as the other per-card action icons.
+- Linked panel rows now refresh health, death cooldown, and status in-place once per second while open.
+- Linked panel actions now use compact icon buttons with tooltips, including a dedicated `Revive` icon state.
+- Unloaded companion naming now uses cached identity fallback priority: `Display Name > Name Key > Role ID`.
+- `TwGlobalConfig_Default.json` is now grouped into top-level sections (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`).
+- Recall and Revive now share the same safe-placement pipeline with off-camera-biased randomized sampling.
 
 ### Fixed
-- Linked-panel action icon textures now load from `Common/UI/Custom/Tamework`, fixing missing-texture placeholder icons for per-card `Recall`, `Set Home`, and `Return Home` buttons.
-- Dead linked-companion snapshots now persist to plugin data so companions remain `DEAD` (and respawnable after cooldown) across relog/server restart instead of reverting to generic unloaded state.
-- Dead companion respawns now sample nearby surface positions and avoid spawning inside terrain blocks in common recall/respawn cases.
-- Dead companion respawns now retry follow bootstrap shortly after spawn to avoid race conditions where state/target supports are not yet ready on the first frame.
-- Dead companion respawn placement now prioritizes nearby forward-facing in-view points and low-height surface probes, reducing outside-building spawns when the player is indoors.
-- Unloaded companion recall is now more reliable after a prior queued Return Home, because relocation source chunk preloading now uses both metadata hints and cached last-known positions without stale hint overwrite.
-- Unloaded companions in the linked panel now use cached identity fallback with priority `Display Name > Name Key > Role ID` instead of always showing `Unloaded companion (<uuid>)`.
-- Queued per-companion recalls now perform an additional short post-chunk apply probe, which fixes cases where first-click recall only loaded an unloaded companion and required a second click to actually relocate it.
-- Linked-panel per-companion `Recall` now reuses the same recall command execution pipeline as radial recall (including loaded/unloaded handling and relocation queue behavior), eliminating drift between command and button outcomes.
-- Unloaded recall queueing now falls back to stored home when last-known position is missing (common after relog), so recall can still load source chunks and relocate companions.
-- Relocation apply now uses a short burst of retry probes around queue/chunk-load events, improving first-click unloaded recall reliability when NPC components become available a few frames after chunk load.
-- Relocation retry accounting is now interval-based (instead of counting every rapid probe), and unloaded recall probes now cover a longer first-load window to reduce missed first-click recalls for companions that materialize slightly later after chunk load.
-- Relocation scheduling is now single-flight per NPC with per-chunk request throttling, preventing relocation probe floods that could stall the world thread during unloaded recall failures.
-- Unloaded recall now probes both persisted `lastKnownPosition` and persisted `homePosition` source chunks for linked records, fixing relog cases where stale last-known metadata prevented recalls until a manual Return Home refreshed in-memory tracking.
-- Queued unloaded relocations now use two-phase apply confirmation (issue move, then confirm arrival before clearing pending), preventing first-attempt recalls from being marked complete before the NPC is fully ready after relog/chunk activation.
+- Linked-panel icon textures now load correctly from `Common/UI/Custom/Tamework` (no missing-texture placeholders).
+- Dead companion snapshots now persist across relog/server restart and remain revivable after cooldown.
+- Revived companions now spawn more safely and reliably re-enter follow behavior.
+- Unloaded recall/rehome flow is now consistent and more reliable after relog, including first-attempt recall in previously inconsistent cases.
+- Relocation queueing/probing was hardened to prevent world-thread stalls from retry floods.
 
 ### Notes
 - Linked-companions row UI now includes hidden scaffolding for future secondary stats and action buttons (traits/talents), so the panel can be extended without another structural UI rewrite.
