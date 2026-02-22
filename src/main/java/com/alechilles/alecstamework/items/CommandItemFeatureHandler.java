@@ -89,6 +89,7 @@ public final class CommandItemFeatureHandler {
     private final CommandCompanionPlacementService companionPlacementService;
     private final CommandRecipientService recipientService;
     private final CommandStepExecutionService stepExecutionService;
+    private final CommandLinkMutationService linkMutationService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -115,6 +116,11 @@ public final class CommandItemFeatureHandler {
         this.stepExecutionService = new CommandStepExecutionService(
                 relocationService,
                 linkedNpcRecordStore,
+                npcNameResolver
+        );
+        this.linkMutationService = new CommandLinkMutationService(
+                linkedNpcRecordStore,
+                linkPolicyService,
                 npcNameResolver
         );
     }
@@ -180,7 +186,7 @@ public final class CommandItemFeatureHandler {
         }
 
         if (targetRef != null && config.isLinkEnabled() && config.isLinkUseTogglesMembership()) {
-            LinkToggleResult link = tryToggleLink(player, store, targetRef, tool.toolId, config, working);
+            LinkToggleResult link = linkMutationService.tryToggleLink(player, store, targetRef, tool.toolId, config, working);
             if (link.toggled) {
                 if (link.updatedItem != null) {
                     working = link.updatedItem;
@@ -277,7 +283,7 @@ public final class CommandItemFeatureHandler {
                 }
             }
         }
-        ItemStack refreshedLinks = refreshLinkedNpcPositions(context.workingItem, recipients, store);
+        ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(context.workingItem, recipients, store);
         if (refreshedLinks != context.workingItem) {
             context.workingItem = refreshedLinks;
             context.itemChanged = true;
@@ -417,9 +423,9 @@ public final class CommandItemFeatureHandler {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            ItemStack updatedStack = removeLinkedNpcRecord(stack, npcUuid);
+            ItemStack updatedStack = linkMutationService.removeLinkedNpcRecord(stack, npcUuid);
             boolean itemChanged = updatedStack != stack;
-            boolean componentChanged = unlinkLoadedNpcFromTool(player, npcUuid, toolId);
+            boolean componentChanged = linkMutationService.unlinkLoadedNpcFromTool(player, npcUuid, toolId);
             if (!itemChanged && !componentChanged) {
                 feedbackService.showWarning(player, "That NPC is not linked to this tool.");
             } else {
@@ -475,7 +481,7 @@ public final class CommandItemFeatureHandler {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
+            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
                 feedbackService.showWarning(player, "That NPC is not linked to this tool.");
                 return;
@@ -541,7 +547,7 @@ public final class CommandItemFeatureHandler {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
+            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
                 feedbackService.showWarning(player, "That NPC is not linked to this tool.");
                 return;
@@ -577,7 +583,7 @@ public final class CommandItemFeatureHandler {
             }
             links.setHomePosition(home);
             store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links);
-            ItemStack updatedStack = upsertLinkedNpcRecord(
+            ItemStack updatedStack = linkMutationService.upsertLinkedNpcRecord(
                     stack,
                     npcUuid,
                     home,
@@ -643,7 +649,7 @@ public final class CommandItemFeatureHandler {
             if (stackToolId == null || !stackToolId.equals(toolId)) {
                 continue;
             }
-            LinkedNpcRecord record = findLinkedNpcRecord(readLinkedNpcRecords(stack), npcUuid);
+            LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
                 feedbackService.showWarning(player, "That NPC is not linked to this tool.");
                 return;
@@ -759,7 +765,7 @@ public final class CommandItemFeatureHandler {
                     break;
                 }
             }
-            ItemStack refreshedLinks = refreshLinkedNpcPositions(context.workingItem, loadedRecipients, store);
+            ItemStack refreshedLinks = linkMutationService.refreshLinkedNpcPositions(context.workingItem, loadedRecipients, store);
             if (refreshedLinks != context.workingItem) {
                 context.workingItem = refreshedLinks;
                 context.itemChanged = true;
@@ -874,8 +880,8 @@ public final class CommandItemFeatureHandler {
                 RESPAWN_FOLLOW_RETRY_DELAY_MS
         );
         scheduleRespawnFollowRetry(player.getWorld(), spawnedNpc.getUuid(), playerRef, followRetryDelayMs);
-        ItemStack updated = removeLinkedNpcRecord(stack, record.npcUuid);
-        updated = upsertLinkedNpcRecord(
+        ItemStack updated = linkMutationService.removeLinkedNpcRecord(stack, record.npcUuid);
+        updated = linkMutationService.upsertLinkedNpcRecord(
                 updated,
                 spawnedNpc.getUuid(),
                 destination,
@@ -938,10 +944,6 @@ public final class CommandItemFeatureHandler {
         );
     }
 
-    private LinkedNpcRecord findLinkedNpcRecord(List<LinkedNpcRecord> records, UUID npcUuid) {
-        return linkedNpcRecordStore.find(records, npcUuid);
-    }
-
     private String formatDuration(long remainingMs) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long minutes = totalSeconds / 60L;
@@ -950,34 +952,6 @@ public final class CommandItemFeatureHandler {
             return seconds + "s";
         }
         return minutes + "m " + seconds + "s";
-    }
-
-    private boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {
-        if (player == null || npcUuid == null || toolId == null || toolId.isBlank()) {
-            return false;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return false;
-        }
-        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
-        if (npcRef == null || !npcRef.isValid()) {
-            return false;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        if (store == null) {
-            return false;
-        }
-        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
-        if (links == null || !links.containsToolId(toolId)) {
-            return false;
-        }
-        UUID owner = links.getOwnerId();
-        if (owner != null && !owner.equals(player.getUuid())) {
-            return false;
-        }
-        store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links.withToolIdRemoved(toolId));
-        return true;
     }
 
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
@@ -1124,75 +1098,6 @@ public final class CommandItemFeatureHandler {
         return links.getHomePosition();
     }
 
-    private LinkToggleResult tryToggleLink(Player player,
-                                           Store<EntityStore> store,
-                                           Ref<EntityStore> targetRef,
-                                           String toolId,
-                                           TwCommandItemConfig config,
-                                           ItemStack workingItem) {
-        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            return LinkToggleResult.notToggled();
-        }
-        UUID playerId = player.getUuid();
-        if (playerId == null) {
-            return LinkToggleResult.notToggled();
-        }
-        UUID ownerId = linkPolicyService.resolveOwnerId(targetRef, store);
-        if (ownerId != null && !ownerId.equals(playerId)) {
-            return LinkToggleResult.notToggled();
-        }
-        if (config.isRequireOwner() && ownerId == null) {
-            return LinkToggleResult.notToggled();
-        }
-        if (config.isRequireTamed() && !TamedStateResolver.isTamed(targetRef, store)) {
-            return LinkToggleResult.notToggled();
-        }
-        if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
-            return LinkToggleResult.notToggled();
-        }
-        TameworkCommandLinksComponent current = store.getComponent(targetRef, TameworkCommandLinksComponent.getComponentType());
-        if (current == null) {
-            current = new TameworkCommandLinksComponent(playerId, new String[0]);
-        }
-        UUID linksOwner = current.getOwnerId();
-        if (linksOwner != null && !linksOwner.equals(playerId)) {
-            return LinkToggleResult.notToggled();
-        }
-        current.setOwnerId(playerId);
-        boolean linked;
-        TameworkCommandLinksComponent updated;
-        if (current.containsToolId(toolId)) {
-            updated = current.withToolIdRemoved(toolId);
-            linked = false;
-        } else {
-            updated = current.withToolIdAdded(toolId);
-            linked = true;
-        }
-        store.putComponent(targetRef, TameworkCommandLinksComponent.getComponentType(), updated);
-        ItemStack updatedItem = workingItem;
-        UUID npcUuid = npc.getUuid();
-        if (npcUuid != null && updatedItem != null && !updatedItem.isEmpty()) {
-            if (linked) {
-                TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
-                Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
-                Vector3d homePosition = updated != null && updated.hasHome() ? updated.getHomePosition() : null;
-                updatedItem = upsertLinkedNpcRecord(
-                        updatedItem,
-                        npcUuid,
-                        lastKnown,
-                        homePosition,
-                        npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
-                        npcNameResolver.resolveNpcNameKey(npc),
-                        npcNameResolver.resolveNpcRoleId(npc)
-                );
-            } else {
-                updatedItem = removeLinkedNpcRecord(updatedItem, npcUuid);
-            }
-        }
-        String name = npcNameResolver.resolveNpcDisplayName(targetRef, store, npc);
-        return new LinkToggleResult(true, linked, name, updatedItem);
-    }
 
     private void maybeRelocateLoadedRecallCandidate(Context context, Candidate candidate) {
         if (context == null || candidate == null || candidate.ref == null || candidate.npc == null) {
@@ -1223,65 +1128,6 @@ public final class CommandItemFeatureHandler {
             return;
         }
         candidate.npc.moveTo(candidate.ref, safePosition.x, safePosition.y, safePosition.z, context.store);
-    }
-
-    private ItemStack upsertLinkedNpcRecord(ItemStack stack, UUID npcUuid, Vector3d position, Vector3d homePosition) {
-        return linkedNpcRecordStore.upsert(stack, npcUuid, position, homePosition, null, null, null);
-    }
-
-    private ItemStack upsertLinkedNpcRecord(ItemStack stack,
-                                            UUID npcUuid,
-                                            Vector3d position,
-                                            Vector3d homePosition,
-                                            String cachedDisplayName,
-                                            String cachedNameKey,
-                                            String cachedRoleId) {
-        return linkedNpcRecordStore.upsert(
-                stack,
-                npcUuid,
-                position,
-                homePosition,
-                cachedDisplayName,
-                cachedNameKey,
-                cachedRoleId
-        );
-    }
-
-    private ItemStack refreshLinkedNpcPositions(ItemStack stack, List<Candidate> recipients, Store<EntityStore> store) {
-        if (stack == null || stack.isEmpty() || recipients == null || recipients.isEmpty() || store == null) {
-            return stack;
-        }
-        ItemStack updated = stack;
-        for (Candidate candidate : recipients) {
-            if (candidate == null || candidate.ref == null || candidate.npc == null || candidate.npc.getUuid() == null) {
-                continue;
-            }
-            TransformComponent transform = store.getComponent(candidate.ref, TransformComponent.getComponentType());
-            Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
-            Vector3d homePosition = readStoredHomePosition(candidate.ref, store);
-            updated = upsertLinkedNpcRecord(
-                    updated,
-                    candidate.npc.getUuid(),
-                    position,
-                    homePosition,
-                    npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, store),
-                    npcNameResolver.resolveNpcNameKey(candidate.npc),
-                    npcNameResolver.resolveNpcRoleId(candidate.npc)
-            );
-        }
-        return updated;
-    }
-
-    private ItemStack removeLinkedNpcRecord(ItemStack stack, UUID npcUuid) {
-        return linkedNpcRecordStore.remove(stack, npcUuid);
-    }
-
-    private List<LinkedNpcRecord> readLinkedNpcRecords(ItemStack stack) {
-        return linkedNpcRecordStore.read(stack);
-    }
-
-    private ItemStack writeLinkedNpcRecords(ItemStack stack, List<LinkedNpcRecord> records) {
-        return linkedNpcRecordStore.write(stack, records);
     }
 
     private boolean isCooldownActive(ItemStack stack, int cooldownMs) {
