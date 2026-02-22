@@ -94,10 +94,11 @@ public final class CommandItemFeatureHandler {
     private static final double RECALL_FORCE_RELOCATE_DISTANCE = 80.0;
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
-    private static final String DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID = "SFX_Creative_Play_Selection_Widget";
+    private static final String DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID = "SFX_Creative_Play_Selection_Place";
+    private static final String LEGACY_WIDGET_FEEDBACK_SOUND_EVENT_ID = "SFX_Creative_Play_Selection_Widget";
     private static final float DEFAULT_COMMAND_FEEDBACK_VOLUME = 1.0f;
     private static final float DEFAULT_COMMAND_FEEDBACK_PITCH = 1.0f;
-    private static final boolean SOUND_DIAGNOSTICS_ENABLED = true;
+    private static final boolean SOUND_DIAGNOSTICS_ENABLED = false;
     private static final String SOUND_DIAGNOSTIC_PROBE_EVENT_ID = "SFX_Creative_Play_Error";
     private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
     private static final double RESPAWN_DISTANCE_CLOSE = 5.0;
@@ -2876,6 +2877,9 @@ public final class CommandItemFeatureHandler {
         String resolvedSoundEventId = (soundEventId != null && !soundEventId.isBlank())
                 ? soundEventId
                 : DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID;
+        if (LEGACY_WIDGET_FEEDBACK_SOUND_EVENT_ID.equals(resolvedSoundEventId)) {
+            resolvedSoundEventId = DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID;
+        }
         int soundEventIndex = SoundEvent.getAssetMap().getIndex(resolvedSoundEventId);
         if (soundEventIndex <= 0 && !DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID.equals(resolvedSoundEventId)) {
             soundEventIndex = SoundEvent.getAssetMap().getIndex(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID);
