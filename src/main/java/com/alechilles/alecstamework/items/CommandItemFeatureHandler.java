@@ -79,6 +79,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import java.util.logging.Level;
 
 /**
  * Handles command-item linking and command dispatch.
@@ -96,6 +97,8 @@ public final class CommandItemFeatureHandler {
     private static final String DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID = "SFX_Creative_Play_Selection_Widget";
     private static final float DEFAULT_COMMAND_FEEDBACK_VOLUME = 1.0f;
     private static final float DEFAULT_COMMAND_FEEDBACK_PITCH = 1.0f;
+    private static final boolean SOUND_DIAGNOSTICS_ENABLED = true;
+    private static final String SOUND_DIAGNOSTIC_PROBE_EVENT_ID = "SFX_Creative_Play_Error";
     private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
     private static final double RESPAWN_DISTANCE_CLOSE = 5.0;
     private static final double RESPAWN_DISTANCE_NEAR = 8.0;
@@ -2878,8 +2881,12 @@ public final class CommandItemFeatureHandler {
             soundEventIndex = SoundEvent.getAssetMap().getIndex(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID);
         }
         if (soundEventIndex <= 0) {
+            logSoundDiagnostic("Failed to resolve sound event index. requested="
+                    + soundEventId + ", resolved=" + resolvedSoundEventId);
             return;
         }
+        logSoundDiagnostic("Playing feedback sound. requested="
+                + soundEventId + ", resolved=" + resolvedSoundEventId + ", index=" + soundEventIndex);
         TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (transform != null) {
             Vector3d position = transform.getPosition();
@@ -2894,6 +2901,7 @@ public final class CommandItemFeatureHandler {
                     DEFAULT_COMMAND_FEEDBACK_PITCH,
                     store
             );
+            emitDiagnosticProbeSound(playerRef, store);
             return;
         }
         SoundUtil.playSoundEvent2d(
@@ -2904,6 +2912,7 @@ public final class CommandItemFeatureHandler {
             DEFAULT_COMMAND_FEEDBACK_PITCH,
             store
         );
+        emitDiagnosticProbeSound(playerRef, store);
     }
 
     private void emitUiClickSound(Player player) {
@@ -2914,6 +2923,38 @@ public final class CommandItemFeatureHandler {
         World world = player.getWorld();
         Store<EntityStore> store = world != null ? world.getEntityStore().getStore() : null;
         emitFeedbackSound(DEFAULT_COMMAND_FEEDBACK_SOUND_EVENT_ID, playerRef, store);
+    }
+
+    private void emitDiagnosticProbeSound(Ref<EntityStore> playerRef, Store<EntityStore> store) {
+        if (!SOUND_DIAGNOSTICS_ENABLED || playerRef == null || !playerRef.isValid() || store == null) {
+            return;
+        }
+        int probeIndex = SoundEvent.getAssetMap().getIndex(SOUND_DIAGNOSTIC_PROBE_EVENT_ID);
+        if (probeIndex <= 0) {
+            logSoundDiagnostic("Diagnostic probe sound failed to resolve: " + SOUND_DIAGNOSTIC_PROBE_EVENT_ID);
+            return;
+        }
+        SoundUtil.playSoundEvent2d(
+                playerRef,
+                probeIndex,
+                SoundCategory.SFX,
+                DEFAULT_COMMAND_FEEDBACK_VOLUME,
+                DEFAULT_COMMAND_FEEDBACK_PITCH,
+                store
+        );
+        logSoundDiagnostic("Played diagnostic probe sound. id="
+                + SOUND_DIAGNOSTIC_PROBE_EVENT_ID + ", index=" + probeIndex);
+    }
+
+    private void logSoundDiagnostic(String message) {
+        if (!SOUND_DIAGNOSTICS_ENABLED || message == null || message.isBlank()) {
+            return;
+        }
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || plugin.getLogger() == null) {
+            return;
+        }
+        plugin.getLogger().at(Level.INFO).log("[CommandSoundDebug] " + message);
     }
 
     private void emitFeedbackParticles(String particleSystem,
