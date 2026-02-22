@@ -45,6 +45,17 @@ $C = "Common.ui";
   Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
 );
 
+@LinkedActionTooltipStyle = TextTooltipStyle(
+  Background: #0f1e30(0.96),
+  MaxWidth: 220,
+  LabelStyle: (
+    Wrap: true,
+    FontSize: 14,
+    TextColor: #eef4fb
+  ),
+  Padding: 12
+);
+
 Group {
   Anchor: (Top: 8, Height: 92);
   Background: #13263c(0.86);
@@ -93,7 +104,7 @@ Group {
     Style: @LinkedActionRespawnButtonStyle;
     Text: "";
     TooltipText: "Respawn companion";
-    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
+    TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
 
@@ -102,7 +113,7 @@ Group {
     Style: @LinkedActionRecallButtonStyle;
     Text: "";
     TooltipText: "Recall companion";
-    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
+    TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
 
@@ -111,7 +122,7 @@ Group {
     Style: @LinkedActionSetHomeButtonStyle;
     Text: "";
     TooltipText: "Set companion home";
-    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
+    TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
 
@@ -120,7 +131,7 @@ Group {
     Style: @LinkedActionReturnHomeButtonStyle;
     Text: "";
     TooltipText: "Send companion home";
-    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
+    TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
 
@@ -129,7 +140,7 @@ Group {
     Style: @RemoveIconButtonStyle;
     Text: "";
     TooltipText: "Unlink companion";
-    TextTooltipStyle: $C.@ButtonTextTooltipStyle;
+    TextTooltipStyle: @LinkedActionTooltipStyle;
   }
 
   Group #HealthFrame {
