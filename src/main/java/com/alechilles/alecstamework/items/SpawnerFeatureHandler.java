@@ -50,7 +50,6 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
 import org.bson.BsonDocument;
-import java.lang.reflect.Method;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -489,132 +488,8 @@ public final class SpawnerFeatureHandler {
     }
 
     private String resolveRoleIdFromMetadata(ItemStack itemStack) {
-        CapturedNPCMetadata meta = resolveCapturedMetadata(itemStack);
-        if (meta == null) {
-            return null;
-        }
-
-        String roleId = readStringGetter(meta,
-                "getRoleId",
-                "getRoleKey",
-                "getRoleNameKey",
-                "getRoleName",
-                "getNpcNameKey"
-        );
-        if (roleId != null && !roleId.isBlank()) {
-            return roleId;
-        }
-
-        Integer roleIndex = readIntGetter(meta, "getRoleIndex");
-        if (roleIndex != null && roleIndex >= 0) {
-            NPCPlugin npcPlugin = NPCPlugin.get();
-            if (npcPlugin != null) {
-                String roleName = npcPlugin.getName(roleIndex);
-                if (roleName != null && !roleName.isBlank()) {
-                    return roleName;
-                }
-            }
-        }
-        return null;
-    }
-
-    private CapturedNPCMetadata resolveCapturedMetadata(ItemStack itemStack) {
-        if (itemStack == null) {
-            return null;
-        }
-        try {
-            return itemStack.getFromMetadataOrNull(CapturedNPCMetadata.KEYED_CODEC);
-        } catch (Exception ex) {
-            logger.at(Level.FINE).withCause(ex).log(
-                    "Spawner stub: failed to read captured NPC metadata from item."
-            );
-            return null;
-        }
-    }
-
-    // Compatibility shim for evolving CapturedNPCMetadata getters/setters across pre-release builds.
-    private static String readStringGetter(Object target, String... methodNames) {
-        if (target == null || methodNames == null) {
-            return null;
-        }
-        for (String methodName : methodNames) {
-            String value = invokeStringGetter(target, methodName);
-            if (value != null && !value.isBlank()) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private static Integer readIntGetter(Object target, String... methodNames) {
-        if (target == null || methodNames == null) {
-            return null;
-        }
-        for (String methodName : methodNames) {
-            Integer value = invokeIntGetter(target, methodName);
-            if (value != null) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private static String invokeStringGetter(Object target, String methodName) {
-        if (target == null || methodName == null) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            Object value = method.invoke(target);
-            return value instanceof String ? (String) value : null;
-        } catch (Exception | LinkageError ex) {
-            return null;
-        }
-    }
-
-    private static Integer invokeIntGetter(Object target, String methodName) {
-        if (target == null || methodName == null) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            Object value = method.invoke(target);
-            if (value instanceof Integer) {
-                return (Integer) value;
-            }
-            if (value instanceof Number) {
-                return ((Number) value).intValue();
-            }
-            return null;
-        } catch (Exception | LinkageError ex) {
-            return null;
-        }
-    }
-
-    private static boolean invokeStringSetter(Object target, String methodName, String value) {
-        if (target == null || methodName == null || value == null || value.isBlank()) {
-            return false;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName, String.class);
-            method.invoke(target, value);
-            return true;
-        } catch (Exception | LinkageError ex) {
-            return false;
-        }
-    }
-
-    private static boolean invokeIntSetter(Object target, String methodName, int value) {
-        if (target == null || methodName == null) {
-            return false;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName, int.class);
-            method.invoke(target, value);
-            return true;
-        } catch (Exception | LinkageError ex) {
-            return false;
-        }
+        CapturedNPCMetadata meta = CapturedNpcMetadataCompat.readMetadata(itemStack, logger);
+        return CapturedNpcMetadataCompat.resolveRoleId(meta);
     }
 
     // Called by NPC action chains to capture an NPC into the held spawner item.
@@ -1421,7 +1296,7 @@ public final class SpawnerFeatureHandler {
 
         Integer roleIndex = captureInfo.roleIndex;
         if (roleIndex != null && roleIndex >= 0) {
-            wrote |= invokeIntSetter(meta, "setRoleIndex", roleIndex);
+            wrote |= CapturedNpcMetadataCompat.invokeIntSetter(meta, "setRoleIndex", roleIndex);
         }
         String npcNameKey = captureInfo.npcNameKey;
         String tooltipName = captureInfo.tooltipDisplayName;
@@ -1429,19 +1304,19 @@ public final class SpawnerFeatureHandler {
             tooltipName = npcNameKey;
         }
         if (tooltipName != null && !tooltipName.isBlank()) {
-            wrote |= invokeStringSetter(meta, "setNpcNameKey", tooltipName);
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setNpcNameKey", tooltipName);
         }
         if (npcNameKey != null && !npcNameKey.isBlank()) {
-            wrote |= invokeStringSetter(meta, "setRoleNameKey", npcNameKey);
-            wrote |= invokeStringSetter(meta, "setRoleId", npcNameKey);
-            wrote |= invokeStringSetter(meta, "setRoleKey", npcNameKey);
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleNameKey", npcNameKey);
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleId", npcNameKey);
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleKey", npcNameKey);
         }
         String icon = (fullItemIcon != null && !fullItemIcon.isBlank()) ? fullItemIcon : captureInfo.iconPath;
         if (icon != null && !icon.isBlank()) {
-            wrote |= invokeStringSetter(meta, "setIconPath", icon);
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setIconPath", icon);
         }
         if (fullItemIcon != null && !fullItemIcon.isBlank()) {
-            wrote |= invokeStringSetter(meta, "setFullItemIcon", fullItemIcon);
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setFullItemIcon", fullItemIcon);
         }
         if (!wrote) {
             return updated;
