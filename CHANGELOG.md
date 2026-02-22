@@ -3,6 +3,8 @@
 ## Unreleased
 ### Added
 - New `Component_Tamework_Instruction_Wander` component for reusable random wandering within a configurable radius.
+### Changed
+- `Component_Tamework_Instruction_Wander` now explicitly supports `AvoidBlockDamage` (default `true`) so wander motion can avoid environmental-damage blocks (for example, fire/brambles when flagged as damaging).
 
 ## 2.1.1 - Linked Companions Panel UX and Safety - 2026-02-21
 ### Added

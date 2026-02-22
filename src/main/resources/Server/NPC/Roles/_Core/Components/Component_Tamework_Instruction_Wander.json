@@ -16,6 +16,10 @@
     "WanderRelativeSpeed": {
       "Value": 0.3,
       "Description": "Relative movement speed while wandering."
+    },
+    "WanderAvoidBlockDamage": {
+      "Value": true,
+      "Description": "Whether wander movement should avoid blocks that cause environmental damage."
     }
   },
   "Content": {
@@ -50,6 +54,9 @@
                 },
                 "RelativeSpeed": {
                   "Compute": "WanderRelativeSpeed"
+                },
+                "AvoidBlockDamage": {
+                  "Compute": "WanderAvoidBlockDamage"
                 }
               }
             },
