@@ -9,7 +9,6 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearTarge
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.FailurePolicy;
-import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MembershipMode;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ModeMapping;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MoveSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MoveToPositionStep;
@@ -28,12 +27,9 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
-import com.hypixel.hytale.component.ArchetypeChunk;
-import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -56,8 +52,6 @@ import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -93,6 +87,7 @@ public final class CommandItemFeatureHandler {
     private final CommandResolutionService resolutionService;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandCompanionPlacementService companionPlacementService;
+    private final CommandRecipientService recipientService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -115,6 +110,7 @@ public final class CommandItemFeatureHandler {
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.linkPolicyService = new CommandLinkPolicyService();
         this.companionPlacementService = new CommandCompanionPlacementService();
+        this.recipientService = new CommandRecipientService(linkPolicyService, linkedNpcRecordStore);
     }
 
     // Handles a single command-item use.
@@ -253,8 +249,8 @@ public final class CommandItemFeatureHandler {
                 recallForceRelocateDistance
         );
 
-        List<Candidate> recipients = queryRecipients(context);
-        List<LinkedNpcRecord> unloadedLinked = queryUnloadedLinkedRecords(context, recipients);
+        List<Candidate> recipients = recipientService.queryRecipients(context);
+        List<LinkedNpcRecord> unloadedLinked = recipientService.queryUnloadedLinkedRecords(context, recipients);
         if (recipients.isEmpty() && unloadedLinked.isEmpty()) {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
@@ -1013,121 +1009,6 @@ public final class CommandItemFeatureHandler {
             return command.getId();
         }
         return "Unknown";
-    }
-
-    private List<Candidate> queryRecipients(Context context) {
-        ArrayList<Candidate> out = new ArrayList<>();
-        TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
-        Vector3d playerPos = playerTransform != null ? new Vector3d(playerTransform.getPosition()) : null;
-        double radiusSq = context.config.getRadius() >= 0 ? context.config.getRadius() * context.config.getRadius() : -1;
-        int maxTargets = Math.max(1, context.config.getMaxTargets());
-        UUID playerUuid = context.player.getUuid();
-
-        context.store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
-            for (int i = 0; i < chunk.size(); i++) {
-                NPCEntity npc = chunk.getComponent(i, NPCEntity.getComponentType());
-                if (npc == null) {
-                    continue;
-                }
-                Ref<EntityStore> npcRef = chunk.getReferenceTo(i);
-                if (npcRef == null || !npcRef.isValid()) {
-                    continue;
-                }
-                if (!linkPolicyService.matchesMembership(
-                        context.config.getMembershipMode(),
-                        npcRef,
-                        npc,
-                        context.playerRef,
-                        playerUuid,
-                        context.toolId,
-                        context.store
-                )) {
-                    continue;
-                }
-                if (!linkPolicyService.passesOwnerAndTamed(
-                        context.config.isRequireOwner(),
-                        context.config.isRequireTamed(),
-                        npcRef,
-                        playerUuid,
-                        context.store
-                )) {
-                    continue;
-                }
-                if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
-                    continue;
-                }
-                TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
-                double distSq = 0;
-                if (playerPos != null && npcTransform != null) {
-                    Vector3d p = npcTransform.getPosition();
-                    double dx = p.x - playerPos.x;
-                    double dy = p.y - playerPos.y;
-                    double dz = p.z - playerPos.z;
-                    distSq = dx * dx + dy * dy + dz * dz;
-                    if (radiusSq >= 0 && distSq > radiusSq) {
-                        continue;
-                    }
-                } else if (radiusSq >= 0) {
-                    continue;
-                }
-                out.add(new Candidate(npcRef, npc, distSq));
-            }
-        });
-        out.sort(Comparator.comparingDouble(value -> value.distSq));
-        if (out.size() > maxTargets) {
-            return new ArrayList<>(out.subList(0, maxTargets));
-        }
-        return out;
-    }
-
-    private List<LinkedNpcRecord> queryUnloadedLinkedRecords(Context context, List<Candidate> loadedRecipients) {
-        MembershipMode mode = context.config.getMembershipMode() != null
-                ? context.config.getMembershipMode()
-                : MembershipMode.LinkedOnly;
-        if (mode != MembershipMode.LinkedOnly && mode != MembershipMode.LinkedOrMasterTarget) {
-            return List.of();
-        }
-        List<LinkedNpcRecord> linkedRecords = readLinkedNpcRecords(context.workingItem);
-        if (linkedRecords.isEmpty()) {
-            return List.of();
-        }
-        Set<UUID> loadedUuids = new HashSet<>();
-        if (loadedRecipients != null) {
-            for (Candidate recipient : loadedRecipients) {
-                if (recipient == null || recipient.npc == null || recipient.npc.getUuid() == null) {
-                    continue;
-                }
-                loadedUuids.add(recipient.npc.getUuid());
-            }
-        }
-        int remaining = Math.max(0, Math.max(1, context.config.getMaxTargets()) - loadedUuids.size());
-        if (remaining <= 0) {
-            return List.of();
-        }
-        ArrayList<LinkedNpcRecord> unloaded = new ArrayList<>();
-        World world = context.player != null ? context.player.getWorld() : null;
-        if (world == null) {
-            return List.of();
-        }
-        for (LinkedNpcRecord record : linkedRecords) {
-            if (record == null || record.npcUuid == null || loadedUuids.contains(record.npcUuid)) {
-                continue;
-            }
-            Ref<EntityStore> ref = world.getEntityRef(record.npcUuid);
-            if (ref != null && ref.isValid()) {
-                // A valid world ref does not guarantee the NPC is currently loaded in chunk store.
-                // If the component is absent, treat this record as unloaded so relocation can be queued.
-                NPCEntity npc = context.store.getComponent(ref, NPCEntity.getComponentType());
-                if (npc != null) {
-                    continue;
-                }
-            }
-            unloaded.add(record);
-            if (unloaded.size() >= remaining) {
-                break;
-            }
-        }
-        return unloaded;
     }
 
     private int queueRelocationsForUnloaded(Context context, List<LinkedNpcRecord> unloadedLinked) {

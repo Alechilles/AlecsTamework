@@ -1,0 +1,145 @@
+package com.alechilles.alecstamework.items;
+
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MembershipMode;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.UUID;
+
+/**
+ * Resolves loaded and unloaded command recipients from command context.
+ */
+final class CommandRecipientService {
+    private final CommandLinkPolicyService linkPolicyService;
+    private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
+
+    CommandRecipientService(CommandLinkPolicyService linkPolicyService,
+                            CommandLinkedNpcRecordStore linkedNpcRecordStore) {
+        this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
+        this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
+    }
+
+    List<Candidate> queryRecipients(Context context) {
+        ArrayList<Candidate> out = new ArrayList<>();
+        TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
+        Vector3d playerPos = playerTransform != null ? new Vector3d(playerTransform.getPosition()) : null;
+        double radiusSq = context.config.getRadius() >= 0 ? context.config.getRadius() * context.config.getRadius() : -1;
+        int maxTargets = Math.max(1, context.config.getMaxTargets());
+        UUID playerUuid = context.player.getUuid();
+
+        context.store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
+            for (int i = 0; i < chunk.size(); i++) {
+                NPCEntity npc = chunk.getComponent(i, NPCEntity.getComponentType());
+                if (npc == null) {
+                    continue;
+                }
+                Ref<EntityStore> npcRef = chunk.getReferenceTo(i);
+                if (npcRef == null || !npcRef.isValid()) {
+                    continue;
+                }
+                if (!linkPolicyService.matchesMembership(
+                        context.config.getMembershipMode(),
+                        npcRef,
+                        npc,
+                        context.playerRef,
+                        playerUuid,
+                        context.toolId,
+                        context.store
+                )) {
+                    continue;
+                }
+                if (!linkPolicyService.passesOwnerAndTamed(
+                        context.config.isRequireOwner(),
+                        context.config.isRequireTamed(),
+                        npcRef,
+                        playerUuid,
+                        context.store
+                )) {
+                    continue;
+                }
+                if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
+                    continue;
+                }
+                TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
+                double distSq = 0;
+                if (playerPos != null && npcTransform != null) {
+                    Vector3d p = npcTransform.getPosition();
+                    double dx = p.x - playerPos.x;
+                    double dy = p.y - playerPos.y;
+                    double dz = p.z - playerPos.z;
+                    distSq = dx * dx + dy * dy + dz * dz;
+                    if (radiusSq >= 0 && distSq > radiusSq) {
+                        continue;
+                    }
+                } else if (radiusSq >= 0) {
+                    continue;
+                }
+                out.add(new Candidate(npcRef, npc, distSq));
+            }
+        });
+        out.sort(Comparator.comparingDouble(value -> value.distSq));
+        if (out.size() > maxTargets) {
+            return new ArrayList<>(out.subList(0, maxTargets));
+        }
+        return out;
+    }
+
+    List<LinkedNpcRecord> queryUnloadedLinkedRecords(Context context, List<Candidate> loadedRecipients) {
+        MembershipMode mode = context.config.getMembershipMode() != null
+                ? context.config.getMembershipMode()
+                : MembershipMode.LinkedOnly;
+        if (mode != MembershipMode.LinkedOnly && mode != MembershipMode.LinkedOrMasterTarget) {
+            return List.of();
+        }
+        List<LinkedNpcRecord> linkedRecords = linkedNpcRecordStore.read(context.workingItem);
+        if (linkedRecords.isEmpty()) {
+            return List.of();
+        }
+        Set<UUID> loadedUuids = new HashSet<>();
+        if (loadedRecipients != null) {
+            for (Candidate recipient : loadedRecipients) {
+                if (recipient == null || recipient.npc == null || recipient.npc.getUuid() == null) {
+                    continue;
+                }
+                loadedUuids.add(recipient.npc.getUuid());
+            }
+        }
+        int remaining = Math.max(0, Math.max(1, context.config.getMaxTargets()) - loadedUuids.size());
+        if (remaining <= 0) {
+            return List.of();
+        }
+        ArrayList<LinkedNpcRecord> unloaded = new ArrayList<>();
+        World world = context.player != null ? context.player.getWorld() : null;
+        if (world == null) {
+            return List.of();
+        }
+        for (LinkedNpcRecord record : linkedRecords) {
+            if (record == null || record.npcUuid == null || loadedUuids.contains(record.npcUuid)) {
+                continue;
+            }
+            Ref<EntityStore> ref = world.getEntityRef(record.npcUuid);
+            if (ref != null && ref.isValid()) {
+                NPCEntity npc = context.store.getComponent(ref, NPCEntity.getComponentType());
+                if (npc != null) {
+                    continue;
+                }
+            }
+            unloaded.add(record);
+            if (unloaded.size() >= remaining) {
+                break;
+            }
+        }
+        return unloaded;
+    }
+}
