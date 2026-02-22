@@ -113,6 +113,7 @@ public final class SpawnerFeatureHandler {
     private final HytaleLogger logger;
     private final ItemFeatureRegistry registry;
     private final SpawnerLinkedNpcSyncService linkedNpcSyncService;
+    private final SpawnerOwnershipPolicyService ownershipPolicyService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -120,6 +121,7 @@ public final class SpawnerFeatureHandler {
         this.logger = logger;
         this.registry = registry;
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
+        this.ownershipPolicyService = new SpawnerOwnershipPolicyService();
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -355,7 +357,7 @@ public final class SpawnerFeatureHandler {
         }
 
         UUID ownerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING);
-        if (!isSpawnAllowedByOwnership(player.getUuid(), ownerUuid, config)) {
+        if (!ownershipPolicyService.isSpawnAllowed(player.getUuid(), ownerUuid, config)) {
             return false;
         }
         boolean tamed = Boolean.TRUE.equals(itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TAMED, Codec.BOOLEAN));
@@ -587,53 +589,6 @@ public final class SpawnerFeatureHandler {
         );
         return true;
     }
-    private boolean resolveCaptureRequireOwner(ItemFeatureConfig config) {
-        if (config == null) {
-            return false;
-        }
-        Boolean override = config.getCaptureRequireOwnerOverride();
-        return override != null ? override : false;
-    }
-    private boolean resolveSpawnRequireOwner(ItemFeatureConfig config) {
-        if (config == null) {
-            return false;
-        }
-        Boolean override = config.getSpawnRequireOwnerOverride();
-        return override != null ? override : false;
-    }
-
-    private boolean isCaptureAllowedByOwnership(UUID playerUuid, UUID ownerUuid, ItemFeatureConfig config) {
-        boolean ownerRestricted = config.isCaptureOwnerRestricted();
-        boolean requireOwner = resolveCaptureRequireOwner(config);
-        if (ownerUuid != null) {
-            if (ownerRestricted && (playerUuid == null || !ownerUuid.equals(playerUuid))) {
-                return false;
-            }
-            return true;
-        }
-        if (requireOwner) {
-            return false;
-        }
-        return true;
-    }
-
-    private boolean isSpawnAllowedByOwnership(UUID playerUuid, UUID ownerUuid, ItemFeatureConfig config) {
-        if (config == null) {
-            return false;
-        }
-        boolean requireOwner = resolveSpawnRequireOwner(config);
-        if (ownerUuid != null) {
-            if (config.isSpawnOwnerRestricted() && (playerUuid == null || !ownerUuid.equals(playerUuid))) {
-                return false;
-            }
-            return true;
-        }
-        if (requireOwner) {
-            return false;
-        }
-        return true;
-    }
-
     private boolean canCapture(Player player, Ref<EntityStore> targetRef, ItemFeatureConfig config, ItemStack itemStack) {
         if (player == null || targetRef == null || config == null || itemStack == null) {
             return false;
@@ -663,7 +618,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         UUID ownerUuid = resolveOwnerFromComponent(targetRef, world);
-        if (!isCaptureAllowedByOwnership(player.getUuid(), ownerUuid, config)) {
+        if (!ownershipPolicyService.isCaptureAllowed(player.getUuid(), ownerUuid, config)) {
             if (ownerUuid != null) {
                 String npcName = resolveNpcDisplayName(npc);
                 String ownerName = resolveOwnerNameFromComponent(targetRef, world);
