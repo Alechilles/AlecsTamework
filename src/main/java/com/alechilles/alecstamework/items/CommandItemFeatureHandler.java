@@ -105,6 +105,7 @@ public final class CommandItemFeatureHandler {
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkedPanelEntryService panelEntryService;
+    private final CommandToolInventoryService toolInventoryService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -123,6 +124,7 @@ public final class CommandItemFeatureHandler {
                 captureService,
                 npcNameResolver
         );
+        this.toolInventoryService = new CommandToolInventoryService(panelEntryService);
     }
 
     // Handles a single command-item use.
@@ -149,7 +151,7 @@ public final class CommandItemFeatureHandler {
             return false;
         }
 
-        ToolResolution tool = ensureToolId(itemStack);
+        CommandToolInventoryService.ToolResolution tool = toolInventoryService.ensureToolId(itemStack);
         ItemStack working = tool.stack;
         boolean updateHeldItem = tool.changed;
         if (tool.toolId == null || tool.toolId.isBlank()) {
@@ -367,7 +369,7 @@ public final class CommandItemFeatureHandler {
                 config,
                 selectedId,
                 requireUnlinkConfirm,
-                () -> buildLinkedPanelEntriesForTool(player, toolId),
+                () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
@@ -392,7 +394,7 @@ public final class CommandItemFeatureHandler {
             sendWarningMessage(player, "That command is no longer available.");
             return;
         }
-        boolean updated = setSelectedCommandOnTool(player, toolId, selected.getId());
+        boolean updated = toolInventoryService.setSelectedCommandOnTool(player, toolId, selected.getId());
         if (!updated) {
             sendWarningMessage(player, "Unable to apply the selected command.");
             return;
@@ -953,39 +955,6 @@ public final class CommandItemFeatureHandler {
         return minutes + "m " + seconds + "s";
     }
 
-    private List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player,
-                                                                                              String toolId) {
-        if (player == null || toolId == null || toolId.isBlank()) {
-            return List.of();
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
-            return List.of();
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        short capacity = hotbar.getCapacity();
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack stack = hotbar.getItemStack(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-            if (stackToolId == null || !stackToolId.equals(toolId)) {
-                continue;
-            }
-            World world = player.getWorld();
-            if (world == null) {
-                return List.of();
-            }
-            Store<EntityStore> store = world.getEntityStore().getStore();
-            if (store == null) {
-                return List.of();
-            }
-            return panelEntryService.buildEntries(player, store, stack, toolId);
-        }
-        return List.of();
-    }
-
     private boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {
         if (player == null || npcUuid == null || toolId == null || toolId.isBlank()) {
             return false;
@@ -1012,34 +981,6 @@ public final class CommandItemFeatureHandler {
         }
         store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links.withToolIdRemoved(toolId));
         return true;
-    }
-
-    private boolean setSelectedCommandOnTool(Player player, String toolId, String commandId) {
-        Inventory inventory = player != null ? player.getInventory() : null;
-        if (inventory == null) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        if (hotbar == null) {
-            return false;
-        }
-        short capacity = hotbar.getCapacity();
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack stack = hotbar.getItemStack(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-            if (stackToolId == null || !stackToolId.equals(toolId)) {
-                continue;
-            }
-            ItemStack updated = stack.withMetadata(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING, commandId);
-            hotbar.setItemStackForSlot(slot, updated);
-            inventory.markChanged();
-            player.sendInventory();
-            return true;
-        }
-        return false;
     }
 
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
@@ -1091,19 +1032,6 @@ public final class CommandItemFeatureHandler {
             return null;
         }
         return registry.get(itemId);
-    }
-
-    private ToolResolution ensureToolId(ItemStack itemStack) {
-        String toolId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-        if (toolId != null && !toolId.isBlank()) {
-            return new ToolResolution(itemStack, toolId, false);
-        }
-        String generated = UUID.randomUUID().toString();
-        return new ToolResolution(
-                itemStack.withMetadata(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING, generated),
-                generated,
-                true
-        );
     }
 
     private CommandEntry resolveCommand(TwCommandItemConfig config, String commandIdOverride, ItemStack itemStack) {
@@ -2463,34 +2391,7 @@ public final class CommandItemFeatureHandler {
     }
 
     private boolean updateHeldItem(Player player, ItemStack updated) {
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        if (hotbar == null) {
-            return false;
-        }
-        byte slot = inventory.getActiveHotbarSlot();
-        if (slot == Inventory.INACTIVE_SLOT_INDEX) {
-            return false;
-        }
-        hotbar.setItemStackForSlot((short) slot, updated);
-        inventory.markChanged();
-        player.sendInventory();
-        return true;
-    }
-
-    private static final class ToolResolution {
-        private final ItemStack stack;
-        private final String toolId;
-        private final boolean changed;
-
-        private ToolResolution(ItemStack stack, String toolId, boolean changed) {
-            this.stack = stack;
-            this.toolId = toolId;
-            this.changed = changed;
-        }
+        return toolInventoryService.updateHeldItem(player, updated);
     }
 
     private static final class Context {
