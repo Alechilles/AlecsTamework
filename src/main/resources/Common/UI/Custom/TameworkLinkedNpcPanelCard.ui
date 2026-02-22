@@ -12,6 +12,32 @@ $C = "Common.ui";
   Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Disabled.png"), LabelStyle: @RemoveIconButtonLabelStyle)
 );
 
+@LinkedActionIconLabelStyle = LabelStyle(
+  FontSize: 1,
+  TextColor: #00000000
+);
+
+@LinkedActionRecallButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+);
+
+@LinkedActionSetHomeButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+);
+
+@LinkedActionReturnHomeButtonStyle = TextButtonStyle(
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+);
+
 Group {
   Anchor: (Top: 8, Height: 92);
   Background: #13263c(0.86);
@@ -62,24 +88,24 @@ Group {
     Visible: false;
   }
 
-  $C.@SmallSecondaryTextButton #RecallButton {
-    Anchor: (Top: 24, Right: 34, Width: 76, Height: 22);
-    Padding: (Horizontal: 8);
-    Text: "Recall";
+  TextButton #RecallButton {
+    Anchor: (Top: 24, Right: 36, Width: 24, Height: 24);
+    Style: @LinkedActionRecallButtonStyle;
+    Text: "";
     Visible: false;
   }
 
-  $C.@SmallSecondaryTextButton #SetHomeButton {
-    Anchor: (Top: 48, Right: 34, Width: 76, Height: 22);
-    Padding: (Horizontal: 8);
-    Text: "Set Home";
+  TextButton #SetHomeButton {
+    Anchor: (Top: 48, Right: 36, Width: 24, Height: 24);
+    Style: @LinkedActionSetHomeButtonStyle;
+    Text: "";
     Visible: false;
   }
 
-  $C.@SmallSecondaryTextButton #ReturnHomeButton {
-    Anchor: (Top: 68, Right: 34, Width: 76, Height: 22);
-    Padding: (Horizontal: 8);
-    Text: "Return";
+  TextButton #ReturnHomeButton {
+    Anchor: (Top: 68, Right: 36, Width: 24, Height: 24);
+    Style: @LinkedActionReturnHomeButtonStyle;
+    Text: "";
     Visible: false;
   }
 
