@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -10,7 +11,6 @@ import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -21,8 +21,6 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
-import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
-import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.asset.type.model.config.Model;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
@@ -33,9 +31,7 @@ import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.util.TargetUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
@@ -54,7 +50,6 @@ import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -64,10 +59,6 @@ import java.util.logging.Level;
  */
 public final class SpawnerFeatureHandler {
 
-    private static final double SPAWN_OFFSET_Y = 0.5;
-    private static final double SPAWN_SURFACE_OFFSET_Y = 0.01;
-    private static final double SPAWN_FORWARD_DISTANCE = 1.5;
-    private static final double RAYCAST_DISTANCE_EPSILON = 0.1;
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final Gson GSON = new Gson();
     private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
@@ -114,6 +105,7 @@ public final class SpawnerFeatureHandler {
     private final ItemFeatureRegistry registry;
     private final SpawnerLinkedNpcSyncService linkedNpcSyncService;
     private final SpawnerOwnershipPolicyService ownershipPolicyService;
+    private final SpawnerSpawnPositionService spawnPositionService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -122,6 +114,7 @@ public final class SpawnerFeatureHandler {
         this.registry = registry;
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
         this.ownershipPolicyService = new SpawnerOwnershipPolicyService();
+        this.spawnPositionService = new SpawnerSpawnPositionService(logger);
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -348,11 +341,11 @@ public final class SpawnerFeatureHandler {
             return false;
         }
 
-        Vector3d spawnPosition = resolveSpawnPosition(player, config);
+        Vector3d spawnPosition = spawnPositionService.resolveSpawnPosition(player, config);
         if (spawnPosition == null) {
             return false;
         }
-        if (!isWithinSpawnDistance(player, spawnPosition, config)) {
+        if (!spawnPositionService.isWithinSpawnDistance(player, spawnPosition, config)) {
             return false;
         }
 
@@ -376,7 +369,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         Ref<EntityStore> playerRef = player.getReference();
-        Vector3f rotation = resolveSpawnRotation(store, playerRef, spawnPosition);
+        Vector3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             logger.at(Level.FINE).log("Spawner spawn: failed to spawn role=" + roleId);
@@ -702,213 +695,6 @@ public final class SpawnerFeatureHandler {
         double dz = p.z - t.z;
         double maxDistSq = maxDistance * maxDistance;
         return (dx * dx + dy * dy + dz * dz) <= maxDistSq;
-    }
-
-    private boolean isWithinSpawnDistance(Player player, Vector3d spawnPosition, ItemFeatureConfig config) {
-        if (player == null || spawnPosition == null || config == null) {
-            return false;
-        }
-        double maxDistance = config.getSpawnMaxDistance();
-        if (maxDistance <= 0) {
-            return true;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return false;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        if (playerRef == null || !playerRef.isValid()) {
-            return false;
-        }
-        TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (playerTransform == null) {
-            return false;
-        }
-        Vector3d p = new Vector3d(playerTransform.getPosition());
-        double dx = p.x - spawnPosition.x;
-        double dy = p.y - spawnPosition.y;
-        double dz = p.z - spawnPosition.z;
-        double maxDistSq = maxDistance * maxDistance;
-        return (dx * dx + dy * dy + dz * dz) <= maxDistSq;
-    }
-
-    private Vector3d resolveSpawnPosition(Player player, ItemFeatureConfig config) {
-        if (player == null) {
-            return null;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return null;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        Ref<EntityStore> playerRef = player.getReference();
-        if (playerRef == null || !playerRef.isValid()) {
-            return null;
-        }
-        double maxDistance = config != null ? config.getSpawnMaxDistance() : 0;
-        double spawnDistance = maxDistance > 0 ? maxDistance : SPAWN_FORWARD_DISTANCE;
-        double rayDistance = spawnDistance + RAYCAST_DISTANCE_EPSILON;
-
-        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform == null) {
-            return null;
-        }
-        Vector3f rotation = new Vector3f(transform.getRotation());
-        HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
-        if (headRotation != null) {
-            rotation = new Vector3f(headRotation.getRotation());
-        }
-
-        Vector3f forward = new Vector3f(Vector3f.FORWARD);
-        forward.rotateY(rotation.getYaw());
-        forward.rotateX(rotation.getPitch());
-        forward.normalize();
-
-        Vector3d targetLocation = TargetUtil.getTargetLocation(
-            playerRef,
-            blockId -> isBlockingSpawnBlock(blockId),
-            rayDistance,
-            store
-        );
-        if (targetLocation != null) {
-            // Nudge the hit position back along the ray so we reliably resolve the hit block,
-            // then spawn centered on top of that block to avoid inside-block spawns.
-            double nudge = 0.01;
-            Vector3d adjusted = new Vector3d(
-                targetLocation.x - forward.x * nudge,
-                targetLocation.y - forward.y * nudge,
-                targetLocation.z - forward.z * nudge
-            );
-            int blockX = (int) Math.floor(adjusted.x);
-            int blockY = (int) Math.floor(adjusted.y);
-            int blockZ = (int) Math.floor(adjusted.z);
-            double clampedX = Math.min(Math.max(targetLocation.x, blockX + 0.001), blockX + 0.999);
-            double clampedZ = Math.min(Math.max(targetLocation.z, blockZ + 0.001), blockZ + 0.999);
-            double targetY = targetLocation.y;
-            double spawnY;
-            double snapThreshold = 0.02;
-            if (Math.abs(targetY - blockY) <= snapThreshold || Math.abs(targetY - (blockY + 1.0)) <= snapThreshold) {
-                spawnY = targetY + SPAWN_SURFACE_OFFSET_Y;
-            } else {
-                spawnY = blockY + 1.0 + SPAWN_SURFACE_OFFSET_Y;
-            }
-            Vector3d spawnPos = new Vector3d(
-                clampedX,
-                spawnY,
-                clampedZ
-            );
-            logSpawnDebug("hit", targetLocation, adjusted, spawnPos, forward, rayDistance, maxDistance, blockX, blockY, blockZ);
-            return spawnPos;
-        }
-
-        Vector3d spawnPos = new Vector3d(transform.getPosition());
-        spawnPos.x += forward.x * spawnDistance;
-        spawnPos.y += forward.y * spawnDistance + SPAWN_OFFSET_Y;
-        spawnPos.z += forward.z * spawnDistance;
-        double minY = transform.getPosition().y + SPAWN_SURFACE_OFFSET_Y;
-        if (spawnPos.y < minY) {
-            spawnPos.y = minY;
-            logSpawnDebug("fallback-clamped", null, null, spawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
-            return spawnPos;
-        }
-        logSpawnDebug("fallback", null, null, spawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
-        return spawnPos;
-    }
-
-    private boolean isBlockingSpawnBlock(int blockId) {
-        if (blockId == 0) {
-            return false;
-        }
-        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
-        if (blockType == null || blockType == BlockType.UNKNOWN) {
-            return false;
-        }
-        return WorldUtil.isSolidOnlyBlock(blockType, 0);
-    }
-
-
-
-
-
-    private void logSpawnDebug(
-            String stage,
-            Vector3d targetLocation,
-            Vector3d adjusted,
-            Vector3d spawnPos,
-            Vector3f forward,
-            double rayDistance,
-            double maxDistance,
-            int blockX,
-            int blockY,
-            int blockZ
-    ) {
-        Tamework instance = Tamework.getInstance();
-        if (instance == null || !instance.isDebugSpawnerEnabled()) {
-            return;
-        }
-        StringBuilder message = new StringBuilder(200);
-        message.append("Spawner spawn debug [").append(stage).append("] ");
-        message.append("ray=").append(rayDistance).append(" max=").append(maxDistance).append(" ");
-        if (forward != null) {
-            message.append("forward=").append(formatVector(forward)).append(" ");
-        }
-        if (targetLocation != null) {
-            message.append("target=").append(formatVector(targetLocation)).append(" ");
-        }
-        if (adjusted != null) {
-            message.append("adjusted=").append(formatVector(adjusted)).append(" ");
-        }
-        if (blockX != -1 || blockY != -1 || blockZ != -1) {
-            message.append("block=(").append(blockX).append(",").append(blockY).append(",").append(blockZ).append(") ");
-        }
-        if (spawnPos != null) {
-            message.append("spawn=").append(formatVector(spawnPos));
-        }
-        logger.at(Level.INFO).log(message.toString());
-    }
-
-    private static String formatVector(Vector3d vector) {
-        if (vector == null) {
-            return "(null)";
-        }
-        return String.format(Locale.US, "(%.3f, %.3f, %.3f)", vector.x, vector.y, vector.z);
-    }
-
-    private static String formatVector(Vector3f vector) {
-        if (vector == null) {
-            return "(null)";
-        }
-        return String.format(Locale.US, "(%.3f, %.3f, %.3f)", vector.x, vector.y, vector.z);
-    }
-
-    private Vector3f resolveSpawnRotation(Store<EntityStore> store,
-                                         Ref<EntityStore> playerRef,
-                                         Vector3d spawnPosition) {
-        if (store == null || playerRef == null || !playerRef.isValid()) {
-            return new Vector3f();
-        }
-        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform == null) {
-            return new Vector3f();
-        }
-        Vector3d playerPos = new Vector3d(transform.getPosition());
-        if (spawnPosition != null) {
-            Vector3d relative = new Vector3d(
-                playerPos.x - spawnPosition.x,
-                0.0,
-                playerPos.z - spawnPosition.z
-            );
-            if (relative.squaredLength() > 0.0001) {
-                return Vector3f.lookAt(relative);
-            }
-        }
-        Vector3f rotation = new Vector3f(transform.getRotation());
-        HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
-        if (headRotation != null) {
-            rotation = new Vector3f(headRotation.getRotation());
-        }
-        return rotation;
     }
 
     private void spawnSpawnParticles(World world, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
