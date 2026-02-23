@@ -20,18 +20,12 @@ import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
-import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
-import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
-import com.hypixel.hytale.server.core.universe.world.SoundUtil;
-import com.hypixel.hytale.protocol.SoundCategory;
-import com.hypixel.hytale.math.vector.Vector3d;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -44,11 +38,13 @@ public final class NamingFeatureHandler {
 
     private final NameItemRegistry registry;
     private final TranslationRegistry translationRegistry;
+    private final NamingEffectService effectService;
     private final ConcurrentHashMap<UUID, PendingNameRequest> pendingByPlayer = new ConcurrentHashMap<>();
 
     public NamingFeatureHandler(NameItemRegistry registry, TranslationRegistry translationRegistry) {
         this.registry = registry;
         this.translationRegistry = translationRegistry;
+        this.effectService = new NamingEffectService();
     }
 
     // Begins a naming request for the player. Runs on the store thread.
@@ -325,7 +321,12 @@ public final class NamingFeatureHandler {
         }
 
         applyItemChanges(player, rules);
-        spawnSuccessEffects(player.getWorld(), request.npcRef, rules);
+        effectService.playSuccessEffects(
+                player.getWorld(),
+                request.npcRef,
+                rules.getParticleSystem(),
+                rules.getSoundEvent()
+        );
         sendMessage(player, "NPC named " + finalName + ".");
         pendingByPlayer.remove(playerUuid);
     }
@@ -554,33 +555,6 @@ public final class NamingFeatureHandler {
         if (rules.getCooldownMs() > 0) {
             ItemStack updated = applyCooldown(after, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs());
             hotbar.setItemStackForSlot((short) slot, updated);
-        }
-    }
-
-    private void spawnSuccessEffects(World world, Ref<EntityStore> targetRef, NamingRules rules) {
-        if (world == null || targetRef == null || !targetRef.isValid() || rules == null) {
-            return;
-        }
-        String particleSystem = rules.getParticleSystem();
-        String soundEvent = rules.getSoundEvent();
-        if ((particleSystem == null || particleSystem.isBlank())
-                && (soundEvent == null || soundEvent.isBlank())) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
-        if (transform == null) {
-            return;
-        }
-        Vector3d position = new Vector3d(transform.getPosition());
-        if (particleSystem != null && !particleSystem.isBlank()) {
-            ParticleUtil.spawnParticleEffect(particleSystem, position, store);
-        }
-        if (soundEvent != null && !soundEvent.isBlank()) {
-            int soundEventIndex = SoundEvent.getAssetMap().getIndex(soundEvent);
-            if (soundEventIndex > 0) {
-                SoundUtil.playSoundEvent3d(soundEventIndex, SoundCategory.SFX, position, store);
-            }
         }
     }
 
