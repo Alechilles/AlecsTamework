@@ -46,6 +46,13 @@
       ],
       "Description": "How long to remain in settle mode before resuming wander."
     },
+    "SettleEntryDelayRange": {
+      "Value": [
+        0.8,
+        0.8
+      ],
+      "Description": "How long to wait after applying settle posture before ambient settle logic begins."
+    },
     "SettleExitAnimation": {
       "Value": "",
       "Description": "Optional animation to play when leaving settle mode before movement resumes (for example StandUp)."
@@ -221,11 +228,68 @@
                 "Actions": [
                   {
                     "Type": "State",
-                    "State": ".Settle"
+                    "State": ".SettleEnter"
                   }
                 ]
               }
             ]
+          }
+        ]
+      },
+      {
+        "$Comment": "Stop movement while transitioning into settle posture.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".SettleEnter"
+        },
+        "BodyMotion": {
+          "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "Initialize settle posture before ambient settle behavior begins.",
+        "Enabled": {
+          "Compute": "!isEmpty(BasePostureAnimation)"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".SettleEnter"
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "BasePostureAnimation"
+            }
+          },
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "SettleEntryDelayRange"
+            }
+          },
+          {
+            "Type": "State",
+            "State": ".Settle"
+          }
+        ]
+      },
+      {
+        "$Comment": "If no settle posture is configured, transition directly to settle ambient logic.",
+        "Enabled": {
+          "Compute": "isEmpty(BasePostureAnimation)"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".SettleEnter"
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Settle"
           }
         ]
       },

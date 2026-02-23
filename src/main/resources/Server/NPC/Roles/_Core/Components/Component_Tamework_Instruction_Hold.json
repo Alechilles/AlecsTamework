@@ -150,6 +150,26 @@
         ]
       },
       {
+        "$Comment": "Apply hold posture on Hold entry.",
+        "Enabled": {
+          "Compute": "!isEmpty(HoldBaseAnimation)"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "HoldBaseAnimation"
+            }
+          }
+        ]
+      },
+      {
         "$Comment": "Run shared ambient hold behavior.",
         "Reference": "Component_Tamework_Instruction_Ambient_Idle",
         "Modify": {

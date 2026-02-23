@@ -18,6 +18,20 @@
       ],
       "Description": "How long to stay in the base posture when the still branch is selected."
     },
+    "AmbientCycleDurationRange": {
+      "Value": [
+        4,
+        8
+      ],
+      "Description": "How long to run each ambient random selection cycle before rerolling."
+    },
+    "FlavorCooldownRange": {
+      "Value": [
+        3,
+        6
+      ],
+      "Description": "Minimum delay between flavor animations while in ambient idle."
+    },
     "DayFlavorAnimation": {
       "Value": "",
       "Description": "A flavor animation to play during the day. Ignored if null or empty."
@@ -94,32 +108,12 @@
     }
   },
   "Content": {
-    "$Comment": "Caller should initialize Ambient_Entry_Sleep_Gate once on state entry.",
+    "$Comment": "Caller should initialize Ambient_Entry_Sleep_Gate and base posture once on state entry.",
     "Continue": true,
     "Sensor": {
       "Type": "Any"
     },
     "Instructions": [
-      {
-        "$Comment": "Apply base posture when entering this ambient idle context.",
-        "Enabled": {
-          "Compute": "!isEmpty(BasePostureAnimation)"
-        },
-        "Continue": true,
-        "Sensor": {
-          "Type": "Any",
-          "Once": true
-        },
-        "Actions": [
-          {
-            "Type": "PlayAnimation",
-            "Slot": "Status",
-            "Animation": {
-              "Compute": "BasePostureAnimation"
-            }
-          }
-        ]
-      },
       {
         "Continue": true,
         "BodyMotion": {
@@ -216,10 +210,9 @@
       {
         "$Comment": "Execute daytime ambient behaviors.",
         "Type": "Random",
-        "ExecuteFor": [
-          30,
-          60
-        ],
+        "ExecuteFor": {
+          "Compute": "AmbientCycleDurationRange"
+        },
         "Sensor": {
           "Type": "Time",
           "Period": {
@@ -252,6 +245,11 @@
               "Compute": "!isEmpty(DayFlavorAnimation) && !isEmpty(DayFlavorAnimationAfter)"
             },
             "Weight": 3,
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "Ambient_Flavor_Cooldown",
+              "State": "Stopped"
+            },
             "Instructions": [
               {
                 "ActionsBlocking": true,
@@ -289,6 +287,20 @@
                     "Animation": {
                       "Compute": "BasePostureAnimation"
                     }
+                  },
+                  {
+                    "Type": "TimerStart",
+                    "Name": "Ambient_Flavor_Cooldown",
+                    "StartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    },
+                    "RestartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    }
+                  },
+                  {
+                    "Type": "TimerRestart",
+                    "Name": "Ambient_Flavor_Cooldown"
                   }
                 ]
               }
@@ -300,6 +312,11 @@
               "Compute": "!isEmpty(DayFlavorAnimation) && isEmpty(DayFlavorAnimationAfter)"
             },
             "Weight": 3,
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "Ambient_Flavor_Cooldown",
+              "State": "Stopped"
+            },
             "Instructions": [
               {
                 "ActionsBlocking": true,
@@ -323,6 +340,20 @@
                     "Animation": {
                       "Compute": "BasePostureAnimation"
                     }
+                  },
+                  {
+                    "Type": "TimerStart",
+                    "Name": "Ambient_Flavor_Cooldown",
+                    "StartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    },
+                    "RestartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    }
+                  },
+                  {
+                    "Type": "TimerRestart",
+                    "Name": "Ambient_Flavor_Cooldown"
                   }
                 ]
               }
@@ -417,10 +448,9 @@
           "Compute": "!AlwaysSleepAtNight"
         },
         "Type": "Random",
-        "ExecuteFor": [
-          15,
-          20
-        ],
+        "ExecuteFor": {
+          "Compute": "AmbientCycleDurationRange"
+        },
         "Sensor": {
           "Type": "Not",
           "Sensor": {
@@ -456,6 +486,11 @@
               "Compute": "!isEmpty(NightFlavorAnimation) && !isEmpty(NightFlavorAnimationAfter)"
             },
             "Weight": 3,
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "Ambient_Flavor_Cooldown",
+              "State": "Stopped"
+            },
             "Instructions": [
               {
                 "ActionsBlocking": true,
@@ -493,6 +528,20 @@
                     "Animation": {
                       "Compute": "BasePostureAnimation"
                     }
+                  },
+                  {
+                    "Type": "TimerStart",
+                    "Name": "Ambient_Flavor_Cooldown",
+                    "StartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    },
+                    "RestartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    }
+                  },
+                  {
+                    "Type": "TimerRestart",
+                    "Name": "Ambient_Flavor_Cooldown"
                   }
                 ]
               }
@@ -504,6 +553,11 @@
               "Compute": "!isEmpty(NightFlavorAnimation) && isEmpty(NightFlavorAnimationAfter)"
             },
             "Weight": 3,
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "Ambient_Flavor_Cooldown",
+              "State": "Stopped"
+            },
             "Instructions": [
               {
                 "ActionsBlocking": true,
@@ -527,6 +581,20 @@
                     "Animation": {
                       "Compute": "BasePostureAnimation"
                     }
+                  },
+                  {
+                    "Type": "TimerStart",
+                    "Name": "Ambient_Flavor_Cooldown",
+                    "StartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    },
+                    "RestartValueRange": {
+                      "Compute": "FlavorCooldownRange"
+                    }
+                  },
+                  {
+                    "Type": "TimerRestart",
+                    "Name": "Ambient_Flavor_Cooldown"
                   }
                 ]
               }
