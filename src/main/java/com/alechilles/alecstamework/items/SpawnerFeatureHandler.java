@@ -4,13 +4,10 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
-import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
-import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -41,8 +38,6 @@ import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -69,6 +64,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerCaptureMetadataService captureMetadataService;
     private final SpawnerRolePolicyService rolePolicyService;
     private final SpawnerItemStackMetadataService itemStackMetadataService;
+    private final SpawnerNpcStateService npcStateService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -81,6 +77,7 @@ public final class SpawnerFeatureHandler {
         this.captureMetadataService = new SpawnerCaptureMetadataService(logger, registry);
         this.rolePolicyService = new SpawnerRolePolicyService(logger);
         this.itemStackMetadataService = new SpawnerItemStackMetadataService(registry, captureMetadataService);
+        this.npcStateService = new SpawnerNpcStateService();
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -345,9 +342,9 @@ public final class SpawnerFeatureHandler {
         Ref<EntityStore> npcRef = spawned.first();
         NPCEntity npc = spawned.second();
         applyAttachments(itemStack, npcRef, npc, store);
-        applyOwner(config, npcRef, npc, playerRef, ownerUuid, world);
-        applyTamed(npcRef, tamed, world);
-        applyCapturedName(itemStack, npcRef, store);
+        npcStateService.applyOwner(config, npcRef, npc, playerRef, ownerUuid, world);
+        npcStateService.applyTamed(npcRef, tamed, world);
+        npcStateService.applyCapturedName(itemStack, npcRef, store);
         linkedNpcSyncService.restoreCommandLinksFromCapturedSnapshot(npcRef, store, ownerUuid, capturedSnapshot);
         UUID spawnedNpcUuid = npc.getUuid();
         if (capturedNpcUuid != null && spawnedNpcUuid != null) {
@@ -475,7 +472,7 @@ public final class SpawnerFeatureHandler {
 
         World world = player.getWorld();
         UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
-        UUID existingOwner = resolveOwnerFromComponent(targetRef, world);
+        UUID existingOwner = npcStateService.resolveOwnerFromComponent(targetRef, world);
         UUID ownerToStore = null;
         if (!config.isCaptureClearsOwner()) {
             ownerToStore = existingOwner != null ? existingOwner : player.getUuid();
@@ -511,7 +508,7 @@ public final class SpawnerFeatureHandler {
         if (attachmentsJson != null) {
             updated = updated.withMetadata(TameworkMetadataKeys.ATTACHMENTS, Codec.STRING, attachmentsJson);
         }
-        boolean tamed = resolveTamedState(targetRef, world);
+        boolean tamed = npcStateService.resolveTamedState(targetRef, world);
         if (tamed) {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
@@ -563,16 +560,16 @@ public final class SpawnerFeatureHandler {
         if (!rolePolicyService.isRoleAllowed(roleId, config)) {
             return false;
         }
-        if (config.isCaptureRequireTamed() && !resolveTamedState(targetRef, world)) {
+        if (config.isCaptureRequireTamed() && !npcStateService.resolveTamedState(targetRef, world)) {
             String npcName = resolveNpcDisplayName(npc);
             OwnerMessageUtil.sendUntamed(player, npcName);
             return false;
         }
-        UUID ownerUuid = resolveOwnerFromComponent(targetRef, world);
+        UUID ownerUuid = npcStateService.resolveOwnerFromComponent(targetRef, world);
         if (!ownershipPolicyService.isCaptureAllowed(player.getUuid(), ownerUuid, config)) {
             if (ownerUuid != null) {
                 String npcName = resolveNpcDisplayName(npc);
-                String ownerName = resolveOwnerNameFromComponent(targetRef, world);
+                String ownerName = npcStateService.resolveOwnerNameFromComponent(targetRef, world);
                 OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "capture");
             }
             return false;
@@ -673,105 +670,6 @@ public final class SpawnerFeatureHandler {
         return until > System.currentTimeMillis();
     }
 
-    private void applyOwner(ItemFeatureConfig config,
-                            Ref<EntityStore> npcRef,
-                            NPCEntity npc,
-                            Ref<EntityStore> playerRef,
-                            UUID ownerUuid,
-                            World world) {
-        if (npc == null) {
-            return;
-        }
-        if (world != null && npcRef != null && npcRef.isValid()) {
-            Store<EntityStore> store = world.getEntityStore().getStore();
-            ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-            if (type != null) {
-                String ownerName = null;
-                if (ownerUuid != null) {
-                    Player ownerPlayer = null;
-                    if (playerRef != null) {
-                        ownerPlayer = store.getComponent(playerRef, Player.getComponentType());
-                    }
-                    if (ownerPlayer != null && ownerUuid.equals(ownerPlayer.getUuid())) {
-                        ownerName = OwnerNameUtil.resolve(ownerPlayer);
-                    } else {
-                        Ref<EntityStore> ownerRef = world.getEntityRef(ownerUuid);
-                        if (ownerRef != null) {
-                            Player resolvedOwner = store.getComponent(ownerRef, Player.getComponentType());
-                            if (resolvedOwner != null) {
-                                ownerName = OwnerNameUtil.resolve(resolvedOwner);
-                            }
-                        }
-                    }
-                }
-                store.putComponent(npcRef, type, new TameworkOwnerComponent(ownerUuid, ownerName));
-            }
-        }
-        if (!config.isSpawnAssignsOwner()) {
-            return;
-        }
-        Role role = npc.getRole();
-        if (role == null) {
-            return;
-        }
-        Ref<EntityStore> ownerRef = playerRef;
-        if (ownerUuid != null && world != null) {
-            Ref<EntityStore> resolved = world.getEntityRef(ownerUuid);
-            if (resolved != null) {
-                ownerRef = resolved;
-            }
-        }
-        if (ownerRef != null) {
-            role.setMarkedTarget(MASTER_TARGET_SLOT, ownerRef);
-        }
-    }
-
-    private void applyTamed(Ref<EntityStore> npcRef, boolean tamed, World world) {
-        if (npcRef == null || !npcRef.isValid() || world == null) {
-            return;
-        }
-        ComponentType<EntityStore, TameworkTamedComponent> type = TameworkTamedComponent.getComponentType();
-        if (type == null) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        store.putComponent(npcRef, type, new TameworkTamedComponent(tamed));
-    }
-
-    private void applyCapturedName(ItemStack itemStack, Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (itemStack == null || npcRef == null || store == null || !npcRef.isValid()) {
-            return;
-        }
-        String name = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME, Codec.STRING);
-        if (name == null || name.isBlank()) {
-            return;
-        }
-        UUID ownerId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME_OWNER_UUID, Codec.UUID_STRING);
-        Long updatedMs = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME_UPDATED_MS, Codec.LONG);
-        String sourceRaw = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME_SOURCE, Codec.STRING);
-        TameworkNpcNameComponent.NameSource source = parseNameSource(sourceRaw);
-        if (source == null) {
-            source = TameworkNpcNameComponent.NameSource.Player;
-        }
-        long resolvedUpdatedMs = (updatedMs != null && updatedMs > 0) ? updatedMs : System.currentTimeMillis();
-        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
-        if (nameType != null) {
-            store.putComponent(npcRef, nameType, new TameworkNpcNameComponent(name, ownerId, resolvedUpdatedMs, source));
-        }
-        EntitySupport.setDisplayName(npcRef, name, store);
-    }
-
-    private TameworkNpcNameComponent.NameSource parseNameSource(String sourceRaw) {
-        if (sourceRaw == null || sourceRaw.isBlank()) {
-            return null;
-        }
-        try {
-            return TameworkNpcNameComponent.NameSource.valueOf(sourceRaw);
-        } catch (IllegalArgumentException ex) {
-            return null;
-        }
-    }
-
     private void applyAttachments(ItemStack itemStack,
                                   Ref<EntityStore> npcRef,
                                   NPCEntity npc,
@@ -851,40 +749,6 @@ public final class SpawnerFeatureHandler {
         }
     }
 
-
-    private boolean resolveTamedState(Ref<EntityStore> targetRef, World world) {
-        if (targetRef == null || world == null || !targetRef.isValid()) {
-            return false;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        return TamedStateResolver.isTamed(targetRef, store);
-    }
-
-    private UUID resolveOwnerFromComponent(Ref<EntityStore> targetRef, World world) {
-        if (targetRef == null || world == null || !targetRef.isValid()) {
-            return null;
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-        if (type == null) {
-            return null;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        TameworkOwnerComponent component = store.getComponent(targetRef, type);
-        return component != null ? component.getOwnerId() : null;
-    }
-
-    private String resolveOwnerNameFromComponent(Ref<EntityStore> targetRef, World world) {
-        if (targetRef == null || world == null || !targetRef.isValid()) {
-            return null;
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-        if (type == null) {
-            return null;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        TameworkOwnerComponent component = store.getComponent(targetRef, type);
-        return component != null ? component.getOwnerName() : null;
-    }
 
     private String resolveNpcDisplayName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
         if (npcRef != null && npcRef.isValid() && store != null) {
