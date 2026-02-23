@@ -63,49 +63,12 @@ public final class SpawnerFeatureHandler {
     private static final Gson GSON = new Gson();
     private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
 
-    private static final class CapturedName {
-        private final String name;
-        private final UUID ownerId;
-        private final long updatedMs;
-        private final TameworkNpcNameComponent.NameSource source;
-
-        private CapturedName(String name, UUID ownerId, long updatedMs, TameworkNpcNameComponent.NameSource source) {
-            this.name = name;
-            this.ownerId = ownerId;
-            this.updatedMs = updatedMs;
-            this.source = source;
-        }
-    }
-
-    private static final class CaptureInfo {
-        private final String attachmentsJson;
-        private final Integer roleIndex;
-        private final String npcNameKey;
-        private final String iconPath;
-        private final CapturedName capturedName;
-        private final String tooltipDisplayName;
-
-        private CaptureInfo(String attachmentsJson,
-                            Integer roleIndex,
-                            String npcNameKey,
-                            String iconPath,
-                            CapturedName capturedName,
-                            String tooltipDisplayName) {
-            this.attachmentsJson = attachmentsJson;
-            this.roleIndex = roleIndex;
-            this.npcNameKey = npcNameKey;
-            this.iconPath = iconPath;
-            this.capturedName = capturedName;
-            this.tooltipDisplayName = tooltipDisplayName;
-        }
-    }
-
-
     private final HytaleLogger logger;
     private final ItemFeatureRegistry registry;
     private final SpawnerLinkedNpcSyncService linkedNpcSyncService;
     private final SpawnerOwnershipPolicyService ownershipPolicyService;
     private final SpawnerSpawnPositionService spawnPositionService;
+    private final SpawnerCaptureMetadataService captureMetadataService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -115,6 +78,7 @@ public final class SpawnerFeatureHandler {
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
         this.ownershipPolicyService = new SpawnerOwnershipPolicyService();
         this.spawnPositionService = new SpawnerSpawnPositionService(logger);
+        this.captureMetadataService = new SpawnerCaptureMetadataService(logger, registry);
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -501,8 +465,12 @@ public final class SpawnerFeatureHandler {
         if (!canCapture(player, targetRef, config, itemStack)) {
             return false;
         }
-        CaptureInfo captureInfo = buildCaptureInfo(player, targetRef);
-        String attachmentsJson = captureInfo.attachmentsJson;
+        SpawnerCaptureMetadataService.CaptureInfo captureInfo = captureMetadataService.buildCaptureInfo(
+                player,
+                targetRef,
+                this::resolveNpcDisplayName
+        );
+        String attachmentsJson = captureInfo.attachmentsJson();
         if (attachmentsJson != null && !attachmentsJson.isBlank()) {
             logger.at(Level.FINE).log(
                     "Spawner capture attachments: item=" + itemStack.getItemId() + " attachments=" + attachmentsJson
@@ -513,7 +481,12 @@ public final class SpawnerFeatureHandler {
                         + " modelAssetId=" + resolveModelAssetId(player, targetRef)
                         + " attachmentsPresent=" + (attachmentsJson != null && !attachmentsJson.isBlank())
         );
-        String fullItemIcon = resolveFullItemIcon(config, attachmentsJson, itemStack.getItemId(), captureInfo.npcNameKey);
+        String fullItemIcon = captureMetadataService.resolveFullItemIcon(
+                config,
+                attachmentsJson,
+                itemStack.getItemId(),
+                captureInfo.npcNameKey()
+        );
 
         World world = player.getWorld();
         UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
@@ -522,10 +495,10 @@ public final class SpawnerFeatureHandler {
         if (!config.isCaptureClearsOwner()) {
             ownerToStore = existingOwner != null ? existingOwner : player.getUuid();
         }
-        String snapshotDisplayName = (captureInfo.capturedName != null
-                && captureInfo.capturedName.name != null
-                && !captureInfo.capturedName.name.isBlank())
-                ? captureInfo.capturedName.name
+        String snapshotDisplayName = (captureInfo.capturedName() != null
+                && captureInfo.capturedName().name() != null
+                && !captureInfo.capturedName().name().isBlank())
+                ? captureInfo.capturedName().name()
                 : null;
         String snapshotRoleId = null;
         if (world != null) {
@@ -558,13 +531,13 @@ public final class SpawnerFeatureHandler {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
         updated = applyOwnerMetadata(updated, ownerToStore);
-        if (captureInfo.npcNameKey != null && !captureInfo.npcNameKey.isBlank()) {
-            updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureInfo.npcNameKey);
+        if (captureInfo.npcNameKey() != null && !captureInfo.npcNameKey().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureInfo.npcNameKey());
         } else {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
         }
-        updated = applyCapturedMetadata(updated, captureInfo, fullItemIcon);
-        updated = applyCapturedNameMetadata(updated, captureInfo);
+        updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
+        updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
         updated = applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
 
         if (!updateHeldItem(player, updated)) {
@@ -942,74 +915,6 @@ public final class SpawnerFeatureHandler {
         }
     }
 
-
-
-    // Collect attachments, role/name keys, and icon overrides from the target NPC.
-    private CaptureInfo buildCaptureInfo(Player player, Ref<EntityStore> targetRef) {
-        if (player == null || targetRef == null || !targetRef.isValid()) {
-            return new CaptureInfo(null, null, null, null, null, null);
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return new CaptureInfo(null, null, null, null, null, null);
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-
-        String attachmentsJson = null;
-        String iconPath = null;
-        ModelComponent modelComponent = store.getComponent(targetRef, ModelComponent.getComponentType());
-        if (modelComponent != null) {
-            Model model = modelComponent.getModel();
-            if (model != null) {
-                Map<String, String> attachments = model.getRandomAttachmentIds();
-                if (attachments != null) {
-                    Map<String, String> snapshot = new HashMap<>(attachments);
-                    attachmentsJson = GSON.toJson(snapshot, ATTACHMENT_MAP_TYPE);
-                }
-                ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(model.getModelAssetId());
-                if (modelAsset != null) {
-                    iconPath = modelAsset.getIcon();
-                }
-            }
-        }
-
-        Integer roleIndex = null;
-        String npcNameKey = null;
-        String tooltipDisplayName = null;
-        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
-        if (npc != null) {
-            int resolvedRoleIndex = npc.getRoleIndex();
-            if (resolvedRoleIndex >= 0) {
-                roleIndex = resolvedRoleIndex;
-                String nameKey = NPCPlugin.get().getName(resolvedRoleIndex);
-                if (nameKey != null && !nameKey.isBlank()) {
-                    npcNameKey = nameKey;
-                }
-            }
-            tooltipDisplayName = resolveNpcDisplayName(targetRef, store, npc);
-        }
-
-        CapturedName capturedName = null;
-        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
-        if (nameType != null) {
-            TameworkNpcNameComponent nameComponent = store.getComponent(targetRef, nameType);
-            if (nameComponent != null) {
-                String name = nameComponent.getName();
-                if (name != null && !name.isBlank()) {
-                    capturedName = new CapturedName(
-                            name,
-                            nameComponent.getOwnerId(),
-                            nameComponent.getLastUpdatedMs(),
-                            nameComponent.getSource()
-                    );
-                }
-            }
-        }
-
-        return new CaptureInfo(attachmentsJson, roleIndex, npcNameKey, iconPath, capturedName, tooltipDisplayName);
-    }
-
-
     private String resolveModelAssetId(Player player, Ref<EntityStore> targetRef) {
         if (player == null || targetRef == null || !targetRef.isValid()) {
             return "<none>";
@@ -1025,189 +930,6 @@ public final class SpawnerFeatureHandler {
         }
         return modelComponent.getModel().getModelAssetId();
     }
-
-    // Writes CapturedNPCMetadata (role/name/icon) onto the spawner item.
-    // Persist capture info (role, icon, attachments, optional name) onto the item.
-    private ItemStack applyCapturedMetadata(ItemStack updated, CaptureInfo captureInfo, String fullItemIcon) {
-        if (updated == null || captureInfo == null) {
-            return updated;
-        }
-        CapturedNPCMetadata meta = new CapturedNPCMetadata();
-        boolean wrote = false;
-
-        Integer roleIndex = captureInfo.roleIndex;
-        if (roleIndex != null && roleIndex >= 0) {
-            wrote |= CapturedNpcMetadataCompat.invokeIntSetter(meta, "setRoleIndex", roleIndex);
-        }
-        String npcNameKey = captureInfo.npcNameKey;
-        String tooltipName = captureInfo.tooltipDisplayName;
-        if (tooltipName == null || tooltipName.isBlank()) {
-            tooltipName = npcNameKey;
-        }
-        if (tooltipName != null && !tooltipName.isBlank()) {
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setNpcNameKey", tooltipName);
-        }
-        if (npcNameKey != null && !npcNameKey.isBlank()) {
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleNameKey", npcNameKey);
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleId", npcNameKey);
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleKey", npcNameKey);
-        }
-        String icon = (fullItemIcon != null && !fullItemIcon.isBlank()) ? fullItemIcon : captureInfo.iconPath;
-        if (icon != null && !icon.isBlank()) {
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setIconPath", icon);
-        }
-        if (fullItemIcon != null && !fullItemIcon.isBlank()) {
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setFullItemIcon", fullItemIcon);
-        }
-        if (!wrote) {
-            return updated;
-        }
-        return updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, meta);
-    }
-
-    private ItemStack applyCapturedNameMetadata(ItemStack updated, CaptureInfo captureInfo) {
-        if (updated == null || captureInfo == null) {
-            return updated;
-        }
-        CapturedName capturedName = captureInfo.capturedName;
-        if (capturedName == null || capturedName.name == null || capturedName.name.isBlank()) {
-            return clearNameMetadata(updated);
-        }
-        ItemStack result = updated.withMetadata(TameworkMetadataKeys.NPC_NAME, Codec.STRING, capturedName.name);
-        if (capturedName.ownerId != null) {
-            result = result.withMetadata(
-                    TameworkMetadataKeys.NPC_NAME_OWNER_UUID,
-                    Codec.UUID_STRING,
-                    capturedName.ownerId
-            );
-        } else {
-            result = clearMetadataKey(result, TameworkMetadataKeys.NPC_NAME_OWNER_UUID);
-        }
-        long updatedMs = capturedName.updatedMs > 0 ? capturedName.updatedMs : System.currentTimeMillis();
-        result = result.withMetadata(TameworkMetadataKeys.NPC_NAME_UPDATED_MS, Codec.LONG, updatedMs);
-        if (capturedName.source != null) {
-            result = result.withMetadata(
-                    TameworkMetadataKeys.NPC_NAME_SOURCE,
-                    Codec.STRING,
-                    capturedName.source.name()
-            );
-        } else {
-            result = clearMetadataKey(result, TameworkMetadataKeys.NPC_NAME_SOURCE);
-        }
-        return result;
-    }
-
-    private ItemStack clearNameMetadata(ItemStack updated) {
-        ItemStack cleared = clearMetadataKey(updated, TameworkMetadataKeys.NPC_NAME);
-        cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_OWNER_UUID);
-        cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_UPDATED_MS);
-        cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_SOURCE);
-        return cleared;
-    }
-
-    private ItemFeatureConfig resolveIconConfig(ItemFeatureConfig config) {
-        if (config == null) {
-            return null;
-        }
-        String filledId = config.getSpawnerFilledItemId();
-        if (filledId == null || filledId.isBlank() || registry == null) {
-            return config;
-        }
-        ItemFeatureConfig filledConfig = registry.get(filledId);
-        return filledConfig != null ? filledConfig : config;
-    }
-
-    // Resolve icon overrides based on captured attachments (falls back to default icon).
-    // Resolve a per-attachment icon override or fall back to default.
-    private String resolveFullItemIcon(ItemFeatureConfig config, String attachmentsJson, String itemId, String roleId) {
-        ItemFeatureConfig resolved = resolveIconConfig(config);
-        if (resolved == null) {
-            return null;
-        }
-        String defaultIcon = resolved.getSpawnerIconDefault();
-        Map<String, List<ItemFeatureConfig.SpawnerIconOverride>> overridesByRole = resolved.getSpawnerIconOverridesByRole();
-        List<ItemFeatureConfig.SpawnerIconOverride> roleOverrides = null;
-        if (roleId != null && overridesByRole != null && !overridesByRole.isEmpty()) {
-            roleOverrides = overridesByRole.get(roleId);
-        }
-        List<ItemFeatureConfig.SpawnerIconOverride> overrides = resolved.getSpawnerIconOverrides();
-        boolean hasRoleOverrides = roleOverrides != null && !roleOverrides.isEmpty();
-        boolean hasGlobalOverrides = overrides != null && !overrides.isEmpty();
-        if (!hasRoleOverrides && !hasGlobalOverrides) {
-            return defaultIcon;
-        }
-        if (attachmentsJson == null || attachmentsJson.isBlank()) {
-            return defaultIcon;
-        }
-
-        Map<String, String> attachments;
-        try {
-            attachments = GSON.fromJson(attachmentsJson, ATTACHMENT_MAP_TYPE);
-        } catch (Exception ex) {
-            logger.at(Level.WARNING).withCause(ex).log("Spawner icon override: failed to parse attachments.");
-            return defaultIcon;
-        }
-        if (attachments == null) {
-            return defaultIcon;
-        }
-
-        if (hasRoleOverrides) {
-            for (ItemFeatureConfig.SpawnerIconOverride override : roleOverrides) {
-                if (override == null) {
-                    continue;
-                }
-                if (matchesAttachments(override.getAttachments(), attachments)) {
-                    String icon = override.getIcon();
-                    logger.at(Level.FINE).log(
-                            "Spawner icon override (role): matched item=" + itemId
-                                    + " role=" + roleId
-                                    + " icon=" + icon
-                                    + " attachments=" + attachmentsJson
-                    );
-                    return icon;
-                }
-            }
-        }
-
-        if (hasGlobalOverrides) {
-            for (ItemFeatureConfig.SpawnerIconOverride override : overrides) {
-                if (override == null) {
-                    continue;
-                }
-                if (matchesAttachments(override.getAttachments(), attachments)) {
-                    String icon = override.getIcon();
-                    logger.at(Level.FINE).log(
-                            "Spawner icon override: matched item=" + itemId + " icon=" + icon + " attachments=" + attachmentsJson
-                    );
-                    return icon;
-                }
-            }
-        }
-
-        logger.at(Level.FINE).log(
-                "Spawner icon override: no match item=" + itemId + " role=" + roleId + " attachments=" + attachmentsJson
-        );
-        return defaultIcon;
-    }
-
-    private boolean matchesAttachments(Map<String, String> required, Map<String, String> actual) {
-        if (required == null || required.isEmpty()) {
-            return false;
-        }
-        if (actual == null || actual.isEmpty()) {
-            return false;
-        }
-        for (Map.Entry<String, String> entry : required.entrySet()) {
-            String value = actual.get(entry.getKey());
-            if (value == null || !value.equals(entry.getValue())) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-
-
 
     private void despawnNpc(Player player, Ref<EntityStore> targetRef, Entity targetEntity) {
         if (player == null) {
@@ -1259,7 +981,7 @@ public final class SpawnerFeatureHandler {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.ATTACHMENTS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TAMED);
-        updated = clearNameMetadata(updated);
+        updated = captureMetadataService.clearNameMetadata(updated);
         updated = updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, null);
         return updated;
     }
