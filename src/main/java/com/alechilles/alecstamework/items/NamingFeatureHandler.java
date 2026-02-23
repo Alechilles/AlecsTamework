@@ -4,9 +4,7 @@ import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
@@ -19,11 +17,9 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import java.util.UUID;
@@ -37,14 +33,14 @@ public final class NamingFeatureHandler {
     private static final String CANCEL_TOKEN = "cancel";
 
     private final NameItemRegistry registry;
-    private final TranslationRegistry translationRegistry;
     private final NamingEffectService effectService;
+    private final NamingNpcInfoService npcInfoService;
     private final ConcurrentHashMap<UUID, PendingNameRequest> pendingByPlayer = new ConcurrentHashMap<>();
 
     public NamingFeatureHandler(NameItemRegistry registry, TranslationRegistry translationRegistry) {
         this.registry = registry;
-        this.translationRegistry = translationRegistry;
         this.effectService = new NamingEffectService();
+        this.npcInfoService = new NamingNpcInfoService(translationRegistry);
     }
 
     // Begins a naming request for the player. Runs on the store thread.
@@ -73,19 +69,19 @@ public final class NamingFeatureHandler {
         TwNameItemConfig config = resolveConfig(itemId, configIdOverride);
         NamingRules rules = resolveRules(config, overrides);
 
-        String roleId = resolveRoleIdFromNpc(npc);
+        String roleId = npcInfoService.resolveRoleId(npc);
         if (!isRoleAllowed(roleId, config)) {
             sendMessage(player, "That NPC cannot be named with this item.");
             return false;
         }
 
-        if (rules.isRequireTamed() && !isTamed(targetRef, store)) {
-            String npcName = resolveNpcDisplayName(npc);
+        if (rules.isRequireTamed() && !npcInfoService.isTamed(targetRef, store)) {
+            String npcName = npcInfoService.resolveDisplayName(npc);
             sendMessage(player, "You must tame that " + npcName + " before naming it.");
             return false;
         }
 
-        UUID ownerUuid = resolveOwnerUuid(targetRef, store);
+        UUID ownerUuid = npcInfoService.resolveOwnerUuid(targetRef, store);
         UUID playerUuid = player.getUuid();
         if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
             if (ownerUuid == null) {
@@ -93,8 +89,8 @@ public final class NamingFeatureHandler {
                 return false;
             }
             if (rules.isRequireOwner()) {
-                String npcName = resolveNpcDisplayName(npc);
-                String ownerName = resolveOwnerName(targetRef, store);
+                String npcName = npcInfoService.resolveDisplayName(npc);
+                String ownerName = npcInfoService.resolveOwnerName(targetRef, store);
                 OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
                 return false;
             }
@@ -105,8 +101,8 @@ public final class NamingFeatureHandler {
             return false;
         }
 
-        boolean hasTameworkName = hasTameworkName(targetRef, store);
-        boolean hasAnyName = hasAnyName(targetRef, store, npc);
+        boolean hasTameworkName = npcInfoService.hasTameworkName(targetRef, store);
+        boolean hasAnyName = npcInfoService.hasAnyName(targetRef, store, npc);
         if (!rules.isAllowRename() && hasTameworkName) {
             sendMessage(player, "This NPC has already been named.");
             return false;
@@ -253,21 +249,21 @@ public final class NamingFeatureHandler {
             return;
         }
 
-        String roleId = resolveRoleIdFromNpc(npc);
+        String roleId = npcInfoService.resolveRoleId(npc);
         if (!isRoleAllowed(roleId, config)) {
             pendingByPlayer.remove(playerUuid);
             sendMessage(player, "That NPC cannot be named with this item.");
             return;
         }
 
-        if (rules.isRequireTamed() && !isTamed(request.npcRef, store)) {
+        if (rules.isRequireTamed() && !npcInfoService.isTamed(request.npcRef, store)) {
             pendingByPlayer.remove(playerUuid);
-            String npcName = resolveNpcDisplayName(npc);
+            String npcName = npcInfoService.resolveDisplayName(npc);
             sendMessage(player, "You must tame that " + npcName + " before naming it.");
             return;
         }
 
-        UUID ownerUuid = resolveOwnerUuid(request.npcRef, store);
+        UUID ownerUuid = npcInfoService.resolveOwnerUuid(request.npcRef, store);
         if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
             if (ownerUuid == null) {
                 pendingByPlayer.remove(playerUuid);
@@ -276,15 +272,15 @@ public final class NamingFeatureHandler {
             }
             if (rules.isRequireOwner()) {
                 pendingByPlayer.remove(playerUuid);
-                String npcName = resolveNpcDisplayName(npc);
-                String ownerName = resolveOwnerName(request.npcRef, store);
+                String npcName = npcInfoService.resolveDisplayName(npc);
+                String ownerName = npcInfoService.resolveOwnerName(request.npcRef, store);
                 OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
                 return;
             }
         }
 
-        boolean hasTameworkName = hasTameworkName(request.npcRef, store);
-        boolean hasAnyName = hasAnyName(request.npcRef, store, npc);
+        boolean hasTameworkName = npcInfoService.hasTameworkName(request.npcRef, store);
+        boolean hasAnyName = npcInfoService.hasAnyName(request.npcRef, store, npc);
         NameValidation.NameValidationResult validation = NameValidation.validate(
                 rawName,
                 rules,
@@ -453,61 +449,6 @@ public final class NamingFeatureHandler {
         }
     }
 
-    private String resolveRoleIdFromNpc(NPCEntity npc) {
-        if (npc == null) {
-            return null;
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
-        int roleIndex = npc.getRoleIndex();
-        if (roleIndex >= 0) {
-            String nameKey = NPCPlugin.get().getName(roleIndex);
-            if (nameKey != null && !nameKey.isBlank()) {
-                return nameKey;
-            }
-        }
-        return null;
-    }
-
-    private boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return TamedStateResolver.isTamed(npcRef, store);
-    }
-
-    private UUID resolveOwnerUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        TameworkOwnerComponent component = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
-        return component != null ? component.getOwnerId() : null;
-    }
-
-    private String resolveOwnerName(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        TameworkOwnerComponent component = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
-        return component != null ? component.getOwnerName() : null;
-    }
-
-    private boolean hasTameworkName(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkNpcNameComponent> type = TameworkNpcNameComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
-        TameworkNpcNameComponent component = store.getComponent(npcRef, type);
-        return component != null && component.getName() != null && !component.getName().isBlank();
-    }
-
-    private boolean hasAnyName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
-        if (hasTameworkName(npcRef, store)) {
-            return true;
-        }
-        DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
-        if (displayName != null && displayName.getDisplayName() != null) {
-            if (!displayName.getDisplayName().getAnsiMessage().isEmpty()) {
-                return true;
-            }
-        }
-        String legacy = npc != null ? npc.getLegacyDisplayName() : null;
-        return legacy != null && !legacy.isBlank();
-    }
-
     private ItemStack getActiveItem(Player player) {
         if (player == null) {
             return null;
@@ -575,48 +516,6 @@ public final class NamingFeatureHandler {
         }
         long until = System.currentTimeMillis() + cooldownMs;
         return itemStack.withMetadata(key, Codec.LONG, until);
-    }
-
-    private String resolveNpcDisplayName(NPCEntity npc) {
-        if (npc == null) {
-            return "pet";
-        }
-        String displayName = npc.getLegacyDisplayName();
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName;
-        }
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin != null) {
-            int roleIndex = npc.getRoleIndex();
-            if (roleIndex >= 0) {
-                String nameKey = npcPlugin.getName(roleIndex);
-                if (nameKey != null && translationRegistry != null) {
-                    String translated = translationRegistry.get(nameKey);
-                    if (translated != null && !translated.isBlank()) {
-                        return translated;
-                    }
-                    if (!nameKey.contains(".")) {
-                        String derivedKey = "npcRoles." + nameKey + ".name";
-                        translated = translationRegistry.get(derivedKey);
-                        if (translated != null && !translated.isBlank()) {
-                            return translated;
-                        }
-                    }
-                }
-            }
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            if (translationRegistry != null) {
-                String derivedKey = "npcRoles." + roleName + ".name";
-                String translated = translationRegistry.get(derivedKey);
-                if (translated != null && !translated.isBlank()) {
-                    return translated;
-                }
-            }
-            return roleName;
-        }
-        return "pet";
     }
 
     private void sendMessage(Player player, String message) {
