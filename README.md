@@ -57,7 +57,7 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.1.1"
+  "Alechilles:Alec's Tamework!": "2.1.2"
 },
 "IncludesAssetPack": true
 ```
@@ -135,6 +135,14 @@ Optional prompt updater (see the example template for full usage):
 - **TwCommandItemConfig**: command-tool behavior and command list.
   Location: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
 - After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
+
+## Contributor Architecture Snapshot
+- Runtime systems use orchestrators plus focused services (selection, validation, persistence, UI view-models, relocation, feedback) instead of single monolithic handlers.
+- Main orchestrators:
+  - `SpawnerFeatureHandler` (with `Spawner*Service` collaborators)
+  - `NamingFeatureHandler` (with `Naming*Service` collaborators)
+  - `CommandItemFeatureHandler` (with `Command*Service` collaborators)
+- Detailed contributor map: `docs/Architecture.md`
 
 ## Documentation (Wiki)
 - Home: https://github.com/Alechilles/AlecsTamework/wiki

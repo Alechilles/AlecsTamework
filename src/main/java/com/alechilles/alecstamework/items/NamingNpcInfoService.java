@@ -1,0 +1,122 @@
+package com.alechilles.alecstamework.items;
+
+import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.UUID;
+
+/**
+ * Resolves naming-related NPC identity and ownership details.
+ */
+public final class NamingNpcInfoService {
+    private final TranslationRegistry translationRegistry;
+
+    public NamingNpcInfoService(TranslationRegistry translationRegistry) {
+        this.translationRegistry = translationRegistry;
+    }
+
+    public String resolveRoleId(NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        String roleName = npc.getRoleName();
+        if (roleName != null && !roleName.isBlank()) {
+            return roleName;
+        }
+        int roleIndex = npc.getRoleIndex();
+        if (roleIndex >= 0) {
+            String nameKey = NPCPlugin.get().getName(roleIndex);
+            if (nameKey != null && !nameKey.isBlank()) {
+                return nameKey;
+            }
+        }
+        return null;
+    }
+
+    public boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return TamedStateResolver.isTamed(npcRef, store);
+    }
+
+    public UUID resolveOwnerUuid(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        TameworkOwnerComponent component = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
+        return component != null ? component.getOwnerId() : null;
+    }
+
+    public String resolveOwnerName(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        TameworkOwnerComponent component = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
+        return component != null ? component.getOwnerName() : null;
+    }
+
+    public boolean hasTameworkName(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkNpcNameComponent> type = TameworkNpcNameComponent.getComponentType();
+        if (type == null) {
+            return false;
+        }
+        TameworkNpcNameComponent component = store.getComponent(npcRef, type);
+        return component != null && component.getName() != null && !component.getName().isBlank();
+    }
+
+    public boolean hasAnyName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
+        if (hasTameworkName(npcRef, store)) {
+            return true;
+        }
+        DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
+        if (displayName != null && displayName.getDisplayName() != null
+                && !displayName.getDisplayName().getAnsiMessage().isEmpty()) {
+            return true;
+        }
+        String legacy = npc != null ? npc.getLegacyDisplayName() : null;
+        return legacy != null && !legacy.isBlank();
+    }
+
+    public String resolveDisplayName(NPCEntity npc) {
+        if (npc == null) {
+            return "pet";
+        }
+        String displayName = npc.getLegacyDisplayName();
+        if (displayName != null && !displayName.isBlank()) {
+            return displayName;
+        }
+        NPCPlugin npcPlugin = NPCPlugin.get();
+        if (npcPlugin != null) {
+            int roleIndex = npc.getRoleIndex();
+            if (roleIndex >= 0) {
+                String nameKey = npcPlugin.getName(roleIndex);
+                if (nameKey != null && translationRegistry != null) {
+                    String translated = translationRegistry.get(nameKey);
+                    if (translated != null && !translated.isBlank()) {
+                        return translated;
+                    }
+                    if (!nameKey.contains(".")) {
+                        String derivedKey = "npcRoles." + nameKey + ".name";
+                        translated = translationRegistry.get(derivedKey);
+                        if (translated != null && !translated.isBlank()) {
+                            return translated;
+                        }
+                    }
+                }
+            }
+        }
+        String roleName = npc.getRoleName();
+        if (roleName != null && !roleName.isBlank()) {
+            if (translationRegistry != null) {
+                String derivedKey = "npcRoles." + roleName + ".name";
+                String translated = translationRegistry.get(derivedKey);
+                if (translated != null && !translated.isBlank()) {
+                    return translated;
+                }
+            }
+            return roleName;
+        }
+        return "pet";
+    }
+}
+

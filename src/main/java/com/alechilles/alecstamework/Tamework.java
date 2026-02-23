@@ -22,6 +22,7 @@ import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
@@ -94,6 +95,7 @@ public class Tamework extends JavaPlugin {
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
     private CommandNpcRelocationService commandNpcRelocationService;
+    private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
     private boolean npcActionsRegistered;
     private boolean globalAssetsRegistered;
@@ -173,6 +175,9 @@ public class Tamework extends JavaPlugin {
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
         commandNpcRelocationService = new CommandNpcRelocationService();
+        commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
+                getDataDirectory().resolve("CommandLinkedNpcCaptures.dat")
+        );
         commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
                 getDataDirectory().resolve("CommandLinkedNpcDeaths.dat")
         );
@@ -209,14 +214,15 @@ public class Tamework extends JavaPlugin {
         getLogger().at(Level.INFO).log("Tamework language entries loaded: " + langLoaded);
 
         // Core handler for capture/spawn flows.
-        spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry);
+        spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, commandLinkedNpcCaptureService);
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
         commandItemFeatureHandler = new CommandItemFeatureHandler(
                 commandItemRegistry,
                 commandNpcRelocationService,
-                commandLinkedNpcDeathService
+                commandLinkedNpcDeathService,
+                commandLinkedNpcCaptureService
         );
 
         // Register /tw commands if the server supports it.

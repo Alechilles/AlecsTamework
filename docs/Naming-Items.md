@@ -4,6 +4,14 @@
 Naming items use `TwNameItemConfig` assets to control who can name an NPC and what names are allowed.
 Items trigger naming via the `TameworkNameNpc` item interaction, which opens a chat-based prompt.
 
+## Runtime Architecture (Contributor View)
+Naming runtime is split into:
+- Orchestrator: `NamingFeatureHandler`
+- NPC info + ownership/tamed checks: `NamingNpcInfoService`
+- Effect application (component writes, cooldowns, consume, feedback): `NamingEffectService`
+
+When changing naming flow, keep policy checks and effect execution in their existing service boundaries.
+
 ## Asset location
 `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 
