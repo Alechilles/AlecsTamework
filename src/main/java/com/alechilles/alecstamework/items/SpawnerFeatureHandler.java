@@ -3,12 +3,9 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
-import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
-import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -21,7 +18,6 @@ import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -51,6 +47,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerPlayerInventoryService playerInventoryService;
     private final SpawnerAttachmentService attachmentService;
     private final SpawnerEffectService effectService;
+    private final SpawnerNpcIdentityService npcIdentityService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -67,6 +64,7 @@ public final class SpawnerFeatureHandler {
         this.playerInventoryService = new SpawnerPlayerInventoryService();
         this.attachmentService = new SpawnerAttachmentService(logger);
         this.effectService = new SpawnerEffectService();
+        this.npcIdentityService = new SpawnerNpcIdentityService();
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -439,7 +437,7 @@ public final class SpawnerFeatureHandler {
         SpawnerCaptureMetadataService.CaptureInfo captureInfo = captureMetadataService.buildCaptureInfo(
                 player,
                 targetRef,
-                this::resolveNpcDisplayName
+                npcIdentityService::resolveDisplayName
         );
         String attachmentsJson = captureInfo.attachmentsJson();
         if (attachmentsJson != null && !attachmentsJson.isBlank()) {
@@ -449,7 +447,7 @@ public final class SpawnerFeatureHandler {
         }
         logger.at(Level.FINE).log(
                 "Spawner capture debug: item=" + itemStack.getItemId()
-                        + " modelAssetId=" + resolveModelAssetId(player, targetRef)
+                        + " modelAssetId=" + npcIdentityService.resolveModelAssetId(player, targetRef)
                         + " attachmentsPresent=" + (attachmentsJson != null && !attachmentsJson.isBlank())
         );
         String fullItemIcon = captureMetadataService.resolveFullItemIcon(
@@ -476,9 +474,9 @@ public final class SpawnerFeatureHandler {
             Store<EntityStore> store = world.getEntityStore().getStore();
             NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
             if (npc != null) {
-                snapshotRoleId = resolveRoleId(npc);
+                snapshotRoleId = npcIdentityService.resolveRoleId(npc);
                 if (snapshotDisplayName == null || snapshotDisplayName.isBlank()) {
-                    snapshotDisplayName = resolveNpcDisplayName(targetRef, store, npc);
+                    snapshotDisplayName = npcIdentityService.resolveDisplayName(targetRef, store, npc);
                 }
             }
         }
@@ -550,14 +548,14 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (config.isCaptureRequireTamed() && !npcStateService.resolveTamedState(targetRef, world)) {
-            String npcName = resolveNpcDisplayName(npc);
+            String npcName = npcIdentityService.resolveDisplayName(npc);
             OwnerMessageUtil.sendUntamed(player, npcName);
             return false;
         }
         UUID ownerUuid = npcStateService.resolveOwnerFromComponent(targetRef, world);
         if (!ownershipPolicyService.isCaptureAllowed(player.getUuid(), ownerUuid, config)) {
             if (ownerUuid != null) {
-                String npcName = resolveNpcDisplayName(npc);
+                String npcName = npcIdentityService.resolveDisplayName(npc);
                 String ownerName = npcStateService.resolveOwnerNameFromComponent(targetRef, world);
                 OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "capture");
             }
@@ -606,22 +604,6 @@ public final class SpawnerFeatureHandler {
         return until > System.currentTimeMillis();
     }
 
-    private String resolveModelAssetId(Player player, Ref<EntityStore> targetRef) {
-        if (player == null || targetRef == null || !targetRef.isValid()) {
-            return "<none>";
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return "<no-world>";
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        ModelComponent modelComponent = store.getComponent(targetRef, ModelComponent.getComponentType());
-        if (modelComponent == null || modelComponent.getModel() == null) {
-            return "<no-model>";
-        }
-        return modelComponent.getModel().getModelAssetId();
-    }
-
     private void despawnNpc(Player player, Ref<EntityStore> targetRef, Entity targetEntity) {
         if (player == null) {
             return;
@@ -643,84 +625,6 @@ public final class SpawnerFeatureHandler {
             npc.setToDespawn();
         }
     }
-
-
-    private String resolveNpcDisplayName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
-        if (npcRef != null && npcRef.isValid() && store != null) {
-            ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
-            if (nameType != null) {
-                TameworkNpcNameComponent nameComponent = store.getComponent(npcRef, nameType);
-                if (nameComponent != null && nameComponent.getName() != null && !nameComponent.getName().isBlank()) {
-                    return nameComponent.getName();
-                }
-            }
-        }
-        return resolveNpcDisplayName(npc);
-    }
-
-    private String resolveNpcDisplayName(NPCEntity npc) {
-        if (npc == null) {
-            return null;
-        }
-        String displayName = npc.getLegacyDisplayName();
-        if (displayName != null && !displayName.isBlank()) {
-            return displayName;
-        }
-        TranslationRegistry registry = null;
-        Tamework instance = Tamework.getInstance();
-        if (instance != null) {
-            registry = instance.getTranslationRegistry();
-        }
-        int roleIndex = npc.getRoleIndex();
-        if (roleIndex >= 0) {
-            String nameKey = NPCPlugin.get().getName(roleIndex);
-            if (nameKey != null && !nameKey.isBlank()) {
-                String translated = registry != null ? registry.get(nameKey) : null;
-                if (translated != null && !translated.isBlank()) {
-                    return translated;
-                }
-                if (registry != null && !nameKey.contains(".")) {
-                    String derivedKey = "npcRoles." + nameKey + ".name";
-                    translated = registry.get(derivedKey);
-                    if (translated != null && !translated.isBlank()) {
-                        return translated;
-                    }
-                }
-                return nameKey;
-            }
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            if (registry != null) {
-                String derivedKey = "npcRoles." + roleName + ".name";
-                String translated = registry.get(derivedKey);
-                if (translated != null && !translated.isBlank()) {
-                    return translated;
-                }
-            }
-            return roleName;
-        }
-        return null;
-    }
-
-    private String resolveRoleId(NPCEntity npc) {
-        if (npc == null) {
-            return null;
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
-        int roleIndex = npc.getRoleIndex();
-        if (roleIndex >= 0 && NPCPlugin.get() != null) {
-            String name = NPCPlugin.get().getName(roleIndex);
-            if (name != null && !name.isBlank()) {
-                return name;
-            }
-        }
-        return null;
-    }
-
     private void clearOwnerIfConfigured(Player player, ItemFeatureConfig config, Ref<EntityStore> targetRef) {
         if (player == null || !config.isCaptureClearsOwner() || targetRef == null) {
             return;
