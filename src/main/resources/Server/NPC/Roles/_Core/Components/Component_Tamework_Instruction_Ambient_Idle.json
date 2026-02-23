@@ -1,0 +1,614 @@
+{
+  "$Comment": "Reusable ambient idle behavior: posture, flavor animations, and opportunistic sleep transitions.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Parameters": {
+    "BasePostureAnimation": {
+      "Value": "Idle",
+      "Description": "Animation to persist while in this ambient idle context."
+    },
+    "StillWeight": {
+      "Value": 3,
+      "Description": "Random weight for staying in the base posture with no extra flavor animation."
+    },
+    "StillDurationRange": {
+      "Value": [
+        2,
+        5
+      ],
+      "Description": "How long to stay in the base posture when the still branch is selected."
+    },
+    "DayFlavorAnimation": {
+      "Value": "",
+      "Description": "A flavor animation to play during the day. Ignored if null or empty."
+    },
+    "DayFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the daytime flavor animation."
+    },
+    "DayFlavorAnimationLength": {
+      "Value": [
+        2,
+        4
+      ],
+      "Description": "How long to play the daytime flavor animation."
+    },
+    "DayTimePeriod": {
+      "Value": [
+        6.01,
+        17.99
+      ],
+      "Description": "The hour range considered to be daytime for this NPC."
+    },
+    "NightFlavorAnimation": {
+      "Value": "",
+      "Description": "A flavor animation to play at night. Ignored if null or empty."
+    },
+    "NightFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the night flavor animation."
+    },
+    "NightFlavorAnimationLength": {
+      "Value": [
+        2,
+        4
+      ],
+      "Description": "How long to play the night flavor animation."
+    },
+    "_ImportStates": [
+      "GoSleep"
+    ],
+    "AlwaysSleepAtNight": {
+      "Value": true,
+      "Description": "Whether this NPC should always sleep at night when conditions allow."
+    },
+    "DayTimeNapWeight": {
+      "Value": 2,
+      "Description": "Weight used to determine if the NPC should have a short nap during the day. Set to 0 to disable."
+    },
+    "CanHear": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs that would wake this NPC."
+    },
+    "HearingRange": {
+      "Value": 8,
+      "Description": "Range used to detect nearby NPCs that would wake this NPC."
+    },
+    "ReactToNPCs": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs when deciding to sleep."
+    },
+    "Attitudes": {
+      "Value": [
+        "Hostile",
+        "Neutral"
+      ],
+      "Description": "Attitudes that would wake this NPC."
+    },
+    "SleepDelayAfterLastSleepRange": {
+      "Value": [
+        15,
+        15
+      ],
+      "Description": "Minimum delay before ambient idle can transition to sleep after waking from sleep."
+    }
+  },
+  "Content": {
+    "$Comment": "Caller should initialize Ambient_Entry_Sleep_Gate once on state entry.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Apply base posture when entering this ambient idle context.",
+        "Enabled": {
+          "Compute": "!isEmpty(BasePostureAnimation)"
+        },
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "BasePostureAnimation"
+            }
+          }
+        ]
+      },
+      {
+        "Continue": true,
+        "BodyMotion": {
+          "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "Sleep at night whenever conditions allow.",
+        "Enabled": {
+          "Compute": "AlwaysSleepAtNight"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Time",
+                "Period": {
+                  "Compute": "DayTimePeriod"
+                },
+                "CheckDay": true
+              }
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Reference": "Component_Sensor_Sound_By_Attitude",
+                "Modify": {
+                  "Enabled": {
+                    "Compute": "CanHear"
+                  },
+                  "HearingRange": {
+                    "Compute": "HearingRange"
+                  },
+                  "GetNPCs": {
+                    "Compute": "ReactToNPCs"
+                  },
+                  "Attitudes": {
+                    "Compute": "Attitudes"
+                  }
+                }
+              }
+            },
+            {
+              "Type": "Timer",
+              "Name": "Ambient_Entry_Sleep_Gate",
+              "State": "Stopped"
+            },
+            {
+              "Type": "Timer",
+              "Name": "Ambient_PostSleep_Cooldown",
+              "State": "Stopped"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": [
+              2,
+              4
+            ],
+            "Action": {
+              "Type": "Sequence",
+              "Actions": [
+                {
+                  "Type": "TimerStart",
+                  "Name": "Ambient_PostSleep_Cooldown",
+                  "StartValueRange": {
+                    "Compute": "SleepDelayAfterLastSleepRange"
+                  },
+                  "RestartValueRange": {
+                    "Compute": "SleepDelayAfterLastSleepRange"
+                  }
+                },
+                {
+                  "Type": "TimerRestart",
+                  "Name": "Ambient_PostSleep_Cooldown"
+                },
+                {
+                  "Type": "TimerPause",
+                  "Name": "Ambient_PostSleep_Cooldown"
+                },
+                {
+                  "Type": "ParentState",
+                  "State": "GoSleep"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "Execute daytime ambient behaviors.",
+        "Type": "Random",
+        "ExecuteFor": [
+          30,
+          60
+        ],
+        "Sensor": {
+          "Type": "Time",
+          "Period": {
+            "Compute": "DayTimePeriod"
+          },
+          "CheckDay": true
+        },
+        "Instructions": [
+          {
+            "$Comment": "Stay in base posture.",
+            "Enabled": {
+              "Compute": "StillWeight > 0"
+            },
+            "Weight": {
+              "Compute": "StillWeight"
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "StillDurationRange"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Play daytime flavor with follow-up.",
+            "Enabled": {
+              "Compute": "!isEmpty(DayFlavorAnimation) && !isEmpty(DayFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "DayFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "DayFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "DayFlavorAnimationAfter"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": [
+                      1,
+                      1
+                    ]
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "BasePostureAnimation"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Play daytime flavor.",
+            "Enabled": {
+              "Compute": "!isEmpty(DayFlavorAnimation) && isEmpty(DayFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "DayFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "DayFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "BasePostureAnimation"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Take a daytime nap.",
+            "Enabled": {
+              "Compute": "DayTimeNapWeight > 0"
+            },
+            "Weight": {
+              "Compute": "DayTimeNapWeight"
+            },
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Reference": "Component_Sensor_Sound_By_Attitude",
+                    "Modify": {
+                      "Enabled": {
+                        "Compute": "CanHear"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "GetNPCs": {
+                        "Compute": "ReactToNPCs"
+                      },
+                      "Attitudes": {
+                        "Compute": "Attitudes"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Ambient_Entry_Sleep_Gate",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Ambient_PostSleep_Cooldown",
+                  "State": "Stopped"
+                }
+              ]
+            },
+            "Instructions": [
+              {
+                "Actions": [
+                  {
+                    "Type": "TimerStart",
+                    "Name": "Ambient_PostSleep_Cooldown",
+                    "StartValueRange": {
+                      "Compute": "SleepDelayAfterLastSleepRange"
+                    },
+                    "RestartValueRange": {
+                      "Compute": "SleepDelayAfterLastSleepRange"
+                    }
+                  },
+                  {
+                    "Type": "TimerRestart",
+                    "Name": "Ambient_PostSleep_Cooldown"
+                  },
+                  {
+                    "Type": "TimerPause",
+                    "Name": "Ambient_PostSleep_Cooldown"
+                  },
+                  {
+                    "Type": "ParentState",
+                    "State": "GoSleep"
+                  },
+                  {
+                    "Type": "SpawnParticles",
+                    "Offset": [
+                      0,
+                      0,
+                      -0.5
+                    ],
+                    "ParticleSystem": "Sleepy"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "$Comment": "Execute nighttime ambient behaviors for NPCs that do not always sleep at night.",
+        "Enabled": {
+          "Compute": "!AlwaysSleepAtNight"
+        },
+        "Type": "Random",
+        "ExecuteFor": [
+          15,
+          20
+        ],
+        "Sensor": {
+          "Type": "Not",
+          "Sensor": {
+            "Type": "Time",
+            "Period": {
+              "Compute": "DayTimePeriod"
+            },
+            "CheckDay": true
+          }
+        },
+        "Instructions": [
+          {
+            "$Comment": "Stay in base posture.",
+            "Enabled": {
+              "Compute": "StillWeight > 0"
+            },
+            "Weight": {
+              "Compute": "StillWeight"
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "StillDurationRange"
+                }
+              }
+            ]
+          },
+          {
+            "$Comment": "Play night flavor with follow-up.",
+            "Enabled": {
+              "Compute": "!isEmpty(NightFlavorAnimation) && !isEmpty(NightFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "NightFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "NightFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "NightFlavorAnimationAfter"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": [
+                      1,
+                      1
+                    ]
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "BasePostureAnimation"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Play night flavor.",
+            "Enabled": {
+              "Compute": "!isEmpty(NightFlavorAnimation) && isEmpty(NightFlavorAnimationAfter)"
+            },
+            "Weight": 3,
+            "Instructions": [
+              {
+                "ActionsBlocking": true,
+                "Actions": [
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "NightFlavorAnimation"
+                    }
+                  },
+                  {
+                    "Type": "Timeout",
+                    "Delay": {
+                      "Compute": "NightFlavorAnimationLength"
+                    }
+                  },
+                  {
+                    "Type": "PlayAnimation",
+                    "Slot": "Status",
+                    "Animation": {
+                      "Compute": "BasePostureAnimation"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "$Comment": "Low chance of sleeping at night for non-night-sleepers.",
+            "Weight": 1,
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Reference": "Component_Sensor_Sound_By_Attitude",
+                    "Modify": {
+                      "Enabled": {
+                        "Compute": "CanHear"
+                      },
+                      "HearingRange": {
+                        "Compute": "HearingRange"
+                      },
+                      "GetNPCs": {
+                        "Compute": "ReactToNPCs"
+                      },
+                      "Attitudes": {
+                        "Compute": "Attitudes"
+                      }
+                    }
+                  }
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Ambient_Entry_Sleep_Gate",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "Timer",
+                  "Name": "Ambient_PostSleep_Cooldown",
+                  "State": "Stopped"
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": [
+                  2,
+                  4
+                ],
+                "Action": {
+                  "Type": "Sequence",
+                  "Actions": [
+                    {
+                      "Type": "TimerStart",
+                      "Name": "Ambient_PostSleep_Cooldown",
+                      "StartValueRange": {
+                        "Compute": "SleepDelayAfterLastSleepRange"
+                      },
+                      "RestartValueRange": {
+                        "Compute": "SleepDelayAfterLastSleepRange"
+                      }
+                    },
+                    {
+                      "Type": "TimerRestart",
+                      "Name": "Ambient_PostSleep_Cooldown"
+                    },
+                    {
+                      "Type": "TimerPause",
+                      "Name": "Ambient_PostSleep_Cooldown"
+                    },
+                    {
+                      "Type": "ParentState",
+                      "State": "GoSleep"
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
