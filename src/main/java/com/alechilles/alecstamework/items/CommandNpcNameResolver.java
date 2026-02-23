@@ -83,9 +83,9 @@ final class CommandNpcNameResolver {
         }
         DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
         if (displayName != null && displayName.getDisplayName() != null) {
-            String raw = displayName.getDisplayName().toString();
-            if (raw != null && !raw.isBlank()) {
-                return raw;
+            String ansi = displayName.getDisplayName().getAnsiMessage();
+            if (ansi != null && !ansi.isBlank()) {
+                return ansi;
             }
         }
         return null;
