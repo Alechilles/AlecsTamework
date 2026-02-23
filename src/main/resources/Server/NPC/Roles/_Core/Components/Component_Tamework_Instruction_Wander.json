@@ -46,6 +46,17 @@
       ],
       "Description": "How long to remain in settle mode before resuming wander."
     },
+    "SettleExitAnimation": {
+      "Value": "",
+      "Description": "Optional animation to play when leaving settle mode before movement resumes (for example StandUp)."
+    },
+    "SettleExitDelayRange": {
+      "Value": [
+        0.83,
+        0.83
+      ],
+      "Description": "How long to wait after the settle-exit animation before movement can resume."
+    },
     "BasePostureAnimation": {
       "Value": "",
       "Description": "Animation to use while settled (for example Sit)."
@@ -332,6 +343,9 @@
       },
       {
         "$Comment": "Leave settle mode after the configured duration.",
+        "Enabled": {
+          "Compute": "isEmpty(SettleExitAnimation)"
+        },
         "Sensor": {
           "Type": "State",
           "State": ".Settle"
@@ -343,6 +357,46 @@
             "Delay": {
               "Compute": "WanderSettleDurationRange"
             }
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "Leave settle mode with an explicit transition animation.",
+        "Enabled": {
+          "Compute": "!isEmpty(SettleExitAnimation)"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".Settle"
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "WanderSettleDurationRange"
+            }
+          },
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "SettleExitAnimation"
+            }
+          },
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "SettleExitDelayRange"
+            }
+          },
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
           },
           {
             "Type": "State",
