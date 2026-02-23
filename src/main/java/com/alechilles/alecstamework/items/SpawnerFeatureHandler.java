@@ -9,8 +9,6 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.google.gson.Gson;
-import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -19,8 +17,6 @@ import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.protocol.InteractionType;
-import com.hypixel.hytale.server.core.asset.type.model.config.Model;
-import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
@@ -37,11 +33,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import java.util.logging.Level;
 
@@ -51,8 +44,6 @@ import java.util.logging.Level;
 public final class SpawnerFeatureHandler {
 
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
-    private static final Gson GSON = new Gson();
-    private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() {}.getType();
 
     private final HytaleLogger logger;
     private final ItemFeatureRegistry registry;
@@ -64,6 +55,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerItemStackMetadataService itemStackMetadataService;
     private final SpawnerNpcStateService npcStateService;
     private final SpawnerPlayerInventoryService playerInventoryService;
+    private final SpawnerAttachmentService attachmentService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -78,6 +70,7 @@ public final class SpawnerFeatureHandler {
         this.itemStackMetadataService = new SpawnerItemStackMetadataService(registry, captureMetadataService);
         this.npcStateService = new SpawnerNpcStateService();
         this.playerInventoryService = new SpawnerPlayerInventoryService();
+        this.attachmentService = new SpawnerAttachmentService(logger);
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -341,7 +334,7 @@ public final class SpawnerFeatureHandler {
 
         Ref<EntityStore> npcRef = spawned.first();
         NPCEntity npc = spawned.second();
-        applyAttachments(itemStack, npcRef, npc, store);
+        attachmentService.applyAttachments(itemStack, npcRef, npc, store);
         npcStateService.applyOwner(config, npcRef, npc, playerRef, ownerUuid, world);
         npcStateService.applyTamed(npcRef, tamed, world);
         npcStateService.applyCapturedName(itemStack, npcRef, store);
@@ -668,47 +661,6 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         return until > System.currentTimeMillis();
-    }
-
-    private void applyAttachments(ItemStack itemStack,
-                                  Ref<EntityStore> npcRef,
-                                  NPCEntity npc,
-                                  Store<EntityStore> store) {
-        String attachmentsJson = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.ATTACHMENTS,
-                Codec.STRING
-        );
-        if (attachmentsJson == null || attachmentsJson.isBlank()) {
-            return;
-        }
-        Map<String, String> attachments;
-        try {
-            attachments = GSON.fromJson(attachmentsJson, ATTACHMENT_MAP_TYPE);
-        } catch (Exception ex) {
-            logger.at(Level.WARNING).withCause(ex).log("Spawner stub: failed to parse attachment metadata.");
-            return;
-        }
-        if (attachments == null) {
-            return;
-        }
-
-        ModelComponent modelComponent = store.getComponent(npcRef, ModelComponent.getComponentType());
-        if (modelComponent == null) {
-            return;
-        }
-        Model model = modelComponent.getModel();
-        ModelAsset modelAsset = ModelAsset.getAssetMap().getAsset(model.getModelAssetId());
-        if (modelAsset == null) {
-            logger.at(Level.WARNING).log("Spawner stub: missing model asset for attachments.");
-            return;
-        }
-
-        Map<String, String> applied = new HashMap<>(attachments);
-        Model updatedModel = Model.createScaledModel(modelAsset, model.getScale(), applied);
-        store.putComponent(npcRef, ModelComponent.getComponentType(), new ModelComponent(updatedModel));
-        if (npc != null && npc.getRole() != null) {
-            npc.getRole().updateMotionControllers(npcRef, updatedModel, updatedModel.getBoundingBox(), store);
-        }
     }
 
     private String resolveModelAssetId(Player player, Ref<EntityStore> targetRef) {
