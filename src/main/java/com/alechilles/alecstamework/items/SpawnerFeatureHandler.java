@@ -4,12 +4,10 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
@@ -33,8 +31,6 @@ import java.util.logging.Level;
  */
 public final class SpawnerFeatureHandler {
 
-    private static final String MASTER_TARGET_SLOT = "MasterTarget";
-
     private final HytaleLogger logger;
     private final ItemFeatureRegistry registry;
     private final SpawnerLinkedNpcSyncService linkedNpcSyncService;
@@ -48,6 +44,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerAttachmentService attachmentService;
     private final SpawnerEffectService effectService;
     private final SpawnerNpcIdentityService npcIdentityService;
+    private final SpawnerCaptureFinalizerService captureFinalizerService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -65,6 +62,7 @@ public final class SpawnerFeatureHandler {
         this.attachmentService = new SpawnerAttachmentService(logger);
         this.effectService = new SpawnerEffectService();
         this.npcIdentityService = new SpawnerNpcIdentityService();
+        this.captureFinalizerService = new SpawnerCaptureFinalizerService();
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -514,8 +512,8 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         effectService.playCaptureEffects(world, targetRef, config);
-        clearOwnerIfConfigured(player, config, targetRef);
-        despawnNpc(player, targetRef, null);
+        captureFinalizerService.clearOwnerIfConfigured(player, config, targetRef);
+        captureFinalizerService.despawnNpc(player, targetRef, null);
 
         logger.at(Level.FINE).log(
                 "Spawner stub: capture request item=" + itemStack.getItemId()
@@ -602,47 +600,6 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         return until > System.currentTimeMillis();
-    }
-
-    private void despawnNpc(Player player, Ref<EntityStore> targetRef, Entity targetEntity) {
-        if (player == null) {
-            return;
-        }
-        if (targetEntity instanceof NPCEntity npcEntity) {
-            npcEntity.setToDespawn();
-            return;
-        }
-        if (targetRef == null || !targetRef.isValid()) {
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
-        if (npc != null) {
-            npc.setToDespawn();
-        }
-    }
-    private void clearOwnerIfConfigured(Player player, ItemFeatureConfig config, Ref<EntityStore> targetRef) {
-        if (player == null || !config.isCaptureClearsOwner() || targetRef == null) {
-            return;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
-        if (npc == null || npc.getRole() == null) {
-            return;
-        }
-        ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-        if (type != null) {
-            store.putComponent(targetRef, type, new TameworkOwnerComponent(null, null));
-        }
-        npc.getRole().getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, null);
     }
 
 }
