@@ -24,9 +24,7 @@ import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
-import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -65,6 +63,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerRolePolicyService rolePolicyService;
     private final SpawnerItemStackMetadataService itemStackMetadataService;
     private final SpawnerNpcStateService npcStateService;
+    private final SpawnerPlayerInventoryService playerInventoryService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -78,6 +77,7 @@ public final class SpawnerFeatureHandler {
         this.rolePolicyService = new SpawnerRolePolicyService(logger);
         this.itemStackMetadataService = new SpawnerItemStackMetadataService(registry, captureMetadataService);
         this.npcStateService = new SpawnerNpcStateService();
+        this.playerInventoryService = new SpawnerPlayerInventoryService();
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -140,7 +140,7 @@ public final class SpawnerFeatureHandler {
             return;
         }
 
-        ItemStack itemStack = getHotbarItem(player, activeHotbarSlot);
+        ItemStack itemStack = playerInventoryService.getHotbarItem(player, activeHotbarSlot);
         if (itemStack == null || itemStack.isEmpty()) {
             logger.at(Level.FINE).log(
                     "Spawner stub: packet empty slot item=" + itemId
@@ -195,7 +195,7 @@ public final class SpawnerFeatureHandler {
         if (player == null || itemStack == null || config == null) {
             return;
         }
-        Ref<EntityStore> targetRef = resolveEntityRef(player, targetEntityId, null);
+        Ref<EntityStore> targetRef = playerInventoryService.resolveEntityRef(player, targetEntityId, null);
         if (targetRef == null || !targetRef.isValid()) {
             return;
         }
@@ -365,8 +365,8 @@ public final class SpawnerFeatureHandler {
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs());
 
         boolean updatedOk = hotbarSlot != null
-                ? updateHotbarSlot(player, hotbarSlot, updated)
-                : updateHeldItem(player, updated);
+                ? playerInventoryService.updateHotbarSlot(player, hotbarSlot, updated)
+                : playerInventoryService.updateHeldItem(player, updated);
         if (!updatedOk) {
             logger.at(Level.WARNING).log("Spawner spawn: failed to update held item.");
             return false;
@@ -522,7 +522,7 @@ public final class SpawnerFeatureHandler {
         updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
 
-        if (!updateHeldItem(player, updated)) {
+        if (!playerInventoryService.updateHeldItem(player, updated)) {
             logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
             return false;
         }
@@ -846,77 +846,6 @@ public final class SpawnerFeatureHandler {
         npc.getRole().getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, null);
     }
 
-    private Ref<EntityStore> resolveEntityRef(Player player, Integer entityId, UUID entityUuid) {
-        if (player == null) {
-            return null;
-        }
-        World world = player.getWorld();
-        if (world == null) {
-            return null;
-        }
-        if (entityUuid != null) {
-            return world.getEntityRef(entityUuid);
-        }
-        if (entityId == null || entityId <= 0) {
-            return null;
-        }
-        return world.getEntityStore().getRefFromNetworkId(entityId);
-    }
-
-    
-    private ItemStack getHotbarItem(Player player, int slot) {
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return null;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        if (hotbar == null) {
-            return null;
-        }
-        return hotbar.getItemStack((short) slot);
-    }
-
-    // Update the active hotbar slot and push inventory changes to the client.
-    private boolean updateHeldItem(Player player, ItemStack updated) {
-        if (player == null) {
-            return false;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        if (hotbar == null) {
-            return false;
-        }
-        byte activeSlot = inventory.getActiveHotbarSlot();
-        hotbar.setItemStackForSlot((short) activeSlot, updated);
-        inventory.markChanged();
-        player.sendInventory();
-        return true;
-    }
-
-
-
-
-    // Update a specific hotbar slot when the packet provides the slot index.
-    private boolean updateHotbarSlot(Player player, int slot, ItemStack updated) {
-        if (player == null) {
-            return false;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        if (hotbar == null) {
-            return false;
-        }
-        hotbar.setItemStackForSlot((short) slot, updated);
-        inventory.markChanged();
-        player.sendInventory();
-        return true;
-    }
 }
 
 
