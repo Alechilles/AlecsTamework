@@ -1,7 +1,17 @@
 # Spawner Config (TwSpawnerConfig)
 
 ## Overview
-Spawner items use `TwSpawnerConfig` assets to control capture and spawn behavior. These assets are converted into per item feature configs at runtime and drive `SpawnerFeatureHandler` and `TameworkSpawn` interactions.
+Spawner items use `TwSpawnerConfig` assets to control capture and spawn behavior. These assets are converted into per-item feature configs at runtime and executed through `TameworkSpawn` + spawner services.
+
+## Runtime Architecture (Contributor View)
+Spawner runtime is split into an orchestrator plus focused services:
+- Orchestrator: `SpawnerFeatureHandler`
+- Policy + validation: `SpawnerCapturePolicyService`, `SpawnerRolePolicyService`, `SpawnerOwnershipPolicyService`
+- Metadata + identity/state: `SpawnerCaptureMetadataService`, `SpawnerNpcIdentityService`, `SpawnerNpcStateService`, `SpawnerItemStackMetadataService`
+- Placement/effects/inventory: `SpawnerSpawnPositionService`, `SpawnerEffectService`, `SpawnerPlayerInventoryService`
+- Capture finalization and linked-companion sync: `SpawnerCaptureFinalizerService`, `SpawnerLinkedNpcSyncService`
+
+When extending spawner behavior, add logic to these service domains instead of centralizing it in the orchestrator.
 
 ## Asset location
 `<ModRoot>/Server/Tamework/Items/Spawners/*.json`

@@ -1,0 +1,198 @@
+package com.alechilles.alecstamework.items;
+
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * Handles linked-NPC mutations and command-item linked-record persistence.
+ */
+final class CommandLinkMutationService {
+    private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
+    private final CommandLinkPolicyService linkPolicyService;
+    private final CommandNpcNameResolver npcNameResolver;
+
+    CommandLinkMutationService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                               CommandLinkPolicyService linkPolicyService,
+                               CommandNpcNameResolver npcNameResolver) {
+        this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
+        this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
+        this.npcNameResolver = npcNameResolver != null ? npcNameResolver : new CommandNpcNameResolver();
+    }
+
+    LinkToggleResult tryToggleLink(Player player,
+                                   Store<EntityStore> store,
+                                   Ref<EntityStore> targetRef,
+                                   String toolId,
+                                   TwCommandItemConfig config,
+                                   ItemStack workingItem) {
+        NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            return LinkToggleResult.notToggled();
+        }
+        UUID playerId = player.getUuid();
+        if (playerId == null) {
+            return LinkToggleResult.notToggled();
+        }
+        UUID ownerId = linkPolicyService.resolveOwnerId(targetRef, store);
+        if (ownerId != null && !ownerId.equals(playerId)) {
+            return LinkToggleResult.notToggled();
+        }
+        if (config.isRequireOwner() && ownerId == null) {
+            return LinkToggleResult.notToggled();
+        }
+        if (config.isRequireTamed() && !TamedStateResolver.isTamed(targetRef, store)) {
+            return LinkToggleResult.notToggled();
+        }
+        if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
+            return LinkToggleResult.notToggled();
+        }
+        TameworkCommandLinksComponent current = store.getComponent(targetRef, TameworkCommandLinksComponent.getComponentType());
+        if (current == null) {
+            current = new TameworkCommandLinksComponent(playerId, new String[0]);
+        }
+        UUID linksOwner = current.getOwnerId();
+        if (linksOwner != null && !linksOwner.equals(playerId)) {
+            return LinkToggleResult.notToggled();
+        }
+        current.setOwnerId(playerId);
+        boolean linked;
+        TameworkCommandLinksComponent updated;
+        if (current.containsToolId(toolId)) {
+            updated = current.withToolIdRemoved(toolId);
+            linked = false;
+        } else {
+            updated = current.withToolIdAdded(toolId);
+            linked = true;
+        }
+        store.putComponent(targetRef, TameworkCommandLinksComponent.getComponentType(), updated);
+        ItemStack updatedItem = workingItem;
+        UUID npcUuid = npc.getUuid();
+        if (npcUuid != null && updatedItem != null && !updatedItem.isEmpty()) {
+            if (linked) {
+                TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
+                Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
+                Vector3d homePosition = updated.hasHome() ? updated.getHomePosition() : null;
+                updatedItem = linkedNpcRecordStore.upsert(
+                        updatedItem,
+                        npcUuid,
+                        lastKnown,
+                        homePosition,
+                        npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
+                        npcNameResolver.resolveNpcNameKey(npc),
+                        npcNameResolver.resolveNpcRoleId(npc)
+                );
+            } else {
+                updatedItem = linkedNpcRecordStore.remove(updatedItem, npcUuid);
+            }
+        }
+        String name = npcNameResolver.resolveNpcDisplayName(targetRef, store, npc);
+        return new LinkToggleResult(true, linked, name, updatedItem);
+    }
+
+    boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {
+        if (player == null || npcUuid == null || toolId == null || toolId.isBlank()) {
+            return false;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            return false;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        if (npcRef == null || !npcRef.isValid()) {
+            return false;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            return false;
+        }
+        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+        if (links == null || !links.containsToolId(toolId)) {
+            return false;
+        }
+        UUID owner = links.getOwnerId();
+        if (owner != null && !owner.equals(player.getUuid())) {
+            return false;
+        }
+        store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links.withToolIdRemoved(toolId));
+        return true;
+    }
+
+    LinkedNpcRecord findLinkedNpcRecord(List<LinkedNpcRecord> records, UUID npcUuid) {
+        return linkedNpcRecordStore.find(records, npcUuid);
+    }
+
+    ItemStack upsertLinkedNpcRecord(ItemStack stack,
+                                    UUID npcUuid,
+                                    Vector3d position,
+                                    Vector3d homePosition) {
+        return linkedNpcRecordStore.upsert(stack, npcUuid, position, homePosition, null, null, null);
+    }
+
+    ItemStack upsertLinkedNpcRecord(ItemStack stack,
+                                    UUID npcUuid,
+                                    Vector3d position,
+                                    Vector3d homePosition,
+                                    String cachedDisplayName,
+                                    String cachedNameKey,
+                                    String cachedRoleId) {
+        return linkedNpcRecordStore.upsert(
+                stack,
+                npcUuid,
+                position,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId
+        );
+    }
+
+    ItemStack refreshLinkedNpcPositions(ItemStack stack, List<Candidate> recipients, Store<EntityStore> store) {
+        if (stack == null || stack.isEmpty() || recipients == null || recipients.isEmpty() || store == null) {
+            return stack;
+        }
+        ItemStack updated = stack;
+        for (Candidate candidate : recipients) {
+            if (candidate == null || candidate.ref == null || candidate.npc == null || candidate.npc.getUuid() == null) {
+                continue;
+            }
+            TransformComponent transform = store.getComponent(candidate.ref, TransformComponent.getComponentType());
+            Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
+            TameworkCommandLinksComponent links = store.getComponent(candidate.ref, TameworkCommandLinksComponent.getComponentType());
+            Vector3d homePosition = links != null && links.hasHome() ? links.getHomePosition() : null;
+            updated = linkedNpcRecordStore.upsert(
+                    updated,
+                    candidate.npc.getUuid(),
+                    position,
+                    homePosition,
+                    npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, store),
+                    npcNameResolver.resolveNpcNameKey(candidate.npc),
+                    npcNameResolver.resolveNpcRoleId(candidate.npc)
+            );
+        }
+        return updated;
+    }
+
+    ItemStack removeLinkedNpcRecord(ItemStack stack, UUID npcUuid) {
+        return linkedNpcRecordStore.remove(stack, npcUuid);
+    }
+
+    List<LinkedNpcRecord> readLinkedNpcRecords(ItemStack stack) {
+        return linkedNpcRecordStore.read(stack);
+    }
+
+    ItemStack writeLinkedNpcRecords(ItemStack stack, List<LinkedNpcRecord> records) {
+        return linkedNpcRecordStore.write(stack, records);
+    }
+}

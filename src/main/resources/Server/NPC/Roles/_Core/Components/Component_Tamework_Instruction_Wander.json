@@ -1,10 +1,13 @@
 {
-  "$Comment": "Reusable random wander behavior for idle-style states.",
+  "$Comment": "Reusable wander behavior with random move/settle cycles. Settle cycles can run ambient posture/flavor/sleep behavior.",
   "Type": "Component",
   "Class": "Instruction",
   "Interface": "Tamework.Instruction.Wander",
   "DefaultState": ".Default",
   "Parameters": {
+    "_ImportStates": [
+      "GoSleep"
+    ],
     "WanderRadius": {
       "Value": 8,
       "Description": "Radius used by WanderInCircle movement."
@@ -16,55 +19,454 @@
     "WanderRelativeSpeed": {
       "Value": 0.3,
       "Description": "Relative movement speed while wandering."
+    },
+    "WanderAvoidBlockDamage": {
+      "Value": true,
+      "Description": "Whether wander movement should avoid blocks that cause environmental damage."
+    },
+    "WanderMoveWeight": {
+      "Value": 6,
+      "Description": "Random weight for selecting a movement burst."
+    },
+    "WanderSettleWeight": {
+      "Value": 3,
+      "Description": "Random weight for selecting a settle/ambient behavior window."
+    },
+    "WanderMoveDurationRange": {
+      "Value": [
+        1,
+        4
+      ],
+      "Description": "How long to wander before selecting the next behavior."
+    },
+    "WanderSettleDurationRange": {
+      "Value": [
+        4,
+        8
+      ],
+      "Description": "How long to remain in settle mode before resuming wander."
+    },
+    "SettleEntryDelayRange": {
+      "Value": [
+        0.8,
+        0.8
+      ],
+      "Description": "How long to wait after applying settle posture before ambient settle logic begins."
+    },
+    "SettleExitAnimation": {
+      "Value": "",
+      "Description": "Optional animation to play when leaving settle mode before movement resumes (for example StandUp)."
+    },
+    "SettleExitDelayRange": {
+      "Value": [
+        0.83,
+        0.83
+      ],
+      "Description": "How long to wait after the settle-exit animation before movement can resume."
+    },
+    "BasePostureAnimation": {
+      "Value": "",
+      "Description": "Animation to use while settled (for example Sit)."
+    },
+    "StillWeight": {
+      "Value": 3,
+      "Description": "Random weight for staying in settle posture with no extra flavor animation."
+    },
+    "StillDurationRange": {
+      "Value": [
+        2,
+        5
+      ],
+      "Description": "How long to stay in settle posture when the still branch is selected."
+    },
+    "DayFlavorAnimation": {
+      "Value": "",
+      "Description": "A flavor animation to play during the day while settled."
+    },
+    "DayFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the daytime flavor animation."
+    },
+    "DayFlavorAnimationLength": {
+      "Value": [
+        2,
+        4
+      ],
+      "Description": "How long to play the daytime flavor animation."
+    },
+    "DayTimePeriod": {
+      "Value": [
+        6.01,
+        17.99
+      ],
+      "Description": "The hour range considered to be daytime for this NPC."
+    },
+    "NightFlavorAnimation": {
+      "Value": "",
+      "Description": "A flavor animation to play at night while settled."
+    },
+    "NightFlavorAnimationAfter": {
+      "Value": "",
+      "Description": "Optional animation to play after the night flavor animation."
+    },
+    "NightFlavorAnimationLength": {
+      "Value": [
+        2,
+        4
+      ],
+      "Description": "How long to play the night flavor animation."
+    },
+    "AlwaysSleepAtNight": {
+      "Value": false,
+      "Description": "Whether this NPC should always sleep at night when settled and conditions allow."
+    },
+    "DayTimeNapWeight": {
+      "Value": 1,
+      "Description": "Weight used to determine if this NPC should nap during daytime settle windows. Set to 0 to disable."
+    },
+    "CanHear": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs that would wake this NPC."
+    },
+    "HearingRange": {
+      "Value": 8,
+      "Description": "Range used to detect nearby NPCs that would wake this NPC."
+    },
+    "ReactToNPCs": {
+      "Value": true,
+      "Description": "Whether to consider nearby NPCs when deciding to sleep."
+    },
+    "Attitudes": {
+      "Value": [
+        "Hostile",
+        "Neutral"
+      ],
+      "Description": "Attitudes that would wake this NPC."
+    },
+    "SleepDelayAfterEntryRange": {
+      "Value": [
+        10,
+        10
+      ],
+      "Description": "Minimum delay before settle behavior can transition to sleep after entering Wander."
+    },
+    "SleepDelayAfterLastSleepRange": {
+      "Value": [
+        15,
+        15
+      ],
+      "Description": "Minimum delay before settle behavior can transition to sleep after waking from sleep."
     }
   },
   "Content": {
-    "$Comment": "Default Wander State: move in short random bursts with brief idle pauses.",
+    "$Comment": "Wander loops between movement bursts and settle windows.",
     "Continue": true,
     "Sensor": {
       "Type": "Any"
     },
     "Instructions": [
       {
+        "$Comment": "Initialize sleep gate timers when entering wander mode.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "TimerStart",
+            "Name": "Ambient_Entry_Sleep_Gate",
+            "StartValueRange": {
+              "Compute": "SleepDelayAfterEntryRange"
+            },
+            "RestartValueRange": {
+              "Compute": "SleepDelayAfterEntryRange"
+            }
+          },
+          {
+            "Type": "TimerRestart",
+            "Name": "Ambient_Entry_Sleep_Gate"
+          },
+          {
+            "Type": "TimerContinue",
+            "Name": "Ambient_PostSleep_Cooldown"
+          }
+        ]
+      },
+      {
+        "$Comment": "Pick whether to keep moving or settle for ambient behavior.",
         "Sensor": {
           "Type": "State",
           "State": ".Default"
         },
-        "BodyMotion": {
-          "Type": "Sequence",
-          "Looped": true,
-          "Motions": [
-            {
-              "Type": "Timer",
-              "Time": [
-                1,
-                4
-              ],
-              "Motion": {
-                "Type": "WanderInCircle",
-                "Radius": {
-                  "Compute": "WanderRadius"
+        "Instructions": [
+          {
+            "Type": "Random",
+            "ExecuteFor": [
+              0.01,
+              0.01
+            ],
+            "Instructions": [
+              {
+                "Weight": {
+                  "Compute": "WanderMoveWeight"
                 },
-                "MaxHeadingChange": {
-                  "Compute": "WanderMaxHeadingChange"
+                "Actions": [
+                  {
+                    "Type": "State",
+                    "State": ".Move"
+                  }
+                ]
+              },
+              {
+                "Enabled": {
+                  "Compute": "WanderSettleWeight > 0"
                 },
-                "RelativeSpeed": {
-                  "Compute": "WanderRelativeSpeed"
-                }
+                "Weight": {
+                  "Compute": "WanderSettleWeight"
+                },
+                "Actions": [
+                  {
+                    "Type": "State",
+                    "State": ".SettleEnter"
+                  }
+                ]
               }
-            },
-            {
-              "Type": "Timer",
-              "Time": [
-                1,
-                2
+            ]
+          }
+        ]
+      },
+      {
+        "$Comment": "Stop movement while transitioning into settle posture.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".SettleEnter"
+        },
+        "BodyMotion": {
+          "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "Initialize settle posture before ambient settle behavior begins.",
+        "Enabled": {
+          "Compute": "!isEmpty(BasePostureAnimation)"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".SettleEnter"
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "BasePostureAnimation"
+            }
+          },
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "SettleEntryDelayRange"
+            }
+          },
+          {
+            "Type": "State",
+            "State": ".Settle"
+          }
+        ]
+      },
+      {
+        "$Comment": "If no settle posture is configured, transition directly to settle ambient logic.",
+        "Enabled": {
+          "Compute": "isEmpty(BasePostureAnimation)"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".SettleEnter"
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Settle"
+          }
+        ]
+      },
+      {
+        "$Comment": "Movement burst.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Move"
+        },
+        "BodyMotion": {
+          "Type": "WanderInCircle",
+          "Radius": {
+            "Compute": "WanderRadius"
+          },
+          "MaxHeadingChange": {
+            "Compute": "WanderMaxHeadingChange"
+          },
+          "RelativeSpeed": {
+            "Compute": "WanderRelativeSpeed"
+          },
+          "AvoidBlockDamage": {
+            "Compute": "WanderAvoidBlockDamage"
+          }
+        }
+      },
+      {
+        "$Comment": "End movement burst and choose again.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".Move"
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "WanderMoveDurationRange"
+            }
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "Settle behavior uses shared ambient posture/flavor/sleep logic.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Settle"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Ambient_Idle",
+            "Modify": {
+              "_ExportStates": [
+                "GoSleep"
               ],
-              "Motion": {
-                "Type": "Nothing"
+              "BasePostureAnimation": {
+                "Compute": "BasePostureAnimation"
+              },
+              "StillWeight": {
+                "Compute": "StillWeight"
+              },
+              "StillDurationRange": {
+                "Compute": "StillDurationRange"
+              },
+              "DayFlavorAnimation": {
+                "Compute": "DayFlavorAnimation"
+              },
+              "DayFlavorAnimationAfter": {
+                "Compute": "DayFlavorAnimationAfter"
+              },
+              "DayFlavorAnimationLength": {
+                "Compute": "DayFlavorAnimationLength"
+              },
+              "DayTimePeriod": {
+                "Compute": "DayTimePeriod"
+              },
+              "NightFlavorAnimation": {
+                "Compute": "NightFlavorAnimation"
+              },
+              "NightFlavorAnimationAfter": {
+                "Compute": "NightFlavorAnimationAfter"
+              },
+              "NightFlavorAnimationLength": {
+                "Compute": "NightFlavorAnimationLength"
+              },
+              "AlwaysSleepAtNight": {
+                "Compute": "AlwaysSleepAtNight"
+              },
+              "DayTimeNapWeight": {
+                "Compute": "DayTimeNapWeight"
+              },
+              "CanHear": {
+                "Compute": "CanHear"
+              },
+              "HearingRange": {
+                "Compute": "HearingRange"
+              },
+              "ReactToNPCs": {
+                "Compute": "ReactToNPCs"
+              },
+              "Attitudes": {
+                "Compute": "Attitudes"
+              },
+              "SleepDelayAfterLastSleepRange": {
+                "Compute": "SleepDelayAfterLastSleepRange"
               }
             }
-          ]
-        }
+          }
+        ]
+      },
+      {
+        "$Comment": "Leave settle mode after the configured duration.",
+        "Enabled": {
+          "Compute": "isEmpty(SettleExitAnimation)"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".Settle"
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "WanderSettleDurationRange"
+            }
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "Leave settle mode with an explicit transition animation.",
+        "Enabled": {
+          "Compute": "!isEmpty(SettleExitAnimation)"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".Settle"
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "WanderSettleDurationRange"
+            }
+          },
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": {
+              "Compute": "SettleExitAnimation"
+            }
+          },
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "SettleExitDelayRange"
+            }
+          },
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
       }
     ]
   }

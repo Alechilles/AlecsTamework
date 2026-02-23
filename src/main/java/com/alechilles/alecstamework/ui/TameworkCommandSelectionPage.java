@@ -10,8 +10,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
-import com.hypixel.hytale.server.core.ui.Anchor;
-import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -107,7 +105,10 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
         commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
         commandBuilder.set("#TameworkLinkedPanelTitle.Text", "Linked Companions");
-        commandBuilder.set("#TameworkLinkedPanelSubtitle.Text", resolvePanelSubtitle());
+        commandBuilder.set(
+                "#TameworkLinkedPanelSubtitle.Text",
+                LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
+        );
 
         buildCommandButtons(commandBuilder, eventBuilder);
         buildLinkedNpcPanel(commandBuilder, eventBuilder);
@@ -128,7 +129,7 @@ public final class TameworkCommandSelectionPage
             if (unlinkCallback == null) {
                 return;
             }
-            UUID npcUuid = parseUnlinkNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, UNLINK_COMMAND_PREFIX);
             if (npcUuid != null) {
                 if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
                     pendingUnlinkNpcUuid = npcUuid;
@@ -146,7 +147,7 @@ public final class TameworkCommandSelectionPage
             if (respawnCallback == null) {
                 return;
             }
-            UUID npcUuid = parseRespawnNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, RESPAWN_COMMAND_PREFIX);
             if (npcUuid != null) {
                 respawnCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -159,7 +160,7 @@ public final class TameworkCommandSelectionPage
             if (recallCallback == null) {
                 return;
             }
-            UUID npcUuid = parseRecallNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, RECALL_COMMAND_PREFIX);
             if (npcUuid != null) {
                 recallCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -172,7 +173,7 @@ public final class TameworkCommandSelectionPage
             if (setHomeCallback == null) {
                 return;
             }
-            UUID npcUuid = parseSetHomeNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, SET_HOME_COMMAND_PREFIX);
             if (npcUuid != null) {
                 setHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -185,7 +186,7 @@ public final class TameworkCommandSelectionPage
             if (returnHomeCallback == null) {
                 return;
             }
-            UUID npcUuid = parseReturnHomeNpcUuid(data.commandId);
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, RETURN_HOME_COMMAND_PREFIX);
             if (npcUuid != null) {
                 returnHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
@@ -244,99 +245,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         for (int i = 0; i < linkedNpcEntries.length; i++) {
-            LinkedNpcEntry entry = linkedNpcEntries[i];
-            String entrySelector = "#TameworkLinkedPanelList[" + i + "]";
-            String nameSelector = entrySelector + " #Name";
-            String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
-            String statusConfirmSelector = entrySelector + " #StatusConfirm";
-            String healthTextSelector = entrySelector + " #HealthText";
-            String healthFillSelector = entrySelector + " #HealthFill";
-            String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
-            String tertiaryStatFrameSelector = entrySelector + " #FutureStatBFrame";
-            String futureActionBarSelector = entrySelector + " #FutureActionBar";
-            String traitsButtonSelector = entrySelector + " #TraitsButton";
-            String talentsButtonSelector = entrySelector + " #TalentsButton";
-            String removeSelector = entrySelector + " #RemoveButton";
-            String respawnSelector = entrySelector + " #RespawnButton";
-            String recallSelector = entrySelector + " #RecallButton";
-            String setHomeSelector = entrySelector + " #SetHomeButton";
-            String returnHomeSelector = entrySelector + " #ReturnHomeButton";
-
-            commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
-            commandBuilder.set(nameSelector + ".Text", entry.displayName());
-            boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
-            boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
-            boolean showRecall = !entry.dead() && !entry.captured() && !pendingUnlink;
-            boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
-            boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
-            commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-            commandBuilder.set(statusUnloadedSelector + ".Text", resolveAvailabilityStatusText(entry));
-            commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
-            if (entry.hasHealth()) {
-                commandBuilder.set(
-                        healthTextSelector + ".Text",
-                        "Health: " + entry.currentHealth() + "/" + entry.maxHealth()
-                );
-                commandBuilder.set(healthFillSelector + ".Visible", true);
-                commandBuilder.setObject(healthFillSelector + ".Anchor", buildHealthFillAnchor(entry.healthRatio()));
-            } else if (entry.dead()) {
-                commandBuilder.set(healthTextSelector + ".Text", resolveDeadHealthText(entry));
-                commandBuilder.set(healthFillSelector + ".Visible", false);
-            } else if (!entry.loaded()) {
-                commandBuilder.set(healthTextSelector + ".Text", resolveUnavailableHealthText(entry));
-                commandBuilder.set(healthFillSelector + ".Visible", false);
-            } else {
-                commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
-                commandBuilder.set(healthFillSelector + ".Visible", false);
-            }
-            commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
-            commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
-            commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
-            commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
-            commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
-            commandBuilder.set(respawnSelector + ".Visible", showRespawn);
-            commandBuilder.set(recallSelector + ".Visible", showRecall);
-            commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
-            commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
-            commandBuilder.set(removeSelector + ".Text", "");
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    removeSelector,
-                    EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-            if (showRespawn) {
-                eventBuilder.addEventBinding(
-                        CustomUIEventBindingType.Activating,
-                        respawnSelector,
-                        EventData.of(EVENT_COMMAND_ID, RESPAWN_COMMAND_PREFIX + entry.npcUuid()),
-                        false
-                );
-            }
-            if (showRecall) {
-                eventBuilder.addEventBinding(
-                        CustomUIEventBindingType.Activating,
-                        recallSelector,
-                        EventData.of(EVENT_COMMAND_ID, RECALL_COMMAND_PREFIX + entry.npcUuid()),
-                        false
-                );
-            }
-            if (showSetHome) {
-                eventBuilder.addEventBinding(
-                        CustomUIEventBindingType.Activating,
-                        setHomeSelector,
-                        EventData.of(EVENT_COMMAND_ID, SET_HOME_COMMAND_PREFIX + entry.npcUuid()),
-                        false
-                );
-            }
-            if (showReturnHome) {
-                eventBuilder.addEventBinding(
-                        CustomUIEventBindingType.Activating,
-                        returnHomeSelector,
-                        EventData.of(EVENT_COMMAND_ID, RETURN_HOME_COMMAND_PREFIX + entry.npcUuid()),
-                        false
-                );
-            }
+            bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true);
         }
     }
 
@@ -392,104 +301,16 @@ public final class TameworkCommandSelectionPage
     private void sendCardRefreshUpdate() {
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
-        commandBuilder.set("#TameworkLinkedPanelSubtitle.Text", resolvePanelSubtitle());
+        commandBuilder.set(
+                "#TameworkLinkedPanelSubtitle.Text",
+                LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
+        );
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
         if (hasEntries) {
             for (int i = 0; i < linkedNpcEntries.length; i++) {
-                LinkedNpcEntry entry = linkedNpcEntries[i];
-                String entrySelector = "#TameworkLinkedPanelList[" + i + "]";
-                String nameSelector = entrySelector + " #Name";
-                String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
-                String statusConfirmSelector = entrySelector + " #StatusConfirm";
-                String healthTextSelector = entrySelector + " #HealthText";
-                String healthFillSelector = entrySelector + " #HealthFill";
-                String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
-                String tertiaryStatFrameSelector = entrySelector + " #FutureStatBFrame";
-                String futureActionBarSelector = entrySelector + " #FutureActionBar";
-                String traitsButtonSelector = entrySelector + " #TraitsButton";
-                String talentsButtonSelector = entrySelector + " #TalentsButton";
-                String removeSelector = entrySelector + " #RemoveButton";
-                String respawnSelector = entrySelector + " #RespawnButton";
-                String recallSelector = entrySelector + " #RecallButton";
-                String setHomeSelector = entrySelector + " #SetHomeButton";
-                String returnHomeSelector = entrySelector + " #ReturnHomeButton";
-
-                commandBuilder.set(nameSelector + ".Text", entry.displayName());
-                boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
-                boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
-                boolean showRecall = !entry.dead() && !entry.captured() && !pendingUnlink;
-                boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
-                boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
-                commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-                commandBuilder.set(statusUnloadedSelector + ".Text", resolveAvailabilityStatusText(entry));
-                commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
-                if (entry.hasHealth()) {
-                    commandBuilder.set(
-                            healthTextSelector + ".Text",
-                            "Health: " + entry.currentHealth() + "/" + entry.maxHealth()
-                    );
-                    commandBuilder.set(healthFillSelector + ".Visible", true);
-                    commandBuilder.setObject(healthFillSelector + ".Anchor", buildHealthFillAnchor(entry.healthRatio()));
-                } else if (entry.dead()) {
-                    commandBuilder.set(healthTextSelector + ".Text", resolveDeadHealthText(entry));
-                    commandBuilder.set(healthFillSelector + ".Visible", false);
-                } else if (!entry.loaded()) {
-                    commandBuilder.set(healthTextSelector + ".Text", resolveUnavailableHealthText(entry));
-                    commandBuilder.set(healthFillSelector + ".Visible", false);
-                } else {
-                    commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
-                    commandBuilder.set(healthFillSelector + ".Visible", false);
-                }
-                commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
-                commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
-                commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
-                commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
-                commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
-                commandBuilder.set(respawnSelector + ".Visible", showRespawn);
-                commandBuilder.set(recallSelector + ".Visible", showRecall);
-                commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
-                commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
-                commandBuilder.set(removeSelector + ".Text", "");
-                eventBuilder.addEventBinding(
-                        CustomUIEventBindingType.Activating,
-                        removeSelector,
-                        EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid()),
-                        false
-                );
-                if (showRespawn) {
-                    eventBuilder.addEventBinding(
-                            CustomUIEventBindingType.Activating,
-                            respawnSelector,
-                            EventData.of(EVENT_COMMAND_ID, RESPAWN_COMMAND_PREFIX + entry.npcUuid()),
-                            false
-                    );
-                }
-                if (showRecall) {
-                    eventBuilder.addEventBinding(
-                            CustomUIEventBindingType.Activating,
-                            recallSelector,
-                            EventData.of(EVENT_COMMAND_ID, RECALL_COMMAND_PREFIX + entry.npcUuid()),
-                            false
-                    );
-                }
-                if (showSetHome) {
-                    eventBuilder.addEventBinding(
-                            CustomUIEventBindingType.Activating,
-                            setHomeSelector,
-                            EventData.of(EVENT_COMMAND_ID, SET_HOME_COMMAND_PREFIX + entry.npcUuid()),
-                            false
-                    );
-                }
-                if (showReturnHome) {
-                    eventBuilder.addEventBinding(
-                            CustomUIEventBindingType.Activating,
-                            returnHomeSelector,
-                            EventData.of(EVENT_COMMAND_ID, RETURN_HOME_COMMAND_PREFIX + entry.npcUuid()),
-                            false
-                    );
-                }
+                bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false);
             }
         }
         bindCommandButtonEvents(eventBuilder);
@@ -521,25 +342,115 @@ public final class TameworkCommandSelectionPage
         );
     }
 
-    private String resolvePanelSubtitle() {
-        int total = linkedNpcEntries.length;
-        if (pendingUnlinkNpcUuid != null) {
-            String pendingName = resolvePendingUnlinkName(pendingUnlinkNpcUuid);
-            if (pendingName == null || pendingName.isBlank()) {
-                pendingName = "this companion";
-            }
-            return "Click X again to remove " + pendingName;
+    private void bindLinkedNpcCard(@Nonnull UICommandBuilder commandBuilder,
+                                   @Nonnull UIEventBuilder eventBuilder,
+                                   int index,
+                                   LinkedNpcEntry entry,
+                                   boolean appendCard) {
+        String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
+        String nameSelector = entrySelector + " #Name";
+        String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
+        String statusConfirmSelector = entrySelector + " #StatusConfirm";
+        String healthTextSelector = entrySelector + " #HealthText";
+        String healthFillSelector = entrySelector + " #HealthFill";
+        String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
+        String tertiaryStatFrameSelector = entrySelector + " #FutureStatBFrame";
+        String futureActionBarSelector = entrySelector + " #FutureActionBar";
+        String traitsButtonSelector = entrySelector + " #TraitsButton";
+        String talentsButtonSelector = entrySelector + " #TalentsButton";
+        String removeSelector = entrySelector + " #RemoveButton";
+        String respawnSelector = entrySelector + " #RespawnButton";
+        String recallSelector = entrySelector + " #RecallButton";
+        String setHomeSelector = entrySelector + " #SetHomeButton";
+        String returnHomeSelector = entrySelector + " #ReturnHomeButton";
+
+        if (appendCard) {
+            commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
         }
-        if (total <= 0) {
-            return "No linked companions";
+        commandBuilder.set(nameSelector + ".Text", entry.displayName());
+        boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
+        boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
+        boolean showRecall = !entry.dead() && !entry.captured() && !pendingUnlink;
+        boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
+        boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
+        commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
+        commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
+        commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
+        if (entry.hasHealth()) {
+            commandBuilder.set(
+                    healthTextSelector + ".Text",
+                    "Health: " + entry.currentHealth() + "/" + entry.maxHealth()
+            );
+            commandBuilder.set(healthFillSelector + ".Visible", true);
+            commandBuilder.setObject(
+                    healthFillSelector + ".Anchor",
+                    LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(entry.healthRatio(), HEALTH_FILL_MAX_WIDTH)
+            );
+        } else if (entry.dead()) {
+            commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry));
+            commandBuilder.set(healthFillSelector + ".Visible", false);
+        } else if (!entry.loaded()) {
+            commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(entry));
+            commandBuilder.set(healthFillSelector + ".Visible", false);
+        } else {
+            commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
+            commandBuilder.set(healthFillSelector + ".Visible", false);
         }
-        return total + " linked companion" + (total == 1 ? "" : "s");
+        commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
+        commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
+        commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
+        commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
+        commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
+        commandBuilder.set(respawnSelector + ".Visible", showRespawn);
+        commandBuilder.set(recallSelector + ".Visible", showRecall);
+        commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
+        commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
+        commandBuilder.set(removeSelector + ".Text", "");
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                removeSelector,
+                EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid()),
+                false
+        );
+        if (showRespawn) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    respawnSelector,
+                    EventData.of(EVENT_COMMAND_ID, RESPAWN_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showRecall) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    recallSelector,
+                    EventData.of(EVENT_COMMAND_ID, RECALL_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showSetHome) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    setHomeSelector,
+                    EventData.of(EVENT_COMMAND_ID, SET_HOME_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showReturnHome) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    returnHomeSelector,
+                    EventData.of(EVENT_COMMAND_ID, RETURN_HOME_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
     }
 
     private void refreshLinkedNpcEntries() {
         List<LinkedNpcEntry> entries = linkedNpcEntriesSupplier != null ? linkedNpcEntriesSupplier.get() : List.of();
         linkedNpcEntries = buildLinkedNpcEntries(entries);
-        if (pendingUnlinkNpcUuid != null && resolvePendingUnlinkName(pendingUnlinkNpcUuid) == null) {
+        if (pendingUnlinkNpcUuid != null
+                && !LinkedNpcPanelSubtitleService.containsEntry(linkedNpcEntries, pendingUnlinkNpcUuid)) {
             pendingUnlinkNpcUuid = null;
         }
     }
@@ -549,7 +460,7 @@ public final class TameworkCommandSelectionPage
             return false;
         }
         for (CommandOption option : options) {
-            if (option != null && commandIdEquals(option.id, commandId)) {
+            if (option != null && CommandUiIdParser.commandIdEquals(option.id, commandId)) {
                 return true;
             }
         }
@@ -561,7 +472,7 @@ public final class TameworkCommandSelectionPage
             return "Current: none";
         }
         for (CommandOption option : options) {
-            if (option != null && commandIdEquals(option.id, selectedCommandId)) {
+            if (option != null && CommandUiIdParser.commandIdEquals(option.id, selectedCommandId)) {
                 return "Current: " + option.label;
             }
         }
@@ -628,60 +539,6 @@ public final class TameworkCommandSelectionPage
         return out.toArray(new LinkedNpcEntry[0]);
     }
 
-    private static Anchor buildHealthFillAnchor(double ratio) {
-        int width = (int) Math.round(Math.max(0.0, Math.min(1.0, ratio)) * HEALTH_FILL_MAX_WIDTH);
-        Anchor anchor = new Anchor();
-        anchor.setLeft(Value.of(1));
-        anchor.setTop(Value.of(1));
-        anchor.setWidth(Value.of(width));
-        anchor.setHeight(Value.of(12));
-        return anchor;
-    }
-
-    private String resolveDeadHealthText(LinkedNpcEntry entry) {
-        if (entry == null || !entry.dead()) {
-            return "Dead";
-        }
-        if (entry.deadRespawnRemainingMs() < 0L) {
-            return "Dead: respawn disabled.";
-        }
-        long remainingMs = Math.max(0L, entry.deadRespawnRemainingMs());
-        if (remainingMs <= 0L) {
-            return "Dead: ready to respawn.";
-        }
-        return "Dead: respawn in " + formatRemainingTime(remainingMs) + ".";
-    }
-
-    private String resolveAvailabilityStatusText(LinkedNpcEntry entry) {
-        if (entry == null) {
-            return "UNLOADED";
-        }
-        if (entry.dead()) {
-            return "DEAD";
-        }
-        if (entry.captured()) {
-            return "CAPTURED";
-        }
-        return "UNLOADED";
-    }
-
-    private String resolveUnavailableHealthText(LinkedNpcEntry entry) {
-        if (entry != null && entry.captured()) {
-            return "Captured in item.";
-        }
-        return "Unloaded (commands still queue).";
-    }
-
-    private String formatRemainingTime(long remainingMs) {
-        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
-        long minutes = totalSeconds / 60L;
-        long seconds = totalSeconds % 60L;
-        if (minutes <= 0L) {
-            return seconds + "s";
-        }
-        return minutes + "m " + seconds + "s";
-    }
-
     private static String resolveLabel(CommandEntry entry) {
         if (entry.getDisplayName() != null && !entry.getDisplayName().isBlank()) {
             return entry.getDisplayName();
@@ -689,105 +546,8 @@ public final class TameworkCommandSelectionPage
         return entry.getId();
     }
 
-    private static boolean commandIdEquals(String left, String right) {
-        if (left == null || right == null || left.isBlank() || right.isBlank()) {
-            return false;
-        }
-        return left.trim().equalsIgnoreCase(right.trim());
-    }
-
     private boolean isPendingUnlink(UUID npcUuid) {
         return npcUuid != null && pendingUnlinkNpcUuid != null && pendingUnlinkNpcUuid.equals(npcUuid);
-    }
-
-    private String resolvePendingUnlinkName(UUID pendingUuid) {
-        if (pendingUuid == null || linkedNpcEntries.length == 0) {
-            return null;
-        }
-        for (LinkedNpcEntry entry : linkedNpcEntries) {
-            if (entry == null || entry.npcUuid() == null) {
-                continue;
-            }
-            if (pendingUuid.equals(entry.npcUuid())) {
-                return entry.displayName();
-            }
-        }
-        return null;
-    }
-
-    private UUID parseUnlinkNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(UNLINK_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(UNLINK_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseRespawnNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(RESPAWN_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(RESPAWN_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseRecallNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(RECALL_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(RECALL_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseSetHomeNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(SET_HOME_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(SET_HOME_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-    }
-
-    private UUID parseReturnHomeNpcUuid(String commandId) {
-        if (commandId == null || !commandId.startsWith(RETURN_HOME_COMMAND_PREFIX)) {
-            return null;
-        }
-        String raw = commandId.substring(RETURN_HOME_COMMAND_PREFIX.length());
-        if (raw.isBlank()) {
-            return null;
-        }
-        try {
-            return UUID.fromString(raw);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
     }
 
     private record CommandOption(String id, String label) { }
