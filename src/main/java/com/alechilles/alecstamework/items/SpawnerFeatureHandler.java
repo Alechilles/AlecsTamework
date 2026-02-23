@@ -69,6 +69,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerOwnershipPolicyService ownershipPolicyService;
     private final SpawnerSpawnPositionService spawnPositionService;
     private final SpawnerCaptureMetadataService captureMetadataService;
+    private final SpawnerRolePolicyService rolePolicyService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -79,6 +80,7 @@ public final class SpawnerFeatureHandler {
         this.ownershipPolicyService = new SpawnerOwnershipPolicyService();
         this.spawnPositionService = new SpawnerSpawnPositionService(logger);
         this.captureMetadataService = new SpawnerCaptureMetadataService(logger, registry);
+        this.rolePolicyService = new SpawnerRolePolicyService(logger);
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -232,11 +234,11 @@ public final class SpawnerFeatureHandler {
         if (!isFilledItem(itemStack, config)) {
             return false;
         }
-        String roleId = resolveSpawnRoleId(itemStack, config);
+        String roleId = rolePolicyService.resolveSpawnRoleId(itemStack);
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
-        return isRoleAllowed(roleId, config);
+        return rolePolicyService.isRoleAllowed(roleId, config);
     }
 
     // Used by TameworkSpawnInteraction: capture from a targeted NPC using the held spawner item.
@@ -290,12 +292,12 @@ public final class SpawnerFeatureHandler {
         CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
                 linkedNpcSyncService.getCapturedSnapshot(capturedNpcUuid);
 
-        String roleId = resolveSpawnRoleId(itemStack, config);
+        String roleId = rolePolicyService.resolveSpawnRoleId(itemStack);
         if (roleId == null || roleId.isBlank()) {
             logger.at(Level.FINE).log("Spawner spawn: missing role for item=" + itemStack.getItemId());
             return false;
         }
-        if (!isRoleAllowed(roleId, config)) {
+        if (!rolePolicyService.isRoleAllowed(roleId, config)) {
             logger.at(Level.FINE).log("Spawner spawn: role not allowed role=" + roleId);
             return false;
         }
@@ -432,25 +434,6 @@ public final class SpawnerFeatureHandler {
                 .build();
     }
 
-    private String resolveSpawnRoleId(ItemStack itemStack, ItemFeatureConfig config) {
-        if (itemStack != null) {
-            String capturedRoleId = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING);
-            if (capturedRoleId != null && !capturedRoleId.isBlank()) {
-                return capturedRoleId;
-            }
-        }
-        String roleId = resolveRoleIdFromMetadata(itemStack);
-        if (roleId != null && !roleId.isBlank()) {
-            return roleId;
-        }
-        return null;
-    }
-
-    private String resolveRoleIdFromMetadata(ItemStack itemStack) {
-        CapturedNPCMetadata meta = CapturedNpcMetadataCompat.readMetadata(itemStack, logger);
-        return CapturedNpcMetadataCompat.resolveRoleId(meta);
-    }
-
     // Called by NPC action chains to capture an NPC into the held spawner item.
     public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
         if (player == null || targetRef == null || itemStack == null || config == null) {
@@ -574,8 +557,8 @@ public final class SpawnerFeatureHandler {
         if (npc == null) {
             return false;
         }
-        String roleId = resolveRoleIdFromNpc(npc);
-        if (!isRoleAllowed(roleId, config)) {
+        String roleId = rolePolicyService.resolveRoleIdFromNpc(npc);
+        if (!rolePolicyService.isRoleAllowed(roleId, config)) {
             return false;
         }
         if (config.isCaptureRequireTamed() && !resolveTamedState(targetRef, world)) {
@@ -593,52 +576,6 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         return isWithinCaptureDistance(player, targetRef, config, store);
-    }
-
-    private String resolveRoleIdFromNpc(NPCEntity npc) {
-        if (npc == null) {
-            return null;
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
-        int roleIndex = npc.getRoleIndex();
-        if (roleIndex >= 0) {
-            String nameKey = NPCPlugin.get().getName(roleIndex);
-            if (nameKey != null && !nameKey.isBlank()) {
-                return nameKey;
-            }
-        }
-        return null;
-    }
-
-    private boolean isRoleAllowed(String roleId, ItemFeatureConfig config) {
-        if (config == null) {
-            return false;
-        }
-        ItemFeatureConfig.RoleListMode mode = config.getSpawnerRoleListMode();
-        if (mode == null || mode == ItemFeatureConfig.RoleListMode.ANY) {
-            return true;
-        }
-        if (mode == ItemFeatureConfig.RoleListMode.ALLOW) {
-            if (roleId == null || roleId.isBlank()) {
-                return false;
-            }
-            List<String> allow = config.getSpawnerRoleAllowlist();
-            return allow != null && allow.contains(roleId);
-        }
-        if (mode == ItemFeatureConfig.RoleListMode.DENY) {
-            List<String> deny = config.getSpawnerRoleDenylist();
-            if (deny == null || deny.isEmpty()) {
-                return true;
-            }
-            if (roleId == null || roleId.isBlank()) {
-                return true;
-            }
-            return !deny.contains(roleId);
-        }
-        return true;
     }
 
     private boolean isWithinCaptureDistance(Player player,
