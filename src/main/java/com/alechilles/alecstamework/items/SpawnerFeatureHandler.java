@@ -41,11 +41,9 @@ import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
-import org.bson.BsonDocument;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -70,6 +68,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerSpawnPositionService spawnPositionService;
     private final SpawnerCaptureMetadataService captureMetadataService;
     private final SpawnerRolePolicyService rolePolicyService;
+    private final SpawnerItemStackMetadataService itemStackMetadataService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -81,6 +80,7 @@ public final class SpawnerFeatureHandler {
         this.spawnPositionService = new SpawnerSpawnPositionService(logger);
         this.captureMetadataService = new SpawnerCaptureMetadataService(logger, registry);
         this.rolePolicyService = new SpawnerRolePolicyService(logger);
+        this.itemStackMetadataService = new SpawnerItemStackMetadataService(registry, captureMetadataService);
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -213,7 +213,7 @@ public final class SpawnerFeatureHandler {
         if (config == null || !config.isSpawnerEnabled()) {
             return false;
         }
-        if (isAlreadyCaptured(itemStack)) {
+        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
             return false;
         }
         return canCapture(player, targetRef, config, itemStack);
@@ -231,7 +231,7 @@ public final class SpawnerFeatureHandler {
         if (isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
             return false;
         }
-        if (!isFilledItem(itemStack, config)) {
+        if (!itemStackMetadataService.isFilledItem(itemStack, config)) {
             return false;
         }
         String roleId = rolePolicyService.resolveSpawnRoleId(itemStack);
@@ -250,7 +250,7 @@ public final class SpawnerFeatureHandler {
         if (config == null || !config.isSpawnerEnabled()) {
             return false;
         }
-        if (isAlreadyCaptured(itemStack)) {
+        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
             logger.at(Level.FINE).log(
                     "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
             );
@@ -285,7 +285,7 @@ public final class SpawnerFeatureHandler {
         if (isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
             return false;
         }
-        if (!isFilledItem(itemStack, config)) {
+        if (!itemStackMetadataService.isFilledItem(itemStack, config)) {
             return false;
         }
         UUID capturedNpcUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING);
@@ -356,14 +356,16 @@ public final class SpawnerFeatureHandler {
         linkedNpcSyncService.clearCapturedSnapshotIfPresent(capturedNpcUuid);
 
         ItemStack updated = itemStack;
-        if (isAlreadyCaptured(itemStack)) {
-            String emptyItemId = emptyItemIdOverride != null ? emptyItemIdOverride : resolveEmptyItemId(itemStack.getItemId());
+        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
+            String emptyItemId = emptyItemIdOverride != null
+                    ? emptyItemIdOverride
+                    : itemStackMetadataService.resolveEmptyItemId(itemStack.getItemId());
             if (emptyItemId != null && !emptyItemId.isBlank()) {
-                updated = swapItemId(updated, emptyItemId);
+                updated = itemStackMetadataService.swapItemId(updated, emptyItemId);
             }
-            updated = clearCapturedMetadata(updated);
+            updated = itemStackMetadataService.clearCapturedMetadata(updated);
         }
-        updated = applyCooldown(updated, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs());
+        updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs());
 
         boolean updatedOk = hotbarSlot != null
                 ? updateHotbarSlot(player, hotbarSlot, updated)
@@ -389,7 +391,7 @@ public final class SpawnerFeatureHandler {
         if (config != null) {
             return config;
         }
-        String emptyItemId = resolveEmptyItemId(itemId);
+        String emptyItemId = itemStackMetadataService.resolveEmptyItemId(itemId);
         if (emptyItemId != null && !emptyItemId.isBlank()) {
             return registry.get(emptyItemId);
         }
@@ -439,7 +441,7 @@ public final class SpawnerFeatureHandler {
         if (player == null || targetRef == null || itemStack == null || config == null) {
             return false;
         }
-        if (isAlreadyCaptured(itemStack)) {
+        if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
             logger.at(Level.FINE).log(
                     "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
             );
@@ -503,7 +505,7 @@ public final class SpawnerFeatureHandler {
                 snapshotDisplayName
         );
 
-        ItemStack updated = swapItemId(itemStack, config.getSpawnerFilledItemId())
+        ItemStack updated = itemStackMetadataService.swapItemId(itemStack, config.getSpawnerFilledItemId())
                 .withMetadata(TameworkMetadataKeys.CAPTURED, Codec.BOOLEAN, true)
                 .withMetadata(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING, targetUuid);
         if (attachmentsJson != null) {
@@ -513,15 +515,15 @@ public final class SpawnerFeatureHandler {
         if (tamed) {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
-        updated = applyOwnerMetadata(updated, ownerToStore);
+        updated = itemStackMetadataService.applyOwnerMetadata(updated, ownerToStore);
         if (captureInfo.npcNameKey() != null && !captureInfo.npcNameKey().isBlank()) {
             updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureInfo.npcNameKey());
         } else {
-            updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
+            updated = itemStackMetadataService.clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
         }
         updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
         updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
-        updated = applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
+        updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
 
         if (!updateHeldItem(player, updated)) {
             logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
@@ -658,7 +660,9 @@ public final class SpawnerFeatureHandler {
             }
         }
         return refs;
-    }    private boolean isCooldownActive(ItemStack itemStack, String key, int cooldownMs) {
+    }
+
+    private boolean isCooldownActive(ItemStack itemStack, String key, int cooldownMs) {
         if (itemStack == null || key == null || cooldownMs <= 0) {
             return false;
         }
@@ -667,49 +671,6 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         return until > System.currentTimeMillis();
-    }
-
-    private ItemStack applyCooldown(ItemStack itemStack, String key, int cooldownMs) {
-        if (itemStack == null || key == null || cooldownMs <= 0) {
-            return itemStack;
-        }
-        long until = System.currentTimeMillis() + cooldownMs;
-        return itemStack.withMetadata(key, Codec.LONG, until);
-    }
-
-
-
-    private boolean isAlreadyCaptured(ItemStack itemStack) {
-        if (itemStack == null) {
-            return false;
-        }
-        String itemId = itemStack.getItemId();
-        if (itemId != null && itemId.contains("_State_")) {
-            return true;
-        }
-        Boolean captured = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.CAPTURED,
-                Codec.BOOLEAN
-        );
-        return Boolean.TRUE.equals(captured);
-    }
-
-    private boolean isFilledItem(ItemStack itemStack, ItemFeatureConfig config) {
-        if (itemStack == null || itemStack.getItemId() == null) {
-            return false;
-        }
-        String itemId = itemStack.getItemId();
-        if (itemId.contains("_State_")) {
-            return true;
-        }
-        Boolean captured = itemStack.getFromMetadataOrNull(
-                TameworkMetadataKeys.CAPTURED,
-                Codec.BOOLEAN
-        );
-        if (captured != null) {
-            return captured;
-        }
-        return false;
     }
 
     private void applyOwner(ItemFeatureConfig config,
@@ -890,83 +851,6 @@ public final class SpawnerFeatureHandler {
         }
     }
 
-    private ItemStack swapItemId(ItemStack stack, String itemId) {
-        if (stack == null || itemId == null || itemId.isBlank()) {
-            return stack;
-        }
-        if (itemId.equals(stack.getItemId())) {
-            return stack;
-        }
-        return new ItemStack(
-                itemId,
-                stack.getQuantity(),
-                stack.getDurability(),
-                stack.getMaxDurability(),
-                stack.getMetadata()
-        );
-    }
-
-    // Removes captured metadata and resets the item to its empty state.
-    private ItemStack clearCapturedMetadata(ItemStack stack) {
-        if (stack == null) {
-            return null;
-        }
-        ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.CAPTURED);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.TARGET_UUID);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.TARGET_ENTITY_ID);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.ATTACHMENTS);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.TAMED);
-        updated = captureMetadataService.clearNameMetadata(updated);
-        updated = updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, null);
-        return updated;
-    }
-
-    private String resolveEmptyItemId(String currentItemId) {
-        if (currentItemId == null || registry == null) {
-            return null;
-        }
-        String normalized = ItemFeatureRegistry.normalizeStateItemId(currentItemId);
-        for (Map.Entry<String, ItemFeatureConfig> entry : registry.snapshot().entrySet()) {
-            ItemFeatureConfig cfg = entry.getValue();
-            if (cfg == null) {
-                continue;
-            }
-            String filledId = cfg.getSpawnerFilledItemId();
-            if (filledId == null || filledId.isBlank()) {
-                continue;
-            }
-            String normalizedFilled = ItemFeatureRegistry.normalizeStateItemId(filledId);
-            if (normalized != null && normalized.equals(normalizedFilled)) {
-                return entry.getKey();
-            }
-        }
-        return null;
-    }
-
-    private ItemStack applyOwnerMetadata(ItemStack updated, UUID ownerUuid) {
-        if (updated == null) {
-            return null;
-        }
-        if (ownerUuid == null) {
-            return clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
-        }
-        return updated.withMetadata(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING, ownerUuid);
-    }
-
-    private ItemStack clearMetadataKey(ItemStack stack, String key) {
-        if (stack == null || key == null) {
-            return stack;
-        }
-        BsonDocument metadata = stack.getMetadata();
-        if (metadata == null || !metadata.containsKey(key)) {
-            return stack;
-        }
-        BsonDocument copy = metadata.clone();
-        copy.remove(key);
-        return stack.withMetadata(copy);
-    }
 
     private boolean resolveTamedState(Ref<EntityStore> targetRef, World world) {
         if (targetRef == null || world == null || !targetRef.isValid()) {
