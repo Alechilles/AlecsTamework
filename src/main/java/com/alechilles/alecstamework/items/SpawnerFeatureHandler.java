@@ -24,16 +24,10 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
-import com.hypixel.hytale.server.core.universe.world.SoundUtil;
-import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
-import com.hypixel.hytale.protocol.SoundCategory;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -56,6 +50,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerNpcStateService npcStateService;
     private final SpawnerPlayerInventoryService playerInventoryService;
     private final SpawnerAttachmentService attachmentService;
+    private final SpawnerEffectService effectService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
@@ -71,6 +66,7 @@ public final class SpawnerFeatureHandler {
         this.npcStateService = new SpawnerNpcStateService();
         this.playerInventoryService = new SpawnerPlayerInventoryService();
         this.attachmentService = new SpawnerAttachmentService(logger);
+        this.effectService = new SpawnerEffectService();
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -365,7 +361,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
 
-        spawnSpawnParticles(world, npcRef, config);
+        effectService.playSpawnEffects(world, npcRef, config);
         return true;
     }
 
@@ -519,7 +515,7 @@ public final class SpawnerFeatureHandler {
             logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
             return false;
         }
-        spawnCaptureParticles(world, targetRef, config);
+        effectService.playCaptureEffects(world, targetRef, config);
         clearOwnerIfConfigured(player, config, targetRef);
         despawnNpc(player, targetRef, null);
 
@@ -597,59 +593,6 @@ public final class SpawnerFeatureHandler {
         double dz = p.z - t.z;
         double maxDistSq = maxDistance * maxDistance;
         return (dx * dx + dy * dy + dz * dz) <= maxDistSq;
-    }
-
-    private void spawnSpawnParticles(World world, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
-        if (config == null) {
-            return;
-        }
-        spawnEffects(world, targetRef, config.getSpawnParticleSystem(), config.getSpawnSoundEvent());
-    }
-
-    private void spawnCaptureParticles(World world, Ref<EntityStore> targetRef, ItemFeatureConfig config) {
-        if (config == null) {
-            return;
-        }
-        spawnEffects(world, targetRef, config.getCaptureParticleSystem(), config.getCaptureSoundEvent());
-    }
-
-    private void spawnEffects(World world, Ref<EntityStore> targetRef, String particleSystem, String soundEvent) {
-        if (world == null || targetRef == null || !targetRef.isValid()) {
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
-        if (transform == null) {
-            return;
-        }
-        Vector3d position = new Vector3d(transform.getPosition());
-        List<Ref<EntityStore>> playerRefs = resolvePlayerRefs(world);
-        if (particleSystem != null && !particleSystem.isBlank() && !playerRefs.isEmpty()) {
-            ParticleUtil.spawnParticleEffect(particleSystem, position, targetRef, playerRefs, store);
-        }
-        if (soundEvent != null && !soundEvent.isBlank()) {
-            int soundEventIndex = SoundEvent.getAssetMap().getIndex(soundEvent);
-            if (soundEventIndex > 0) {
-                SoundUtil.playSoundEvent3d(soundEventIndex, SoundCategory.SFX, position, store);
-            }
-        }
-    }
-
-    private List<Ref<EntityStore>> resolvePlayerRefs(World world) {
-        if (world == null) {
-            return List.of();
-        }
-        List<Ref<EntityStore>> refs = new ArrayList<>();
-        for (PlayerRef playerRef : world.getPlayerRefs()) {
-            if (playerRef == null) {
-                continue;
-            }
-            Ref<EntityStore> ref = playerRef.getReference();
-            if (ref != null && ref.isValid()) {
-                refs.add(ref);
-            }
-        }
-        return refs;
     }
 
     private boolean isCooldownActive(ItemStack itemStack, String key, int cooldownMs) {
