@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 2.1.2 - Wander and Ambient Behavior Refinements - 2026-02-23
 ### Added
 - New `Component_Tamework_Instruction_Wander` component for reusable random wandering within a configurable radius.
 - New `Component_Tamework_Instruction_Ambient_Idle` component that centralizes reusable ambient posture/flavor/sleep behavior for idle-style states.
