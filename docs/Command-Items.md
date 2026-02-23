@@ -7,7 +7,7 @@ Command items let players link companion NPCs to a tool and issue commands at ru
 The system is asset-driven and built around:
 - `TwCommandItemConfig` assets
 - `TameworkCommand` item interaction
-- `CommandItemFeatureHandler` runtime dispatch
+- `CommandItemFeatureHandler` orchestration
 - Optional NPC instruction bridge `Component_Tamework_Instruction_Command_Move`
 
 Core behaviors:
@@ -15,6 +15,18 @@ Core behaviors:
 - Select a command (cycle or radial menu).
 - Execute command steps on matching recipients.
 - Queue relocation-style commands for unloaded linked NPCs and apply when chunks/entities are available.
+
+## Runtime Architecture (Contributor View)
+Command runtime is intentionally split so one class does not own all logic:
+- Orchestrator: `CommandItemFeatureHandler`
+- Selection/resolution: `CommandResolutionService`, `CommandRecipientService`
+- Link persistence/mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`
+- Step execution + move/home behavior: `CommandStepExecutionService`, `CommandMenuMoveService`
+- Off-screen relocation + revive: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandRespawnService`, `CommandLinkedNpcDeathService`
+- Panel view-model assembly: `CommandLinkedPanelEntryService`
+- Player feedback: `CommandFeedbackService`
+
+This split is important for maintainability and testability; add new logic to the matching service domain instead of growing the orchestrator.
 
 ## Asset and Item Wiring
 - Command config assets:
