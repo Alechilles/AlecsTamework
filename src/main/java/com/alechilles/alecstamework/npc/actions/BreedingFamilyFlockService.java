@@ -1,32 +1,28 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.npc.components.TameworkFlockFollowComponent;
-import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.flock.FlockMembershipSystems;
+import com.hypixel.hytale.server.flock.FlockPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
-import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
- * Assigns parent-offspring breeding groups into a lightweight follow flock.
+ * Assigns parent-offspring breeding groups into a vanilla flock and follower behavior state.
  */
 final class BreedingFamilyFlockService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
-    private static final String FOLLOW_STATE = "Follow";
+    private static final String FLOCK_FOLLOW_STATE = "FlockFollow";
+    private static final String FALLBACK_FOLLOW_STATE = "Follow";
 
     void assignFamilyFlock(Ref<EntityStore> childRef,
                            @Nullable Ref<EntityStore> parentARef,
                            @Nullable Ref<EntityStore> parentBRef,
                            Store<EntityStore> store) {
-        if (store == null || childRef == null || !childRef.isValid()) {
-            return;
-        }
-        ComponentType<EntityStore, TameworkFlockFollowComponent> flockType = TameworkFlockFollowComponent.getComponentType();
-        if (flockType == null) {
+        if (store == null) {
             return;
         }
         Ref<EntityStore> leaderRef = resolveLeaderRef(parentARef, parentBRef);
@@ -34,22 +30,19 @@ final class BreedingFamilyFlockService {
             return;
         }
         NPCEntity leaderNpc = store.getComponent(leaderRef, NPCEntity.getComponentType());
-        UUID leaderUuid = leaderNpc != null ? leaderNpc.getUuid() : null;
-        if (leaderUuid == null) {
+        Role leaderRole = leaderNpc != null ? leaderNpc.getRole() : null;
+        if (leaderRole == null) {
+            return;
+        }
+        Ref<EntityStore> flockRef = FlockPlugin.createFlock(store, leaderRole);
+        if (flockRef == null || !flockRef.isValid()) {
             return;
         }
 
-        long formedAtMs = System.currentTimeMillis();
-        String flockId = UUID.randomUUID().toString();
-        store.putComponent(
-                leaderRef,
-                flockType,
-                new TameworkFlockFollowComponent(flockId, leaderUuid, true, formedAtMs)
-        );
-
-        assignFollower(parentARef, leaderRef, leaderUuid, flockId, formedAtMs, flockType, store);
-        assignFollower(parentBRef, leaderRef, leaderUuid, flockId, formedAtMs, flockType, store);
-        assignFollower(childRef, leaderRef, leaderUuid, flockId, formedAtMs, flockType, store);
+        joinFlockMember(leaderRef, flockRef, store);
+        joinFollower(parentARef, leaderRef, flockRef, store);
+        joinFollower(parentBRef, leaderRef, flockRef, store);
+        joinFollower(childRef, leaderRef, flockRef, store);
     }
 
     @Nullable
@@ -64,22 +57,24 @@ final class BreedingFamilyFlockService {
         return null;
     }
 
-    private void assignFollower(@Nullable Ref<EntityStore> followerRef,
-                                Ref<EntityStore> leaderRef,
-                                UUID leaderUuid,
-                                String flockId,
-                                long formedAtMs,
-                                ComponentType<EntityStore, TameworkFlockFollowComponent> flockType,
-                                Store<EntityStore> store) {
+    private void joinFollower(@Nullable Ref<EntityStore> followerRef,
+                              Ref<EntityStore> leaderRef,
+                              Ref<EntityStore> flockRef,
+                              Store<EntityStore> store) {
         if (followerRef == null || !followerRef.isValid() || followerRef.equals(leaderRef)) {
             return;
         }
-        store.putComponent(
-                followerRef,
-                flockType,
-                new TameworkFlockFollowComponent(flockId, leaderUuid, false, formedAtMs)
-        );
+        joinFlockMember(followerRef, flockRef, store);
         applyFollowerTargetAndState(followerRef, leaderRef, store);
+    }
+
+    private void joinFlockMember(Ref<EntityStore> memberRef,
+                                 Ref<EntityStore> flockRef,
+                                 Store<EntityStore> store) {
+        if (memberRef == null || !memberRef.isValid() || flockRef == null || !flockRef.isValid() || store == null) {
+            return;
+        }
+        FlockMembershipSystems.join(memberRef, flockRef, store);
     }
 
     private void applyFollowerTargetAndState(Ref<EntityStore> followerRef,
@@ -105,17 +100,33 @@ final class BreedingFamilyFlockService {
             return;
         }
         StateSupport stateSupport = role.getStateSupport();
+        String resolvedState = resolveFollowerState(stateSupport);
+        if (resolvedState == null) {
+            return;
+        }
         String subState = "";
         if (stateSupport.getStateHelper() != null) {
-            int followStateIndex = stateSupport.getStateHelper().getStateIndex(FOLLOW_STATE);
-            if (followStateIndex == StateSupport.NO_STATE) {
-                return;
-            }
             String defaultSubState = stateSupport.getStateHelper().getDefaultSubState();
             if (defaultSubState != null && !defaultSubState.isBlank()) {
                 subState = defaultSubState;
             }
         }
-        stateSupport.setState(followerRef, FOLLOW_STATE, subState, store);
+        stateSupport.setState(followerRef, resolvedState, subState, store);
+    }
+
+    @Nullable
+    private String resolveFollowerState(StateSupport stateSupport) {
+        if (stateSupport == null || stateSupport.getStateHelper() == null) {
+            return FALLBACK_FOLLOW_STATE;
+        }
+        int flockFollowStateIndex = stateSupport.getStateHelper().getStateIndex(FLOCK_FOLLOW_STATE);
+        if (flockFollowStateIndex != StateSupport.NO_STATE) {
+            return FLOCK_FOLLOW_STATE;
+        }
+        int followStateIndex = stateSupport.getStateHelper().getStateIndex(FALLBACK_FOLLOW_STATE);
+        if (followStateIndex != StateSupport.NO_STATE) {
+            return FALLBACK_FOLLOW_STATE;
+        }
+        return null;
     }
 }

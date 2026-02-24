@@ -1,0 +1,113 @@
+{
+  "$Comment": "Keeps flock followers close to their flock leader while allowing local wander movement.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "DefaultState": ".Default",
+  "Parameters": {
+    "LeashEnabled": {
+      "Value": true,
+      "Description": "Whether follower-to-leader leash behavior is enabled."
+    },
+    "FlockFollowerWanderRadius": {
+      "Value": 3,
+      "Description": "How far followers are allowed to drift from their flock leader."
+    },
+    "FlockFollowerStopDistance": {
+      "Value": 2,
+      "Description": "How close followers stop when moving back toward their leader."
+    },
+    "FlockFollowerRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative speed used by leash seek behavior."
+    },
+    "FlockFollowerMoveDurationRange": {
+      "Value": [
+        1,
+        3
+      ],
+      "Description": "How long each local wander burst lasts."
+    },
+    "FlockFollowerSettleDurationRange": {
+      "Value": [
+        1,
+        2
+      ],
+      "Description": "How long followers pause between wander bursts."
+    },
+    "FlockFollowerMaxHeadingChange": {
+      "Value": 60,
+      "Description": "Maximum heading change used while wandering."
+    },
+    "FlockFollowerWanderSpeed": {
+      "Value": 0.2,
+      "Description": "Relative speed for local follower wander motion."
+    }
+  },
+  "Content": {
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Use vanilla flock leash behavior so followers stay near the flock leader.",
+        "Continue": true,
+        "Reference": "Component_Instruction_Leash_To_Flock_Leader",
+        "Modify": {
+          "Enabled": {
+            "Compute": "LeashEnabled"
+          },
+          "WanderRadius": {
+            "Compute": "FlockFollowerWanderRadius"
+          },
+          "StopDistance": {
+            "Compute": "FlockFollowerStopDistance"
+          },
+          "RelativeSpeed": {
+            "Compute": "FlockFollowerRelativeSpeed"
+          }
+        }
+      },
+      {
+        "$Comment": "Followers wander locally while the leash component handles regrouping.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".Default"
+        },
+        "BodyMotion": {
+          "Type": "Sequence",
+          "Looped": true,
+          "Motions": [
+            {
+              "Type": "Timer",
+              "Time": {
+                "Compute": "FlockFollowerMoveDurationRange"
+              },
+              "Motion": {
+                "Type": "WanderInCircle",
+                "Radius": {
+                  "Compute": "FlockFollowerWanderRadius"
+                },
+                "MaxHeadingChange": {
+                  "Compute": "FlockFollowerMaxHeadingChange"
+                },
+                "RelativeSpeed": {
+                  "Compute": "FlockFollowerWanderSpeed"
+                }
+              }
+            },
+            {
+              "Type": "Timer",
+              "Time": {
+                "Compute": "FlockFollowerSettleDurationRange"
+              },
+              "Motion": {
+                "Type": "Nothing"
+              }
+            }
+          ]
+        }
+      }
+    ]
+  }
+}

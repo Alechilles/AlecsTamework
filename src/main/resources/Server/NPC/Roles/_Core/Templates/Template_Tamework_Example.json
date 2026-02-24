@@ -99,6 +99,40 @@
       ],
       "Description": "Duration to hold the idle animation in the spin state."
     },
+    "FlockFollowerWanderRadius": {
+      "Value": 3,
+      "Description": "How far flock followers can wander from their flock leader."
+    },
+    "FlockFollowerStopDistance": {
+      "Value": 2,
+      "Description": "How close flock followers stop when regrouping with their leader."
+    },
+    "FlockFollowerRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative movement speed used when flock followers regroup to their leader."
+    },
+    "FlockFollowerMoveDurationRange": {
+      "Value": [
+        1,
+        3
+      ],
+      "Description": "Duration range for flock follower local wander bursts."
+    },
+    "FlockFollowerSettleDurationRange": {
+      "Value": [
+        1,
+        2
+      ],
+      "Description": "Duration range for flock follower short settle pauses."
+    },
+    "FlockFollowerMaxHeadingChange": {
+      "Value": 60,
+      "Description": "Maximum heading change used by flock follower local wander."
+    },
+    "FlockFollowerWanderSpeed": {
+      "Value": 0.2,
+      "Description": "Relative speed used by flock follower local wander."
+    },
     "MaxSpeed": {
       "Value": 6,
       "Description": "Maximum walking speed for this NPC."
@@ -818,6 +852,10 @@
         },
         {
           "Type": "State",
+          "State": "FlockFollow"
+        },
+        {
+          "Type": "State",
           "State": "CommandMove"
         },
         {
@@ -957,6 +995,41 @@
             },
             "FollowSpinIdleDurationRange": {
               "Compute": "FollowSpinIdleDurationRange"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "Flock follower behavior while in FlockFollow state.",
+      "Sensor": {
+        "Type": "State",
+        "State": "FlockFollow"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Flock_Follow_Wander",
+          "Modify": {
+            "FlockFollowerWanderRadius": {
+              "Compute": "FlockFollowerWanderRadius"
+            },
+            "FlockFollowerStopDistance": {
+              "Compute": "FlockFollowerStopDistance"
+            },
+            "FlockFollowerRelativeSpeed": {
+              "Compute": "FlockFollowerRelativeSpeed"
+            },
+            "FlockFollowerMoveDurationRange": {
+              "Compute": "FlockFollowerMoveDurationRange"
+            },
+            "FlockFollowerSettleDurationRange": {
+              "Compute": "FlockFollowerSettleDurationRange"
+            },
+            "FlockFollowerMaxHeadingChange": {
+              "Compute": "FlockFollowerMaxHeadingChange"
+            },
+            "FlockFollowerWanderSpeed": {
+              "Compute": "FlockFollowerWanderSpeed"
             }
           }
         }
