@@ -50,6 +50,8 @@
 - Confirm capture and spawn preserves attachments.
 - Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
 - Check shared happiness + breeding eligibility context with `/tw gethappiness`.
+- Force/tune happiness gates during testing with `/tw sethappiness <value>`.
+- Inspect rolled traits and effect-key values with `/tw gettraits`.
 - Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.
 - Toggle spawner raycast logs with `/tw debugspawner` when testing spawner items.
 - After editing spawner, naming, or command item configs, run `/tw reloadconfig`.

@@ -13,6 +13,7 @@
 - Trait modifier resolver service (`TraitModifierService`) for effect-key multiplier lookups from rolled trait values.
 - Unit tests for trait roll determinism/conflict handling and trait modifier multiplier resolution.
 - `/tw gethappiness` command to inspect targeted NPC happiness source/value and breeding eligibility context.
+- `/tw sethappiness <value>` and `/tw gettraits` commands for in-game progression debugging and balancing.
 
 ### Changed
 - Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
