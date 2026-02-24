@@ -24,10 +24,8 @@ public final class CompanionLifeStageService {
     private static final long DEFAULT_BABY_DURATION_MS = TimeUnit.MINUTES.toMillis(3);
     private static final long DEFAULT_ADOLESCENT_DURATION_MS = TimeUnit.MINUTES.toMillis(4);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
-    private static final double DEFAULT_BABY_SCALE_FACTOR = 0.75;
-    private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.90;
-    private static final double MIN_VISIBLE_BABY_SCALE = 0.70;
-    private static final double MIN_VISIBLE_ADOLESCENT_SCALE = 0.85;
+    private static final double DEFAULT_BABY_SCALE_FACTOR = 0.55;
+    private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.80;
     private static final double MIN_SCALE = 0.10;
 
     private CompanionLifeStageService() {
@@ -329,15 +327,11 @@ public final class CompanionLifeStageService {
     }
 
     private static double resolveBabyScale(double adultScale) {
-        double scaled = clampScale(adultScale * DEFAULT_BABY_SCALE_FACTOR);
-        double minimum = Math.min(adultScale, MIN_VISIBLE_BABY_SCALE);
-        return clampScale(Math.max(scaled, minimum));
+        return clampScale(adultScale * DEFAULT_BABY_SCALE_FACTOR);
     }
 
     private static double resolveAdolescentScale(double adultScale) {
-        double scaled = clampScale(adultScale * DEFAULT_ADOLESCENT_SCALE_FACTOR);
-        double minimum = Math.min(adultScale, MIN_VISIBLE_ADOLESCENT_SCALE);
-        return clampScale(Math.max(scaled, minimum));
+        return clampScale(adultScale * DEFAULT_ADOLESCENT_SCALE_FACTOR);
     }
 
     private static double clampScale(double value) {

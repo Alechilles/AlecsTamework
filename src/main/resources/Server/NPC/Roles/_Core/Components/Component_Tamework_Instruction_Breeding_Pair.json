@@ -87,6 +87,20 @@
             "Slot": "Status"
           },
           {
+            "Type": "TimerStart",
+            "Name": "BreedingPair_Move_Timeout",
+            "StartValueRange": {
+              "Compute": "BreedingPairMoveTimeoutRange"
+            },
+            "RestartValueRange": {
+              "Compute": "BreedingPairMoveTimeoutRange"
+            }
+          },
+          {
+            "Type": "TimerRestart",
+            "Name": "BreedingPair_Move_Timeout"
+          },
+          {
             "Type": "State",
             "State": ".Move"
           },
@@ -117,6 +131,20 @@
             },
             "Actions": [
               {
+                "Type": "TimerStart",
+                "Name": "BreedingPair_Complete_Delay",
+                "StartValueRange": {
+                  "Compute": "BreedingPairCompleteDelayRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "BreedingPairCompleteDelayRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": "BreedingPair_Complete_Delay"
+              },
+              {
                 "Type": "State",
                 "State": ".CompleteDelay"
               }
@@ -136,6 +164,25 @@
                   "Compute": "BreedingPairReadRange"
                 }
               }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnPairComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Fail-safe completion when move timeout has elapsed.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "BreedingPair_Move_Timeout",
+              "State": "Stopped"
             },
             "Actions": [
               {
@@ -174,26 +221,6 @@
                 "Compute": "BreedingPairSeekRelativeSpeed"
               }
             }
-          },
-          {
-            "$Comment": "Fail-safe completion if pair movement takes too long.",
-            "Sensor": {
-              "Type": "State",
-              "State": ".Move"
-            },
-            "ActionsBlocking": true,
-            "Actions": [
-              {
-                "Type": "Timeout",
-                "Delay": {
-                  "Compute": "BreedingPairMoveTimeoutRange"
-                }
-              },
-              {
-                "Type": "State",
-                "State": ".CompleteDelay"
-              }
-            ]
           }
         ]
       },
@@ -210,25 +237,27 @@
       },
       {
         "$Comment": "Finalize pair movement after a short delay.",
-        "ActionsBlocking": true,
         "Sensor": {
           "Type": "State",
           "State": ".CompleteDelay"
         },
-        "Actions": [
+        "Instructions": [
           {
-            "Type": "Timeout",
-            "Delay": {
-              "Compute": "BreedingPairCompleteDelayRange"
-            }
-          },
-          {
-            "Type": "State",
-            "State": ".Listen"
-          },
-          {
-            "Type": "ParentState",
-            "State": "OnPairComplete"
+            "Sensor": {
+              "Type": "Timer",
+              "Name": "BreedingPair_Complete_Delay",
+              "State": "Stopped"
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnPairComplete"
+              }
+            ]
           }
         ]
       }

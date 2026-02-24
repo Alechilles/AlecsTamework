@@ -39,7 +39,7 @@
 - Breed interaction custom effects now apply only when breeding actually starts, preventing false-positive "ready" feedback when blocked (for example by cooldown).
 - `/tw gethappiness` now reports breeding cooldown state (`cooldownActive`, `cooldownRemainingMs`, `cooldownUntilMs`) and `readyNow` to clarify readiness vs cooldown.
 - Offspring spawn diagnostics now include async failure logging and post-spawn presence/position checks, and newborns spawn slightly higher with child hearts for easier visual confirmation.
-- Non-baby-variant life-stage scaling now uses larger/default-visible juvenile factors (baby/adolescent) with minimum visibility floors to avoid effectively invisible offspring at tiny scales.
+- Non-baby-variant life-stage scaling now uses smaller juvenile defaults again (`baby=0.55`, `adolescent=0.80`) now that juvenile model-visibility issues were fixed.
 - Breeding offspring placement now prioritizes wider horizontal offsets and higher vertical fallback offsets to reduce parent-overlap/terrain clipping, and spawn presence checks now run at multiple delayed checkpoints (0.9s, 3s, 8s) to expose delayed despawn issues.
 - Juvenile model scaling now preserves random attachment IDs from the current model when rebuilding scaled models, fixing invisible offspring where required attachments were being dropped during scale updates.
 - `Template_Tamework_Example`/`Template_Tamework_Example_Vanilla` now use wander-driven `Idle` behavior and an explicit `Follow` state, and the example command item now sets `Follow`/`Recall` to state `Follow`.
@@ -47,8 +47,7 @@
 ### Fixed
 - Fixed a world-thread crash in `CommandLinkedNpcDeathService` when recording death snapshots for linked NPCs that had neither shared happiness nor breeding happiness (null-safe fallback now avoids `Double` auto-unboxing).
 - Fixed breeding pair state completion flow so `BreedPair` no longer stalls after arrival, and breeding pair start now clears lingering status posture animation to prevent slide-like movement.
-- Breeding pair completion now uses an explicit completion range (`BreedingPairCompleteRange`) separate from seek stop distance so tuning close approach distances does not trap NPCs in `BreedPair`.
-- Breeding pair completion now finalizes from a non-one-shot delay state and includes a move-timeout fail-safe, and close-range completion once again follows `SeekStopDistance + 0.15` for tighter pair-up spacing.
+- Breeding pair completion now uses timer-driven exit flow (arrival delay + move-timeout fail-safe), and close-range completion follows `SeekStopDistance + 0.15` for tight pair-up spacing without getting stuck in `BreedPair`.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added
