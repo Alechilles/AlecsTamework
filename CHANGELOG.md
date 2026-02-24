@@ -17,6 +17,7 @@
 - Trait bootstrap now backfills empty trait components with deterministic rolls and role-config IDs.
 - Feeding interactions now apply breeding happiness gains from breeding config, including trait-based `HappinessGainMultiplier` scaling.
 - Breeding config resolution now supports direct config-id lookup (`resolveById`) and shared resolver usage across breeding/spawner/respawn paths.
+- Happiness updates now route through shared `CompanionHappinessService` (with `BreedingHappinessService` retained as a compatibility shim), keeping architecture open for non-breeding consumers.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

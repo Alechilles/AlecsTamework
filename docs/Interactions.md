@@ -96,6 +96,7 @@ Effects:
 - Shows floating combat text for healing (if a player is present).
 - Consumes the held item.
 - Applies breeding happiness gain using resolved `TwBreedingConfig.Happiness.GainOnFeed` when breeding progression exists.
+  This currently flows through shared `CompanionHappinessService` plumbing.
   Trait effect key `HappinessGainMultiplier` scales this gain when traits are present.
 
 ### Harvest
