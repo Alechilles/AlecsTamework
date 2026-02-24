@@ -37,6 +37,7 @@ public final class CompanionProgressionBootstrapService {
         TameworkHappinessComponent happiness = bootstrapHappinessComponent(npcRef, store, roleId, breedingConfig);
         bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
         bootstrapTraitsComponent(npcRef, store, roleId);
+        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
         CompanionLifeStageService.ensureLifeStageComponent(npcRef, store);
         CompanionLifeStageService.refreshLifeStage(
                 npcRef,

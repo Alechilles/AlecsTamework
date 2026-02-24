@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -260,6 +261,7 @@ final class CommandRespawnService {
                 TraitValueCodec.decode(snapshot.traitsValues())
         );
         store.putComponent(spawnedRef, traitsType, component);
+        CompanionStatModifierService.applyTraitModifiers(spawnedRef, store);
     }
 
     private void applyRespawnLifeStageState(Ref<EntityStore> spawnedRef,

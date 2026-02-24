@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitInheritanceService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
 import com.hypixel.hytale.component.ComponentType;
@@ -57,6 +58,7 @@ final class BreedingOffspringProgressionService {
                 store
         );
         applyOffspringTraits(childRef, parentARef, parentBRef, childRoleId, childNpc, breedingConfigId, store);
+        CompanionStatModifierService.applyTraitModifiers(childRef, store);
         CompanionLifeStageService.initializeOffspringLifeStage(childRef, childNpc, store, hasBabyVariant);
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
