@@ -37,6 +37,7 @@ final class LinkedNpcTraitIndicatorBinder {
                                  LinkedNpcTraitIndicator indicator) {
         String fillColor = indicator.belowDefault() ? NEGATIVE_FILL_COLOR : POSITIVE_FILL_COLOR;
         commandBuilder.set(slotSelector + " #TraitIcon.Text", indicator.iconText());
+        commandBuilder.set(slotSelector + " #TraitTooltip.TooltipText", indicator.tooltipText());
         commandBuilder.set(slotSelector + " #RingFillTop.Background", fillColor);
         commandBuilder.set(slotSelector + " #RingFillRight.Background", fillColor);
         commandBuilder.set(slotSelector + " #RingFillBottom.Background", fillColor);

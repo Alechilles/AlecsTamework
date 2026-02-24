@@ -186,9 +186,11 @@ final class CommandLinkedPanelEntryService {
             double fillRatio = belowDefault
                     ? ratioToLowerBound(value, min, defaultValue)
                     : ratioToUpperBound(value, defaultValue, max);
+            String label = resolveLabel(definition);
             indicators.add(new LinkedNpcTraitIndicator(
                     resolveIconGlyph(definition),
-                    resolveLabel(definition),
+                    label,
+                    buildTooltip(label, value, max),
                     fillRatio,
                     !belowDefault,
                     belowDefault
@@ -325,6 +327,34 @@ final class CommandLinkedPanelEntryService {
             return null;
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String buildTooltip(String label, double value, double max) {
+        double safeMax = Double.isFinite(max) ? max : 0.0;
+        double normalized = safeMax == 0.0 ? 0.0 : value / safeMax;
+        return label
+                + ": "
+                + format(value)
+                + " / "
+                + format(safeMax)
+                + " max ("
+                + formatPercent(normalized)
+                + ")";
+    }
+
+    private String format(double value) {
+        if (!Double.isFinite(value)) {
+            return "0.00";
+        }
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private String formatPercent(double ratio) {
+        if (!Double.isFinite(ratio)) {
+            return "0%";
+        }
+        int percent = (int) Math.round(clamp(ratio, 0.0, 1.0) * 100.0);
+        return percent + "%";
     }
 
     private static final class HealthSnapshot {

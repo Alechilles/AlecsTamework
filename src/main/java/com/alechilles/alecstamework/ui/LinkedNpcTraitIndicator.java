@@ -8,17 +8,20 @@ public final class LinkedNpcTraitIndicator {
 
     private final String iconText;
     private final String label;
+    private final String tooltipText;
     private final double fillRatio;
     private final boolean counterClockwise;
     private final boolean belowDefault;
 
     public LinkedNpcTraitIndicator(String iconText,
                                    String label,
+                                   String tooltipText,
                                    double fillRatio,
                                    boolean counterClockwise,
                                    boolean belowDefault) {
         this.iconText = sanitizeText(iconText, "?");
         this.label = sanitizeText(label, "Trait");
+        this.tooltipText = sanitizeText(tooltipText, this.label);
         this.fillRatio = clamp(fillRatio);
         this.counterClockwise = counterClockwise;
         this.belowDefault = belowDefault;
@@ -30,6 +33,10 @@ public final class LinkedNpcTraitIndicator {
 
     public String label() {
         return label;
+    }
+
+    public String tooltipText() {
+        return tooltipText;
     }
 
     public double fillRatio() {

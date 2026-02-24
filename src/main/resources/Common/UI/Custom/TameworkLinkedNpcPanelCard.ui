@@ -61,6 +61,18 @@ $C = "Common.ui";
   Padding: 12
 );
 
+@TraitTooltipLabelStyle = LabelStyle(
+  FontSize: 1,
+  TextColor: #00000000
+);
+
+@TraitTooltipButtonStyle = TextButtonStyle(
+  Default: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle),
+  Hovered: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle),
+  Pressed: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle),
+  Disabled: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle)
+);
+
 Group {
   Anchor: (Top: 8, Left: 0, Right: 0, Height: 96);
   Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
@@ -134,6 +146,14 @@ Group {
           VerticalAlignment: Center
         );
       }
+
+      TextButton #TraitTooltip {
+        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "Trait";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+      }
     }
 
     Group { Anchor: (Width: 4); }
@@ -164,6 +184,14 @@ Group {
           VerticalAlignment: Center
         );
       }
+
+      TextButton #TraitTooltip {
+        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "Trait";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+      }
     }
 
     Group { Anchor: (Width: 4); }
@@ -193,6 +221,14 @@ Group {
           HorizontalAlignment: Center,
           VerticalAlignment: Center
         );
+      }
+
+      TextButton #TraitTooltip {
+        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "Trait";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
       }
     }
   }
