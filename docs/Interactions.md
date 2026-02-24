@@ -95,8 +95,9 @@ Effects:
 - Heals the NPC by the per‑item override or the global `Heal`.
 - Shows floating combat text for healing (if a player is present).
 - Consumes the held item.
-- Applies breeding happiness gain using resolved `TwBreedingConfig.Happiness.GainOnFeed` when breeding progression exists.
-  This currently flows through shared `CompanionHappinessService` plumbing.
+- Applies shared happiness gain using resolved `TwHappinessConfig.Sources.GainOnFeed` when happiness progression exists.
+  Falls back to `TwBreedingConfig.Happiness.GainOnFeed` for legacy/compatibility paths.
+  This flows through `CompanionHappinessService` and mirrors into breeding progression when present.
   Trait effect key `HappinessGainMultiplier` scales this gain when traits are present.
 
 ### Harvest
@@ -147,9 +148,9 @@ Fields:
 - `FertilityBonus` (reserved for partner/offspring phase)
 
 Effects:
-- Ensures breeding progression state exists on the NPC.
+- Ensures happiness and breeding progression state exists on the NPC.
 - Uses role/config breeding resolution and enforces config-level `Eligibility.RequireTamed` when enabled.
-- Marks breeding readiness when happiness meets the interaction/config threshold.
+- Marks breeding readiness when shared happiness meets the interaction/config threshold.
 - Full partner matching and offspring spawning are still in progress.
 
 ## Custom interactions

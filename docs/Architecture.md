@@ -12,6 +12,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - NPC actions and sensors
 - Optimized interactions pipeline (TwInteractionConfig + Action_Tamework_Interact)
 - Hook and instruction bridge (TriggerNpcHook effect + TameworkHook sensor)
+- Companion progression (TwHappinessConfig/TwBreedingConfig/TwTraitConfig + bootstrap + persistence bridges)
 - Spawner items (TwSpawnerConfig + TameworkSpawn + SpawnerFeatureHandler orchestrating spawner services)
 - Naming items (TwNameItemConfig + TameworkNameNpc + NamingFeatureHandler orchestrating naming services)
 - Command items (TwCommandItemConfig + TameworkCommand + CommandItemFeatureHandler orchestrating command services)
@@ -25,6 +26,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Action_Tamework_Interact resolves a TwInteractionConfig and executes the first matching interaction entry.
 - The interaction pipeline is split into resolution, selection, and execution helpers to isolate matching, cooldowns, and effects.
 - TwInteractionConfig supports preset interactions (Tame, Feed, Harvest, Mount, ModeCycle, Breed) plus fully custom requirements and effects.
+- Shared happiness progression is stored in `TameworkHappinessComponent` and resolved from `TwHappinessConfig`; breeding reads/mirrors this value for compatibility while partner/offspring logic evolves.
 - The hook system allows interaction effects to emit a hook signal that can be consumed by NPC instruction sensors.
 - TwSpawnerConfig assets are converted into per-item feature configs and executed through dedicated spawner services (policy, metadata, identity/state, effects, placement, inventory).
 - TwNameItemConfig assets are resolved per item and executed through naming services (NPC info/ownership checks plus effect application).
@@ -40,9 +42,11 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Sensors: `src/main/java/com/alechilles/alecstamework/npc/sensors`
 - Components: `src/main/java/com/alechilles/alecstamework/npc/components`
 - Interaction config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwInteractionConfig.java`
+- Happiness config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwHappinessConfig.java`
 - Spawner config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwSpawnerConfig.java`
 - Naming config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwNameItemConfig.java`
 - Command config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwCommandItemConfig.java`
+- Progression bootstrap and services: `src/main/java/com/alechilles/alecstamework/npc/progression/CompanionProgressionBootstrapService.java` and `src/main/java/com/alechilles/alecstamework/npc/progression/CompanionHappinessService.java`
 - Spawner orchestration + services: `src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java` and `src/main/java/com/alechilles/alecstamework/items/Spawner*Service.java`
 - Naming orchestration + services: `src/main/java/com/alechilles/alecstamework/items/NamingFeatureHandler.java` and `src/main/java/com/alechilles/alecstamework/items/Naming*Service.java`
 - Command orchestration + services: `src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java` and `src/main/java/com/alechilles/alecstamework/items/Command*Service.java`
