@@ -57,6 +57,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHo
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.AssetPack;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
@@ -71,6 +72,7 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
@@ -214,6 +216,13 @@ public class Tamework extends JavaPlugin {
 
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CompanionTraitStatSyncSystem(
+                        NPCEntity.getComponentType(),
+                        EntityStatMap.getComponentType(),
+                        traitsComponentType
+                )
         );
         commandNpcRelocationService = new CommandNpcRelocationService();
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
