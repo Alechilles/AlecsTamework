@@ -145,12 +145,14 @@ If `Cycle` is empty, default cycle is `Hold -> Idle -> Defend`.
 Fields:
 - `RequireTamed` (default true)
 - `MinHappiness` (optional threshold override)
-- `FertilityBonus` (reserved for partner/offspring phase)
+- `FertilityBonus` (optional additive bonus applied during interaction eligibility checks)
 
 Effects:
 - Ensures happiness and breeding progression state exists on the NPC.
 - Uses role/config breeding resolution and enforces config-level `Eligibility.RequireTamed` when enabled.
-- Marks breeding readiness when shared happiness meets the interaction/config threshold.
+- Marks breeding readiness when effective fertility meets threshold:
+  `effective = (sharedHappiness * FertilityMultiplier) + FertilityBonus`.
+  Trait effect key `FertilityMultiplier` defaults to `1.0` when traits are missing.
 - Full partner matching and offspring spawning are still in progress.
 
 ## Custom interactions

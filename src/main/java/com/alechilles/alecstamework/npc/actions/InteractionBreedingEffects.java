@@ -4,9 +4,11 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingEligibilityService;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -61,7 +63,28 @@ final class InteractionBreedingEffects {
             breeding.setHappiness(happiness);
         }
         double threshold = resolveThreshold(interaction, config);
-        if (happiness < threshold) {
+        double fertilityMultiplier = TraitModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                "FertilityMultiplier",
+                1.0
+        );
+        double effectiveHappiness = BreedingEligibilityService.resolveEffectiveHappiness(
+                happiness,
+                fertilityMultiplier,
+                interaction != null ? interaction.getFertilityBonus() : null
+        );
+        if (!BreedingEligibilityService.isEligible(effectiveHappiness, threshold)) {
+            if (breeding.isReady()) {
+                breeding.setReady(false);
+                store.putComponent(npcRef, breedingType, breeding);
+            }
+            owner.logDebug(String.format(
+                    "TameworkInteract: breeding blocked. baseHappiness=%.2f effectiveHappiness=%.2f threshold=%.2f",
+                    happiness,
+                    effectiveHappiness,
+                    threshold
+            ));
             return false;
         }
         breeding.setReady(true);
@@ -71,12 +94,12 @@ final class InteractionBreedingEffects {
     }
 
     private double resolveThreshold(BreedInteraction interaction, @Nullable TwBreedingConfig config) {
-        if (interaction != null && interaction.getMinHappiness() != null) {
-            return interaction.getMinHappiness();
-        }
-        if (config != null && config.getHappiness() != null) {
-            return config.getHappiness().getThreshold();
-        }
-        return 0.0;
+        double fallback = config != null && config.getHappiness() != null
+                ? config.getHappiness().getThreshold()
+                : 0.0;
+        return BreedingEligibilityService.resolveThreshold(
+                interaction != null ? interaction.getMinHappiness() : null,
+                fallback
+        );
     }
 }
