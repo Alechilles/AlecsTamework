@@ -74,7 +74,7 @@ $C = "Common.ui";
 );
 
 Group {
-  Anchor: (Top: 8, Left: 0, Right: 0, Height: 96);
+  Anchor: (Top: 8, Left: 0, Right: 0, Height: 112);
   Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
@@ -290,6 +290,27 @@ Group {
   Label #HealthText {
     Anchor: (Top: 50, Left: 0, Width: 206, Height: 16);
     Text: "Health: ?/?";
+    Style: (
+      FontSize: 11,
+      TextColor: #bed0e3,
+      HorizontalAlignment: Start,
+      VerticalAlignment: Center
+    );
+  }
+
+  Group #HappinessFrame {
+    Anchor: (Top: 68, Left: 0, Width: 206, Height: 14);
+    Background: #0a121b(0.95);
+
+    Group #HappinessFill {
+      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
+      Background: #f2c97c;
+    }
+  }
+
+  Label #HappinessText {
+    Anchor: (Top: 86, Left: 0, Width: 206, Height: 16);
+    Text: "Happiness: ?/?";
     Style: (
       FontSize: 11,
       TextColor: #bed0e3,

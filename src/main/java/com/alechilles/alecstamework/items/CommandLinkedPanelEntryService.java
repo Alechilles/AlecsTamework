@@ -1,10 +1,14 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.hypixel.hytale.component.ComponentType;
@@ -63,6 +67,8 @@ final class CommandLinkedPanelEntryService {
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         boolean deadRespawnEnabled = globalConfig != null && globalConfig.isCommandDeadRespawnEnabled();
         World world = player.getWorld();
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         ComponentType<EntityStore, TameworkTraitsComponent> traitType = TameworkTraitsComponent.getComponentType();
         ArrayList<TameworkCommandSelectionPage.LinkedNpcEntry> entries = new ArrayList<>(records.size());
         for (LinkedNpcRecord record : records) {
@@ -80,6 +86,8 @@ final class CommandLinkedPanelEntryService {
             }
             int health = 0;
             int maxHealth = 0;
+            int happiness = 0;
+            int maxHappiness = 0;
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
             if (world != null) {
                 Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
@@ -97,6 +105,16 @@ final class CommandLinkedPanelEntryService {
                         if (snapshot != null) {
                             health = snapshot.current;
                             maxHealth = snapshot.max;
+                        }
+                        HappinessSnapshot happinessSnapshot = readNpcHappinessSnapshot(
+                                npcRef,
+                                store,
+                                happinessType,
+                                breedingType
+                        );
+                        if (happinessSnapshot != null) {
+                            happiness = happinessSnapshot.current;
+                            maxHappiness = happinessSnapshot.max;
                         }
                         traitIndicators = readTraitIndicators(npcRef, store, traitType);
                     }
@@ -137,6 +155,8 @@ final class CommandLinkedPanelEntryService {
                     displayName,
                     health,
                     maxHealth,
+                    happiness,
+                    maxHappiness,
                     loaded,
                     hasHome,
                     dead,
@@ -230,6 +250,47 @@ final class CommandLinkedPanelEntryService {
             current = max;
         }
         return new HealthSnapshot(current, max);
+    }
+
+    private HappinessSnapshot readNpcHappinessSnapshot(
+            Ref<EntityStore> npcRef,
+            Store<EntityStore> store,
+            ComponentType<EntityStore, TameworkHappinessComponent> happinessType,
+            ComponentType<EntityStore, TameworkBreedingComponent> breedingType) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        TameworkHappinessComponent happinessComponent = happinessType != null
+                ? store.getComponent(npcRef, happinessType)
+                : null;
+        double value = happinessComponent != null ? happinessComponent.getValue() : Double.NaN;
+        if (!Double.isFinite(value) && breedingType != null) {
+            TameworkBreedingComponent breedingComponent = store.getComponent(npcRef, breedingType);
+            if (breedingComponent != null && Double.isFinite(breedingComponent.getHappiness())) {
+                value = breedingComponent.getHappiness();
+            }
+        }
+        if (!Double.isFinite(value)) {
+            return null;
+        }
+        double max = 100.0;
+        TwHappinessConfig config = HappinessConfigResolver.resolveConfig(npcRef, store, happinessComponent);
+        if (config != null && config.isEnabled()) {
+            TwHappinessConfig.ValueSettings values = config.getValues();
+            double min = values.getMin();
+            max = values.getMax();
+            if (max < min) {
+                double swap = min;
+                min = max;
+                max = swap;
+            }
+            value = clamp(value, min, max);
+        } else {
+            value = Math.max(0.0, value);
+        }
+        int roundedMax = Math.max(1, Math.round((float) max));
+        int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
+        return new HappinessSnapshot(roundedValue, roundedMax);
     }
 
     private String abbreviateUuid(UUID uuid) {
@@ -362,6 +423,16 @@ final class CommandLinkedPanelEntryService {
         private final int max;
 
         private HealthSnapshot(int current, int max) {
+            this.current = current;
+            this.max = max;
+        }
+    }
+
+    private static final class HappinessSnapshot {
+        private final int current;
+        private final int max;
+
+        private HappinessSnapshot(int current, int max) {
             this.current = current;
             this.max = max;
         }

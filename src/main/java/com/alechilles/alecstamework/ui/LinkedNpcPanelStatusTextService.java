@@ -43,6 +43,20 @@ final class LinkedNpcPanelStatusTextService {
         return "Unloaded (commands still queue).";
     }
 
+    static String resolveDeadHappinessText(LinkedNpcEntry entry) {
+        if (entry == null || !entry.dead()) {
+            return "Happiness: unavailable";
+        }
+        return "Happiness: unavailable (dead).";
+    }
+
+    static String resolveUnavailableHappinessText(LinkedNpcEntry entry) {
+        if (entry != null && entry.captured()) {
+            return "Happiness: unavailable (captured).";
+        }
+        return "Happiness: unavailable (unloaded).";
+    }
+
     private static String formatRemainingTime(long remainingMs) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long minutes = totalSeconds / 60L;

@@ -43,7 +43,6 @@ public final class TameworkCommandSelectionPage
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
     private static final String RETURN_HOME_COMMAND_PREFIX = "__returnhome__:";
     private static final int MAX_COMMAND_BUTTONS = 8;
-    private static final int HEALTH_FILL_MAX_WIDTH = 204;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
 
     private final CommandOption[] options;
@@ -351,8 +350,6 @@ public final class TameworkCommandSelectionPage
         String nameSelector = entrySelector + " #Name";
         String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
         String statusConfirmSelector = entrySelector + " #StatusConfirm";
-        String healthTextSelector = entrySelector + " #HealthText";
-        String healthFillSelector = entrySelector + " #HealthFill";
         String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
         String tertiaryStatFrameSelector = entrySelector + " #FutureStatBFrame";
         String futureActionBarSelector = entrySelector + " #FutureActionBar";
@@ -376,26 +373,7 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
-        if (entry.hasHealth()) {
-            commandBuilder.set(
-                    healthTextSelector + ".Text",
-                    "Health: " + entry.currentHealth() + "/" + entry.maxHealth()
-            );
-            commandBuilder.set(healthFillSelector + ".Visible", true);
-            commandBuilder.setObject(
-                    healthFillSelector + ".Anchor",
-                    LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(entry.healthRatio(), HEALTH_FILL_MAX_WIDTH)
-            );
-        } else if (entry.dead()) {
-            commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry));
-            commandBuilder.set(healthFillSelector + ".Visible", false);
-        } else if (!entry.loaded()) {
-            commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(entry));
-            commandBuilder.set(healthFillSelector + ".Visible", false);
-        } else {
-            commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
-            commandBuilder.set(healthFillSelector + ".Visible", false);
-        }
+        LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
         commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
         commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
@@ -512,11 +490,15 @@ public final class TameworkCommandSelectionPage
             }
             int current = Math.max(0, entry.currentHealth);
             int max = Math.max(0, entry.maxHealth);
+            int currentHappiness = Math.max(0, entry.currentHappiness);
+            int maxHappiness = Math.max(0, entry.maxHappiness);
             out.add(new LinkedNpcEntry(
                     entry.npcUuid,
                     name,
                     current,
                     max,
+                    currentHappiness,
+                    maxHappiness,
                     entry.loaded,
                     entry.hasHome,
                     entry.dead,
@@ -560,6 +542,8 @@ public final class TameworkCommandSelectionPage
         private final String displayName;
         private final int currentHealth;
         private final int maxHealth;
+        private final int currentHappiness;
+        private final int maxHappiness;
         private final boolean loaded;
         private final boolean dead;
         private final boolean captured;
@@ -577,6 +561,8 @@ public final class TameworkCommandSelectionPage
                               String displayName,
                               int currentHealth,
                               int maxHealth,
+                              int currentHappiness,
+                              int maxHappiness,
                               boolean loaded,
                               boolean hasHome,
                               boolean dead,
@@ -588,6 +574,8 @@ public final class TameworkCommandSelectionPage
                     displayName,
                     currentHealth,
                     maxHealth,
+                    currentHappiness,
+                    maxHappiness,
                     loaded,
                     hasHome,
                     dead,
@@ -607,6 +595,8 @@ public final class TameworkCommandSelectionPage
                               String displayName,
                               int currentHealth,
                               int maxHealth,
+                              int currentHappiness,
+                              int maxHappiness,
                               boolean loaded,
                               boolean hasHome,
                               boolean dead,
@@ -623,6 +613,8 @@ public final class TameworkCommandSelectionPage
             this.displayName = displayName;
             this.currentHealth = currentHealth;
             this.maxHealth = maxHealth;
+            this.currentHappiness = currentHappiness;
+            this.maxHappiness = maxHappiness;
             this.loaded = loaded;
             this.hasHome = hasHome;
             this.dead = dead;
@@ -657,6 +649,14 @@ public final class TameworkCommandSelectionPage
             return maxHealth;
         }
 
+        public int currentHappiness() {
+            return currentHappiness;
+        }
+
+        public int maxHappiness() {
+            return maxHappiness;
+        }
+
         public boolean loaded() {
             return loaded;
         }
@@ -682,6 +682,17 @@ public final class TameworkCommandSelectionPage
                 return 0.0;
             }
             return (double) currentHealth / (double) maxHealth;
+        }
+
+        public boolean hasHappiness() {
+            return loaded && maxHappiness > 0;
+        }
+
+        public double happinessRatio() {
+            if (!hasHappiness()) {
+                return 0.0;
+            }
+            return (double) currentHappiness / (double) maxHappiness;
         }
 
         public boolean hasFutureStatA() {
