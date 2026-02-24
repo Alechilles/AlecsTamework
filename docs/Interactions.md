@@ -144,7 +144,9 @@ Fields:
 - `FertilityBonus` (reserved)
 
 Effects:
-- Not implemented yet (logs a warning).
+- Ensures breeding progression state exists on the NPC.
+- Marks breeding readiness when happiness meets the configured threshold.
+- Full partner matching and offspring spawning are still in progress.
 
 ## Custom interactions
 `Type: "Custom"` exposes full `Requires` + `Effects` control.

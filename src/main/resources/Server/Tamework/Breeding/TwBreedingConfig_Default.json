@@ -1,0 +1,46 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "RoleIds": [
+    "Mob_Tamework_Example",
+    "Mob_Tamework_Example_Vanilla",
+    "Mob_Tamework_Example_Simple",
+    "Mob_Tamework_Example_Simple_Vanilla",
+    "Mob_Tamework_Example_Hytalor"
+  ],
+  "Happiness": {
+    "CurrentDefault": 50.0,
+    "Min": 0.0,
+    "Max": 100.0,
+    "Threshold": 70.0,
+    "DecayPerMinute": 1.0,
+    "GainOnFeed": 5.0,
+    "GainOnPet": 3.0,
+    "GainPerMinuteNearOwner": 1.0,
+    "LoseOnDamage": 10.0
+  },
+  "Eligibility": {
+    "RequireTamed": true,
+    "RequireAdult": true,
+    "RequireNotInCombat": true,
+    "RequireNotSleeping": true
+  },
+  "Pairing": {
+    "BreedRadius": 10.0,
+    "RequireWanderMode": true,
+    "RequireSameOwner": false,
+    "MaxNearbyOffspring": 0,
+    "RequireSameRoleId": true
+  },
+  "Cooldowns": {
+    "BaseCooldownSeconds": 600,
+    "MinDelaySeconds": 15,
+    "MaxDelaySeconds": 45
+  },
+  "Inheritance": {
+    "InheritOwner": true,
+    "InheritTamed": true,
+    "InheritAttachments": false,
+    "InheritTraits": false
+  }
+}

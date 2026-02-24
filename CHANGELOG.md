@@ -1,6 +1,16 @@
 # Changelog
 
 ## Unreleased
+### Added
+- Foundation breeding and traits asset types: `TwBreedingConfig` and `TwTraitConfig`, including role-priority resolution and default example assets.
+- New progression components: `TameworkBreedingComponent` and `TameworkTraitsComponent`, plus bootstrap initialization for newly tamed companions.
+- Progression persistence bridges for spawner capture/spawn and command-linked death/respawn snapshots (breeding + traits fields).
+- Initial `Breed` interaction handling for happiness-gated readiness state setup.
+- Unit tests for breeding/traits priority resolution and trait-value metadata codec round-trips.
+
+### Changed
+- Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
+- Interaction/docs coverage updated to reflect current breeding behavior (no longer a pure stub path).
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

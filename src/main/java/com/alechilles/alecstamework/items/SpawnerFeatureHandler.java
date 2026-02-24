@@ -35,6 +35,7 @@ public final class SpawnerFeatureHandler {
     private final SpawnerOwnershipPolicyService ownershipPolicyService;
     private final SpawnerSpawnPositionService spawnPositionService;
     private final SpawnerCaptureMetadataService captureMetadataService;
+    private final SpawnerNpcProgressionMetadataService progressionMetadataService;
     private final SpawnerRolePolicyService rolePolicyService;
     private final SpawnerItemStackMetadataService itemStackMetadataService;
     private final SpawnerNpcStateService npcStateService;
@@ -54,8 +55,13 @@ public final class SpawnerFeatureHandler {
         this.ownershipPolicyService = new SpawnerOwnershipPolicyService();
         this.spawnPositionService = new SpawnerSpawnPositionService(logger);
         this.captureMetadataService = new SpawnerCaptureMetadataService(logger, registry);
+        this.progressionMetadataService = new SpawnerNpcProgressionMetadataService();
         this.rolePolicyService = new SpawnerRolePolicyService(logger);
-        this.itemStackMetadataService = new SpawnerItemStackMetadataService(registry, captureMetadataService);
+        this.itemStackMetadataService = new SpawnerItemStackMetadataService(
+                registry,
+                captureMetadataService,
+                progressionMetadataService
+        );
         this.npcStateService = new SpawnerNpcStateService();
         this.playerInventoryService = new SpawnerPlayerInventoryService();
         this.attachmentService = new SpawnerAttachmentService(logger);
@@ -335,6 +341,7 @@ public final class SpawnerFeatureHandler {
         npcStateService.applyOwner(config, npcRef, npc, playerRef, ownerUuid, world);
         npcStateService.applyTamed(npcRef, tamed, world);
         npcStateService.applyCapturedName(itemStack, npcRef, store);
+        progressionMetadataService.applyNpcProgressionFromItem(itemStack, npcRef, store);
         linkedNpcSyncService.restoreCommandLinksFromCapturedSnapshot(npcRef, store, ownerUuid, capturedSnapshot);
         UUID spawnedNpcUuid = npc.getUuid();
         if (capturedNpcUuid != null && spawnedNpcUuid != null) {
@@ -461,6 +468,7 @@ public final class SpawnerFeatureHandler {
         );
 
         World world = player.getWorld();
+        Store<EntityStore> worldStore = world != null ? world.getEntityStore().getStore() : null;
         UUID targetUuid = linkedNpcSyncService.resolveEntityUuid(player, targetRef);
         UUID existingOwner = npcStateService.resolveOwnerFromComponent(targetRef, world);
         UUID ownerToStore = null;
@@ -473,13 +481,12 @@ public final class SpawnerFeatureHandler {
                 ? captureInfo.capturedName().name()
                 : null;
         String snapshotRoleId = null;
-        if (world != null) {
-            Store<EntityStore> store = world.getEntityStore().getStore();
-            NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
+        if (worldStore != null) {
+            NPCEntity npc = worldStore.getComponent(targetRef, NPCEntity.getComponentType());
             if (npc != null) {
                 snapshotRoleId = npcIdentityService.resolveRoleId(npc);
                 if (snapshotDisplayName == null || snapshotDisplayName.isBlank()) {
-                    snapshotDisplayName = npcIdentityService.resolveDisplayName(targetRef, store, npc);
+                    snapshotDisplayName = npcIdentityService.resolveDisplayName(targetRef, worldStore, npc);
                 }
             }
         }
@@ -510,6 +517,9 @@ public final class SpawnerFeatureHandler {
         }
         updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
         updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
+        if (worldStore != null) {
+            updated = progressionMetadataService.applyNpcProgressionMetadata(updated, targetRef, worldStore);
+        }
         updated = itemStackMetadataService.applyCooldown(updated, TameworkMetadataKeys.CAPTURE_COOLDOWN_UNTIL, config.getCaptureCooldownMs());
 
         if (!playerInventoryService.updateHeldItem(player, updated)) {

@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StatDelta;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -39,6 +40,7 @@ final class InteractionStateEffects {
             String ownerName = ref != null ? ref.getUsername() : null;
             store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
         }
+        CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
         return true;
     }
 
@@ -66,6 +68,9 @@ final class InteractionStateEffects {
             return false;
         }
         store.putComponent(npcRef, tamedType, new TameworkTamedComponent(value));
+        if (value) {
+            CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
+        }
         return true;
     }
 

@@ -2,9 +2,12 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
@@ -94,6 +97,24 @@ public final class CommandLinkedNpcDeathService {
         }
         String ownerName = ownerComponent != null ? ownerComponent.getOwnerName() : null;
         boolean tamed = TamedStateResolver.isTamed(reference, store);
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        TameworkBreedingComponent breedingComponent = breedingType != null
+                ? store.getComponent(reference, breedingType)
+                : null;
+        String breedingConfigId = breedingComponent != null ? breedingComponent.getConfigId() : null;
+        Double breedingHappiness = breedingComponent != null ? breedingComponent.getHappiness() : null;
+        long breedingCooldownUntilMs = breedingComponent != null ? breedingComponent.getCooldownUntilMs() : 0L;
+        UUID breedingLastPartnerUuid = breedingComponent != null ? breedingComponent.getLastPartnerUuid() : null;
+        ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
+        TameworkTraitsComponent traitsComponent = traitsType != null
+                ? store.getComponent(reference, traitsType)
+                : null;
+        String traitsConfigId = traitsComponent != null ? traitsComponent.getConfigId() : null;
+        long traitsRollSeed = traitsComponent != null ? traitsComponent.getRollSeed() : 0L;
+        String traitsValues = traitsComponent != null ? TraitValueCodec.encode(traitsComponent.getTraitValues()) : null;
+        if (traitsValues != null && traitsValues.isBlank()) {
+            traitsValues = null;
+        }
 
         TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
         Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
@@ -118,7 +139,14 @@ public final class CommandLinkedNpcDeathService {
                         lastKnownPosition,
                         homePosition,
                         diedAtMs,
-                        respawnAvailableAtMs
+                        respawnAvailableAtMs,
+                        breedingConfigId,
+                        breedingHappiness,
+                        breedingCooldownUntilMs,
+                        breedingLastPartnerUuid,
+                        traitsConfigId,
+                        traitsRollSeed,
+                        traitsValues
                 )
         );
         persistSnapshots();
@@ -222,7 +250,14 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + encodeVector(snapshot.lastKnownPosition())
                 + FIELD_SEPARATOR + encodeVector(snapshot.homePosition())
                 + FIELD_SEPARATOR + snapshot.diedAtMs()
-                + FIELD_SEPARATOR + snapshot.respawnAvailableAtMs();
+                + FIELD_SEPARATOR + snapshot.respawnAvailableAtMs()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.breedingConfigId())
+                + FIELD_SEPARATOR + encodeNullableDouble(snapshot.breedingHappiness())
+                + FIELD_SEPARATOR + snapshot.breedingCooldownUntilMs()
+                + FIELD_SEPARATOR + encodeNullableUuid(snapshot.breedingLastPartnerUuid())
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.traitsConfigId())
+                + FIELD_SEPARATOR + snapshot.traitsRollSeed()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.traitsValues());
     }
 
     @Nullable
@@ -249,6 +284,13 @@ public final class CommandLinkedNpcDeathService {
         Vector3d homePosition = decodeVector(parts[9]);
         long diedAtMs = parseLong(parts[10], System.currentTimeMillis());
         long respawnAvailableAtMs = parseLong(parts[11], diedAtMs);
+        String breedingConfigId = parts.length > 12 ? decodeNullableString(parts[12]) : null;
+        Double breedingHappiness = parts.length > 13 ? parseNullableDouble(parts[13]) : null;
+        long breedingCooldownUntilMs = parts.length > 14 ? parseLong(parts[14], 0L) : 0L;
+        UUID breedingLastPartnerUuid = parts.length > 15 ? decodeNullableUuid(parts[15]) : null;
+        String traitsConfigId = parts.length > 16 ? decodeNullableString(parts[16]) : null;
+        long traitsRollSeed = parts.length > 17 ? parseLong(parts[17], 0L) : 0L;
+        String traitsValues = parts.length > 18 ? decodeNullableString(parts[18]) : null;
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -261,7 +303,14 @@ public final class CommandLinkedNpcDeathService {
                 lastKnownPosition,
                 homePosition,
                 diedAtMs,
-                respawnAvailableAtMs
+                respawnAvailableAtMs,
+                breedingConfigId,
+                breedingHappiness,
+                breedingCooldownUntilMs,
+                breedingLastPartnerUuid,
+                traitsConfigId,
+                traitsRollSeed,
+                traitsValues
         );
     }
 
@@ -286,6 +335,13 @@ public final class CommandLinkedNpcDeathService {
             return "";
         }
         return Base64.getUrlEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private String encodeNullableDouble(@Nullable Double value) {
+        if (value == null) {
+            return "";
+        }
+        return Double.toString(value);
     }
 
     @Nullable
@@ -370,6 +426,18 @@ public final class CommandLinkedNpcDeathService {
             return Long.parseLong(value.trim());
         } catch (NumberFormatException ignored) {
             return fallback;
+        }
+    }
+
+    @Nullable
+    private Double parseNullableDouble(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        try {
+            return Double.parseDouble(value.trim());
+        } catch (NumberFormatException ignored) {
+            return null;
         }
     }
 
@@ -486,7 +554,14 @@ public final class CommandLinkedNpcDeathService {
                                         @Nullable Vector3d lastKnownPosition,
                                         @Nullable Vector3d homePosition,
                                         long diedAtMs,
-                                        long respawnAvailableAtMs) {
+                                        long respawnAvailableAtMs,
+                                        @Nullable String breedingConfigId,
+                                        @Nullable Double breedingHappiness,
+                                        long breedingCooldownUntilMs,
+                                        @Nullable UUID breedingLastPartnerUuid,
+                                        @Nullable String traitsConfigId,
+                                        long traitsRollSeed,
+                                        @Nullable String traitsValues) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
@@ -88,6 +89,9 @@ final class SpawnerNpcStateService {
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         store.putComponent(npcRef, type, new TameworkTamedComponent(tamed));
+        if (tamed) {
+            CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
+        }
     }
 
     void applyCapturedName(ItemStack itemStack, Ref<EntityStore> npcRef, Store<EntityStore> store) {

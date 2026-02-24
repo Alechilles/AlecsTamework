@@ -10,7 +10,7 @@
 - "Unknown JSON attribute ..." -> builder does not recognize the field name.
 - "TameworkInteract: no config resolved or config disabled" -> role id mismatch or config disabled.
 - "TameworkInteract: no interactions matched" -> requirements did not pass. The log includes a summary of key flags.
-- "Mount preset effect not yet implemented" or "StartBreeding effect not yet implemented" -> feature stub.
+- "Mount preset effect not yet implemented" -> feature stub.
 
 ## Interaction troubleshooting
 - Verify `TwInteractionConfig` is enabled and `RoleIds` include the NPC role id.

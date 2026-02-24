@@ -1,0 +1,55 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "RoleIds": [
+    "Mob_Tamework_Example",
+    "Mob_Tamework_Example_Vanilla",
+    "Mob_Tamework_Example_Simple",
+    "Mob_Tamework_Example_Simple_Vanilla",
+    "Mob_Tamework_Example_Hytalor"
+  ],
+  "Selection": {
+    "RollsPerSpawn": 2,
+    "RerollDuplicates": true,
+    "UseSeededRandom": true
+  },
+  "Stacking": {
+    "MaxTraitsPerNpc": 3,
+    "AllowDuplicateTraits": false
+  },
+  "Inheritance": {
+    "AllowInheritance": true,
+    "InheritanceChance": 0.6,
+    "MutationChance": 0.1,
+    "PreferParentTraits": true
+  },
+  "Traits": [
+    {
+      "Id": "Trait_Disposition",
+      "DisplayName": "Disposition",
+      "EffectKey": "HappinessGainMultiplier",
+      "Weight": 1.0,
+      "Min": 0.8,
+      "Max": 1.2,
+      "Default": 1.0
+    },
+    {
+      "Id": "Trait_Fertility",
+      "DisplayName": "Fertility",
+      "EffectKey": "FertilityMultiplier",
+      "Weight": 0.8,
+      "Min": 0.7,
+      "Max": 1.3,
+      "Default": 1.0
+    },
+    {
+      "Id": "Trait_Health",
+      "DisplayName": "Health",
+      "EffectKey": "MaxHealthMultiplier",
+      "Weight": 0.9,
+      "Min": 0.85,
+      "Max": 1.25,
+      "Default": 1.0
+    }
+  ]
+}

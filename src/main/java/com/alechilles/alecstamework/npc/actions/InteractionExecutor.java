@@ -74,7 +74,8 @@ final class InteractionExecutor {
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         if (entry instanceof BreedInteraction) {
-            boolean applied = effects.applyStartBreeding();
+            BreedInteraction breeding = (BreedInteraction) entry;
+            boolean applied = effects.applyStartBreeding(breeding, npcRef, role, store);
             return applied | effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx);
         }
         return false;

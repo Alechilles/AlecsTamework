@@ -1,9 +1,13 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -15,6 +19,7 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -119,6 +124,7 @@ final class CommandRespawnService {
                     new TameworkTamedComponent(deadSnapshot.tamed())
             );
         }
+        applyRespawnProgressionState(spawnedRef, store, deadSnapshot);
         if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
             ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
             if (nameType != null) {
@@ -151,6 +157,83 @@ final class CommandRespawnService {
             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
         }
         return updated;
+    }
+
+    private void applyRespawnProgressionState(Ref<EntityStore> spawnedRef,
+                                              Store<EntityStore> store,
+                                              CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        if (spawnedRef == null || !spawnedRef.isValid() || store == null || snapshot == null) {
+            return;
+        }
+        applyRespawnBreedingState(spawnedRef, store, snapshot);
+        applyRespawnTraitsState(spawnedRef, store, snapshot);
+    }
+
+    private void applyRespawnBreedingState(Ref<EntityStore> spawnedRef,
+                                           Store<EntityStore> store,
+                                           CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        if (breedingType == null) {
+            return;
+        }
+        boolean hasBreedingData = (snapshot.breedingConfigId() != null && !snapshot.breedingConfigId().isBlank())
+                || snapshot.breedingHappiness() != null
+                || snapshot.breedingCooldownUntilMs() > 0L
+                || snapshot.breedingLastPartnerUuid() != null;
+        if (!hasBreedingData) {
+            return;
+        }
+        double happiness = snapshot.breedingHappiness() != null ? snapshot.breedingHappiness() : 0.0;
+        boolean ready = false;
+        String configId = snapshot.breedingConfigId();
+        if (configId != null && !configId.isBlank()) {
+            ready = resolveBreedingReadiness(configId, happiness);
+        }
+        TameworkBreedingComponent component = new TameworkBreedingComponent(
+                configId,
+                happiness,
+                System.currentTimeMillis(),
+                ready,
+                snapshot.breedingCooldownUntilMs(),
+                snapshot.breedingLastPartnerUuid()
+        );
+        store.putComponent(spawnedRef, breedingType, component);
+    }
+
+    private void applyRespawnTraitsState(Ref<EntityStore> spawnedRef,
+                                         Store<EntityStore> store,
+                                         CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
+        if (traitsType == null) {
+            return;
+        }
+        boolean hasTraitsData = (snapshot.traitsConfigId() != null && !snapshot.traitsConfigId().isBlank())
+                || snapshot.traitsRollSeed() != 0L
+                || (snapshot.traitsValues() != null && !snapshot.traitsValues().isBlank());
+        if (!hasTraitsData) {
+            return;
+        }
+        TameworkTraitsComponent component = new TameworkTraitsComponent(
+                snapshot.traitsConfigId(),
+                snapshot.traitsRollSeed(),
+                TraitValueCodec.decode(snapshot.traitsValues())
+        );
+        store.putComponent(spawnedRef, traitsType, component);
+    }
+
+    private boolean resolveBreedingReadiness(String configId, double happiness) {
+        if (configId == null || configId.isBlank()) {
+            return false;
+        }
+        DefaultAssetMap<String, TwBreedingConfig> assetMap = TwBreedingConfig.getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return false;
+        }
+        TwBreedingConfig config = assetMap.getAssetMap().get(configId);
+        if (config == null) {
+            return false;
+        }
+        return happiness >= config.getHappiness().getThreshold();
     }
 
     private void applyRespawnFollowBootstrap(Ref<EntityStore> npcRef,

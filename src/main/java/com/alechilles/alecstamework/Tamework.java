@@ -12,11 +12,13 @@ import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
@@ -40,10 +42,12 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPrompt;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
@@ -103,12 +107,16 @@ public class Tamework extends JavaPlugin {
     private boolean namingAssetsRegistered;
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
+    private boolean breedingAssetsRegistered;
+    private boolean traitAssetsRegistered;
     private String lastGlobalConfigWarningKey;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
     private ComponentType<EntityStore, TameworkNpcNameComponent> npcNameComponentType;
     private ComponentType<EntityStore, TameworkCommandLinksComponent> commandLinksComponentType;
+    private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
+    private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
@@ -139,6 +147,8 @@ public class Tamework extends JavaPlugin {
         registerNamingItemAssets();
         registerCommandItemAssets();
         registerInteractionAssets();
+        registerBreedingAssets();
+        registerTraitAssets();
 
         // Register components that persist owner and tamed state on NPCs.
         ownerComponentType = getEntityStoreRegistry().registerComponent(
@@ -169,6 +179,18 @@ public class Tamework extends JavaPlugin {
                 TameworkCommandLinksComponent.class,
                 "TameworkCommandLinks",
                 TameworkCommandLinksComponent.CODEC
+        );
+
+        breedingComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkBreedingComponent.class,
+                "TameworkBreeding",
+                TameworkBreedingComponent.CODEC
+        );
+
+        traitsComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkTraitsComponent.class,
+                "TameworkTraits",
+                TameworkTraitsComponent.CODEC
         );
 
         getEntityStoreRegistry().registerSystem(
@@ -582,6 +604,38 @@ public class Tamework extends JavaPlugin {
         interactionAssetsRegistered = true;
     }
 
+    private void registerBreedingAssets() {
+        if (breedingAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwBreedingConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Breeding")
+                        .setCodec(TwBreedingConfig.CODEC)
+                        .setKeyFunction(TwBreedingConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwBreedingConfig.class, this::onBreedingAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwBreedingConfig.class, this::onBreedingAssetsRemoved);
+        breedingAssetsRegistered = true;
+    }
+
+    private void registerTraitAssets() {
+        if (traitAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwTraitConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Traits")
+                        .setCodec(TwTraitConfig.CODEC)
+                        .setKeyFunction(TwTraitConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsRemoved);
+        traitAssetsRegistered = true;
+    }
+
     private void onSpawnerAssetsLoaded(
             LoadedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         reloadItemFeatureConfigs();
@@ -634,6 +688,26 @@ public class Tamework extends JavaPlugin {
     private void onInteractionAssetsRemoved(
             RemovedAssetsEvent<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> event) {
         TwInteractionConfig.clearRoleCache();
+    }
+
+    private void onBreedingAssetsLoaded(
+            LoadedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
+        TwBreedingConfig.clearRoleCache();
+    }
+
+    private void onBreedingAssetsRemoved(
+            RemovedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
+        TwBreedingConfig.clearRoleCache();
+    }
+
+    private void onTraitAssetsLoaded(
+            LoadedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
+        TwTraitConfig.clearRoleCache();
+    }
+
+    private void onTraitAssetsRemoved(
+            RemovedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
+        TwTraitConfig.clearRoleCache();
     }
 
     private int loadSpawnerItemAssets() {
@@ -741,6 +815,14 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkCommandLinksComponent> getCommandLinksComponentType() {
         return commandLinksComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkBreedingComponent> getBreedingComponentType() {
+        return breedingComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkTraitsComponent> getTraitsComponentType() {
+        return traitsComponentType;
     }
 
     public boolean isDebugHookEnabled() {

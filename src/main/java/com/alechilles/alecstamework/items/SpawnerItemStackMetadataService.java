@@ -16,11 +16,14 @@ import org.bson.BsonDocument;
 final class SpawnerItemStackMetadataService {
     private final ItemFeatureRegistry registry;
     private final SpawnerCaptureMetadataService captureMetadataService;
+    private final SpawnerNpcProgressionMetadataService progressionMetadataService;
 
     SpawnerItemStackMetadataService(ItemFeatureRegistry registry,
-                                    SpawnerCaptureMetadataService captureMetadataService) {
+                                    SpawnerCaptureMetadataService captureMetadataService,
+                                    SpawnerNpcProgressionMetadataService progressionMetadataService) {
         this.registry = registry;
         this.captureMetadataService = captureMetadataService;
+        this.progressionMetadataService = progressionMetadataService;
     }
 
     ItemStack applyCooldown(ItemStack itemStack, String key, int cooldownMs) {
@@ -85,6 +88,9 @@ final class SpawnerItemStackMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.ATTACHMENTS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.OWNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TAMED);
+        if (progressionMetadataService != null) {
+            updated = progressionMetadataService.clearProgressionMetadata(updated);
+        }
         updated = captureMetadataService.clearNameMetadata(updated);
         updated = updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, null);
         return updated;

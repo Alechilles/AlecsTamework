@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemInventoryEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemsHandEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Effects;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
@@ -34,6 +35,7 @@ final class TameworkInteractEffects {
     private final InteractionModeCycleEffects modeCycleEffects;
     private final InteractionMountEffects mountEffects;
     private final InteractionHookEffects hookEffects;
+    private final InteractionBreedingEffects breedingEffects;
 
     TameworkInteractEffects(ActionTameworkInteract owner) {
         this.owner = owner;
@@ -43,6 +45,7 @@ final class TameworkInteractEffects {
         this.modeCycleEffects = new InteractionModeCycleEffects(owner, presentationEffects, stateEffects);
         this.mountEffects = new InteractionMountEffects(owner);
         this.hookEffects = new InteractionHookEffects(owner);
+        this.breedingEffects = new InteractionBreedingEffects(owner);
     }
 
     boolean applyCustomEffects(Effects effects,
@@ -197,9 +200,11 @@ final class TameworkInteractEffects {
         return modeCycleEffects.applyToggleMode(cycle, showFloatingText, showUiMessage, npcRef, role, store, player);
     }
 
-    boolean applyStartBreeding() {
-        owner.logUnsupported("Breeding interaction not yet implemented.");
-        return false;
+    boolean applyStartBreeding(BreedInteraction interaction,
+                               Ref<EntityStore> npcRef,
+                               Role role,
+                               Store<EntityStore> store) {
+        return breedingEffects.applyStartBreeding(interaction, npcRef, role, store);
     }
 
 }
