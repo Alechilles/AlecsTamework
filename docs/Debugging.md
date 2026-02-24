@@ -22,7 +22,7 @@
   The alarm prefix is `TwGlobalConfig.InteractionCooldownAlarmPrefix`.
 - If prompts look wrong or stale, ensure `TameworkInteractPrompt` is running and use `/tw debugprompt` to inspect prompt selection.
 - Prompt hint keys are `server.interactionHints.*` and must be defined in `Server/Languages/en-US/server.lang` without the `server.` prefix.
-- Breed readiness currently depends on shared happiness (mirrored into breeding state). Feeding increases happiness using `TwHappinessConfig.Sources.GainOnFeed` when present, with `TwBreedingConfig.Happiness.GainOnFeed` as fallback and optional trait multiplier `HappinessGainMultiplier`.
+- Breed readiness currently depends on shared happiness (mirrored into breeding state). Feeding increases happiness using `TwHappinessConfig.Sources.GainOnFeed` when present (or shared defaults when no happiness config resolves), with optional trait multiplier `HappinessGainMultiplier`.
 - Breed interaction checks now use effective fertility for threshold gating: `(Happiness * FertilityMultiplier) + FertilityBonus`.
 - Breed interaction now checks config state gates (`RequireNotSleeping`, `RequireNotInCombat`) and adult gating (`RequireAdult` via life-stage state), and logs blocked-state diagnostics when debug is enabled.
 - Successful breeding now schedules a visible sequence: parent approach movement, hearts particle, then delayed offspring spawn.

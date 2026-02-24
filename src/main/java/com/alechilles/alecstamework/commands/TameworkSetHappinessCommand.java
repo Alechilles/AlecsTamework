@@ -23,6 +23,9 @@ import javax.annotation.Nullable;
  * Command to set shared companion happiness for the targeted NPC.
  */
 public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
+    private static final double DEFAULT_HAPPINESS_MIN = 0.0;
+    private static final double DEFAULT_HAPPINESS_MAX = 100.0;
+
     public TameworkSetHappinessCommand() {
         super("sethappiness", "Set happiness of the NPC you are looking at.");
         setAllowsExtraArguments(true);
@@ -68,7 +71,7 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
 
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(candidate.ref, store, happiness);
         TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(candidate.ref, store, breeding);
-        ClampRules clampRules = resolveClampRules(happinessConfig, breedingConfig);
+        ClampRules clampRules = resolveClampRules(happinessConfig);
         double clamped = clampRules != null
                 ? clamp(requested, clampRules.min(), clampRules.max())
                 : requested;
@@ -139,19 +142,13 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
     }
 
     @Nullable
-    private static ClampRules resolveClampRules(@Nullable TwHappinessConfig happinessConfig,
-                                                @Nullable TwBreedingConfig breedingConfig) {
+    private static ClampRules resolveClampRules(@Nullable TwHappinessConfig happinessConfig) {
         if (happinessConfig != null && happinessConfig.isEnabled()) {
             double min = happinessConfig.getValues().getMin();
             double max = happinessConfig.getValues().getMax();
             return normalizeRange(min, max);
         }
-        if (breedingConfig != null && breedingConfig.isEnabled()) {
-            double min = breedingConfig.getHappiness().getMin();
-            double max = breedingConfig.getHappiness().getMax();
-            return normalizeRange(min, max);
-        }
-        return null;
+        return normalizeRange(DEFAULT_HAPPINESS_MIN, DEFAULT_HAPPINESS_MAX);
     }
 
     @Nullable

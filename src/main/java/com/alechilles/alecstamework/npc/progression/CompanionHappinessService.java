@@ -18,6 +18,10 @@ import javax.annotation.Nullable;
  */
 public final class CompanionHappinessService {
     private static final double EPSILON = 0.000001;
+    private static final double DEFAULT_MIN = 0.0;
+    private static final double DEFAULT_MAX = 100.0;
+    private static final double DEFAULT_VALUE = 50.0;
+    private static final double DEFAULT_FEED_GAIN = 5.0;
 
     private CompanionHappinessService() {
     }
@@ -41,10 +45,7 @@ public final class CompanionHappinessService {
                 store.getComponent(npcRef, happinessType)
         );
         TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
-        HappinessRules rules = resolveRules(happinessConfig, breedingConfig);
-        if (rules == null) {
-            return false;
-        }
+        HappinessRules rules = resolveRules(happinessConfig);
         TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
         if (happiness == null) {
             double seedValue = breeding != null ? breeding.getHappiness() : rules.defaultValue;
@@ -139,9 +140,7 @@ public final class CompanionHappinessService {
         return fallback;
     }
 
-    @Nullable
-    private static HappinessRules resolveRules(@Nullable TwHappinessConfig happinessConfig,
-                                               @Nullable TwBreedingConfig breedingConfig) {
+    private static HappinessRules resolveRules(@Nullable TwHappinessConfig happinessConfig) {
         if (happinessConfig != null && happinessConfig.isEnabled()) {
             TwHappinessConfig.ValueSettings values = happinessConfig.getValues();
             double min = values.getMin();
@@ -155,20 +154,7 @@ public final class CompanionHappinessService {
             double feedGain = happinessConfig.getSources().getGainOnFeed();
             return new HappinessRules(min, max, defaultValue, feedGain);
         }
-        if (breedingConfig != null && breedingConfig.isEnabled()) {
-            TwBreedingConfig.HappinessSettings settings = breedingConfig.getHappiness();
-            double min = settings.getMin();
-            double max = settings.getMax();
-            if (max < min) {
-                double swap = min;
-                min = max;
-                max = swap;
-            }
-            double defaultValue = clamp(settings.getCurrentDefault(), min, max);
-            double feedGain = settings.getGainOnFeed();
-            return new HappinessRules(min, max, defaultValue, feedGain);
-        }
-        return null;
+        return new HappinessRules(DEFAULT_MIN, DEFAULT_MAX, DEFAULT_VALUE, DEFAULT_FEED_GAIN);
     }
 
     private record HappinessRules(double min, double max, double defaultValue, double feedGain) {

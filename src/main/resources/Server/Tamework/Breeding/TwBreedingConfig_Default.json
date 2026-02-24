@@ -9,15 +9,7 @@
     "Mob_Tamework_Example_Hytalor"
   ],
   "Happiness": {
-    "CurrentDefault": 50.0,
-    "Min": 0.0,
-    "Max": 100.0,
-    "Threshold": 70.0,
-    "DecayPerMinute": 1.0,
-    "GainOnFeed": 5.0,
-    "GainOnPet": 3.0,
-    "GainPerMinuteNearOwner": 1.0,
-    "LoseOnDamage": 10.0
+    "Threshold": 70.0
   },
   "Eligibility": {
     "RequireTamed": true,

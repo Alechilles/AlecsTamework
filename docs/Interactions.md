@@ -96,7 +96,7 @@ Effects:
 - Shows floating combat text for healing (if a player is present).
 - Consumes the held item.
 - Applies shared happiness gain using resolved `TwHappinessConfig.Sources.GainOnFeed` when happiness progression exists.
-  Falls back to `TwBreedingConfig.Happiness.GainOnFeed` for legacy/compatibility paths.
+  If no happiness config is resolved, default shared happiness rules are used.
   This flows through `CompanionHappinessService` and mirrors into breeding progression when present.
   Trait effect key `HappinessGainMultiplier` scales this gain when traits are present.
 

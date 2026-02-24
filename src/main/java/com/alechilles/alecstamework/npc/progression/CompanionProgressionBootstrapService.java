@@ -18,6 +18,9 @@ import java.util.UUID;
  */
 public final class CompanionProgressionBootstrapService {
     private static final double EPSILON = 0.000001;
+    private static final double DEFAULT_HAPPINESS_MIN = 0.0;
+    private static final double DEFAULT_HAPPINESS_MAX = 100.0;
+    private static final double DEFAULT_HAPPINESS_VALUE = 50.0;
 
     private CompanionProgressionBootstrapService() {
     }
@@ -62,7 +65,7 @@ public final class CompanionProgressionBootstrapService {
                 existing.setConfigId(config.getId());
                 changed = true;
             }
-            double clamped = clampHappinessValue(existing.getValue(), config, breedingConfig);
+            double clamped = clampHappinessValue(existing.getValue(), config);
             if (Math.abs(existing.getValue() - clamped) > EPSILON) {
                 existing.setValue(clamped);
                 changed = true;
@@ -80,7 +83,7 @@ public final class CompanionProgressionBootstrapService {
         if (config == null && breedingConfig == null && legacy == null) {
             return null;
         }
-        double initial = resolveInitialHappinessValue(npcRef, store, config, breedingConfig);
+        double initial = resolveInitialHappinessValue(npcRef, store, config);
         String configId = config != null && config.getId() != null && !config.getId().isBlank()
                 ? config.getId()
                 : null;
@@ -103,7 +106,7 @@ public final class CompanionProgressionBootstrapService {
         long now = System.currentTimeMillis();
         double happinessValue = happiness != null
                 ? happiness.getValue()
-                : resolveInitialHappinessValue(npcRef, store, null, config);
+                : resolveInitialHappinessValue(npcRef, store, null);
         long lastUpdateMs = happiness != null && happiness.getLastUpdateMs() > 0L
                 ? happiness.getLastUpdateMs()
                 : now;
@@ -210,11 +213,10 @@ public final class CompanionProgressionBootstrapService {
 
     private static double resolveInitialHappinessValue(Ref<EntityStore> npcRef,
                                                        Store<EntityStore> store,
-                                                       TwHappinessConfig happinessConfig,
-                                                       TwBreedingConfig breedingConfig) {
+                                                       TwHappinessConfig happinessConfig) {
         Double legacy = resolveLegacyBreedingHappiness(npcRef, store);
         if (legacy != null && Double.isFinite(legacy)) {
-            return clampHappinessValue(legacy, happinessConfig, breedingConfig);
+            return clampHappinessValue(legacy, happinessConfig);
         }
         if (happinessConfig != null) {
             TwHappinessConfig.ValueSettings values = happinessConfig.getValues();
@@ -227,23 +229,11 @@ public final class CompanionProgressionBootstrapService {
             }
             return clamp(values.getCurrentDefault(), min, max);
         }
-        if (breedingConfig != null) {
-            TwBreedingConfig.HappinessSettings settings = breedingConfig.getHappiness();
-            double min = settings.getMin();
-            double max = settings.getMax();
-            if (max < min) {
-                double swap = min;
-                min = max;
-                max = swap;
-            }
-            return clamp(settings.getCurrentDefault(), min, max);
-        }
-        return 0.0;
+        return clamp(DEFAULT_HAPPINESS_VALUE, DEFAULT_HAPPINESS_MIN, DEFAULT_HAPPINESS_MAX);
     }
 
     private static double clampHappinessValue(double value,
-                                              TwHappinessConfig happinessConfig,
-                                              TwBreedingConfig breedingConfig) {
+                                              TwHappinessConfig happinessConfig) {
         if (happinessConfig != null) {
             TwHappinessConfig.ValueSettings settings = happinessConfig.getValues();
             double min = settings.getMin();
@@ -255,18 +245,7 @@ public final class CompanionProgressionBootstrapService {
             }
             return clamp(value, min, max);
         }
-        if (breedingConfig != null) {
-            TwBreedingConfig.HappinessSettings settings = breedingConfig.getHappiness();
-            double min = settings.getMin();
-            double max = settings.getMax();
-            if (max < min) {
-                double swap = min;
-                min = max;
-                max = swap;
-            }
-            return clamp(value, min, max);
-        }
-        return value;
+        return clamp(value, DEFAULT_HAPPINESS_MIN, DEFAULT_HAPPINESS_MAX);
     }
 
     private static Double resolveLegacyBreedingHappiness(Ref<EntityStore> npcRef, Store<EntityStore> store) {

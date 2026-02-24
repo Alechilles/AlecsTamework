@@ -22,7 +22,7 @@
 - Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
 - Interaction/docs coverage updated to reflect current breeding behavior (no longer a pure stub path).
 - Trait bootstrap now backfills empty trait components with deterministic rolls and role-config IDs.
-- Feeding interactions now apply shared happiness gains from happiness config with breeding-config fallback, including trait-based `HappinessGainMultiplier` scaling.
+- Feeding interactions now apply shared happiness gains from happiness config (or shared defaults when no happiness config resolves), including trait-based `HappinessGainMultiplier` scaling.
 - Breeding config resolution now supports direct config-id lookup (`resolveById`) and shared resolver usage across breeding/spawner/respawn paths.
 - Happiness updates now route through shared `CompanionHappinessService` (with `BreedingHappinessService` retained as a compatibility shim), keeping architecture open for non-breeding consumers.
 - Spawner metadata and command death/respawn snapshots now persist shared happiness state and restore breeding happiness from that shared source for backward-compatible migration.

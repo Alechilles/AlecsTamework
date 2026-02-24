@@ -25,57 +25,9 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             HappinessSettings::new
     )
         .<Double>append(
-            new KeyedCodec<>("CurrentDefault", Codec.DOUBLE),
-            (settings, value) -> settings.currentDefault = value,
-            settings -> settings.currentDefault
-        )
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("Min", Codec.DOUBLE),
-            (settings, value) -> settings.min = value,
-            settings -> settings.min
-        )
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("Max", Codec.DOUBLE),
-            (settings, value) -> settings.max = value,
-            settings -> settings.max
-        )
-        .add()
-        .<Double>append(
             new KeyedCodec<>("Threshold", Codec.DOUBLE),
             (settings, value) -> settings.threshold = value,
             settings -> settings.threshold
-        )
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("DecayPerMinute", Codec.DOUBLE),
-            (settings, value) -> settings.decayPerMinute = value,
-            settings -> settings.decayPerMinute
-        )
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("GainOnFeed", Codec.DOUBLE),
-            (settings, value) -> settings.gainOnFeed = value,
-            settings -> settings.gainOnFeed
-        )
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("GainOnPet", Codec.DOUBLE),
-            (settings, value) -> settings.gainOnPet = value,
-            settings -> settings.gainOnPet
-        )
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("GainPerMinuteNearOwner", Codec.DOUBLE),
-            (settings, value) -> settings.gainPerMinuteNearOwner = value,
-            settings -> settings.gainPerMinuteNearOwner
-        )
-        .add()
-        .<Double>append(
-            new KeyedCodec<>("LoseOnDamage", Codec.DOUBLE),
-            (settings, value) -> settings.loseOnDamage = value,
-            settings -> settings.loseOnDamage
         )
         .add()
         .build();
@@ -433,52 +385,12 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return inheritance == null ? new InheritanceSettings() : inheritance;
     }
 
-    /** Tunable values for breeding happiness gates and progression. */
+    /** Tunable values for breeding-specific happiness gating. */
     public static final class HappinessSettings {
-        private double currentDefault = 50.0;
-        private double min = 0.0;
-        private double max = 100.0;
         private double threshold = 70.0;
-        private double decayPerMinute = 1.0;
-        private double gainOnFeed = 5.0;
-        private double gainOnPet = 3.0;
-        private double gainPerMinuteNearOwner = 1.0;
-        private double loseOnDamage = 10.0;
-
-        public double getCurrentDefault() {
-            return currentDefault;
-        }
-
-        public double getMin() {
-            return min;
-        }
-
-        public double getMax() {
-            return max;
-        }
 
         public double getThreshold() {
             return threshold;
-        }
-
-        public double getDecayPerMinute() {
-            return decayPerMinute;
-        }
-
-        public double getGainOnFeed() {
-            return gainOnFeed;
-        }
-
-        public double getGainOnPet() {
-            return gainOnPet;
-        }
-
-        public double getGainPerMinuteNearOwner() {
-            return gainPerMinuteNearOwner;
-        }
-
-        public double getLoseOnDamage() {
-            return loseOnDamage;
         }
     }
 
