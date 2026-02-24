@@ -43,6 +43,7 @@
 - Breeding offspring placement now prioritizes wider horizontal offsets and higher vertical fallback offsets to reduce parent-overlap/terrain clipping, and spawn presence checks now run at multiple delayed checkpoints (0.9s, 3s, 8s) to expose delayed despawn issues.
 - Juvenile model scaling now preserves random attachment IDs from the current model when rebuilding scaled models, fixing invisible offspring where required attachments were being dropped during scale updates.
 - `Template_Tamework_Example`/`Template_Tamework_Example_Vanilla` now use wander-driven `Idle` behavior and an explicit `Follow` state, and the example command item now sets `Follow`/`Recall` to state `Follow`.
+- Breeding offspring progression now creates a family flock group (`TameworkFlockFollow`) where one parent is leader and the other parent plus child are assigned to follow that leader via `MasterTarget` + `Follow` state.
 
 ### Fixed
 - Fixed a world-thread crash in `CommandLinkedNpcDeathService` when recording death snapshots for linked NPCs that had neither shared happiness nor breeding happiness (null-safe fallback now avoids `Double` auto-unboxing).

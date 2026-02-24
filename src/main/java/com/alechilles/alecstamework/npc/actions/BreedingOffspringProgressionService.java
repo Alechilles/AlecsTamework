@@ -25,6 +25,11 @@ import javax.annotation.Nullable;
  */
 final class BreedingOffspringProgressionService {
     private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
+    private final BreedingFamilyFlockService familyFlockService;
+
+    BreedingOffspringProgressionService() {
+        this.familyFlockService = new BreedingFamilyFlockService();
+    }
 
     void applyOffspringState(Ref<EntityStore> childRef,
                              NPCEntity childNpc,
@@ -55,6 +60,7 @@ final class BreedingOffspringProgressionService {
         CompanionLifeStageService.initializeOffspringLifeStage(childRef, childNpc, store, hasBabyVariant);
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
+        familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
     }
 
     private void applyOffspringOwnershipAndTamedState(Ref<EntityStore> childRef,

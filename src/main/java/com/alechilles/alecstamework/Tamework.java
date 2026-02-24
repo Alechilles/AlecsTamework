@@ -44,6 +44,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPro
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkFlockFollowComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
@@ -123,6 +124,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
+    private ComponentType<EntityStore, TameworkFlockFollowComponent> flockFollowComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
@@ -210,6 +212,12 @@ public class Tamework extends JavaPlugin {
                 TameworkLifeStageComponent.class,
                 "TameworkLifeStage",
                 TameworkLifeStageComponent.CODEC
+        );
+
+        flockFollowComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkFlockFollowComponent.class,
+                "TameworkFlockFollow",
+                TameworkFlockFollowComponent.CODEC
         );
 
         getEntityStoreRegistry().registerSystem(
@@ -876,6 +884,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkLifeStageComponent> getLifeStageComponentType() {
         return lifeStageComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkFlockFollowComponent> getFlockFollowComponentType() {
+        return flockFollowComponentType;
     }
 
     public boolean isDebugHookEnabled() {
