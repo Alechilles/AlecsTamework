@@ -48,6 +48,7 @@
 - Fixed a world-thread crash in `CommandLinkedNpcDeathService` when recording death snapshots for linked NPCs that had neither shared happiness nor breeding happiness (null-safe fallback now avoids `Double` auto-unboxing).
 - Fixed breeding pair state completion flow so `BreedPair` no longer stalls after arrival, and breeding pair start now clears lingering status posture animation to prevent slide-like movement.
 - Breeding pair completion now uses an explicit completion range (`BreedingPairCompleteRange`) separate from seek stop distance so tuning close approach distances does not trap NPCs in `BreedPair`.
+- Breeding pair completion now finalizes from a non-one-shot delay state and includes a move-timeout fail-safe, and close-range completion once again follows `SeekStopDistance + 0.15` for tighter pair-up spacing.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

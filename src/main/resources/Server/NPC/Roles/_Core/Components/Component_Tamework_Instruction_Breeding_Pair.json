@@ -24,10 +24,6 @@
       "Value": 0.3,
       "Description": "Distance considered close enough for the pair to meet."
     },
-    "BreedingPairCompleteRange": {
-      "Value": 1.2,
-      "Description": "Distance threshold used to finalize pair movement and exit breeding pair state."
-    },
     "BreedingPairSeekRelativeSpeed": {
       "Value": 0.45,
       "Description": "Relative speed while approaching breeding pair target."
@@ -35,6 +31,13 @@
     "BreedingPairReadRange": {
       "Value": 64,
       "Description": "Range used to read the stored breeding pair destination."
+    },
+    "BreedingPairMoveTimeoutRange": {
+      "Value": [
+        4,
+        4
+      ],
+      "Description": "Fail-safe maximum move time before forcing pair completion."
     },
     "BreedingPairCompleteDelayRange": {
       "Value": [
@@ -109,7 +112,7 @@
                 "Compute": "BreedingPairTargetSlot"
               },
               "Range": {
-                "Compute": "BreedingPairCompleteRange"
+                "Compute": "BreedingPairSeekStopDistance + 0.15"
               }
             },
             "Actions": [
@@ -156,7 +159,7 @@
                 "Compute": "BreedingPairReadRange"
               },
               "MinRange": {
-                "Compute": "BreedingPairCompleteRange"
+                "Compute": "BreedingPairSeekStopDistance + 0.15"
               }
             },
             "BodyMotion": {
@@ -171,6 +174,26 @@
                 "Compute": "BreedingPairSeekRelativeSpeed"
               }
             }
+          },
+          {
+            "$Comment": "Fail-safe completion if pair movement takes too long.",
+            "Sensor": {
+              "Type": "State",
+              "State": ".Move"
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "BreedingPairMoveTimeoutRange"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".CompleteDelay"
+              }
+            ]
           }
         ]
       },
@@ -190,8 +213,7 @@
         "ActionsBlocking": true,
         "Sensor": {
           "Type": "State",
-          "State": ".CompleteDelay",
-          "Once": true
+          "State": ".CompleteDelay"
         },
         "Actions": [
           {
