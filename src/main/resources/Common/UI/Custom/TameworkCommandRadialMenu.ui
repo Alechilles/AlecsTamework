@@ -29,56 +29,64 @@ $C = "Common.ui";
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice0_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @Slice1ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice1_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @Slice2ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice2_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @Slice3ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice3_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @Slice4ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice4_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @Slice5ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice5_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @Slice6ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice6_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @Slice7ButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Default.png"), LabelStyle: @SliceButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Hover.png"), LabelStyle: @SliceButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Pressed.png"), LabelStyle: @SliceButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/CommandWheelSlice7_Default.png", Color: #ffffff(0.5)), LabelStyle: @SliceButtonDisabledLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 $C.@PageOverlay {

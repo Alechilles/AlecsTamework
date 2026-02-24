@@ -1,57 +1,59 @@
 $C = "Common.ui";
 
-Group #TameworkLinkedPanelRoot {
+$C.@DecoratedContainer #TameworkLinkedPanelRoot {
   Anchor: (Top: 290, Left: 132, Width: 430, Height: 640);
-  LayoutMode: Top;
-  Padding: (Left: 14, Right: 6, Top: 12, Bottom: 12);
-  Background: #0b1a2c(0.78);
   Visible: false;
 
-  Label #TameworkLinkedPanelTitle {
-    Anchor: (Height: 30);
-    Text: "Linked Companions";
-    Style: (
-      FontSize: 24,
-      RenderBold: true,
-      TextColor: #eef3f8,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
+  #Title {
+    $C.@Title #TameworkLinkedPanelTitle {
+      @Alignment = Start;
+      @Text = "Linked Companions";
+    }
   }
 
-  Label #TameworkLinkedPanelSubtitle {
-    Anchor: (Top: 2, Height: 20);
-    Text: "No linked companions";
-    Style: (
-      FontSize: 14,
-      TextColor: #c4d2e1,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
-  }
+  #Content {
+    LayoutMode: Top;
+    Padding: (Left: 10, Right: 6, Top: 8, Bottom: 10);
 
-  Label #TameworkLinkedPanelEmptyState {
-    Anchor: (Top: 16, Height: 48);
-    Text: "No linked companions yet. Primary-use on an owned NPC to link it.";
-    Style: (
-      FontSize: 14,
-      TextColor: #b2c3d6,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Start
-    );
-    Visible: false;
-  }
+    Label #TameworkLinkedPanelSubtitle {
+      Anchor: (Height: 20);
+      Text: "No linked companions";
+      Style: (
+        FontSize: 14,
+        TextColor: #c4d2e1,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center
+      );
+    }
 
-  Group #TameworkLinkedPanelListViewport {
-    Anchor: (Top: 10);
-    FlexWeight: 1;
-    LayoutMode: TopScrolling;
-    ScrollbarStyle: $C.@DefaultScrollbarStyle;
+    $C.@PanelSeparatorFancy {
+      @Anchor = (Top: 6, Bottom: 8);
+    }
 
-    Group #TameworkLinkedPanelList {
-      LayoutMode: Top;
-      Anchor: (Bottom: 6);
-      Padding: (Right: 0);
+    Label #TameworkLinkedPanelEmptyState {
+      Anchor: (Top: 8, Height: 48);
+      Text: "No linked companions yet. Primary-use on an owned NPC to link it.";
+      Style: (
+        FontSize: 14,
+        TextColor: #b2c3d6,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Start
+      );
+      Visible: false;
+    }
+
+    Group #TameworkLinkedPanelListViewport {
+      Anchor: (Top: 10);
+      FlexWeight: 1;
+      LayoutMode: TopScrolling;
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+      Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
+      Padding: (Left: 7, Right: 2, Top: 7, Bottom: 7);
+
+      Group #TameworkLinkedPanelList {
+        LayoutMode: Top;
+        Anchor: (Bottom: 6);
+      }
     }
   }
 }

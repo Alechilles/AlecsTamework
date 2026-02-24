@@ -9,7 +9,8 @@ $C = "Common.ui";
   Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Default.png"), LabelStyle: @RemoveIconButtonLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Hover.png"), LabelStyle: @RemoveIconButtonLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Pressed.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Disabled.png"), LabelStyle: @RemoveIconButtonLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Disabled.png"), LabelStyle: @RemoveIconButtonLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @LinkedActionIconLabelStyle = LabelStyle(
@@ -21,28 +22,32 @@ $C = "Common.ui";
   Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @LinkedActionSetHomeButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @LinkedActionReturnHomeButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @LinkedActionRespawnButtonStyle = TextButtonStyle(
   Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
   Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle)
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
+  Sounds: $C.@ButtonSounds
 );
 
 @LinkedActionTooltipStyle = TextTooltipStyle(
@@ -57,9 +62,9 @@ $C = "Common.ui";
 );
 
 Group {
-  Anchor: (Top: 8, Left: 0, Right: 0, Height: 92);
-  Background: #13263c(0.86);
-  Padding: (Horizontal: 10, Vertical: 8);
+  Anchor: (Top: 8, Left: 0, Right: 0, Height: 96);
+  Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
+  Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
   Label #Name {
     Anchor: (Top: 0, Left: 0, Width: 206, Height: 22);
