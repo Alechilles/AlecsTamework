@@ -4,7 +4,7 @@
     "Name": "server.items.Tamework_Command_Whistle_Example.name",
     "Description": "server.items.Tamework_Command_Whistle_Example.description"
   },
-  "Quality": "Template",
+  "Quality": "Tool",
   "PlayerAnimationsId": "Item",
   "Interactions": {
     "Primary": {

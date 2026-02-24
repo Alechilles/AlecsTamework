@@ -4,7 +4,7 @@
     "Name": "server.items.Spawner_Tamework_Example.name",
     "Description": "server.items.Spawner_Tamework_Example.description"
   },
-  "Quality": "Template",
+  "Quality": "Tool",
   "PlayerAnimationsId": "Item",
   "Interactions": {
     "Primary": {

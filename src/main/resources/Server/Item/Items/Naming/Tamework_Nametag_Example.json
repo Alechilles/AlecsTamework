@@ -4,7 +4,7 @@
     "Name": "server.items.Tamework_Nametag_Example.name",
     "Description": "server.items.Tamework_Nametag_Example.description"
   },
-  "Quality": "Template",
+  "Quality": "Tool",
   "PlayerAnimationsId": "Item",
   "Interactions": {
     "Primary": {
