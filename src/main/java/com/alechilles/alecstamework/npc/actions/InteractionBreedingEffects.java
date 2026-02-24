@@ -7,7 +7,9 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingEligibilityService;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -22,9 +24,11 @@ import javax.annotation.Nullable;
  */
 final class InteractionBreedingEffects {
     private final ActionTameworkInteract owner;
+    private final BreedingOffspringService offspringService;
 
     InteractionBreedingEffects(ActionTameworkInteract owner) {
         this.owner = owner;
+        this.offspringService = new BreedingOffspringService(new BreedingPartnerService());
     }
 
     boolean applyStartBreeding(@Nullable BreedInteraction interaction,
@@ -91,6 +95,11 @@ final class InteractionBreedingEffects {
         breeding.setReady(true);
         breeding.setLastHappinessUpdateMs(now);
         store.putComponent(npcRef, breedingType, breeding);
+        if (offspringService.tryCompletePairing(npcRef, store, breeding, config)) {
+            owner.logDebug("TameworkInteract: breeding pair matched and offspring spawn queued.");
+        } else {
+            owner.logDebug("TameworkInteract: breeding ready; waiting for nearby partner.");
+        }
         return true;
     }
 
@@ -105,6 +114,13 @@ final class InteractionBreedingEffects {
         if (eligibility.isRequireTamed() && !TamedStateResolver.isTamed(npcRef, store)) {
             owner.logDebug("TameworkInteract: breeding blocked. NPC is not tamed.");
             return false;
+        }
+        if (eligibility.isRequireAdult()) {
+            String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+            if (!CompanionLifeStageService.isAdult(npcRef, store, roleId)) {
+                owner.logDebug("TameworkInteract: breeding blocked. NPC is not adult. role=" + roleId);
+                return false;
+            }
         }
         String currentStateName = resolveCurrentStateName(role);
         if (BreedingEligibilityService.isBlockedByState(

@@ -30,6 +30,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `TameworkHappinessComponent`: Stores shared per-NPC happiness progression state (config id, value, last update).
 - `TameworkBreedingComponent`: Stores per-NPC breeding progression state (config id, mirrored happiness/readiness, cooldown, partner).
 - `TameworkTraitsComponent`: Stores rolled trait values and deterministic trait seed per NPC (assigned during progression bootstrap when role trait config is enabled).
+- `TameworkLifeStageComponent`: Stores companion life stage (`Baby`, `Adolescent`, `Adult`) plus growth timing/scaling data.
 
 ## Item interactions
 - `TameworkSpawn`: Custom item interaction used by spawner items to capture or spawn NPCs.
@@ -39,6 +40,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 ## Commands
 - `/tw getowner` prints the owner name + UUID (when available).
 - `/tw gethappiness` prints the current happiness value/source and breeding eligibility context for the targeted NPC.
+- `/tw getlifestage` prints the targeted NPC life stage and growth timing/scaling metadata.
 - `/tw sethappiness <value>` sets targeted NPC happiness using configured min/max clamp rules and mirrors breeding readiness state when present.
 - `/tw gettraits` prints the targeted NPC trait config/seed and rolled trait values (including effect keys when available).
 - `/tw gettamed` prints the current tamed status for the targeted NPC (component or `Tamed*` role id).

@@ -27,7 +27,7 @@
   },
   "Pairing": {
     "BreedRadius": 10.0,
-    "RequireWanderMode": true,
+    "RequireWanderMode": false,
     "RequireSameOwner": false,
     "MaxNearbyOffspring": 0,
     "RequireSameRoleId": true

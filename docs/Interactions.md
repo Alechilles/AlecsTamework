@@ -150,11 +150,14 @@ Fields:
 Effects:
 - Ensures happiness and breeding progression state exists on the NPC.
 - Uses role/config breeding resolution and enforces config-level state gates:
-  `Eligibility.RequireTamed`, `Eligibility.RequireNotSleeping`, and `Eligibility.RequireNotInCombat`.
+  `Eligibility.RequireTamed`, `Eligibility.RequireAdult`, `Eligibility.RequireNotSleeping`, and `Eligibility.RequireNotInCombat`.
 - Marks breeding readiness when effective fertility meets threshold:
   `effective = (sharedHappiness * FertilityMultiplier) + FertilityBonus`.
   Trait effect key `FertilityMultiplier` defaults to `1.0` when traits are missing.
-- Full partner matching and offspring spawning are still in progress.
+- Attempts nearby partner matching when both NPCs are breeding-ready, then:
+  parent cooldown alarm is set, parents move toward each other, hearts play, and offspring spawns shortly after.
+- Offspring role selection prefers a baby-role variant when one exists (`*_Baby` patterns) and falls back to the parent role.
+- Offspring progression state now initializes life stage (`Baby -> Adolescent -> Adult`) and supports growth scaling for fallback baby roles.
 
 ## Custom interactions
 `Type: "Custom"` exposes full `Requires` + `Effects` control.

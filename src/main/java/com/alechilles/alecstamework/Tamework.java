@@ -46,6 +46,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -121,6 +122,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkHappinessComponent> happinessComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
+    private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
@@ -202,6 +204,12 @@ public class Tamework extends JavaPlugin {
                 TameworkTraitsComponent.class,
                 "TameworkTraits",
                 TameworkTraitsComponent.CODEC
+        );
+
+        lifeStageComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkLifeStageComponent.class,
+                "TameworkLifeStage",
+                TameworkLifeStageComponent.CODEC
         );
 
         getEntityStoreRegistry().registerSystem(
@@ -864,6 +872,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkTraitsComponent> getTraitsComponentType() {
         return traitsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkLifeStageComponent> getLifeStageComponentType() {
+        return lifeStageComponentType;
     }
 
     public boolean isDebugHookEnabled() {

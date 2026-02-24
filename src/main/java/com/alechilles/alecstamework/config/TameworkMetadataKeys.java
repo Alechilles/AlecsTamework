@@ -21,6 +21,14 @@ public final class TameworkMetadataKeys {
     public static final String TRAITS_CONFIG_ID = "Tamework.Traits.ConfigId";
     public static final String TRAITS_ROLL_SEED = "Tamework.Traits.RollSeed";
     public static final String TRAITS_VALUES = "Tamework.Traits.Values";
+    public static final String LIFE_STAGE = "Tamework.LifeStage.Stage";
+    public static final String LIFE_STAGE_BORN_AT_MS = "Tamework.LifeStage.BornAtMs";
+    public static final String LIFE_STAGE_ADOLESCENT_AT_MS = "Tamework.LifeStage.AdolescentAtMs";
+    public static final String LIFE_STAGE_ADULT_AT_MS = "Tamework.LifeStage.AdultAtMs";
+    public static final String LIFE_STAGE_BABY_SCALE = "Tamework.LifeStage.BabyScale";
+    public static final String LIFE_STAGE_ADOLESCENT_SCALE = "Tamework.LifeStage.AdolescentScale";
+    public static final String LIFE_STAGE_ADULT_SCALE = "Tamework.LifeStage.AdultScale";
+    public static final String LIFE_STAGE_GROWTH_SCALING_ENABLED = "Tamework.LifeStage.GrowthScalingEnabled";
     public static final String NPC_NAME = "Tamework.NpcName";
     public static final String NPC_NAME_OWNER_UUID = "Tamework.NpcNameOwnerUuid";
     public static final String NPC_NAME_UPDATED_MS = "Tamework.NpcNameUpdatedMs";

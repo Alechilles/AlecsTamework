@@ -24,7 +24,8 @@
 - Prompt hint keys are `server.interactionHints.*` and must be defined in `Server/Languages/en-US/server.lang` without the `server.` prefix.
 - Breed readiness currently depends on shared happiness (mirrored into breeding state). Feeding increases happiness using `TwHappinessConfig.Sources.GainOnFeed` when present, with `TwBreedingConfig.Happiness.GainOnFeed` as fallback and optional trait multiplier `HappinessGainMultiplier`.
 - Breed interaction checks now use effective fertility for threshold gating: `(Happiness * FertilityMultiplier) + FertilityBonus`.
-- Breed interaction now also checks state gates from breeding config (`RequireNotSleeping`, `RequireNotInCombat`) and logs blocked-state diagnostics when debug is enabled.
+- Breed interaction now checks config state gates (`RequireNotSleeping`, `RequireNotInCombat`) and adult gating (`RequireAdult` via life-stage state), and logs blocked-state diagnostics when debug is enabled.
+- Successful breeding now schedules a visible sequence: parent approach movement, hearts particle, then delayed offspring spawn.
 
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.
@@ -50,6 +51,7 @@
 - Confirm capture and spawn preserves attachments.
 - Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
 - Check shared happiness + breeding eligibility context with `/tw gethappiness`.
+- Check life-stage gates and growth timing with `/tw getlifestage`.
 - Force/tune happiness gates during testing with `/tw sethappiness <value>`.
 - Inspect rolled traits and effect-key values with `/tw gettraits`.
 - Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.

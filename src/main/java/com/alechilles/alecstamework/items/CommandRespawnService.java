@@ -4,10 +4,12 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -169,6 +171,7 @@ final class CommandRespawnService {
         applyRespawnHappinessState(spawnedRef, store, snapshot);
         applyRespawnBreedingState(spawnedRef, store, snapshot);
         applyRespawnTraitsState(spawnedRef, store, snapshot);
+        applyRespawnLifeStageState(spawnedRef, store, snapshot);
     }
 
     private void applyRespawnHappinessState(Ref<EntityStore> spawnedRef,
@@ -257,6 +260,44 @@ final class CommandRespawnService {
                 TraitValueCodec.decode(snapshot.traitsValues())
         );
         store.putComponent(spawnedRef, traitsType, component);
+    }
+
+    private void applyRespawnLifeStageState(Ref<EntityStore> spawnedRef,
+                                            Store<EntityStore> store,
+                                            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        boolean hasLifeStageData = (snapshot.lifeStage() != null && !snapshot.lifeStage().isBlank())
+                || snapshot.lifeStageBornAtMs() > 0L
+                || snapshot.lifeStageAdolescentAtMs() > 0L
+                || snapshot.lifeStageAdultAtMs() > 0L;
+        if (!hasLifeStageData) {
+            CompanionLifeStageService.ensureLifeStageComponent(spawnedRef, store);
+            CompanionLifeStageService.refreshLifeStage(
+                    spawnedRef,
+                    store.getComponent(spawnedRef, NPCEntity.getComponentType()),
+                    store
+            );
+            return;
+        }
+        TameworkLifeStageComponent component = new TameworkLifeStageComponent(
+                snapshot.lifeStage(),
+                snapshot.lifeStageBornAtMs(),
+                snapshot.lifeStageAdolescentAtMs(),
+                snapshot.lifeStageAdultAtMs(),
+                snapshot.lifeStageBabyScale(),
+                snapshot.lifeStageAdolescentScale(),
+                snapshot.lifeStageAdultScale(),
+                snapshot.lifeStageGrowthScalingEnabled()
+        );
+        store.putComponent(spawnedRef, type, component);
+        CompanionLifeStageService.refreshLifeStage(
+                spawnedRef,
+                store.getComponent(spawnedRef, NPCEntity.getComponentType()),
+                store
+        );
     }
 
     private boolean resolveBreedingReadiness(String configId, double happiness) {

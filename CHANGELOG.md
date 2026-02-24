@@ -14,6 +14,8 @@
 - Unit tests for trait roll determinism/conflict handling and trait modifier multiplier resolution.
 - `/tw gethappiness` command to inspect targeted NPC happiness source/value and breeding eligibility context.
 - `/tw sethappiness <value>` and `/tw gettraits` commands for in-game progression debugging and balancing.
+- New life-stage progression component/service (`TameworkLifeStageComponent`, `CompanionLifeStageService`) plus `/tw getlifestage` debugging command.
+- Unit tests covering trait inheritance blending/mutation bounds and life-stage transition/scale interpolation behavior.
 
 ### Changed
 - Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
@@ -26,6 +28,9 @@
 - Breed interaction eligibility now evaluates effective fertility using trait key `FertilityMultiplier` plus optional interaction `FertilityBonus` before readiness is set.
 - Breed interaction eligibility now enforces `TwBreedingConfig.Eligibility.RequireNotSleeping` and `RequireNotInCombat` state gates in addition to tame checks.
 - `TwInteractionConfig_Example` now includes a crouch-gated owner `Breed` entry for `Mob_Tamework_Example` so breeding readiness can be tested in-game.
+- Breeding now performs nearby partner matching and applies a staged sequence (parent approach movement -> hearts particles -> delayed offspring spawn).
+- Offspring spawning now supports role baby-variant selection with fallback juvenile scaling, trait inheritance via `TraitInheritanceService`, and alarm-backed parent/offspring breeding cooldown locks.
+- Adult breeding gates now use explicit life-stage progression when present (with role-name fallback), and life-stage state now persists through spawner capture/spawn and command death/respawn snapshots.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

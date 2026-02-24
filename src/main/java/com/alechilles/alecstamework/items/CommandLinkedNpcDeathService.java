@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
@@ -129,6 +130,19 @@ public final class CommandLinkedNpcDeathService {
         if (traitsValues != null && traitsValues.isBlank()) {
             traitsValues = null;
         }
+        ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageType = TameworkLifeStageComponent.getComponentType();
+        TameworkLifeStageComponent lifeStageComponent = lifeStageType != null
+                ? store.getComponent(reference, lifeStageType)
+                : null;
+        String lifeStage = lifeStageComponent != null ? lifeStageComponent.getStage() : null;
+        long lifeStageBornAtMs = lifeStageComponent != null ? lifeStageComponent.getBornAtMs() : 0L;
+        long lifeStageAdolescentAtMs = lifeStageComponent != null ? lifeStageComponent.getAdolescentAtMs() : 0L;
+        long lifeStageAdultAtMs = lifeStageComponent != null ? lifeStageComponent.getAdultAtMs() : 0L;
+        double lifeStageBabyScale = lifeStageComponent != null ? lifeStageComponent.getBabyScale() : 0.55;
+        double lifeStageAdolescentScale = lifeStageComponent != null ? lifeStageComponent.getAdolescentScale() : 0.80;
+        double lifeStageAdultScale = lifeStageComponent != null ? lifeStageComponent.getAdultScale() : 1.00;
+        boolean lifeStageGrowthScalingEnabled = lifeStageComponent != null
+                && lifeStageComponent.isGrowthScalingEnabled();
 
         TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
         Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
@@ -163,7 +177,15 @@ public final class CommandLinkedNpcDeathService {
                         traitsValues,
                         happinessConfigId,
                         happinessValue,
-                        happinessLastUpdateMs
+                        happinessLastUpdateMs,
+                        lifeStage,
+                        lifeStageBornAtMs,
+                        lifeStageAdolescentAtMs,
+                        lifeStageAdultAtMs,
+                        lifeStageBabyScale,
+                        lifeStageAdolescentScale,
+                        lifeStageAdultScale,
+                        lifeStageGrowthScalingEnabled
                 )
         );
         persistSnapshots();
@@ -277,7 +299,15 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.traitsValues())
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.happinessConfigId())
                 + FIELD_SEPARATOR + encodeNullableDouble(snapshot.happinessValue())
-                + FIELD_SEPARATOR + snapshot.happinessLastUpdateMs();
+                + FIELD_SEPARATOR + snapshot.happinessLastUpdateMs()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.lifeStage())
+                + FIELD_SEPARATOR + snapshot.lifeStageBornAtMs()
+                + FIELD_SEPARATOR + snapshot.lifeStageAdolescentAtMs()
+                + FIELD_SEPARATOR + snapshot.lifeStageAdultAtMs()
+                + FIELD_SEPARATOR + snapshot.lifeStageBabyScale()
+                + FIELD_SEPARATOR + snapshot.lifeStageAdolescentScale()
+                + FIELD_SEPARATOR + snapshot.lifeStageAdultScale()
+                + FIELD_SEPARATOR + snapshot.lifeStageGrowthScalingEnabled();
     }
 
     @Nullable
@@ -314,6 +344,14 @@ public final class CommandLinkedNpcDeathService {
         String happinessConfigId = parts.length > 19 ? decodeNullableString(parts[19]) : null;
         Double happinessValue = parts.length > 20 ? parseNullableDouble(parts[20]) : null;
         long happinessLastUpdateMs = parts.length > 21 ? parseLong(parts[21], 0L) : 0L;
+        String lifeStage = parts.length > 22 ? decodeNullableString(parts[22]) : null;
+        long lifeStageBornAtMs = parts.length > 23 ? parseLong(parts[23], 0L) : 0L;
+        long lifeStageAdolescentAtMs = parts.length > 24 ? parseLong(parts[24], 0L) : 0L;
+        long lifeStageAdultAtMs = parts.length > 25 ? parseLong(parts[25], 0L) : 0L;
+        double lifeStageBabyScale = parts.length > 26 ? parseDouble(parts[26], 0.55) : 0.55;
+        double lifeStageAdolescentScale = parts.length > 27 ? parseDouble(parts[27], 0.80) : 0.80;
+        double lifeStageAdultScale = parts.length > 28 ? parseDouble(parts[28], 1.00) : 1.00;
+        boolean lifeStageGrowthScalingEnabled = parts.length > 29 && Boolean.parseBoolean(parts[29]);
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -336,7 +374,15 @@ public final class CommandLinkedNpcDeathService {
                 traitsValues,
                 happinessConfigId,
                 happinessValue,
-                happinessLastUpdateMs
+                happinessLastUpdateMs,
+                lifeStage,
+                lifeStageBornAtMs,
+                lifeStageAdolescentAtMs,
+                lifeStageAdultAtMs,
+                lifeStageBabyScale,
+                lifeStageAdolescentScale,
+                lifeStageAdultScale,
+                lifeStageGrowthScalingEnabled
         );
     }
 
@@ -450,6 +496,17 @@ public final class CommandLinkedNpcDeathService {
         }
         try {
             return Long.parseLong(value.trim());
+        } catch (NumberFormatException ignored) {
+            return fallback;
+        }
+    }
+
+    private double parseDouble(String value, double fallback) {
+        if (value == null || value.isBlank()) {
+            return fallback;
+        }
+        try {
+            return Double.parseDouble(value.trim());
         } catch (NumberFormatException ignored) {
             return fallback;
         }
@@ -587,10 +644,18 @@ public final class CommandLinkedNpcDeathService {
                                         @Nullable UUID breedingLastPartnerUuid,
                                         @Nullable String traitsConfigId,
                                         long traitsRollSeed,
-                                        @Nullable String traitsValues,
-                                        @Nullable String happinessConfigId,
-                                        @Nullable Double happinessValue,
-                                        long happinessLastUpdateMs) {
+                                         @Nullable String traitsValues,
+                                         @Nullable String happinessConfigId,
+                                         @Nullable Double happinessValue,
+                                         long happinessLastUpdateMs,
+                                         @Nullable String lifeStage,
+                                         long lifeStageBornAtMs,
+                                         long lifeStageAdolescentAtMs,
+                                         long lifeStageAdultAtMs,
+                                         double lifeStageBabyScale,
+                                         double lifeStageAdolescentScale,
+                                         double lifeStageAdultScale,
+                                         boolean lifeStageGrowthScalingEnabled) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

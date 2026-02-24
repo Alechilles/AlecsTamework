@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.codec.Codec;
@@ -28,7 +29,8 @@ final class SpawnerNpcProgressionMetadataService {
         }
         ItemStack updated = applyHappinessMetadata(stack, npcRef, store);
         updated = applyBreedingMetadata(updated, npcRef, store);
-        return applyTraitsMetadata(updated, npcRef, store);
+        updated = applyTraitsMetadata(updated, npcRef, store);
+        return applyLifeStageMetadata(updated, npcRef, store);
     }
 
     void applyNpcProgressionFromItem(@Nullable ItemStack stack,
@@ -40,6 +42,7 @@ final class SpawnerNpcProgressionMetadataService {
         restoreHappinessComponent(stack, npcRef, store);
         restoreBreedingComponent(stack, npcRef, store);
         restoreTraitsComponent(stack, npcRef, store);
+        restoreLifeStageComponent(stack, npcRef, store);
     }
 
     ItemStack clearProgressionMetadata(@Nullable ItemStack stack) {
@@ -53,6 +56,14 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_CONFIG_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_ROLL_SEED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_VALUES);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BORN_AT_MS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_AT_MS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
         return updated;
     }
 
@@ -307,6 +318,116 @@ final class SpawnerNpcProgressionMetadataService {
                 TraitValueCodec.decode(values)
         );
         store.putComponent(npcRef, type, component);
+    }
+
+    private ItemStack applyLifeStageMetadata(ItemStack stack,
+                                             Ref<EntityStore> npcRef,
+                                             Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        if (type == null) {
+            return stack;
+        }
+        TameworkLifeStageComponent component = store.getComponent(npcRef, type);
+        if (component == null) {
+            ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.LIFE_STAGE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BORN_AT_MS);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_AT_MS);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
+            return updated;
+        }
+        ItemStack updated = stack;
+        if (component.getStage() != null && !component.getStage().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE, Codec.STRING, component.getStage());
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE);
+        }
+        updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_BORN_AT_MS, Codec.LONG, component.getBornAtMs());
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_AT_MS,
+                Codec.LONG,
+                component.getAdolescentAtMs()
+        );
+        updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS, Codec.LONG, component.getAdultAtMs());
+        updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE, Codec.DOUBLE, component.getBabyScale());
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE,
+                Codec.DOUBLE,
+                component.getAdolescentScale()
+        );
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE,
+                Codec.DOUBLE,
+                component.getAdultScale()
+        );
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED,
+                Codec.BOOLEAN,
+                component.isGrowthScalingEnabled()
+        );
+        return updated;
+    }
+
+    private void restoreLifeStageComponent(ItemStack stack,
+                                           Ref<EntityStore> npcRef,
+                                           Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        String stage = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE, Codec.STRING);
+        Long bornAtMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_BORN_AT_MS, Codec.LONG);
+        Long adolescentAtMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_AT_MS, Codec.LONG);
+        Long adultAtMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS, Codec.LONG);
+        Double babyScale = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE, Codec.DOUBLE);
+        Double adolescentScale = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE, Codec.DOUBLE);
+        Double adultScale = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE, Codec.DOUBLE);
+        Boolean growthScaling = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED,
+                Codec.BOOLEAN
+        );
+        boolean hasData = (stage != null && !stage.isBlank())
+                || bornAtMs != null
+                || adolescentAtMs != null
+                || adultAtMs != null
+                || babyScale != null
+                || adolescentScale != null
+                || adultScale != null
+                || growthScaling != null;
+        if (!hasData) {
+            return;
+        }
+        TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
+        TameworkLifeStageComponent restored = new TameworkLifeStageComponent(
+                stage != null && !stage.isBlank()
+                        ? stage
+                        : existing != null ? existing.getStage() : "Adult",
+                bornAtMs != null
+                        ? bornAtMs
+                        : existing != null ? existing.getBornAtMs() : 0L,
+                adolescentAtMs != null
+                        ? adolescentAtMs
+                        : existing != null ? existing.getAdolescentAtMs() : 0L,
+                adultAtMs != null
+                        ? adultAtMs
+                        : existing != null ? existing.getAdultAtMs() : 0L,
+                babyScale != null
+                        ? babyScale
+                        : existing != null ? existing.getBabyScale() : 0.55,
+                adolescentScale != null
+                        ? adolescentScale
+                        : existing != null ? existing.getAdolescentScale() : 0.80,
+                adultScale != null
+                        ? adultScale
+                        : existing != null ? existing.getAdultScale() : 1.00,
+                growthScaling != null
+                        ? growthScaling
+                        : existing != null && existing.isGrowthScalingEnabled()
+        );
+        store.putComponent(npcRef, type, restored);
     }
 
     private ItemStack clearMetadataKey(@Nullable ItemStack stack, @Nullable String key) {
