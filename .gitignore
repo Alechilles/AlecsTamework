@@ -25,3 +25,6 @@ Thumbs.db
 .project
 
 AGENTS.md
+
+# Release pipeline
+artifacts/

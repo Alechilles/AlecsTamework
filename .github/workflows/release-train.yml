@@ -1,0 +1,375 @@
+name: Release Train
+
+on:
+  workflow_dispatch:
+    inputs:
+      tamework_version:
+        description: "Tamework version (for example 2.1.3)."
+        required: true
+        type: string
+      cats_version:
+        description: "Cats version (for example 1.5.2)."
+        required: true
+        type: string
+      nametags_version:
+        description: "Nametags version (for example 1.1.0)."
+        required: true
+        type: string
+      tamework_ref:
+        description: "Git ref to dispatch in AlecsTamework."
+        required: true
+        default: "main"
+        type: string
+      cats_ref:
+        description: "Git ref to dispatch in AlecsCats."
+        required: true
+        default: "main"
+        type: string
+      nametags_ref:
+        description: "Git ref to dispatch in AlecsNametags."
+        required: true
+        default: "main"
+        type: string
+      dry_run:
+        description: "Run downstream workflows in dry-run mode."
+        required: true
+        default: true
+        type: boolean
+      publish_curseforge:
+        description: "Enable downstream CurseForge publish (ignored when dry_run=true)."
+        required: true
+        default: false
+        type: boolean
+      publish_modtale:
+        description: "Enable downstream Modtale publish (ignored when dry_run=true)."
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  release-tamework:
+    runs-on: ubuntu-latest
+    outputs:
+      run_url: ${{ steps.dispatch.outputs.run_url }}
+    steps:
+      - name: Dispatch and wait for AlecsTamework publish
+        id: dispatch
+        uses: actions/github-script@v7
+        env:
+          TARGET_REPO: AlecsTamework
+          TARGET_REF: ${{ github.event.inputs.tamework_ref }}
+          TARGET_VERSION: ${{ github.event.inputs.tamework_version }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          PUBLISH_CURSEFORGE: ${{ github.event.inputs.publish_curseforge }}
+          PUBLISH_MODTALE: ${{ github.event.inputs.publish_modtale }}
+        with:
+          github-token: ${{ secrets.RELEASE_BOT_TOKEN }}
+          script: |
+            const owner = "Alechilles";
+            const repo = process.env.TARGET_REPO;
+            const ref = process.env.TARGET_REF;
+            const version = process.env.TARGET_VERSION;
+            const dryRun = process.env.DRY_RUN.toLowerCase();
+            const publishCurseForge = process.env.PUBLISH_CURSEFORGE.toLowerCase();
+            const publishModtale = process.env.PUBLISH_MODTALE.toLowerCase();
+            const workflowId = "publish.yml";
+            const workflowName = "Publish";
+
+            const startTime = new Date();
+            core.info(`Dispatching ${owner}/${repo}:${workflowId} ref=${ref} version=${version}`);
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: workflowId,
+              ref,
+              inputs: {
+                version,
+                dry_run: dryRun,
+                publish_curseforge: publishCurseForge,
+                publish_modtale: publishModtale
+              }
+            });
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const timeoutMs = 90 * 60 * 1000;
+            const pollMs = 15000;
+            const startedAtMs = Date.now();
+            let runId = null;
+
+            while (Date.now() - startedAtMs < timeoutMs) {
+              const runsResponse = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: workflowId,
+                event: "workflow_dispatch",
+                per_page: 30
+              });
+
+              const candidates = runsResponse.data.workflow_runs
+                .filter((run) => run.name === workflowName)
+                .filter((run) => new Date(run.created_at) >= startTime)
+                .filter((run) => !run.head_branch || run.head_branch === ref)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              if (candidates.length > 0) {
+                runId = candidates[0].id;
+                core.info(`Matched workflow run id ${runId}`);
+                break;
+              }
+
+              await sleep(pollMs);
+            }
+
+            if (!runId) {
+              core.setFailed(`Timed out waiting for dispatched run to appear for ${owner}/${repo}.`);
+              return;
+            }
+
+            while (Date.now() - startedAtMs < timeoutMs) {
+              const runResponse = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId
+              });
+
+              const run = runResponse.data;
+              core.info(`Run ${run.id} status=${run.status} conclusion=${run.conclusion ?? "n/a"}`);
+
+              if (run.status === "completed") {
+                core.setOutput("run_url", run.html_url);
+                if (run.conclusion !== "success") {
+                  core.setFailed(`Workflow failed for ${owner}/${repo}: ${run.html_url}`);
+                }
+                return;
+              }
+
+              await sleep(pollMs);
+            }
+
+            core.setFailed(`Timed out waiting for completion of run ${runId} in ${owner}/${repo}.`);
+
+  release-cats:
+    needs: release-tamework
+    runs-on: ubuntu-latest
+    outputs:
+      run_url: ${{ steps.dispatch.outputs.run_url }}
+    steps:
+      - name: Dispatch and wait for AlecsCats publish
+        id: dispatch
+        uses: actions/github-script@v7
+        env:
+          TARGET_REPO: AlecsCats
+          TARGET_REF: ${{ github.event.inputs.cats_ref }}
+          TARGET_VERSION: ${{ github.event.inputs.cats_version }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          PUBLISH_CURSEFORGE: ${{ github.event.inputs.publish_curseforge }}
+          PUBLISH_MODTALE: ${{ github.event.inputs.publish_modtale }}
+        with:
+          github-token: ${{ secrets.RELEASE_BOT_TOKEN }}
+          script: |
+            const owner = "Alechilles";
+            const repo = process.env.TARGET_REPO;
+            const ref = process.env.TARGET_REF;
+            const version = process.env.TARGET_VERSION;
+            const dryRun = process.env.DRY_RUN.toLowerCase();
+            const publishCurseForge = process.env.PUBLISH_CURSEFORGE.toLowerCase();
+            const publishModtale = process.env.PUBLISH_MODTALE.toLowerCase();
+            const workflowId = "publish.yml";
+            const workflowName = "Publish";
+
+            const startTime = new Date();
+            core.info(`Dispatching ${owner}/${repo}:${workflowId} ref=${ref} version=${version}`);
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: workflowId,
+              ref,
+              inputs: {
+                version,
+                dry_run: dryRun,
+                publish_curseforge: publishCurseForge,
+                publish_modtale: publishModtale
+              }
+            });
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const timeoutMs = 90 * 60 * 1000;
+            const pollMs = 15000;
+            const startedAtMs = Date.now();
+            let runId = null;
+
+            while (Date.now() - startedAtMs < timeoutMs) {
+              const runsResponse = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: workflowId,
+                event: "workflow_dispatch",
+                per_page: 30
+              });
+
+              const candidates = runsResponse.data.workflow_runs
+                .filter((run) => run.name === workflowName)
+                .filter((run) => new Date(run.created_at) >= startTime)
+                .filter((run) => !run.head_branch || run.head_branch === ref)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              if (candidates.length > 0) {
+                runId = candidates[0].id;
+                core.info(`Matched workflow run id ${runId}`);
+                break;
+              }
+
+              await sleep(pollMs);
+            }
+
+            if (!runId) {
+              core.setFailed(`Timed out waiting for dispatched run to appear for ${owner}/${repo}.`);
+              return;
+            }
+
+            while (Date.now() - startedAtMs < timeoutMs) {
+              const runResponse = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId
+              });
+
+              const run = runResponse.data;
+              core.info(`Run ${run.id} status=${run.status} conclusion=${run.conclusion ?? "n/a"}`);
+
+              if (run.status === "completed") {
+                core.setOutput("run_url", run.html_url);
+                if (run.conclusion !== "success") {
+                  core.setFailed(`Workflow failed for ${owner}/${repo}: ${run.html_url}`);
+                }
+                return;
+              }
+
+              await sleep(pollMs);
+            }
+
+            core.setFailed(`Timed out waiting for completion of run ${runId} in ${owner}/${repo}.`);
+
+  release-nametags:
+    needs: release-tamework
+    runs-on: ubuntu-latest
+    outputs:
+      run_url: ${{ steps.dispatch.outputs.run_url }}
+    steps:
+      - name: Dispatch and wait for AlecsNametags publish
+        id: dispatch
+        uses: actions/github-script@v7
+        env:
+          TARGET_REPO: AlecsNametags
+          TARGET_REF: ${{ github.event.inputs.nametags_ref }}
+          TARGET_VERSION: ${{ github.event.inputs.nametags_version }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+          PUBLISH_CURSEFORGE: ${{ github.event.inputs.publish_curseforge }}
+          PUBLISH_MODTALE: ${{ github.event.inputs.publish_modtale }}
+        with:
+          github-token: ${{ secrets.RELEASE_BOT_TOKEN }}
+          script: |
+            const owner = "Alechilles";
+            const repo = process.env.TARGET_REPO;
+            const ref = process.env.TARGET_REF;
+            const version = process.env.TARGET_VERSION;
+            const dryRun = process.env.DRY_RUN.toLowerCase();
+            const publishCurseForge = process.env.PUBLISH_CURSEFORGE.toLowerCase();
+            const publishModtale = process.env.PUBLISH_MODTALE.toLowerCase();
+            const workflowId = "publish.yml";
+            const workflowName = "Publish";
+
+            const startTime = new Date();
+            core.info(`Dispatching ${owner}/${repo}:${workflowId} ref=${ref} version=${version}`);
+
+            await github.rest.actions.createWorkflowDispatch({
+              owner,
+              repo,
+              workflow_id: workflowId,
+              ref,
+              inputs: {
+                version,
+                dry_run: dryRun,
+                publish_curseforge: publishCurseForge,
+                publish_modtale: publishModtale
+              }
+            });
+
+            const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+            const timeoutMs = 90 * 60 * 1000;
+            const pollMs = 15000;
+            const startedAtMs = Date.now();
+            let runId = null;
+
+            while (Date.now() - startedAtMs < timeoutMs) {
+              const runsResponse = await github.rest.actions.listWorkflowRuns({
+                owner,
+                repo,
+                workflow_id: workflowId,
+                event: "workflow_dispatch",
+                per_page: 30
+              });
+
+              const candidates = runsResponse.data.workflow_runs
+                .filter((run) => run.name === workflowName)
+                .filter((run) => new Date(run.created_at) >= startTime)
+                .filter((run) => !run.head_branch || run.head_branch === ref)
+                .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+              if (candidates.length > 0) {
+                runId = candidates[0].id;
+                core.info(`Matched workflow run id ${runId}`);
+                break;
+              }
+
+              await sleep(pollMs);
+            }
+
+            if (!runId) {
+              core.setFailed(`Timed out waiting for dispatched run to appear for ${owner}/${repo}.`);
+              return;
+            }
+
+            while (Date.now() - startedAtMs < timeoutMs) {
+              const runResponse = await github.rest.actions.getWorkflowRun({
+                owner,
+                repo,
+                run_id: runId
+              });
+
+              const run = runResponse.data;
+              core.info(`Run ${run.id} status=${run.status} conclusion=${run.conclusion ?? "n/a"}`);
+
+              if (run.status === "completed") {
+                core.setOutput("run_url", run.html_url);
+                if (run.conclusion !== "success") {
+                  core.setFailed(`Workflow failed for ${owner}/${repo}: ${run.html_url}`);
+                }
+                return;
+              }
+
+              await sleep(pollMs);
+            }
+
+            core.setFailed(`Timed out waiting for completion of run ${runId} in ${owner}/${repo}.`);
+
+  summary:
+    needs:
+      - release-tamework
+      - release-cats
+      - release-nametags
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Summary
+        shell: bash
+        run: |
+          echo "Release train complete."
+          echo "Tamework run: ${{ needs.release-tamework.outputs.run_url }}"
+          echo "Cats run: ${{ needs.release-cats.outputs.run_url }}"
+          echo "Nametags run: ${{ needs.release-nametags.outputs.run_url }}"

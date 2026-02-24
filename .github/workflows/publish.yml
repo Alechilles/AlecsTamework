@@ -1,0 +1,154 @@
+name: Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to publish (for example 2.1.3 or v2.1.3). Leave empty to use the current tag."
+        required: false
+        type: string
+      dry_run:
+        description: "If true, run validation/build only and skip platform uploads."
+        required: true
+        default: true
+        type: boolean
+      publish_curseforge:
+        description: "Attempt CurseForge upload (ignored when dry_run=true)."
+        required: true
+        default: false
+        type: boolean
+      publish_modtale:
+        description: "Attempt Modtale upload (ignored when dry_run=true)."
+        required: true
+        default: false
+        type: boolean
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on:
+      - self-hosted
+      - windows
+    concurrency: release-${{ github.ref_name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        shell: pwsh
+        run: |
+          $raw = "${{ github.event.inputs.version }}"
+          if ([string]::IsNullOrWhiteSpace($raw)) {
+            $raw = "${{ github.ref_name }}"
+          }
+          if ([string]::IsNullOrWhiteSpace($raw)) {
+            throw "Unable to resolve version. Provide workflow input 'version' or run from a version tag."
+          }
+
+          $normalized = $raw -replace '^v', ''
+          "raw=$raw" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "version=$normalized" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Resolve publish flags
+        id: flags
+        shell: pwsh
+        run: |
+          $eventName = "${{ github.event_name }}"
+
+          if ($eventName -eq "workflow_dispatch") {
+            $dry = "${{ github.event.inputs.dry_run }}".ToLowerInvariant()
+            $publishCurseForge = "${{ github.event.inputs.publish_curseforge }}".ToLowerInvariant()
+            $publishModtale = "${{ github.event.inputs.publish_modtale }}".ToLowerInvariant()
+          } else {
+            # Tag pushes stay dry-run in Phase 1 until IDs/secrets are fully configured.
+            $dry = "true"
+            $publishCurseForge = "false"
+            $publishModtale = "false"
+          }
+
+          if ($dry -eq "true") {
+            $publishCurseForge = "false"
+            $publishModtale = "false"
+          }
+
+          "dry_run=$dry" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "publish_curseforge=$publishCurseForge" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "publish_modtale=$publishModtale" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Validate release
+        shell: pwsh
+        run: |
+          .\scripts\release\validate-release.ps1 -Version "${{ steps.version.outputs.version }}"
+
+      - name: Build package
+        id: build
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path artifacts -Force | Out-Null
+          .\scripts\release\build-package.ps1 `
+            -Version "${{ steps.version.outputs.version }}" `
+            -OutputDir "artifacts" `
+            -ArtifactPathOutputFile "artifacts\artifact-path.txt"
+
+          $artifactPath = (Get-Content -Path "artifacts\artifact-path.txt" -Raw).Trim()
+          if ([string]::IsNullOrWhiteSpace($artifactPath)) {
+            throw "Artifact path output was empty."
+          }
+
+          "artifact_path=$artifactPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Extract changelog
+        id: changelog
+        shell: pwsh
+        run: |
+          .\scripts\release\extract-changelog.ps1 `
+            -Version "${{ steps.version.outputs.version }}" `
+            -OutputPath "artifacts\changelog.md"
+
+          $changelogPath = (Resolve-Path "artifacts\changelog.md").Path
+          "changelog_path=$changelogPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ steps.version.outputs.version }}
+          path: ${{ steps.build.outputs.artifact_path }}
+          if-no-files-found: error
+
+      - name: Publish to CurseForge
+        if: ${{ steps.flags.outputs.publish_curseforge == 'true' }}
+        shell: pwsh
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+        run: |
+          .\scripts\release\publish-curseforge.ps1 `
+            -Version "${{ steps.version.outputs.version }}" `
+            -ArtifactPath "${{ steps.build.outputs.artifact_path }}" `
+            -ChangelogPath "${{ steps.changelog.outputs.changelog_path }}" `
+            -DryRun $false
+
+      - name: Publish to Modtale
+        if: ${{ steps.flags.outputs.publish_modtale == 'true' }}
+        shell: pwsh
+        env:
+          MODTALE_API_TOKEN: ${{ secrets.MODTALE_API_TOKEN }}
+        run: |
+          .\scripts\release\publish-modtale.ps1 `
+            -Version "${{ steps.version.outputs.version }}" `
+            -ArtifactPath "${{ steps.build.outputs.artifact_path }}" `
+            -ChangelogPath "${{ steps.changelog.outputs.changelog_path }}" `
+            -DryRun $false
+
+      - name: Create GitHub release
+        if: ${{ github.ref_type == 'tag' && steps.flags.outputs.dry_run != 'true' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: false
+          body_path: ${{ steps.changelog.outputs.changelog_path }}
+          files: ${{ steps.build.outputs.artifact_path }}
