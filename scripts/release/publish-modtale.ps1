@@ -92,10 +92,52 @@ foreach ($gameVersion in @($config.modtale.gameVersions)) {
 
 $curlArgs += @("-F", "file=@$ArtifactPath")
 
-$response = & curl.exe @curlArgs
+$responseTempFile = New-TemporaryFile
+$statusCode = & curl.exe @curlArgs `
+    -o $responseTempFile `
+    -w "%{http_code}"
+$statusCode = $statusCode.Trim()
+
 if ($LASTEXITCODE -ne 0) {
+    Remove-Item -Path $responseTempFile -Force -ErrorAction SilentlyContinue
     throw "Modtale upload failed with exit code $LASTEXITCODE."
 }
 
-Write-Host "Modtale upload completed."
-Write-Output $response
+$response = ""
+if (Test-Path -Path $responseTempFile) {
+    $response = Get-Content -Path $responseTempFile -Raw
+    Remove-Item -Path $responseTempFile -Force -ErrorAction SilentlyContinue
+}
+
+$statusCodeInt = 0
+if (-not [int]::TryParse($statusCode, [ref]$statusCodeInt)) {
+    throw "Modtale upload failed with an invalid HTTP status value '$statusCode'."
+}
+
+if ($statusCodeInt -lt 200 -or $statusCodeInt -ge 300) {
+    $responseSummary = if ([string]::IsNullOrWhiteSpace($response)) { "<empty>" } else { $response }
+
+    $knownVersionsSummary = ""
+    $knownVersionsTempFile = New-TemporaryFile
+    $knownVersionsStatus = & curl.exe `
+        -sS `
+        -o $knownVersionsTempFile `
+        -w "%{http_code}" `
+        -X GET `
+        "https://api.modtale.net/api/v1/meta/game-versions" `
+        -H "X-MODTALE-KEY: $effectiveApiKey"
+    if ($LASTEXITCODE -eq 0) {
+        $knownVersionsBody = Get-Content -Path $knownVersionsTempFile -Raw
+        if ($knownVersionsStatus -eq "200" -and -not [string]::IsNullOrWhiteSpace($knownVersionsBody)) {
+            $knownVersionsSummary = " Known game versions response: $knownVersionsBody"
+        }
+    }
+    Remove-Item -Path $knownVersionsTempFile -Force -ErrorAction SilentlyContinue
+
+    throw "Modtale upload failed with HTTP status $statusCode. Response: $responseSummary$knownVersionsSummary"
+}
+
+Write-Host "Modtale upload completed (HTTP $statusCode)."
+if (-not [string]::IsNullOrWhiteSpace($response)) {
+    Write-Output $response
+}

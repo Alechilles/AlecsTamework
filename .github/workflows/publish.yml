@@ -31,9 +31,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on:
-      - self-hosted
-      - windows
+    runs-on: windows-latest
     concurrency: release-${{ github.ref_name }}
     steps:
       - name: Checkout
