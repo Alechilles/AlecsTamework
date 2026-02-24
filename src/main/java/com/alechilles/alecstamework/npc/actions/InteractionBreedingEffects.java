@@ -1,15 +1,15 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.NPCPlugin;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import javax.annotation.Nullable;
 
@@ -45,8 +45,10 @@ final class InteractionBreedingEffects {
         if (breeding.isCooldownActive(now)) {
             return false;
         }
-        String roleId = resolveRoleId(npcRef, role, store);
-        TwBreedingConfig config = roleId != null ? TwBreedingConfig.resolveForRole(roleId) : null;
+        TwBreedingConfig config = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
+        if (config != null && config.getEligibility().isRequireTamed() && !TamedStateResolver.isTamed(npcRef, store)) {
+            return false;
+        }
         if ((breeding.getConfigId() == null || breeding.getConfigId().isBlank())
                 && config != null
                 && config.getId() != null
@@ -71,30 +73,5 @@ final class InteractionBreedingEffects {
             return config.getHappiness().getThreshold();
         }
         return 0.0;
-    }
-
-    @Nullable
-    private String resolveRoleId(Ref<EntityStore> npcRef, Role role, Store<EntityStore> store) {
-        if (role != null && role.getRoleName() != null && !role.getRoleName().isBlank()) {
-            return role.getRoleName();
-        }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            return null;
-        }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
-        int roleIndex = npc.getRoleIndex();
-        if (roleIndex < 0) {
-            return null;
-        }
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin == null) {
-            return null;
-        }
-        String resolved = npcPlugin.getName(roleIndex);
-        return resolved == null || resolved.isBlank() ? null : resolved;
     }
 }

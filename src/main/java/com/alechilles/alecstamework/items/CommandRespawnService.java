@@ -19,7 +19,6 @@ import com.hypixel.hytale.server.core.modules.entity.component.TransformComponen
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
-import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -225,11 +224,7 @@ final class CommandRespawnService {
         if (configId == null || configId.isBlank()) {
             return false;
         }
-        DefaultAssetMap<String, TwBreedingConfig> assetMap = TwBreedingConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return false;
-        }
-        TwBreedingConfig config = assetMap.getAssetMap().get(configId);
+        TwBreedingConfig config = TwBreedingConfig.resolveById(configId);
         if (config == null) {
             return false;
         }

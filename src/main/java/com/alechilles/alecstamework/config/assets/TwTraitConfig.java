@@ -269,6 +269,32 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
     }
 
+    @Nullable
+    public static TwTraitConfig resolveById(@Nullable String configId) {
+        if (configId == null || configId.isBlank()) {
+            return null;
+        }
+        DefaultAssetMap<String, TwTraitConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return null;
+        }
+        Map<String, TwTraitConfig> map = assetMap.getAssetMap();
+        TwTraitConfig direct = map.get(configId);
+        if (direct != null) {
+            return direct;
+        }
+        String normalized = configId.trim();
+        for (TwTraitConfig candidate : map.values()) {
+            if (candidate == null || candidate.getId() == null) {
+                continue;
+            }
+            if (candidate.getId().equalsIgnoreCase(normalized)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
     private static Map<String, TwTraitConfig> buildRoleCache(
             @Nullable DefaultAssetMap<String, TwTraitConfig> assetMap) {
         Map<String, TwTraitConfig> cache = new HashMap<>();

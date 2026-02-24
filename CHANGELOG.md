@@ -7,10 +7,16 @@
 - Progression persistence bridges for spawner capture/spawn and command-linked death/respawn snapshots (breeding + traits fields).
 - Initial `Breed` interaction handling for happiness-gated readiness state setup.
 - Unit tests for breeding/traits priority resolution and trait-value metadata codec round-trips.
+- Deterministic trait assignment service (`TraitRollService`) with duplicate/conflict enforcement and seed-based rolls.
+- Trait modifier resolver service (`TraitModifierService`) for effect-key multiplier lookups from rolled trait values.
+- Unit tests for trait roll determinism/conflict handling and trait modifier multiplier resolution.
 
 ### Changed
 - Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
 - Interaction/docs coverage updated to reflect current breeding behavior (no longer a pure stub path).
+- Trait bootstrap now backfills empty trait components with deterministic rolls and role-config IDs.
+- Feeding interactions now apply breeding happiness gains from breeding config, including trait-based `HappinessGainMultiplier` scaling.
+- Breeding config resolution now supports direct config-id lookup (`resolveById`) and shared resolver usage across breeding/spawner/respawn paths.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

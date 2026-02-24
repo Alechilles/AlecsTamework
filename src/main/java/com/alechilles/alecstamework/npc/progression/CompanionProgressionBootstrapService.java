@@ -8,9 +8,8 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import javax.annotation.Nullable;
+import java.util.UUID;
 
 /**
  * Initializes breeding and trait components for companions when they first become tamed.
@@ -23,7 +22,7 @@ public final class CompanionProgressionBootstrapService {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
-        String roleId = resolveRoleId(npcRef, store);
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         if (roleId == null || roleId.isBlank()) {
             return;
         }
@@ -85,16 +84,31 @@ public final class CompanionProgressionBootstrapService {
         }
         TameworkTraitsComponent existing = store.getComponent(npcRef, traitsType);
         if (existing != null) {
+            boolean changed = false;
             if ((existing.getConfigId() == null || existing.getConfigId().isBlank()) && config.getId() != null) {
                 existing.setConfigId(config.getId());
+                changed = true;
+            }
+            long seed = existing.getRollSeed();
+            if (seed == 0L) {
+                seed = resolveRollSeed(npcRef, store);
+                existing.setRollSeed(seed);
+                changed = true;
+            }
+            if (existing.getTraitValues().length == 0) {
+                existing.setTraitValues(TraitRollService.rollTraits(config, seed));
+                changed = true;
+            }
+            if (changed) {
                 store.putComponent(npcRef, traitsType, existing);
             }
             return;
         }
+        long seed = resolveRollSeed(npcRef, store);
         TameworkTraitsComponent created = new TameworkTraitsComponent(
                 config.getId(),
-                System.nanoTime(),
-                new TameworkTraitsComponent.TraitValue[0]
+                seed,
+                TraitRollService.rollTraits(config, seed)
         );
         store.putComponent(npcRef, traitsType, created);
     }
@@ -109,25 +123,16 @@ public final class CompanionProgressionBootstrapService {
         return value;
     }
 
-    @Nullable
-    private static String resolveRoleId(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+    private static long resolveRollSeed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            return null;
+        if (npc != null && npc.getUuid() != null) {
+            UUID uuid = npc.getUuid();
+            long seed = uuid.getMostSignificantBits() ^ uuid.getLeastSignificantBits();
+            if (seed != 0L) {
+                return seed;
+            }
         }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
-        int roleIndex = npc.getRoleIndex();
-        if (roleIndex < 0) {
-            return null;
-        }
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin == null) {
-            return null;
-        }
-        String roleId = npcPlugin.getName(roleIndex);
-        return roleId == null || roleId.isBlank() ? null : roleId;
+        long fallback = System.nanoTime();
+        return fallback != 0L ? fallback : 1L;
     }
 }

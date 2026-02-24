@@ -318,6 +318,32 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
     }
 
+    @Nullable
+    public static TwBreedingConfig resolveById(@Nullable String configId) {
+        if (configId == null || configId.isBlank()) {
+            return null;
+        }
+        DefaultAssetMap<String, TwBreedingConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return null;
+        }
+        Map<String, TwBreedingConfig> map = assetMap.getAssetMap();
+        TwBreedingConfig direct = map.get(configId);
+        if (direct != null) {
+            return direct;
+        }
+        String normalized = configId.trim();
+        for (TwBreedingConfig candidate : map.values()) {
+            if (candidate == null || candidate.getId() == null) {
+                continue;
+            }
+            if (candidate.getId().equalsIgnoreCase(normalized)) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
     private static Map<String, TwBreedingConfig> buildRoleCache(
             @Nullable DefaultAssetMap<String, TwBreedingConfig> assetMap) {
         Map<String, TwBreedingConfig> cache = new HashMap<>();

@@ -28,7 +28,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `TameworkNpcNameComponent`: Stores custom NPC name metadata (name, owner id, timestamp). Names are re‑applied on load and preserved by spawner capture.
 - `TameworkCommandLinksComponent`: Stores per-owner command tool links on NPCs.
 - `TameworkBreedingComponent`: Stores per-NPC breeding progression state (config id, happiness, readiness, cooldown, partner).
-- `TameworkTraitsComponent`: Stores rolled trait values and deterministic trait seed per NPC.
+- `TameworkTraitsComponent`: Stores rolled trait values and deterministic trait seed per NPC (assigned during progression bootstrap when role trait config is enabled).
 
 ## Item interactions
 - `TameworkSpawn`: Custom item interaction used by spawner items to capture or spawn NPCs.

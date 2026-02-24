@@ -138,9 +138,7 @@ final class SpawnerNpcProgressionMetadataService {
         long cooldownUntil = cooldown != null ? cooldown : 0L;
         boolean ready = false;
         if (configId != null && !configId.isBlank()) {
-            TwBreedingConfig config = TwBreedingConfig.getAssetMap() != null
-                    ? TwBreedingConfig.getAssetMap().getAssetMap().get(configId)
-                    : null;
+            TwBreedingConfig config = TwBreedingConfig.resolveById(configId);
             if (config != null) {
                 ready = value >= config.getHappiness().getThreshold();
             }

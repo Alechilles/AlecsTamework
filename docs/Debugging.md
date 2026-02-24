@@ -22,6 +22,7 @@
   The alarm prefix is `TwGlobalConfig.InteractionCooldownAlarmPrefix`.
 - If prompts look wrong or stale, ensure `TameworkInteractPrompt` is running and use `/tw debugprompt` to inspect prompt selection.
 - Prompt hint keys are `server.interactionHints.*` and must be defined in `Server/Languages/en-US/server.lang` without the `server.` prefix.
+- Breed readiness currently depends on breeding happiness. Feeding now increases happiness using `TwBreedingConfig.Happiness.GainOnFeed` and optional trait multiplier `HappinessGainMultiplier`.
 
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.

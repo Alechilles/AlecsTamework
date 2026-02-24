@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParticlesEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
+import com.alechilles.alecstamework.npc.progression.BreedingHappinessService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -174,6 +175,7 @@ final class TameworkInteractEffects {
             stateEffects.applyHeal(npcRef, store, healAmount);
             presentationEffects.showFeedingCombatText(npcRef, store, player, healAmount);
         }
+        BreedingHappinessService.applyFeedGain(npcRef, store);
         return true;
     }
 

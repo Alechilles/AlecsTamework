@@ -95,6 +95,8 @@ Effects:
 - Heals the NPC by the per‑item override or the global `Heal`.
 - Shows floating combat text for healing (if a player is present).
 - Consumes the held item.
+- Applies breeding happiness gain using resolved `TwBreedingConfig.Happiness.GainOnFeed` when breeding progression exists.
+  Trait effect key `HappinessGainMultiplier` scales this gain when traits are present.
 
 ### Harvest
 Fields:
@@ -140,12 +142,13 @@ If `Cycle` is empty, default cycle is `Hold -> Idle -> Defend`.
 ### Breed
 Fields:
 - `RequireTamed` (default true)
-- `MinHappiness` (reserved)
-- `FertilityBonus` (reserved)
+- `MinHappiness` (optional threshold override)
+- `FertilityBonus` (reserved for partner/offspring phase)
 
 Effects:
 - Ensures breeding progression state exists on the NPC.
-- Marks breeding readiness when happiness meets the configured threshold.
+- Uses role/config breeding resolution and enforces config-level `Eligibility.RequireTamed` when enabled.
+- Marks breeding readiness when happiness meets the interaction/config threshold.
 - Full partner matching and offspring spawning are still in progress.
 
 ## Custom interactions
