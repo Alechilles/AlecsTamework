@@ -38,9 +38,9 @@ final class BreedingOffspringService {
     private static final String HEARTS_PARTICLE = "Hearts";
     private static final long HEARTS_PARTICLE_DELAY_MS = 850L;
     private static final long OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS = 1200L;
-    private static final long OFFSPRING_PRESENCE_CHECK_DELAY_MS = 900L;
+    private static final long[] OFFSPRING_PRESENCE_CHECK_DELAYS_MS = new long[] { 900L, 3000L, 8000L };
     private static final double APPROACH_SPACING = 0.45;
-    private static final double OFFSPRING_SPAWN_HEIGHT_OFFSET = 0.60;
+    private static final double OFFSPRING_SPAWN_HEIGHT_OFFSET = 1.00;
 
     private final BreedingPartnerService partnerService;
     private final BreedingOffspringSpawnService spawnService;
@@ -603,25 +603,30 @@ final class BreedingOffspringService {
         if (world == null || childUuid == null || childRoleId == null || childRoleId.isBlank() || context == null) {
             return;
         }
-        scheduleWorldAction(
-                world,
-                OFFSPRING_PRESENCE_CHECK_DELAY_MS,
-                "offspring-presence-check",
-                () -> verifyOffspringPresence(world, childUuid, childRoleId, context)
-        );
+        for (long delayMs : OFFSPRING_PRESENCE_CHECK_DELAYS_MS) {
+            long safeDelayMs = Math.max(0L, delayMs);
+            scheduleWorldAction(
+                    world,
+                    safeDelayMs,
+                    "offspring-presence-check-" + safeDelayMs + "ms",
+                    () -> verifyOffspringPresence(world, childUuid, childRoleId, context, safeDelayMs)
+            );
+        }
     }
 
     private void verifyOffspringPresence(World world,
                                          UUID childUuid,
                                          String childRoleId,
-                                         OffspringSpawnContext context) {
+                                         OffspringSpawnContext context,
+                                         long checkDelayMs) {
         if (world == null || childUuid == null || childRoleId == null || childRoleId.isBlank() || context == null) {
             return;
         }
         Ref<EntityStore> childRef = world.getEntityRef(childUuid);
         if (childRef == null || !childRef.isValid()) {
             logWarn(String.format(
-                    "Breeding offspring missing shortly after spawn: child=%s role=%s parentA=%s parentB=%s.",
+                    "Breeding offspring missing after %dms: child=%s role=%s parentA=%s parentB=%s.",
+                    checkDelayMs,
                     childUuid,
                     childRoleId,
                     context.parentAUuid(),
@@ -638,7 +643,8 @@ final class BreedingOffspringService {
         NPCEntity npc = store.getComponent(childRef, NPCEntity.getComponentType());
         if (npc == null) {
             logWarn(String.format(
-                    "Breeding offspring reference present but NPC component missing: child=%s role=%s parentA=%s parentB=%s.",
+                    "Breeding offspring reference present but NPC component missing after %dms: child=%s role=%s parentA=%s parentB=%s.",
+                    checkDelayMs,
                     childUuid,
                     childRoleId,
                     context.parentAUuid(),
@@ -658,7 +664,8 @@ final class BreedingOffspringService {
             }
         }
         logInfo(String.format(
-                "Breeding offspring confirmed in-world: child=%s role=%s pos=%s scale=%.2f stage=%s.",
+                "Breeding offspring confirmed in-world after %dms: child=%s role=%s pos=%s scale=%.2f stage=%s.",
+                checkDelayMs,
                 childUuid,
                 childRoleId,
                 position != null

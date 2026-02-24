@@ -15,6 +15,7 @@
 - `/tw gethappiness` command to inspect targeted NPC happiness source/value and breeding eligibility context.
 - `/tw sethappiness <value>` and `/tw gettraits` commands for in-game progression debugging and balancing.
 - New life-stage progression component/service (`TameworkLifeStageComponent`, `CompanionLifeStageService`) plus `/tw getlifestage` debugging command.
+- `/tw findnpc <uuid> [mark:on|off]` command to resolve a specific NPC by UUID, print live world state, and optionally mark its location with particles.
 - Unit tests covering trait inheritance blending/mutation bounds and life-stage transition/scale interpolation behavior.
 
 ### Changed
@@ -36,6 +37,7 @@
 - `/tw gethappiness` now reports breeding cooldown state (`cooldownActive`, `cooldownRemainingMs`, `cooldownUntilMs`) and `readyNow` to clarify readiness vs cooldown.
 - Offspring spawn diagnostics now include async failure logging and post-spawn presence/position checks, and newborns spawn slightly higher with child hearts for easier visual confirmation.
 - Non-baby-variant life-stage scaling now uses larger/default-visible juvenile factors (baby/adolescent) with minimum visibility floors to avoid effectively invisible offspring at tiny scales.
+- Breeding offspring placement now prioritizes wider horizontal offsets and higher vertical fallback offsets to reduce parent-overlap/terrain clipping, and spawn presence checks now run at multiple delayed checkpoints (0.9s, 3s, 8s) to expose delayed despawn issues.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

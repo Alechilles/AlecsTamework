@@ -15,21 +15,21 @@ import javax.annotation.Nullable;
  */
 final class BreedingOffspringSpawnService {
     private static final double[][] SPAWN_POSITION_OFFSETS = new double[][] {
-            { 0.00, 0.00 },
-            { 0.60, 0.00 },
-            { -0.60, 0.00 },
-            { 0.00, 0.60 },
-            { 0.00, -0.60 },
+            { 1.35, 0.00 },
+            { -1.35, 0.00 },
+            { 0.00, 1.35 },
+            { 0.00, -1.35 },
             { 0.95, 0.95 },
             { -0.95, 0.95 },
             { 0.95, -0.95 },
             { -0.95, -0.95 },
-            { 1.35, 0.00 },
-            { -1.35, 0.00 },
-            { 0.00, 1.35 },
-            { 0.00, -1.35 }
+            { 0.60, 0.00 },
+            { -0.60, 0.00 },
+            { 0.00, 0.60 },
+            { 0.00, -0.60 },
+            { 0.00, 0.00 }
     };
-    private static final double[] SPAWN_VERTICAL_OFFSETS = new double[] { 0.00, 0.35, 0.75 };
+    private static final double[] SPAWN_VERTICAL_OFFSETS = new double[] { 0.35, 0.75, 1.15, 0.00 };
 
     private final BreedingOffspringRoleResolver roleResolver;
 
