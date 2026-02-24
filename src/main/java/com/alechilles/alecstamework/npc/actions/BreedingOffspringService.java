@@ -36,6 +36,7 @@ final class BreedingOffspringService {
     private static final String HEARTS_PARTICLE = "Hearts";
     private static final long HEARTS_PARTICLE_DELAY_MS = 850L;
     private static final long OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS = 1200L;
+    private static final long OFFSPRING_PRESENCE_CHECK_DELAY_MS = 900L;
     private static final double APPROACH_SPACING = 0.45;
 
     private final BreedingPartnerService partnerService;
@@ -258,24 +259,46 @@ final class BreedingOffspringService {
         scheduleWorldAction(
                 world,
                 HEARTS_PARTICLE_DELAY_MS,
+                "pairing-hearts",
                 () -> spawnPairedHearts(world, context)
         );
         scheduleWorldAction(
                 world,
                 HEARTS_PARTICLE_DELAY_MS + OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS,
+                "offspring-spawn",
                 () -> spawnOffspring(world, context)
         );
     }
 
-    private void scheduleWorldAction(World world, long delayMs, Runnable action) {
+    private void scheduleWorldAction(World world, long delayMs, String actionLabel, Runnable action) {
         if (world == null || action == null) {
             return;
         }
         long safeDelayMs = Math.max(0L, delayMs);
-        CompletableFuture.runAsync(
-                () -> world.execute(action),
-                CompletableFuture.delayedExecutor(safeDelayMs, TimeUnit.MILLISECONDS)
-        );
+        CompletableFuture.runAsync(() -> executeWorldAction(world, actionLabel, action),
+                CompletableFuture.delayedExecutor(safeDelayMs, TimeUnit.MILLISECONDS))
+                .exceptionally(ex -> {
+                    logWarn("Breeding delayed action failed asynchronously: " + actionLabel + ".", ex);
+                    return null;
+                });
+    }
+
+    private void executeWorldAction(World world, @Nullable String actionLabel, Runnable action) {
+        if (world == null || action == null) {
+            return;
+        }
+        String label = actionLabel == null || actionLabel.isBlank() ? "unknown-action" : actionLabel;
+        try {
+            world.execute(() -> {
+                try {
+                    action.run();
+                } catch (Throwable ex) {
+                    logWarn("Breeding delayed action failed during world execution: " + label + ".", ex);
+                }
+            });
+        } catch (Throwable ex) {
+            logWarn("Breeding delayed action failed before world execution: " + label + ".", ex);
+        }
     }
 
     private void spawnPairedHearts(World world, OffspringSpawnContext context) {
@@ -372,6 +395,14 @@ final class BreedingOffspringService {
                 spawnRole.hasBabyVariant(),
                 store
         );
+        logInfo(String.format(
+                "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s.",
+                childNpc.getUuid(),
+                spawnRole.roleId(),
+                context.parentAUuid(),
+                context.parentBUuid()
+        ));
+        scheduleOffspringPresenceCheck(world, childNpc.getUuid(), spawnRole.roleId(), context);
     }
 
     @Nullable
@@ -539,6 +570,77 @@ final class BreedingOffspringService {
             return;
         }
         instance.getLogger().at(Level.WARNING).log(message);
+    }
+
+    private void logWarn(String message, Throwable error) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null || message == null || message.isBlank()) {
+            return;
+        }
+        if (error == null) {
+            instance.getLogger().at(Level.WARNING).log(message);
+            return;
+        }
+        instance.getLogger().at(Level.WARNING).withCause(error).log(message);
+    }
+
+    private void logInfo(String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null || message == null || message.isBlank()) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(message);
+    }
+
+    private void scheduleOffspringPresenceCheck(World world,
+                                                @Nullable UUID childUuid,
+                                                String childRoleId,
+                                                OffspringSpawnContext context) {
+        if (world == null || childUuid == null || childRoleId == null || childRoleId.isBlank() || context == null) {
+            return;
+        }
+        scheduleWorldAction(
+                world,
+                OFFSPRING_PRESENCE_CHECK_DELAY_MS,
+                "offspring-presence-check",
+                () -> verifyOffspringPresence(world, childUuid, childRoleId, context)
+        );
+    }
+
+    private void verifyOffspringPresence(World world,
+                                         UUID childUuid,
+                                         String childRoleId,
+                                         OffspringSpawnContext context) {
+        if (world == null || childUuid == null || childRoleId == null || childRoleId.isBlank() || context == null) {
+            return;
+        }
+        Ref<EntityStore> childRef = world.getEntityRef(childUuid);
+        if (childRef == null || !childRef.isValid()) {
+            logWarn(String.format(
+                    "Breeding offspring missing shortly after spawn: child=%s role=%s parentA=%s parentB=%s.",
+                    childUuid,
+                    childRoleId,
+                    context.parentAUuid(),
+                    context.parentBUuid()
+            ));
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore() != null
+                ? world.getEntityStore().getStore()
+                : null;
+        if (store == null) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(childRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            logWarn(String.format(
+                    "Breeding offspring reference present but NPC component missing: child=%s role=%s parentA=%s parentB=%s.",
+                    childUuid,
+                    childRoleId,
+                    context.parentAUuid(),
+                    context.parentBUuid()
+            ));
+        }
     }
 
     private record PairingTargets(Vector3d parentATarget, Vector3d parentBTarget) {
