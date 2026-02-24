@@ -24,8 +24,8 @@ public final class CompanionLifeStageService {
     private static final long DEFAULT_BABY_DURATION_MS = TimeUnit.MINUTES.toMillis(3);
     private static final long DEFAULT_ADOLESCENT_DURATION_MS = TimeUnit.MINUTES.toMillis(4);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
-    private static final double DEFAULT_BABY_SCALE_FACTOR = 0.55;
-    private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.80;
+    private static final double DEFAULT_BABY_SCALE_FACTOR = 0.33;
+    private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
 
     private CompanionLifeStageService() {
