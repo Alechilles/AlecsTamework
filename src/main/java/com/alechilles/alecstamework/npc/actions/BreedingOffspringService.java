@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
@@ -19,6 +20,8 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import it.unimi.dsi.fastutil.Pair;
@@ -36,10 +39,14 @@ import javax.annotation.Nullable;
 final class BreedingOffspringService {
     private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
     private static final String HEARTS_PARTICLE = "Hearts";
-    private static final long HEARTS_PARTICLE_DELAY_MS = 850L;
+    private static final String BREEDING_PAIR_HOOK_ID = "Tamework.Breeding.Pair.Start";
+    private static final String BREEDING_PAIR_STATE = "BreedPair";
+    private static final long PAIRING_PROXIMITY_CHECK_INTERVAL_MS = 250L;
+    private static final long PAIRING_PROXIMITY_TIMEOUT_MS = 5000L;
     private static final long OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS = 1200L;
     private static final long[] OFFSPRING_PRESENCE_CHECK_DELAYS_MS = new long[] { 900L, 3000L, 8000L };
     private static final double APPROACH_SPACING = 0.45;
+    private static final double PAIRING_READY_DISTANCE = 1.35;
     private static final double OFFSPRING_SPAWN_HEIGHT_OFFSET = 1.00;
 
     private final BreedingPartnerService partnerService;
@@ -166,8 +173,21 @@ final class BreedingOffspringService {
             return;
         }
         PairingTargets targets = resolvePairingTargets(parentATransform, parentBTransform);
-        moveNpcToTarget(parentANpc, parentARef, targets.parentATarget(), store);
-        moveNpcToTarget(parentBNpc, parentBRef, targets.parentBTarget(), store);
+        moveNpcToPairingTarget(parentANpc, parentARef, targets.parentATarget(), store);
+        moveNpcToPairingTarget(parentBNpc, parentBRef, targets.parentBTarget(), store);
+    }
+
+    private void moveNpcToPairingTarget(@Nullable NPCEntity npc,
+                                        @Nullable Ref<EntityStore> npcRef,
+                                        @Nullable Vector3d target,
+                                        @Nullable Store<EntityStore> store) {
+        if (npc == null || npcRef == null || !npcRef.isValid() || store == null || target == null) {
+            return;
+        }
+        if (applyBreedingPairHook(npc, npcRef, target, store)) {
+            return;
+        }
+        moveNpcToTarget(npc, npcRef, target, store);
     }
 
     private void moveNpcToTarget(@Nullable NPCEntity npc,
@@ -178,6 +198,44 @@ final class BreedingOffspringService {
             return;
         }
         npc.moveTo(npcRef, target.x, target.y, target.z, store);
+    }
+
+    private boolean applyBreedingPairHook(@Nullable NPCEntity npc,
+                                          @Nullable Ref<EntityStore> npcRef,
+                                          @Nullable Vector3d target,
+                                          @Nullable Store<EntityStore> store) {
+        if (npc == null || npcRef == null || !npcRef.isValid() || target == null || store == null) {
+            return false;
+        }
+        if (!supportsBreedingPairState(npc)) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkHookComponent> hookType = TameworkHookComponent.getComponentType();
+        if (hookType == null) {
+            return false;
+        }
+        store.putComponent(npcRef, hookType, new TameworkHookComponent(
+                BREEDING_PAIR_HOOK_ID,
+                null,
+                null,
+                null,
+                System.currentTimeMillis(),
+                true,
+                target
+        ));
+        return true;
+    }
+
+    private boolean supportsBreedingPairState(@Nullable NPCEntity npc) {
+        if (npc == null) {
+            return false;
+        }
+        Role role = npc.getRole();
+        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null) {
+            return false;
+        }
+        int stateIndex = role.getStateSupport().getStateHelper().getStateIndex(BREEDING_PAIR_STATE);
+        return stateIndex != StateSupport.NO_STATE;
     }
 
     private PairingTargets resolvePairingTargets(@Nullable TransformComponent parentATransform,
@@ -261,16 +319,62 @@ final class BreedingOffspringService {
         }
         scheduleWorldAction(
                 world,
-                HEARTS_PARTICLE_DELAY_MS,
-                "pairing-hearts",
-                () -> spawnPairedHearts(world, context)
+                PAIRING_PROXIMITY_CHECK_INTERVAL_MS,
+                "pairing-await-proximity",
+                () -> awaitPairingProximity(world, context, PAIRING_PROXIMITY_CHECK_INTERVAL_MS)
         );
+    }
+
+    private void awaitPairingProximity(World world, OffspringSpawnContext context, long elapsedMs) {
+        if (world == null || context == null) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore() != null
+                ? world.getEntityStore().getStore()
+                : null;
+        if (store == null) {
+            return;
+        }
+        Ref<EntityStore> parentARef = world.getEntityRef(context.parentAUuid());
+        Ref<EntityStore> parentBRef = world.getEntityRef(context.parentBUuid());
+        boolean ready = isPairingReady(parentARef, parentBRef, store);
+        if (ready || elapsedMs >= PAIRING_PROXIMITY_TIMEOUT_MS) {
+            if (!ready) {
+                logInfo(String.format(
+                        "Breeding pairing proximity timeout after %dms: parentA=%s parentB=%s.",
+                        elapsedMs,
+                        context.parentAUuid(),
+                        context.parentBUuid()
+                ));
+            }
+            spawnPairedHearts(world, context);
+            scheduleWorldAction(
+                    world,
+                    OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS,
+                    "offspring-spawn",
+                    () -> spawnOffspring(world, context)
+            );
+            return;
+        }
+        long nextElapsed = elapsedMs + PAIRING_PROXIMITY_CHECK_INTERVAL_MS;
         scheduleWorldAction(
                 world,
-                HEARTS_PARTICLE_DELAY_MS + OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS,
-                "offspring-spawn",
-                () -> spawnOffspring(world, context)
+                PAIRING_PROXIMITY_CHECK_INTERVAL_MS,
+                "pairing-await-proximity",
+                () -> awaitPairingProximity(world, context, nextElapsed)
         );
+    }
+
+    private boolean isPairingReady(@Nullable Ref<EntityStore> parentARef,
+                                   @Nullable Ref<EntityStore> parentBRef,
+                                   Store<EntityStore> store) {
+        TransformComponent parentATransform = getTransform(parentARef, store);
+        TransformComponent parentBTransform = getTransform(parentBRef, store);
+        if (parentATransform == null || parentBTransform == null) {
+            return false;
+        }
+        double distance = parentATransform.getPosition().distanceTo(parentBTransform.getPosition());
+        return Double.isFinite(distance) && distance <= PAIRING_READY_DISTANCE;
     }
 
     private void scheduleWorldAction(World world, long delayMs, String actionLabel, Runnable action) {

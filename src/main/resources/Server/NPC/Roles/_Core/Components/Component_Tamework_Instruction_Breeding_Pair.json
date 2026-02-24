@@ -1,0 +1,168 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.BreedingPair",
+  "DefaultState": ".Listen",
+  "Parameters": {
+    "_ImportStates": [
+      "OnPairActive",
+      "OnPairComplete"
+    ],
+    "BreedingPairTargetSlot": {
+      "Value": "TameworkBreedingPairTarget",
+      "Description": "Stored destination slot used while a breeding pair is approaching."
+    },
+    "BreedingPairHookId": {
+      "Value": "Tamework.Breeding.Pair.Start",
+      "Description": "Hook id consumed to start breeding pair approach behavior."
+    },
+    "BreedingPairSeekSlowDownDistance": {
+      "Value": 2.4,
+      "Description": "Distance where breeding pair movement starts to slow down."
+    },
+    "BreedingPairSeekStopDistance": {
+      "Value": 1.05,
+      "Description": "Distance considered close enough for the pair to meet."
+    },
+    "BreedingPairSeekRelativeSpeed": {
+      "Value": 0.45,
+      "Description": "Relative speed while approaching breeding pair target."
+    },
+    "BreedingPairReadRange": {
+      "Value": 64,
+      "Description": "Range used to read the stored breeding pair destination."
+    }
+  },
+  "Content": {
+    "$Comment": "Reusable movement bridge for breeding pair approach.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "No-op listen branch to satisfy local state pairing validation.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Listen"
+        }
+      },
+      {
+        "$Comment": "Start pair movement when the breeding pair hook is received.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "TameworkHook",
+          "HookId": {
+            "Compute": "BreedingPairHookId"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "BreedingPairTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": ".Move"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnPairActive"
+          }
+        ]
+      },
+      {
+        "$Comment": "Pair movement runtime behavior while local move state is active.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".Move"
+        },
+        "Instructions": [
+          {
+            "$Comment": "When close enough, complete pair movement.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "BreedingPairTargetSlot"
+              },
+              "Range": {
+                "Compute": "BreedingPairSeekStopDistance + 0.15"
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnPairComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "If destination cannot be read anymore, recover to idle parent state.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "ReadPosition",
+                "Slot": {
+                  "Compute": "BreedingPairTargetSlot"
+                },
+                "Range": {
+                  "Compute": "BreedingPairReadRange"
+                }
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Listen"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnPairComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Seek toward the stored breeding pair destination.",
+            "Sensor": {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "BreedingPairTargetSlot"
+              },
+              "Range": {
+                "Compute": "BreedingPairReadRange"
+              },
+              "MinRange": {
+                "Compute": "BreedingPairSeekStopDistance + 0.15"
+              }
+            },
+            "BodyMotion": {
+              "Type": "Seek",
+              "SlowDownDistance": {
+                "Compute": "BreedingPairSeekSlowDownDistance"
+              },
+              "StopDistance": {
+                "Compute": "BreedingPairSeekStopDistance"
+              },
+              "RelativeSpeed": {
+                "Compute": "BreedingPairSeekRelativeSpeed"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

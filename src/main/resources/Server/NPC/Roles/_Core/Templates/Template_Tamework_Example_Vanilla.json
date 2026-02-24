@@ -697,6 +697,32 @@
       }
     },
     {
+      "$Comment": "Bridge breeding pair hooks into dedicated pair movement.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "Any"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Breeding_Pair",
+          "Modify": {
+            "_ExportStates": [
+              "BreedPair",
+              "Idle"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "No-op branch to pair the BreedPair state with a state sensor.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "State",
+        "State": "BreedPair"
+      }
+    },
+    {
       "$Comment": "Default follow/idle behavior using Tamework component.",
       "Sensor": {
         "Type": "State",
