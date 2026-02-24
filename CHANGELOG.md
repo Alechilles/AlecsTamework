@@ -38,6 +38,7 @@
 - Offspring spawn diagnostics now include async failure logging and post-spawn presence/position checks, and newborns spawn slightly higher with child hearts for easier visual confirmation.
 - Non-baby-variant life-stage scaling now uses larger/default-visible juvenile factors (baby/adolescent) with minimum visibility floors to avoid effectively invisible offspring at tiny scales.
 - Breeding offspring placement now prioritizes wider horizontal offsets and higher vertical fallback offsets to reduce parent-overlap/terrain clipping, and spawn presence checks now run at multiple delayed checkpoints (0.9s, 3s, 8s) to expose delayed despawn issues.
+- Juvenile model scaling now preserves random attachment IDs from the current model when rebuilding scaled models, fixing invisible offspring where required attachments were being dropped during scale updates.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

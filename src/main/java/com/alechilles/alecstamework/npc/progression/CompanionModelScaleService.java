@@ -74,11 +74,15 @@ public final class CompanionModelScaleService {
         if (model == null) {
             return Collections.emptyMap();
         }
+        Map<String, String> direct = sanitizeAttachmentMap(model.getRandomAttachmentIds());
+        if (!direct.isEmpty()) {
+            return direct;
+        }
         Map<String, String> byReflection = tryReadAttachmentsMap(model, "getAdditionalAttachments");
         if (!byReflection.isEmpty()) {
             return byReflection;
         }
-        byReflection = tryReadAttachmentsMap(model, "getAttachments");
+        byReflection = tryReadAttachmentsMap(model, "getRandomAttachmentIds");
         if (!byReflection.isEmpty()) {
             return byReflection;
         }
@@ -90,17 +94,24 @@ public final class CompanionModelScaleService {
             Method method = model.getClass().getMethod(methodName);
             Object value = method.invoke(model);
             if (value instanceof Map<?, ?> map) {
-                HashMap<String, String> converted = new HashMap<>();
-                for (Map.Entry<?, ?> entry : map.entrySet()) {
-                    if (entry.getKey() instanceof String key && entry.getValue() instanceof String val) {
-                        converted.put(key, val);
-                    }
-                }
-                return converted;
+                return sanitizeAttachmentMap(map);
             }
         } catch (ReflectiveOperationException ignored) {
             return Collections.emptyMap();
         }
         return Collections.emptyMap();
+    }
+
+    private static Map<String, String> sanitizeAttachmentMap(@Nullable Map<?, ?> raw) {
+        if (raw == null || raw.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        HashMap<String, String> converted = new HashMap<>();
+        for (Map.Entry<?, ?> entry : raw.entrySet()) {
+            if (entry.getKey() instanceof String key && entry.getValue() instanceof String val) {
+                converted.put(key, val);
+            }
+        }
+        return converted;
     }
 }
