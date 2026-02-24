@@ -65,6 +65,21 @@
       }
     },
     {
+      "Type": "Breed",
+      "MinHappiness": 70.0,
+      "Requires": {
+        "All": {
+          "PlayerIsOwner": true,
+          "PlayerCrouching": true
+        }
+      },
+      "Effects": {
+        "ShowFloatingText": {
+          "Message": "Breeding Ready"
+        }
+      }
+    },
+    {
       "Type": "ModeCycle",
       "Enabled": true,
       "Cycle": [
