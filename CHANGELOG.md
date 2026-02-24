@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
+### Added
+- New `TameworkNameInputPage` custom UI used by naming items for direct in-page text entry with `Apply` / `Cancel` actions.
+
+### Changed
+- Naming items now open the naming UI by default instead of requiring chat input; when the page cannot be opened, naming safely falls back to the legacy chat prompt flow.
+- Name input UI now uses vanilla-style decorated container framing with compact action buttons.
+- Linked companions side panel now uses vanilla-style decorated container framing and framed list/card surfaces.
+- Command radial slices, linked panel action icon buttons, and naming action buttons now use standard button hover/click sounds for consistency with base UI behavior.
+
 ## 2.1.2 - Wander and Ambient Behavior Refinements - 2026-02-23
 ### Added
 - New `Component_Tamework_Instruction_Wander` component for reusable random wandering within a configurable radius.
