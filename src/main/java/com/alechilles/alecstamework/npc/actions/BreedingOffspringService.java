@@ -4,7 +4,9 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -38,6 +40,7 @@ final class BreedingOffspringService {
     private static final long OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS = 1200L;
     private static final long OFFSPRING_PRESENCE_CHECK_DELAY_MS = 900L;
     private static final double APPROACH_SPACING = 0.45;
+    private static final double OFFSPRING_SPAWN_HEIGHT_OFFSET = 0.60;
 
     private final BreedingPartnerService partnerService;
     private final BreedingOffspringSpawnService spawnService;
@@ -395,6 +398,7 @@ final class BreedingOffspringService {
                 spawnRole.hasBabyVariant(),
                 store
         );
+        spawnHeartsParticle(childRef, store);
         logInfo(String.format(
                 "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s.",
                 childNpc.getUuid(),
@@ -442,7 +446,7 @@ final class BreedingOffspringService {
             Vector3d b = parentBTransform.getPosition();
             return new Vector3d(
                     (a.x + b.x) * 0.5,
-                    Math.max(a.y, b.y) + 0.1,
+                    Math.max(a.y, b.y) + OFFSPRING_SPAWN_HEIGHT_OFFSET,
                     (a.z + b.z) * 0.5
             );
         }
@@ -451,12 +455,12 @@ final class BreedingOffspringService {
             Vector3d base = source.getPosition();
             double offsetX = ThreadLocalRandom.current().nextDouble(-0.6, 0.6);
             double offsetZ = ThreadLocalRandom.current().nextDouble(-0.6, 0.6);
-            return new Vector3d(base.x + offsetX, base.y + 0.1, base.z + offsetZ);
+            return new Vector3d(base.x + offsetX, base.y + OFFSPRING_SPAWN_HEIGHT_OFFSET, base.z + offsetZ);
         }
         if (fallbackAnchor == null) {
             return null;
         }
-        return new Vector3d(fallbackAnchor.x, fallbackAnchor.y + 0.1, fallbackAnchor.z);
+        return new Vector3d(fallbackAnchor.x, fallbackAnchor.y + OFFSPRING_SPAWN_HEIGHT_OFFSET, fallbackAnchor.z);
     }
 
     private Vector3f resolveSpawnRotation(@Nullable TransformComponent parentATransform,
@@ -640,7 +644,29 @@ final class BreedingOffspringService {
                     context.parentAUuid(),
                     context.parentBUuid()
             ));
+            return;
         }
+        TransformComponent transform = store.getComponent(childRef, TransformComponent.getComponentType());
+        Vector3d position = transform != null ? transform.getPosition() : null;
+        double scale = CompanionModelScaleService.resolveCurrentScale(childRef, store, 1.0);
+        String stage = null;
+        ComponentType<EntityStore, TameworkLifeStageComponent> stageType = TameworkLifeStageComponent.getComponentType();
+        if (stageType != null) {
+            TameworkLifeStageComponent stageComponent = store.getComponent(childRef, stageType);
+            if (stageComponent != null) {
+                stage = stageComponent.getStage();
+            }
+        }
+        logInfo(String.format(
+                "Breeding offspring confirmed in-world: child=%s role=%s pos=%s scale=%.2f stage=%s.",
+                childUuid,
+                childRoleId,
+                position != null
+                        ? String.format("(%.2f, %.2f, %.2f)", position.x, position.y, position.z)
+                        : "(unknown)",
+                scale,
+                stage != null ? stage : "unknown"
+        ));
     }
 
     private record PairingTargets(Vector3d parentATarget, Vector3d parentBTarget) {
