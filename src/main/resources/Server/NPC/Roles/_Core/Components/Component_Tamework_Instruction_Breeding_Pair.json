@@ -76,6 +76,10 @@
             "TargetSlot": "LockedTarget"
           },
           {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          },
+          {
             "Type": "State",
             "State": ".Move"
           },
@@ -95,7 +99,6 @@
           {
             "$Comment": "When close enough, complete pair movement.",
             "Continue": true,
-            "ActionsBlocking": true,
             "Sensor": {
               "Type": "ReadPosition",
               "Slot": {
@@ -107,18 +110,8 @@
             },
             "Actions": [
               {
-                "Type": "Timeout",
-                "Delay": {
-                  "Compute": "BreedingPairCompleteDelayRange"
-                }
-              },
-              {
                 "Type": "State",
-                "State": ".Listen"
-              },
-              {
-                "Type": "ParentState",
-                "State": "OnPairComplete"
+                "State": ".CompleteDelay"
               }
             ]
           },
@@ -174,6 +167,42 @@
                 "Compute": "BreedingPairSeekRelativeSpeed"
               }
             }
+          }
+        ]
+      },
+      {
+        "$Comment": "Stop movement while waiting for pair completion delay.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".CompleteDelay"
+        },
+        "BodyMotion": {
+          "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "Finalize pair movement after a short delay.",
+        "ActionsBlocking": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".CompleteDelay",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": {
+              "Compute": "BreedingPairCompleteDelayRange"
+            }
+          },
+          {
+            "Type": "State",
+            "State": ".Listen"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnPairComplete"
           }
         ]
       }
