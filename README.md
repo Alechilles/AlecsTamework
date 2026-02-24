@@ -20,7 +20,7 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - Also includes components like tamed status and ownership
     - Ownership can optionally be cleared on capture and re-set on spawn to enable player trading of captured NPCs
   - This will be expanded in the near future as new systems such as breeding, traits, talents, etc. are added. Everything will always be saved on capture.
-- **Naming Items** - Name tamed NPCs via chat using `TwNameItemConfig` + `TameworkNameNpc`.
+- **Naming Items** - Name tamed NPCs with an in-game input UI using `TwNameItemConfig` + `TameworkNameNpc`.
   - Works with any custom item; not a fixed nametag item
   - Per-item rules for roles, ownership, allowed characters, rename rules, and more
 - **Command Item System** - Build custom command tools with `TwCommandItemConfig` + `TameworkCommand`.
@@ -57,7 +57,7 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.1.2"
+  "Alechilles:Alec's Tamework!": "2.1.3"
 },
 "IncludesAssetPack": true
 ```
