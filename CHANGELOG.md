@@ -3,7 +3,9 @@
 ## Unreleased
 ### Added
 - Foundation breeding and traits asset types: `TwBreedingConfig` and `TwTraitConfig`, including role-priority resolution and default example assets.
+- Foundation shared happiness asset type: `TwHappinessConfig`, including role-priority resolution and default example assets.
 - New progression components: `TameworkBreedingComponent` and `TameworkTraitsComponent`, plus bootstrap initialization for newly tamed companions.
+- New shared progression component: `TameworkHappinessComponent` with config id, value, and last-update timestamp.
 - Progression persistence bridges for spawner capture/spawn and command-linked death/respawn snapshots (breeding + traits fields).
 - Initial `Breed` interaction handling for happiness-gated readiness state setup.
 - Unit tests for breeding/traits priority resolution and trait-value metadata codec round-trips.
@@ -15,9 +17,10 @@
 - Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
 - Interaction/docs coverage updated to reflect current breeding behavior (no longer a pure stub path).
 - Trait bootstrap now backfills empty trait components with deterministic rolls and role-config IDs.
-- Feeding interactions now apply breeding happiness gains from breeding config, including trait-based `HappinessGainMultiplier` scaling.
+- Feeding interactions now apply shared happiness gains from happiness config with breeding-config fallback, including trait-based `HappinessGainMultiplier` scaling.
 - Breeding config resolution now supports direct config-id lookup (`resolveById`) and shared resolver usage across breeding/spawner/respawn paths.
 - Happiness updates now route through shared `CompanionHappinessService` (with `BreedingHappinessService` retained as a compatibility shim), keeping architecture open for non-breeding consumers.
+- Spawner metadata and command death/respawn snapshots now persist shared happiness state and restore breeding happiness from that shared source for backward-compatible migration.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
@@ -43,6 +44,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPro
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -107,6 +109,7 @@ public class Tamework extends JavaPlugin {
     private boolean namingAssetsRegistered;
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
+    private boolean happinessAssetsRegistered;
     private boolean breedingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private String lastGlobalConfigWarningKey;
@@ -115,6 +118,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
     private ComponentType<EntityStore, TameworkNpcNameComponent> npcNameComponentType;
     private ComponentType<EntityStore, TameworkCommandLinksComponent> commandLinksComponentType;
+    private ComponentType<EntityStore, TameworkHappinessComponent> happinessComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private volatile boolean debugHookLogs;
@@ -147,6 +151,7 @@ public class Tamework extends JavaPlugin {
         registerNamingItemAssets();
         registerCommandItemAssets();
         registerInteractionAssets();
+        registerHappinessAssets();
         registerBreedingAssets();
         registerTraitAssets();
 
@@ -179,6 +184,12 @@ public class Tamework extends JavaPlugin {
                 TameworkCommandLinksComponent.class,
                 "TameworkCommandLinks",
                 TameworkCommandLinksComponent.CODEC
+        );
+
+        happinessComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkHappinessComponent.class,
+                "TameworkHappiness",
+                TameworkHappinessComponent.CODEC
         );
 
         breedingComponentType = getEntityStoreRegistry().registerComponent(
@@ -604,6 +615,22 @@ public class Tamework extends JavaPlugin {
         interactionAssetsRegistered = true;
     }
 
+    private void registerHappinessAssets() {
+        if (happinessAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwHappinessConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Happiness")
+                        .setCodec(TwHappinessConfig.CODEC)
+                        .setKeyFunction(TwHappinessConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwHappinessConfig.class, this::onHappinessAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwHappinessConfig.class, this::onHappinessAssetsRemoved);
+        happinessAssetsRegistered = true;
+    }
+
     private void registerBreedingAssets() {
         if (breedingAssetsRegistered) {
             return;
@@ -688,6 +715,16 @@ public class Tamework extends JavaPlugin {
     private void onInteractionAssetsRemoved(
             RemovedAssetsEvent<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> event) {
         TwInteractionConfig.clearRoleCache();
+    }
+
+    private void onHappinessAssetsLoaded(
+            LoadedAssetsEvent<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> event) {
+        TwHappinessConfig.clearRoleCache();
+    }
+
+    private void onHappinessAssetsRemoved(
+            RemovedAssetsEvent<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> event) {
+        TwHappinessConfig.clearRoleCache();
     }
 
     private void onBreedingAssetsLoaded(
@@ -815,6 +852,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkCommandLinksComponent> getCommandLinksComponentType() {
         return commandLinksComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkHappinessComponent> getHappinessComponentType() {
+        return happinessComponentType;
     }
 
     public ComponentType<EntityStore, TameworkBreedingComponent> getBreedingComponentType() {

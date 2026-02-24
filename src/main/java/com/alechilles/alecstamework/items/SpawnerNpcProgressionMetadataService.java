@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.codec.Codec;
@@ -16,7 +17,7 @@ import javax.annotation.Nullable;
 import org.bson.BsonDocument;
 
 /**
- * Captures and restores companion progression state (breeding + traits) on spawner item metadata.
+ * Captures and restores companion progression state (happiness, breeding, and traits) on spawner item metadata.
  */
 final class SpawnerNpcProgressionMetadataService {
     ItemStack applyNpcProgressionMetadata(@Nullable ItemStack stack,
@@ -25,7 +26,8 @@ final class SpawnerNpcProgressionMetadataService {
         if (stack == null || npcRef == null || store == null || !npcRef.isValid()) {
             return stack;
         }
-        ItemStack updated = applyBreedingMetadata(stack, npcRef, store);
+        ItemStack updated = applyHappinessMetadata(stack, npcRef, store);
+        updated = applyBreedingMetadata(updated, npcRef, store);
         return applyTraitsMetadata(updated, npcRef, store);
     }
 
@@ -35,18 +37,47 @@ final class SpawnerNpcProgressionMetadataService {
         if (stack == null || npcRef == null || store == null || !npcRef.isValid()) {
             return;
         }
+        restoreHappinessComponent(stack, npcRef, store);
         restoreBreedingComponent(stack, npcRef, store);
         restoreTraitsComponent(stack, npcRef, store);
     }
 
     ItemStack clearProgressionMetadata(@Nullable ItemStack stack) {
-        ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.BREEDING_CONFIG_ID);
+        ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_VALUE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_CONFIG_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_HAPPINESS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_LAST_PARTNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_CONFIG_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_ROLL_SEED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_VALUES);
+        return updated;
+    }
+
+    private ItemStack applyHappinessMetadata(ItemStack stack,
+                                             Ref<EntityStore> npcRef,
+                                             Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> type = TameworkHappinessComponent.getComponentType();
+        if (type == null) {
+            return stack;
+        }
+        TameworkHappinessComponent component = store.getComponent(npcRef, type);
+        if (component == null) {
+            ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_VALUE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS);
+            return updated;
+        }
+        ItemStack updated = stack;
+        if (component.getConfigId() != null && !component.getConfigId().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_CONFIG_ID, Codec.STRING, component.getConfigId());
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
+        }
+        updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_VALUE, Codec.DOUBLE, component.getValue());
+        updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS, Codec.LONG, component.getLastUpdateMs());
         return updated;
     }
 
@@ -71,7 +102,11 @@ final class SpawnerNpcProgressionMetadataService {
         } else {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_CONFIG_ID);
         }
-        updated = updated.withMetadata(TameworkMetadataKeys.BREEDING_HAPPINESS, Codec.DOUBLE, component.getHappiness());
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.BREEDING_HAPPINESS,
+                Codec.DOUBLE,
+                resolveCurrentHappiness(npcRef, store, component.getHappiness())
+        );
         updated = updated.withMetadata(
                 TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL,
                 Codec.LONG,
@@ -84,6 +119,19 @@ final class SpawnerNpcProgressionMetadataService {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_LAST_PARTNER_UUID);
         }
         return updated;
+    }
+
+    private double resolveCurrentHappiness(Ref<EntityStore> npcRef,
+                                           Store<EntityStore> store,
+                                           double fallback) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType != null) {
+            TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+            if (happiness != null && Double.isFinite(happiness.getValue())) {
+                return happiness.getValue();
+            }
+        }
+        return fallback;
     }
 
     private ItemStack applyTraitsMetadata(ItemStack stack,
@@ -124,34 +172,116 @@ final class SpawnerNpcProgressionMetadataService {
             return;
         }
         String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_CONFIG_ID, Codec.STRING);
-        Double happiness = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_HAPPINESS, Codec.DOUBLE);
+        Double legacyHappiness = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_HAPPINESS, Codec.DOUBLE);
         Long cooldown = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL, Codec.LONG);
         UUID partner = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_LAST_PARTNER_UUID, Codec.UUID_STRING);
         boolean hasData = (configId != null && !configId.isBlank())
-                || happiness != null
+                || legacyHappiness != null
                 || cooldown != null
                 || partner != null;
         if (!hasData) {
             return;
         }
-        double value = happiness != null ? happiness : 0.0;
-        long cooldownUntil = cooldown != null ? cooldown : 0L;
+        TameworkBreedingComponent existing = store.getComponent(npcRef, type);
+        String resolvedConfigId = (configId != null && !configId.isBlank())
+                ? configId
+                : existing != null ? existing.getConfigId() : null;
+        Double currentHappiness = getRestoredHappiness(npcRef, store);
+        double value = currentHappiness != null
+                ? currentHappiness
+                : legacyHappiness != null
+                ? legacyHappiness
+                : existing != null
+                ? existing.getHappiness()
+                : 0.0;
+        long lastHappinessUpdateMs = getRestoredHappinessTimestamp(npcRef, store);
+        long cooldownUntil = cooldown != null
+                ? cooldown
+                : existing != null
+                ? existing.getCooldownUntilMs()
+                : 0L;
+        UUID lastPartner = partner != null
+                ? partner
+                : existing != null ? existing.getLastPartnerUuid() : null;
         boolean ready = false;
-        if (configId != null && !configId.isBlank()) {
-            TwBreedingConfig config = TwBreedingConfig.resolveById(configId);
+        if (resolvedConfigId != null && !resolvedConfigId.isBlank()) {
+            TwBreedingConfig config = TwBreedingConfig.resolveById(resolvedConfigId);
             if (config != null) {
                 ready = value >= config.getHappiness().getThreshold();
             }
         }
         TameworkBreedingComponent component = new TameworkBreedingComponent(
-                configId,
+                resolvedConfigId,
                 value,
-                System.currentTimeMillis(),
+                lastHappinessUpdateMs > 0L ? lastHappinessUpdateMs : System.currentTimeMillis(),
                 ready,
                 cooldownUntil,
-                partner
+                lastPartner
         );
         store.putComponent(npcRef, type, component);
+    }
+
+    private void restoreHappinessComponent(ItemStack stack,
+                                           Ref<EntityStore> npcRef,
+                                           Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> type = TameworkHappinessComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.HAPPINESS_CONFIG_ID, Codec.STRING);
+        Double value = stack.getFromMetadataOrNull(TameworkMetadataKeys.HAPPINESS_VALUE, Codec.DOUBLE);
+        Long lastUpdate = stack.getFromMetadataOrNull(TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS, Codec.LONG);
+        Double legacyBreedingHappiness = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_HAPPINESS, Codec.DOUBLE);
+        boolean hasData = (configId != null && !configId.isBlank())
+                || value != null
+                || lastUpdate != null
+                || legacyBreedingHappiness != null;
+        if (!hasData) {
+            return;
+        }
+        TameworkHappinessComponent existing = store.getComponent(npcRef, type);
+        String resolvedConfigId = (configId != null && !configId.isBlank())
+                ? configId
+                : existing != null ? existing.getConfigId() : null;
+        double resolvedValue = value != null
+                ? value
+                : legacyBreedingHappiness != null
+                ? legacyBreedingHappiness
+                : existing != null
+                ? existing.getValue()
+                : 0.0;
+        long resolvedLastUpdate = lastUpdate != null && lastUpdate > 0L
+                ? lastUpdate
+                : existing != null && existing.getLastUpdateMs() > 0L
+                ? existing.getLastUpdateMs()
+                : System.currentTimeMillis();
+        store.putComponent(
+                npcRef,
+                type,
+                new TameworkHappinessComponent(resolvedConfigId, resolvedValue, resolvedLastUpdate)
+        );
+    }
+
+    @Nullable
+    private Double getRestoredHappiness(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return null;
+        }
+        TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+        if (happiness == null || !Double.isFinite(happiness.getValue())) {
+            return null;
+        }
+        return happiness.getValue();
+    }
+
+    private long getRestoredHappinessTimestamp(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return 0L;
+        }
+        TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+        return happiness != null ? happiness.getLastUpdateMs() : 0L;
     }
 
     private void restoreTraitsComponent(ItemStack stack,

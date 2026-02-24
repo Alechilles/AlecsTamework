@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -26,6 +27,7 @@ import it.unimi.dsi.fastutil.Pair;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nullable;
 
 /**
  * Handles linked-companion respawn for command item flows.
@@ -164,8 +166,39 @@ final class CommandRespawnService {
         if (spawnedRef == null || !spawnedRef.isValid() || store == null || snapshot == null) {
             return;
         }
+        applyRespawnHappinessState(spawnedRef, store, snapshot);
         applyRespawnBreedingState(spawnedRef, store, snapshot);
         applyRespawnTraitsState(spawnedRef, store, snapshot);
+    }
+
+    private void applyRespawnHappinessState(Ref<EntityStore> spawnedRef,
+                                            Store<EntityStore> store,
+                                            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return;
+        }
+        boolean hasHappinessData = (snapshot.happinessConfigId() != null && !snapshot.happinessConfigId().isBlank())
+                || snapshot.happinessValue() != null
+                || snapshot.happinessLastUpdateMs() > 0L
+                || snapshot.breedingHappiness() != null;
+        if (!hasHappinessData) {
+            return;
+        }
+        double value = snapshot.happinessValue() != null
+                ? snapshot.happinessValue()
+                : snapshot.breedingHappiness() != null
+                ? snapshot.breedingHappiness()
+                : 0.0;
+        long lastUpdateMs = snapshot.happinessLastUpdateMs() > 0L
+                ? snapshot.happinessLastUpdateMs()
+                : System.currentTimeMillis();
+        TameworkHappinessComponent component = new TameworkHappinessComponent(
+                snapshot.happinessConfigId(),
+                value,
+                lastUpdateMs
+        );
+        store.putComponent(spawnedRef, happinessType, component);
     }
 
     private void applyRespawnBreedingState(Ref<EntityStore> spawnedRef,
@@ -182,16 +215,22 @@ final class CommandRespawnService {
         if (!hasBreedingData) {
             return;
         }
-        double happiness = snapshot.breedingHappiness() != null ? snapshot.breedingHappiness() : 0.0;
+        Double restoredHappiness = resolveRestoredHappiness(spawnedRef, store);
+        double happiness = restoredHappiness != null
+                ? restoredHappiness
+                : snapshot.breedingHappiness() != null
+                ? snapshot.breedingHappiness()
+                : 0.0;
         boolean ready = false;
         String configId = snapshot.breedingConfigId();
         if (configId != null && !configId.isBlank()) {
             ready = resolveBreedingReadiness(configId, happiness);
         }
+        long lastHappinessUpdateMs = resolveRestoredHappinessTimestamp(spawnedRef, store);
         TameworkBreedingComponent component = new TameworkBreedingComponent(
                 configId,
                 happiness,
-                System.currentTimeMillis(),
+                lastHappinessUpdateMs > 0L ? lastHappinessUpdateMs : System.currentTimeMillis(),
                 ready,
                 snapshot.breedingCooldownUntilMs(),
                 snapshot.breedingLastPartnerUuid()
@@ -229,6 +268,28 @@ final class CommandRespawnService {
             return false;
         }
         return happiness >= config.getHappiness().getThreshold();
+    }
+
+    @Nullable
+    private Double resolveRestoredHappiness(Ref<EntityStore> spawnedRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> type = TameworkHappinessComponent.getComponentType();
+        if (type == null) {
+            return null;
+        }
+        TameworkHappinessComponent happiness = store.getComponent(spawnedRef, type);
+        if (happiness == null || !Double.isFinite(happiness.getValue())) {
+            return null;
+        }
+        return happiness.getValue();
+    }
+
+    private long resolveRestoredHappinessTimestamp(Ref<EntityStore> spawnedRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> type = TameworkHappinessComponent.getComponentType();
+        if (type == null) {
+            return 0L;
+        }
+        TameworkHappinessComponent happiness = store.getComponent(spawnedRef, type);
+        return happiness != null ? happiness.getLastUpdateMs() : 0L;
     }
 
     private void applyRespawnFollowBootstrap(Ref<EntityStore> npcRef,

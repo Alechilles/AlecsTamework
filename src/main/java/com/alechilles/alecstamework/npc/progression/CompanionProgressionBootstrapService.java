@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -12,9 +14,11 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 
 /**
- * Initializes breeding and trait components for companions when they first become tamed.
+ * Initializes happiness, breeding, and trait components for companions when they first become tamed.
  */
 public final class CompanionProgressionBootstrapService {
+    private static final double EPSILON = 0.000001;
+
     private CompanionProgressionBootstrapService() {
     }
 
@@ -26,14 +30,63 @@ public final class CompanionProgressionBootstrapService {
         if (roleId == null || roleId.isBlank()) {
             return;
         }
-        bootstrapBreedingComponent(npcRef, store, roleId);
+        TwBreedingConfig breedingConfig = TwBreedingConfig.resolveForRole(roleId);
+        TameworkHappinessComponent happiness = bootstrapHappinessComponent(npcRef, store, roleId, breedingConfig);
+        bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
         bootstrapTraitsComponent(npcRef, store, roleId);
+    }
+
+    private static TameworkHappinessComponent bootstrapHappinessComponent(Ref<EntityStore> npcRef,
+                                                                          Store<EntityStore> store,
+                                                                          String roleId,
+                                                                          TwBreedingConfig breedingConfig) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return null;
+        }
+        TwHappinessConfig config = TwHappinessConfig.resolveForRole(roleId);
+        TameworkHappinessComponent existing = store.getComponent(npcRef, happinessType);
+        long now = System.currentTimeMillis();
+        if (existing != null) {
+            boolean changed = false;
+            if ((existing.getConfigId() == null || existing.getConfigId().isBlank())
+                    && config != null
+                    && config.getId() != null
+                    && !config.getId().isBlank()) {
+                existing.setConfigId(config.getId());
+                changed = true;
+            }
+            double clamped = clampHappinessValue(existing.getValue(), config, breedingConfig);
+            if (Math.abs(existing.getValue() - clamped) > EPSILON) {
+                existing.setValue(clamped);
+                changed = true;
+            }
+            if (existing.getLastUpdateMs() <= 0L) {
+                existing.setLastUpdateMs(now);
+                changed = true;
+            }
+            if (changed) {
+                store.putComponent(npcRef, happinessType, existing);
+            }
+            return existing;
+        }
+        Double legacy = resolveLegacyBreedingHappiness(npcRef, store);
+        if (config == null && breedingConfig == null && legacy == null) {
+            return null;
+        }
+        double initial = resolveInitialHappinessValue(npcRef, store, config, breedingConfig);
+        String configId = config != null && config.getId() != null && !config.getId().isBlank()
+                ? config.getId()
+                : null;
+        TameworkHappinessComponent created = new TameworkHappinessComponent(configId, initial, now);
+        store.putComponent(npcRef, happinessType, created);
+        return created;
     }
 
     private static void bootstrapBreedingComponent(Ref<EntityStore> npcRef,
                                                    Store<EntityStore> store,
-                                                   String roleId) {
-        TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
+                                                   TwBreedingConfig config,
+                                                   TameworkHappinessComponent happiness) {
         if (config == null || !config.isEnabled()) {
             return;
         }
@@ -41,29 +94,42 @@ public final class CompanionProgressionBootstrapService {
         if (breedingType == null) {
             return;
         }
+        long now = System.currentTimeMillis();
+        double happinessValue = happiness != null
+                ? happiness.getValue()
+                : resolveInitialHappinessValue(npcRef, store, null, config);
+        long lastUpdateMs = happiness != null && happiness.getLastUpdateMs() > 0L
+                ? happiness.getLastUpdateMs()
+                : now;
+        boolean ready = happinessValue >= config.getHappiness().getThreshold();
         TameworkBreedingComponent existing = store.getComponent(npcRef, breedingType);
         if (existing != null) {
+            boolean changed = false;
             if ((existing.getConfigId() == null || existing.getConfigId().isBlank()) && config.getId() != null) {
                 existing.setConfigId(config.getId());
+                changed = true;
+            }
+            if (Math.abs(existing.getHappiness() - happinessValue) > EPSILON) {
+                existing.setHappiness(happinessValue);
+                changed = true;
+            }
+            if (existing.getLastHappinessUpdateMs() != lastUpdateMs) {
+                existing.setLastHappinessUpdateMs(lastUpdateMs);
+                changed = true;
+            }
+            if (existing.isReady() != ready) {
+                existing.setReady(ready);
+                changed = true;
+            }
+            if (changed) {
                 store.putComponent(npcRef, breedingType, existing);
             }
             return;
         }
-        TwBreedingConfig.HappinessSettings happinessSettings = config.getHappiness();
-        double min = happinessSettings.getMin();
-        double max = happinessSettings.getMax();
-        if (max < min) {
-            double swap = max;
-            max = min;
-            min = swap;
-        }
-        double value = clamp(happinessSettings.getCurrentDefault(), min, max);
-        boolean ready = value >= happinessSettings.getThreshold();
-        long now = System.currentTimeMillis();
         TameworkBreedingComponent created = new TameworkBreedingComponent(
                 config.getId(),
-                value,
-                now,
+                happinessValue,
+                lastUpdateMs,
                 ready,
                 0L,
                 null
@@ -134,5 +200,78 @@ public final class CompanionProgressionBootstrapService {
         }
         long fallback = System.nanoTime();
         return fallback != 0L ? fallback : 1L;
+    }
+
+    private static double resolveInitialHappinessValue(Ref<EntityStore> npcRef,
+                                                       Store<EntityStore> store,
+                                                       TwHappinessConfig happinessConfig,
+                                                       TwBreedingConfig breedingConfig) {
+        Double legacy = resolveLegacyBreedingHappiness(npcRef, store);
+        if (legacy != null && Double.isFinite(legacy)) {
+            return clampHappinessValue(legacy, happinessConfig, breedingConfig);
+        }
+        if (happinessConfig != null) {
+            TwHappinessConfig.ValueSettings values = happinessConfig.getValues();
+            double min = values.getMin();
+            double max = values.getMax();
+            if (max < min) {
+                double swap = min;
+                min = max;
+                max = swap;
+            }
+            return clamp(values.getCurrentDefault(), min, max);
+        }
+        if (breedingConfig != null) {
+            TwBreedingConfig.HappinessSettings settings = breedingConfig.getHappiness();
+            double min = settings.getMin();
+            double max = settings.getMax();
+            if (max < min) {
+                double swap = min;
+                min = max;
+                max = swap;
+            }
+            return clamp(settings.getCurrentDefault(), min, max);
+        }
+        return 0.0;
+    }
+
+    private static double clampHappinessValue(double value,
+                                              TwHappinessConfig happinessConfig,
+                                              TwBreedingConfig breedingConfig) {
+        if (happinessConfig != null) {
+            TwHappinessConfig.ValueSettings settings = happinessConfig.getValues();
+            double min = settings.getMin();
+            double max = settings.getMax();
+            if (max < min) {
+                double swap = min;
+                min = max;
+                max = swap;
+            }
+            return clamp(value, min, max);
+        }
+        if (breedingConfig != null) {
+            TwBreedingConfig.HappinessSettings settings = breedingConfig.getHappiness();
+            double min = settings.getMin();
+            double max = settings.getMax();
+            if (max < min) {
+                double swap = min;
+                min = max;
+                max = swap;
+            }
+            return clamp(value, min, max);
+        }
+        return value;
+    }
+
+    private static Double resolveLegacyBreedingHappiness(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        if (breedingType == null) {
+            return null;
+        }
+        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
+        if (breeding == null || !Double.isFinite(breeding.getHappiness())) {
+            return null;
+        }
+        return breeding.getHappiness();
     }
 }

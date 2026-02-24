@@ -11,6 +11,9 @@ public final class TameworkMetadataKeys {
     public static final String ATTACHMENTS = "Tamework.Attachments";
     public static final String OWNER_UUID = "Tamework.OwnerUuid";
     public static final String TAMED = "Tamework.Tamed";
+    public static final String HAPPINESS_CONFIG_ID = "Tamework.Happiness.ConfigId";
+    public static final String HAPPINESS_VALUE = "Tamework.Happiness.Value";
+    public static final String HAPPINESS_LAST_UPDATE_MS = "Tamework.Happiness.LastUpdateMs";
     public static final String BREEDING_CONFIG_ID = "Tamework.Breeding.ConfigId";
     public static final String BREEDING_HAPPINESS = "Tamework.Breeding.Happiness";
     public static final String BREEDING_COOLDOWN_UNTIL = "Tamework.Breeding.CooldownUntil";

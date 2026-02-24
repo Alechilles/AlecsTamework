@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
@@ -105,6 +106,19 @@ public final class CommandLinkedNpcDeathService {
         Double breedingHappiness = breedingComponent != null ? breedingComponent.getHappiness() : null;
         long breedingCooldownUntilMs = breedingComponent != null ? breedingComponent.getCooldownUntilMs() : 0L;
         UUID breedingLastPartnerUuid = breedingComponent != null ? breedingComponent.getLastPartnerUuid() : null;
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        TameworkHappinessComponent happinessComponent = happinessType != null
+                ? store.getComponent(reference, happinessType)
+                : null;
+        String happinessConfigId = happinessComponent != null ? happinessComponent.getConfigId() : null;
+        Double happinessValue = happinessComponent != null
+                ? happinessComponent.getValue()
+                : breedingHappiness;
+        long happinessLastUpdateMs = happinessComponent != null
+                ? happinessComponent.getLastUpdateMs()
+                : breedingComponent != null
+                ? breedingComponent.getLastHappinessUpdateMs()
+                : 0L;
         ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
         TameworkTraitsComponent traitsComponent = traitsType != null
                 ? store.getComponent(reference, traitsType)
@@ -146,7 +160,10 @@ public final class CommandLinkedNpcDeathService {
                         breedingLastPartnerUuid,
                         traitsConfigId,
                         traitsRollSeed,
-                        traitsValues
+                        traitsValues,
+                        happinessConfigId,
+                        happinessValue,
+                        happinessLastUpdateMs
                 )
         );
         persistSnapshots();
@@ -257,7 +274,10 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + encodeNullableUuid(snapshot.breedingLastPartnerUuid())
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.traitsConfigId())
                 + FIELD_SEPARATOR + snapshot.traitsRollSeed()
-                + FIELD_SEPARATOR + encodeNullableString(snapshot.traitsValues());
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.traitsValues())
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.happinessConfigId())
+                + FIELD_SEPARATOR + encodeNullableDouble(snapshot.happinessValue())
+                + FIELD_SEPARATOR + snapshot.happinessLastUpdateMs();
     }
 
     @Nullable
@@ -291,6 +311,9 @@ public final class CommandLinkedNpcDeathService {
         String traitsConfigId = parts.length > 16 ? decodeNullableString(parts[16]) : null;
         long traitsRollSeed = parts.length > 17 ? parseLong(parts[17], 0L) : 0L;
         String traitsValues = parts.length > 18 ? decodeNullableString(parts[18]) : null;
+        String happinessConfigId = parts.length > 19 ? decodeNullableString(parts[19]) : null;
+        Double happinessValue = parts.length > 20 ? parseNullableDouble(parts[20]) : null;
+        long happinessLastUpdateMs = parts.length > 21 ? parseLong(parts[21], 0L) : 0L;
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -310,7 +333,10 @@ public final class CommandLinkedNpcDeathService {
                 breedingLastPartnerUuid,
                 traitsConfigId,
                 traitsRollSeed,
-                traitsValues
+                traitsValues,
+                happinessConfigId,
+                happinessValue,
+                happinessLastUpdateMs
         );
     }
 
@@ -561,7 +587,10 @@ public final class CommandLinkedNpcDeathService {
                                         @Nullable UUID breedingLastPartnerUuid,
                                         @Nullable String traitsConfigId,
                                         long traitsRollSeed,
-                                        @Nullable String traitsValues) {
+                                        @Nullable String traitsValues,
+                                        @Nullable String happinessConfigId,
+                                        @Nullable Double happinessValue,
+                                        long happinessLastUpdateMs) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -55,8 +56,12 @@ final class InteractionBreedingEffects {
                 && !config.getId().isBlank()) {
             breeding.setConfigId(config.getId());
         }
+        double happiness = CompanionHappinessService.resolveCurrentValue(npcRef, store, breeding.getHappiness());
+        if (Math.abs(breeding.getHappiness() - happiness) > 0.000001) {
+            breeding.setHappiness(happiness);
+        }
         double threshold = resolveThreshold(interaction, config);
-        if (breeding.getHappiness() < threshold) {
+        if (happiness < threshold) {
             return false;
         }
         breeding.setReady(true);
