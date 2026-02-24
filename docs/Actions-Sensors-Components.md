@@ -38,6 +38,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 
 ## Commands
 - `/tw getowner` prints the owner name + UUID (when available).
+- `/tw gethappiness` prints the current happiness value/source and breeding eligibility context for the targeted NPC.
 - `/tw gettamed` prints the current tamed status for the targeted NPC (component or `Tamed*` role id).
 - `/tw getalarm [AlarmName] [NpcUuid]` prints alarm status (unset/active/passed) and remaining time when set. Uses the NPC in view if no UUID is provided. Defaults to `TwGlobalConfig.HarvestAlarmName` (default `Harvest_Ready`) when no alarm name is supplied.
 - `/tw setowner` assigns the targeted NPC to the executing player.

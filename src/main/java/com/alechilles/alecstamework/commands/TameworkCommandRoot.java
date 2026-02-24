@@ -10,6 +10,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         super("tw", "Tamework commands.");
         addSubCommand(new TameworkSetOwnerCommand());
         addSubCommand(new TameworkGetOwnerCommand());
+        addSubCommand(new TameworkGetHappinessCommand());
         addSubCommand(new TameworkGetTamedCommand());
         addSubCommand(new TameworkSetTamedCommand());
         addSubCommand(new TameworkGetAlarmCommand());

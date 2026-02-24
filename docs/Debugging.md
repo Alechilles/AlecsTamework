@@ -49,6 +49,7 @@
 - Spawn both Tamework example mobs to validate actions and sensors.
 - Confirm capture and spawn preserves attachments.
 - Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
+- Check shared happiness + breeding eligibility context with `/tw gethappiness`.
 - Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.
 - Toggle spawner raycast logs with `/tw debugspawner` when testing spawner items.
 - After editing spawner, naming, or command item configs, run `/tw reloadconfig`.
