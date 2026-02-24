@@ -34,6 +34,8 @@
 - Breeding offspring spawn now retries nearby fallback positions and uses additional role-resolution fallbacks to prevent silent no-spawn outcomes after successful pairing/hearts.
 - Breed interaction custom effects now apply only when breeding actually starts, preventing false-positive "ready" feedback when blocked (for example by cooldown).
 - `/tw gethappiness` now reports breeding cooldown state (`cooldownActive`, `cooldownRemainingMs`, `cooldownUntilMs`) and `readyNow` to clarify readiness vs cooldown.
+- Offspring spawn diagnostics now include async failure logging and post-spawn presence/position checks, and newborns spawn slightly higher with child hearts for easier visual confirmation.
+- Non-baby-variant life-stage scaling now uses larger/default-visible juvenile factors (baby/adolescent) with minimum visibility floors to avoid effectively invisible offspring at tiny scales.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

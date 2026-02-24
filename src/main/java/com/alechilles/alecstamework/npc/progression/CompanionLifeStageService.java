@@ -24,8 +24,10 @@ public final class CompanionLifeStageService {
     private static final long DEFAULT_BABY_DURATION_MS = TimeUnit.MINUTES.toMillis(3);
     private static final long DEFAULT_ADOLESCENT_DURATION_MS = TimeUnit.MINUTES.toMillis(4);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
-    private static final double DEFAULT_BABY_SCALE_FACTOR = 0.55;
-    private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.80;
+    private static final double DEFAULT_BABY_SCALE_FACTOR = 0.75;
+    private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.90;
+    private static final double MIN_VISIBLE_BABY_SCALE = 0.70;
+    private static final double MIN_VISIBLE_ADOLESCENT_SCALE = 0.85;
     private static final double MIN_SCALE = 0.10;
 
     private CompanionLifeStageService() {
@@ -40,7 +42,7 @@ public final class CompanionLifeStageService {
         if (type == null) {
             return;
         }
-        TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
+            TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
         if (existing == null) {
             double currentScale = CompanionModelScaleService.resolveCurrentScale(npcRef, store, 1.0);
             TameworkLifeStageComponent created = new TameworkLifeStageComponent(
@@ -48,8 +50,8 @@ public final class CompanionLifeStageService {
                     0L,
                     0L,
                     0L,
-                    currentScale * DEFAULT_BABY_SCALE_FACTOR,
-                    currentScale * DEFAULT_ADOLESCENT_SCALE_FACTOR,
+                    resolveBabyScale(currentScale),
+                    resolveAdolescentScale(currentScale),
                     currentScale,
                     false
             );
@@ -77,8 +79,8 @@ public final class CompanionLifeStageService {
         long adolescentAtMs = now + DEFAULT_BABY_DURATION_MS;
         long adultAtMs = adolescentAtMs + DEFAULT_ADOLESCENT_DURATION_MS;
         double adultScale = resolveAdultScale(childRef, store);
-        double babyScale = clampScale(adultScale * DEFAULT_BABY_SCALE_FACTOR);
-        double adolescentScale = clampScale(adultScale * DEFAULT_ADOLESCENT_SCALE_FACTOR);
+        double babyScale = resolveBabyScale(adultScale);
+        double adolescentScale = resolveAdolescentScale(adultScale);
         boolean growthScalingEnabled = !hasBabyVariant;
         TameworkLifeStageComponent stage = new TameworkLifeStageComponent(
                 STAGE_BABY,
@@ -231,11 +233,11 @@ public final class CompanionLifeStageService {
             changed = true;
         }
         if (!Double.isFinite(component.getBabyScale()) || component.getBabyScale() <= 0.0) {
-            component.setBabyScale(clampScale(component.getAdultScale() * DEFAULT_BABY_SCALE_FACTOR));
+            component.setBabyScale(resolveBabyScale(component.getAdultScale()));
             changed = true;
         }
         if (!Double.isFinite(component.getAdolescentScale()) || component.getAdolescentScale() <= 0.0) {
-            component.setAdolescentScale(clampScale(component.getAdultScale() * DEFAULT_ADOLESCENT_SCALE_FACTOR));
+            component.setAdolescentScale(resolveAdolescentScale(component.getAdultScale()));
             changed = true;
         }
         if (component.isGrowthScalingEnabled()
@@ -324,6 +326,18 @@ public final class CompanionLifeStageService {
             sizeMultiplier = 1.0;
         }
         return clampScale(current * sizeMultiplier);
+    }
+
+    private static double resolveBabyScale(double adultScale) {
+        double scaled = clampScale(adultScale * DEFAULT_BABY_SCALE_FACTOR);
+        double minimum = Math.min(adultScale, MIN_VISIBLE_BABY_SCALE);
+        return clampScale(Math.max(scaled, minimum));
+    }
+
+    private static double resolveAdolescentScale(double adultScale) {
+        double scaled = clampScale(adultScale * DEFAULT_ADOLESCENT_SCALE_FACTOR);
+        double minimum = Math.min(adultScale, MIN_VISIBLE_ADOLESCENT_SCALE);
+        return clampScale(Math.max(scaled, minimum));
     }
 
     private static double clampScale(double value) {
