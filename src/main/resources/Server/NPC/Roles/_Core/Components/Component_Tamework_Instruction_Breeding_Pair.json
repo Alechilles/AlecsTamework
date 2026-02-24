@@ -21,8 +21,12 @@
       "Description": "Distance where breeding pair movement starts to slow down."
     },
     "BreedingPairSeekStopDistance": {
-      "Value": 1.05,
+      "Value": 0.3,
       "Description": "Distance considered close enough for the pair to meet."
+    },
+    "BreedingPairCompleteRange": {
+      "Value": 1.2,
+      "Description": "Distance threshold used to finalize pair movement and exit breeding pair state."
     },
     "BreedingPairSeekRelativeSpeed": {
       "Value": 0.45,
@@ -105,7 +109,7 @@
                 "Compute": "BreedingPairTargetSlot"
               },
               "Range": {
-                "Compute": "BreedingPairSeekStopDistance + 0.15"
+                "Compute": "BreedingPairCompleteRange"
               }
             },
             "Actions": [
@@ -152,7 +156,7 @@
                 "Compute": "BreedingPairReadRange"
               },
               "MinRange": {
-                "Compute": "BreedingPairSeekStopDistance + 0.15"
+                "Compute": "BreedingPairCompleteRange"
               }
             },
             "BodyMotion": {
