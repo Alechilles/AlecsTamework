@@ -41,12 +41,12 @@ final class BreedingOffspringService {
     private static final String HEARTS_PARTICLE = "Hearts";
     private static final String BREEDING_PAIR_HOOK_ID = "Tamework.Breeding.Pair.Start";
     private static final String BREEDING_PAIR_STATE = "BreedPair";
-    private static final long PAIRING_PROXIMITY_CHECK_INTERVAL_MS = 250L;
+    private static final long PAIRING_PROXIMITY_CHECK_INTERVAL_MS = 100L;
     private static final long PAIRING_PROXIMITY_TIMEOUT_MS = 5000L;
     private static final long OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS = 2200L;
     private static final long[] OFFSPRING_PRESENCE_CHECK_DELAYS_MS = new long[] { 900L, 3000L, 8000L };
     private static final double APPROACH_SPACING = 0.45;
-    private static final double PAIRING_READY_DISTANCE = 1.35;
+    private static final double PAIRING_READY_DISTANCE = 2.20;
     private static final double OFFSPRING_SPAWN_HEIGHT_OFFSET = 1.00;
 
     private final BreedingPartnerService partnerService;
