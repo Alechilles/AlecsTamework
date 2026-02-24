@@ -116,7 +116,24 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         if (configId == null && config != null) {
             configId = normalizeBlank(config.getId());
         }
-        return new BreedingSnapshot(true, breeding.isReady(), configId, threshold, fertilityMultiplier, effective, eligible);
+        long now = System.currentTimeMillis();
+        boolean cooldownActive = breeding.isCooldownActive(now);
+        long cooldownUntilMs = breeding.getCooldownUntilMs();
+        long cooldownRemainingMs = cooldownActive
+                ? Math.max(0L, cooldownUntilMs - now)
+                : 0L;
+        return new BreedingSnapshot(
+                true,
+                breeding.isReady(),
+                cooldownActive,
+                cooldownRemainingMs,
+                cooldownUntilMs,
+                configId,
+                threshold,
+                fertilityMultiplier,
+                effective,
+                eligible
+        );
     }
 
     private static String buildMessage(@Nonnull UUID npcUuid,
@@ -143,6 +160,14 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         }
 
         message.append(". Breeding: readyFlag=").append(breeding.readyFlag());
+        message.append(", cooldownActive=").append(breeding.cooldownActive());
+        if (breeding.cooldownUntilMs() > 0L) {
+            message.append(", cooldownUntilMs=").append(breeding.cooldownUntilMs());
+        }
+        if (breeding.cooldownActive()) {
+            message.append(", cooldownRemainingMs=").append(breeding.cooldownRemainingMs());
+        }
+        message.append(", readyNow=").append(breeding.readyFlag() && !breeding.cooldownActive());
         if (breeding.configId() != null) {
             message.append(", config=").append(breeding.configId());
         }
@@ -175,13 +200,16 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
 
     private record BreedingSnapshot(boolean hasComponent,
                                     boolean readyFlag,
+                                    boolean cooldownActive,
+                                    long cooldownRemainingMs,
+                                    long cooldownUntilMs,
                                     @Nullable String configId,
                                     @Nullable Double threshold,
                                     double fertilityMultiplier,
                                     double effectiveHappiness,
                                     @Nullable Boolean eligible) {
         private static BreedingSnapshot empty() {
-            return new BreedingSnapshot(false, false, null, null, 1.0, 0.0, null);
+            return new BreedingSnapshot(false, false, false, 0L, 0L, null, null, 1.0, 0.0, null);
         }
     }
 }

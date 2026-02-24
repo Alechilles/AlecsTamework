@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -24,6 +25,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import javax.annotation.Nullable;
 
 /**
@@ -37,12 +39,12 @@ final class BreedingOffspringService {
     private static final double APPROACH_SPACING = 0.45;
 
     private final BreedingPartnerService partnerService;
-    private final BreedingOffspringRoleResolver roleResolver;
+    private final BreedingOffspringSpawnService spawnService;
     private final BreedingOffspringProgressionService progressionService;
 
     BreedingOffspringService(BreedingPartnerService partnerService) {
         this.partnerService = partnerService;
-        this.roleResolver = new BreedingOffspringRoleResolver();
+        this.spawnService = new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
         this.progressionService = new BreedingOffspringProgressionService();
     }
 
@@ -85,6 +87,9 @@ final class BreedingOffspringService {
                 partnerNpc.getUuid(),
                 resolveRoleId(sourceNpc),
                 resolveRoleId(partnerNpc),
+                sourceNpc.getRoleIndex(),
+                partnerNpc.getRoleIndex(),
+                resolveSpawnAnchor(sourceRef, partner.ref, store),
                 resolveOwnerSnapshot(sourceRef, store),
                 resolveOwnerSnapshot(partner.ref, store),
                 resolveTamedState(sourceRef, store),
@@ -299,32 +304,53 @@ final class BreedingOffspringService {
         Ref<EntityStore> parentBRef = world.getEntityRef(context.parentBUuid());
         TransformComponent parentATransform = getTransform(parentARef, store);
         TransformComponent parentBTransform = getTransform(parentBRef, store);
-        if (parentATransform == null && parentBTransform == null) {
-            return;
-        }
-
-        String baseRoleId = resolveBaseRoleId(context, parentARef, parentBRef, store);
-        if (baseRoleId == null || baseRoleId.isBlank()) {
-            return;
-        }
         NPCPlugin npcPlugin = NPCPlugin.get();
         if (npcPlugin == null) {
             return;
         }
-        BreedingOffspringRoleResolver.OffspringRoleSelection roleSelection =
-                roleResolver.selectOffspringRole(baseRoleId, npcPlugin);
-        if (roleSelection == null || roleSelection.roleId() == null || roleSelection.roleId().isBlank()) {
+        String baseRoleId = resolveBaseRoleId(context, parentARef, parentBRef, store);
+        BreedingOffspringSpawnService.ResolvedSpawnRole spawnRole = spawnService.resolveSpawnRole(
+                baseRoleId,
+                context.parentARoleIndex(),
+                context.parentBRoleIndex(),
+                npcPlugin
+        );
+        if (spawnRole == null) {
+            logWarn(String.format(
+                    "Breeding spawn skipped: unable to resolve offspring role (parentA=%s, parentB=%s).",
+                    context.parentAUuid(),
+                    context.parentBUuid()
+            ));
             return;
         }
-        int roleIndex = npcPlugin.getIndex(roleSelection.roleId());
-        if (roleIndex < 0) {
+        Vector3d spawnPosition = resolveSpawnPosition(parentATransform, parentBTransform, context.spawnAnchor());
+        if (spawnPosition == null) {
+            logWarn(String.format(
+                    "Breeding spawn skipped: no spawn position (parentA=%s, parentB=%s).",
+                    context.parentAUuid(),
+                    context.parentBUuid()
+            ));
             return;
         }
-
-        Vector3d spawnPosition = resolveSpawnPosition(parentATransform, parentBTransform);
         Vector3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
-        Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, spawnRotation, null, null);
+        Pair<Ref<EntityStore>, NPCEntity> spawned = spawnService.spawnWithFallback(
+                npcPlugin,
+                store,
+                spawnRole.roleIndex(),
+                spawnPosition,
+                spawnRotation
+        );
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
+            logWarn(String.format(
+                    "Breeding spawn failed after fallback attempts: role=%s index=%d parentA=%s parentB=%s pos=(%.2f, %.2f, %.2f).",
+                    spawnRole.roleId(),
+                    spawnRole.roleIndex(),
+                    context.parentAUuid(),
+                    context.parentBUuid(),
+                    spawnPosition.x,
+                    spawnPosition.y,
+                    spawnPosition.z
+            ));
             return;
         }
         Ref<EntityStore> childRef = spawned.first();
@@ -336,14 +362,14 @@ final class BreedingOffspringService {
                 childNpc,
                 parentARef,
                 parentBRef,
-                roleSelection.roleId(),
+                spawnRole.roleId(),
                 context.parentAOwner(),
                 context.parentBOwner(),
                 context.parentATamed(),
                 context.parentBTamed(),
                 context.breedingConfigId(),
                 childCooldownMs,
-                roleSelection.hasBabyVariant(),
+                spawnRole.hasBabyVariant(),
                 store
         );
     }
@@ -376,8 +402,10 @@ final class BreedingOffspringService {
         return resolveRoleId(parentBRef, store);
     }
 
+    @Nullable
     private Vector3d resolveSpawnPosition(@Nullable TransformComponent parentATransform,
-                                          @Nullable TransformComponent parentBTransform) {
+                                          @Nullable TransformComponent parentBTransform,
+                                          @Nullable Vector3d fallbackAnchor) {
         if (parentATransform != null && parentBTransform != null) {
             Vector3d a = parentATransform.getPosition();
             Vector3d b = parentBTransform.getPosition();
@@ -387,11 +415,17 @@ final class BreedingOffspringService {
                     (a.z + b.z) * 0.5
             );
         }
-        TransformComponent source = parentATransform != null ? parentATransform : parentBTransform;
-        Vector3d base = source.getPosition();
-        double offsetX = ThreadLocalRandom.current().nextDouble(-0.6, 0.6);
-        double offsetZ = ThreadLocalRandom.current().nextDouble(-0.6, 0.6);
-        return new Vector3d(base.x + offsetX, base.y + 0.1, base.z + offsetZ);
+        if (parentATransform != null || parentBTransform != null) {
+            TransformComponent source = parentATransform != null ? parentATransform : parentBTransform;
+            Vector3d base = source.getPosition();
+            double offsetX = ThreadLocalRandom.current().nextDouble(-0.6, 0.6);
+            double offsetZ = ThreadLocalRandom.current().nextDouble(-0.6, 0.6);
+            return new Vector3d(base.x + offsetX, base.y + 0.1, base.z + offsetZ);
+        }
+        if (fallbackAnchor == null) {
+            return null;
+        }
+        return new Vector3d(fallbackAnchor.x, fallbackAnchor.y + 0.1, fallbackAnchor.z);
     }
 
     private Vector3f resolveSpawnRotation(@Nullable TransformComponent parentATransform,
@@ -407,6 +441,18 @@ final class BreedingOffspringService {
         }
         TransformComponent fallback = parentATransform != null ? parentATransform : parentBTransform;
         return new Vector3f(fallback.getRotation());
+    }
+
+    @Nullable
+    private Vector3d resolveSpawnAnchor(@Nullable Ref<EntityStore> parentARef,
+                                        @Nullable Ref<EntityStore> parentBRef,
+                                        @Nullable Store<EntityStore> store) {
+        if (store == null) {
+            return null;
+        }
+        TransformComponent parentATransform = getTransform(parentARef, store);
+        TransformComponent parentBTransform = getTransform(parentBRef, store);
+        return resolveSpawnPosition(parentATransform, parentBTransform, null);
     }
 
     private TwBreedingConfig resolveBreedingConfig(@Nullable String configId) {
@@ -487,6 +533,14 @@ final class BreedingOffspringService {
         return resolveRoleId(store.getComponent(npcRef, NPCEntity.getComponentType()));
     }
 
+    private void logWarn(String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null || message == null || message.isBlank()) {
+            return;
+        }
+        instance.getLogger().at(Level.WARNING).log(message);
+    }
+
     private record PairingTargets(Vector3d parentATarget, Vector3d parentBTarget) {
     }
 
@@ -494,6 +548,9 @@ final class BreedingOffspringService {
                                          UUID parentBUuid,
                                          @Nullable String parentARoleId,
                                          @Nullable String parentBRoleId,
+                                         int parentARoleIndex,
+                                         int parentBRoleIndex,
+                                         @Nullable Vector3d spawnAnchor,
                                          BreedingOffspringProgressionService.OwnerSnapshot parentAOwner,
                                          BreedingOffspringProgressionService.OwnerSnapshot parentBOwner,
                                          boolean parentATamed,
