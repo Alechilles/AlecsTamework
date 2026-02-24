@@ -723,10 +723,69 @@
       }
     },
     {
-      "$Comment": "Default follow/idle behavior using Tamework component.",
+      "$Comment": "Default idle behavior using Tamework wander component.",
       "Sensor": {
         "Type": "State",
         "State": "Idle"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Wander",
+          "Modify": {
+            "_ExportStates": [
+              "Sleep"
+            ],
+            "WanderRadius": {
+              "Compute": "WanderRadius"
+            },
+            "DayFlavorAnimation": {
+              "Compute": "DayFlavorAnimation"
+            },
+            "DayFlavorAnimationAfter": {
+              "Compute": "DayFlavorAnimationAfter"
+            },
+            "DayFlavorAnimationLength": {
+              "Compute": "DayFlavorAnimationLength"
+            },
+            "DayTimePeriod": {
+              "Compute": "DayTimePeriod"
+            },
+            "NightFlavorAnimation": {
+              "Compute": "NightFlavorAnimation"
+            },
+            "NightFlavorAnimationAfter": {
+              "Compute": "NightFlavorAnimationAfter"
+            },
+            "NightFlavorAnimationLength": {
+              "Compute": "NightFlavorAnimationLength"
+            },
+            "DayTimeNapWeight": {
+              "Compute": "DayTimeNapWeight"
+            },
+            "AlwaysSleepAtNight": {
+              "Compute": "AlwaysSleepAtNight"
+            },
+            "CanHear": {
+              "Compute": "CanHear"
+            },
+            "HearingRange": {
+              "Compute": "HearingRange"
+            },
+            "ReactToNPCs": {
+              "Compute": "ReactToNPCs"
+            },
+            "Attitudes": {
+              "Compute": "WakeupAttitudes"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "Explicit follow behavior while in Follow state.",
+      "Sensor": {
+        "Type": "State",
+        "State": "Follow"
       },
       "Instructions": [
         {

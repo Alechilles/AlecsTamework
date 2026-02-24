@@ -31,6 +31,13 @@
     "BreedingPairReadRange": {
       "Value": 64,
       "Description": "Range used to read the stored breeding pair destination."
+    },
+    "BreedingPairCompleteDelayRange": {
+      "Value": [
+        1,
+        1
+      ],
+      "Description": "Delay after pair arrival before the parent state returns to idle."
     }
   },
   "Content": {
@@ -88,6 +95,7 @@
           {
             "$Comment": "When close enough, complete pair movement.",
             "Continue": true,
+            "ActionsBlocking": true,
             "Sensor": {
               "Type": "ReadPosition",
               "Slot": {
@@ -98,6 +106,12 @@
               }
             },
             "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "BreedingPairCompleteDelayRange"
+                }
+              },
               {
                 "Type": "State",
                 "State": ".Listen"
