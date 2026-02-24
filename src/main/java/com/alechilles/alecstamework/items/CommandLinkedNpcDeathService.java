@@ -112,9 +112,12 @@ public final class CommandLinkedNpcDeathService {
                 ? store.getComponent(reference, happinessType)
                 : null;
         String happinessConfigId = happinessComponent != null ? happinessComponent.getConfigId() : null;
-        Double happinessValue = happinessComponent != null
-                ? happinessComponent.getValue()
-                : breedingHappiness;
+        Double happinessValue = null;
+        if (happinessComponent != null) {
+            happinessValue = happinessComponent.getValue();
+        } else if (breedingHappiness != null) {
+            happinessValue = breedingHappiness;
+        }
         long happinessLastUpdateMs = happinessComponent != null
                 ? happinessComponent.getLastUpdateMs()
                 : breedingComponent != null
