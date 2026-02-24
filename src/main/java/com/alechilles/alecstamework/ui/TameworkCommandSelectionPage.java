@@ -405,6 +405,7 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
         commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
+        LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
         commandBuilder.set(removeSelector + ".Text", "");
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
@@ -523,6 +524,7 @@ public final class TameworkCommandSelectionPage
                     entry.deadRespawnRemainingMs,
                     entry.futureStatA,
                     entry.futureStatB,
+                    entry.traitIndicators,
                     entry.traitsActionVisible,
                     entry.traitsActionEnabled,
                     entry.talentsActionVisible,
@@ -565,35 +567,11 @@ public final class TameworkCommandSelectionPage
         private final long deadRespawnRemainingMs;
         private final FutureStat futureStatA;
         private final FutureStat futureStatB;
+        private final LinkedNpcTraitIndicator[] traitIndicators;
         private final boolean traitsActionVisible;
         private final boolean traitsActionEnabled;
         private final boolean talentsActionVisible;
         private final boolean talentsActionEnabled;
-
-        public LinkedNpcEntry(UUID npcUuid, String displayName, int currentHealth, int maxHealth, boolean loaded) {
-            this(npcUuid, displayName, currentHealth, maxHealth, loaded, false, false, 0L);
-        }
-
-        public LinkedNpcEntry(UUID npcUuid,
-                              String displayName,
-                              int currentHealth,
-                              int maxHealth,
-                              boolean loaded,
-                              boolean hasHome,
-                              boolean dead,
-                              long deadRespawnRemainingMs) {
-            this(
-                    npcUuid,
-                    displayName,
-                    currentHealth,
-                    maxHealth,
-                    loaded,
-                    hasHome,
-                    dead,
-                    false,
-                    deadRespawnRemainingMs
-            );
-        }
 
         public LinkedNpcEntry(UUID npcUuid,
                               String displayName,
@@ -603,7 +581,8 @@ public final class TameworkCommandSelectionPage
                               boolean hasHome,
                               boolean dead,
                               boolean captured,
-                              long deadRespawnRemainingMs) {
+                              long deadRespawnRemainingMs,
+                              LinkedNpcTraitIndicator[] traitIndicators) {
             this(
                     npcUuid,
                     displayName,
@@ -616,6 +595,7 @@ public final class TameworkCommandSelectionPage
                     deadRespawnRemainingMs,
                     null,
                     null,
+                    traitIndicators,
                     false,
                     false,
                     false,
@@ -634,6 +614,7 @@ public final class TameworkCommandSelectionPage
                               long deadRespawnRemainingMs,
                               FutureStat futureStatA,
                               FutureStat futureStatB,
+                              LinkedNpcTraitIndicator[] traitIndicators,
                               boolean traitsActionVisible,
                               boolean traitsActionEnabled,
                               boolean talentsActionVisible,
@@ -649,6 +630,7 @@ public final class TameworkCommandSelectionPage
             this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
             this.futureStatA = futureStatA;
             this.futureStatB = futureStatB;
+            this.traitIndicators = sanitizeTraitIndicators(traitIndicators);
             this.traitsActionVisible = traitsActionVisible;
             this.traitsActionEnabled = traitsActionEnabled;
             this.talentsActionVisible = talentsActionVisible;
@@ -718,6 +700,10 @@ public final class TameworkCommandSelectionPage
             return futureStatB;
         }
 
+        public LinkedNpcTraitIndicator[] traitIndicators() {
+            return traitIndicators;
+        }
+
         public boolean hasAnyFutureAction() {
             return traitsActionVisible || talentsActionVisible;
         }
@@ -736,6 +722,23 @@ public final class TameworkCommandSelectionPage
 
         public boolean isTalentsActionEnabled() {
             return talentsActionEnabled;
+        }
+
+        private static LinkedNpcTraitIndicator[] sanitizeTraitIndicators(LinkedNpcTraitIndicator[] input) {
+            if (input == null || input.length == 0) {
+                return LinkedNpcTraitIndicator.EMPTY;
+            }
+            List<LinkedNpcTraitIndicator> out = new ArrayList<>(input.length);
+            for (LinkedNpcTraitIndicator indicator : input) {
+                if (indicator == null) {
+                    continue;
+                }
+                out.add(indicator);
+                if (out.size() >= LinkedNpcTraitIndicatorBinder.MAX_VISIBLE_TRAIT_INDICATORS) {
+                    break;
+                }
+            }
+            return out.isEmpty() ? LinkedNpcTraitIndicator.EMPTY : out.toArray(new LinkedNpcTraitIndicator[0]);
         }
     }
 

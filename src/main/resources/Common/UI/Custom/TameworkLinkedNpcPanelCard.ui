@@ -104,6 +104,99 @@ Group {
     Visible: false;
   }
 
+  Group #TraitStrip {
+    Anchor: (Top: 1, Right: 34, Width: 80, Height: 24);
+    LayoutMode: Left;
+
+    Group #TraitSlot0 {
+      Anchor: (Width: 24, Height: 24);
+      Visible: false;
+
+      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+
+      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
+      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #6fc576; }
+      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
+      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
+
+      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Label #TraitIcon {
+        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+        Text: "?";
+        Style: (
+          FontSize: 10,
+          RenderBold: true,
+          TextColor: #deebff,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+    }
+
+    Group { Anchor: (Width: 4); }
+
+    Group #TraitSlot1 {
+      Anchor: (Width: 24, Height: 24);
+      Visible: false;
+
+      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+
+      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
+      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #6fc576; }
+      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
+      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
+
+      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Label #TraitIcon {
+        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+        Text: "?";
+        Style: (
+          FontSize: 10,
+          RenderBold: true,
+          TextColor: #deebff,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+    }
+
+    Group { Anchor: (Width: 4); }
+
+    Group #TraitSlot2 {
+      Anchor: (Width: 24, Height: 24);
+      Visible: false;
+
+      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+
+      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
+      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #6fc576; }
+      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
+      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
+
+      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Label #TraitIcon {
+        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+        Text: "?";
+        Style: (
+          FontSize: 10,
+          RenderBold: true,
+          TextColor: #deebff,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+    }
+  }
+
   TextButton #RespawnButton {
     Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRespawnButtonStyle;
