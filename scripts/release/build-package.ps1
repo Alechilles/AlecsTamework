@@ -4,6 +4,7 @@ param(
     [string]$ConfigPath = ".release/publish-config.json",
     [string]$OutputDir = "artifacts",
     [string]$ArtifactPathOutputFile = "",
+    [string]$HytaleInstallPath = "",
     [bool]$SkipTests = $false
 )
 
@@ -40,6 +41,21 @@ switch ($config.packaging) {
         $mvnArgs = @("-B", "clean", "test", "package")
         if ($SkipTests) {
             $mvnArgs = @("-B", "clean", "package", "-DskipTests")
+        }
+
+        if (-not [string]::IsNullOrWhiteSpace($HytaleInstallPath)) {
+            if (-not (Test-Path -Path $HytaleInstallPath)) {
+                throw "Provided hytale install path was not found: '$HytaleInstallPath'."
+            }
+
+            $resolvedInstallPath = (Resolve-Path -Path $HytaleInstallPath).Path
+            $serverJarPath = Join-Path $resolvedInstallPath "Server\HytaleServer.jar"
+            if (-not (Test-Path -Path $serverJarPath)) {
+                throw "Expected HytaleServer.jar at '$serverJarPath'."
+            }
+
+            $mvnArgs += "-Dhytale.install.path=$resolvedInstallPath"
+            Write-Host "Using hytale.install.path override: $resolvedInstallPath"
         }
 
         & .\mvnw.cmd @mvnArgs

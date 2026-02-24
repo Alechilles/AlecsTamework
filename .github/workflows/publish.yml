@@ -90,6 +90,51 @@ jobs:
         run: |
           .\scripts\release\validate-release.ps1 -Version "${{ steps.version.outputs.version }}"
 
+      - name: Prepare Hytale server jar
+        id: hytale
+        shell: pwsh
+        env:
+          HYTALE_SERVER_JAR_URL: ${{ secrets.HYTALE_SERVER_JAR_URL }}
+          HYTALE_SERVER_JAR_AUTH_HEADER: ${{ secrets.HYTALE_SERVER_JAR_AUTH_HEADER }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:HYTALE_SERVER_JAR_URL)) {
+            throw "HYTALE_SERVER_JAR_URL secret is required for hosted build packaging."
+          }
+
+          $installPath = Join-Path $PWD ".ci\hytale-install"
+          $serverDir = Join-Path $installPath "Server"
+          New-Item -ItemType Directory -Path $serverDir -Force | Out-Null
+
+          $serverJarPath = Join-Path $serverDir "HytaleServer.jar"
+          $curlArgs = @(
+            "-fL",
+            "--retry", "3",
+            "--retry-delay", "2",
+            "-o", $serverJarPath,
+            $env:HYTALE_SERVER_JAR_URL
+          )
+
+          if (-not [string]::IsNullOrWhiteSpace($env:HYTALE_SERVER_JAR_AUTH_HEADER)) {
+            $curlArgs = @("-H", $env:HYTALE_SERVER_JAR_AUTH_HEADER) + $curlArgs
+          }
+
+          & curl.exe @curlArgs
+          if ($LASTEXITCODE -ne 0) {
+            throw "Failed to download HytaleServer.jar (curl exit code $LASTEXITCODE)."
+          }
+
+          if (-not (Test-Path -Path $serverJarPath)) {
+            throw "HytaleServer.jar was not downloaded to '$serverJarPath'."
+          }
+
+          $jarInfo = Get-Item -Path $serverJarPath
+          if ($jarInfo.Length -le 0) {
+            throw "Downloaded HytaleServer.jar is empty: '$serverJarPath'."
+          }
+
+          "install_path=$installPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          Write-Host "Prepared Hytale install path at '$installPath'."
+
       - name: Build package
         id: build
         shell: pwsh
@@ -97,6 +142,7 @@ jobs:
           New-Item -ItemType Directory -Path artifacts -Force | Out-Null
           .\scripts\release\build-package.ps1 `
             -Version "${{ steps.version.outputs.version }}" `
+            -HytaleInstallPath "${{ steps.hytale.outputs.install_path }}" `
             -OutputDir "artifacts" `
             -ArtifactPathOutputFile "artifacts\artifact-path.txt"
 
