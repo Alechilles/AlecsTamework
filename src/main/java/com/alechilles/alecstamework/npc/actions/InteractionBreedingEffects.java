@@ -14,6 +14,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import javax.annotation.Nullable;
 
 /**
@@ -49,7 +50,7 @@ final class InteractionBreedingEffects {
             return false;
         }
         TwBreedingConfig config = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
-        if (config != null && config.getEligibility().isRequireTamed() && !TamedStateResolver.isTamed(npcRef, store)) {
+        if (!passesEligibilityGates(config, role, npcRef, store)) {
             return false;
         }
         if ((breeding.getConfigId() == null || breeding.getConfigId().isBlank())
@@ -91,6 +92,43 @@ final class InteractionBreedingEffects {
         breeding.setLastHappinessUpdateMs(now);
         store.putComponent(npcRef, breedingType, breeding);
         return true;
+    }
+
+    private boolean passesEligibilityGates(@Nullable TwBreedingConfig config,
+                                           @Nullable Role role,
+                                           Ref<EntityStore> npcRef,
+                                           Store<EntityStore> store) {
+        if (config == null) {
+            return true;
+        }
+        TwBreedingConfig.EligibilitySettings eligibility = config.getEligibility();
+        if (eligibility.isRequireTamed() && !TamedStateResolver.isTamed(npcRef, store)) {
+            owner.logDebug("TameworkInteract: breeding blocked. NPC is not tamed.");
+            return false;
+        }
+        String currentStateName = resolveCurrentStateName(role);
+        if (BreedingEligibilityService.isBlockedByState(
+                currentStateName,
+                eligibility.isRequireNotSleeping(),
+                eligibility.isRequireNotInCombat()
+        )) {
+            owner.logDebug("TameworkInteract: breeding blocked by state gate. state=" + currentStateName);
+            return false;
+        }
+        return true;
+    }
+
+    @Nullable
+    private String resolveCurrentStateName(@Nullable Role role) {
+        if (role == null || role.getStateSupport() == null || role.getStateSupport().getStateHelper() == null) {
+            return null;
+        }
+        StateSupport stateSupport = role.getStateSupport();
+        int currentState = stateSupport.getStateIndex();
+        if (currentState == StateSupport.NO_STATE) {
+            return null;
+        }
+        return stateSupport.getStateHelper().getStateName(currentState);
     }
 
     private double resolveThreshold(BreedInteraction interaction, @Nullable TwBreedingConfig config) {

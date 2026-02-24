@@ -24,6 +24,7 @@
 - Prompt hint keys are `server.interactionHints.*` and must be defined in `Server/Languages/en-US/server.lang` without the `server.` prefix.
 - Breed readiness currently depends on shared happiness (mirrored into breeding state). Feeding increases happiness using `TwHappinessConfig.Sources.GainOnFeed` when present, with `TwBreedingConfig.Happiness.GainOnFeed` as fallback and optional trait multiplier `HappinessGainMultiplier`.
 - Breed interaction checks now use effective fertility for threshold gating: `(Happiness * FertilityMultiplier) + FertilityBonus`.
+- Breed interaction now also checks state gates from breeding config (`RequireNotSleeping`, `RequireNotInCombat`) and logs blocked-state diagnostics when debug is enabled.
 
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.

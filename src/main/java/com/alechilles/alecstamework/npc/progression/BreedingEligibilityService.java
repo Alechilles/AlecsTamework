@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import java.util.Locale;
 import javax.annotation.Nullable;
 
 /**
@@ -34,5 +35,19 @@ public final class BreedingEligibilityService {
         }
         double safeThreshold = Double.isFinite(threshold) ? threshold : 0.0;
         return effectiveHappiness >= safeThreshold;
+    }
+
+    public static boolean isBlockedByState(@Nullable String stateName,
+                                           boolean requireNotSleeping,
+                                           boolean requireNotInCombat) {
+        if (stateName == null || stateName.isBlank()) {
+            return false;
+        }
+        String normalized = stateName.trim().toLowerCase(Locale.ROOT);
+        if (requireNotSleeping && normalized.contains("sleep")) {
+            return true;
+        }
+        return requireNotInCombat
+                && (normalized.contains("defend") || normalized.contains("combat"));
     }
 }

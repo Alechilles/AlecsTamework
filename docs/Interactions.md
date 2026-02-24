@@ -149,7 +149,8 @@ Fields:
 
 Effects:
 - Ensures happiness and breeding progression state exists on the NPC.
-- Uses role/config breeding resolution and enforces config-level `Eligibility.RequireTamed` when enabled.
+- Uses role/config breeding resolution and enforces config-level state gates:
+  `Eligibility.RequireTamed`, `Eligibility.RequireNotSleeping`, and `Eligibility.RequireNotInCombat`.
 - Marks breeding readiness when effective fertility meets threshold:
   `effective = (sharedHappiness * FertilityMultiplier) + FertilityBonus`.
   Trait effect key `FertilityMultiplier` defaults to `1.0` when traits are missing.

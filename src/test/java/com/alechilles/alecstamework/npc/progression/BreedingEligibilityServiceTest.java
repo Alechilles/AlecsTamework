@@ -34,4 +34,18 @@ class BreedingEligibilityServiceTest {
         assertEquals(0.0, effective, 0.000001);
         assertFalse(BreedingEligibilityService.isEligible(Double.NaN, 10.0));
     }
+
+    @Test
+    void isBlockedByStateDetectsSleepAndCombatWhenRequired() {
+        assertTrue(BreedingEligibilityService.isBlockedByState("Sleep", true, false));
+        assertTrue(BreedingEligibilityService.isBlockedByState("Defend", false, true));
+        assertTrue(BreedingEligibilityService.isBlockedByState("Combat_Chase", false, true));
+    }
+
+    @Test
+    void isBlockedByStateIgnoresStatesWhenNotRequired() {
+        assertFalse(BreedingEligibilityService.isBlockedByState("Sleep", false, false));
+        assertFalse(BreedingEligibilityService.isBlockedByState("Idle", true, true));
+        assertFalse(BreedingEligibilityService.isBlockedByState(null, true, true));
+    }
 }
