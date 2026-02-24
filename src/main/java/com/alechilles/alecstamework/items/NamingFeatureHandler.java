@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ui.TameworkNameInputPage;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -26,11 +27,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Handles naming item interactions and chat-based naming flow.
+ * Handles naming item interactions and name submission flow (UI first, chat fallback).
  */
 public final class NamingFeatureHandler {
     private static final long REQUEST_TIMEOUT_MS = 30000L;
     private static final String CANCEL_TOKEN = "cancel";
+    private static final int DEFAULT_UI_NAME_MAX_LENGTH = 32;
 
     private final NameItemRegistry registry;
     private final NamingEffectService effectService;
@@ -115,20 +117,29 @@ public final class NamingFeatureHandler {
         if (playerUuid == null) {
             return false;
         }
-        PendingNameRequest request = new PendingNameRequest(
+        PendingNameRequest uiRequest = new PendingNameRequest(
                 playerUuid,
                 targetRef,
                 itemId,
                 configIdOverride,
                 overrides,
-                System.currentTimeMillis()
+                System.currentTimeMillis(),
+                InputMode.Ui,
+                UUID.randomUUID()
         );
-        pendingByPlayer.put(playerUuid, request);
-        sendMessage(player, "Type a name in chat to name this NPC. Type 'cancel' to cancel.");
+        pendingByPlayer.put(playerUuid, uiRequest);
+        if (openNamingInputPage(player, store, npc, rules, uiRequest)) {
+            return true;
+        }
+
+        pendingByPlayer.remove(playerUuid, uiRequest);
+        PendingNameRequest chatFallbackRequest = uiRequest.withInputMode(InputMode.ChatFallback);
+        pendingByPlayer.put(playerUuid, chatFallbackRequest);
+        sendMessage(player, "Name UI unavailable. Type a name in chat to name this NPC. Type 'cancel' to cancel.");
         return true;
     }
 
-    // Handles async chat events to capture naming input.
+    // Handles async chat events for the fallback chat naming path.
     public void onPlayerChat(PlayerChatEvent event) {
         if (event == null) {
             return;
@@ -141,39 +152,43 @@ public final class NamingFeatureHandler {
         if (playerUuid == null) {
             return;
         }
-        PendingNameRequest request = pendingByPlayer.remove(playerUuid);
-        if (request == null) {
+        PendingNameRequest request = pendingByPlayer.get(playerUuid);
+        if (request == null || request.inputMode != InputMode.ChatFallback) {
+            return;
+        }
+        if (!pendingByPlayer.remove(playerUuid, request)) {
             return;
         }
         event.setCancelled(true);
 
         String content = event.getContent();
         if (content == null) {
-            pendingByPlayer.remove(playerUuid);
             return;
         }
         if (isCancelMessage(content)) {
-            pendingByPlayer.remove(playerUuid);
             sender.sendMessage(Message.raw("Naming cancelled."));
             return;
         }
 
         Ref<EntityStore> playerRef = sender.getReference();
         if (playerRef == null || !playerRef.isValid()) {
-            pendingByPlayer.remove(playerUuid);
             return;
         }
         Store<EntityStore> store = playerRef.getStore();
-        if (store == null) {
-            pendingByPlayer.remove(playerUuid);
+        if (store == null || store.getExternalData() == null) {
             return;
         }
         World world = store.getExternalData().getWorld();
         if (world == null) {
-            pendingByPlayer.remove(playerUuid);
             return;
         }
-        world.execute(() -> applyNameFromChat(sender, playerRef, request, content));
+        world.execute(() -> {
+            Player player = store.getComponent(playerRef, Player.getComponentType());
+            if (player == null) {
+                return;
+            }
+            applyNameFromInput(player, request, content);
+        });
     }
 
     public void onPlayerDisconnect(PlayerDisconnectEvent event) {
@@ -186,57 +201,117 @@ public final class NamingFeatureHandler {
         }
     }
 
-    private void applyNameFromChat(PlayerRef playerRef,
-                                   Ref<EntityStore> playerEntityRef,
-                                   PendingNameRequest request,
-                                   String rawName) {
-        if (playerRef == null || playerEntityRef == null || request == null) {
+    private boolean openNamingInputPage(Player player,
+                                        Store<EntityStore> store,
+                                        NPCEntity npc,
+                                        NamingRules rules,
+                                        PendingNameRequest request) {
+        if (player == null || store == null || npc == null || rules == null || request == null) {
+            return false;
+        }
+        if (player.getPageManager() == null) {
+            return false;
+        }
+        Ref<EntityStore> playerRef = player.getReference();
+        if (playerRef == null || !playerRef.isValid()) {
+            return false;
+        }
+        PlayerRef uiPlayerRef = player.getPlayerRef();
+        if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
+            return false;
+        }
+        String npcName = npcInfoService.resolveDisplayName(npc);
+        if (npcName == null || npcName.isBlank()) {
+            npcName = "Companion";
+        }
+        String title = "Name " + npcName;
+        String subtitle = "Enter a name and click Apply.";
+        String existingName = npcInfoService.resolveAssignedName(request.npcRef, store, npc);
+        int maxLength = rules.getMaxLength() > 0 ? rules.getMaxLength() : DEFAULT_UI_NAME_MAX_LENGTH;
+        TameworkNameInputPage page = new TameworkNameInputPage(
+                uiPlayerRef,
+                title,
+                subtitle,
+                "Enter companion name",
+                existingName,
+                maxLength,
+                () -> handleUiNameCancelled(player, request.playerUuid, request.requestId),
+                input -> handleUiNameSubmitted(player, request.playerUuid, request.requestId, input)
+        );
+        player.getPageManager().openCustomPage(playerRef, store, page);
+        return true;
+    }
+
+    private void handleUiNameCancelled(Player player, UUID playerUuid, UUID requestId) {
+        if (player == null || playerUuid == null || requestId == null) {
             return;
         }
-        UUID playerUuid = playerRef.getUuid();
+        PendingNameRequest request = pendingByPlayer.get(playerUuid);
+        if (request == null || request.inputMode != InputMode.Ui || !requestId.equals(request.requestId)) {
+            return;
+        }
+        if (!pendingByPlayer.remove(playerUuid, request)) {
+            return;
+        }
+        sendMessage(player, "Naming cancelled.");
+    }
+
+    private void handleUiNameSubmitted(Player player,
+                                       UUID playerUuid,
+                                       UUID requestId,
+                                       String rawName) {
+        if (player == null || playerUuid == null || requestId == null) {
+            return;
+        }
+        PendingNameRequest request = pendingByPlayer.get(playerUuid);
+        if (request == null || request.inputMode != InputMode.Ui || !requestId.equals(request.requestId)) {
+            return;
+        }
+        if (!pendingByPlayer.remove(playerUuid, request)) {
+            return;
+        }
+        applyNameFromInput(player, request, rawName);
+    }
+
+    private void applyNameFromInput(Player player,
+                                    PendingNameRequest request,
+                                    String rawName) {
+        if (player == null || request == null) {
+            return;
+        }
+        UUID playerUuid = player.getUuid();
         if (playerUuid == null || !playerUuid.equals(request.playerUuid)) {
             return;
         }
         if (isRequestExpired(request)) {
-            pendingByPlayer.remove(playerUuid);
-            playerRef.sendMessage(Message.raw("Naming request expired. Use the item again."));
+            sendMessage(player, "Naming request expired. Use the item again.");
+            return;
+        }
+        Ref<EntityStore> playerEntityRef = player.getReference();
+        if (playerEntityRef == null || !playerEntityRef.isValid()) {
             return;
         }
         Store<EntityStore> store = playerEntityRef.getStore();
         if (store == null) {
-            pendingByPlayer.remove(playerUuid);
-            return;
-        }
-        if (!playerEntityRef.isValid()) {
-            pendingByPlayer.remove(playerUuid);
-            return;
-        }
-        Player player = store.getComponent(playerEntityRef, Player.getComponentType());
-        if (player == null) {
-            pendingByPlayer.remove(playerUuid);
             return;
         }
         if (request.npcRef == null || !request.npcRef.isValid()) {
-            pendingByPlayer.remove(playerUuid);
             sendMessage(player, "That NPC is no longer available.");
             return;
         }
         NPCEntity npc = store.getComponent(request.npcRef, NPCEntity.getComponentType());
         if (npc == null) {
-            pendingByPlayer.remove(playerUuid);
             sendMessage(player, "That NPC is no longer available.");
             return;
         }
 
         ItemStack activeItem = getActiveItem(player);
         if (activeItem == null || activeItem.isEmpty()) {
-            pendingByPlayer.remove(playerUuid);
             sendMessage(player, "Hold the naming item to finish naming.");
             return;
         }
         String activeItemId = activeItem.getItemId();
         if (activeItemId == null || !activeItemId.equals(request.itemId)) {
-            pendingByPlayer.remove(playerUuid);
             sendMessage(player, "Hold the naming item to finish naming.");
             return;
         }
@@ -251,13 +326,11 @@ public final class NamingFeatureHandler {
 
         String roleId = npcInfoService.resolveRoleId(npc);
         if (!isRoleAllowed(roleId, config)) {
-            pendingByPlayer.remove(playerUuid);
             sendMessage(player, "That NPC cannot be named with this item.");
             return;
         }
 
         if (rules.isRequireTamed() && !npcInfoService.isTamed(request.npcRef, store)) {
-            pendingByPlayer.remove(playerUuid);
             String npcName = npcInfoService.resolveDisplayName(npc);
             sendMessage(player, "You must tame that " + npcName + " before naming it.");
             return;
@@ -266,12 +339,10 @@ public final class NamingFeatureHandler {
         UUID ownerUuid = npcInfoService.resolveOwnerUuid(request.npcRef, store);
         if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
             if (ownerUuid == null) {
-                pendingByPlayer.remove(playerUuid);
                 sendMessage(player, "That NPC does not have an owner.");
                 return;
             }
             if (rules.isRequireOwner()) {
-                pendingByPlayer.remove(playerUuid);
                 String npcName = npcInfoService.resolveDisplayName(npc);
                 String ownerName = npcInfoService.resolveOwnerName(request.npcRef, store);
                 OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "name");
@@ -288,7 +359,6 @@ public final class NamingFeatureHandler {
                 hasAnyName
         );
         if (!validation.isOk()) {
-            pendingByPlayer.remove(playerUuid);
             String message = validation.getErrorMessage();
             sendMessage(player, message != null ? message : "That name is not allowed.");
             return;
@@ -296,7 +366,6 @@ public final class NamingFeatureHandler {
 
         String finalName = validation.getNormalizedName();
         if (finalName == null || finalName.isBlank()) {
-            pendingByPlayer.remove(playerUuid);
             sendMessage(player, "That name is not allowed.");
             return;
         }
@@ -324,7 +393,6 @@ public final class NamingFeatureHandler {
                 rules.getSoundEvent()
         );
         sendMessage(player, "NPC named " + finalName + ".");
-        pendingByPlayer.remove(playerUuid);
     }
 
     private boolean isRequestExpired(PendingNameRequest request) {
@@ -525,6 +593,11 @@ public final class NamingFeatureHandler {
         player.sendMessage(Message.raw(message));
     }
 
+    private enum InputMode {
+        Ui,
+        ChatFallback
+    }
+
     private static final class PendingNameRequest {
         private final UUID playerUuid;
         private final Ref<EntityStore> npcRef;
@@ -532,19 +605,38 @@ public final class NamingFeatureHandler {
         private final String configIdOverride;
         private final NamingOverrides overrides;
         private final long createdMs;
+        private final InputMode inputMode;
+        private final UUID requestId;
 
         private PendingNameRequest(UUID playerUuid,
                                    Ref<EntityStore> npcRef,
                                    String itemId,
                                    String configIdOverride,
                                    NamingOverrides overrides,
-                                   long createdMs) {
+                                   long createdMs,
+                                   InputMode inputMode,
+                                   UUID requestId) {
             this.playerUuid = playerUuid;
             this.npcRef = npcRef;
             this.itemId = itemId;
             this.configIdOverride = configIdOverride;
             this.overrides = overrides;
             this.createdMs = createdMs;
+            this.inputMode = inputMode;
+            this.requestId = requestId;
+        }
+
+        private PendingNameRequest withInputMode(InputMode mode) {
+            return new PendingNameRequest(
+                    playerUuid,
+                    npcRef,
+                    itemId,
+                    configIdOverride,
+                    overrides,
+                    createdMs,
+                    mode,
+                    requestId
+            );
         }
     }
 }

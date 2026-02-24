@@ -2,7 +2,7 @@
 
 ## Overview
 Naming items use `TwNameItemConfig` assets to control who can name an NPC and what names are allowed.
-Items trigger naming via the `TameworkNameNpc` item interaction, which opens a chat-based prompt.
+Items trigger naming via the `TameworkNameNpc` item interaction, which opens a text input UI.
 
 ## Runtime Architecture (Contributor View)
 Naming runtime is split into:
@@ -65,10 +65,11 @@ Allowed character presets:
 
 Custom regex is supported via `AllowedChars: "Regex:<pattern>"`.
 
-## Chat flow
-When the interaction succeeds, the player is prompted to type a name in chat.
-- Type the desired name in chat to apply it.
-- Type `cancel` to cancel the request.
+## Name input flow
+When the interaction succeeds, the player gets a naming UI with a text field and `Apply` / `Cancel` buttons.
+- Enter the desired name and click `Apply` to submit.
+- Click `Cancel` to cancel the request.
+- If the page cannot be opened, naming automatically falls back to chat input (`cancel` still cancels).
 
 The server re‑validates ownership/tamed state on submission.
 

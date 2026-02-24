@@ -30,7 +30,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 
 ## Item interactions
 - `TameworkSpawn`: Custom item interaction used by spawner items to capture or spawn NPCs.
-- `TameworkNameNpc`: Custom item interaction used by naming items to name tamed NPCs via chat input.
+- `TameworkNameNpc`: Custom item interaction used by naming items to name tamed NPCs via an input UI (with chat fallback if UI open fails).
 - `TameworkCommand`: Custom item interaction used by command tools for linking, command selection, and command dispatch.
 
 ## Commands

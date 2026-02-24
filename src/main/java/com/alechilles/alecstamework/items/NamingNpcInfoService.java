@@ -77,6 +77,31 @@ public final class NamingNpcInfoService {
         return legacy != null && !legacy.isBlank();
     }
 
+    public String resolveAssignedName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkNpcNameComponent> type = TameworkNpcNameComponent.getComponentType();
+        if (type != null) {
+            TameworkNpcNameComponent component = store.getComponent(npcRef, type);
+            if (component != null && component.getName() != null && !component.getName().isBlank()) {
+                return component.getName();
+            }
+        }
+        DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
+        if (displayName != null && displayName.getDisplayName() != null) {
+            String ansi = displayName.getDisplayName().getAnsiMessage();
+            if (ansi != null && !ansi.isBlank()) {
+                return ansi;
+            }
+        }
+        String legacy = npc != null ? npc.getLegacyDisplayName() : null;
+        if (legacy != null && !legacy.isBlank()) {
+            return legacy;
+        }
+        return null;
+    }
+
     public String resolveDisplayName(NPCEntity npc) {
         if (npc == null) {
             return "pet";

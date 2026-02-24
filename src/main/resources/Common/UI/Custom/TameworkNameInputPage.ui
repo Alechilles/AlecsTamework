@@ -1,0 +1,60 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer #TameworkNameInputRoot {
+    Anchor: (Width: 470, Height: 220);
+
+    #Title {
+      $C.@Title #TameworkNameInputTitle {
+        @Text = "Name Companion";
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+
+      Label #TameworkNameInputSubtitle {
+        Anchor: (Height: 26, Bottom: 16);
+        Text: "Enter a name and click Apply.";
+        Style: (
+          FontSize: 16,
+          TextColor: #bfd0e5,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+
+      TextField #TameworkNameInputField {
+        Style: $C.@DefaultInputFieldStyle;
+        PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+        Background: $C.@InputBoxBackground;
+        Anchor: (Height: 44, Bottom: 20);
+        Padding: (Horizontal: 10);
+        PlaceholderText: "Enter companion name";
+        MaxLength: 32;
+      }
+
+      Group {
+        LayoutMode: Right;
+
+        $C.@SmallSecondaryTextButton #TameworkNameCancelButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = "Cancel";
+          @Anchor = (MinWidth: 128);
+        }
+
+        Group #TameworkNameButtonSpacer {
+          Anchor: (Width: 12);
+        }
+
+        $C.@SmallSecondaryTextButton #TameworkNameApplyButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = "Apply";
+          @Anchor = (Right: 10, MinWidth: 140);
+        }
+      }
+    }
+  }
+}
