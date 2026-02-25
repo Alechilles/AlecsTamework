@@ -33,6 +33,6 @@
     "InheritOwner": true,
     "InheritTamed": true,
     "InheritAttachments": false,
-    "InheritTraits": false
+    "InheritTraits": true
   }
 }
