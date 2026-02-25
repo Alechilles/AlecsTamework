@@ -113,7 +113,7 @@
       "Default": 1.0
     },
     {
-      "Id": "Trait_Foraging_Luck",
+      "Id": "Trait_Bounty",
       "DisplayName": "Bounty",
       "EffectKey": "HarvestDoubleDropChanceMultiplier",
       "Weight": 0.65,
