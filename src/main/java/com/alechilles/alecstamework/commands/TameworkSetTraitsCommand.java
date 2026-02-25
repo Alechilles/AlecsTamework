@@ -2,7 +2,9 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -101,8 +103,26 @@ public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
         String configId = TameworkTraitCommandSupport.resolveConfigId(config, existing);
 
         TameworkTraitsComponent updated = new TameworkTraitsComponent(configId, seed, nextValues);
+        double previousSizeMultiplier = TraitModifierService.resolveMultiplier(
+                existing,
+                config,
+                "SizeMultiplier",
+                1.0
+        );
+        double nextSizeMultiplier = TraitModifierService.resolveMultiplier(
+                updated,
+                config,
+                "SizeMultiplier",
+                1.0
+        );
         store.putComponent(candidate.ref, traitsType, updated);
         CompanionStatModifierService.applyTraitModifiers(candidate.ref, store);
+        CompanionLifeStageService.applySizeMultiplierDelta(
+                candidate.ref,
+                store,
+                previousSizeMultiplier,
+                nextSizeMultiplier
+        );
 
         commandContext.sender().sendMessage(Message.raw(buildResultMessage(
                 candidate.npcUuid.toString(),
@@ -140,4 +160,3 @@ public final class TameworkSetTraitsCommand extends AbstractPlayerCommand {
         return message.toString();
     }
 }
-

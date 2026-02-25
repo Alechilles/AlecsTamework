@@ -2,7 +2,9 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -94,8 +96,26 @@ public final class TameworkAddTraitCommand extends AbstractPlayerCommand {
         long seed = TameworkTraitCommandSupport.resolveRollSeed(candidate.ref, store, existing);
         String configId = TameworkTraitCommandSupport.resolveConfigId(config, existing);
         TameworkTraitsComponent updated = new TameworkTraitsComponent(configId, seed, combined);
+        double previousSizeMultiplier = TraitModifierService.resolveMultiplier(
+                existing,
+                config,
+                "SizeMultiplier",
+                1.0
+        );
+        double nextSizeMultiplier = TraitModifierService.resolveMultiplier(
+                updated,
+                config,
+                "SizeMultiplier",
+                1.0
+        );
         store.putComponent(candidate.ref, traitsType, updated);
         CompanionStatModifierService.applyTraitModifiers(candidate.ref, store);
+        CompanionLifeStageService.applySizeMultiplierDelta(
+                candidate.ref,
+                store,
+                previousSizeMultiplier,
+                nextSizeMultiplier
+        );
 
         StringBuilder message = new StringBuilder();
         message.append("Added trait for NPC ")
@@ -115,4 +135,3 @@ public final class TameworkAddTraitCommand extends AbstractPlayerCommand {
         commandContext.sender().sendMessage(Message.raw(message.toString()));
     }
 }
-

@@ -163,6 +163,51 @@ public final class CompanionLifeStageService {
         return isAdultRoleFallback(roleIdFallback) ? STAGE_ADULT : STAGE_BABY;
     }
 
+    /**
+     * Applies a relative size-multiplier change to active model scale and tracked life-stage scale targets.
+     *
+     * <p>This is intended for explicit trait mutation flows (for example, debug commands) where the previous and
+     * next SizeMultiplier values are both known.
+     */
+    public static void applySizeMultiplierDelta(@Nullable Ref<EntityStore> npcRef,
+                                                @Nullable Store<EntityStore> store,
+                                                double previousMultiplier,
+                                                double nextMultiplier) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        double safePrevious = sanitizeMultiplier(previousMultiplier);
+        double safeNext = sanitizeMultiplier(nextMultiplier);
+        if (Math.abs(safePrevious - safeNext) <= 0.000001) {
+            return;
+        }
+        double ratio = safeNext / safePrevious;
+        if (!Double.isFinite(ratio) || ratio <= 0.0) {
+            return;
+        }
+
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageType = TameworkLifeStageComponent.getComponentType();
+        TameworkLifeStageComponent stage = lifeStageType != null ? store.getComponent(npcRef, lifeStageType) : null;
+        if (stage != null) {
+            stage.setAdultScale(clampScale(stage.getAdultScale() * ratio));
+            stage.setBabyScale(clampScale(stage.getBabyScale() * ratio));
+            stage.setAdolescentScale(clampScale(stage.getAdolescentScale() * ratio));
+            long now = System.currentTimeMillis();
+            String resolvedStage = resolveStageId(stage, now);
+            if (!resolvedStage.equals(stage.getStage())) {
+                stage.setStage(resolvedStage);
+            }
+            double targetScale = resolveScale(stage, now);
+            CompanionModelScaleService.applyScale(npcRef, npc, store, targetScale);
+            store.putComponent(npcRef, lifeStageType, stage);
+            return;
+        }
+
+        double current = CompanionModelScaleService.resolveCurrentScale(npcRef, store, 1.0);
+        CompanionModelScaleService.applyScale(npcRef, npc, store, current * ratio);
+    }
+
     static String resolveStageId(@Nullable TameworkLifeStageComponent component, long nowMs) {
         if (component == null) {
             return STAGE_ADULT;
@@ -339,6 +384,13 @@ public final class CompanionLifeStageService {
             return 1.0;
         }
         return Math.max(MIN_SCALE, value);
+    }
+
+    private static double sanitizeMultiplier(double value) {
+        if (!Double.isFinite(value) || value <= 0.0) {
+            return 1.0;
+        }
+        return value;
     }
 
     private static double lerp(double start, double end, double progress) {
