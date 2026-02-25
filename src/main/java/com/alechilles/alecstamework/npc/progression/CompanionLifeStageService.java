@@ -28,7 +28,8 @@ public final class CompanionLifeStageService {
     private static final long DEFAULT_GROWTH_DURATION_MS = TimeUnit.MINUTES.toMillis(7);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
     private static final long INITIAL_SCALE_RETRY_INTERVAL_MS = 100L;
-    private static final int INITIAL_SCALE_MAX_RETRIES = 20;
+    private static final int INITIAL_SCALE_MAX_RETRIES = 40;
+    private static final int ROLE_CHANGE_SCALE_MAX_RETRIES = 40;
     private static final double DEFAULT_BABY_SCALE_FACTOR = 0.33;
     private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
@@ -111,10 +112,8 @@ public final class CompanionLifeStageService {
         );
         store.putComponent(childRef, type, component);
         double initialScale = lifecycle.babyStartScale();
-        boolean applied = CompanionModelScaleService.applyScale(childRef, childNpc, store, initialScale);
-        if (!applied && !isScaleClose(childRef, store, initialScale)) {
-            scheduleInitialScaleRetry(childRef, childNpc, store, INITIAL_SCALE_MAX_RETRIES);
-        }
+        CompanionModelScaleService.applyScale(childRef, childNpc, store, initialScale);
+        scheduleInitialScaleRetry(childRef, childNpc, store, INITIAL_SCALE_MAX_RETRIES);
         scheduleGrowthTick(childRef, childNpc, store);
     }
 
@@ -399,6 +398,7 @@ public final class CompanionLifeStageService {
             return false;
         }
         RoleChangeSystem.requestRoleChange(npcRef, role, targetRoleIndex, true, store);
+        scheduleInitialScaleRetry(npcRef, npc, store, ROLE_CHANGE_SCALE_MAX_RETRIES);
         return true;
     }
 
@@ -556,7 +556,7 @@ public final class CompanionLifeStageService {
             return;
         }
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
-        if (stage == null || !stage.isGrowthScalingEnabled()) {
+        if (stage == null) {
             return;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
