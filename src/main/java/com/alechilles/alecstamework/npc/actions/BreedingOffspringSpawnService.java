@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -39,20 +40,21 @@ final class BreedingOffspringSpawnService {
 
     @Nullable
     ResolvedSpawnRole resolveSpawnRole(@Nullable String baseRoleId,
+                                       @Nullable TwBreedingConfig breedingConfig,
                                        int parentARoleIndex,
                                        int parentBRoleIndex,
                                        @Nullable NPCPlugin npcPlugin) {
-        ResolvedSpawnRole fromBaseRole = resolveSpawnRoleFromBaseRoleId(baseRoleId, npcPlugin);
+        ResolvedSpawnRole fromBaseRole = resolveSpawnRoleFromBaseRoleId(baseRoleId, breedingConfig, npcPlugin);
         if (fromBaseRole != null) {
             return fromBaseRole;
         }
         String parentARoleId = resolveRoleIdFromIndex(parentARoleIndex, npcPlugin);
-        ResolvedSpawnRole fromParentAIndex = resolveSpawnRoleFromBaseRoleId(parentARoleId, npcPlugin);
+        ResolvedSpawnRole fromParentAIndex = resolveSpawnRoleFromBaseRoleId(parentARoleId, breedingConfig, npcPlugin);
         if (fromParentAIndex != null) {
             return fromParentAIndex;
         }
         String parentBRoleId = resolveRoleIdFromIndex(parentBRoleIndex, npcPlugin);
-        return resolveSpawnRoleFromBaseRoleId(parentBRoleId, npcPlugin);
+        return resolveSpawnRoleFromBaseRoleId(parentBRoleId, breedingConfig, npcPlugin);
     }
 
     @Nullable
@@ -87,12 +89,14 @@ final class BreedingOffspringSpawnService {
     }
 
     @Nullable
-    private ResolvedSpawnRole resolveSpawnRoleFromBaseRoleId(@Nullable String baseRoleId, @Nullable NPCPlugin npcPlugin) {
+    private ResolvedSpawnRole resolveSpawnRoleFromBaseRoleId(@Nullable String baseRoleId,
+                                                             @Nullable TwBreedingConfig breedingConfig,
+                                                             @Nullable NPCPlugin npcPlugin) {
         if (baseRoleId == null || baseRoleId.isBlank() || npcPlugin == null) {
             return null;
         }
         BreedingOffspringRoleResolver.OffspringRoleSelection selection =
-                roleResolver.selectOffspringRole(baseRoleId, npcPlugin);
+                roleResolver.selectOffspringRole(baseRoleId, breedingConfig, npcPlugin);
         if (selection == null || selection.roleId() == null || selection.roleId().isBlank()) {
             return null;
         }
@@ -100,7 +104,7 @@ final class BreedingOffspringSpawnService {
         if (roleIndex < 0) {
             return null;
         }
-        return new ResolvedSpawnRole(selection.roleId(), roleIndex, selection.hasBabyVariant());
+        return new ResolvedSpawnRole(selection.roleId(), roleIndex, selection.lifecycleFamily());
     }
 
     @Nullable
@@ -138,6 +142,8 @@ final class BreedingOffspringSpawnService {
         return roleId;
     }
 
-    record ResolvedSpawnRole(String roleId, int roleIndex, boolean hasBabyVariant) {
+    record ResolvedSpawnRole(String roleId,
+                             int roleIndex,
+                             @Nullable TwBreedingConfig.RoleFamily lifecycleFamily) {
     }
 }

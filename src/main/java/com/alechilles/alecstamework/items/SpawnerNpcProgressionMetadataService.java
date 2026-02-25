@@ -60,8 +60,12 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BORN_AT_MS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_AT_MS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_FULLY_GROWN_AT_MS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SWITCH_SCALE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_START_SCALE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
         return updated;
@@ -333,8 +337,12 @@ final class SpawnerNpcProgressionMetadataService {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BORN_AT_MS);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_AT_MS);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_FULLY_GROWN_AT_MS);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SWITCH_SCALE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_START_SCALE);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
             return updated;
@@ -352,11 +360,31 @@ final class SpawnerNpcProgressionMetadataService {
                 component.getAdolescentAtMs()
         );
         updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS, Codec.LONG, component.getAdultAtMs());
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_FULLY_GROWN_AT_MS,
+                Codec.LONG,
+                component.getFullyGrownAtMs()
+        );
         updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE, Codec.DOUBLE, component.getBabyScale());
         updated = updated.withMetadata(
                 TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE,
                 Codec.DOUBLE,
                 component.getAdolescentScale()
+        );
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SWITCH_SCALE,
+                Codec.DOUBLE,
+                component.getAdolescentSwitchScale()
+        );
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_ADULT_START_SCALE,
+                Codec.DOUBLE,
+                component.getAdultStartScale()
+        );
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE,
+                Codec.DOUBLE,
+                component.getAdultSwitchScale()
         );
         updated = updated.withMetadata(
                 TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE,
@@ -382,8 +410,18 @@ final class SpawnerNpcProgressionMetadataService {
         Long bornAtMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_BORN_AT_MS, Codec.LONG);
         Long adolescentAtMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_AT_MS, Codec.LONG);
         Long adultAtMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADULT_AT_MS, Codec.LONG);
+        Long fullyGrownAtMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_FULLY_GROWN_AT_MS, Codec.LONG);
         Double babyScale = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_BABY_SCALE, Codec.DOUBLE);
         Double adolescentScale = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SCALE, Codec.DOUBLE);
+        Double adolescentSwitchScale = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.LIFE_STAGE_ADOLESCENT_SWITCH_SCALE,
+                Codec.DOUBLE
+        );
+        Double adultStartScale = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADULT_START_SCALE, Codec.DOUBLE);
+        Double adultSwitchScale = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE,
+                Codec.DOUBLE
+        );
         Double adultScale = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE, Codec.DOUBLE);
         Boolean growthScaling = stack.getFromMetadataOrNull(
                 TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED,
@@ -393,8 +431,12 @@ final class SpawnerNpcProgressionMetadataService {
                 || bornAtMs != null
                 || adolescentAtMs != null
                 || adultAtMs != null
+                || fullyGrownAtMs != null
                 || babyScale != null
                 || adolescentScale != null
+                || adolescentSwitchScale != null
+                || adultStartScale != null
+                || adultSwitchScale != null
                 || adultScale != null
                 || growthScaling != null;
         if (!hasData) {
@@ -414,12 +456,24 @@ final class SpawnerNpcProgressionMetadataService {
                 adultAtMs != null
                         ? adultAtMs
                         : existing != null ? existing.getAdultAtMs() : 0L,
+                fullyGrownAtMs != null
+                        ? fullyGrownAtMs
+                        : existing != null ? existing.getFullyGrownAtMs() : 0L,
                 babyScale != null
                         ? babyScale
                         : existing != null ? existing.getBabyScale() : 0.55,
                 adolescentScale != null
                         ? adolescentScale
                         : existing != null ? existing.getAdolescentScale() : 0.80,
+                adolescentSwitchScale != null
+                        ? adolescentSwitchScale
+                        : existing != null ? existing.getAdolescentSwitchScale() : 0.80,
+                adultStartScale != null
+                        ? adultStartScale
+                        : existing != null ? existing.getAdultStartScale() : 0.80,
+                adultSwitchScale != null
+                        ? adultSwitchScale
+                        : existing != null ? existing.getAdultSwitchScale() : 1.00,
                 adultScale != null
                         ? adultScale
                         : existing != null ? existing.getAdultScale() : 1.00,

@@ -453,8 +453,10 @@ final class BreedingOffspringService {
             return;
         }
         String baseRoleId = resolveBaseRoleId(context, parentARef, parentBRef, store);
+        TwBreedingConfig childBreedingConfig = resolveBreedingConfig(context.breedingConfigId());
         BreedingOffspringSpawnService.ResolvedSpawnRole spawnRole = spawnService.resolveSpawnRole(
                 baseRoleId,
+                childBreedingConfig,
                 context.parentARoleIndex(),
                 context.parentBRoleIndex(),
                 npcPlugin
@@ -508,7 +510,6 @@ final class BreedingOffspringService {
             }
             Ref<EntityStore> childRef = spawned.first();
             NPCEntity childNpc = spawned.second();
-            TwBreedingConfig childBreedingConfig = resolveBreedingConfig(context.breedingConfigId());
             long childCooldownMs = resolveCooldownMs(childBreedingConfig, childRef, store);
             progressionService.applyOffspringState(
                     childRef,
@@ -522,7 +523,7 @@ final class BreedingOffspringService {
                     context.parentBTamed(),
                     context.breedingConfigId(),
                     childCooldownMs,
-                    spawnRole.hasBabyVariant(),
+                    spawnRole.lifecycleFamily(),
                     store
             );
             spawnHeartsParticle(childRef, store);

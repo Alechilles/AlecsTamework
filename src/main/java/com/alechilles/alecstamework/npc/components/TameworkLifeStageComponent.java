@@ -41,6 +41,12 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
         )
         .add()
         .append(
+            new KeyedCodec<>("FullyGrownAtMs", Codec.LONG),
+            TameworkLifeStageComponent::setFullyGrownAtMs,
+            TameworkLifeStageComponent::getFullyGrownAtMs
+        )
+        .add()
+        .append(
             new KeyedCodec<>("BabyScale", Codec.DOUBLE),
             TameworkLifeStageComponent::setBabyScale,
             TameworkLifeStageComponent::getBabyScale
@@ -50,6 +56,24 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
             new KeyedCodec<>("AdolescentScale", Codec.DOUBLE),
             TameworkLifeStageComponent::setAdolescentScale,
             TameworkLifeStageComponent::getAdolescentScale
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("AdolescentSwitchScale", Codec.DOUBLE),
+            TameworkLifeStageComponent::setAdolescentSwitchScale,
+            TameworkLifeStageComponent::getAdolescentSwitchScale
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("AdultStartScale", Codec.DOUBLE),
+            TameworkLifeStageComponent::setAdultStartScale,
+            TameworkLifeStageComponent::getAdultStartScale
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("AdultSwitchScale", Codec.DOUBLE),
+            TameworkLifeStageComponent::setAdultSwitchScale,
+            TameworkLifeStageComponent::getAdultSwitchScale
         )
         .add()
         .append(
@@ -70,8 +94,12 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
     private long bornAtMs;
     private long adolescentAtMs;
     private long adultAtMs;
+    private long fullyGrownAtMs;
     private double babyScale = 0.55;
     private double adolescentScale = 0.80;
+    private double adolescentSwitchScale = 0.80;
+    private double adultStartScale = 0.80;
+    private double adultSwitchScale = 1.00;
     private double adultScale = 1.00;
     private boolean growthScalingEnabled;
 
@@ -82,16 +110,24 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
                                       long bornAtMs,
                                       long adolescentAtMs,
                                       long adultAtMs,
+                                      long fullyGrownAtMs,
                                       double babyScale,
                                       double adolescentScale,
+                                      double adolescentSwitchScale,
+                                      double adultStartScale,
+                                      double adultSwitchScale,
                                       double adultScale,
                                       boolean growthScalingEnabled) {
         this.stage = stage;
         this.bornAtMs = bornAtMs;
         this.adolescentAtMs = adolescentAtMs;
         this.adultAtMs = adultAtMs;
+        this.fullyGrownAtMs = fullyGrownAtMs;
         this.babyScale = babyScale;
         this.adolescentScale = adolescentScale;
+        this.adolescentSwitchScale = adolescentSwitchScale;
+        this.adultStartScale = adultStartScale;
+        this.adultSwitchScale = adultSwitchScale;
         this.adultScale = adultScale;
         this.growthScalingEnabled = growthScalingEnabled;
     }
@@ -133,6 +169,14 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
         this.adultAtMs = adultAtMs;
     }
 
+    public long getFullyGrownAtMs() {
+        return fullyGrownAtMs;
+    }
+
+    public void setFullyGrownAtMs(long fullyGrownAtMs) {
+        this.fullyGrownAtMs = fullyGrownAtMs;
+    }
+
     public double getBabyScale() {
         return babyScale;
     }
@@ -147,6 +191,30 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
 
     public void setAdolescentScale(double adolescentScale) {
         this.adolescentScale = adolescentScale;
+    }
+
+    public double getAdolescentSwitchScale() {
+        return adolescentSwitchScale;
+    }
+
+    public void setAdolescentSwitchScale(double adolescentSwitchScale) {
+        this.adolescentSwitchScale = adolescentSwitchScale;
+    }
+
+    public double getAdultStartScale() {
+        return adultStartScale;
+    }
+
+    public void setAdultStartScale(double adultStartScale) {
+        this.adultStartScale = adultStartScale;
+    }
+
+    public double getAdultSwitchScale() {
+        return adultSwitchScale;
+    }
+
+    public void setAdultSwitchScale(double adultSwitchScale) {
+        this.adultSwitchScale = adultSwitchScale;
     }
 
     public double getAdultScale() {
@@ -172,8 +240,12 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
                 bornAtMs,
                 adolescentAtMs,
                 adultAtMs,
+                fullyGrownAtMs,
                 babyScale,
                 adolescentScale,
+                adolescentSwitchScale,
+                adultStartScale,
+                adultSwitchScale,
                 adultScale,
                 growthScalingEnabled
         );

@@ -21,7 +21,7 @@
     "BreedRadius": 15.0,
     "RequireWanderMode": false,
     "RequireSameOwner": false,
-    "MaxNearbyOffspring": 8,
+    "MaxNearbySameType": 8,
     "RequireSameRoleId": true
   },
   "Cooldowns": {
@@ -37,5 +37,20 @@
     "InheritTamed": true,
     "InheritAttachments": false,
     "InheritTraits": true
+  },
+  "OffspringLifecycle": {
+    "Enabled": true,
+    "DefaultTimeToFullGrownSeconds": 420,
+    "DefaultBabyStartScale": 0.55,
+    "DefaultAdolescentStartScale": 0.8,
+    "DefaultAdultStartScale": 0.8,
+    "DefaultAdolescentSwitchScale": 1.0,
+    "DefaultAdultSwitchScale": 1.0,
+    "Families": [
+      {
+        "AdultRoleId": "Mob_Tamework_Example",
+        "TimeToFullGrownSeconds": 420
+      }
+    ]
   }
 }

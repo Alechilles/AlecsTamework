@@ -153,7 +153,7 @@ public final class PassiveBreedingSweepService {
         if (pairing == null) {
             return false;
         }
-        int maxNearbySameType = Math.max(0, pairing.getMaxNearbyOffspring());
+        int maxNearbySameType = Math.max(0, pairing.getMaxNearbySameType());
         if (maxNearbySameType <= 0) {
             return false;
         }

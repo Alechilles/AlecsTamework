@@ -141,8 +141,14 @@ public final class CommandLinkedNpcDeathService {
         long lifeStageBornAtMs = lifeStageComponent != null ? lifeStageComponent.getBornAtMs() : 0L;
         long lifeStageAdolescentAtMs = lifeStageComponent != null ? lifeStageComponent.getAdolescentAtMs() : 0L;
         long lifeStageAdultAtMs = lifeStageComponent != null ? lifeStageComponent.getAdultAtMs() : 0L;
+        long lifeStageFullyGrownAtMs = lifeStageComponent != null ? lifeStageComponent.getFullyGrownAtMs() : 0L;
         double lifeStageBabyScale = lifeStageComponent != null ? lifeStageComponent.getBabyScale() : 0.55;
         double lifeStageAdolescentScale = lifeStageComponent != null ? lifeStageComponent.getAdolescentScale() : 0.80;
+        double lifeStageAdolescentSwitchScale = lifeStageComponent != null
+                ? lifeStageComponent.getAdolescentSwitchScale()
+                : 0.80;
+        double lifeStageAdultStartScale = lifeStageComponent != null ? lifeStageComponent.getAdultStartScale() : 0.80;
+        double lifeStageAdultSwitchScale = lifeStageComponent != null ? lifeStageComponent.getAdultSwitchScale() : 1.00;
         double lifeStageAdultScale = lifeStageComponent != null ? lifeStageComponent.getAdultScale() : 1.00;
         boolean lifeStageGrowthScalingEnabled = lifeStageComponent != null
                 && lifeStageComponent.isGrowthScalingEnabled();
@@ -185,8 +191,12 @@ public final class CommandLinkedNpcDeathService {
                         lifeStageBornAtMs,
                         lifeStageAdolescentAtMs,
                         lifeStageAdultAtMs,
+                        lifeStageFullyGrownAtMs,
                         lifeStageBabyScale,
                         lifeStageAdolescentScale,
+                        lifeStageAdolescentSwitchScale,
+                        lifeStageAdultStartScale,
+                        lifeStageAdultSwitchScale,
                         lifeStageAdultScale,
                         lifeStageGrowthScalingEnabled
                 )
@@ -307,8 +317,12 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + snapshot.lifeStageBornAtMs()
                 + FIELD_SEPARATOR + snapshot.lifeStageAdolescentAtMs()
                 + FIELD_SEPARATOR + snapshot.lifeStageAdultAtMs()
+                + FIELD_SEPARATOR + snapshot.lifeStageFullyGrownAtMs()
                 + FIELD_SEPARATOR + snapshot.lifeStageBabyScale()
                 + FIELD_SEPARATOR + snapshot.lifeStageAdolescentScale()
+                + FIELD_SEPARATOR + snapshot.lifeStageAdolescentSwitchScale()
+                + FIELD_SEPARATOR + snapshot.lifeStageAdultStartScale()
+                + FIELD_SEPARATOR + snapshot.lifeStageAdultSwitchScale()
                 + FIELD_SEPARATOR + snapshot.lifeStageAdultScale()
                 + FIELD_SEPARATOR + snapshot.lifeStageGrowthScalingEnabled();
     }
@@ -351,10 +365,31 @@ public final class CommandLinkedNpcDeathService {
         long lifeStageBornAtMs = parts.length > 23 ? parseLong(parts[23], 0L) : 0L;
         long lifeStageAdolescentAtMs = parts.length > 24 ? parseLong(parts[24], 0L) : 0L;
         long lifeStageAdultAtMs = parts.length > 25 ? parseLong(parts[25], 0L) : 0L;
-        double lifeStageBabyScale = parts.length > 26 ? parseDouble(parts[26], 0.55) : 0.55;
-        double lifeStageAdolescentScale = parts.length > 27 ? parseDouble(parts[27], 0.80) : 0.80;
-        double lifeStageAdultScale = parts.length > 28 ? parseDouble(parts[28], 1.00) : 1.00;
-        boolean lifeStageGrowthScalingEnabled = parts.length > 29 && Boolean.parseBoolean(parts[29]);
+        boolean legacyLifeStageLayout = parts.length <= 30;
+        long lifeStageFullyGrownAtMs = legacyLifeStageLayout
+                ? lifeStageAdultAtMs
+                : parts.length > 26 ? parseLong(parts[26], 0L) : 0L;
+        double lifeStageBabyScale = legacyLifeStageLayout
+                ? (parts.length > 26 ? parseDouble(parts[26], 0.55) : 0.55)
+                : (parts.length > 27 ? parseDouble(parts[27], 0.55) : 0.55);
+        double lifeStageAdolescentScale = legacyLifeStageLayout
+                ? (parts.length > 27 ? parseDouble(parts[27], 0.80) : 0.80)
+                : (parts.length > 28 ? parseDouble(parts[28], 0.80) : 0.80);
+        double lifeStageAdolescentSwitchScale = legacyLifeStageLayout
+                ? lifeStageAdolescentScale
+                : (parts.length > 29 ? parseDouble(parts[29], 0.80) : 0.80);
+        double lifeStageAdultStartScale = legacyLifeStageLayout
+                ? lifeStageAdolescentScale
+                : (parts.length > 30 ? parseDouble(parts[30], 0.80) : 0.80);
+        double lifeStageAdultSwitchScale = legacyLifeStageLayout
+                ? (parts.length > 28 ? parseDouble(parts[28], 1.00) : 1.00)
+                : (parts.length > 31 ? parseDouble(parts[31], 1.00) : 1.00);
+        double lifeStageAdultScale = legacyLifeStageLayout
+                ? (parts.length > 28 ? parseDouble(parts[28], 1.00) : 1.00)
+                : (parts.length > 32 ? parseDouble(parts[32], 1.00) : 1.00);
+        boolean lifeStageGrowthScalingEnabled = legacyLifeStageLayout
+                ? (parts.length > 29 && Boolean.parseBoolean(parts[29]))
+                : (parts.length > 33 && Boolean.parseBoolean(parts[33]));
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -382,8 +417,12 @@ public final class CommandLinkedNpcDeathService {
                 lifeStageBornAtMs,
                 lifeStageAdolescentAtMs,
                 lifeStageAdultAtMs,
+                lifeStageFullyGrownAtMs,
                 lifeStageBabyScale,
                 lifeStageAdolescentScale,
+                lifeStageAdolescentSwitchScale,
+                lifeStageAdultStartScale,
+                lifeStageAdultSwitchScale,
                 lifeStageAdultScale,
                 lifeStageGrowthScalingEnabled
         );
@@ -655,8 +694,12 @@ public final class CommandLinkedNpcDeathService {
                                          long lifeStageBornAtMs,
                                          long lifeStageAdolescentAtMs,
                                          long lifeStageAdultAtMs,
+                                         long lifeStageFullyGrownAtMs,
                                          double lifeStageBabyScale,
                                          double lifeStageAdolescentScale,
+                                         double lifeStageAdolescentSwitchScale,
+                                         double lifeStageAdultStartScale,
+                                         double lifeStageAdultSwitchScale,
                                          double lifeStageAdultScale,
                                          boolean lifeStageGrowthScalingEnabled) {
         public boolean containsToolId(String toolId) {

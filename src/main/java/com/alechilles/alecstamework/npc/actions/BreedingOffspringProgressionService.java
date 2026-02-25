@@ -46,11 +46,12 @@ final class BreedingOffspringProgressionService {
                              boolean parentBTamed,
                              @Nullable String breedingConfigId,
                              long childCooldownMs,
-                             boolean hasBabyVariant,
+                             @Nullable TwBreedingConfig.RoleFamily lifecycleFamily,
                              Store<EntityStore> store) {
         if (childRef == null || !childRef.isValid() || store == null || childRoleId == null || childRoleId.isBlank()) {
             return;
         }
+        TwBreedingConfig breedingConfig = resolveBreedingConfig(breedingConfigId);
         applyOffspringOwnershipAndTamedState(
                 childRef,
                 parentAOwner,
@@ -65,7 +66,14 @@ final class BreedingOffspringProgressionService {
         }
         applyOffspringTraits(childRef, parentARef, parentBRef, childRoleId, childNpc, breedingConfigId, store);
         CompanionStatModifierService.applyTraitModifiers(childRef, store);
-        CompanionLifeStageService.initializeOffspringLifeStage(childRef, childNpc, store, hasBabyVariant);
+        CompanionLifeStageService.initializeOffspringLifeStage(
+                childRef,
+                childNpc,
+                store,
+                childRoleId,
+                breedingConfig,
+                lifecycleFamily
+        );
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
         familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);

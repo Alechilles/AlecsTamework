@@ -274,7 +274,8 @@ final class CommandRespawnService {
         boolean hasLifeStageData = (snapshot.lifeStage() != null && !snapshot.lifeStage().isBlank())
                 || snapshot.lifeStageBornAtMs() > 0L
                 || snapshot.lifeStageAdolescentAtMs() > 0L
-                || snapshot.lifeStageAdultAtMs() > 0L;
+                || snapshot.lifeStageAdultAtMs() > 0L
+                || snapshot.lifeStageFullyGrownAtMs() > 0L;
         if (!hasLifeStageData) {
             CompanionLifeStageService.ensureLifeStageComponent(spawnedRef, store);
             CompanionLifeStageService.refreshLifeStage(
@@ -289,8 +290,12 @@ final class CommandRespawnService {
                 snapshot.lifeStageBornAtMs(),
                 snapshot.lifeStageAdolescentAtMs(),
                 snapshot.lifeStageAdultAtMs(),
+                snapshot.lifeStageFullyGrownAtMs(),
                 snapshot.lifeStageBabyScale(),
                 snapshot.lifeStageAdolescentScale(),
+                snapshot.lifeStageAdolescentSwitchScale(),
+                snapshot.lifeStageAdultStartScale(),
+                snapshot.lifeStageAdultSwitchScale(),
                 snapshot.lifeStageAdultScale(),
                 snapshot.lifeStageGrowthScalingEnabled()
         );

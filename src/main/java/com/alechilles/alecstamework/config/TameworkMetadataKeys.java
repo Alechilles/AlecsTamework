@@ -25,8 +25,12 @@ public final class TameworkMetadataKeys {
     public static final String LIFE_STAGE_BORN_AT_MS = "Tamework.LifeStage.BornAtMs";
     public static final String LIFE_STAGE_ADOLESCENT_AT_MS = "Tamework.LifeStage.AdolescentAtMs";
     public static final String LIFE_STAGE_ADULT_AT_MS = "Tamework.LifeStage.AdultAtMs";
+    public static final String LIFE_STAGE_FULLY_GROWN_AT_MS = "Tamework.LifeStage.FullyGrownAtMs";
     public static final String LIFE_STAGE_BABY_SCALE = "Tamework.LifeStage.BabyScale";
     public static final String LIFE_STAGE_ADOLESCENT_SCALE = "Tamework.LifeStage.AdolescentScale";
+    public static final String LIFE_STAGE_ADOLESCENT_SWITCH_SCALE = "Tamework.LifeStage.AdolescentSwitchScale";
+    public static final String LIFE_STAGE_ADULT_START_SCALE = "Tamework.LifeStage.AdultStartScale";
+    public static final String LIFE_STAGE_ADULT_SWITCH_SCALE = "Tamework.LifeStage.AdultSwitchScale";
     public static final String LIFE_STAGE_ADULT_SCALE = "Tamework.LifeStage.AdultScale";
     public static final String LIFE_STAGE_GROWTH_SCALING_ENABLED = "Tamework.LifeStage.GrowthScalingEnabled";
     public static final String NPC_NAME = "Tamework.NpcName";

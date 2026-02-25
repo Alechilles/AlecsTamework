@@ -13,8 +13,12 @@ class CompanionLifeStageServiceTest {
                 1000L,
                 2000L,
                 3000L,
+                4000L,
                 0.55,
                 0.80,
+                0.90,
+                0.70,
+                1.10,
                 1.00,
                 true
         );
@@ -30,15 +34,20 @@ class CompanionLifeStageServiceTest {
                 1000L,
                 2000L,
                 3000L,
+                4000L,
                 0.55,
                 0.80,
+                0.90,
+                0.70,
+                1.10,
                 1.20,
                 true
         );
         assertEquals(0.55, CompanionLifeStageService.resolveScale(component, 1000L), 0.000001);
-        assertEquals(0.675, CompanionLifeStageService.resolveScale(component, 1500L), 0.000001);
-        assertEquals(1.00, CompanionLifeStageService.resolveScale(component, 2500L), 0.000001);
-        assertEquals(1.20, CompanionLifeStageService.resolveScale(component, 3500L), 0.000001);
+        assertEquals(0.725, CompanionLifeStageService.resolveScale(component, 1500L), 0.000001);
+        assertEquals(0.95, CompanionLifeStageService.resolveScale(component, 2500L), 0.000001);
+        assertEquals(0.95, CompanionLifeStageService.resolveScale(component, 3500L), 0.000001);
+        assertEquals(1.20, CompanionLifeStageService.resolveScale(component, 4500L), 0.000001);
     }
 
     @Test
@@ -48,8 +57,12 @@ class CompanionLifeStageServiceTest {
                 1000L,
                 2000L,
                 3000L,
+                4000L,
                 0.55,
                 0.80,
+                0.90,
+                0.70,
+                1.10,
                 1.35,
                 false
         );
