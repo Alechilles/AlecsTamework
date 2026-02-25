@@ -48,7 +48,7 @@ public final class TraitInheritanceService {
             return EMPTY_VALUES;
         }
 
-        boolean allowDuplicates = config.getStacking().isAllowDuplicateTraits();
+        boolean allowDuplicates = config.getSelection().isAllowDuplicateTraits();
         List<TwTraitConfig.TraitDefinition> definitions = List.of(config.getTraits());
         Map<String, TwTraitConfig.TraitDefinition> definitionById = buildDefinitionMap(definitions);
         List<TameworkTraitsComponent.TraitValue> selected = new ArrayList<>(targetCount);
@@ -141,7 +141,7 @@ public final class TraitInheritanceService {
     private static int resolveTargetCount(TwTraitConfig config,
                                           TameworkTraitsComponent.TraitValue[] fallback,
                                           List<ParentTraitCandidate> parentCandidates) {
-        int maxTraits = Math.max(0, config.getStacking().getMaxTraitsPerNpc());
+        int maxTraits = Math.max(0, config.getSelection().getMaxTraitsPerNpc());
         int rolls = Math.max(0, TraitRollService.resolveMaxConfiguredRollCount(config.getSelection()));
         int cap = Math.min(maxTraits, rolls);
         if (cap <= 0) {

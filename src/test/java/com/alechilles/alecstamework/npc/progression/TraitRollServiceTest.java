@@ -21,8 +21,6 @@ class TraitRollServiceTest {
         TwTraitConfig config = createConfig(
                 true,
                 3,
-                true,
-                2,
                 false,
                 trait("Trait_A", "FertilityMultiplier", 1.0, 0.8, 1.2, 1.0),
                 trait("Trait_B", "HappinessGainMultiplier", 1.0, 0.7, 1.3, 1.0),
@@ -44,8 +42,6 @@ class TraitRollServiceTest {
     @Test
     void rollTraitsEnforcesDuplicateAndConflictRules() throws Exception {
         TwTraitConfig config = createConfig(
-                true,
-                4,
                 true,
                 4,
                 false,
@@ -84,8 +80,6 @@ class TraitRollServiceTest {
         TwTraitConfig config = createConfig(
                 true,
                 3,
-                false,
-                3,
                 true,
                 trait("Trait_Repeatable", "FertilityMultiplier", 1.0, 1.0, 1.0, 1.0)
         );
@@ -101,8 +95,6 @@ class TraitRollServiceTest {
     void rollTraitsUsesWeightedVariableRollCounts() throws Exception {
         TwTraitConfig config = createConfig(
                 true,
-                2,
-                false,
                 4,
                 true,
                 trait("Trait_Repeatable", "FertilityMultiplier", 1.0, 1.0, 1.0, 1.0)
@@ -128,8 +120,6 @@ class TraitRollServiceTest {
         TwTraitConfig config = createConfig(
                 true,
                 1,
-                true,
-                1,
                 false,
                 traitWithRanges(
                         "Trait_Genetics",
@@ -151,8 +141,6 @@ class TraitRollServiceTest {
     }
 
     private TwTraitConfig createConfig(boolean seeded,
-                                       int rollsPerSpawn,
-                                       boolean rerollDuplicates,
                                        int maxTraits,
                                        boolean allowDuplicates,
                                        TwTraitConfig.TraitDefinition... traits) throws Exception {
@@ -161,15 +149,11 @@ class TraitRollServiceTest {
         TwTraitConfig config = ctor.newInstance();
         setField(config, "enabled", true);
         TwTraitConfig.SelectionSettings selection = new TwTraitConfig.SelectionSettings();
-        setField(selection, "rollsPerSpawn", rollsPerSpawn);
-        setField(selection, "rollCountWeights", weightsForFixedRollCount(rollsPerSpawn));
-        setField(selection, "rerollDuplicates", rerollDuplicates);
+        setField(selection, "maxTraitsPerNpc", maxTraits);
+        setField(selection, "rollCountWeights", weightsForFixedRollCount(maxTraits));
+        setField(selection, "allowDuplicateTraits", allowDuplicates);
         setField(selection, "useSeededRandom", seeded);
         setField(config, "selection", selection);
-        TwTraitConfig.StackingSettings stacking = new TwTraitConfig.StackingSettings();
-        setField(stacking, "maxTraitsPerNpc", maxTraits);
-        setField(stacking, "allowDuplicateTraits", allowDuplicates);
-        setField(config, "stacking", stacking);
         setField(config, "traits", traits);
         return config;
     }

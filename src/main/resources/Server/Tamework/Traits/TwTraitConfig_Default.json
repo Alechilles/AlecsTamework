@@ -9,7 +9,7 @@
     "Mob_Tamework_Example_Hytalor"
   ],
   "Selection": {
-    "RollsPerSpawn": 2,
+    "MaxTraitsPerNpc": 4,
     "RollCountWeights": {
       "Count0": 0.15,
       "Count1": 0.25,
@@ -17,12 +17,8 @@
       "Count3": 0.15,
       "Count4": 0.05
     },
-    "RerollDuplicates": true,
+    "AllowDuplicateTraits": false,
     "UseSeededRandom": true
-  },
-  "Stacking": {
-    "MaxTraitsPerNpc": 4,
-    "AllowDuplicateTraits": false
   },
   "Inheritance": {
     "AllowInheritance": true,

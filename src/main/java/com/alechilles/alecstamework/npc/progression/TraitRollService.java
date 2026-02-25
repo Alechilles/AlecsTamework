@@ -34,7 +34,7 @@ public final class TraitRollService {
         Random random = selection.isUseSeededRandom()
                 ? new Random(seed)
                 : new Random();
-        int maxTraits = Math.max(0, config.getStacking().getMaxTraitsPerNpc());
+        int maxTraits = Math.max(0, selection.getMaxTraitsPerNpc());
         int rolls = resolveConfiguredRollCount(selection, random);
         if (maxTraits == 0 || rolls == 0) {
             return EMPTY_VALUES;
@@ -56,8 +56,7 @@ public final class TraitRollService {
         if (pool.isEmpty()) {
             return EMPTY_VALUES;
         }
-        boolean allowDuplicates = config.getStacking().isAllowDuplicateTraits();
-        boolean rerollDuplicates = selection.isRerollDuplicates();
+        boolean allowDuplicates = selection.isAllowDuplicateTraits();
 
         ArrayList<TameworkTraitsComponent.TraitValue> selected = new ArrayList<>(targetCount);
         int attempts = Math.max(pool.size() * 4, targetCount * 4);
@@ -72,11 +71,8 @@ public final class TraitRollService {
                 continue;
             }
             if (!allowDuplicates && containsTrait(selected, candidateId)) {
-                if (rerollDuplicates) {
-                    removeFromPool(pool, candidateId);
-                    continue;
-                }
-                break;
+                removeFromPool(pool, candidateId);
+                continue;
             }
             if (conflictsWithSelected(candidate, selected, byId)) {
                 removeFromPool(pool, candidateId);
@@ -98,7 +94,7 @@ public final class TraitRollService {
         if (selection == null) {
             return 0;
         }
-        int fallback = Math.max(0, selection.getRollsPerSpawn());
+        int fallback = Math.max(0, selection.getMaxTraitsPerNpc());
         TwTraitConfig.RollCountWeights weights = selection.getRollCountWeights();
         if (weights == null) {
             return fallback;
@@ -126,7 +122,7 @@ public final class TraitRollService {
         if (selection == null) {
             return 0;
         }
-        int fallback = Math.max(0, selection.getRollsPerSpawn());
+        int fallback = Math.max(0, selection.getMaxTraitsPerNpc());
         TwTraitConfig.RollCountWeights weights = selection.getRollCountWeights();
         if (weights == null || random == null) {
             return fallback;

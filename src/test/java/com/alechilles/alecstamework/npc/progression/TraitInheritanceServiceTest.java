@@ -22,7 +22,6 @@ class TraitInheritanceServiceTest {
                 0.1,
                 true,
                 2,
-                2,
                 trait("Trait_A", "FertilityMultiplier", 0.8, 1.2, 1.0),
                 trait("Trait_B", "HappinessGainMultiplier", 0.8, 1.2, 1.0)
         );
@@ -58,7 +57,6 @@ class TraitInheritanceServiceTest {
                 1.0,
                 0.0,
                 true,
-                2,
                 2,
                 trait("Trait_A", "FertilityMultiplier", 0.8, 1.2, 1.0),
                 trait("Trait_B", "HappinessGainMultiplier", 0.8, 1.2, 1.0),
@@ -96,7 +94,6 @@ class TraitInheritanceServiceTest {
                 1.0,
                 1.0,
                 true,
-                2,
                 2,
                 trait("Trait_A", "FertilityMultiplier", 0.9, 1.1, 1.0),
                 trait("Trait_B", "HappinessGainMultiplier", 0.8, 1.2, 1.0)
@@ -137,7 +134,6 @@ class TraitInheritanceServiceTest {
                 0.0,
                 true,
                 1,
-                1,
                 noInheritanceWeightTrait
         );
         TwTraitConfig.TraitDefinition fullInheritanceWeightTrait =
@@ -147,7 +143,6 @@ class TraitInheritanceServiceTest {
                 1.0,
                 0.0,
                 true,
-                1,
                 1,
                 fullInheritanceWeightTrait
         );
@@ -183,7 +178,6 @@ class TraitInheritanceServiceTest {
                 0.0,
                 true,
                 1,
-                1,
                 0.0,
                 definition
         );
@@ -192,7 +186,6 @@ class TraitInheritanceServiceTest {
                 1.0,
                 0.0,
                 true,
-                1,
                 1,
                 1.0,
                 definition
@@ -244,7 +237,6 @@ class TraitInheritanceServiceTest {
                 0.0,
                 true,
                 1,
-                1,
                 1.0,
                 definition
         );
@@ -276,7 +268,6 @@ class TraitInheritanceServiceTest {
                                        double mutationChance,
                                        boolean preferParentTraits,
                                        int maxTraits,
-                                       int rollsPerSpawn,
                                        TwTraitConfig.TraitDefinition... traits) throws Exception {
         return createConfig(
                 allowInheritance,
@@ -284,7 +275,6 @@ class TraitInheritanceServiceTest {
                 mutationChance,
                 preferParentTraits,
                 maxTraits,
-                rollsPerSpawn,
                 0.6,
                 traits
         );
@@ -295,7 +285,6 @@ class TraitInheritanceServiceTest {
                                        double mutationChance,
                                        boolean preferParentTraits,
                                        int maxTraits,
-                                       int rollsPerSpawn,
                                        double pairAlignmentRangeInfluence,
                                        TwTraitConfig.TraitDefinition... traits) throws Exception {
         Constructor<TwTraitConfig> ctor = TwTraitConfig.class.getDeclaredConstructor();
@@ -304,16 +293,11 @@ class TraitInheritanceServiceTest {
         setField(config, "enabled", true);
 
         TwTraitConfig.SelectionSettings selection = new TwTraitConfig.SelectionSettings();
-        setField(selection, "rollsPerSpawn", rollsPerSpawn);
-        setField(selection, "rollCountWeights", weightsForFixedRollCount(rollsPerSpawn));
-        setField(selection, "rerollDuplicates", true);
+        setField(selection, "maxTraitsPerNpc", maxTraits);
+        setField(selection, "rollCountWeights", weightsForFixedRollCount(maxTraits));
+        setField(selection, "allowDuplicateTraits", false);
         setField(selection, "useSeededRandom", true);
         setField(config, "selection", selection);
-
-        TwTraitConfig.StackingSettings stacking = new TwTraitConfig.StackingSettings();
-        setField(stacking, "maxTraitsPerNpc", maxTraits);
-        setField(stacking, "allowDuplicateTraits", false);
-        setField(config, "stacking", stacking);
 
         TwTraitConfig.InheritanceSettings inheritance = new TwTraitConfig.InheritanceSettings();
         setField(inheritance, "allowInheritance", allowInheritance);

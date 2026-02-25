@@ -23,24 +23,6 @@ import javax.annotation.Nullable;
 public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwTraitConfig>> {
     private static final TraitDefinition[] EMPTY_TRAITS = new TraitDefinition[0];
 
-    private static final BuilderCodec<StackingSettings> STACKING_CODEC = BuilderCodec.builder(
-            StackingSettings.class,
-            StackingSettings::new
-    )
-        .<Integer>append(
-            new KeyedCodec<>("MaxTraitsPerNpc", Codec.INTEGER),
-            (settings, value) -> settings.maxTraitsPerNpc = value,
-            settings -> settings.maxTraitsPerNpc
-        )
-        .add()
-        .<Boolean>append(
-            new KeyedCodec<>("AllowDuplicateTraits", Codec.BOOLEAN),
-            (settings, value) -> settings.allowDuplicateTraits = value,
-            settings -> settings.allowDuplicateTraits
-        )
-        .add()
-        .build();
-
     private static final BuilderCodec<RollCountWeights> ROLL_COUNT_WEIGHTS_CODEC = BuilderCodec.builder(
             RollCountWeights.class,
             RollCountWeights::new
@@ -82,9 +64,9 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             SelectionSettings::new
     )
         .<Integer>append(
-            new KeyedCodec<>("RollsPerSpawn", Codec.INTEGER),
-            (settings, value) -> settings.rollsPerSpawn = value,
-            settings -> settings.rollsPerSpawn
+            new KeyedCodec<>("MaxTraitsPerNpc", Codec.INTEGER),
+            (settings, value) -> settings.maxTraitsPerNpc = value,
+            settings -> settings.maxTraitsPerNpc
         )
         .add()
         .<RollCountWeights>append(
@@ -94,9 +76,9 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .add()
         .<Boolean>append(
-            new KeyedCodec<>("RerollDuplicates", Codec.BOOLEAN),
-            (settings, value) -> settings.rerollDuplicates = value,
-            settings -> settings.rerollDuplicates
+            new KeyedCodec<>("AllowDuplicateTraits", Codec.BOOLEAN),
+            (settings, value) -> settings.allowDuplicateTraits = value,
+            settings -> settings.allowDuplicateTraits
         )
         .add()
         .<Boolean>append(
@@ -258,12 +240,6 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             asset -> asset.selection
         )
         .add()
-        .<StackingSettings>append(
-            new KeyedCodec<>("Stacking", STACKING_CODEC),
-            (asset, value) -> asset.stacking = value == null ? new StackingSettings() : value,
-            asset -> asset.stacking
-        )
-        .add()
         .<InheritanceSettings>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_CODEC),
             (asset, value) -> asset.inheritance = value == null ? new InheritanceSettings() : value,
@@ -289,7 +265,6 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
     private int priority;
     private String[] roleIds = ArrayUtil.EMPTY_STRING_ARRAY;
     private SelectionSettings selection = new SelectionSettings();
-    private StackingSettings stacking = new StackingSettings();
     private InheritanceSettings inheritance = new InheritanceSettings();
     private TraitDefinition[] traits = EMPTY_TRAITS;
 
@@ -434,10 +409,6 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         return selection == null ? new SelectionSettings() : selection;
     }
 
-    public StackingSettings getStacking() {
-        return stacking == null ? new StackingSettings() : stacking;
-    }
-
     public InheritanceSettings getInheritance() {
         return inheritance == null ? new InheritanceSettings() : inheritance;
     }
@@ -446,23 +417,23 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         return traits == null ? EMPTY_TRAITS : traits;
     }
 
-    /** Trait roll counts and randomization controls. */
+    /** Trait roll counts, duplicate policy, and randomization controls. */
     public static final class SelectionSettings {
-        private int rollsPerSpawn = 2;
+        private int maxTraitsPerNpc = 3;
         private RollCountWeights rollCountWeights = new RollCountWeights();
-        private boolean rerollDuplicates = true;
+        private boolean allowDuplicateTraits;
         private boolean useSeededRandom = true;
 
-        public int getRollsPerSpawn() {
-            return rollsPerSpawn;
+        public int getMaxTraitsPerNpc() {
+            return maxTraitsPerNpc;
         }
 
         public RollCountWeights getRollCountWeights() {
             return rollCountWeights == null ? new RollCountWeights() : rollCountWeights;
         }
 
-        public boolean isRerollDuplicates() {
-            return rerollDuplicates;
+        public boolean isAllowDuplicateTraits() {
+            return allowDuplicateTraits;
         }
 
         public boolean isUseSeededRandom() {
@@ -496,20 +467,6 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public double getCount4() {
             return count4;
-        }
-    }
-
-    /** Limits for duplicate handling and trait count per NPC. */
-    public static final class StackingSettings {
-        private int maxTraitsPerNpc = 3;
-        private boolean allowDuplicateTraits;
-
-        public int getMaxTraitsPerNpc() {
-            return maxTraitsPerNpc;
-        }
-
-        public boolean isAllowDuplicateTraits() {
-            return allowDuplicateTraits;
         }
     }
 
