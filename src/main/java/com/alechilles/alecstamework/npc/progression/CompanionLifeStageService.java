@@ -363,12 +363,7 @@ public final class CompanionLifeStageService {
     }
 
     private static double resolveAdultScale(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        double current = CompanionModelScaleService.resolveCurrentScale(npcRef, store, 1.0);
-        double sizeMultiplier = TraitModifierService.resolveMultiplier(npcRef, store, "SizeMultiplier", 1.0);
-        if (!Double.isFinite(sizeMultiplier) || sizeMultiplier <= 0.0) {
-            sizeMultiplier = 1.0;
-        }
-        return clampScale(current * sizeMultiplier);
+        return clampScale(CompanionModelScaleService.resolveCurrentScale(npcRef, store, 1.0));
     }
 
     private static double resolveBabyScale(double adultScale) {

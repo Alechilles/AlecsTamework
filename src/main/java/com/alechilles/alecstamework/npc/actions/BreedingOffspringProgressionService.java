@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstra
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitInheritanceService;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -121,17 +122,37 @@ final class BreedingOffspringProgressionService {
         TameworkTraitsComponent parentBTraits = parentBRef != null && parentBRef.isValid()
                 ? store.getComponent(parentBRef, traitsType)
                 : null;
+        TameworkTraitsComponent existingTraits = store.getComponent(childRef, traitsType);
 
         long seed = resolveOffspringSeed(childNpc, parentARef, parentBRef, store);
         TwBreedingConfig breedingConfig = resolveBreedingConfig(breedingConfigId);
         boolean inheritTraits = breedingConfig != null && breedingConfig.getInheritance().isInheritTraits();
+        double previousSizeMultiplier = TraitModifierService.resolveMultiplier(
+                existingTraits,
+                traitConfig,
+                "SizeMultiplier",
+                1.0
+        );
         TameworkTraitsComponent.TraitValue[] values = inheritTraits
                 ? TraitInheritanceService.inheritTraits(traitConfig, parentATraits, parentBTraits, seed)
                 : TraitRollService.rollTraits(traitConfig, seed);
+        TameworkTraitsComponent updatedTraits = new TameworkTraitsComponent(traitConfig.getId(), seed, values);
+        double nextSizeMultiplier = TraitModifierService.resolveMultiplier(
+                updatedTraits,
+                traitConfig,
+                "SizeMultiplier",
+                1.0
+        );
         store.putComponent(
                 childRef,
                 traitsType,
-                new TameworkTraitsComponent(traitConfig.getId(), seed, values)
+                updatedTraits
+        );
+        CompanionLifeStageService.applySizeMultiplierDelta(
+                childRef,
+                store,
+                previousSizeMultiplier,
+                nextSizeMultiplier
         );
     }
 

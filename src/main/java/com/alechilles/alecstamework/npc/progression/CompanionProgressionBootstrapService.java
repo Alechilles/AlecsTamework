@@ -12,6 +12,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Initializes and self-heals progression components (traits, happiness, breeding, life-stage) for companions.
@@ -56,9 +57,18 @@ public final class CompanionProgressionBootstrapService {
     private static void ensureTraitComponents(Ref<EntityStore> npcRef,
                                               Store<EntityStore> store,
                                               String roleId) {
+        TwTraitConfig traitConfig = TwTraitConfig.resolveForRole(roleId);
+        double previousSizeMultiplier = resolveSizeMultiplier(npcRef, store, traitConfig);
         bootstrapTraitsComponent(npcRef, store, roleId);
+        double nextSizeMultiplier = resolveSizeMultiplier(npcRef, store, traitConfig);
         CompanionStatModifierService.applyTraitModifiers(npcRef, store);
         CompanionLifeStageService.ensureLifeStageComponent(npcRef, store);
+        CompanionLifeStageService.applySizeMultiplierDelta(
+                npcRef,
+                store,
+                previousSizeMultiplier,
+                nextSizeMultiplier
+        );
         CompanionLifeStageService.refreshLifeStage(
                 npcRef,
                 store.getComponent(npcRef, NPCEntity.getComponentType()),
@@ -283,5 +293,16 @@ public final class CompanionProgressionBootstrapService {
             return null;
         }
         return breeding.getHappiness();
+    }
+
+    private static double resolveSizeMultiplier(Ref<EntityStore> npcRef,
+                                                Store<EntityStore> store,
+                                                @Nullable TwTraitConfig traitConfig) {
+        ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
+        if (traitsType == null) {
+            return 1.0;
+        }
+        TameworkTraitsComponent traits = store.getComponent(npcRef, traitsType);
+        return TraitModifierService.resolveMultiplier(traits, traitConfig, "SizeMultiplier", 1.0);
     }
 }
