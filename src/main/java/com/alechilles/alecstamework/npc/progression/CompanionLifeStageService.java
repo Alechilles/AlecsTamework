@@ -27,6 +27,8 @@ public final class CompanionLifeStageService {
 
     private static final long DEFAULT_GROWTH_DURATION_MS = TimeUnit.MINUTES.toMillis(7);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
+    private static final long INITIAL_SCALE_RETRY_INTERVAL_MS = 100L;
+    private static final int INITIAL_SCALE_MAX_RETRIES = 20;
     private static final double DEFAULT_BABY_SCALE_FACTOR = 0.33;
     private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
@@ -108,7 +110,11 @@ public final class CompanionLifeStageService {
                 true
         );
         store.putComponent(childRef, type, component);
-        CompanionModelScaleService.applyScale(childRef, childNpc, store, lifecycle.babyStartScale());
+        double initialScale = lifecycle.babyStartScale();
+        boolean applied = CompanionModelScaleService.applyScale(childRef, childNpc, store, initialScale);
+        if (!applied && !isScaleClose(childRef, store, initialScale)) {
+            scheduleInitialScaleRetry(childRef, childNpc, store, INITIAL_SCALE_MAX_RETRIES);
+        }
         scheduleGrowthTick(childRef, childNpc, store);
     }
 
@@ -516,6 +522,52 @@ public final class CompanionLifeStageService {
         );
     }
 
+    private static void scheduleInitialScaleRetry(Ref<EntityStore> npcRef,
+                                                  @Nullable NPCEntity npc,
+                                                  Store<EntityStore> store,
+                                                  int remainingRetries) {
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        UUID npcUuid = npc != null ? npc.getUuid() : null;
+        if (world == null || npcUuid == null || remainingRetries <= 0) {
+            return;
+        }
+        CompletableFuture.runAsync(
+                () -> world.execute(() -> onInitialScaleRetry(world, npcUuid, remainingRetries)),
+                CompletableFuture.delayedExecutor(INITIAL_SCALE_RETRY_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        );
+    }
+
+    private static void onInitialScaleRetry(@Nullable World world,
+                                            @Nullable UUID npcUuid,
+                                            int remainingRetries) {
+        if (world == null || npcUuid == null || remainingRetries <= 0) {
+            return;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        if (npcRef == null || !npcRef.isValid()) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
+        if (stage == null || !stage.isGrowthScalingEnabled()) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        double targetScale = resolveScale(stage, System.currentTimeMillis());
+        boolean applied = CompanionModelScaleService.applyScale(npcRef, npc, store, targetScale);
+        if (applied || isScaleClose(npcRef, store, targetScale) || remainingRetries <= 1) {
+            return;
+        }
+        scheduleInitialScaleRetry(npcRef, npc, store, remainingRetries - 1);
+    }
+
     private static void onGrowthTick(World world, UUID npcUuid) {
         if (world == null || npcUuid == null) {
             return;
@@ -615,6 +667,16 @@ public final class CompanionLifeStageService {
             return 1.0;
         }
         return value;
+    }
+
+    private static boolean isScaleClose(@Nullable Ref<EntityStore> npcRef,
+                                        @Nullable Store<EntityStore> store,
+                                        double targetScale) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        double currentScale = CompanionModelScaleService.resolveCurrentScale(npcRef, store, 1.0);
+        return Math.abs(currentScale - targetScale) <= 0.0001;
     }
 
     private static double lerp(double start, double end, double progress) {
