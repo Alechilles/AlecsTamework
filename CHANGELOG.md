@@ -15,6 +15,7 @@
 - `/tw gethappiness` command to inspect targeted NPC happiness source/value and breeding eligibility context.
 - `/tw sethappiness <value>` and `/tw gettraits` commands for in-game progression debugging and balancing.
 - `/tw settraits <TraitId> <Value> [TraitId Value ...]` and `/tw addtrait <TraitId> <Value>` debug commands for explicit trait assignment on targeted NPCs.
+- `/tw setbreedingready [true|false|toggle]` debug command to force/clear breeding readiness on the targeted NPC (including cooldown clear when forcing ready).
 - New life-stage progression component/service (`TameworkLifeStageComponent`, `CompanionLifeStageService`) plus `/tw getlifestage` debugging command.
 - `/tw findnpc <uuid> [mark:on|off]` command to resolve a specific NPC by UUID, print live world state, and optionally mark its location with particles.
 - Unit tests covering trait inheritance blending/mutation bounds and life-stage transition/scale interpolation behavior.
