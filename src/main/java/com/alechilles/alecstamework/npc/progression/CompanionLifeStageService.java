@@ -134,13 +134,13 @@ public final class CompanionLifeStageService {
     public static boolean isAdult(@Nullable Ref<EntityStore> npcRef,
                                   @Nullable Store<EntityStore> store,
                                   @Nullable String roleIdFallback) {
+        // Keep this path read-only; it is called from chunk iteration contexts (e.g. partner scans).
         if (npcRef != null && npcRef.isValid() && store != null) {
             ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
             if (type != null) {
                 TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
                 if (stage != null) {
-                    refreshLifeStage(npcRef, store.getComponent(npcRef, NPCEntity.getComponentType()), store);
-                    return STAGE_ADULT.equals(stage.getStage());
+                    return STAGE_ADULT.equals(resolveStageId(stage, System.currentTimeMillis()));
                 }
             }
         }
@@ -150,13 +150,13 @@ public final class CompanionLifeStageService {
     public static String resolveCurrentStage(@Nullable Ref<EntityStore> npcRef,
                                              @Nullable Store<EntityStore> store,
                                              @Nullable String roleIdFallback) {
+        // Keep this path read-only; callers may run inside store iteration callbacks.
         if (npcRef != null && npcRef.isValid() && store != null) {
             ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
             if (type != null) {
                 TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
                 if (stage != null) {
-                    refreshLifeStage(npcRef, store.getComponent(npcRef, NPCEntity.getComponentType()), store);
-                    return stage.getStage();
+                    return resolveStageId(stage, System.currentTimeMillis());
                 }
             }
         }
