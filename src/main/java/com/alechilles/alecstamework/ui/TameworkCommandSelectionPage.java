@@ -287,11 +287,7 @@ public final class TameworkCommandSelectionPage
             return;
         }
         refreshLinkedNpcEntries();
-        if (linkedNpcEntries.length != renderedLinkedNpcCardCount) {
-            rebuild();
-        } else {
-            sendCardRefreshUpdate();
-        }
+        sendCardRefreshUpdate();
         if (!dismissed) {
             scheduleRefreshTick();
         }
@@ -304,12 +300,14 @@ public final class TameworkCommandSelectionPage
                 "#TameworkLinkedPanelSubtitle.Text",
                 LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
         );
+        renderedLinkedNpcCardCount = linkedNpcEntries.length;
+        commandBuilder.clear("#TameworkLinkedPanelList");
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
         if (hasEntries) {
             for (int i = 0; i < linkedNpcEntries.length; i++) {
-                bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false);
+                bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true);
             }
         }
         bindCommandButtonEvents(eventBuilder);
