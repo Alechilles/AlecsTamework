@@ -11,9 +11,9 @@
   "Selection": {
     "RollsPerSpawn": 2,
     "RollCountWeights": {
-      "Count0": 0.10,
+      "Count0": 0.15,
       "Count1": 0.20,
-      "Count2": 0.45,
+      "Count2": 0.40,
       "Count3": 0.20,
       "Count4": 0.05
     },
@@ -56,6 +56,15 @@
       "Weight": 0.9,
       "Min": 0.85,
       "Max": 1.25,
+      "Default": 1.0
+    },
+    {
+      "Id": "Trait_Size",
+      "DisplayName": "Size",
+      "EffectKey": "SizeMultiplier",
+      "Weight": 0.8,
+      "Min": 0.85,
+      "Max": 1.2,
       "Default": 1.0
     },
     {

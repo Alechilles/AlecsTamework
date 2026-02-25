@@ -2884,7 +2884,7 @@
               },
               "Actions": [
                 {
-                  "Type": "DropItem",
+                  "Type": "TameworkHarvestDrop",
                   "DropList": {
                     "Compute": "HarvestDropList"
                   },

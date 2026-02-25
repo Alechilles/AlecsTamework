@@ -40,6 +40,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStra
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCaptureUntamed;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestDrop;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPrompt;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
@@ -1002,6 +1003,7 @@ public class Tamework extends JavaPlugin {
             actionFactory.add(BuilderActionTameworkCaptureWild.BUILDER_ID, BuilderActionTameworkCaptureWild::new);
             actionFactory.add(BuilderActionTameworkDenyInteract.BUILDER_ID, BuilderActionTameworkDenyInteract::new);
             actionFactory.add(BuilderActionTameworkDenyCaptureUntamed.BUILDER_ID, BuilderActionTameworkDenyCaptureUntamed::new);
+            actionFactory.add(BuilderActionTameworkHarvestDrop.BUILDER_ID, BuilderActionTameworkHarvestDrop::new);
             actionFactory.add(BuilderActionTameworkInteract.BUILDER_ID, BuilderActionTameworkInteract::new);
             actionFactory.add(BuilderActionTameworkInteractPrompt.BUILDER_ID, BuilderActionTameworkInteractPrompt::new);
             actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
