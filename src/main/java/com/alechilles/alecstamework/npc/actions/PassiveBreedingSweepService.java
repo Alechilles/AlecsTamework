@@ -27,10 +27,10 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Performs coarse passive breeding sweeps for companions that are already marked breeding-ready.
+ * Performs coarse passive breeding sweeps and refreshes breeding readiness from current eligibility.
  *
- * <p>This service intentionally does not mutate the ready flag. It only reads existing readiness
- * and attempts pair matching through the shared offspring service.
+ * <p>The sweep updates the persisted ready flag, then attempts pair matching through the shared
+ * offspring service when a companion is ready and not on cooldown.
  */
 public final class PassiveBreedingSweepService {
     private final BreedingOffspringService offspringService;
@@ -51,25 +51,27 @@ public final class PassiveBreedingSweepService {
         }
 
         List<RoleSnapshot> roleSnapshots = new ArrayList<>();
-        List<ReadyCandidate> readyCandidates = new ArrayList<>();
+        List<SweepCandidate> sweepCandidates = new ArrayList<>();
         store.forEachChunk(
                 Query.and(npcType, transformType, breedingType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
-                        collectCandidates(chunk, npcType, transformType, breedingType, store, nowMs, roleSnapshots, readyCandidates)
+                        collectCandidates(chunk, npcType, transformType, breedingType, store, roleSnapshots, sweepCandidates)
         );
-        if (readyCandidates.isEmpty()) {
+        if (sweepCandidates.isEmpty()) {
             return;
         }
 
-        for (ReadyCandidate candidate : readyCandidates) {
+        for (SweepCandidate candidate : sweepCandidates) {
             TameworkBreedingComponent breeding = store.getComponent(candidate.ref(), breedingType);
-            if (breeding == null || !breeding.isReady() || breeding.isCooldownActive(nowMs)) {
+            if (breeding == null) {
                 continue;
             }
-            if (!passesHappinessThreshold(candidate, breeding, store)) {
-                continue;
+            boolean shouldBeReady = resolveShouldBeReady(candidate, breeding, store);
+            if (breeding.isReady() != shouldBeReady) {
+                breeding.setReady(shouldBeReady);
+                store.putComponent(candidate.ref(), breedingType, breeding);
             }
-            if (!passesEligibilityGates(candidate, store)) {
+            if (!shouldBeReady || breeding.isCooldownActive(nowMs)) {
                 continue;
             }
             if (isOvercrowded(candidate, roleSnapshots)) {
@@ -84,9 +86,8 @@ public final class PassiveBreedingSweepService {
                                           @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
                                           @Nonnull ComponentType<EntityStore, TameworkBreedingComponent> breedingType,
                                           @Nonnull Store<EntityStore> store,
-                                          long nowMs,
                                           @Nonnull List<RoleSnapshot> roleSnapshots,
-                                          @Nonnull List<ReadyCandidate> readyCandidates) {
+                                          @Nonnull List<SweepCandidate> sweepCandidates) {
         int size = chunk.size();
         for (int i = 0; i < size; i++) {
             Ref<EntityStore> ref = chunk.getReferenceTo(i);
@@ -102,19 +103,22 @@ public final class PassiveBreedingSweepService {
             }
 
             roleSnapshots.add(new RoleSnapshot(ref, roleId, new Vector3d(transform.getPosition())));
-            if (!breeding.isReady() || breeding.isCooldownActive(nowMs)) {
-                continue;
-            }
-
             TwBreedingConfig config = BreedingConfigResolver.resolveConfig(ref, store, breeding);
             if (config == null || !config.isEnabled() || !config.getPassiveBreeding().isEnabled()) {
                 continue;
             }
-            readyCandidates.add(new ReadyCandidate(ref, npc, roleId, new Vector3d(transform.getPosition()), config));
+            sweepCandidates.add(new SweepCandidate(ref, npc, roleId, new Vector3d(transform.getPosition()), config));
         }
     }
 
-    private static boolean passesHappinessThreshold(@Nonnull ReadyCandidate candidate,
+    private static boolean resolveShouldBeReady(@Nonnull SweepCandidate candidate,
+                                                @Nonnull TameworkBreedingComponent breeding,
+                                                @Nonnull Store<EntityStore> store) {
+        return passesHappinessThreshold(candidate, breeding, store)
+                && passesEligibilityGates(candidate, store);
+    }
+
+    private static boolean passesHappinessThreshold(@Nonnull SweepCandidate candidate,
                                                     @Nonnull TameworkBreedingComponent breeding,
                                                     @Nonnull Store<EntityStore> store) {
         double happiness = CompanionHappinessService.resolveCurrentValue(candidate.ref(), store, breeding.getHappiness());
@@ -123,7 +127,7 @@ public final class PassiveBreedingSweepService {
         return BreedingEligibilityService.isEligible(effectiveHappiness, threshold);
     }
 
-    private static boolean passesEligibilityGates(@Nonnull ReadyCandidate candidate,
+    private static boolean passesEligibilityGates(@Nonnull SweepCandidate candidate,
                                                   @Nonnull Store<EntityStore> store) {
         TwBreedingConfig.EligibilitySettings eligibility = candidate.config().getEligibility();
         if (eligibility == null) {
@@ -143,7 +147,7 @@ public final class PassiveBreedingSweepService {
         );
     }
 
-    private static boolean isOvercrowded(@Nonnull ReadyCandidate candidate,
+    private static boolean isOvercrowded(@Nonnull SweepCandidate candidate,
                                          @Nonnull List<RoleSnapshot> snapshots) {
         TwBreedingConfig.PairingSettings pairing = candidate.config().getPairing();
         if (pairing == null) {
@@ -234,7 +238,7 @@ public final class PassiveBreedingSweepService {
     private record RoleSnapshot(Ref<EntityStore> ref, String roleId, Vector3d position) {
     }
 
-    private record ReadyCandidate(Ref<EntityStore> ref,
+    private record SweepCandidate(Ref<EntityStore> ref,
                                   NPCEntity npc,
                                   String roleId,
                                   Vector3d position,
