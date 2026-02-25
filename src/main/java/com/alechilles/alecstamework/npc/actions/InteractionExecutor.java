@@ -58,7 +58,7 @@ final class InteractionExecutor {
         if (entry instanceof FeedInteraction) {
             FeedInteraction feed = (FeedInteraction) entry;
             double healAmount = feedHelper.resolveFeedHeal(feed, role, ctx);
-            boolean applied = effects.applyFeeding(npcRef, store, healAmount, player);
+            boolean applied = effects.applyFeeding(npcRef, store, healAmount, player, ctx);
             feedHelper.consumeHeldItem(player, 1);
             return applied
                     | effects.applyCustomEffects(

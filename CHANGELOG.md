@@ -4,8 +4,10 @@
 ### Added
 - Foundation breeding and traits asset types: `TwBreedingConfig` and `TwTraitConfig`, including role-priority resolution and default example assets.
 - Foundation shared happiness asset type: `TwHappinessConfig`, including role-priority resolution and default example assets.
+- Foundation needs asset type: `TwNeedsConfig`, including role-priority resolution and default hunger/thirst config under `Server/Tamework/Needs`.
 - New progression components: `TameworkBreedingComponent` and `TameworkTraitsComponent`, plus bootstrap initialization for newly tamed companions.
 - New shared progression component: `TameworkHappinessComponent` with config id, value, and last-update timestamp.
+- New shared progression component: `TameworkNeedsComponent` with hunger/thirst values, passive-sweep tracking, and applied happiness penalty state.
 - Progression persistence bridges for spawner capture/spawn and command-linked death/respawn snapshots (breeding + traits fields).
 - Initial `Breed` interaction handling for happiness-gated readiness state setup.
 - Unit tests for breeding/traits priority resolution and trait-value metadata codec round-trips.
@@ -13,6 +15,7 @@
 - Trait modifier resolver service (`TraitModifierService`) for effect-key multiplier lookups from rolled trait values.
 - Unit tests for trait roll determinism/conflict handling and trait modifier multiplier resolution.
 - `/tw gethappiness` command to inspect targeted NPC happiness source/value and breeding eligibility context.
+- `/tw getneeds` command to inspect targeted NPC hunger/thirst state, applied needs penalty, and needs timing/config context.
 - `/tw sethappiness <value>` and `/tw gettraits` commands for in-game progression debugging and balancing.
 - `/tw settraits <TraitId> <Value> [TraitId Value ...]` and `/tw addtrait <TraitId> <Value>` debug commands for explicit trait assignment on targeted NPCs.
 - `/tw setbreedingready [true|false|toggle]` debug command to force/clear breeding readiness on the targeted NPC (including cooldown clear when forcing ready).
@@ -25,6 +28,7 @@
 - Interaction/docs coverage updated to reflect current breeding behavior (no longer a pure stub path).
 - Trait bootstrap now backfills empty trait components with deterministic rolls and role-config IDs.
 - Feeding interactions now apply shared happiness gains from happiness config (or shared defaults when no happiness config resolves), including trait-based `HappinessGainMultiplier` scaling.
+- Feeding interactions now also apply manual needs refill (`hunger`, plus optional `thirst` for configured water-bucket items), while the new `CompanionNeedsSystem` handles periodic hunger/thirst decay, passive container feed, passive water drinking, and needs-driven happiness penalties.
 - Breeding config resolution now supports direct config-id lookup (`resolveById`) and shared resolver usage across breeding/spawner/respawn paths.
 - Happiness updates now route through shared `CompanionHappinessService` (with `BreedingHappinessService` retained as a compatibility shim), keeping architecture open for non-breeding consumers.
 - Spawner metadata and command death/respawn snapshots now persist shared happiness state and restore breeding happiness from that shared source for backward-compatible migration.

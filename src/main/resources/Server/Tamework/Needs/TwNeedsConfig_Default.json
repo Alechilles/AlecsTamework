@@ -1,0 +1,54 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "RoleIds": [
+    "Mob_Tamework_Example",
+    "Mob_Tamework_Example_Baby",
+    "Mob_Tamework_Example_Vanilla",
+    "Mob_Tamework_Example_Simple",
+    "Mob_Tamework_Example_Simple_Vanilla",
+    "Mob_Tamework_Example_Hytalor"
+  ],
+  "Values": {
+    "HungerDefault": 100.0,
+    "HungerMin": 0.0,
+    "HungerMax": 100.0,
+    "ThirstDefault": 100.0,
+    "ThirstMin": 0.0,
+    "ThirstMax": 100.0
+  },
+  "Decay": {
+    "HungerPerMinute": 1.2,
+    "ThirstPerMinute": 1.8
+  },
+  "HappinessImpact": {
+    "HungerPenaltyAtMin": 20.0,
+    "ThirstPenaltyAtMin": 30.0,
+    "PenaltyCurvePower": 1.15
+  },
+  "PassiveRefill": {
+    "SweepIntervalSeconds": 15,
+    "NearbyContainerFeedEnabled": true,
+    "ContainerSearchRadius": 7.0,
+    "ContainerFoodItemIds": [
+      "Plant_Fruit_Apple",
+      "Plant_Fruit_Azure",
+      "Plant_Fruit_Pinkberry"
+    ],
+    "HungerGainPerConsumedItem": 25.0,
+    "MaxContainerItemsConsumedPerSweep": 1,
+    "NearbyWaterDrinkEnabled": true,
+    "WaterSearchRadius": 4.0,
+    "ThirstGainPerSweepNearWater": 20.0
+  },
+  "ManualRefill": {
+    "HungerGainOnFeedInteraction": 20.0,
+    "ThirstGainOnWaterBucket": 30.0,
+    "WaterBucketItemIds": [
+      "Container_Bucket"
+    ]
+  },
+  "Timing": {
+    "Basis": "REAL_TIME"
+  }
+}

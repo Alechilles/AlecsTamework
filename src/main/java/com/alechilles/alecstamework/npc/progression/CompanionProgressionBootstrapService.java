@@ -15,7 +15,7 @@ import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
- * Initializes and self-heals progression components (traits, happiness, breeding, life-stage) for companions.
+ * Initializes and self-heals progression components (traits, needs, happiness, breeding, life-stage) for companions.
  */
 public final class CompanionProgressionBootstrapService {
     private static final double EPSILON = 0.000001;
@@ -35,7 +35,9 @@ public final class CompanionProgressionBootstrapService {
             return;
         }
         TwBreedingConfig breedingConfig = TwBreedingConfig.resolveForRole(roleId);
-        TameworkHappinessComponent happiness = bootstrapHappinessComponent(npcRef, store, roleId);
+        bootstrapHappinessComponent(npcRef, store, roleId);
+        CompanionNeedsService.tickNeeds(npcRef, store, roleId);
+        TameworkHappinessComponent happiness = resolveHappinessComponent(npcRef, store);
         bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
         ensureTraitComponents(npcRef, store, roleId);
     }
@@ -129,6 +131,16 @@ public final class CompanionProgressionBootstrapService {
         TameworkHappinessComponent created = new TameworkHappinessComponent(configId, initial, now);
         store.putComponent(npcRef, happinessType, created);
         return created;
+    }
+
+    @Nullable
+    private static TameworkHappinessComponent resolveHappinessComponent(Ref<EntityStore> npcRef,
+                                                                        Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return null;
+        }
+        return store.getComponent(npcRef, happinessType);
     }
 
     private static void bootstrapBreedingComponent(Ref<EntityStore> npcRef,

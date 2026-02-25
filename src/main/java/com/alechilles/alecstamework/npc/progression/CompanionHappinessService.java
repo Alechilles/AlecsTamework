@@ -31,36 +31,9 @@ public final class CompanionHappinessService {
             return false;
         }
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
-        if (happinessType == null) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
-        TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
-        if (breeding == null && store.getComponent(npcRef, happinessType) == null) {
-            return false;
-        }
-        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(
-                npcRef,
-                store,
-                store.getComponent(npcRef, happinessType)
-        );
-        TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
+        TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
+        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
         HappinessRules rules = resolveRules(happinessConfig);
-        TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
-        if (happiness == null) {
-            double seedValue = breeding != null ? breeding.getHappiness() : rules.defaultValue;
-            String configId = happinessConfig != null ? happinessConfig.getId() : null;
-            happiness = new TameworkHappinessComponent(configId, clamp(seedValue, rules.min, rules.max), System.currentTimeMillis());
-            store.putComponent(npcRef, happinessType, happiness);
-        }
-        boolean changed = false;
-        if ((happiness.getConfigId() == null || happiness.getConfigId().isBlank())
-                && happinessConfig != null
-                && happinessConfig.getId() != null
-                && !happinessConfig.getId().isBlank()) {
-            happiness.setConfigId(happinessConfig.getId());
-            changed = true;
-        }
         double gain = rules.feedGain;
         double gainMultiplier = TraitModifierService.resolveMultiplier(
                 npcRef,
@@ -72,23 +45,69 @@ public final class CompanionHappinessService {
         if (!Double.isFinite(adjustedGain)) {
             adjustedGain = 0.0;
         }
-        double previous = happiness.getValue();
-        double next = clamp(previous + adjustedGain, rules.min, rules.max);
-        if (Math.abs(next - previous) > EPSILON) {
-            happiness.setValue(next);
-            changed = true;
+        return applyDelta(npcRef, store, adjustedGain);
+    }
+
+    public static boolean applyDelta(@Nullable Ref<EntityStore> npcRef,
+                                     @Nullable Store<EntityStore> store,
+                                     double delta) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+        TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
+        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        if (happiness == null && breeding == null && happinessConfig == null) {
+            return false;
+        }
+        TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
+        HappinessRules rules = resolveRules(happinessConfig);
+        if (!Double.isFinite(delta)) {
+            delta = 0.0;
         }
         long now = System.currentTimeMillis();
-        if (happiness.getLastUpdateMs() != now) {
-            happiness.setLastUpdateMs(now);
-            changed = true;
-        }
-        if (changed) {
+        if (happiness == null) {
+            double seedValue = breeding != null && Double.isFinite(breeding.getHappiness())
+                    ? breeding.getHappiness()
+                    : rules.defaultValue;
+            String configId = happinessConfig != null ? happinessConfig.getId() : null;
+            happiness = new TameworkHappinessComponent(
+                    configId,
+                    clamp(seedValue, rules.min, rules.max),
+                    now
+            );
             store.putComponent(npcRef, happinessType, happiness);
         }
+        boolean happinessChanged = false;
+        if ((happiness.getConfigId() == null || happiness.getConfigId().isBlank())
+                && happinessConfig != null
+                && happinessConfig.getId() != null
+                && !happinessConfig.getId().isBlank()) {
+            happiness.setConfigId(happinessConfig.getId());
+            happinessChanged = true;
+        }
+        double previous = Double.isFinite(happiness.getValue()) ? happiness.getValue() : rules.defaultValue;
+        double next = clamp(previous + delta, rules.min, rules.max);
+        if (Math.abs(next - previous) > EPSILON) {
+            happiness.setValue(next);
+            happinessChanged = true;
+        }
+        if (happiness.getLastUpdateMs() != now) {
+            happiness.setLastUpdateMs(now);
+            happinessChanged = true;
+        }
+        if (happinessChanged) {
+            store.putComponent(npcRef, happinessType, happiness);
+        }
+
+        boolean breedingChanged = false;
         if (breeding != null && breedingType != null) {
-            boolean breedingChanged = false;
-            if (Math.abs(breeding.getHappiness() - next) > EPSILON) {
+            if (!Double.isFinite(breeding.getHappiness()) || Math.abs(breeding.getHappiness() - next) > EPSILON) {
                 breeding.setHappiness(next);
                 breedingChanged = true;
             }
@@ -112,9 +131,8 @@ public final class CompanionHappinessService {
             if (breedingChanged) {
                 store.putComponent(npcRef, breedingType, breeding);
             }
-            changed |= breedingChanged;
         }
-        return changed;
+        return happinessChanged || breedingChanged;
     }
 
     public static double resolveCurrentValue(@Nullable Ref<EntityStore> npcRef,

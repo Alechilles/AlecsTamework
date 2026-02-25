@@ -17,6 +17,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -49,6 +50,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -62,6 +64,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnL
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.AssetPack;
@@ -118,6 +121,7 @@ public class Tamework extends JavaPlugin {
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private boolean happinessAssetsRegistered;
+    private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private String lastGlobalConfigWarningKey;
@@ -127,6 +131,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkNpcNameComponent> npcNameComponentType;
     private ComponentType<EntityStore, TameworkCommandLinksComponent> commandLinksComponentType;
     private ComponentType<EntityStore, TameworkHappinessComponent> happinessComponentType;
+    private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
@@ -161,6 +166,7 @@ public class Tamework extends JavaPlugin {
         registerCommandItemAssets();
         registerInteractionAssets();
         registerHappinessAssets();
+        registerNeedsAssets();
         registerBreedingAssets();
         registerTraitAssets();
 
@@ -201,6 +207,12 @@ public class Tamework extends JavaPlugin {
                 TameworkHappinessComponent.CODEC
         );
 
+        needsComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkNeedsComponent.class,
+                "TameworkNeeds",
+                TameworkNeedsComponent.CODEC
+        );
+
         breedingComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkBreedingComponent.class,
                 "TameworkBreeding",
@@ -235,6 +247,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)
         );
+        getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService();
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
@@ -661,6 +674,22 @@ public class Tamework extends JavaPlugin {
         happinessAssetsRegistered = true;
     }
 
+    private void registerNeedsAssets() {
+        if (needsAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwNeedsConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Needs")
+                        .setCodec(TwNeedsConfig.CODEC)
+                        .setKeyFunction(TwNeedsConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwNeedsConfig.class, this::onNeedsAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwNeedsConfig.class, this::onNeedsAssetsRemoved);
+        needsAssetsRegistered = true;
+    }
+
     private void registerBreedingAssets() {
         if (breedingAssetsRegistered) {
             return;
@@ -755,6 +784,16 @@ public class Tamework extends JavaPlugin {
     private void onHappinessAssetsRemoved(
             RemovedAssetsEvent<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> event) {
         TwHappinessConfig.clearRoleCache();
+    }
+
+    private void onNeedsAssetsLoaded(
+            LoadedAssetsEvent<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> event) {
+        TwNeedsConfig.clearRoleCache();
+    }
+
+    private void onNeedsAssetsRemoved(
+            RemovedAssetsEvent<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> event) {
+        TwNeedsConfig.clearRoleCache();
     }
 
     private void onBreedingAssetsLoaded(
@@ -886,6 +925,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkHappinessComponent> getHappinessComponentType() {
         return happinessComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkNeedsComponent> getNeedsComponentType() {
+        return needsComponentType;
     }
 
     public ComponentType<EntityStore, TameworkBreedingComponent> getBreedingComponentType() {

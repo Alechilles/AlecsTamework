@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParti
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -171,12 +172,18 @@ final class TameworkInteractEffects {
         return roleId;
     }
 
-    boolean applyFeeding(Ref<EntityStore> npcRef, Store<EntityStore> store, double healAmount, Player player) {
+    boolean applyFeeding(Ref<EntityStore> npcRef,
+                         Store<EntityStore> store,
+                         double healAmount,
+                         Player player,
+                         InteractionContextSnapshot ctx) {
         if (healAmount > 0) {
             stateEffects.applyHeal(npcRef, store, healAmount);
             presentationEffects.showFeedingCombatText(npcRef, store, player, healAmount);
         }
         CompanionHappinessService.applyFeedGain(npcRef, store);
+        String heldItemId = ctx != null ? ctx.activeItemId : null;
+        CompanionNeedsService.applyFeedInteractionRefill(npcRef, store, heldItemId);
         return true;
     }
 
