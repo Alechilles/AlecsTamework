@@ -34,20 +34,29 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
                               @Nonnull AddReason reason,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        if (npcType == null) {
+        if (npcType == null || tamedType == null) {
             return;
         }
         if (store.getComponent(reference, npcType) == null) {
-            return;
-        }
-        if (tamedType == null) {
             return;
         }
         TameworkTamedComponent tamed = store.getComponent(reference, tamedType);
         if (tamed == null || !tamed.isTamed()) {
             return;
         }
-        CompanionProgressionBootstrapService.ensureProgressionComponents(reference, store);
+        commandBuffer.run(bufferStore -> {
+            if (bufferStore == null || reference == null || !reference.isValid()) {
+                return;
+            }
+            if (bufferStore.getComponent(reference, npcType) == null) {
+                return;
+            }
+            TameworkTamedComponent latestTamed = bufferStore.getComponent(reference, tamedType);
+            if (latestTamed == null || !latestTamed.isTamed()) {
+                return;
+            }
+            CompanionProgressionBootstrapService.ensureProgressionComponents(reference, bufferStore);
+        });
     }
 
     @Override
