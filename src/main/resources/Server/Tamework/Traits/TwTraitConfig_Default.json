@@ -12,9 +12,9 @@
     "RollsPerSpawn": 2,
     "RollCountWeights": {
       "Count0": 0.15,
-      "Count1": 0.20,
+      "Count1": 0.25,
       "Count2": 0.40,
-      "Count3": 0.20,
+      "Count3": 0.15,
       "Count4": 0.05
     },
     "RerollDuplicates": true,
