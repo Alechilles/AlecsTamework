@@ -108,7 +108,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
                 FERTILITY_MULTIPLIER_KEY,
                 1.0
         );
-        double effective = BreedingEligibilityService.resolveEffectiveHappiness(baseHappiness, fertilityMultiplier, null);
+        double effective = BreedingEligibilityService.resolveEffectiveHappiness(baseHappiness, 1.0, null);
         Boolean eligible = threshold != null
                 ? BreedingEligibilityService.isEligible(effective, threshold)
                 : null;
@@ -171,7 +171,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         if (breeding.configId() != null) {
             message.append(", config=").append(breeding.configId());
         }
-        message.append(", fertilityMultiplier=").append(formatDouble(breeding.fertilityMultiplier()));
+        message.append(", fertilityOffspringFactor=").append(formatDouble(breeding.fertilityMultiplier()));
         message.append(", effective=").append(formatDouble(breeding.effectiveHappiness()));
         if (breeding.threshold() != null) {
             message.append(", threshold=").append(formatDouble(breeding.threshold()));

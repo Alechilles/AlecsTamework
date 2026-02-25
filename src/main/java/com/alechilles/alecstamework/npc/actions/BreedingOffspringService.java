@@ -5,9 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
-import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
-import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -44,19 +42,22 @@ final class BreedingOffspringService {
     private static final long PAIRING_PROXIMITY_CHECK_INTERVAL_MS = 100L;
     private static final long PAIRING_PROXIMITY_TIMEOUT_MS = 5000L;
     private static final long OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS = 2200L;
-    private static final long[] OFFSPRING_PRESENCE_CHECK_DELAYS_MS = new long[] { 900L, 3000L, 8000L };
     private static final double APPROACH_SPACING = 0.45;
     private static final double PAIRING_READY_DISTANCE = 2.20;
     private static final double OFFSPRING_SPAWN_HEIGHT_OFFSET = 1.00;
 
     private final BreedingPartnerService partnerService;
     private final BreedingOffspringSpawnService spawnService;
+    private final BreedingFertilityOffspringService fertilityOffspringService;
     private final BreedingOffspringProgressionService progressionService;
+    private final BreedingOffspringPresenceProbeService presenceProbeService;
 
     BreedingOffspringService(BreedingPartnerService partnerService) {
         this.partnerService = partnerService;
         this.spawnService = new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
+        this.fertilityOffspringService = new BreedingFertilityOffspringService();
         this.progressionService = new BreedingOffspringProgressionService();
+        this.presenceProbeService = new BreedingOffspringPresenceProbeService();
     }
 
     boolean tryCompletePairing(Ref<EntityStore> sourceRef,
@@ -432,6 +433,19 @@ final class BreedingOffspringService {
         }
         Ref<EntityStore> parentARef = world.getEntityRef(context.parentAUuid());
         Ref<EntityStore> parentBRef = world.getEntityRef(context.parentBUuid());
+        BreedingFertilityOffspringService.FertilityRoll fertilityRoll =
+                fertilityOffspringService.rollOffspring(parentARef, parentBRef, store);
+        if (fertilityRoll.offspringCount() <= 0) {
+            logInfo(String.format(
+                    "Breeding produced no offspring: parentA=%s parentB=%s fertilityA=%.2f fertilityB=%.2f expected=%.2f.",
+                    context.parentAUuid(),
+                    context.parentBUuid(),
+                    fertilityRoll.parentAMultiplier(),
+                    fertilityRoll.parentBMultiplier(),
+                    fertilityRoll.expectedOffspring()
+            ));
+            return;
+        }
         TransformComponent parentATransform = getTransform(parentARef, store);
         TransformComponent parentBTransform = getTransform(parentBRef, store);
         NPCPlugin npcPlugin = NPCPlugin.get();
@@ -463,54 +477,82 @@ final class BreedingOffspringService {
             return;
         }
         Vector3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
-        Pair<Ref<EntityStore>, NPCEntity> spawned = spawnService.spawnWithFallback(
-                npcPlugin,
-                store,
-                spawnRole.roleIndex(),
-                spawnPosition,
-                spawnRotation
-        );
-        if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            logWarn(String.format(
-                    "Breeding spawn failed after fallback attempts: role=%s index=%d parentA=%s parentB=%s pos=(%.2f, %.2f, %.2f).",
-                    spawnRole.roleId(),
+        int spawnedCount = 0;
+        for (int i = 0; i < fertilityRoll.offspringCount(); i++) {
+            Vector3d spawnAttemptPosition = i == 0
+                    ? spawnPosition
+                    : new Vector3d(
+                            spawnPosition.x + ThreadLocalRandom.current().nextDouble(-0.55, 0.55),
+                            spawnPosition.y,
+                            spawnPosition.z + ThreadLocalRandom.current().nextDouble(-0.55, 0.55)
+                    );
+            Pair<Ref<EntityStore>, NPCEntity> spawned = spawnService.spawnWithFallback(
+                    npcPlugin,
+                    store,
                     spawnRole.roleIndex(),
+                    spawnAttemptPosition,
+                    spawnRotation
+            );
+            if (spawned == null || spawned.first() == null || spawned.second() == null) {
+                logWarn(String.format(
+                        "Breeding spawn failed after fallback attempts: role=%s index=%d parentA=%s parentB=%s pos=(%.2f, %.2f, %.2f).",
+                        spawnRole.roleId(),
+                        spawnRole.roleIndex(),
+                        context.parentAUuid(),
+                        context.parentBUuid(),
+                        spawnAttemptPosition.x,
+                        spawnAttemptPosition.y,
+                        spawnAttemptPosition.z
+                ));
+                continue;
+            }
+            Ref<EntityStore> childRef = spawned.first();
+            NPCEntity childNpc = spawned.second();
+            TwBreedingConfig childBreedingConfig = resolveBreedingConfig(context.breedingConfigId());
+            long childCooldownMs = resolveCooldownMs(childBreedingConfig, childRef, store);
+            progressionService.applyOffspringState(
+                    childRef,
+                    childNpc,
+                    parentARef,
+                    parentBRef,
+                    spawnRole.roleId(),
+                    context.parentAOwner(),
+                    context.parentBOwner(),
+                    context.parentATamed(),
+                    context.parentBTamed(),
+                    context.breedingConfigId(),
+                    childCooldownMs,
+                    spawnRole.hasBabyVariant(),
+                    store
+            );
+            spawnHeartsParticle(childRef, store);
+            logInfo(String.format(
+                    "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s.",
+                    childNpc.getUuid(),
+                    spawnRole.roleId(),
+                    context.parentAUuid(),
+                    context.parentBUuid()
+            ));
+            presenceProbeService.schedulePresenceChecks(
+                    world,
+                    childNpc.getUuid(),
+                    spawnRole.roleId(),
+                    context.parentAUuid(),
+                    context.parentBUuid()
+            );
+            spawnedCount++;
+        }
+        if (spawnedCount > 1) {
+            logInfo(String.format(
+                    "Breeding produced multiple offspring: count=%d parentA=%s parentB=%s fertilityA=%.2f fertilityB=%.2f expected=%.2f.",
+                    spawnedCount,
                     context.parentAUuid(),
                     context.parentBUuid(),
-                    spawnPosition.x,
-                    spawnPosition.y,
-                    spawnPosition.z
+                    fertilityRoll.parentAMultiplier(),
+                    fertilityRoll.parentBMultiplier(),
+                    fertilityRoll.expectedOffspring()
             ));
-            return;
         }
-        Ref<EntityStore> childRef = spawned.first();
-        NPCEntity childNpc = spawned.second();
-        TwBreedingConfig childBreedingConfig = resolveBreedingConfig(context.breedingConfigId());
-        long childCooldownMs = resolveCooldownMs(childBreedingConfig, childRef, store);
-        progressionService.applyOffspringState(
-                childRef,
-                childNpc,
-                parentARef,
-                parentBRef,
-                spawnRole.roleId(),
-                context.parentAOwner(),
-                context.parentBOwner(),
-                context.parentATamed(),
-                context.parentBTamed(),
-                context.breedingConfigId(),
-                childCooldownMs,
-                spawnRole.hasBabyVariant(),
-                store
-        );
-        spawnHeartsParticle(childRef, store);
-        logInfo(String.format(
-                "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s.",
-                childNpc.getUuid(),
-                spawnRole.roleId(),
-                context.parentAUuid(),
-                context.parentBUuid()
-        ));
-        scheduleOffspringPresenceCheck(world, childNpc.getUuid(), spawnRole.roleId(), context);
     }
 
     @Nullable
@@ -698,86 +740,6 @@ final class BreedingOffspringService {
             return;
         }
         instance.getLogger().at(Level.INFO).log(message);
-    }
-
-    private void scheduleOffspringPresenceCheck(World world,
-                                                @Nullable UUID childUuid,
-                                                String childRoleId,
-                                                OffspringSpawnContext context) {
-        if (world == null || childUuid == null || childRoleId == null || childRoleId.isBlank() || context == null) {
-            return;
-        }
-        for (long delayMs : OFFSPRING_PRESENCE_CHECK_DELAYS_MS) {
-            long safeDelayMs = Math.max(0L, delayMs);
-            scheduleWorldAction(
-                    world,
-                    safeDelayMs,
-                    "offspring-presence-check-" + safeDelayMs + "ms",
-                    () -> verifyOffspringPresence(world, childUuid, childRoleId, context, safeDelayMs)
-            );
-        }
-    }
-
-    private void verifyOffspringPresence(World world,
-                                         UUID childUuid,
-                                         String childRoleId,
-                                         OffspringSpawnContext context,
-                                         long checkDelayMs) {
-        if (world == null || childUuid == null || childRoleId == null || childRoleId.isBlank() || context == null) {
-            return;
-        }
-        Ref<EntityStore> childRef = world.getEntityRef(childUuid);
-        if (childRef == null || !childRef.isValid()) {
-            logWarn(String.format(
-                    "Breeding offspring missing after %dms: child=%s role=%s parentA=%s parentB=%s.",
-                    checkDelayMs,
-                    childUuid,
-                    childRoleId,
-                    context.parentAUuid(),
-                    context.parentBUuid()
-            ));
-            return;
-        }
-        Store<EntityStore> store = world.getEntityStore() != null
-                ? world.getEntityStore().getStore()
-                : null;
-        if (store == null) {
-            return;
-        }
-        NPCEntity npc = store.getComponent(childRef, NPCEntity.getComponentType());
-        if (npc == null) {
-            logWarn(String.format(
-                    "Breeding offspring reference present but NPC component missing after %dms: child=%s role=%s parentA=%s parentB=%s.",
-                    checkDelayMs,
-                    childUuid,
-                    childRoleId,
-                    context.parentAUuid(),
-                    context.parentBUuid()
-            ));
-            return;
-        }
-        TransformComponent transform = store.getComponent(childRef, TransformComponent.getComponentType());
-        Vector3d position = transform != null ? transform.getPosition() : null;
-        double scale = CompanionModelScaleService.resolveCurrentScale(childRef, store, 1.0);
-        String stage = null;
-        ComponentType<EntityStore, TameworkLifeStageComponent> stageType = TameworkLifeStageComponent.getComponentType();
-        if (stageType != null) {
-            TameworkLifeStageComponent stageComponent = store.getComponent(childRef, stageType);
-            if (stageComponent != null) {
-                stage = stageComponent.getStage();
-            }
-        }
-        logInfo(String.format(
-                "Breeding offspring confirmed in-world after %dms: child=%s role=%s pos=%s scale=%.2f stage=%s.",
-                checkDelayMs,
-                childUuid,
-                childRoleId,
-                position != null
-                        ? String.format("(%.2f, %.2f, %.2f)", position.x, position.y, position.z)
-                        : "(unknown)",
-                scale,
-                stage != null ? stage : "unknown"
-        ));
     }
 
     private record PairingTargets(Vector3d parentATarget, Vector3d parentBTarget) {

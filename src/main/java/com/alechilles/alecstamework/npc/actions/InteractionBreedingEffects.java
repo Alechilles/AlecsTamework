@@ -10,7 +10,6 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -68,15 +67,9 @@ final class InteractionBreedingEffects {
             breeding.setHappiness(happiness);
         }
         double threshold = resolveThreshold(interaction, config);
-        double fertilityMultiplier = TraitModifierService.resolveMultiplier(
-                npcRef,
-                store,
-                "FertilityMultiplier",
-                1.0
-        );
         double effectiveHappiness = BreedingEligibilityService.resolveEffectiveHappiness(
                 happiness,
-                fertilityMultiplier,
+                1.0,
                 interaction != null ? interaction.getFertilityBonus() : null
         );
         if (!BreedingEligibilityService.isEligible(effectiveHappiness, threshold)) {
