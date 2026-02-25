@@ -4,6 +4,7 @@
     "Mode": "Allowlist",
     "Allowlist": [
       "Mob_Tamework_Example",
+      "Mob_Tamework_Example_Baby",
       "Mob_Tamework_Example_Simple",
       "Cat_Pet",
       "Tamed_Sheep"

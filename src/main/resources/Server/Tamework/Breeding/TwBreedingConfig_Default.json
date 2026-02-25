@@ -3,6 +3,7 @@
   "Priority": 0,
   "RoleIds": [
     "Mob_Tamework_Example",
+    "Mob_Tamework_Example_Baby",
     "Mob_Tamework_Example_Vanilla",
     "Mob_Tamework_Example_Simple",
     "Mob_Tamework_Example_Simple_Vanilla",
@@ -49,6 +50,7 @@
     "Families": [
       {
         "AdultRoleId": "Mob_Tamework_Example",
+        "BabyRoleId": "Mob_Tamework_Example_Baby",
         "TimeToFullGrownSeconds": 420
       }
     ]
