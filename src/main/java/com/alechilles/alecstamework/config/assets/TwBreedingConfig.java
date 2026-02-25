@@ -152,6 +152,18 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
+    private static final BuilderCodec<PassiveBreedingSettings> PASSIVE_BREEDING_CODEC = BuilderCodec.builder(
+            PassiveBreedingSettings.class,
+            PassiveBreedingSettings::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            (settings, value) -> settings.enabled = value != null && value,
+            settings -> settings.enabled
+        )
+        .add()
+        .build();
+
     public static final AssetBuilderCodec<String, TwBreedingConfig> CODEC = AssetBuilderCodec.builder(
             TwBreedingConfig.class,
             TwBreedingConfig::new,
@@ -204,6 +216,12 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             asset -> asset.cooldowns
         )
         .add()
+        .<PassiveBreedingSettings>append(
+            new KeyedCodec<>("PassiveBreeding", PASSIVE_BREEDING_CODEC),
+            (asset, value) -> asset.passiveBreeding = value == null ? new PassiveBreedingSettings() : value,
+            asset -> asset.passiveBreeding
+        )
+        .add()
         .<InheritanceSettings>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_CODEC),
             (asset, value) -> asset.inheritance = value == null ? new InheritanceSettings() : value,
@@ -226,6 +244,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     private EligibilitySettings eligibility = new EligibilitySettings();
     private PairingSettings pairing = new PairingSettings();
     private CooldownSettings cooldowns = new CooldownSettings();
+    private PassiveBreedingSettings passiveBreeding = new PassiveBreedingSettings();
     private InheritanceSettings inheritance = new InheritanceSettings();
 
     public static AssetStore<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> getAssetStore() {
@@ -381,6 +400,10 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return cooldowns == null ? new CooldownSettings() : cooldowns;
     }
 
+    public PassiveBreedingSettings getPassiveBreeding() {
+        return passiveBreeding == null ? new PassiveBreedingSettings() : passiveBreeding;
+    }
+
     public InheritanceSettings getInheritance() {
         return inheritance == null ? new InheritanceSettings() : inheritance;
     }
@@ -463,6 +486,15 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         public int getMaxDelaySeconds() {
             return maxDelaySeconds;
+        }
+    }
+
+    /** Controls passive, non-interaction breeding candidate generation. */
+    public static final class PassiveBreedingSettings {
+        private boolean enabled;
+
+        public boolean isEnabled() {
+            return enabled;
         }
     }
 

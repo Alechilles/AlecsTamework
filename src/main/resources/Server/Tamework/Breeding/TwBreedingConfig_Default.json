@@ -21,13 +21,16 @@
     "BreedRadius": 10.0,
     "RequireWanderMode": false,
     "RequireSameOwner": false,
-    "MaxNearbyOffspring": 0,
+    "MaxNearbyOffspring": 8,
     "RequireSameRoleId": true
   },
   "Cooldowns": {
     "BaseCooldownSeconds": 600,
     "MinDelaySeconds": 15,
     "MaxDelaySeconds": 45
+  },
+  "PassiveBreeding": {
+    "Enabled": true
   },
   "Inheritance": {
     "InheritOwner": true,
