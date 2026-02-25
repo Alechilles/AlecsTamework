@@ -87,7 +87,7 @@ public final class TraitInheritanceService {
                                           TameworkTraitsComponent.TraitValue[] fallback,
                                           List<ParentTraitCandidate> parentCandidates) {
         int maxTraits = Math.max(0, config.getStacking().getMaxTraitsPerNpc());
-        int rolls = Math.max(0, config.getSelection().getRollsPerSpawn());
+        int rolls = Math.max(0, TraitRollService.resolveMaxConfiguredRollCount(config.getSelection()));
         int cap = Math.min(maxTraits, rolls);
         if (cap <= 0) {
             return 0;

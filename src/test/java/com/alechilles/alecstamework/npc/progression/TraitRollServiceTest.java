@@ -97,6 +97,32 @@ class TraitRollServiceTest {
         assertEquals("Trait_Repeatable", rolled[2].getId());
     }
 
+    @Test
+    void rollTraitsUsesWeightedVariableRollCounts() throws Exception {
+        TwTraitConfig config = createConfig(
+                true,
+                2,
+                false,
+                4,
+                true,
+                trait("Trait_Repeatable", "FertilityMultiplier", 1.0, 1.0, 1.0, 1.0)
+        );
+        TwTraitConfig.SelectionSettings selection =
+                (TwTraitConfig.SelectionSettings) readField(config, "selection");
+        setField(selection, "rollCountWeights", weights(0.10, 0.20, 0.45, 0.20, 0.05));
+
+        int[] counts = new int[5];
+        for (int seed = 1; seed <= 2000; seed++) {
+            int rolledCount = TraitRollService.rollTraits(config, seed).length;
+            assertTrue(rolledCount >= 0 && rolledCount <= 4);
+            counts[rolledCount]++;
+        }
+
+        assertTrue(counts[2] > counts[1]);
+        assertTrue(counts[2] > counts[3]);
+        assertTrue(counts[4] < counts[2]);
+    }
+
     private TwTraitConfig createConfig(boolean seeded,
                                        int rollsPerSpawn,
                                        boolean rerollDuplicates,
@@ -109,6 +135,7 @@ class TraitRollServiceTest {
         setField(config, "enabled", true);
         TwTraitConfig.SelectionSettings selection = new TwTraitConfig.SelectionSettings();
         setField(selection, "rollsPerSpawn", rollsPerSpawn);
+        setField(selection, "rollCountWeights", weightsForFixedRollCount(rollsPerSpawn));
         setField(selection, "rerollDuplicates", rerollDuplicates);
         setField(selection, "useSeededRandom", seeded);
         setField(config, "selection", selection);
@@ -118,6 +145,31 @@ class TraitRollServiceTest {
         setField(config, "stacking", stacking);
         setField(config, "traits", traits);
         return config;
+    }
+
+    private TwTraitConfig.RollCountWeights weightsForFixedRollCount(int rollCount) throws Exception {
+        int clamped = Math.max(0, Math.min(4, rollCount));
+        TwTraitConfig.RollCountWeights weights = new TwTraitConfig.RollCountWeights();
+        setField(weights, "count0", clamped == 0 ? 1.0 : 0.0);
+        setField(weights, "count1", clamped == 1 ? 1.0 : 0.0);
+        setField(weights, "count2", clamped == 2 ? 1.0 : 0.0);
+        setField(weights, "count3", clamped == 3 ? 1.0 : 0.0);
+        setField(weights, "count4", clamped == 4 ? 1.0 : 0.0);
+        return weights;
+    }
+
+    private TwTraitConfig.RollCountWeights weights(double count0,
+                                                   double count1,
+                                                   double count2,
+                                                   double count3,
+                                                   double count4) throws Exception {
+        TwTraitConfig.RollCountWeights weights = new TwTraitConfig.RollCountWeights();
+        setField(weights, "count0", count0);
+        setField(weights, "count1", count1);
+        setField(weights, "count2", count2);
+        setField(weights, "count3", count3);
+        setField(weights, "count4", count4);
+        return weights;
     }
 
     private TwTraitConfig.TraitDefinition trait(String id,
@@ -143,5 +195,11 @@ class TraitRollServiceTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static Object readField(Object target, String fieldName) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        return field.get(target);
     }
 }

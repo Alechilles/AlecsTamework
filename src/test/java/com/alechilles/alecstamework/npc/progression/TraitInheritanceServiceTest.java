@@ -141,6 +141,7 @@ class TraitInheritanceServiceTest {
 
         TwTraitConfig.SelectionSettings selection = new TwTraitConfig.SelectionSettings();
         setField(selection, "rollsPerSpawn", rollsPerSpawn);
+        setField(selection, "rollCountWeights", weightsForFixedRollCount(rollsPerSpawn));
         setField(selection, "rerollDuplicates", true);
         setField(selection, "useSeededRandom", true);
         setField(config, "selection", selection);
@@ -159,6 +160,17 @@ class TraitInheritanceServiceTest {
 
         setField(config, "traits", traits);
         return config;
+    }
+
+    private TwTraitConfig.RollCountWeights weightsForFixedRollCount(int rollCount) throws Exception {
+        int clamped = Math.max(0, Math.min(4, rollCount));
+        TwTraitConfig.RollCountWeights weights = new TwTraitConfig.RollCountWeights();
+        setField(weights, "count0", clamped == 0 ? 1.0 : 0.0);
+        setField(weights, "count1", clamped == 1 ? 1.0 : 0.0);
+        setField(weights, "count2", clamped == 2 ? 1.0 : 0.0);
+        setField(weights, "count3", clamped == 3 ? 1.0 : 0.0);
+        setField(weights, "count4", clamped == 4 ? 1.0 : 0.0);
+        return weights;
     }
 
     private TwTraitConfig.TraitDefinition trait(String id,

@@ -30,8 +30,12 @@ public final class TraitRollService {
         if (definitions == null || definitions.length == 0) {
             return EMPTY_VALUES;
         }
+        TwTraitConfig.SelectionSettings selection = config.getSelection();
+        Random random = selection.isUseSeededRandom()
+                ? new Random(seed)
+                : new Random();
         int maxTraits = Math.max(0, config.getStacking().getMaxTraitsPerNpc());
-        int rolls = Math.max(0, config.getSelection().getRollsPerSpawn());
+        int rolls = resolveConfiguredRollCount(selection, random);
         if (maxTraits == 0 || rolls == 0) {
             return EMPTY_VALUES;
         }
@@ -52,11 +56,8 @@ public final class TraitRollService {
         if (pool.isEmpty()) {
             return EMPTY_VALUES;
         }
-        Random random = config.getSelection().isUseSeededRandom()
-                ? new Random(seed)
-                : new Random();
         boolean allowDuplicates = config.getStacking().isAllowDuplicateTraits();
-        boolean rerollDuplicates = config.getSelection().isRerollDuplicates();
+        boolean rerollDuplicates = selection.isRerollDuplicates();
 
         ArrayList<TameworkTraitsComponent.TraitValue> selected = new ArrayList<>(targetCount);
         int attempts = Math.max(pool.size() * 4, targetCount * 4);
@@ -91,6 +92,72 @@ public final class TraitRollService {
         return selected.isEmpty()
                 ? EMPTY_VALUES
                 : selected.toArray(new TameworkTraitsComponent.TraitValue[0]);
+    }
+
+    static int resolveMaxConfiguredRollCount(@Nullable TwTraitConfig.SelectionSettings selection) {
+        if (selection == null) {
+            return 0;
+        }
+        int fallback = Math.max(0, selection.getRollsPerSpawn());
+        TwTraitConfig.RollCountWeights weights = selection.getRollCountWeights();
+        if (weights == null) {
+            return fallback;
+        }
+        if (sanitizeRollCountWeight(weights.getCount4()) > 0.0) {
+            return 4;
+        }
+        if (sanitizeRollCountWeight(weights.getCount3()) > 0.0) {
+            return 3;
+        }
+        if (sanitizeRollCountWeight(weights.getCount2()) > 0.0) {
+            return 2;
+        }
+        if (sanitizeRollCountWeight(weights.getCount1()) > 0.0) {
+            return 1;
+        }
+        if (sanitizeRollCountWeight(weights.getCount0()) > 0.0) {
+            return 0;
+        }
+        return fallback;
+    }
+
+    static int resolveConfiguredRollCount(@Nullable TwTraitConfig.SelectionSettings selection,
+                                          @Nullable Random random) {
+        if (selection == null) {
+            return 0;
+        }
+        int fallback = Math.max(0, selection.getRollsPerSpawn());
+        TwTraitConfig.RollCountWeights weights = selection.getRollCountWeights();
+        if (weights == null || random == null) {
+            return fallback;
+        }
+        double weight0 = sanitizeRollCountWeight(weights.getCount0());
+        double weight1 = sanitizeRollCountWeight(weights.getCount1());
+        double weight2 = sanitizeRollCountWeight(weights.getCount2());
+        double weight3 = sanitizeRollCountWeight(weights.getCount3());
+        double weight4 = sanitizeRollCountWeight(weights.getCount4());
+        double total = weight0 + weight1 + weight2 + weight3 + weight4;
+        if (!(total > 0.0)) {
+            return fallback;
+        }
+        double roll = random.nextDouble() * total;
+        double cumulative = weight0;
+        if (roll <= cumulative) {
+            return 0;
+        }
+        cumulative += weight1;
+        if (roll <= cumulative) {
+            return 1;
+        }
+        cumulative += weight2;
+        if (roll <= cumulative) {
+            return 2;
+        }
+        cumulative += weight3;
+        if (roll <= cumulative) {
+            return 3;
+        }
+        return 4;
     }
 
     private static boolean containsTrait(List<TameworkTraitsComponent.TraitValue> values, String traitId) {
@@ -232,6 +299,10 @@ public final class TraitRollService {
     }
 
     private static double sanitizeWeight(double weight) {
+        return Double.isFinite(weight) && weight > 0.0 ? weight : 0.0;
+    }
+
+    private static double sanitizeRollCountWeight(double weight) {
         return Double.isFinite(weight) && weight > 0.0 ? weight : 0.0;
     }
 

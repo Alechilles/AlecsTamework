@@ -10,6 +10,13 @@
   ],
   "Selection": {
     "RollsPerSpawn": 2,
+    "RollCountWeights": {
+      "Count0": 0.10,
+      "Count1": 0.20,
+      "Count2": 0.45,
+      "Count3": 0.20,
+      "Count4": 0.05
+    },
     "RerollDuplicates": true,
     "UseSeededRandom": true
   },

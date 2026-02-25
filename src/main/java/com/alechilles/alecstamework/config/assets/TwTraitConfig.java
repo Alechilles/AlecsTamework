@@ -41,6 +41,42 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .build();
 
+    private static final BuilderCodec<RollCountWeights> ROLL_COUNT_WEIGHTS_CODEC = BuilderCodec.builder(
+            RollCountWeights.class,
+            RollCountWeights::new
+    )
+        .<Double>append(
+            new KeyedCodec<>("Count0", Codec.DOUBLE),
+            (weights, value) -> weights.count0 = value,
+            weights -> weights.count0
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Count1", Codec.DOUBLE),
+            (weights, value) -> weights.count1 = value,
+            weights -> weights.count1
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Count2", Codec.DOUBLE),
+            (weights, value) -> weights.count2 = value,
+            weights -> weights.count2
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Count3", Codec.DOUBLE),
+            (weights, value) -> weights.count3 = value,
+            weights -> weights.count3
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Count4", Codec.DOUBLE),
+            (weights, value) -> weights.count4 = value,
+            weights -> weights.count4
+        )
+        .add()
+        .build();
+
     private static final BuilderCodec<SelectionSettings> SELECTION_CODEC = BuilderCodec.builder(
             SelectionSettings.class,
             SelectionSettings::new
@@ -49,6 +85,12 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             new KeyedCodec<>("RollsPerSpawn", Codec.INTEGER),
             (settings, value) -> settings.rollsPerSpawn = value,
             settings -> settings.rollsPerSpawn
+        )
+        .add()
+        .<RollCountWeights>append(
+            new KeyedCodec<>("RollCountWeights", ROLL_COUNT_WEIGHTS_CODEC),
+            (settings, value) -> settings.rollCountWeights = value == null ? new RollCountWeights() : value,
+            settings -> settings.rollCountWeights
         )
         .add()
         .<Boolean>append(
@@ -383,11 +425,16 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
     /** Trait roll counts and randomization controls. */
     public static final class SelectionSettings {
         private int rollsPerSpawn = 2;
+        private RollCountWeights rollCountWeights = new RollCountWeights();
         private boolean rerollDuplicates = true;
         private boolean useSeededRandom = true;
 
         public int getRollsPerSpawn() {
             return rollsPerSpawn;
+        }
+
+        public RollCountWeights getRollCountWeights() {
+            return rollCountWeights == null ? new RollCountWeights() : rollCountWeights;
         }
 
         public boolean isRerollDuplicates() {
@@ -396,6 +443,35 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isUseSeededRandom() {
             return useSeededRandom;
+        }
+    }
+
+    /** Weighted roll-count settings (0..4) used to vary spawned trait counts. */
+    public static final class RollCountWeights {
+        private double count0 = 0.10;
+        private double count1 = 0.20;
+        private double count2 = 0.45;
+        private double count3 = 0.20;
+        private double count4 = 0.05;
+
+        public double getCount0() {
+            return count0;
+        }
+
+        public double getCount1() {
+            return count1;
+        }
+
+        public double getCount2() {
+            return count2;
+        }
+
+        public double getCount3() {
+            return count3;
+        }
+
+        public double getCount4() {
+            return count4;
         }
     }
 
