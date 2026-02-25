@@ -34,7 +34,7 @@ public final class CompanionProgressionBootstrapService {
             return;
         }
         TwBreedingConfig breedingConfig = TwBreedingConfig.resolveForRole(roleId);
-        TameworkHappinessComponent happiness = bootstrapHappinessComponent(npcRef, store, roleId, breedingConfig);
+        TameworkHappinessComponent happiness = bootstrapHappinessComponent(npcRef, store, roleId);
         bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
         bootstrapTraitsComponent(npcRef, store, roleId);
         CompanionStatModifierService.applyTraitModifiers(npcRef, store);
@@ -48,8 +48,7 @@ public final class CompanionProgressionBootstrapService {
 
     private static TameworkHappinessComponent bootstrapHappinessComponent(Ref<EntityStore> npcRef,
                                                                           Store<EntityStore> store,
-                                                                          String roleId,
-                                                                          TwBreedingConfig breedingConfig) {
+                                                                          String roleId) {
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         if (happinessType == null) {
             return null;
@@ -66,8 +65,16 @@ public final class CompanionProgressionBootstrapService {
                 existing.setConfigId(config.getId());
                 changed = true;
             }
-            double clamped = clampHappinessValue(existing.getValue(), config);
-            if (Math.abs(existing.getValue() - clamped) > EPSILON) {
+            double fallback = resolveInitialHappinessValue(npcRef, store, config);
+            double current = existing.getValue();
+            if (!Double.isFinite(current)) {
+                current = fallback;
+            }
+            double clamped = clampHappinessValue(current, config);
+            if (!Double.isFinite(clamped)) {
+                clamped = clampHappinessValue(fallback, config);
+            }
+            if (!Double.isFinite(existing.getValue()) || Math.abs(existing.getValue() - clamped) > EPSILON) {
                 existing.setValue(clamped);
                 changed = true;
             }
@@ -79,10 +86,6 @@ public final class CompanionProgressionBootstrapService {
                 store.putComponent(npcRef, happinessType, existing);
             }
             return existing;
-        }
-        Double legacy = resolveLegacyBreedingHappiness(npcRef, store);
-        if (config == null && breedingConfig == null && legacy == null) {
-            return null;
         }
         double initial = resolveInitialHappinessValue(npcRef, store, config);
         String configId = config != null && config.getId() != null && !config.getId().isBlank()
@@ -119,7 +122,8 @@ public final class CompanionProgressionBootstrapService {
                 existing.setConfigId(config.getId());
                 changed = true;
             }
-            if (Math.abs(existing.getHappiness() - happinessValue) > EPSILON) {
+            if (!Double.isFinite(existing.getHappiness())
+                    || Math.abs(existing.getHappiness() - happinessValue) > EPSILON) {
                 existing.setHappiness(happinessValue);
                 changed = true;
             }
