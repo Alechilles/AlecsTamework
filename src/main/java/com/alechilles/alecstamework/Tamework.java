@@ -59,6 +59,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHo
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
@@ -226,6 +227,9 @@ public class Tamework extends JavaPlugin {
                         EntityStatMap.getComponentType(),
                         traitsComponentType
                 )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CompanionTraitBootstrapOnLoadSystem(NPCEntity.getComponentType())
         );
         getEntityStoreRegistry().registerSystem(
                 new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)

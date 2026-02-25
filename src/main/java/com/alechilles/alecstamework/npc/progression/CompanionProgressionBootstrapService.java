@@ -14,7 +14,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.UUID;
 
 /**
- * Initializes happiness, breeding, and trait components for companions when they first become tamed.
+ * Initializes and self-heals progression components (traits, happiness, breeding, life-stage) for companions.
  */
 public final class CompanionProgressionBootstrapService {
     private static final double EPSILON = 0.000001;
@@ -36,6 +36,26 @@ public final class CompanionProgressionBootstrapService {
         TwBreedingConfig breedingConfig = TwBreedingConfig.resolveForRole(roleId);
         TameworkHappinessComponent happiness = bootstrapHappinessComponent(npcRef, store, roleId);
         bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
+        ensureTraitComponents(npcRef, store, roleId);
+    }
+
+    /**
+     * Ensures trait-driven state exists and is actively applied for any configured role.
+     */
+    public static void ensureTraitComponents(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId == null || roleId.isBlank()) {
+            return;
+        }
+        ensureTraitComponents(npcRef, store, roleId);
+    }
+
+    private static void ensureTraitComponents(Ref<EntityStore> npcRef,
+                                              Store<EntityStore> store,
+                                              String roleId) {
         bootstrapTraitsComponent(npcRef, store, roleId);
         CompanionStatModifierService.applyTraitModifiers(npcRef, store);
         CompanionLifeStageService.ensureLifeStageComponent(npcRef, store);

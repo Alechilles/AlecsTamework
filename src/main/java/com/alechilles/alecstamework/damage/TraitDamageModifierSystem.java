@@ -16,7 +16,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  * Applies trait-driven incoming and outgoing damage multipliers.
  */
 public final class TraitDamageModifierSystem extends DamageEventSystem {
-    private static final String DAMAGE_TAKEN_MULTIPLIER_EFFECT_KEY = "DamageTakenMultiplier";
+    private static final String TOUGHNESS_MULTIPLIER_EFFECT_KEY = "DamageTakenMultiplier";
     private static final String DAMAGE_DEALT_MULTIPLIER_EFFECT_KEY = "DamageDealtMultiplier";
     private static final double EPSILON = 0.000001;
 
@@ -51,12 +51,13 @@ public final class TraitDamageModifierSystem extends DamageEventSystem {
             return;
         }
 
-        double takenMultiplier = sanitizeMultiplier(TraitModifierService.resolveMultiplier(
+        double toughnessMultiplier = sanitizeMultiplier(TraitModifierService.resolveMultiplier(
                 targetRef,
                 store,
-                DAMAGE_TAKEN_MULTIPLIER_EFFECT_KEY,
+                TOUGHNESS_MULTIPLIER_EFFECT_KEY,
                 1.0
         ));
+        double takenMultiplier = resolveIncomingDamageMultiplier(toughnessMultiplier);
         double dealtMultiplier = sanitizeMultiplier(resolveSourceDamageMultiplier(damage, store));
         if (Math.abs(takenMultiplier - 1.0) <= EPSILON && Math.abs(dealtMultiplier - 1.0) <= EPSILON) {
             return;
@@ -99,5 +100,16 @@ public final class TraitDamageModifierSystem extends DamageEventSystem {
             return 1.0;
         }
         return multiplier;
+    }
+
+    static double resolveIncomingDamageMultiplier(double toughnessMultiplier) {
+        if (!Double.isFinite(toughnessMultiplier) || toughnessMultiplier <= 0.0) {
+            return 1.0;
+        }
+        double resolved = 1.0 / toughnessMultiplier;
+        if (!Double.isFinite(resolved) || resolved <= 0.0) {
+            return 1.0;
+        }
+        return resolved;
     }
 }

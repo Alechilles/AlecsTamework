@@ -40,17 +40,17 @@ public final class CompanionLifeStageService {
         if (type == null) {
             return;
         }
-            TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
+        TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
         if (existing == null) {
-            double currentScale = CompanionModelScaleService.resolveCurrentScale(npcRef, store, 1.0);
+            double adultScale = resolveAdultScale(npcRef, store);
             TameworkLifeStageComponent created = new TameworkLifeStageComponent(
                     STAGE_ADULT,
                     0L,
                     0L,
                     0L,
-                    resolveBabyScale(currentScale),
-                    resolveAdolescentScale(currentScale),
-                    currentScale,
+                    resolveBabyScale(adultScale),
+                    resolveAdolescentScale(adultScale),
+                    adultScale,
                     false
             );
             store.putComponent(npcRef, type, created);
