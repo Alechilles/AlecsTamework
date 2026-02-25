@@ -105,8 +105,8 @@ public final class TraitInheritanceService {
             return candidate.averagedValue();
         }
 
-        double min = finiteOrDefault(definition.getMin(), definition.getDefaultValue());
-        double max = finiteOrDefault(definition.getMax(), definition.getDefaultValue());
+        double min = finiteOrDefault(definition.getBreedingMin(), definition.getDefaultValue());
+        double max = finiteOrDefault(definition.getBreedingMax(), definition.getDefaultValue());
         if (max < min) {
             double swap = min;
             min = max;
@@ -366,8 +366,8 @@ public final class TraitInheritanceService {
         if (random.nextDouble() > mutationChance) {
             return value;
         }
-        double min = finiteOrDefault(definition.getMin(), definition.getDefaultValue());
-        double max = finiteOrDefault(definition.getMax(), definition.getDefaultValue());
+        double min = finiteOrDefault(definition.getBreedingMin(), definition.getDefaultValue());
+        double max = finiteOrDefault(definition.getBreedingMax(), definition.getDefaultValue());
         if (max < min) {
             double swap = min;
             min = max;
@@ -383,8 +383,8 @@ public final class TraitInheritanceService {
         if (definition == null) {
             return value;
         }
-        double min = finiteOrDefault(definition.getMin(), definition.getDefaultValue());
-        double max = finiteOrDefault(definition.getMax(), definition.getDefaultValue());
+        double min = finiteOrDefault(definition.getBreedingMin(), definition.getDefaultValue());
+        double max = finiteOrDefault(definition.getBreedingMax(), definition.getDefaultValue());
         if (max < min) {
             double swap = min;
             min = max;

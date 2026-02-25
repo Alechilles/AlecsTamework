@@ -38,8 +38,10 @@
       "EffectKey": "HappinessGainMultiplier",
       "Weight": 1.0,
       "InheritanceWeight": 1.0,
-      "Min": 0.8,
-      "Max": 1.2,
+      "NaturalMin": 0.9,
+      "NaturalMax": 1.1,
+      "BreedingMin": 0.8,
+      "BreedingMax": 1.2,
       "Default": 1.0
     },
     {
@@ -48,8 +50,10 @@
       "EffectKey": "FertilityMultiplier",
       "Weight": 0.8,
       "InheritanceWeight": 0.8,
-      "Min": 0.7,
-      "Max": 1.3,
+      "NaturalMin": 0.85,
+      "NaturalMax": 1.15,
+      "BreedingMin": 0.7,
+      "BreedingMax": 1.3,
       "Default": 1.0
     },
     {
@@ -58,8 +62,10 @@
       "EffectKey": "MaxHealthMultiplier",
       "Weight": 0.9,
       "InheritanceWeight": 0.9,
-      "Min": 0.85,
-      "Max": 1.25,
+      "NaturalMin": 0.95,
+      "NaturalMax": 1.1,
+      "BreedingMin": 0.85,
+      "BreedingMax": 1.25,
       "Default": 1.0
     },
     {
@@ -68,8 +74,10 @@
       "EffectKey": "SizeMultiplier",
       "Weight": 0.8,
       "InheritanceWeight": 0.8,
-      "Min": 0.85,
-      "Max": 1.2,
+      "NaturalMin": 0.95,
+      "NaturalMax": 1.08,
+      "BreedingMin": 0.85,
+      "BreedingMax": 1.2,
       "Default": 1.0
     },
     {
@@ -78,8 +86,10 @@
       "EffectKey": "MoveSpeedMultiplier",
       "Weight": 0.75,
       "InheritanceWeight": 0.75,
-      "Min": 0.85,
-      "Max": 1.2,
+      "NaturalMin": 0.95,
+      "NaturalMax": 1.1,
+      "BreedingMin": 0.85,
+      "BreedingMax": 1.2,
       "Default": 1.0
     },
     {
@@ -88,8 +98,10 @@
       "EffectKey": "DamageTakenMultiplier",
       "Weight": 0.85,
       "InheritanceWeight": 0.85,
-      "Min": 0.75,
-      "Max": 1.1,
+      "NaturalMin": 0.9,
+      "NaturalMax": 1.05,
+      "BreedingMin": 0.75,
+      "BreedingMax": 1.1,
       "Default": 1.0
     },
     {
@@ -98,8 +110,10 @@
       "EffectKey": "DamageDealtMultiplier",
       "Weight": 0.85,
       "InheritanceWeight": 0.85,
-      "Min": 0.85,
-      "Max": 1.3,
+      "NaturalMin": 0.95,
+      "NaturalMax": 1.1,
+      "BreedingMin": 0.85,
+      "BreedingMax": 1.3,
       "Default": 1.0
     },
     {
@@ -108,8 +122,10 @@
       "EffectKey": "HarvestDoubleDropChanceMultiplier",
       "Weight": 0.65,
       "InheritanceWeight": 0.65,
-      "Min": 1.0,
-      "Max": 1.35,
+      "NaturalMin": 1.0,
+      "NaturalMax": 1.1,
+      "BreedingMin": 1.0,
+      "BreedingMax": 1.35,
       "Default": 1.0
     }
   ]

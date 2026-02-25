@@ -226,6 +226,51 @@ class TraitInheritanceServiceTest {
         assertTrue(withInfluence[0].getValue() <= 1.4);
     }
 
+    @Test
+    void inheritTraitsUsesBreedingRangeNotNaturalRange() throws Exception {
+        TwTraitConfig.TraitDefinition definition = traitWithRanges(
+                "Trait_A",
+                "FertilityMultiplier",
+                0.95,
+                1.05,
+                0.70,
+                1.30,
+                1.0,
+                1.0
+        );
+        TwTraitConfig config = createConfig(
+                true,
+                1.0,
+                0.0,
+                true,
+                1,
+                1,
+                1.0,
+                definition
+        );
+        TameworkTraitsComponent parentA = new TameworkTraitsComponent(
+                "Traits_Test",
+                60L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Trait_A", 1.30)
+                }
+        );
+        TameworkTraitsComponent parentB = new TameworkTraitsComponent(
+                "Traits_Test",
+                61L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Trait_A", 1.30)
+                }
+        );
+
+        TameworkTraitsComponent.TraitValue[] inherited =
+                TraitInheritanceService.inheritTraits(config, parentA, parentB, 7777L);
+
+        assertEquals(1, inherited.length);
+        assertTrue(inherited[0].getValue() >= 0.70 && inherited[0].getValue() <= 1.30);
+        assertTrue(inherited[0].getValue() > 1.05);
+    }
+
     private TwTraitConfig createConfig(boolean allowInheritance,
                                        double inheritanceChance,
                                        double mutationChance,
@@ -307,14 +352,27 @@ class TraitInheritanceServiceTest {
                                                 double max,
                                                 double defaultValue,
                                                 double inheritanceWeight) throws Exception {
+        return traitWithRanges(id, effectKey, min, max, min, max, defaultValue, inheritanceWeight);
+    }
+
+    private TwTraitConfig.TraitDefinition traitWithRanges(String id,
+                                                          String effectKey,
+                                                          double naturalMin,
+                                                          double naturalMax,
+                                                          double breedingMin,
+                                                          double breedingMax,
+                                                          double defaultValue,
+                                                          double inheritanceWeight) throws Exception {
         TwTraitConfig.TraitDefinition definition = new TwTraitConfig.TraitDefinition();
         setField(definition, "id", id);
         setField(definition, "displayName", id);
         setField(definition, "effectKey", effectKey);
         setField(definition, "weight", 1.0);
         setField(definition, "inheritanceWeight", inheritanceWeight);
-        setField(definition, "min", min);
-        setField(definition, "max", max);
+        setField(definition, "naturalMin", naturalMin);
+        setField(definition, "naturalMax", naturalMax);
+        setField(definition, "breedingMin", breedingMin);
+        setField(definition, "breedingMax", breedingMax);
         setField(definition, "defaultValue", defaultValue);
         setField(definition, "conflictsWith", new String[0]);
         return definition;

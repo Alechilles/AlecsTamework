@@ -123,6 +123,33 @@ class TraitRollServiceTest {
         assertTrue(counts[4] < counts[2]);
     }
 
+    @Test
+    void rollTraitsUsesNaturalRangeOnly() throws Exception {
+        TwTraitConfig config = createConfig(
+                true,
+                1,
+                true,
+                1,
+                false,
+                traitWithRanges(
+                        "Trait_Genetics",
+                        "FertilityMultiplier",
+                        1.0,
+                        0.95,
+                        1.05,
+                        0.70,
+                        1.30,
+                        1.0
+                )
+        );
+
+        for (int seed = 1; seed <= 250; seed++) {
+            TameworkTraitsComponent.TraitValue[] rolled = TraitRollService.rollTraits(config, seed);
+            assertEquals(1, rolled.length);
+            assertTrue(rolled[0].getValue() >= 0.95 && rolled[0].getValue() <= 1.05);
+        }
+    }
+
     private TwTraitConfig createConfig(boolean seeded,
                                        int rollsPerSpawn,
                                        boolean rerollDuplicates,
@@ -179,13 +206,27 @@ class TraitRollServiceTest {
                                                 double max,
                                                 double defaultValue,
                                                 String... conflictsWith) throws Exception {
+        return traitWithRanges(id, effectKey, weight, min, max, min, max, defaultValue, conflictsWith);
+    }
+
+    private TwTraitConfig.TraitDefinition traitWithRanges(String id,
+                                                          String effectKey,
+                                                          double weight,
+                                                          double naturalMin,
+                                                          double naturalMax,
+                                                          double breedingMin,
+                                                          double breedingMax,
+                                                          double defaultValue,
+                                                          String... conflictsWith) throws Exception {
         TwTraitConfig.TraitDefinition definition = new TwTraitConfig.TraitDefinition();
         setField(definition, "id", id);
         setField(definition, "displayName", id);
         setField(definition, "effectKey", effectKey);
         setField(definition, "weight", weight);
-        setField(definition, "min", min);
-        setField(definition, "max", max);
+        setField(definition, "naturalMin", naturalMin);
+        setField(definition, "naturalMax", naturalMax);
+        setField(definition, "breedingMin", breedingMin);
+        setField(definition, "breedingMax", breedingMax);
         setField(definition, "defaultValue", defaultValue);
         setField(definition, "conflictsWith", conflictsWith == null ? new String[0] : conflictsWith);
         return definition;

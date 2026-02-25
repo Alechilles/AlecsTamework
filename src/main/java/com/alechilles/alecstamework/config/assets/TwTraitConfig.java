@@ -178,15 +178,27 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .add()
         .<Double>append(
-            new KeyedCodec<>("Min", Codec.DOUBLE),
-            (definition, value) -> definition.min = value,
-            definition -> definition.min
+            new KeyedCodec<>("NaturalMin", Codec.DOUBLE),
+            (definition, value) -> definition.naturalMin = value,
+            definition -> definition.naturalMin
         )
         .add()
         .<Double>append(
-            new KeyedCodec<>("Max", Codec.DOUBLE),
-            (definition, value) -> definition.max = value,
-            definition -> definition.max
+            new KeyedCodec<>("NaturalMax", Codec.DOUBLE),
+            (definition, value) -> definition.naturalMax = value,
+            definition -> definition.naturalMax
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("BreedingMin", Codec.DOUBLE),
+            (definition, value) -> definition.breedingMin = value,
+            definition -> definition.breedingMin
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("BreedingMax", Codec.DOUBLE),
+            (definition, value) -> definition.breedingMax = value,
+            definition -> definition.breedingMax
         )
         .add()
         .<Double>append(
@@ -537,8 +549,10 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         private String effectKey;
         private double weight = 1.0;
         private double inheritanceWeight = 1.0;
-        private double min = 0.0;
-        private double max = 1.0;
+        private double naturalMin = 0.9;
+        private double naturalMax = 1.1;
+        private double breedingMin = 0.0;
+        private double breedingMax = 1.0;
         private double defaultValue = 1.0;
         private String[] flags = ArrayUtil.EMPTY_STRING_ARRAY;
         private String[] conflictsWith = ArrayUtil.EMPTY_STRING_ARRAY;
@@ -563,12 +577,20 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             return inheritanceWeight;
         }
 
-        public double getMin() {
-            return min;
+        public double getNaturalMin() {
+            return naturalMin;
         }
 
-        public double getMax() {
-            return max;
+        public double getNaturalMax() {
+            return naturalMax;
+        }
+
+        public double getBreedingMin() {
+            return breedingMin;
+        }
+
+        public double getBreedingMax() {
+            return breedingMax;
         }
 
         public double getDefaultValue() {

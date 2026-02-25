@@ -52,8 +52,10 @@ class TraitModifierServiceTest {
         setField(definition, "displayName", id);
         setField(definition, "effectKey", effectKey);
         setField(definition, "weight", 1.0);
-        setField(definition, "min", 1.0);
-        setField(definition, "max", 1.0);
+        setField(definition, "naturalMin", 1.0);
+        setField(definition, "naturalMax", 1.0);
+        setField(definition, "breedingMin", 1.0);
+        setField(definition, "breedingMax", 1.0);
         setField(definition, "defaultValue", 1.0);
         return definition;
     }

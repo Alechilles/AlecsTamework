@@ -199,8 +199,8 @@ final class CommandLinkedPanelEntryService {
             if (value == null || !Double.isFinite(value)) {
                 continue;
             }
-            double min = Math.min(definition.getMin(), definition.getMax());
-            double max = Math.max(definition.getMin(), definition.getMax());
+            double min = Math.min(definition.getBreedingMin(), definition.getBreedingMax());
+            double max = Math.max(definition.getBreedingMin(), definition.getBreedingMax());
             double defaultValue = clamp(definition.getDefaultValue(), min, max);
             boolean belowDefault = value < defaultValue;
             double fillRatio = belowDefault

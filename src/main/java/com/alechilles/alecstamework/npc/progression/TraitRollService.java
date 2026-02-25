@@ -277,8 +277,8 @@ public final class TraitRollService {
     }
 
     private static double rollValue(TwTraitConfig.TraitDefinition definition, Random random) {
-        double min = sanitizeRangeBound(definition.getMin(), definition.getDefaultValue());
-        double max = sanitizeRangeBound(definition.getMax(), definition.getDefaultValue());
+        double min = sanitizeRangeBound(definition.getNaturalMin(), definition.getDefaultValue());
+        double max = sanitizeRangeBound(definition.getNaturalMax(), definition.getDefaultValue());
         if (max < min) {
             double swap = min;
             min = max;
