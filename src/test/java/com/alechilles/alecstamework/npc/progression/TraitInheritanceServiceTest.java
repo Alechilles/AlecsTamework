@@ -127,12 +127,131 @@ class TraitInheritanceServiceTest {
         }
     }
 
+    @Test
+    void inheritTraitsRespectsPerTraitInheritanceWeight() throws Exception {
+        TwTraitConfig.TraitDefinition noInheritanceWeightTrait =
+                trait("Trait_A", "FertilityMultiplier", 0.8, 1.2, 1.0, 0.0);
+        TwTraitConfig noInheritanceWeightConfig = createConfig(
+                true,
+                1.0,
+                0.0,
+                true,
+                1,
+                1,
+                noInheritanceWeightTrait
+        );
+        TwTraitConfig.TraitDefinition fullInheritanceWeightTrait =
+                trait("Trait_A", "FertilityMultiplier", 0.8, 1.2, 1.0, 1.0);
+        TwTraitConfig fullInheritanceWeightConfig = createConfig(
+                true,
+                1.0,
+                0.0,
+                true,
+                1,
+                1,
+                fullInheritanceWeightTrait
+        );
+        TameworkTraitsComponent parentA = new TameworkTraitsComponent(
+                "Traits_Test",
+                40L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Trait_A", 5.0)
+                }
+        );
+
+        TameworkTraitsComponent.TraitValue[] noWeight =
+                TraitInheritanceService.inheritTraits(noInheritanceWeightConfig, parentA, null, 3210L);
+        TameworkTraitsComponent.TraitValue[] fullWeight =
+                TraitInheritanceService.inheritTraits(fullInheritanceWeightConfig, parentA, null, 3210L);
+
+        assertEquals(1, noWeight.length);
+        assertEquals("Trait_A", noWeight[0].getId());
+        assertTrue(noWeight[0].getValue() < 1.2);
+
+        assertEquals(1, fullWeight.length);
+        assertEquals("Trait_A", fullWeight[0].getId());
+        assertEquals(1.2, fullWeight[0].getValue(), 0.000001);
+    }
+
+    @Test
+    void inheritTraitsAlignedParentsIncreasePositiveRollRange() throws Exception {
+        TwTraitConfig.TraitDefinition definition =
+                trait("Trait_A", "FertilityMultiplier", 0.8, 1.4, 1.0, 1.0);
+        TwTraitConfig noAlignmentInfluence = createConfig(
+                true,
+                1.0,
+                0.0,
+                true,
+                1,
+                1,
+                0.0,
+                definition
+        );
+        TwTraitConfig withAlignmentInfluence = createConfig(
+                true,
+                1.0,
+                0.0,
+                true,
+                1,
+                1,
+                1.0,
+                definition
+        );
+        TameworkTraitsComponent parentA = new TameworkTraitsComponent(
+                "Traits_Test",
+                50L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Trait_A", 1.30)
+                }
+        );
+        TameworkTraitsComponent parentB = new TameworkTraitsComponent(
+                "Traits_Test",
+                51L,
+                new TameworkTraitsComponent.TraitValue[] {
+                        new TameworkTraitsComponent.TraitValue("Trait_A", 1.20)
+                }
+        );
+
+        TameworkTraitsComponent.TraitValue[] withoutInfluence =
+                TraitInheritanceService.inheritTraits(noAlignmentInfluence, parentA, parentB, 6543L);
+        TameworkTraitsComponent.TraitValue[] withInfluence =
+                TraitInheritanceService.inheritTraits(withAlignmentInfluence, parentA, parentB, 6543L);
+        double parentAverage = 1.25;
+
+        assertEquals(1, withoutInfluence.length);
+        assertEquals(parentAverage, withoutInfluence[0].getValue(), 0.000001);
+
+        assertEquals(1, withInfluence.length);
+        assertTrue(withInfluence[0].getValue() > parentAverage);
+        assertTrue(withInfluence[0].getValue() <= 1.4);
+    }
+
     private TwTraitConfig createConfig(boolean allowInheritance,
                                        double inheritanceChance,
                                        double mutationChance,
                                        boolean preferParentTraits,
                                        int maxTraits,
                                        int rollsPerSpawn,
+                                       TwTraitConfig.TraitDefinition... traits) throws Exception {
+        return createConfig(
+                allowInheritance,
+                inheritanceChance,
+                mutationChance,
+                preferParentTraits,
+                maxTraits,
+                rollsPerSpawn,
+                0.6,
+                traits
+        );
+    }
+
+    private TwTraitConfig createConfig(boolean allowInheritance,
+                                       double inheritanceChance,
+                                       double mutationChance,
+                                       boolean preferParentTraits,
+                                       int maxTraits,
+                                       int rollsPerSpawn,
+                                       double pairAlignmentRangeInfluence,
                                        TwTraitConfig.TraitDefinition... traits) throws Exception {
         Constructor<TwTraitConfig> ctor = TwTraitConfig.class.getDeclaredConstructor();
         ctor.setAccessible(true);
@@ -155,6 +274,7 @@ class TraitInheritanceServiceTest {
         setField(inheritance, "allowInheritance", allowInheritance);
         setField(inheritance, "inheritanceChance", inheritanceChance);
         setField(inheritance, "mutationChance", mutationChance);
+        setField(inheritance, "pairAlignmentRangeInfluence", pairAlignmentRangeInfluence);
         setField(inheritance, "preferParentTraits", preferParentTraits);
         setField(config, "inheritance", inheritance);
 
@@ -178,11 +298,21 @@ class TraitInheritanceServiceTest {
                                                 double min,
                                                 double max,
                                                 double defaultValue) throws Exception {
+        return trait(id, effectKey, min, max, defaultValue, 1.0);
+    }
+
+    private TwTraitConfig.TraitDefinition trait(String id,
+                                                String effectKey,
+                                                double min,
+                                                double max,
+                                                double defaultValue,
+                                                double inheritanceWeight) throws Exception {
         TwTraitConfig.TraitDefinition definition = new TwTraitConfig.TraitDefinition();
         setField(definition, "id", id);
         setField(definition, "displayName", id);
         setField(definition, "effectKey", effectKey);
         setField(definition, "weight", 1.0);
+        setField(definition, "inheritanceWeight", inheritanceWeight);
         setField(definition, "min", min);
         setField(definition, "max", max);
         setField(definition, "defaultValue", defaultValue);

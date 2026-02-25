@@ -129,6 +129,12 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             settings -> settings.mutationChance
         )
         .add()
+        .<Double>append(
+            new KeyedCodec<>("PairAlignmentRangeInfluence", Codec.DOUBLE),
+            (settings, value) -> settings.pairAlignmentRangeInfluence = value,
+            settings -> settings.pairAlignmentRangeInfluence
+        )
+        .add()
         .<Boolean>append(
             new KeyedCodec<>("PreferParentTraits", Codec.BOOLEAN),
             (settings, value) -> settings.preferParentTraits = value,
@@ -163,6 +169,12 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             new KeyedCodec<>("Weight", Codec.DOUBLE),
             (definition, value) -> definition.weight = value,
             definition -> definition.weight
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("InheritanceWeight", Codec.DOUBLE),
+            (definition, value) -> definition.inheritanceWeight = value,
+            definition -> definition.inheritanceWeight
         )
         .add()
         .<Double>append(
@@ -494,6 +506,7 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean allowInheritance = true;
         private double inheritanceChance = 0.6;
         private double mutationChance = 0.1;
+        private double pairAlignmentRangeInfluence = 0.6;
         private boolean preferParentTraits = true;
 
         public boolean isAllowInheritance() {
@@ -508,6 +521,10 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             return mutationChance;
         }
 
+        public double getPairAlignmentRangeInfluence() {
+            return pairAlignmentRangeInfluence;
+        }
+
         public boolean isPreferParentTraits() {
             return preferParentTraits;
         }
@@ -519,6 +536,7 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         private String displayName;
         private String effectKey;
         private double weight = 1.0;
+        private double inheritanceWeight = 1.0;
         private double min = 0.0;
         private double max = 1.0;
         private double defaultValue = 1.0;
@@ -539,6 +557,10 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public double getWeight() {
             return weight;
+        }
+
+        public double getInheritanceWeight() {
+            return inheritanceWeight;
         }
 
         public double getMin() {

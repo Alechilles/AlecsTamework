@@ -61,13 +61,14 @@ public final class TraitInheritanceService {
             if (selected.size() >= targetCount) {
                 break;
             }
-            if (random.nextDouble() > clamp01(inheritance.getInheritanceChance())) {
+            double traitInheritanceChance = resolveTraitInheritanceChance(parent, inheritance);
+            if (random.nextDouble() > traitInheritanceChance) {
                 continue;
             }
             appendCandidate(
                     selected,
                     parent.id(),
-                    parent.value(),
+                    resolveInheritedValue(parent, inheritance, random),
                     parent.definition(),
                     targetCount,
                     definitionById,
@@ -81,6 +82,60 @@ public final class TraitInheritanceService {
         return selected.isEmpty()
                 ? EMPTY_VALUES
                 : selected.toArray(new TameworkTraitsComponent.TraitValue[0]);
+    }
+
+    private static double resolveTraitInheritanceChance(ParentTraitCandidate candidate,
+                                                        TwTraitConfig.InheritanceSettings inheritance) {
+        if (candidate == null || inheritance == null) {
+            return 0.0;
+        }
+        TwTraitConfig.TraitDefinition definition = candidate.definition();
+        double weight = definition == null ? 1.0 : sanitizeInheritanceWeight(definition.getInheritanceWeight());
+        return clamp01(inheritance.getInheritanceChance() * weight);
+    }
+
+    private static double resolveInheritedValue(ParentTraitCandidate candidate,
+                                                TwTraitConfig.InheritanceSettings inheritance,
+                                                @Nullable Random random) {
+        if (candidate == null || inheritance == null || random == null) {
+            return candidate != null ? candidate.averagedValue() : 0.0;
+        }
+        TwTraitConfig.TraitDefinition definition = candidate.definition();
+        if (definition == null) {
+            return candidate.averagedValue();
+        }
+
+        double min = finiteOrDefault(definition.getMin(), definition.getDefaultValue());
+        double max = finiteOrDefault(definition.getMax(), definition.getDefaultValue());
+        if (max < min) {
+            double swap = min;
+            min = max;
+            max = swap;
+        }
+        double baseValue = clamp(candidate.averagedValue(), min, max);
+        ParentAlignment alignment = resolveAlignment(candidate, definition, min, max);
+        if (alignment == ParentAlignment.NONE) {
+            return baseValue;
+        }
+
+        double influence = clamp01(inheritance.getPairAlignmentRangeInfluence());
+        if (influence <= EPSILON) {
+            return baseValue;
+        }
+        double strength = resolveAlignmentStrength(candidate, definition, alignment, min, max);
+        if (strength <= EPSILON) {
+            return baseValue;
+        }
+        double appliedStrength = clamp01(strength * influence);
+        if (appliedStrength <= EPSILON) {
+            return baseValue;
+        }
+        if (alignment == ParentAlignment.POSITIVE) {
+            double highCap = lerp(baseValue, max, appliedStrength);
+            return randomBetween(baseValue, highCap, random);
+        }
+        double lowCap = lerp(baseValue, min, appliedStrength);
+        return randomBetween(lowCap, baseValue, random);
     }
 
     private static int resolveTargetCount(TwTraitConfig config,
@@ -239,8 +294,8 @@ public final class TraitInheritanceService {
         HashMap<String, ParentValueAccumulator> accumulators = new HashMap<>();
         Map<String, TwTraitConfig.TraitDefinition> definitions =
                 buildDefinitionMap(List.of(config.getTraits()));
-        appendParentValues(accumulators, definitions, parentA);
-        appendParentValues(accumulators, definitions, parentB);
+        appendParentValues(accumulators, definitions, parentA, true);
+        appendParentValues(accumulators, definitions, parentB, false);
         if (accumulators.isEmpty()) {
             return List.of();
         }
@@ -248,24 +303,37 @@ public final class TraitInheritanceService {
         for (Map.Entry<String, ParentValueAccumulator> entry : accumulators.entrySet()) {
             String id = entry.getKey();
             ParentValueAccumulator accumulator = entry.getValue();
-            if (accumulator == null || accumulator.count <= 0) {
+            if (accumulator == null || accumulator.getCount() <= 0) {
                 continue;
             }
             TwTraitConfig.TraitDefinition definition = definitions.get(id);
             if (definition == null) {
                 continue;
             }
-            double value = accumulator.count == 1
-                    ? accumulator.sum
-                    : accumulator.sum / accumulator.count;
-            out.add(new ParentTraitCandidate(definition.getId(), clampToDefinition(value, definition), definition));
+            double value = accumulator.getCount() == 1
+                    ? accumulator.getSum()
+                    : accumulator.getSum() / accumulator.getCount();
+            Double parentAValue = accumulator.parentACount > 0
+                    ? clampToDefinition(accumulator.parentASum / accumulator.parentACount, definition)
+                    : null;
+            Double parentBValue = accumulator.parentBCount > 0
+                    ? clampToDefinition(accumulator.parentBSum / accumulator.parentBCount, definition)
+                    : null;
+            out.add(new ParentTraitCandidate(
+                    definition.getId(),
+                    clampToDefinition(value, definition),
+                    parentAValue,
+                    parentBValue,
+                    definition
+            ));
         }
         return out;
     }
 
     private static void appendParentValues(Map<String, ParentValueAccumulator> accumulators,
                                            Map<String, TwTraitConfig.TraitDefinition> definitions,
-                                           @Nullable TameworkTraitsComponent component) {
+                                           @Nullable TameworkTraitsComponent component,
+                                           boolean isParentA) {
         if (component == null || component.getTraitValues().length == 0) {
             return;
         }
@@ -278,8 +346,13 @@ public final class TraitInheritanceService {
                 continue;
             }
             ParentValueAccumulator accumulator = accumulators.computeIfAbsent(id, key -> new ParentValueAccumulator());
-            accumulator.sum += value.getValue();
-            accumulator.count++;
+            if (isParentA) {
+                accumulator.parentASum += value.getValue();
+                accumulator.parentACount++;
+            } else {
+                accumulator.parentBSum += value.getValue();
+                accumulator.parentBCount++;
+            }
         }
     }
 
@@ -346,6 +419,97 @@ public final class TraitInheritanceService {
         return value;
     }
 
+    private static double sanitizeInheritanceWeight(double value) {
+        if (!Double.isFinite(value)) {
+            return 1.0;
+        }
+        return Math.max(0.0, value);
+    }
+
+    private static double clamp(double value, double min, double max) {
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
+    }
+
+    private static double lerp(double start, double end, double t) {
+        return start + ((end - start) * clamp01(t));
+    }
+
+    private static double randomBetween(double min, double max, Random random) {
+        if (random == null) {
+            return min;
+        }
+        if (max < min) {
+            double swap = min;
+            min = max;
+            max = swap;
+        }
+        if (Math.abs(max - min) <= EPSILON) {
+            return min;
+        }
+        return min + (random.nextDouble() * (max - min));
+    }
+
+    private static ParentAlignment resolveAlignment(ParentTraitCandidate candidate,
+                                                    TwTraitConfig.TraitDefinition definition,
+                                                    double min,
+                                                    double max) {
+        if (candidate == null || definition == null) {
+            return ParentAlignment.NONE;
+        }
+        Double parentAValue = candidate.parentAValue();
+        Double parentBValue = candidate.parentBValue();
+        if (parentAValue == null || parentBValue == null) {
+            return ParentAlignment.NONE;
+        }
+        double defaultValue = clamp(finiteOrDefault(definition.getDefaultValue(), candidate.averagedValue()), min, max);
+        boolean parentAPositive = parentAValue > defaultValue + EPSILON;
+        boolean parentBPositive = parentBValue > defaultValue + EPSILON;
+        if (parentAPositive && parentBPositive) {
+            return ParentAlignment.POSITIVE;
+        }
+        boolean parentANegative = parentAValue < defaultValue - EPSILON;
+        boolean parentBNegative = parentBValue < defaultValue - EPSILON;
+        if (parentANegative && parentBNegative) {
+            return ParentAlignment.NEGATIVE;
+        }
+        return ParentAlignment.NONE;
+    }
+
+    private static double resolveAlignmentStrength(ParentTraitCandidate candidate,
+                                                   TwTraitConfig.TraitDefinition definition,
+                                                   ParentAlignment alignment,
+                                                   double min,
+                                                   double max) {
+        Double parentAValue = candidate.parentAValue();
+        Double parentBValue = candidate.parentBValue();
+        if (parentAValue == null || parentBValue == null) {
+            return 0.0;
+        }
+        double defaultValue = clamp(finiteOrDefault(definition.getDefaultValue(), candidate.averagedValue()), min, max);
+        if (alignment == ParentAlignment.POSITIVE) {
+            double denominator = max - defaultValue;
+            if (denominator <= EPSILON) {
+                return 0.0;
+            }
+            double a = clamp01((parentAValue - defaultValue) / denominator);
+            double b = clamp01((parentBValue - defaultValue) / denominator);
+            return (a + b) * 0.5;
+        }
+        double denominator = defaultValue - min;
+        if (denominator <= EPSILON) {
+            return 0.0;
+        }
+        double a = clamp01((defaultValue - parentAValue) / denominator);
+        double b = clamp01((defaultValue - parentBValue) / denominator);
+        return (a + b) * 0.5;
+    }
+
     @Nullable
     private static String normalize(@Nullable String value) {
         if (value == null || value.isBlank()) {
@@ -355,10 +519,30 @@ public final class TraitInheritanceService {
     }
 
     private static final class ParentValueAccumulator {
-        private double sum;
-        private int count;
+        private double parentASum;
+        private int parentACount;
+        private double parentBSum;
+        private int parentBCount;
+
+        private double getSum() {
+            return parentASum + parentBSum;
+        }
+
+        private int getCount() {
+            return parentACount + parentBCount;
+        }
     }
 
-    private record ParentTraitCandidate(String id, double value, TwTraitConfig.TraitDefinition definition) {
+    private enum ParentAlignment {
+        NONE,
+        POSITIVE,
+        NEGATIVE
+    }
+
+    private record ParentTraitCandidate(String id,
+                                        double averagedValue,
+                                        @Nullable Double parentAValue,
+                                        @Nullable Double parentBValue,
+                                        TwTraitConfig.TraitDefinition definition) {
     }
 }
