@@ -132,13 +132,13 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
                     pendingUnlinkNpcUuid = npcUuid;
-                    rebuild();
+                    sendCardRefreshUpdate();
                     return;
                 }
                 unlinkCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
-                rebuild();
+                sendCardRefreshUpdate();
             }
             return;
         }
@@ -151,7 +151,7 @@ public final class TameworkCommandSelectionPage
                 respawnCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
-                rebuild();
+                sendCardRefreshUpdate();
             }
             return;
         }
@@ -164,7 +164,7 @@ public final class TameworkCommandSelectionPage
                 recallCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
-                rebuild();
+                sendCardRefreshUpdate();
             }
             return;
         }
@@ -177,7 +177,7 @@ public final class TameworkCommandSelectionPage
                 setHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
-                rebuild();
+                sendCardRefreshUpdate();
             }
             return;
         }
@@ -190,7 +190,7 @@ public final class TameworkCommandSelectionPage
                 returnHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
-                rebuild();
+                sendCardRefreshUpdate();
             }
             return;
         }
