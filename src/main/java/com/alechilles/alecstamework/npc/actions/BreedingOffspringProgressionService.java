@@ -2,10 +2,12 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitInheritanceService;
@@ -57,6 +59,9 @@ final class BreedingOffspringProgressionService {
                 breedingConfigId,
                 store
         );
+        if (TamedStateResolver.isTamed(childRef, store)) {
+            CompanionProgressionBootstrapService.ensureProgressionComponents(childRef, store);
+        }
         applyOffspringTraits(childRef, parentARef, parentBRef, childRoleId, childNpc, breedingConfigId, store);
         CompanionStatModifierService.applyTraitModifiers(childRef, store);
         CompanionLifeStageService.initializeOffspringLifeStage(childRef, childNpc, store, hasBabyVariant);

@@ -70,6 +70,7 @@
 - Tamed companions now self-heal missing/invalid shared happiness state on world load (including `NaN`/non-finite values), so reloads no longer leave companions reporting "no tracked happiness state."
 - Companion progression bootstrap-on-load now waits for both NPC + `TameworkTamedComponent` before running, fixing a load-order race where some tamed companions could skip happiness/progression bootstrap after reload.
 - Companion progression bootstrap-on-load now defers work through `CommandBuffer.run(...)`, preventing chunk-load crashes from direct `Store.putComponent(...)` calls during store-processing callbacks.
+- Breeding offspring progression now bootstraps tamed newborn progression immediately after spawn, ensuring shared happiness state exists at birth instead of appearing as unavailable until a reload heal pass.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added
