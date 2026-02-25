@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
-import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -21,9 +21,12 @@ import javax.annotation.Nonnull;
  */
 public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<EntityStore> {
     private final ComponentType<EntityStore, NPCEntity> npcType;
+    private final ComponentType<EntityStore, TameworkTamedComponent> tamedType;
 
-    public CompanionProgressionBootstrapOnLoadSystem(ComponentType<EntityStore, NPCEntity> npcType) {
+    public CompanionProgressionBootstrapOnLoadSystem(ComponentType<EntityStore, NPCEntity> npcType,
+                                                     ComponentType<EntityStore, TameworkTamedComponent> tamedType) {
         this.npcType = npcType;
+        this.tamedType = tamedType;
     }
 
     @Override
@@ -37,7 +40,11 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         if (store.getComponent(reference, npcType) == null) {
             return;
         }
-        if (!TamedStateResolver.isTamed(reference, store)) {
+        if (tamedType == null) {
+            return;
+        }
+        TameworkTamedComponent tamed = store.getComponent(reference, tamedType);
+        if (tamed == null || !tamed.isTamed()) {
             return;
         }
         CompanionProgressionBootstrapService.ensureProgressionComponents(reference, store);
@@ -53,9 +60,9 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
 
     @Override
     public Query<EntityStore> getQuery() {
-        if (npcType == null) {
+        if (npcType == null || tamedType == null) {
             return Query.any();
         }
-        return Query.and(npcType);
+        return Query.and(npcType, tamedType);
     }
 }

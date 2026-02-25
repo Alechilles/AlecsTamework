@@ -68,6 +68,7 @@
 - Fixed breeding pair state completion flow so `BreedPair` no longer stalls after arrival, and breeding pair start now clears lingering status posture animation to prevent slide-like movement.
 - Breeding pair completion now uses timer-driven exit flow (arrival delay + move-timeout fail-safe), and close-range completion follows `SeekStopDistance + 0.15` for tight pair-up spacing without getting stuck in `BreedPair`.
 - Tamed companions now self-heal missing/invalid shared happiness state on world load (including `NaN`/non-finite values), so reloads no longer leave companions reporting "no tracked happiness state."
+- Companion progression bootstrap-on-load now waits for both NPC + `TameworkTamedComponent` before running, fixing a load-order race where some tamed companions could skip happiness/progression bootstrap after reload.
 
 ## 2.1.3 - Naming UI and Command UI Polish - 2026-02-24
 ### Added

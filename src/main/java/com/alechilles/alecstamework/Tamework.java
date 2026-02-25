@@ -228,7 +228,7 @@ public class Tamework extends JavaPlugin {
                 )
         );
         getEntityStoreRegistry().registerSystem(
-                new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType())
+                new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)
         );
         commandNpcRelocationService = new CommandNpcRelocationService();
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
