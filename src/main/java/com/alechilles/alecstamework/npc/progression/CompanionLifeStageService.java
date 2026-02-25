@@ -29,6 +29,8 @@ public final class CompanionLifeStageService {
 
     private static final long DEFAULT_GROWTH_DURATION_SECONDS = TimeUnit.MINUTES.toSeconds(7);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
+    private static final long GROWTH_START_RETRY_INTERVAL_MS = 50L;
+    private static final int GROWTH_START_MAX_RETRIES = 40;
     private static final long INITIAL_SCALE_RETRY_INTERVAL_MS = 10L;
     private static final int INITIAL_SCALE_MAX_RETRIES = 120;
     private static final int ROLE_CHANGE_SCALE_MAX_RETRIES = 120;
@@ -187,7 +189,11 @@ public final class CompanionLifeStageService {
             NPCEntity resolvedNpc = store.getComponent(npcRef, NPCEntity.getComponentType());
             npcUuid = resolvedNpc != null ? resolvedNpc.getUuid() : null;
         }
-        if (npcUuid == null || !ACTIVE_GROWTH_TICKERS.add(npcUuid)) {
+        if (npcUuid == null) {
+            scheduleGrowthStartRetry(npcRef, store, GROWTH_START_MAX_RETRIES);
+            return;
+        }
+        if (!ACTIVE_GROWTH_TICKERS.add(npcUuid)) {
             return;
         }
         scheduleGrowthTick(npcRef, npc, store);
@@ -285,15 +291,15 @@ public final class CompanionLifeStageService {
         long adolescentAtMs = component.getAdolescentAtMs();
         long bornAtMs = component.getBornAtMs();
 
-        if (adultAtMs > 0L && nowMs >= adultAtMs) {
+        if (adultAtMs != 0L && nowMs >= adultAtMs) {
             return STAGE_ADULT;
         }
-        if (adolescentAtMs > 0L
+        if (adolescentAtMs != 0L
                 && adultAtMs > adolescentAtMs
                 && nowMs >= adolescentAtMs) {
             return STAGE_ADOLESCENT;
         }
-        if (bornAtMs > 0L) {
+        if (bornAtMs != 0L) {
             return STAGE_BABY;
         }
         String normalized = normalizeStage(component.getStage());
@@ -386,8 +392,8 @@ public final class CompanionLifeStageService {
             changed = true;
         }
         if (component.isGrowthScalingEnabled()
-                && component.getBornAtMs() > 0L
-                && component.getFullyGrownAtMs() > 0L
+                && component.getBornAtMs() != 0L
+                && component.getFullyGrownAtMs() != 0L
                 && component.getFullyGrownAtMs() <= component.getBornAtMs()) {
             component.setGrowthScalingEnabled(false);
             component.setStage(STAGE_ADULT);
@@ -710,6 +716,47 @@ public final class CompanionLifeStageService {
                 () -> world.execute(() -> onGrowthTick(world, npcUuid)),
                 CompletableFuture.delayedExecutor(GROWTH_TICK_INTERVAL_MS, TimeUnit.MILLISECONDS)
         );
+    }
+
+    private static void scheduleGrowthStartRetry(Ref<EntityStore> npcRef,
+                                                 Store<EntityStore> store,
+                                                 int remainingRetries) {
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        if (world == null || remainingRetries <= 0) {
+            return;
+        }
+        CompletableFuture.runAsync(
+                () -> world.execute(() -> onGrowthStartRetry(world, npcRef, remainingRetries)),
+                CompletableFuture.delayedExecutor(GROWTH_START_RETRY_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        );
+    }
+
+    private static void onGrowthStartRetry(@Nullable World world,
+                                           @Nullable Ref<EntityStore> npcRef,
+                                           int remainingRetries) {
+        if (world == null || npcRef == null || !npcRef.isValid() || remainingRetries <= 0) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+        if (store == null) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        TameworkLifeStageComponent stage = type != null ? store.getComponent(npcRef, type) : null;
+        if (stage == null || !stage.isGrowthScalingEnabled()) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        UUID npcUuid = npc != null ? npc.getUuid() : null;
+        if (npcUuid != null) {
+            if (ACTIVE_GROWTH_TICKERS.add(npcUuid)) {
+                scheduleGrowthTick(npcRef, npc, store);
+            }
+            return;
+        }
+        if (remainingRetries > 1) {
+            scheduleGrowthStartRetry(npcRef, store, remainingRetries - 1);
+        }
     }
 
     private static void scheduleInitialScaleRetry(Ref<EntityStore> npcRef,
