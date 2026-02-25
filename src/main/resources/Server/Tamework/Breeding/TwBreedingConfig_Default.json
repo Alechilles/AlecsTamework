@@ -18,7 +18,7 @@
     "RequireNotSleeping": true
   },
   "Pairing": {
-    "BreedRadius": 10.0,
+    "BreedRadius": 15.0,
     "RequireWanderMode": false,
     "RequireSameOwner": false,
     "MaxNearbyOffspring": 8,
