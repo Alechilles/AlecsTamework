@@ -166,6 +166,16 @@ public final class CompanionProgressionBootstrapService {
                 existing.setLastHappinessUpdateMs(lastUpdateMs);
                 changed = true;
             }
+            long migratedCooldownUntilMs = migrateLegacyCooldownUntilMs(
+                    existing.getCooldownUntilMs(),
+                    now,
+                    config,
+                    store
+            );
+            if (migratedCooldownUntilMs != existing.getCooldownUntilMs()) {
+                existing.setCooldownUntilMs(migratedCooldownUntilMs);
+                changed = true;
+            }
             if (existing.isReady() != ready) {
                 existing.setReady(ready);
                 changed = true;
@@ -298,6 +308,32 @@ public final class CompanionProgressionBootstrapService {
             return null;
         }
         return breeding.getHappiness();
+    }
+
+    private static long migrateLegacyCooldownUntilMs(long cooldownUntilMs,
+                                                     long nowGameMs,
+                                                     TwBreedingConfig breedingConfig,
+                                                     Store<EntityStore> store) {
+        if (cooldownUntilMs <= 0L || nowGameMs >= 0L || cooldownUntilMs < 0L) {
+            return cooldownUntilMs;
+        }
+        long nowRealMs = System.currentTimeMillis();
+        long remainingRealMs = cooldownUntilMs - nowRealMs;
+        if (remainingRealMs <= 0L) {
+            return 0L;
+        }
+        TwBreedingConfig.TimerBasis timerBasis = breedingConfig != null
+                ? breedingConfig.getTiming().getTimerBasis()
+                : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
+        long remainingGameMs = BreedingTimeService.toGameDurationMs(
+                remainingRealMs / 1000.0,
+                timerBasis,
+                store
+        );
+        if (remainingGameMs <= 0L) {
+            return 0L;
+        }
+        return nowGameMs + remainingGameMs;
     }
 
     private static double resolveSizeMultiplier(Ref<EntityStore> npcRef,

@@ -277,6 +277,10 @@ public final class CompanionLifeStageService {
         if (component == null) {
             return STAGE_ADULT;
         }
+        if (!component.isGrowthScalingEnabled()) {
+            String normalized = normalizeStage(component.getStage());
+            return normalized != null ? normalized : STAGE_ADULT;
+        }
         long adultAtMs = component.getAdultAtMs();
         long adolescentAtMs = component.getAdolescentAtMs();
         long bornAtMs = component.getBornAtMs();
@@ -374,6 +378,9 @@ public final class CompanionLifeStageService {
             component.setAdultSwitchScale(component.getAdultScale());
             changed = true;
         }
+
+        changed |= migrateLegacyTimelineBasis(component, npcRef, store);
+
         if (component.getFullyGrownAtMs() < component.getAdultAtMs()) {
             component.setFullyGrownAtMs(component.getAdultAtMs());
             changed = true;
@@ -387,6 +394,143 @@ public final class CompanionLifeStageService {
             changed = true;
         }
         return changed;
+    }
+
+    private static boolean migrateLegacyTimelineBasis(TameworkLifeStageComponent component,
+                                                      Ref<EntityStore> npcRef,
+                                                      Store<EntityStore> store) {
+        if (component == null || npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        long nowGameMs = BreedingTimeService.resolveCurrentTimeMs(store);
+        if (!hasLegacyTimelineTimestamp(component, nowGameMs)) {
+            return false;
+        }
+
+        if (!component.isGrowthScalingEnabled()) {
+            boolean cleared = false;
+            String normalizedStage = normalizeStage(component.getStage());
+            if (!STAGE_ADULT.equals(normalizedStage)) {
+                component.setStage(STAGE_ADULT);
+                cleared = true;
+            }
+            if (component.getBornAtMs() != 0L) {
+                component.setBornAtMs(0L);
+                cleared = true;
+            }
+            if (component.getAdolescentAtMs() != 0L) {
+                component.setAdolescentAtMs(0L);
+                cleared = true;
+            }
+            if (component.getAdultAtMs() != 0L) {
+                component.setAdultAtMs(0L);
+                cleared = true;
+            }
+            if (component.getFullyGrownAtMs() != 0L) {
+                component.setFullyGrownAtMs(0L);
+                cleared = true;
+            }
+            return cleared;
+        }
+
+        long nowRealMs = System.currentTimeMillis();
+        TwBreedingConfig.TimerBasis timerBasis = resolveTimerBasis(npcRef, store);
+
+        long born = migrateLegacyAbsoluteTimestamp(component.getBornAtMs(), nowRealMs, nowGameMs, timerBasis, store);
+        long adolescent = migrateLegacyAbsoluteTimestamp(
+                component.getAdolescentAtMs(),
+                nowRealMs,
+                nowGameMs,
+                timerBasis,
+                store
+        );
+        long adult = migrateLegacyAbsoluteTimestamp(component.getAdultAtMs(), nowRealMs, nowGameMs, timerBasis, store);
+        long fullyGrown = migrateLegacyAbsoluteTimestamp(
+                component.getFullyGrownAtMs(),
+                nowRealMs,
+                nowGameMs,
+                timerBasis,
+                store
+        );
+
+        if (born > 0L) {
+            if (adolescent > 0L && adolescent <= born) {
+                adolescent = born + 1L;
+            }
+            if (adult > 0L && adult <= adolescent) {
+                adult = adolescent + 1L;
+            }
+            if (fullyGrown > 0L && fullyGrown <= adult) {
+                fullyGrown = adult + 1L;
+            }
+        }
+
+        boolean changed = false;
+        if (born != component.getBornAtMs()) {
+            component.setBornAtMs(born);
+            changed = true;
+        }
+        if (adolescent != component.getAdolescentAtMs()) {
+            component.setAdolescentAtMs(adolescent);
+            changed = true;
+        }
+        if (adult != component.getAdultAtMs()) {
+            component.setAdultAtMs(adult);
+            changed = true;
+        }
+        if (fullyGrown != component.getFullyGrownAtMs()) {
+            component.setFullyGrownAtMs(fullyGrown);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static boolean hasLegacyTimelineTimestamp(TameworkLifeStageComponent component, long nowGameMs) {
+        return isLegacyTimestamp(component.getBornAtMs(), nowGameMs)
+                || isLegacyTimestamp(component.getAdolescentAtMs(), nowGameMs)
+                || isLegacyTimestamp(component.getAdultAtMs(), nowGameMs)
+                || isLegacyTimestamp(component.getFullyGrownAtMs(), nowGameMs);
+    }
+
+    private static boolean isLegacyTimestamp(long value, long nowGameMs) {
+        if (value <= 0L) {
+            return false;
+        }
+        if (nowGameMs < 0L) {
+            return true;
+        }
+        return value > 946684800000L;
+    }
+
+    private static long migrateLegacyAbsoluteTimestamp(long legacyTimestampMs,
+                                                       long nowRealMs,
+                                                       long nowGameMs,
+                                                       TwBreedingConfig.TimerBasis timerBasis,
+                                                       Store<EntityStore> store) {
+        if (legacyTimestampMs <= 0L || !isLegacyTimestamp(legacyTimestampMs, nowGameMs)) {
+            return legacyTimestampMs;
+        }
+        long deltaRealMs = legacyTimestampMs - nowRealMs;
+        long deltaGameMs = BreedingTimeService.toGameDurationMs(
+                Math.abs(deltaRealMs) / 1000.0,
+                timerBasis,
+                store
+        );
+        if (deltaGameMs <= 0L) {
+            return nowGameMs;
+        }
+        return deltaRealMs < 0L
+                ? nowGameMs - deltaGameMs
+                : nowGameMs + deltaGameMs;
+    }
+
+    private static TwBreedingConfig.TimerBasis resolveTimerBasis(Ref<EntityStore> npcRef,
+                                                                 Store<EntityStore> store) {
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        TwBreedingConfig config = roleId != null ? TwBreedingConfig.resolveForRole(roleId) : null;
+        return config != null
+                ? config.getTiming().getTimerBasis()
+                : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
     }
 
     private static boolean applyLifecycleRoleForStage(@Nullable Ref<EntityStore> npcRef,

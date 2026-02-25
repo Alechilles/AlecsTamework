@@ -15,8 +15,8 @@ import javax.annotation.Nullable;
  * using game-time timestamps so progression behaves consistently across chunk unload/reload and pause flows.
  */
 public final class BreedingTimeService {
-    private static final int DEFAULT_BASELINE_DAYTIME_SECONDS = 1728;
-    private static final int DEFAULT_BASELINE_NIGHTTIME_SECONDS = 1728;
+    private static final int DEFAULT_BASELINE_DAYTIME_SECONDS = WorldTimeResource.DAYTIME_SECONDS;
+    private static final int DEFAULT_BASELINE_NIGHTTIME_SECONDS = WorldTimeResource.NIGHTTIME_SECONDS;
     private static final double DEFAULT_BASELINE_RATE = (double) WorldTimeResource.SECONDS_PER_DAY
             / (double) (DEFAULT_BASELINE_DAYTIME_SECONDS + DEFAULT_BASELINE_NIGHTTIME_SECONDS);
 
@@ -126,4 +126,3 @@ public final class BreedingTimeService {
         return (double) WorldTimeResource.SECONDS_PER_DAY / (double) totalDuration;
     }
 }
-
