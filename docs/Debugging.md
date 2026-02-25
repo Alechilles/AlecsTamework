@@ -26,6 +26,7 @@
 - Breed interaction checks now use effective fertility for threshold gating: `(Happiness * FertilityMultiplier) + FertilityBonus`.
 - Breed interaction now checks config state gates (`RequireNotSleeping`, `RequireNotInCombat`) and adult gating (`RequireAdult` via life-stage state), and logs blocked-state diagnostics when debug is enabled.
 - Successful breeding now schedules a visible sequence: parent approach movement, hearts particle, then delayed offspring spawn.
+- Breeding cooldown/life-stage timing values are tracked in game-time milliseconds; conversion from config seconds is controlled by `TwBreedingConfig.Timing.Basis`.
 
 ## Hook troubleshooting
 - `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.

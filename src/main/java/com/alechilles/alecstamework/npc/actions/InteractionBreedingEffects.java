@@ -10,6 +10,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -48,7 +49,7 @@ final class InteractionBreedingEffects {
             owner.logDebug("TameworkInteract: no breeding component found for NPC.");
             return false;
         }
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
         if (breeding.isCooldownActive(now)) {
             return false;
         }

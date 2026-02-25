@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.actions.PassiveBreedingSweepService;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -21,11 +22,19 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        long nowMs = System.currentTimeMillis();
+        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
         if (nowMs < nextSweepAtMs) {
             return;
         }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        long intervalGameMs = BreedingTimeService.toGameDurationMs(
+                SWEEP_INTERVAL_MS / 1000.0,
+                com.alechilles.alecstamework.config.assets.TwBreedingConfig.TimerBasis.REAL_TIME,
+                store
+        );
+        if (intervalGameMs <= 0L) {
+            intervalGameMs = SWEEP_INTERVAL_MS;
+        }
+        nextSweepAtMs = nowMs + intervalGameMs;
         sweepService.runSweep(store, nowMs);
     }
 }

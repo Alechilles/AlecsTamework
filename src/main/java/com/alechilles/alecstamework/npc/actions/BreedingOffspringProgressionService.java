@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
@@ -176,7 +177,7 @@ final class BreedingOffspringProgressionService {
         if (breeding == null) {
             return;
         }
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
         long cooldownUntilMs = now + Math.max(0L, childCooldownMs);
         breeding.setReady(false);
         breeding.setCooldownUntilMs(cooldownUntilMs);

@@ -12,8 +12,10 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
@@ -25,14 +27,16 @@ public final class CompanionLifeStageService {
     public static final String STAGE_ADOLESCENT = "Adolescent";
     public static final String STAGE_ADULT = "Adult";
 
-    private static final long DEFAULT_GROWTH_DURATION_MS = TimeUnit.MINUTES.toMillis(7);
+    private static final long DEFAULT_GROWTH_DURATION_SECONDS = TimeUnit.MINUTES.toSeconds(7);
     private static final long GROWTH_TICK_INTERVAL_MS = TimeUnit.SECONDS.toMillis(3);
-    private static final long INITIAL_SCALE_RETRY_INTERVAL_MS = 100L;
-    private static final int INITIAL_SCALE_MAX_RETRIES = 40;
-    private static final int ROLE_CHANGE_SCALE_MAX_RETRIES = 40;
+    private static final long INITIAL_SCALE_RETRY_INTERVAL_MS = 10L;
+    private static final int INITIAL_SCALE_MAX_RETRIES = 120;
+    private static final int ROLE_CHANGE_SCALE_MAX_RETRIES = 120;
+    private static final int ROLE_CHANGE_SCALE_SETTLE_RETRIES = 20;
     private static final double DEFAULT_BABY_SCALE_FACTOR = 0.33;
     private static final double DEFAULT_ADOLESCENT_SCALE_FACTOR = 0.66;
     private static final double MIN_SCALE = 0.10;
+    private static final Set<UUID> ACTIVE_GROWTH_TICKERS = ConcurrentHashMap.newKeySet();
 
     private CompanionLifeStageService() {
     }
@@ -87,14 +91,15 @@ public final class CompanionLifeStageService {
             return;
         }
 
-        long nowMs = System.currentTimeMillis();
+        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
         double adultScale = resolveAdultScale(childRef, store);
         LifecycleComputation lifecycle = computeLifecycle(
                 nowMs,
                 adultScale,
                 breedingConfig,
                 preResolvedFamily,
-                spawnedRoleId
+                spawnedRoleId,
+                store
         );
         TameworkLifeStageComponent component = new TameworkLifeStageComponent(
                 STAGE_BABY,
@@ -113,8 +118,8 @@ public final class CompanionLifeStageService {
         store.putComponent(childRef, type, component);
         double initialScale = lifecycle.babyStartScale();
         CompanionModelScaleService.applyScale(childRef, childNpc, store, initialScale);
-        scheduleInitialScaleRetry(childRef, childNpc, store, INITIAL_SCALE_MAX_RETRIES);
-        scheduleGrowthTick(childRef, childNpc, store);
+        scheduleInitialScaleRetry(childRef, childNpc, store, INITIAL_SCALE_MAX_RETRIES, null);
+        ensureGrowthTickScheduled(childRef, childNpc, store);
     }
 
     public static void refreshLifeStage(@Nullable Ref<EntityStore> npcRef,
@@ -133,7 +138,7 @@ public final class CompanionLifeStageService {
         }
 
         boolean changed = normalizeComponentDefaults(stage, npcRef, store);
-        long nowMs = System.currentTimeMillis();
+        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
         String resolvedStage = resolveStageId(stage, nowMs);
         if (!resolvedStage.equals(stage.getStage())) {
             stage.setStage(resolvedStage);
@@ -158,6 +163,36 @@ public final class CompanionLifeStageService {
         }
     }
 
+    /**
+     * Ensures periodic growth processing is running for entities with active growth scaling.
+     *
+     * <p>This is used after load/bootstrap to resume lifecycle progression that otherwise only started at spawn.
+     */
+    public static void ensureGrowthTickScheduled(@Nullable Ref<EntityStore> npcRef,
+                                                 @Nullable NPCEntity npc,
+                                                 @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
+        if (stage == null || !stage.isGrowthScalingEnabled()) {
+            return;
+        }
+        UUID npcUuid = npc != null ? npc.getUuid() : null;
+        if (npcUuid == null) {
+            NPCEntity resolvedNpc = store.getComponent(npcRef, NPCEntity.getComponentType());
+            npcUuid = resolvedNpc != null ? resolvedNpc.getUuid() : null;
+        }
+        if (npcUuid == null || !ACTIVE_GROWTH_TICKERS.add(npcUuid)) {
+            return;
+        }
+        scheduleGrowthTick(npcRef, npc, store);
+    }
+
     public static boolean isAdult(@Nullable Ref<EntityStore> npcRef,
                                   @Nullable Store<EntityStore> store,
                                   @Nullable String roleIdFallback) {
@@ -167,7 +202,7 @@ public final class CompanionLifeStageService {
             if (type != null) {
                 TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
                 if (stage != null) {
-                    return STAGE_ADULT.equals(resolveStageId(stage, System.currentTimeMillis()));
+                    return STAGE_ADULT.equals(resolveStageId(stage, BreedingTimeService.resolveCurrentTimeMs(store)));
                 }
             }
         }
@@ -183,7 +218,7 @@ public final class CompanionLifeStageService {
             if (type != null) {
                 TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
                 if (stage != null) {
-                    return resolveStageId(stage, System.currentTimeMillis());
+                    return resolveStageId(stage, BreedingTimeService.resolveCurrentTimeMs(store));
                 }
             }
         }
@@ -223,7 +258,7 @@ public final class CompanionLifeStageService {
             stage.setAdolescentSwitchScale(clampScale(stage.getAdolescentSwitchScale() * ratio));
             stage.setAdultStartScale(clampScale(stage.getAdultStartScale() * ratio));
             stage.setAdultSwitchScale(clampScale(stage.getAdultSwitchScale() * ratio));
-            long now = System.currentTimeMillis();
+            long now = BreedingTimeService.resolveCurrentTimeMs(store);
             String resolvedStage = resolveStageId(stage, now);
             if (!resolvedStage.equals(stage.getStage())) {
                 stage.setStage(resolvedStage);
@@ -398,7 +433,7 @@ public final class CompanionLifeStageService {
             return false;
         }
         RoleChangeSystem.requestRoleChange(npcRef, role, targetRoleIndex, true, store);
-        scheduleInitialScaleRetry(npcRef, npc, store, ROLE_CHANGE_SCALE_MAX_RETRIES);
+        scheduleInitialScaleRetry(npcRef, npc, store, ROLE_CHANGE_SCALE_MAX_RETRIES, targetRoleId);
         return true;
     }
 
@@ -427,7 +462,8 @@ public final class CompanionLifeStageService {
                                                          double adultScale,
                                                          @Nullable TwBreedingConfig breedingConfig,
                                                          @Nullable TwBreedingConfig.RoleFamily preResolvedFamily,
-                                                         @Nullable String spawnedRoleId) {
+                                                         @Nullable String spawnedRoleId,
+                                                         @Nullable Store<EntityStore> store) {
         TwBreedingConfig.OffspringLifecycleSettings lifecycle = breedingConfig != null
                 ? breedingConfig.getOffspringLifecycle()
                 : null;
@@ -463,7 +499,7 @@ public final class CompanionLifeStageService {
             adultSwitchScale = adultFinalScale;
         }
 
-        long totalGrowthMs = resolveGrowthDurationMs(lifecycle, family);
+        long totalGrowthMs = resolveGrowthDurationMs(breedingConfig, lifecycle, family, store);
         double babyDelta = Math.abs(adolescentSwitchScale - babyStartScale);
         double adolescentDelta = hasAdolescentStage ? Math.abs(adultSwitchScale - adolescentStartScale) : 0.0;
         double adultDelta = Math.abs(adultFinalScale - adultStartScale);
@@ -497,15 +533,25 @@ public final class CompanionLifeStageService {
         );
     }
 
-    private static long resolveGrowthDurationMs(@Nullable TwBreedingConfig.OffspringLifecycleSettings lifecycle,
-                                                @Nullable TwBreedingConfig.RoleFamily family) {
+    private static long resolveGrowthDurationMs(@Nullable TwBreedingConfig breedingConfig,
+                                                @Nullable TwBreedingConfig.OffspringLifecycleSettings lifecycle,
+                                                @Nullable TwBreedingConfig.RoleFamily family,
+                                                @Nullable Store<EntityStore> store) {
+        long configuredSeconds = DEFAULT_GROWTH_DURATION_SECONDS;
         if (lifecycle != null && lifecycle.isEnabled()) {
-            int seconds = lifecycle.resolveTimeToFullGrownSeconds(family);
-            if (seconds > 0) {
-                return TimeUnit.SECONDS.toMillis(seconds);
+            int resolved = lifecycle.resolveTimeToFullGrownSeconds(family);
+            if (resolved > 0) {
+                configuredSeconds = resolved;
             }
         }
-        return DEFAULT_GROWTH_DURATION_MS;
+        TwBreedingConfig.TimerBasis timerBasis = breedingConfig != null
+                ? breedingConfig.getTiming().getTimerBasis()
+                : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
+        long converted = BreedingTimeService.toGameDurationMs(configuredSeconds, timerBasis, store);
+        if (converted > 0L) {
+            return converted;
+        }
+        return TimeUnit.SECONDS.toMillis(Math.max(1L, configuredSeconds));
     }
 
     private static void scheduleGrowthTick(Ref<EntityStore> npcRef,
@@ -525,21 +571,43 @@ public final class CompanionLifeStageService {
     private static void scheduleInitialScaleRetry(Ref<EntityStore> npcRef,
                                                   @Nullable NPCEntity npc,
                                                   Store<EntityStore> store,
-                                                  int remainingRetries) {
+                                                  int remainingRetries,
+                                                  @Nullable String expectedRoleId) {
+        int settleRetries = expectedRoleId != null && !expectedRoleId.isBlank()
+                ? ROLE_CHANGE_SCALE_SETTLE_RETRIES
+                : 0;
+        scheduleInitialScaleRetry(npcRef, npc, store, remainingRetries, expectedRoleId, settleRetries);
+    }
+
+    private static void scheduleInitialScaleRetry(Ref<EntityStore> npcRef,
+                                                  @Nullable NPCEntity npc,
+                                                  Store<EntityStore> store,
+                                                  int remainingRetries,
+                                                  @Nullable String expectedRoleId,
+                                                  int settleRetriesRemaining) {
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         UUID npcUuid = npc != null ? npc.getUuid() : null;
         if (world == null || npcUuid == null || remainingRetries <= 0) {
             return;
         }
+        int nextSettleRetries = Math.max(0, settleRetriesRemaining);
         CompletableFuture.runAsync(
-                () -> world.execute(() -> onInitialScaleRetry(world, npcUuid, remainingRetries)),
+                () -> world.execute(() -> onInitialScaleRetry(
+                        world,
+                        npcUuid,
+                        remainingRetries,
+                        expectedRoleId,
+                        nextSettleRetries
+                )),
                 CompletableFuture.delayedExecutor(INITIAL_SCALE_RETRY_INTERVAL_MS, TimeUnit.MILLISECONDS)
         );
     }
 
     private static void onInitialScaleRetry(@Nullable World world,
                                             @Nullable UUID npcUuid,
-                                            int remainingRetries) {
+                                            int remainingRetries,
+                                            @Nullable String expectedRoleId,
+                                            int settleRetriesRemaining) {
         if (world == null || npcUuid == null || remainingRetries <= 0) {
             return;
         }
@@ -560,12 +628,43 @@ public final class CompanionLifeStageService {
             return;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        double targetScale = resolveScale(stage, System.currentTimeMillis());
+        String currentRoleId = resolveRoleId(npc);
+        boolean targetRoleReady = expectedRoleId == null
+                || expectedRoleId.isBlank()
+                || (currentRoleId != null && expectedRoleId.equalsIgnoreCase(currentRoleId));
+        double targetScale = resolveScale(stage, BreedingTimeService.resolveCurrentTimeMs(store));
         boolean applied = CompanionModelScaleService.applyScale(npcRef, npc, store, targetScale);
-        if (applied || isScaleClose(npcRef, store, targetScale) || remainingRetries <= 1) {
+        boolean closeEnough = isScaleClose(npcRef, store, targetScale);
+        boolean roleSpecificRetry = expectedRoleId != null && !expectedRoleId.isBlank();
+        if (!roleSpecificRetry) {
+            if (remainingRetries <= 1 || applied || closeEnough) {
+                return;
+            }
+            scheduleInitialScaleRetry(npcRef, npc, store, remainingRetries - 1, expectedRoleId, 0);
             return;
         }
-        scheduleInitialScaleRetry(npcRef, npc, store, remainingRetries - 1);
+        int nextSettleRetries = settleRetriesRemaining;
+        if (!targetRoleReady) {
+            nextSettleRetries = ROLE_CHANGE_SCALE_SETTLE_RETRIES;
+        } else if (applied || closeEnough) {
+            nextSettleRetries = Math.max(0, settleRetriesRemaining - 1);
+        } else {
+            nextSettleRetries = ROLE_CHANGE_SCALE_SETTLE_RETRIES;
+        }
+        if (remainingRetries <= 1) {
+            return;
+        }
+        if (targetRoleReady && (applied || closeEnough) && nextSettleRetries <= 0) {
+            return;
+        }
+        scheduleInitialScaleRetry(
+                npcRef,
+                npc,
+                store,
+                remainingRetries - 1,
+                expectedRoleId,
+                nextSettleRetries
+        );
     }
 
     private static void onGrowthTick(World world, UUID npcUuid) {
@@ -574,17 +673,21 @@ public final class CompanionLifeStageService {
         }
         Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
         if (npcRef == null || !npcRef.isValid()) {
+            ACTIVE_GROWTH_TICKERS.remove(npcUuid);
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
+            ACTIVE_GROWTH_TICKERS.remove(npcUuid);
             return;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         refreshLifeStage(npcRef, npc, store);
         if (isGrowthInProgress(npcRef, store)) {
             scheduleGrowthTick(npcRef, npc, store);
+            return;
         }
+        ACTIVE_GROWTH_TICKERS.remove(npcUuid);
     }
 
     private static boolean isGrowthInProgress(Ref<EntityStore> npcRef, Store<EntityStore> store) {

@@ -74,6 +74,11 @@ public final class CompanionProgressionBootstrapService {
                 store.getComponent(npcRef, NPCEntity.getComponentType()),
                 store
         );
+        CompanionLifeStageService.ensureGrowthTickScheduled(
+                npcRef,
+                store.getComponent(npcRef, NPCEntity.getComponentType()),
+                store
+        );
     }
 
     private static TameworkHappinessComponent bootstrapHappinessComponent(Ref<EntityStore> npcRef,
@@ -85,7 +90,7 @@ public final class CompanionProgressionBootstrapService {
         }
         TwHappinessConfig config = TwHappinessConfig.resolveForRole(roleId);
         TameworkHappinessComponent existing = store.getComponent(npcRef, happinessType);
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
         if (existing != null) {
             boolean changed = false;
             if ((existing.getConfigId() == null || existing.getConfigId().isBlank())
@@ -137,7 +142,7 @@ public final class CompanionProgressionBootstrapService {
         if (breedingType == null) {
             return;
         }
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
         double happinessValue = happiness != null
                 ? happiness.getValue()
                 : resolveInitialHappinessValue(npcRef, store, null);

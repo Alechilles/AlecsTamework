@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -41,7 +42,7 @@ final class BreedingPartnerService {
         }
         String sourceRoleId = resolveRoleId(sourceNpc);
         UUID sourceOwnerId = resolveOwnerId(sourceRef, store);
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
 
         TwBreedingConfig.PairingSettings pairing = config != null ? config.getPairing() : null;
         TwBreedingConfig.EligibilitySettings eligibility = config != null ? config.getEligibility() : null;

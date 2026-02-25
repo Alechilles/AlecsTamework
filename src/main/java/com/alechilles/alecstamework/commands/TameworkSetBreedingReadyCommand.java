@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.commands;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -61,7 +62,7 @@ public final class TameworkSetBreedingReadyCommand extends AbstractPlayerCommand
             return;
         }
 
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
         boolean cooldownActiveBefore = breeding.isCooldownActive(now);
         boolean readyNowBefore = breeding.isReady() && !cooldownActiveBefore;
         boolean nextReady = switch (mode) {
@@ -149,4 +150,3 @@ public final class TameworkSetBreedingReadyCommand extends AbstractPlayerCommand
         INVALID
     }
 }
-

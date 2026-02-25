@@ -168,6 +168,18 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
+    private static final BuilderCodec<TimingSettings> TIMING_CODEC = BuilderCodec.builder(
+            TimingSettings.class,
+            TimingSettings::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Basis", Codec.STRING),
+            (settings, value) -> settings.timerBasis = TimerBasis.fromConfigValue(value),
+            settings -> settings.getTimerBasis().toConfigValue()
+        )
+        .add()
+        .build();
+
     private static final BuilderCodec<RoleFamily> ROLE_FAMILY_CODEC = BuilderCodec.builder(
             RoleFamily.class,
             RoleFamily::new
@@ -343,6 +355,12 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             asset -> asset.passiveBreeding
         )
         .add()
+        .<TimingSettings>append(
+            new KeyedCodec<>("Timing", TIMING_CODEC),
+            (asset, value) -> asset.timing = value == null ? new TimingSettings() : value,
+            asset -> asset.timing
+        )
+        .add()
         .<InheritanceSettings>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_CODEC),
             (asset, value) -> asset.inheritance = value == null ? new InheritanceSettings() : value,
@@ -374,6 +392,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     private PairingSettings pairing = new PairingSettings();
     private CooldownSettings cooldowns = new CooldownSettings();
     private PassiveBreedingSettings passiveBreeding = new PassiveBreedingSettings();
+    private TimingSettings timing = new TimingSettings();
     private InheritanceSettings inheritance = new InheritanceSettings();
     private OffspringLifecycleSettings offspringLifecycle = new OffspringLifecycleSettings();
 
@@ -548,6 +567,10 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return passiveBreeding == null ? new PassiveBreedingSettings() : passiveBreeding;
     }
 
+    public TimingSettings getTiming() {
+        return timing == null ? new TimingSettings() : timing;
+    }
+
     public InheritanceSettings getInheritance() {
         return inheritance == null ? new InheritanceSettings() : inheritance;
     }
@@ -651,6 +674,38 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         public boolean isEnabled() {
             return enabled;
+        }
+    }
+
+    /** Controls how breeding durations are mapped onto game-time timestamps. */
+    public static final class TimingSettings {
+        private TimerBasis timerBasis = TimerBasis.WORLD_TIME_SCALED;
+
+        public TimerBasis getTimerBasis() {
+            return timerBasis == null ? TimerBasis.WORLD_TIME_SCALED : timerBasis;
+        }
+    }
+
+    /** Duration basis for breeding cooldown and lifecycle timing conversion. */
+    public enum TimerBasis {
+        REAL_TIME,
+        WORLD_TIME_SCALED;
+
+        public static TimerBasis fromConfigValue(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return WORLD_TIME_SCALED;
+            }
+            String normalized = value.trim().toUpperCase(Locale.ROOT);
+            for (TimerBasis basis : values()) {
+                if (basis.name().equals(normalized)) {
+                    return basis;
+                }
+            }
+            return WORLD_TIME_SCALED;
+        }
+
+        public String toConfigValue() {
+            return name();
         }
     }
 

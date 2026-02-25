@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -87,7 +88,7 @@ final class BreedingOffspringService {
             return false;
         }
 
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
         long sourceCooldownMs = resolveCooldownMs(config, sourceRef, store);
         long partnerCooldownMs = resolveCooldownMs(config, partner.ref, store);
         applyParentCooldown(sourceRef, sourceBreeding, sourceNpc, partnerNpc.getUuid(), sourceCooldownMs, now, store);
@@ -302,13 +303,16 @@ final class BreedingOffspringService {
         int randomDelay = maxDelay > minDelay
                 ? ThreadLocalRandom.current().nextInt(minDelay, maxDelay + 1)
                 : minDelay;
-        long baseMs = (long) (baseSeconds + randomDelay) * 1000L;
+        double baseSecondsWithDelay = (double) baseSeconds + (double) randomDelay;
         double multiplier = TraitModifierService.resolveMultiplier(npcRef, store, "BreedCooldownMultiplier", 1.0);
         if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
             multiplier = 1.0;
         }
-        long adjusted = Math.round(baseMs * multiplier);
-        return Math.max(0L, adjusted);
+        double adjustedSeconds = baseSecondsWithDelay * multiplier;
+        TwBreedingConfig.TimerBasis timerBasis = config != null
+                ? config.getTiming().getTimerBasis()
+                : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
+        return BreedingTimeService.toGameDurationMs(adjustedSeconds, timerBasis, store);
     }
 
     private void schedulePairingEffects(OffspringSpawnContext context, Store<EntityStore> sourceStore) {

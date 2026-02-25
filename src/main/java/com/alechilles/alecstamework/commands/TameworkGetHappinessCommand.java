@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.BreedingEligibilityService;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -116,7 +117,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         if (configId == null && config != null) {
             configId = normalizeBlank(config.getId());
         }
-        long now = System.currentTimeMillis();
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
         boolean cooldownActive = breeding.isCooldownActive(now);
         long cooldownUntilMs = breeding.getCooldownUntilMs();
         long cooldownRemainingMs = cooldownActive

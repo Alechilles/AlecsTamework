@@ -33,6 +33,9 @@
   "PassiveBreeding": {
     "Enabled": true
   },
+  "Timing": {
+    "Basis": "WORLD_TIME_SCALED"
+  },
   "Inheritance": {
     "InheritOwner": true,
     "InheritTamed": true,
@@ -51,7 +54,7 @@
       {
         "AdultRoleId": "Mob_Tamework_Example",
         "BabyRoleId": "Mob_Tamework_Example_Baby",
-        "TimeToFullGrownSeconds": 420
+        "TimeToFullGrownSeconds": 60
       }
     ]
   }

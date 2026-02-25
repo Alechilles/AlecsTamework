@@ -158,6 +158,8 @@ Effects:
   parent cooldown alarm is set, parents move toward each other, hearts play, and offspring spawns shortly after.
 - Offspring role selection prefers a baby-role variant when one exists (`*_Baby` patterns) and falls back to the parent role.
 - Offspring progression state now initializes life stage (`Baby -> Adolescent -> Adult`) and supports growth scaling for fallback baby roles.
+- Breeding cooldown and offspring growth durations are configured in seconds but stored/compared as game-time timestamps.
+  `TwBreedingConfig.Timing.Basis` controls conversion behavior (`WORLD_TIME_SCALED` default, or `REAL_TIME` for current time-scale tracking).
 
 ## Custom interactions
 `Type: "Custom"` exposes full `Requires` + `Effects` control.
