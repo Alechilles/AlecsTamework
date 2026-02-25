@@ -47,9 +47,9 @@
       "Weight": 0.8,
       "InheritanceWeight": 0.8,
       "NaturalMin": 0.85,
-      "NaturalMax": 1.15,
-      "BreedingMin": 0.7,
-      "BreedingMax": 1.3,
+      "NaturalMax": 1.2,
+      "BreedingMin": 0.5,
+      "BreedingMax": 2,
       "Default": 1.0
     },
     {
