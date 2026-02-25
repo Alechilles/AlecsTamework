@@ -16,7 +16,8 @@ import javax.annotation.Nullable;
 /**
  * Applies trait-driven stat modifiers to companion stat maps.
  *
- * <p>Currently this service wires `MaxHealthMultiplier` into `Health` max-stat modifiers.
+ * <p>Currently this service wires `MaxHealthMultiplier` into `Health` max-stat modifiers
+ * and delegates non-stat trait effects (for example move-speed effects).
  */
 public final class CompanionStatModifierService {
     private static final String HEALTH_STAT_ID = "Health";
@@ -32,6 +33,7 @@ public final class CompanionStatModifierService {
             return;
         }
         applyMaxHealthModifier(npcRef, store);
+        CompanionTraitEffectService.applyTraitEffects(npcRef, store);
     }
 
     private static void applyMaxHealthModifier(Ref<EntityStore> npcRef, Store<EntityStore> store) {

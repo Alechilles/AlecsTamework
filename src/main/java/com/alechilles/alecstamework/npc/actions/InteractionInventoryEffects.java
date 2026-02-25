@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
+import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -30,6 +31,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 
 /** Applies inventory-related interaction effects and item drops. */
 final class InteractionInventoryEffects {
+    private static final String HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY = "HarvestDoubleDropChanceMultiplier";
     private final ActionTameworkInteract owner;
 
     // Builds inventory effects for interaction entries.
@@ -169,13 +171,19 @@ final class InteractionInventoryEffects {
     }
 
     // Drops items from the NPC into the world based on drop config.
-    boolean applyDropItem(DropItemEffect effect, Ref<EntityStore> npcRef, Store<EntityStore> store) {
+    boolean applyDropItem(DropItemEffect effect,
+                          Ref<EntityStore> npcRef,
+                          Store<EntityStore> store,
+                          boolean harvestInteraction) {
         if (effect == null || npcRef == null || store == null) {
             return false;
         }
         List<ItemStack> drops = resolveDropItems(effect);
         if (drops.isEmpty()) {
             return false;
+        }
+        if (harvestInteraction && shouldDoubleHarvestDrops(npcRef, store)) {
+            drops = duplicateDrops(drops);
         }
         float throwSpeed = effect.getThrowSpeed() != null ? effect.getThrowSpeed().floatValue() : 0.0f;
         boolean applied = false;
@@ -191,6 +199,62 @@ final class InteractionInventoryEffects {
             applied = true;
         }
         return applied;
+    }
+
+    private boolean shouldDoubleHarvestDrops(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        double multiplier = TraitModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY,
+                1.0
+        );
+        if (!Double.isFinite(multiplier)) {
+            return false;
+        }
+        double chance = clamp(multiplier - 1.0, 0.0, 1.0);
+        return chance > 0.0 && ThreadLocalRandom.current().nextDouble() < chance;
+    }
+
+    private List<ItemStack> duplicateDrops(List<ItemStack> drops) {
+        if (drops == null || drops.isEmpty()) {
+            return List.of();
+        }
+        ArrayList<ItemStack> out = new ArrayList<>(drops.size() * 2);
+        for (ItemStack stack : drops) {
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            out.add(stack);
+            ItemStack duplicate = cloneStack(stack);
+            if (duplicate != null && !duplicate.isEmpty()) {
+                out.add(duplicate);
+            }
+        }
+        return out;
+    }
+
+    private ItemStack cloneStack(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return null;
+        }
+        String itemId = stack.getItemId();
+        if (itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        int quantity = stack.getQuantity();
+        if (quantity <= 0) {
+            return null;
+        }
+        return new ItemStack(
+                itemId,
+                quantity,
+                stack.getDurability(),
+                stack.getMaxDurability(),
+                stack.getMetadata()
+        );
     }
 
     // Resolves the combined inventory container for a player.
@@ -328,6 +392,13 @@ final class InteractionInventoryEffects {
             return min;
         }
         return min + random.nextInt(max - min + 1);
+    }
+
+    private double clamp(double value, double min, double max) {
+        if (!Double.isFinite(value)) {
+            return min;
+        }
+        return Math.max(min, Math.min(max, value));
     }
 
     // Emits a debug log entry when available.

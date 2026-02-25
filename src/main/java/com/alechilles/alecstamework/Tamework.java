@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
+import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
@@ -251,6 +252,7 @@ public class Tamework extends JavaPlugin {
                         getLogger()
                 )
         );
+        getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
 
         // Load item feature configs from bundled defaults and mod overrides.
         int loadedSpawner = loadSpawnerItemAssets();

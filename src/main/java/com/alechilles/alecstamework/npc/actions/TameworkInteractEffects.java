@@ -55,7 +55,8 @@ final class TameworkInteractEffects {
                                InfoProvider infoProvider,
                                Store<EntityStore> store,
                                Player player,
-                               InteractionContextSnapshot ctx) {
+                               InteractionContextSnapshot ctx,
+                               boolean harvestInteraction) {
         if (effects == null) {
             return false;
         }
@@ -109,7 +110,7 @@ final class TameworkInteractEffects {
         }
         DropItemEffect dropItem = effects.getDropItem();
         if (dropItem != null) {
-            applied |= inventoryEffects.applyDropItem(dropItem, npcRef, store);
+            applied |= inventoryEffects.applyDropItem(dropItem, npcRef, store, harvestInteraction);
         }
         HookEffect hookEffect = effects.getTriggerNpcHook();
         if (hookEffect != null) {
