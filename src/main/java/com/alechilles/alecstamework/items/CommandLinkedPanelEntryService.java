@@ -210,7 +210,7 @@ final class CommandLinkedPanelEntryService {
             indicators.add(new LinkedNpcTraitIndicator(
                     resolveIconGlyph(definition),
                     label,
-                    buildTooltip(label, value, max),
+                    buildTooltip(label, value, min, defaultValue, max),
                     fillRatio,
                     !belowDefault,
                     belowDefault
@@ -390,16 +390,35 @@ final class CommandLinkedPanelEntryService {
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private String buildTooltip(String label, double value, double max) {
+    private String buildTooltip(String label,
+                                double value,
+                                double min,
+                                double defaultValue,
+                                double max) {
+        double safeMin = Double.isFinite(min) ? min : 0.0;
         double safeMax = Double.isFinite(max) ? max : 0.0;
-        double normalized = safeMax == 0.0 ? 0.0 : value / safeMax;
+        if (safeMax < safeMin) {
+            double swap = safeMin;
+            safeMin = safeMax;
+            safeMax = swap;
+        }
+        double safeDefault = clamp(defaultValue, safeMin, safeMax);
+        double safeValue = clamp(value, safeMin, safeMax);
+        boolean belowDefault = safeValue < safeDefault;
+        double normalized = belowDefault
+                ? ratioToLowerBound(safeValue, safeMin, safeDefault)
+                : ratioToUpperBound(safeValue, safeDefault, safeMax);
+        String boundLabel = belowDefault ? "min" : "max";
+        double boundValue = belowDefault ? safeMin : safeMax;
         return label
                 + ": "
-                + format(value)
+                + format(safeValue)
                 + " / "
-                + format(safeMax)
-                + " max ("
-                + formatPercent(normalized)
+                + format(boundValue)
+                + " "
+                + boundLabel
+                + " ("
+                + formatPercent(normalized, belowDefault)
                 + ")";
     }
 
@@ -410,11 +429,14 @@ final class CommandLinkedPanelEntryService {
         return String.format(Locale.ROOT, "%.2f", value);
     }
 
-    private String formatPercent(double ratio) {
+    private String formatPercent(double ratio, boolean negativeDirection) {
         if (!Double.isFinite(ratio)) {
             return "0%";
         }
         int percent = (int) Math.round(clamp(ratio, 0.0, 1.0) * 100.0);
+        if (negativeDirection && percent > 0) {
+            return "-" + percent + "%";
+        }
         return percent + "%";
     }
 
