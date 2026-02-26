@@ -28,7 +28,7 @@ import javax.annotation.Nullable;
 /**
  * Handles world-environment probes for needs progression (nearby water and nearby container food).
  */
-final class CompanionNeedsEnvironmentService {
+public final class CompanionNeedsEnvironmentService {
     private static final int CONTAINER_VERTICAL_SCAN_RADIUS = 2;
     private static final int WATER_VERTICAL_SCAN_RADIUS = 1;
     private static final int[][] HORIZONTAL_NEIGHBOR_OFFSETS = {
@@ -91,6 +91,20 @@ final class CompanionNeedsEnvironmentService {
     Vector3d findNearestWaterDrinkingPosition(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store,
                                               @Nonnull TwNeedsConfig config) {
+        if (config == null) {
+            return null;
+        }
+        return findNearestWaterDrinkingPosition(
+                npcRef,
+                store,
+                config.getPassiveRefill().getWaterSearchRadius()
+        );
+    }
+
+    @Nullable
+    public Vector3d findNearestWaterDrinkingPosition(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store,
+                                                     double radius) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return null;
         }
@@ -99,7 +113,6 @@ final class CompanionNeedsEnvironmentService {
         if (transform == null || world == null || world.getChunkStore() == null) {
             return null;
         }
-        double radius = config.getPassiveRefill().getWaterSearchRadius();
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return null;
         }
@@ -157,10 +170,27 @@ final class CompanionNeedsEnvironmentService {
     Vector3d findNearestFoodContainerPosition(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store,
                                               @Nonnull TwNeedsConfig config) {
+        if (config == null) {
+            return null;
+        }
+        TwNeedsConfig.PassiveRefillSettings passive = config.getPassiveRefill();
+        return findNearestFoodContainerPosition(
+                npcRef,
+                store,
+                passive.getContainerSearchRadius(),
+                passive.getContainerFoodItemIds()
+        );
+    }
+
+    @Nullable
+    public Vector3d findNearestFoodContainerPosition(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store,
+                                                     double radius,
+                                                     @Nullable String[] allowedItemIds) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return null;
         }
-        Set<String> allowedFoods = normalizeItemIds(config.getPassiveRefill().getContainerFoodItemIds());
+        Set<String> allowedFoods = normalizeItemIds(allowedItemIds);
         if (allowedFoods.isEmpty()) {
             return null;
         }
@@ -169,7 +199,6 @@ final class CompanionNeedsEnvironmentService {
         if (transform == null || world == null || world.getChunkStore() == null) {
             return null;
         }
-        double radius = config.getPassiveRefill().getContainerSearchRadius();
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return null;
         }

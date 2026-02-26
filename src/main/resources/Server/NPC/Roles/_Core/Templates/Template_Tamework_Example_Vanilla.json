@@ -731,7 +731,7 @@
       }
     },
     {
-      "$Comment": "Bridge needs-seek hooks into resource movement for water/food.",
+      "$Comment": "Bridge needs-seek resource behavior (sensor-driven water/food targeting).",
       "Continue": true,
       "Sensor": {
         "Type": "Any"
@@ -740,6 +740,9 @@
         {
           "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
           "Modify": {
+            "NeedsSeekFoodItemIds": {
+              "Compute": "FoodItemIDs"
+            },
             "_ExportStates": [
               "NeedsSeekWater",
               "Idle",

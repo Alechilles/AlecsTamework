@@ -14,13 +14,26 @@
       "Value": "TameworkNeedsSeekTarget",
       "Description": "Stored destination slot used while a needs resource seek is active."
     },
-    "NeedsSeekWaterHookId": {
-      "Value": "Tamework.Needs.SeekWater.Start",
-      "Description": "Hook id consumed to start water-seek behavior."
+    "NeedsSeekWhenHungerBelowRatio": {
+      "Value": 0.85,
+      "Description": "Start food seeking when normalized hunger is at or below this ratio."
     },
-    "NeedsSeekFoodHookId": {
-      "Value": "Tamework.Needs.SeekFood.Start",
-      "Description": "Hook id consumed to start food-seek behavior."
+    "NeedsSeekWhenThirstBelowRatio": {
+      "Value": 0.85,
+      "Description": "Start water seeking when normalized thirst is at or below this ratio."
+    },
+    "NeedsSeekWaterSearchRange": {
+      "Value": 16,
+      "Description": "Water search radius in blocks."
+    },
+    "NeedsSeekFoodSearchRange": {
+      "Value": 16,
+      "Description": "Food-container search radius in blocks."
+    },
+    "NeedsSeekFoodItemIds": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Allowed food item ids when seeking food containers."
     },
     "NeedsSeekSlowDownDistance": {
       "Value": 2.4,
@@ -76,13 +89,30 @@
         }
       },
       {
-        "$Comment": "Start water-seek movement when the water hook is received.",
+        "$Comment": "Start water-seek movement when thirst is low and a nearby water target is found.",
         "Continue": true,
         "Sensor": {
-          "Type": "TameworkHook",
-          "HookId": {
-            "Compute": "NeedsSeekWaterHookId"
-          }
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Listen"
+            },
+            {
+              "Type": "TameworkNeedBelow",
+              "Need": "Thirst",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenThirstBelowRatio"
+              }
+            },
+            {
+              "Type": "TameworkNeedsResourceTarget",
+              "ResourceType": "Water",
+              "Range": {
+                "Compute": "NeedsSeekWaterSearchRange"
+              }
+            }
+          ]
         },
         "Actions": [
           {
@@ -120,13 +150,33 @@
         ]
       },
       {
-        "$Comment": "Start food-seek movement when the food hook is received.",
+        "$Comment": "Start food-seek movement when hunger is low and a nearby food container target is found.",
         "Continue": true,
         "Sensor": {
-          "Type": "TameworkHook",
-          "HookId": {
-            "Compute": "NeedsSeekFoodHookId"
-          }
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Listen"
+            },
+            {
+              "Type": "TameworkNeedBelow",
+              "Need": "Hunger",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenHungerBelowRatio"
+              }
+            },
+            {
+              "Type": "TameworkNeedsResourceTarget",
+              "ResourceType": "FoodContainer",
+              "Range": {
+                "Compute": "NeedsSeekFoodSearchRange"
+              },
+              "ItemIds": {
+                "Compute": "NeedsSeekFoodItemIds"
+              }
+            }
+          ]
         },
         "Actions": [
           {
