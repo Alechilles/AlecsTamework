@@ -1,7 +1,7 @@
 {
   "$Comment": "Interaction-system example template (updated from vanilla interaction flow).",
   "Debug": "DisplayState, DisplayTarget",
-  "StartState": "Hold",
+  "StartState": "Idle",
   "DefaultSubState": "Default",
   "Type": "Abstract",
   "Parameters": {
