@@ -37,7 +37,7 @@
       "Description": "Relative movement speed while seeking needs resources."
     },
     "NeedsSeekUsePathfinder": {
-      "Value": false,
+      "Value": true,
       "Description": "Use nav pathfinding while moving to a needs resource target."
     },
     "NeedsSeekUseSteering": {
@@ -231,6 +231,26 @@
                   "Compute": "NeedsSeekReadRange"
                 }
               }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Abort seek quickly when nav reports no viable path.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Nav",
+              "NavStates": [
+                "Defer"
+              ]
             },
             "Actions": [
               {
