@@ -16,6 +16,8 @@ public final class CompanionNeedsService {
     private static final double EPSILON = 0.000001;
     private static final double SECONDS_PER_MINUTE = 60.0;
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
+    private static final CompanionNeedsResourceSeekService RESOURCE_SEEK_SERVICE =
+            new CompanionNeedsResourceSeekService(ENVIRONMENT_SERVICE);
 
     private CompanionNeedsService() {
     }
@@ -170,6 +172,7 @@ public final class CompanionNeedsService {
                 );
                 componentChanged = true;
             }
+            RESOURCE_SEEK_SERVICE.tryScheduleSeek(npcRef, store, config, hunger, thirst);
             component.setLastPassiveSweepMs(nowMs);
             componentChanged = true;
         }

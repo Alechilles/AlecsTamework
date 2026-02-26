@@ -39,7 +39,10 @@
     "MaxContainerItemsConsumedPerSweep": 1,
     "NearbyWaterDrinkEnabled": true,
     "WaterSearchRadius": 4.0,
-    "ThirstGainPerSweepNearWater": 20.0
+    "ThirstGainPerSweepNearWater": 20.0,
+    "ResourceSeekEnabled": true,
+    "SeekWhenHungerBelowRatio": 0.85,
+    "SeekWhenThirstBelowRatio": 0.85
   },
   "ManualRefill": {
     "HungerGainOnFeedInteraction": 20.0,

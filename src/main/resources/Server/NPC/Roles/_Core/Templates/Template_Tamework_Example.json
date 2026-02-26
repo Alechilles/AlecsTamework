@@ -809,6 +809,42 @@
       }
     },
     {
+      "$Comment": "Bridge needs-seek hooks into resource movement for water/food.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "Any"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
+          "Modify": {
+            "_ExportStates": [
+              "NeedsSeekWater",
+              "Idle",
+              "NeedsSeekFood",
+              "Idle"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "No-op branch to pair the NeedsSeekWater state with a state sensor.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "State",
+        "State": "NeedsSeekWater"
+      }
+    },
+    {
+      "$Comment": "No-op branch to pair the NeedsSeekFood state with a state sensor.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "State",
+        "State": "NeedsSeekFood"
+      }
+    },
+    {
       "$Comment": "Bridge breeding pair hooks into dedicated pair movement.",
       "Continue": true,
       "Sensor": {
@@ -857,6 +893,14 @@
         {
           "Type": "State",
           "State": "CommandMove"
+        },
+        {
+          "Type": "State",
+          "State": "NeedsSeekWater"
+        },
+        {
+          "Type": "State",
+          "State": "NeedsSeekFood"
         },
         {
           "Type": "State",

@@ -162,6 +162,24 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             settings -> settings.thirstGainPerSweepNearWater
         )
         .add()
+        .<Boolean>append(
+            new KeyedCodec<>("ResourceSeekEnabled", Codec.BOOLEAN),
+            (settings, value) -> settings.resourceSeekEnabled = value == null || value,
+            settings -> settings.resourceSeekEnabled
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("SeekWhenHungerBelowRatio", Codec.DOUBLE),
+            (settings, value) -> settings.seekWhenHungerBelowRatio = value,
+            settings -> settings.seekWhenHungerBelowRatio
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("SeekWhenThirstBelowRatio", Codec.DOUBLE),
+            (settings, value) -> settings.seekWhenThirstBelowRatio = value,
+            settings -> settings.seekWhenThirstBelowRatio
+        )
+        .add()
         .build();
 
     private static final BuilderCodec<ManualRefillSettings> MANUAL_REFILL_CODEC = BuilderCodec.builder(
@@ -524,6 +542,9 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean nearbyWaterDrinkEnabled = true;
         private double waterSearchRadius = 4.0;
         private double thirstGainPerSweepNearWater = 20.0;
+        private boolean resourceSeekEnabled = true;
+        private double seekWhenHungerBelowRatio = 0.85;
+        private double seekWhenThirstBelowRatio = 0.85;
 
         public int getSweepIntervalSeconds() {
             return Math.max(1, sweepIntervalSeconds);
@@ -559,6 +580,18 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public double getThirstGainPerSweepNearWater() {
             return sanitizeNonNegative(thirstGainPerSweepNearWater, 0.0);
+        }
+
+        public boolean isResourceSeekEnabled() {
+            return resourceSeekEnabled;
+        }
+
+        public double getSeekWhenHungerBelowRatio() {
+            return sanitizeRatio(seekWhenHungerBelowRatio, 0.85);
+        }
+
+        public double getSeekWhenThirstBelowRatio() {
+            return sanitizeRatio(seekWhenThirstBelowRatio, 0.85);
         }
     }
 
@@ -631,6 +664,19 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
     private static double sanitizeNonNegative(double value, double fallback) {
         if (!Double.isFinite(value) || value < 0.0) {
             return fallback;
+        }
+        return value;
+    }
+
+    private static double sanitizeRatio(double value, double fallback) {
+        if (!Double.isFinite(value)) {
+            return fallback;
+        }
+        if (value < 0.0) {
+            return 0.0;
+        }
+        if (value > 1.0) {
+            return 1.0;
         }
         return value;
     }
