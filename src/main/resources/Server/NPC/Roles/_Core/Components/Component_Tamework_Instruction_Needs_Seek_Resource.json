@@ -95,6 +95,37 @@
         }
       },
       {
+        "$Comment": "If seek state has no readable target, immediately return to parent completion state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "ReadPosition",
+                "Slot": {
+                  "Compute": "NeedsSeekTargetSlot"
+                },
+                "Range": {
+                  "Compute": "NeedsSeekReadRange"
+                }
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ParentState",
+            "State": "OnNeedsSeekComplete"
+          }
+        ]
+      },
+      {
         "$Comment": "Initialize runtime when not already moving/consuming and a target exists.",
         "Continue": true,
         "Sensor": {
