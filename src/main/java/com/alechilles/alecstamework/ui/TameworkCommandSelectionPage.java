@@ -300,14 +300,21 @@ public final class TameworkCommandSelectionPage
                 "#TameworkLinkedPanelSubtitle.Text",
                 LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
         );
-        renderedLinkedNpcCardCount = linkedNpcEntries.length;
-        commandBuilder.clear("#TameworkLinkedPanelList");
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
-        if (hasEntries) {
+        boolean structureChanged = renderedLinkedNpcCardCount != linkedNpcEntries.length;
+        if (structureChanged) {
+            commandBuilder.clear("#TameworkLinkedPanelList");
+            renderedLinkedNpcCardCount = linkedNpcEntries.length;
+            if (hasEntries) {
+                for (int i = 0; i < linkedNpcEntries.length; i++) {
+                    bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true);
+                }
+            }
+        } else if (hasEntries) {
             for (int i = 0; i < linkedNpcEntries.length; i++) {
-                bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], true);
+                bindLinkedNpcCard(commandBuilder, eventBuilder, i, linkedNpcEntries[i], false);
             }
         }
         bindCommandButtonEvents(eventBuilder);
