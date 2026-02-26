@@ -286,9 +286,16 @@ Group {
       Background: #6fc576;
     }
 
-    Group #HealthTextBackdrop {
-      Anchor: (Top: 1, Left: 64, Width: 78, Height: 12);
-      Background: #081220(0.55);
+    Label #HealthTextShadow {
+      Anchor: (Top: 2, Left: 1, Width: 206, Height: 12);
+      Text: "?/?";
+      Style: (
+        FontSize: 9,
+        RenderBold: true,
+        TextColor: #081220(0.90),
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center
+      );
     }
 
     Label #HealthText {

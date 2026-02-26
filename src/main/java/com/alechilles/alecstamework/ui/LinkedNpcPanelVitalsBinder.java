@@ -24,12 +24,12 @@ final class LinkedNpcPanelVitalsBinder {
 
     private static void bindHealth(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry) {
         String healthTextSelector = entrySelector + " #HealthText";
+        String healthTextShadowSelector = entrySelector + " #HealthTextShadow";
         String healthFillSelector = entrySelector + " #HealthFill";
         if (entry.hasHealth()) {
-            commandBuilder.set(
-                    healthTextSelector + ".Text",
-                    entry.currentHealth() + "/" + entry.maxHealth()
-            );
+            String healthText = entry.currentHealth() + "/" + entry.maxHealth();
+            commandBuilder.set(healthTextSelector + ".Text", healthText);
+            commandBuilder.set(healthTextShadowSelector + ".Text", healthText);
             commandBuilder.set(healthFillSelector + ".Visible", true);
             commandBuilder.setObject(
                     healthFillSelector + ".Anchor",
@@ -39,15 +39,19 @@ final class LinkedNpcPanelVitalsBinder {
         }
         if (entry.dead()) {
             commandBuilder.set(healthTextSelector + ".Text", "Dead");
+            commandBuilder.set(healthTextShadowSelector + ".Text", "Dead");
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
         if (!entry.loaded()) {
-            commandBuilder.set(healthTextSelector + ".Text", entry.captured() ? "Captured" : "Unloaded");
+            String statusText = entry.captured() ? "Captured" : "Unloaded";
+            commandBuilder.set(healthTextSelector + ".Text", statusText);
+            commandBuilder.set(healthTextShadowSelector + ".Text", statusText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
         commandBuilder.set(healthTextSelector + ".Text", "N/A");
+        commandBuilder.set(healthTextShadowSelector + ".Text", "N/A");
         commandBuilder.set(healthFillSelector + ".Visible", false);
     }
 
