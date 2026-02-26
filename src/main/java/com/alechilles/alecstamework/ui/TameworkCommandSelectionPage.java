@@ -508,6 +508,7 @@ public final class TameworkCommandSelectionPage
                     max,
                     currentHappiness,
                     maxHappiness,
+                    entry.happinessModifierBreakdown(),
                     currentHunger,
                     maxHunger,
                     currentThirst,

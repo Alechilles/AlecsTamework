@@ -1,16 +1,14 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
-import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
-import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -30,6 +28,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.StringJoiner;
 import java.util.UUID;
 
 /**
@@ -70,8 +69,6 @@ final class CommandLinkedPanelEntryService {
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         boolean deadRespawnEnabled = globalConfig != null && globalConfig.isCommandDeadRespawnEnabled();
         World world = player.getWorld();
-        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
-        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         ComponentType<EntityStore, TameworkTraitsComponent> traitType = TameworkTraitsComponent.getComponentType();
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
@@ -92,6 +89,7 @@ final class CommandLinkedPanelEntryService {
             int maxHealth = 0;
             int happiness = 0;
             int maxHappiness = 0;
+            String happinessModifierBreakdown = null;
             int hunger = 0;
             int maxHunger = 0;
             int thirst = 0;
@@ -116,13 +114,12 @@ final class CommandLinkedPanelEntryService {
                         }
                         HappinessSnapshot happinessSnapshot = readNpcHappinessSnapshot(
                                 npcRef,
-                                store,
-                                happinessType,
-                                breedingType
+                                store
                         );
                         if (happinessSnapshot != null) {
                             happiness = happinessSnapshot.current;
                             maxHappiness = happinessSnapshot.max;
+                            happinessModifierBreakdown = happinessSnapshot.modifierBreakdown;
                         }
                         NeedsSnapshot needsSnapshot = readNpcNeedsSnapshot(npcRef, store, needsType);
                         if (needsSnapshot != null) {
@@ -172,6 +169,7 @@ final class CommandLinkedPanelEntryService {
                     maxHealth,
                     happiness,
                     maxHappiness,
+                    happinessModifierBreakdown,
                     hunger,
                     maxHunger,
                     thirst,
@@ -273,43 +271,44 @@ final class CommandLinkedPanelEntryService {
 
     private HappinessSnapshot readNpcHappinessSnapshot(
             Ref<EntityStore> npcRef,
-            Store<EntityStore> store,
-            ComponentType<EntityStore, TameworkHappinessComponent> happinessType,
-            ComponentType<EntityStore, TameworkBreedingComponent> breedingType) {
+            Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
-        TameworkHappinessComponent happinessComponent = happinessType != null
-                ? store.getComponent(npcRef, happinessType)
-                : null;
-        double value = happinessComponent != null ? happinessComponent.getValue() : Double.NaN;
-        if (!Double.isFinite(value) && breedingType != null) {
-            TameworkBreedingComponent breedingComponent = store.getComponent(npcRef, breedingType);
-            if (breedingComponent != null && Double.isFinite(breedingComponent.getHappiness())) {
-                value = breedingComponent.getHappiness();
-            }
-        }
-        if (!Double.isFinite(value)) {
+        CompanionHappinessService.HappinessSnapshot snapshot = CompanionHappinessService.resolveSnapshot(npcRef, store);
+        if (snapshot == null) {
             return null;
         }
-        double max = 100.0;
-        TwHappinessConfig config = HappinessConfigResolver.resolveConfig(npcRef, store, happinessComponent);
-        if (config != null && config.isEnabled()) {
-            TwHappinessConfig.ValueSettings values = config.getValues();
-            double min = values.getMin();
-            max = values.getMax();
-            if (max < min) {
-                double swap = min;
-                min = max;
-                max = swap;
-            }
-            value = clamp(value, min, max);
-        } else {
-            value = Math.max(0.0, value);
-        }
+        double value = clamp(snapshot.value(), snapshot.min(), snapshot.max());
+        double max = Math.max(1.0, snapshot.max());
         int roundedMax = Math.max(1, Math.round((float) max));
         int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
-        return new HappinessSnapshot(roundedValue, roundedMax);
+        String modifierBreakdown = buildHappinessModifierBreakdown(snapshot);
+        return new HappinessSnapshot(roundedValue, roundedMax, modifierBreakdown);
+    }
+
+    private String buildHappinessModifierBreakdown(CompanionHappinessService.HappinessSnapshot snapshot) {
+        if (snapshot == null) {
+            return null;
+        }
+        StringJoiner joiner = new StringJoiner("\n");
+        joiner.add("Base: " + format(snapshot.baseSetpoint()));
+        boolean hasModifiers = false;
+        for (CompanionHappinessModifierService.ModifierEntry modifier : snapshot.modifiers()) {
+            if (modifier == null || !Double.isFinite(modifier.value())) {
+                continue;
+            }
+            if (Math.abs(modifier.value()) <= 0.000001) {
+                continue;
+            }
+            hasModifiers = true;
+            joiner.add(modifier.label() + ": " + formatSigned(modifier.value()));
+        }
+        if (!hasModifiers) {
+            joiner.add("Modifiers: none");
+        }
+        joiner.add("Target: " + format(snapshot.target()));
+        return joiner.toString();
     }
 
     private NeedsSnapshot readNpcNeedsSnapshot(Ref<EntityStore> npcRef,
@@ -481,6 +480,13 @@ final class CommandLinkedPanelEntryService {
         return String.format(Locale.ROOT, "%.2f", value);
     }
 
+    private String formatSigned(double value) {
+        if (!Double.isFinite(value)) {
+            return "0.00";
+        }
+        return String.format(Locale.ROOT, "%+.2f", value);
+    }
+
     private String formatPercent(double ratio, boolean negativeDirection) {
         if (!Double.isFinite(ratio)) {
             return "0%";
@@ -505,10 +511,12 @@ final class CommandLinkedPanelEntryService {
     private static final class HappinessSnapshot {
         private final int current;
         private final int max;
+        private final String modifierBreakdown;
 
-        private HappinessSnapshot(int current, int max) {
+        private HappinessSnapshot(int current, int max, String modifierBreakdown) {
             this.current = current;
             this.max = max;
+            this.modifierBreakdown = modifierBreakdown;
         }
     }
 

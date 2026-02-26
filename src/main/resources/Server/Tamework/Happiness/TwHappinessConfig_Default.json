@@ -14,11 +14,82 @@
     "Min": 0.0,
     "Max": 100.0
   },
-  "Sources": {
-    "DecayPerMinute": 1.0,
+  "Equilibrium": {
+    "BaseSetpoint": 50.0,
+    "ConvergencePerMinute": 8.0
+  },
+  "Impulses": {
     "GainOnFeed": 5.0,
     "GainOnPet": 3.0,
-    "GainPerMinuteNearOwner": 1.0,
     "LoseOnDamage": 10.0
+  },
+  "Modifiers": {
+    "Hunger": {
+      "Enabled": true,
+      "Bands": [
+        {
+          "Id": "well_fed",
+          "Label": "Well-fed",
+          "MinPercent": 80.0,
+          "MaxPercent": 100.0,
+          "Offset": 10.0
+        },
+        {
+          "Id": "sated",
+          "Label": "Sated",
+          "MinPercent": 40.0,
+          "MaxPercent": 80.0,
+          "Offset": 0.0
+        },
+        {
+          "Id": "hungry",
+          "Label": "Hungry",
+          "MinPercent": 10.0,
+          "MaxPercent": 40.0,
+          "Offset": -15.0
+        },
+        {
+          "Id": "starving",
+          "Label": "Starving",
+          "MinPercent": 0.0,
+          "MaxPercent": 10.0,
+          "Offset": -30.0
+        }
+      ]
+    },
+    "Thirst": {
+      "Enabled": true,
+      "Bands": [
+        {
+          "Id": "quenched",
+          "Label": "Quenched",
+          "MinPercent": 80.0,
+          "MaxPercent": 100.0,
+          "Offset": 8.0
+        },
+        {
+          "Id": "hydrated",
+          "Label": "Hydrated",
+          "MinPercent": 40.0,
+          "MaxPercent": 80.0,
+          "Offset": 0.0
+        },
+        {
+          "Id": "thirsty",
+          "Label": "Thirsty",
+          "MinPercent": 10.0,
+          "MaxPercent": 40.0,
+          "Offset": -18.0
+        },
+        {
+          "Id": "dehydrated",
+          "Label": "Dehydrated",
+          "MinPercent": 0.0,
+          "MaxPercent": 10.0,
+          "Offset": -35.0
+        }
+      ]
+    },
+    "OwnerNearbyOffset": 0.0
   }
 }

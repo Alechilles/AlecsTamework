@@ -92,7 +92,7 @@ public final class CompanionProgressionBootstrapService {
         }
         TwHappinessConfig config = TwHappinessConfig.resolveForRole(roleId);
         TameworkHappinessComponent existing = store.getComponent(npcRef, happinessType);
-        long now = BreedingTimeService.resolveCurrentTimeMs(store);
+        long now = System.currentTimeMillis();
         if (existing != null) {
             boolean changed = false;
             if ((existing.getConfigId() == null || existing.getConfigId().isBlank())

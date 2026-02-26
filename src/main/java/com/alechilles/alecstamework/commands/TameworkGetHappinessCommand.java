@@ -6,6 +6,8 @@ import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.BreedingEligibilityService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -16,6 +18,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayer
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import javax.annotation.Nonnull;
@@ -59,32 +62,32 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
     @Nullable
     private static HappinessSnapshot resolveHappinessSnapshot(@Nonnull Ref<EntityStore> npcRef,
                                                               @Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
-        if (happinessType != null) {
-            TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
-            if (happiness != null && Double.isFinite(happiness.getValue())) {
-                return new HappinessSnapshot(
-                        happiness.getValue(),
-                        normalizeBlank(happiness.getConfigId()),
-                        happiness.getLastUpdateMs(),
-                        "shared"
-                );
-            }
+        HappinessSnapshot sourceSnapshot = resolveSnapshotFromComponents(npcRef, store);
+        CompanionHappinessService.HappinessSnapshot equilibriumSnapshot =
+                CompanionHappinessService.resolveSnapshot(npcRef, store);
+        if (sourceSnapshot == null && equilibriumSnapshot == null) {
+            return null;
         }
 
-        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
-        if (breedingType == null) {
-            return null;
-        }
-        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
-        if (breeding == null || !Double.isFinite(breeding.getHappiness())) {
-            return null;
-        }
+        double value = sourceSnapshot != null
+                ? sourceSnapshot.value()
+                : equilibriumSnapshot.value();
+        String configId = sourceSnapshot != null ? sourceSnapshot.configId() : null;
+        long lastUpdateMs = sourceSnapshot != null ? sourceSnapshot.lastUpdateMs() : 0L;
+        String source = sourceSnapshot != null ? sourceSnapshot.source() : "computed";
+        double baseSetpoint = equilibriumSnapshot != null ? equilibriumSnapshot.baseSetpoint() : value;
+        double target = equilibriumSnapshot != null ? equilibriumSnapshot.target() : value;
+        List<CompanionHappinessModifierService.ModifierEntry> modifiers = equilibriumSnapshot != null
+                ? equilibriumSnapshot.modifiers()
+                : List.of();
         return new HappinessSnapshot(
-                breeding.getHappiness(),
-                normalizeBlank(breeding.getConfigId()),
-                breeding.getLastHappinessUpdateMs(),
-                "breeding-legacy"
+                value,
+                configId,
+                lastUpdateMs,
+                source,
+                baseSetpoint,
+                target,
+                modifiers
         );
     }
 
@@ -153,6 +156,13 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         if (happiness.lastUpdateMs() > 0L) {
             message.append(", lastUpdateMs=").append(happiness.lastUpdateMs());
         }
+        message.append(", base=").append(formatDouble(happiness.baseSetpoint()));
+        message.append(", target=").append(formatDouble(happiness.target()));
+        if (!happiness.modifiers().isEmpty()) {
+            message.append(", modifiers=").append(formatModifiers(happiness.modifiers()));
+        } else {
+            message.append(", modifiers=[]");
+        }
         message.append(")");
 
         if (!breeding.hasComponent()) {
@@ -184,6 +194,26 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         return message.toString();
     }
 
+    @Nonnull
+    private static String formatModifiers(@Nonnull List<CompanionHappinessModifierService.ModifierEntry> modifiers) {
+        StringBuilder builder = new StringBuilder("[");
+        boolean first = true;
+        for (CompanionHappinessModifierService.ModifierEntry modifier : modifiers) {
+            if (modifier == null || !Double.isFinite(modifier.value())) {
+                continue;
+            }
+            if (!first) {
+                builder.append("; ");
+            }
+            first = false;
+            builder.append(modifier.label())
+                    .append("=")
+                    .append(String.format(Locale.ROOT, "%+.2f", modifier.value()));
+        }
+        builder.append("]");
+        return builder.toString();
+    }
+
     @Nullable
     private static String normalizeBlank(@Nullable String value) {
         if (value == null || value.isBlank()) {
@@ -196,7 +226,50 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         return String.format(Locale.ROOT, "%.2f", value);
     }
 
-    private record HappinessSnapshot(double value, @Nullable String configId, long lastUpdateMs, String source) {
+    @Nullable
+    private static HappinessSnapshot resolveSnapshotFromComponents(@Nonnull Ref<EntityStore> npcRef,
+                                                                   @Nonnull Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType != null) {
+            TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
+            if (happiness != null && Double.isFinite(happiness.getValue())) {
+                return new HappinessSnapshot(
+                        happiness.getValue(),
+                        normalizeBlank(happiness.getConfigId()),
+                        happiness.getLastUpdateMs(),
+                        "shared",
+                        happiness.getValue(),
+                        happiness.getValue(),
+                        List.of()
+                );
+            }
+        }
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        if (breedingType == null) {
+            return null;
+        }
+        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
+        if (breeding == null || !Double.isFinite(breeding.getHappiness())) {
+            return null;
+        }
+        return new HappinessSnapshot(
+                breeding.getHappiness(),
+                normalizeBlank(breeding.getConfigId()),
+                breeding.getLastHappinessUpdateMs(),
+                "breeding-legacy",
+                breeding.getHappiness(),
+                breeding.getHappiness(),
+                List.of()
+        );
+    }
+
+    private record HappinessSnapshot(double value,
+                                     @Nullable String configId,
+                                     long lastUpdateMs,
+                                     String source,
+                                     double baseSetpoint,
+                                     double target,
+                                     List<CompanionHappinessModifierService.ModifierEntry> modifiers) {
     }
 
     private record BreedingSnapshot(boolean hasComponent,

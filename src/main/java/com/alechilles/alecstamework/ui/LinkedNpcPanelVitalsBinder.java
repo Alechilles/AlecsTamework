@@ -81,10 +81,14 @@ final class LinkedNpcPanelVitalsBinder {
 
     private static NeedVisual resolveHappinessNeed(LinkedNpcEntry entry) {
         if (entry.hasHappiness()) {
+            String tooltip = "Happiness: " + entry.currentHappiness() + "/" + entry.maxHappiness()
+                    + " (" + percent(entry.happinessRatio()) + "%)";
+            if (entry.happinessModifierBreakdown() != null && !entry.happinessModifierBreakdown().isBlank()) {
+                tooltip = tooltip + "\n" + entry.happinessModifierBreakdown();
+            }
             return new NeedVisual(
                     entry.happinessRatio(),
-                    "Happiness: " + entry.currentHappiness() + "/" + entry.maxHappiness()
-                            + " (" + percent(entry.happinessRatio()) + "%)",
+                    tooltip,
                     true
             );
         }

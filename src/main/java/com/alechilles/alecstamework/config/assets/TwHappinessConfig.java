@@ -9,6 +9,7 @@ import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashMap;
 import java.util.Locale;
@@ -20,6 +21,8 @@ import javax.annotation.Nullable;
  * Stored under Server/Tamework/Happiness.
  */
 public final class TwHappinessConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwHappinessConfig>> {
+    private static final NeedBandSettings[] EMPTY_BANDS = new NeedBandSettings[0];
+
     private static final BuilderCodec<ValueSettings> VALUE_CODEC = BuilderCodec.builder(
             ValueSettings.class,
             ValueSettings::new
@@ -44,16 +47,28 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         .add()
         .build();
 
-    private static final BuilderCodec<SourceSettings> SOURCE_CODEC = BuilderCodec.builder(
-            SourceSettings.class,
-            SourceSettings::new
+    private static final BuilderCodec<EquilibriumSettings> EQUILIBRIUM_CODEC = BuilderCodec.builder(
+            EquilibriumSettings.class,
+            EquilibriumSettings::new
     )
         .<Double>append(
-            new KeyedCodec<>("DecayPerMinute", Codec.DOUBLE),
-            (settings, value) -> settings.decayPerMinute = value,
-            settings -> settings.decayPerMinute
+            new KeyedCodec<>("BaseSetpoint", Codec.DOUBLE),
+            (settings, value) -> settings.baseSetpoint = value,
+            settings -> settings.baseSetpoint
         )
         .add()
+        .<Double>append(
+            new KeyedCodec<>("ConvergencePerMinute", Codec.DOUBLE),
+            (settings, value) -> settings.convergencePerMinute = value,
+            settings -> settings.convergencePerMinute
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<ImpulseSettings> IMPULSE_CODEC = BuilderCodec.builder(
+            ImpulseSettings.class,
+            ImpulseSettings::new
+    )
         .<Double>append(
             new KeyedCodec<>("GainOnFeed", Codec.DOUBLE),
             (settings, value) -> settings.gainOnFeed = value,
@@ -67,15 +82,90 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         )
         .add()
         .<Double>append(
-            new KeyedCodec<>("GainPerMinuteNearOwner", Codec.DOUBLE),
-            (settings, value) -> settings.gainPerMinuteNearOwner = value,
-            settings -> settings.gainPerMinuteNearOwner
-        )
-        .add()
-        .<Double>append(
             new KeyedCodec<>("LoseOnDamage", Codec.DOUBLE),
             (settings, value) -> settings.loseOnDamage = value,
             settings -> settings.loseOnDamage
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<NeedBandSettings> NEED_BAND_CODEC = BuilderCodec.builder(
+            NeedBandSettings.class,
+            NeedBandSettings::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Id", Codec.STRING),
+            (settings, value) -> settings.id = value,
+            settings -> settings.id
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Label", Codec.STRING),
+            (settings, value) -> settings.label = value,
+            settings -> settings.label
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MinPercent", Codec.DOUBLE),
+            (settings, value) -> settings.minPercent = value,
+            settings -> settings.minPercent
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MaxPercent", Codec.DOUBLE),
+            (settings, value) -> settings.maxPercent = value,
+            settings -> settings.maxPercent
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Offset", Codec.DOUBLE),
+            (settings, value) -> settings.offset = value,
+            settings -> settings.offset
+        )
+        .add()
+        .build();
+
+    private static final ArrayCodec<NeedBandSettings> NEED_BAND_ARRAY_CODEC =
+            new ArrayCodec<>(NEED_BAND_CODEC, NeedBandSettings[]::new);
+
+    private static final BuilderCodec<NeedModifierSettings> NEED_MODIFIER_CODEC = BuilderCodec.builder(
+            NeedModifierSettings.class,
+            NeedModifierSettings::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            (settings, value) -> settings.enabled = value == null || value,
+            settings -> settings.enabled
+        )
+        .add()
+        .<NeedBandSettings[]>append(
+            new KeyedCodec<>("Bands", NEED_BAND_ARRAY_CODEC),
+            (settings, value) -> settings.bands = value == null ? EMPTY_BANDS : value,
+            settings -> settings.bands
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<ModifierSettings> MODIFIER_CODEC = BuilderCodec.builder(
+            ModifierSettings.class,
+            ModifierSettings::new
+    )
+        .<NeedModifierSettings>append(
+            new KeyedCodec<>("Hunger", NEED_MODIFIER_CODEC),
+            (settings, value) -> settings.hunger = value == null ? new NeedModifierSettings() : value,
+            settings -> settings.hunger
+        )
+        .add()
+        .<NeedModifierSettings>append(
+            new KeyedCodec<>("Thirst", NEED_MODIFIER_CODEC),
+            (settings, value) -> settings.thirst = value == null ? new NeedModifierSettings() : value,
+            settings -> settings.thirst
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("OwnerNearbyOffset", Codec.DOUBLE),
+            (settings, value) -> settings.ownerNearbyOffset = value,
+            settings -> settings.ownerNearbyOffset
         )
         .add()
         .build();
@@ -114,10 +204,22 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             asset -> asset.values
         )
         .add()
-        .<SourceSettings>append(
-            new KeyedCodec<>("Sources", SOURCE_CODEC),
-            (asset, value) -> asset.sources = value == null ? new SourceSettings() : value,
-            asset -> asset.sources
+        .<EquilibriumSettings>append(
+            new KeyedCodec<>("Equilibrium", EQUILIBRIUM_CODEC),
+            (asset, value) -> asset.equilibrium = value == null ? new EquilibriumSettings() : value,
+            asset -> asset.equilibrium
+        )
+        .add()
+        .<ImpulseSettings>append(
+            new KeyedCodec<>("Impulses", IMPULSE_CODEC),
+            (asset, value) -> asset.impulses = value == null ? new ImpulseSettings() : value,
+            asset -> asset.impulses
+        )
+        .add()
+        .<ModifierSettings>append(
+            new KeyedCodec<>("Modifiers", MODIFIER_CODEC),
+            (asset, value) -> asset.modifiers = value == null ? new ModifierSettings() : value,
+            asset -> asset.modifiers
         )
         .add()
         .build();
@@ -133,7 +235,9 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
     private int priority;
     private String[] roleIds = ArrayUtil.EMPTY_STRING_ARRAY;
     private ValueSettings values = new ValueSettings();
-    private SourceSettings sources = new SourceSettings();
+    private EquilibriumSettings equilibrium = new EquilibriumSettings();
+    private ImpulseSettings impulses = new ImpulseSettings();
+    private ModifierSettings modifiers = new ModifierSettings();
 
     public static AssetStore<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -276,8 +380,16 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         return values == null ? new ValueSettings() : values;
     }
 
-    public SourceSettings getSources() {
-        return sources == null ? new SourceSettings() : sources;
+    public EquilibriumSettings getEquilibrium() {
+        return equilibrium == null ? new EquilibriumSettings() : equilibrium;
+    }
+
+    public ImpulseSettings getImpulses() {
+        return impulses == null ? new ImpulseSettings() : impulses;
+    }
+
+    public ModifierSettings getModifiers() {
+        return modifiers == null ? new ModifierSettings() : modifiers;
     }
 
     /** Bounds and default value for shared happiness state. */
@@ -287,44 +399,159 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         private double max = 100.0;
 
         public double getCurrentDefault() {
-            return currentDefault;
+            return clamp(currentDefault, getMin(), getMax());
         }
 
         public double getMin() {
+            if (!Double.isFinite(min)) {
+                return 0.0;
+            }
             return min;
         }
 
         public double getMax() {
+            if (!Double.isFinite(max)) {
+                return getMin();
+            }
+            if (max < getMin()) {
+                return getMin();
+            }
             return max;
         }
     }
 
-    /** Event/source knobs that mutate companion happiness over time. */
-    public static final class SourceSettings {
-        private double decayPerMinute = 1.0;
-        private double gainOnFeed = 5.0;
-        private double gainOnPet = 3.0;
-        private double gainPerMinuteNearOwner = 1.0;
-        private double loseOnDamage = 10.0;
+    /** Convergence settings for the equilibrium mood target. */
+    public static final class EquilibriumSettings {
+        private double baseSetpoint = 50.0;
+        private double convergencePerMinute = 8.0;
 
-        public double getDecayPerMinute() {
-            return decayPerMinute;
+        public double getBaseSetpoint() {
+            if (!Double.isFinite(baseSetpoint)) {
+                return 50.0;
+            }
+            return baseSetpoint;
         }
 
+        public double getConvergencePerMinute() {
+            if (!Double.isFinite(convergencePerMinute) || convergencePerMinute < 0.0) {
+                return 0.0;
+            }
+            return convergencePerMinute;
+        }
+    }
+
+    /** Event-style impulse values applied immediately to current happiness. */
+    public static final class ImpulseSettings {
+        private double gainOnFeed = 5.0;
+        private double gainOnPet = 3.0;
+        private double loseOnDamage = 10.0;
+
         public double getGainOnFeed() {
+            if (!Double.isFinite(gainOnFeed)) {
+                return 0.0;
+            }
             return gainOnFeed;
         }
 
         public double getGainOnPet() {
+            if (!Double.isFinite(gainOnPet)) {
+                return 0.0;
+            }
             return gainOnPet;
         }
 
-        public double getGainPerMinuteNearOwner() {
-            return gainPerMinuteNearOwner;
-        }
-
         public double getLoseOnDamage() {
+            if (!Double.isFinite(loseOnDamage)) {
+                return 0.0;
+            }
             return loseOnDamage;
         }
+    }
+
+    /** Active modifier groups that offset equilibrium target happiness. */
+    public static final class ModifierSettings {
+        private NeedModifierSettings hunger = new NeedModifierSettings();
+        private NeedModifierSettings thirst = new NeedModifierSettings();
+        private double ownerNearbyOffset;
+
+        public NeedModifierSettings getHunger() {
+            return hunger == null ? new NeedModifierSettings() : hunger;
+        }
+
+        public NeedModifierSettings getThirst() {
+            return thirst == null ? new NeedModifierSettings() : thirst;
+        }
+
+        public double getOwnerNearbyOffset() {
+            if (!Double.isFinite(ownerNearbyOffset)) {
+                return 0.0;
+            }
+            return ownerNearbyOffset;
+        }
+    }
+
+    /** Need-specific modifier bands (for hunger/thirst). */
+    public static final class NeedModifierSettings {
+        private boolean enabled = true;
+        private NeedBandSettings[] bands = EMPTY_BANDS;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public NeedBandSettings[] getBands() {
+            return bands == null ? EMPTY_BANDS : bands;
+        }
+    }
+
+    /** One percentage band contributing an offset to equilibrium target. */
+    public static final class NeedBandSettings {
+        private String id;
+        private String label;
+        private double minPercent;
+        private double maxPercent = 100.0;
+        private double offset;
+
+        public String getId() {
+            return id;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public double getMinPercent() {
+            if (!Double.isFinite(minPercent)) {
+                return 0.0;
+            }
+            return clamp(minPercent, 0.0, 100.0);
+        }
+
+        public double getMaxPercent() {
+            if (!Double.isFinite(maxPercent)) {
+                return 100.0;
+            }
+            return clamp(maxPercent, 0.0, 100.0);
+        }
+
+        public double getOffset() {
+            if (!Double.isFinite(offset)) {
+                return 0.0;
+            }
+            return offset;
+        }
+    }
+
+    private static double clamp(double value, double min, double max) {
+        if (!Double.isFinite(value)) {
+            return min;
+        }
+        if (value < min) {
+            return min;
+        }
+        if (value > max) {
+            return max;
+        }
+        return value;
     }
 }

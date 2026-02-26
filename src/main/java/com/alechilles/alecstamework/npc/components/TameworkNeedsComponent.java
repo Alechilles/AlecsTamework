@@ -9,7 +9,9 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
- * Stores persistent hunger/thirst state and applied needs-derived happiness penalty for a companion.
+ * Stores persistent hunger/thirst state for a companion.
+ *
+ * <p>{@code AppliedHappinessPenalty} is retained as a legacy field and reset to zero by runtime updates.
  */
 public final class TameworkNeedsComponent implements Component<EntityStore> {
     public static final BuilderCodec<TameworkNeedsComponent> CODEC = BuilderCodec.builder(

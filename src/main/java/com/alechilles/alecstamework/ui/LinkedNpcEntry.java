@@ -13,6 +13,7 @@ public final class LinkedNpcEntry {
     private final int maxHealth;
     private final int currentHappiness;
     private final int maxHappiness;
+    private final String happinessModifierBreakdown;
     private final int currentHunger;
     private final int maxHunger;
     private final int currentThirst;
@@ -36,6 +37,7 @@ public final class LinkedNpcEntry {
                           int maxHealth,
                           int currentHappiness,
                           int maxHappiness,
+                          String happinessModifierBreakdown,
                           int currentHunger,
                           int maxHunger,
                           int currentThirst,
@@ -53,6 +55,7 @@ public final class LinkedNpcEntry {
                 maxHealth,
                 currentHappiness,
                 maxHappiness,
+                happinessModifierBreakdown,
                 currentHunger,
                 maxHunger,
                 currentThirst,
@@ -78,6 +81,7 @@ public final class LinkedNpcEntry {
                           int maxHealth,
                           int currentHappiness,
                           int maxHappiness,
+                          String happinessModifierBreakdown,
                           int currentHunger,
                           int maxHunger,
                           int currentThirst,
@@ -100,6 +104,7 @@ public final class LinkedNpcEntry {
         this.maxHealth = maxHealth;
         this.currentHappiness = currentHappiness;
         this.maxHappiness = maxHappiness;
+        this.happinessModifierBreakdown = happinessModifierBreakdown;
         this.currentHunger = currentHunger;
         this.maxHunger = maxHunger;
         this.currentThirst = currentThirst;
@@ -144,6 +149,10 @@ public final class LinkedNpcEntry {
 
     public int maxHappiness() {
         return maxHappiness;
+    }
+
+    public String happinessModifierBreakdown() {
+        return happinessModifierBreakdown;
     }
 
     public int currentHunger() {

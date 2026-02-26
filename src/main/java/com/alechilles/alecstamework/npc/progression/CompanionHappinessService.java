@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.List;
 import javax.annotation.Nullable;
 
 /**
@@ -22,6 +23,7 @@ public final class CompanionHappinessService {
     private static final double DEFAULT_MAX = 100.0;
     private static final double DEFAULT_VALUE = 50.0;
     private static final double DEFAULT_FEED_GAIN = 5.0;
+    private static final double SECONDS_PER_MINUTE = 60.0;
 
     private CompanionHappinessService() {
     }
@@ -45,12 +47,59 @@ public final class CompanionHappinessService {
         if (!Double.isFinite(adjustedGain)) {
             adjustedGain = 0.0;
         }
-        return applyDelta(npcRef, store, adjustedGain);
+        return applyImpulse(npcRef, store, adjustedGain);
+    }
+
+    public static boolean reconcile(@Nullable Ref<EntityStore> npcRef,
+                                    @Nullable Store<EntityStore> store) {
+        return updateHappiness(npcRef, store, 0.0);
+    }
+
+    public static boolean applyImpulse(@Nullable Ref<EntityStore> npcRef,
+                                       @Nullable Store<EntityStore> store,
+                                       double impulseDelta) {
+        return updateHappiness(npcRef, store, impulseDelta);
     }
 
     public static boolean applyDelta(@Nullable Ref<EntityStore> npcRef,
                                      @Nullable Store<EntityStore> store,
                                      double delta) {
+        return applyImpulse(npcRef, store, delta);
+    }
+
+    @Nullable
+    public static HappinessSnapshot resolveSnapshot(@Nullable Ref<EntityStore> npcRef,
+                                                    @Nullable Store<EntityStore> store) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
+        TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
+        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        if (happiness == null && breeding == null && (happinessConfig == null || !happinessConfig.isEnabled())) {
+            return null;
+        }
+        HappinessRules rules = resolveRules(happinessConfig);
+        double current = resolveCurrent(happiness, breeding, rules.defaultValue);
+        CompanionHappinessModifierService.ModifierSnapshot modifierSnapshot =
+                CompanionHappinessModifierService.resolve(npcRef, store, happinessConfig);
+        double target = clamp(modifierSnapshot.target(), rules.min, rules.max);
+        double baseSetpoint = clamp(modifierSnapshot.baseSetpoint(), rules.min, rules.max);
+        return new HappinessSnapshot(
+                clamp(current, rules.min, rules.max),
+                rules.min,
+                rules.max,
+                baseSetpoint,
+                target,
+                modifierSnapshot.modifiers()
+        );
+    }
+
+    private static boolean updateHappiness(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store,
+                                           double impulseDelta) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -62,42 +111,49 @@ public final class CompanionHappinessService {
         TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
         TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
-        if (happiness == null && breeding == null && happinessConfig == null) {
+        if (happiness == null && breeding == null && (happinessConfig == null || !happinessConfig.isEnabled())) {
             return false;
         }
         TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
         HappinessRules rules = resolveRules(happinessConfig);
-        if (!Double.isFinite(delta)) {
-            delta = 0.0;
+        if (!Double.isFinite(impulseDelta)) {
+            impulseDelta = 0.0;
         }
         long now = System.currentTimeMillis();
+        boolean happinessChanged = false;
         if (happiness == null) {
-            double seedValue = breeding != null && Double.isFinite(breeding.getHappiness())
-                    ? breeding.getHappiness()
-                    : rules.defaultValue;
+            double seedValue = resolveCurrent(happiness, breeding, rules.defaultValue);
             String configId = happinessConfig != null ? happinessConfig.getId() : null;
             happiness = new TameworkHappinessComponent(
                     configId,
                     clamp(seedValue, rules.min, rules.max),
                     now
             );
-            store.putComponent(npcRef, happinessType, happiness);
+            happinessChanged = true;
         }
-        boolean happinessChanged = false;
         if ((happiness.getConfigId() == null || happiness.getConfigId().isBlank())
                 && happinessConfig != null
                 && happinessConfig.getId() != null
-                && !happinessConfig.getId().isBlank()) {
+                    && !happinessConfig.getId().isBlank()) {
             happiness.setConfigId(happinessConfig.getId());
             happinessChanged = true;
         }
-        double previous = Double.isFinite(happiness.getValue()) ? happiness.getValue() : rules.defaultValue;
-        double next = clamp(previous + delta, rules.min, rules.max);
+        double previous = resolveCurrent(happiness, breeding, rules.defaultValue);
+        CompanionHappinessModifierService.ModifierSnapshot modifierSnapshot =
+                CompanionHappinessModifierService.resolve(npcRef, store, happinessConfig);
+        double target = clamp(modifierSnapshot.target(), rules.min, rules.max);
+        long lastUpdateMs = happiness.getLastUpdateMs();
+        long elapsedMs = lastUpdateMs > 0L ? Math.max(0L, now - lastUpdateMs) : 0L;
+        double elapsedMinutes = elapsedMs / (SECONDS_PER_MINUTE * 1000.0);
+        double convergenceStep = rules.convergencePerMinute * elapsedMinutes;
+        double converged = moveToward(previous, target, convergenceStep);
+        double next = clamp(converged + impulseDelta, rules.min, rules.max);
         if (Math.abs(next - previous) > EPSILON) {
             happiness.setValue(next);
             happinessChanged = true;
         }
-        if (happiness.getLastUpdateMs() != now) {
+        if ((happinessChanged || Math.abs(impulseDelta) > EPSILON || elapsedMs > 0L)
+                && happiness.getLastUpdateMs() != now) {
             happiness.setLastUpdateMs(now);
             happinessChanged = true;
         }
@@ -111,7 +167,8 @@ public final class CompanionHappinessService {
                 breeding.setHappiness(next);
                 breedingChanged = true;
             }
-            if (breeding.getLastHappinessUpdateMs() != now) {
+            if ((breedingChanged || Math.abs(impulseDelta) > EPSILON || elapsedMs > 0L)
+                    && breeding.getLastHappinessUpdateMs() != now) {
                 breeding.setLastHappinessUpdateMs(now);
                 breedingChanged = true;
             }
@@ -169,13 +226,60 @@ public final class CompanionHappinessService {
                 max = swap;
             }
             double defaultValue = clamp(values.getCurrentDefault(), min, max);
-            double feedGain = happinessConfig.getSources().getGainOnFeed();
-            return new HappinessRules(min, max, defaultValue, feedGain);
+            double convergencePerMinute = happinessConfig.getEquilibrium().getConvergencePerMinute();
+            double feedGain = happinessConfig.getImpulses().getGainOnFeed();
+            return new HappinessRules(min, max, defaultValue, convergencePerMinute, feedGain);
         }
-        return new HappinessRules(DEFAULT_MIN, DEFAULT_MAX, DEFAULT_VALUE, DEFAULT_FEED_GAIN);
+        return new HappinessRules(DEFAULT_MIN, DEFAULT_MAX, DEFAULT_VALUE, 0.0, DEFAULT_FEED_GAIN);
     }
 
-    private record HappinessRules(double min, double max, double defaultValue, double feedGain) {
+    private static double resolveCurrent(@Nullable TameworkHappinessComponent happiness,
+                                         @Nullable TameworkBreedingComponent breeding,
+                                         double fallback) {
+        if (happiness != null && Double.isFinite(happiness.getValue())) {
+            return happiness.getValue();
+        }
+        if (breeding != null && Double.isFinite(breeding.getHappiness())) {
+            return breeding.getHappiness();
+        }
+        return fallback;
+    }
+
+    private static double moveToward(double current, double target, double maxStep) {
+        if (!Double.isFinite(current)) {
+            return target;
+        }
+        if (!Double.isFinite(target)) {
+            return current;
+        }
+        if (!Double.isFinite(maxStep) || maxStep <= 0.0) {
+            return current;
+        }
+        if (current < target) {
+            return Math.min(target, current + maxStep);
+        }
+        if (current > target) {
+            return Math.max(target, current - maxStep);
+        }
+        return current;
+    }
+
+    private record HappinessRules(double min,
+                                  double max,
+                                  double defaultValue,
+                                  double convergencePerMinute,
+                                  double feedGain) {
+    }
+
+    /**
+     * Read-only happiness state used by UI and debug command output.
+     */
+    public record HappinessSnapshot(double value,
+                                    double min,
+                                    double max,
+                                    double baseSetpoint,
+                                    double target,
+                                    List<CompanionHappinessModifierService.ModifierEntry> modifiers) {
     }
 
     private static double clamp(double value, double min, double max) {

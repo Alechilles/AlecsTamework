@@ -6,11 +6,16 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import java.util.Locale;
+import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Applies hunger/thirst progression and keeps needs-derived happiness penalties synchronized.
+ * Applies hunger/thirst progression and triggers equilibrium-happiness reconciliation.
  */
 public final class CompanionNeedsService {
     private static final double EPSILON = 0.000001;
@@ -92,12 +97,12 @@ public final class CompanionNeedsService {
     }
 
     /**
-     * Runs a needs progression step: decay, passive refill probes, and happiness penalty sync.
+     * Runs a needs progression step: decay plus equilibrium happiness reconciliation.
      */
     public static boolean tickNeeds(@Nullable Ref<EntityStore> npcRef,
                                     @Nullable Store<EntityStore> store,
                                     @Nullable String roleId) {
-        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, null);
+        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, null);
     }
 
     /**
@@ -106,7 +111,56 @@ public final class CompanionNeedsService {
     public static boolean applyFeedInteractionRefill(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store,
                                                      @Nullable String heldItemId) {
-        return runNeedsUpdate(npcRef, store, null, 0.0, 0.0, true, false, heldItemId);
+        return runNeedsUpdate(npcRef, store, null, 0.0, 0.0, true, heldItemId);
+    }
+
+    /**
+     * Applies an explicit consume attempt for water and/or food from action-driven seek flow.
+     */
+    public static boolean applyResourceConsume(@Nullable Ref<EntityStore> npcRef,
+                                               @Nullable Store<EntityStore> store,
+                                               @Nullable String roleId,
+                                               @Nullable String resourceType,
+                                               @Nullable String[] preferredFoodItemIds) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
+        if (needsType == null) {
+            return false;
+        }
+        TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
+        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
+        NeedsResourceConsumeMode mode = NeedsResourceConsumeMode.from(resourceType);
+        double hungerGain = 0.0;
+        double thirstGain = 0.0;
+
+        if (mode.consumesFood() && passiveRefill.isNearbyContainerFeedEnabled()) {
+            String[] effectiveFoodIds = preferredFoodItemIds;
+            if (effectiveFoodIds == null || effectiveFoodIds.length == 0) {
+                effectiveFoodIds = resolveRoleFoodItemIds(npcRef, store);
+            }
+            int consumed = ENVIRONMENT_SERVICE.consumeNearbyContainerFood(npcRef, store, config, effectiveFoodIds);
+            if (consumed > 0) {
+                hungerGain = consumed * passiveRefill.getHungerGainPerConsumedItem();
+            }
+        }
+        if (mode.consumesWater()
+                && passiveRefill.isNearbyWaterDrinkEnabled()) {
+            if (mode == NeedsResourceConsumeMode.WATER) {
+                thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
+            } else if (ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config)) {
+                thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
+            }
+        }
+        if (hungerGain <= 0.0 && thirstGain <= 0.0) {
+            return false;
+        }
+        return runNeedsUpdate(npcRef, store, roleId, hungerGain, thirstGain, false, null);
     }
 
     private static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,
@@ -115,7 +169,6 @@ public final class CompanionNeedsService {
                                           double explicitHungerGain,
                                           double explicitThirstGain,
                                           boolean includeConfiguredManualGains,
-                                          boolean allowPassiveRefill,
                                           @Nullable String heldItemId) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
@@ -141,7 +194,6 @@ public final class CompanionNeedsService {
         long elapsedMs = lastUpdateMs > 0L ? Math.max(0L, nowMs - lastUpdateMs) : 0L;
 
         boolean componentChanged = false;
-        boolean happinessChanged = false;
         if (elapsedMs > 0L) {
             double elapsedMinutes = elapsedMs / (SECONDS_PER_MINUTE * 1000.0);
             TwNeedsConfig.DecaySettings decay = config.getDecay();
@@ -149,28 +201,6 @@ public final class CompanionNeedsService {
             double thirstDecay = decay.getThirstPerMinute() * elapsedMinutes;
             hunger = clamp(hunger - hungerDecay, values.getHungerMin(), values.getHungerMax());
             thirst = clamp(thirst - thirstDecay, values.getThirstMin(), values.getThirstMax());
-            componentChanged = true;
-        }
-
-        if (allowPassiveRefill && shouldRunPassiveSweep(component, config, nowMs)) {
-            TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
-            if (passiveRefill.isNearbyContainerFeedEnabled()) {
-                int consumed = ENVIRONMENT_SERVICE.consumeNearbyContainerFood(npcRef, store, config);
-                if (consumed > 0) {
-                    double hungerGain = consumed * passiveRefill.getHungerGainPerConsumedItem();
-                    hunger = clamp(hunger + hungerGain, values.getHungerMin(), values.getHungerMax());
-                    componentChanged = true;
-                }
-            }
-            if (passiveRefill.isNearbyWaterDrinkEnabled() && ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config)) {
-                thirst = clamp(
-                        thirst + passiveRefill.getThirstGainPerSweepNearWater(),
-                        values.getThirstMin(),
-                        values.getThirstMax()
-                );
-                componentChanged = true;
-            }
-            component.setLastPassiveSweepMs(nowMs);
             componentChanged = true;
         }
 
@@ -192,19 +222,9 @@ public final class CompanionNeedsService {
             componentChanged = true;
         }
 
-        double desiredPenalty = resolveDesiredPenalty(hunger, thirst, config);
-        double previousPenalty = Double.isFinite(component.getAppliedHappinessPenalty())
-                ? component.getAppliedHappinessPenalty()
-                : 0.0;
-        double penaltyDelta = desiredPenalty - previousPenalty;
-        if (Math.abs(penaltyDelta) > EPSILON) {
-            if (CompanionHappinessService.applyDelta(npcRef, store, penaltyDelta)) {
-                component.setAppliedHappinessPenalty(desiredPenalty);
-                componentChanged = true;
-                happinessChanged = true;
-            }
-        } else if (!Double.isFinite(component.getAppliedHappinessPenalty())) {
-            component.setAppliedHappinessPenalty(desiredPenalty);
+        if (!Double.isFinite(component.getAppliedHappinessPenalty())
+                || Math.abs(component.getAppliedHappinessPenalty()) > EPSILON) {
+            component.setAppliedHappinessPenalty(0.0);
             componentChanged = true;
         }
 
@@ -223,6 +243,7 @@ public final class CompanionNeedsService {
         if (componentChanged) {
             store.putComponent(npcRef, needsType, component);
         }
+        boolean happinessChanged = CompanionHappinessService.reconcile(npcRef, store);
         return componentChanged || happinessChanged;
     }
 
@@ -246,15 +267,69 @@ public final class CompanionNeedsService {
         return NeedsConfigResolver.resolveConfig(npcRef, store, component);
     }
 
-    private static boolean shouldRunPassiveSweep(@Nonnull TameworkNeedsComponent component,
-                                                 @Nonnull TwNeedsConfig config,
-                                                 long nowMs) {
-        long lastSweepMs = component.getLastPassiveSweepMs();
-        if (lastSweepMs <= 0L) {
-            return true;
+    @Nonnull
+    private static String[] resolveRoleFoodItemIds(@Nullable Ref<EntityStore> npcRef,
+                                                   @Nullable Store<EntityStore> store) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return new String[0];
         }
-        long intervalMs = Math.max(1L, config.getPassiveRefill().getSweepIntervalSeconds()) * 1000L;
-        return nowMs - lastSweepMs >= intervalMs;
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npc == null || npc.getRole() == null || npc.getRole().getEntitySupport() == null) {
+            return new String[0];
+        }
+        EntitySupport entitySupport = npc.getRole().getEntitySupport();
+        StdScope sensorScope = entitySupport.getSensorScope();
+        if (sensorScope == null) {
+            return new String[0];
+        }
+        try {
+            Supplier<String[]> arraySupplier = sensorScope.getStringArraySupplier("FoodItemIDs");
+            if (arraySupplier != null) {
+                String[] values = sanitizeItemIds(arraySupplier.get());
+                if (values.length > 0) {
+                    return values;
+                }
+            }
+        } catch (IllegalStateException ignored) {
+            // Fall through to string-param fallback.
+        }
+        try {
+            Supplier<String> stringSupplier = sensorScope.getStringSupplier("FoodItemIDs");
+            if (stringSupplier == null) {
+                return new String[0];
+            }
+            String value = stringSupplier.get();
+            if (value == null || value.isBlank()) {
+                return new String[0];
+            }
+            return sanitizeItemIds(new String[] { value });
+        } catch (IllegalStateException ignored) {
+            return new String[0];
+        }
+    }
+
+    @Nonnull
+    private static String[] sanitizeItemIds(@Nullable String[] values) {
+        if (values == null || values.length == 0) {
+            return new String[0];
+        }
+        int count = 0;
+        String[] sanitized = new String[values.length];
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+            sanitized[count++] = value.trim();
+        }
+        if (count == 0) {
+            return new String[0];
+        }
+        if (count == sanitized.length) {
+            return sanitized;
+        }
+        String[] resized = new String[count];
+        System.arraycopy(sanitized, 0, resized, 0, count);
+        return resized;
     }
 
     private static long resolveNowMs(@Nonnull TwNeedsConfig config, @Nullable Store<EntityStore> store) {
@@ -262,29 +337,6 @@ public final class CompanionNeedsService {
             case WORLD_TIME_SCALED -> BreedingTimeService.resolveCurrentTimeMs(store);
             case REAL_TIME -> System.currentTimeMillis();
         };
-    }
-
-    private static double resolveDesiredPenalty(double hunger,
-                                                double thirst,
-                                                @Nonnull TwNeedsConfig config) {
-        TwNeedsConfig.ValueSettings values = config.getValues();
-        TwNeedsConfig.HappinessImpactSettings happinessImpact = config.getHappinessImpact();
-        double hungerDeficit = resolveDeficitRatio(hunger, values.getHungerMin(), values.getHungerMax());
-        double thirstDeficit = resolveDeficitRatio(thirst, values.getThirstMin(), values.getThirstMax());
-        double curvePower = happinessImpact.getPenaltyCurvePower();
-        double hungerPenalty = happinessImpact.getHungerPenaltyAtMin() * Math.pow(hungerDeficit, curvePower);
-        double thirstPenalty = happinessImpact.getThirstPenaltyAtMin() * Math.pow(thirstDeficit, curvePower);
-        double totalPenalty = -(hungerPenalty + thirstPenalty);
-        return Double.isFinite(totalPenalty) ? totalPenalty : 0.0;
-    }
-
-    private static double resolveDeficitRatio(double current, double min, double max) {
-        double range = max - min;
-        if (!Double.isFinite(range) || range <= 0.0) {
-            return 0.0;
-        }
-        double clamped = clamp(current, min, max);
-        return clamp((max - clamped) / range, 0.0, 1.0);
     }
 
     private static double sanitizeAndClamp(double value, double fallback, double min, double max) {
@@ -303,5 +355,37 @@ public final class CompanionNeedsService {
             return max;
         }
         return value;
+    }
+
+    /**
+     * Consume routing mode for action-triggered resource refill.
+     */
+    private enum NeedsResourceConsumeMode {
+        AUTO,
+        FOOD_CONTAINER,
+        WATER;
+
+        boolean consumesFood() {
+            return this == AUTO || this == FOOD_CONTAINER;
+        }
+
+        boolean consumesWater() {
+            return this == AUTO || this == WATER;
+        }
+
+        @Nonnull
+        static NeedsResourceConsumeMode from(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return AUTO;
+            }
+            String normalized = value.trim().toLowerCase(Locale.ROOT);
+            if (normalized.equals("food") || normalized.equals("foodcontainer") || normalized.equals("food_container")) {
+                return FOOD_CONTAINER;
+            }
+            if (normalized.equals("water")) {
+                return WATER;
+            }
+            return AUTO;
+        }
     }
 }
