@@ -147,6 +147,25 @@
           "State": "Defend"
         }
       ]
+    },
+    {
+      "Id": "Idle",
+      "DisplayName": "Idle",
+      "Feedback": {
+        "HudMessage": "Idle: {count}",
+        "SoundEvent": "SFX_Creative_Play_Selection_Widget",
+        "ParticleSystem": "Idle"
+      },
+      "Steps": [
+        {
+          "Type": "ClearTarget",
+          "TargetSlot": "LockedTarget"
+        },
+        {
+          "Type": "SetState",
+          "State": "Idle"
+        }
+      ]
     }
   ]
 }

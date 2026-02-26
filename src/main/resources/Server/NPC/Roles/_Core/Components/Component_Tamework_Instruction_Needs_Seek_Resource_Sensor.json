@@ -1,0 +1,143 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.NeedsSeekResourceSensor",
+  "DefaultState": ".Listen",
+  "Parameters": {
+    "_ImportStates": [
+      "OnNeedsSeekWaterActive",
+      "OnNeedsSeekFoodActive"
+    ],
+    "NeedsSeekTargetSlot": {
+      "Value": "TameworkNeedsSeekTarget",
+      "Description": "Stored destination slot used while a needs resource seek is active."
+    },
+    "NeedsSeekWhenHungerBelowRatio": {
+      "Value": 0.85,
+      "Description": "Start food seeking when normalized hunger is at or below this ratio."
+    },
+    "NeedsSeekWhenThirstBelowRatio": {
+      "Value": 0.85,
+      "Description": "Start water seeking when normalized thirst is at or below this ratio."
+    },
+    "NeedsSeekWaterSearchRange": {
+      "Value": 16,
+      "Description": "Water search radius in blocks."
+    },
+    "NeedsSeekFoodSearchRange": {
+      "Value": 16,
+      "Description": "Food-container search radius in blocks."
+    },
+    "NeedsSeekFoodItemIds": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Allowed food item ids when seeking food containers."
+    }
+  },
+  "Content": {
+    "$Comment": "Needs resource sensor pass; emits seek states when needs are low and target sensors resolve.",
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "No-op listen branch to satisfy local state pairing validation.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Listen"
+        }
+      },
+      {
+        "$Comment": "Trigger water seek when thirst is low and a water target is resolvable.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Listen"
+            },
+            {
+              "Type": "TameworkNeedBelow",
+              "Need": "Thirst",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenThirstBelowRatio"
+              }
+            },
+            {
+              "Type": "TameworkNeedsResourceTarget",
+              "ResourceType": "Water",
+              "Range": {
+                "Compute": "NeedsSeekWaterSearchRange"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "NeedsSeekTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnNeedsSeekWaterActive"
+          }
+        ]
+      },
+      {
+        "$Comment": "Trigger food seek when hunger is low and a food container target is resolvable.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Listen"
+            },
+            {
+              "Type": "TameworkNeedBelow",
+              "Need": "Hunger",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenHungerBelowRatio"
+              }
+            },
+            {
+              "Type": "TameworkNeedsResourceTarget",
+              "ResourceType": "FoodContainer",
+              "Range": {
+                "Compute": "NeedsSeekFoodSearchRange"
+              },
+              "ItemIds": {
+                "Compute": "NeedsSeekFoodItemIds"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "StorePosition",
+            "Slot": {
+              "Compute": "NeedsSeekTargetSlot"
+            }
+          },
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnNeedsSeekFoodActive"
+          }
+        ]
+      }
+    ]
+  }
+}

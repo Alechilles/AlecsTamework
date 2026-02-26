@@ -809,22 +809,62 @@
       }
     },
     {
-      "$Comment": "Bridge needs-seek resource behavior (sensor-driven water/food targeting).",
+      "$Comment": "Bridge needs-seek sensor pass while in Idle state.",
       "Continue": true,
       "Sensor": {
-        "Type": "Any"
+        "Type": "State",
+        "State": "Idle"
       },
       "Instructions": [
         {
-          "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
+          "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource_Sensor",
           "Modify": {
             "NeedsSeekFoodItemIds": {
               "Compute": "FoodItemIDs"
             },
             "_ExportStates": [
               "NeedsSeekWater",
-              "Idle",
-              "NeedsSeekFood",
+              "NeedsSeekFood"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "Needs-seek water movement runtime while in NeedsSeekWater state.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "State",
+        "State": "NeedsSeekWater"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
+          "Modify": {
+            "NeedsSeekResourceType": "Water",
+            "_ExportStates": [
+              "Idle"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "$Comment": "Needs-seek food movement runtime while in NeedsSeekFood state.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "State",
+        "State": "NeedsSeekFood"
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
+          "Modify": {
+            "NeedsSeekResourceType": "FoodContainer",
+            "NeedsSeekFoodItemIDs": {
+              "Compute": "FoodItemIDs"
+            },
+            "_ExportStates": [
               "Idle"
             ]
           }

@@ -1,51 +1,64 @@
 {
   "Type": "Component",
   "Class": "Instruction",
-  "Interface": "Tamework.Instruction.NeedsSeekResource",
-  "DefaultState": ".Listen",
+  "Interface": "Tamework.Instruction.NeedsSeekResourceMove",
+  "DefaultState": ".Default",
   "Parameters": {
     "_ImportStates": [
-      "OnNeedsSeekWaterActive",
-      "OnNeedsSeekWaterComplete",
-      "OnNeedsSeekFoodActive",
-      "OnNeedsSeekFoodComplete"
+      "OnNeedsSeekComplete"
     ],
     "NeedsSeekTargetSlot": {
       "Value": "TameworkNeedsSeekTarget",
       "Description": "Stored destination slot used while a needs resource seek is active."
     },
-    "NeedsSeekWhenHungerBelowRatio": {
-      "Value": 0.85,
-      "Description": "Start food seeking when normalized hunger is at or below this ratio."
+    "NeedsSeekResourceType": {
+      "Value": "Auto",
+      "Description": "Resource consume mode used at seek completion (Auto, Water, FoodContainer)."
     },
-    "NeedsSeekWhenThirstBelowRatio": {
-      "Value": 0.85,
-      "Description": "Start water seeking when normalized thirst is at or below this ratio."
-    },
-    "NeedsSeekWaterSearchRange": {
-      "Value": 16,
-      "Description": "Water search radius in blocks."
-    },
-    "NeedsSeekFoodSearchRange": {
-      "Value": 16,
-      "Description": "Food-container search radius in blocks."
-    },
-    "NeedsSeekFoodItemIds": {
+    "NeedsSeekFoodItemIDs": {
       "Value": [],
       "TypeHint": "String",
-      "Description": "Allowed food item ids when seeking food containers."
+      "Description": "Optional allowed food item ids passed to consume action for container intake."
     },
     "NeedsSeekSlowDownDistance": {
       "Value": 2.4,
       "Description": "Distance where needs-seek movement starts slowing down."
     },
     "NeedsSeekStopDistance": {
-      "Value": 1.05,
+      "Value": 0.35,
       "Description": "Distance considered close enough to the resource target."
+    },
+    "NeedsSeekConsumeDistanceOffset": {
+      "Value": 0.2,
+      "Description": "Extra distance margin added to stop distance when allowing eat/drink completion."
     },
     "NeedsSeekRelativeSpeed": {
       "Value": 0.55,
       "Description": "Relative movement speed while seeking needs resources."
+    },
+    "NeedsSeekUsePathfinder": {
+      "Value": false,
+      "Description": "Use nav pathfinding while moving to a needs resource target."
+    },
+    "NeedsSeekUseSteering": {
+      "Value": true,
+      "Description": "Allow steering assist while pathfinding to a needs resource target."
+    },
+    "NeedsSeekUseBestPath": {
+      "Value": false,
+      "Description": "Allow partial best-path fallback if a full route cannot be found."
+    },
+    "NeedsSeekRelaxedMoveConstraints": {
+      "Value": false,
+      "Description": "Disable relaxed movement so seek follows stricter path constraints."
+    },
+    "NeedsSeekAvoidBlockDamage": {
+      "Value": true,
+      "Description": "Avoid environmental block damage while pathing to needs resources."
+    },
+    "NeedsSeekReachable": {
+      "Value": false,
+      "Description": "Require direct hitbox overlap with target position before considering goal reached."
     },
     "NeedsSeekReadRange": {
       "Value": 96,
@@ -58,73 +71,61 @@
       ],
       "Description": "Fail-safe maximum move time before resource seek completes."
     },
-    "NeedsSeekWaterDrinkDelayRange": {
+    "NeedsSeekConsumeDelayRange": {
       "Value": [
         1,
         1.2
       ],
-      "Description": "Short pause after reaching water before completing the seek."
-    },
-    "NeedsSeekFoodEatDelayRange": {
-      "Value": [
-        1,
-        1.2
-      ],
-      "Description": "Short pause after reaching food before completing the seek."
+      "Description": "Short pause after reaching the resource before completing seek."
     }
   },
   "Content": {
-    "$Comment": "Reusable movement bridge for thirst/hunger resource seeking.",
+    "$Comment": "Needs resource movement runtime using local states only. Parent template gates activation.",
     "Continue": true,
     "Sensor": {
       "Type": "Any"
     },
     "Instructions": [
       {
-        "$Comment": "No-op listen branch to satisfy local state pairing validation.",
+        "$Comment": "No-op default branch to satisfy local state pairing validation.",
         "Continue": true,
         "Sensor": {
           "Type": "State",
-          "State": ".Listen"
+          "State": ".Default"
         }
       },
       {
-        "$Comment": "Start water-seek movement when thirst is low and a nearby water target is found.",
+        "$Comment": "Initialize runtime when not already moving/consuming and a target exists.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
           "Sensors": [
             {
-              "Type": "State",
-              "State": ".Listen"
-            },
-            {
-              "Type": "TameworkNeedBelow",
-              "Need": "Thirst",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenThirstBelowRatio"
+              "Type": "Not",
+              "Sensor": {
+                "Type": "State",
+                "State": ".Move"
               }
             },
             {
-              "Type": "TameworkNeedsResourceTarget",
-              "ResourceType": "Water",
+              "Type": "Not",
+              "Sensor": {
+                "Type": "State",
+                "State": ".ConsumeDelay"
+              }
+            },
+            {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "NeedsSeekTargetSlot"
+              },
               "Range": {
-                "Compute": "NeedsSeekWaterSearchRange"
+                "Compute": "NeedsSeekReadRange"
               }
             }
           ]
         },
         "Actions": [
-          {
-            "Type": "StorePosition",
-            "Slot": {
-              "Compute": "NeedsSeekTargetSlot"
-            }
-          },
-          {
-            "Type": "ReleaseTarget",
-            "TargetSlot": "LockedTarget"
-          },
           {
             "Type": "TimerStart",
             "Name": "NeedsSeek_Move_Timeout",
@@ -141,87 +142,19 @@
           },
           {
             "Type": "State",
-            "State": ".MoveWater"
-          },
-          {
-            "Type": "ParentState",
-            "State": "OnNeedsSeekWaterActive"
+            "State": ".Move"
           }
         ]
       },
       {
-        "$Comment": "Start food-seek movement when hunger is low and a nearby food container target is found.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Listen"
-            },
-            {
-              "Type": "TameworkNeedBelow",
-              "Need": "Hunger",
-              "RatioBelow": {
-                "Compute": "NeedsSeekWhenHungerBelowRatio"
-              }
-            },
-            {
-              "Type": "TameworkNeedsResourceTarget",
-              "ResourceType": "FoodContainer",
-              "Range": {
-                "Compute": "NeedsSeekFoodSearchRange"
-              },
-              "ItemIds": {
-                "Compute": "NeedsSeekFoodItemIds"
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "StorePosition",
-            "Slot": {
-              "Compute": "NeedsSeekTargetSlot"
-            }
-          },
-          {
-            "Type": "ReleaseTarget",
-            "TargetSlot": "LockedTarget"
-          },
-          {
-            "Type": "TimerStart",
-            "Name": "NeedsSeek_Move_Timeout",
-            "StartValueRange": {
-              "Compute": "NeedsSeekMoveTimeoutRange"
-            },
-            "RestartValueRange": {
-              "Compute": "NeedsSeekMoveTimeoutRange"
-            }
-          },
-          {
-            "Type": "TimerRestart",
-            "Name": "NeedsSeek_Move_Timeout"
-          },
-          {
-            "Type": "State",
-            "State": ".MoveFood"
-          },
-          {
-            "Type": "ParentState",
-            "State": "OnNeedsSeekFoodActive"
-          }
-        ]
-      },
-      {
-        "$Comment": "Water-seek runtime behavior while local move state is active.",
+        "$Comment": "Move runtime while active.",
         "Sensor": {
           "Type": "State",
-          "State": ".MoveWater"
+          "State": ".Move"
         },
         "Instructions": [
           {
-            "$Comment": "When close enough to water, hold briefly to simulate drinking.",
+            "$Comment": "When close enough, start a short consume delay.",
             "Continue": true,
             "Sensor": {
               "Type": "ReadPosition",
@@ -229,32 +162,32 @@
                 "Compute": "NeedsSeekTargetSlot"
               },
               "Range": {
-                "Compute": "NeedsSeekStopDistance + 0.2"
+                "Compute": "NeedsSeekStopDistance + NeedsSeekConsumeDistanceOffset"
               }
             },
             "Actions": [
               {
                 "Type": "TimerStart",
-                "Name": "NeedsSeek_Water_Delay",
+                "Name": "NeedsSeek_Consume_Delay",
                 "StartValueRange": {
-                  "Compute": "NeedsSeekWaterDrinkDelayRange"
+                  "Compute": "NeedsSeekConsumeDelayRange"
                 },
                 "RestartValueRange": {
-                  "Compute": "NeedsSeekWaterDrinkDelayRange"
+                  "Compute": "NeedsSeekConsumeDelayRange"
                 }
               },
               {
                 "Type": "TimerRestart",
-                "Name": "NeedsSeek_Water_Delay"
+                "Name": "NeedsSeek_Consume_Delay"
               },
               {
                 "Type": "State",
-                "State": ".WaterDelay"
+                "State": ".ConsumeDelay"
               }
             ]
           },
           {
-            "$Comment": "If destination is no longer readable, recover immediately.",
+            "$Comment": "If destination can no longer be read, recover immediately.",
             "Continue": true,
             "Sensor": {
               "Type": "Not",
@@ -271,16 +204,16 @@
             "Actions": [
               {
                 "Type": "State",
-                "State": ".Listen"
+                "State": ".Default"
               },
               {
                 "Type": "ParentState",
-                "State": "OnNeedsSeekWaterComplete"
+                "State": "OnNeedsSeekComplete"
               }
             ]
           },
           {
-            "$Comment": "Fail-safe completion when move timeout elapses.",
+            "$Comment": "Fail-safe completion when move timeout has elapsed.",
             "Continue": true,
             "Sensor": {
               "Type": "Timer",
@@ -290,16 +223,16 @@
             "Actions": [
               {
                 "Type": "State",
-                "State": ".Listen"
+                "State": ".Default"
               },
               {
                 "Type": "ParentState",
-                "State": "OnNeedsSeekWaterComplete"
+                "State": "OnNeedsSeekComplete"
               }
             ]
           },
           {
-            "$Comment": "Seek toward the stored water destination.",
+            "$Comment": "Seek toward the stored destination.",
             "Sensor": {
               "Type": "ReadPosition",
               "Slot": {
@@ -309,11 +242,29 @@
                 "Compute": "NeedsSeekReadRange"
               },
               "MinRange": {
-                "Compute": "NeedsSeekStopDistance + 0.2"
+                "Compute": "NeedsSeekStopDistance + NeedsSeekConsumeDistanceOffset"
               }
             },
             "BodyMotion": {
               "Type": "Seek",
+              "UsePathfinder": {
+                "Compute": "NeedsSeekUsePathfinder"
+              },
+              "UseSteering": {
+                "Compute": "NeedsSeekUseSteering"
+              },
+              "UseBestPath": {
+                "Compute": "NeedsSeekUseBestPath"
+              },
+              "RelaxedMoveConstraints": {
+                "Compute": "NeedsSeekRelaxedMoveConstraints"
+              },
+              "AvoidBlockDamage": {
+                "Compute": "NeedsSeekAvoidBlockDamage"
+              },
+              "Reachable": {
+                "Compute": "NeedsSeekReachable"
+              },
               "SlowDownDistance": {
                 "Compute": "NeedsSeekSlowDownDistance"
               },
@@ -328,188 +279,46 @@
         ]
       },
       {
-        "$Comment": "Food-seek runtime behavior while local move state is active.",
-        "Sensor": {
-          "Type": "State",
-          "State": ".MoveFood"
-        },
-        "Instructions": [
-          {
-            "$Comment": "When close enough to food, hold briefly to simulate eating.",
-            "Continue": true,
-            "Sensor": {
-              "Type": "ReadPosition",
-              "Slot": {
-                "Compute": "NeedsSeekTargetSlot"
-              },
-              "Range": {
-                "Compute": "NeedsSeekStopDistance + 0.2"
-              }
-            },
-            "Actions": [
-              {
-                "Type": "TimerStart",
-                "Name": "NeedsSeek_Food_Delay",
-                "StartValueRange": {
-                  "Compute": "NeedsSeekFoodEatDelayRange"
-                },
-                "RestartValueRange": {
-                  "Compute": "NeedsSeekFoodEatDelayRange"
-                }
-              },
-              {
-                "Type": "TimerRestart",
-                "Name": "NeedsSeek_Food_Delay"
-              },
-              {
-                "Type": "State",
-                "State": ".FoodDelay"
-              }
-            ]
-          },
-          {
-            "$Comment": "If destination is no longer readable, recover immediately.",
-            "Continue": true,
-            "Sensor": {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "ReadPosition",
-                "Slot": {
-                  "Compute": "NeedsSeekTargetSlot"
-                },
-                "Range": {
-                  "Compute": "NeedsSeekReadRange"
-                }
-              }
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": ".Listen"
-              },
-              {
-                "Type": "ParentState",
-                "State": "OnNeedsSeekFoodComplete"
-              }
-            ]
-          },
-          {
-            "$Comment": "Fail-safe completion when move timeout elapses.",
-            "Continue": true,
-            "Sensor": {
-              "Type": "Timer",
-              "Name": "NeedsSeek_Move_Timeout",
-              "State": "Stopped"
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": ".Listen"
-              },
-              {
-                "Type": "ParentState",
-                "State": "OnNeedsSeekFoodComplete"
-              }
-            ]
-          },
-          {
-            "$Comment": "Seek toward the stored food destination.",
-            "Sensor": {
-              "Type": "ReadPosition",
-              "Slot": {
-                "Compute": "NeedsSeekTargetSlot"
-              },
-              "Range": {
-                "Compute": "NeedsSeekReadRange"
-              },
-              "MinRange": {
-                "Compute": "NeedsSeekStopDistance + 0.2"
-              }
-            },
-            "BodyMotion": {
-              "Type": "Seek",
-              "SlowDownDistance": {
-                "Compute": "NeedsSeekSlowDownDistance"
-              },
-              "StopDistance": {
-                "Compute": "NeedsSeekStopDistance"
-              },
-              "RelativeSpeed": {
-                "Compute": "NeedsSeekRelativeSpeed"
-              }
-            }
-          }
-        ]
-      },
-      {
-        "$Comment": "Stop movement while waiting out the water drink delay.",
+        "$Comment": "Stop movement while waiting out consume delay.",
         "Continue": true,
         "Sensor": {
           "Type": "State",
-          "State": ".WaterDelay"
+          "State": ".ConsumeDelay"
         },
         "BodyMotion": {
           "Type": "Nothing"
         }
       },
       {
-        "$Comment": "Stop movement while waiting out the food eat delay.",
-        "Continue": true,
+        "$Comment": "Finalize seek after consume delay.",
         "Sensor": {
           "Type": "State",
-          "State": ".FoodDelay"
-        },
-        "BodyMotion": {
-          "Type": "Nothing"
-        }
-      },
-      {
-        "$Comment": "Finalize water seek after drink delay.",
-        "Sensor": {
-          "Type": "State",
-          "State": ".WaterDelay"
+          "State": ".ConsumeDelay"
         },
         "Instructions": [
           {
             "Sensor": {
               "Type": "Timer",
-              "Name": "NeedsSeek_Water_Delay",
+              "Name": "NeedsSeek_Consume_Delay",
               "State": "Stopped"
             },
             "Actions": [
               {
+                "Type": "TameworkNeedsResourceConsume",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "FoodItemIDs": {
+                  "Compute": "NeedsSeekFoodItemIDs"
+                }
+              },
+              {
                 "Type": "State",
-                "State": ".Listen"
+                "State": ".Default"
               },
               {
                 "Type": "ParentState",
-                "State": "OnNeedsSeekWaterComplete"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "$Comment": "Finalize food seek after eat delay.",
-        "Sensor": {
-          "Type": "State",
-          "State": ".FoodDelay"
-        },
-        "Instructions": [
-          {
-            "Sensor": {
-              "Type": "Timer",
-              "Name": "NeedsSeek_Food_Delay",
-              "State": "Stopped"
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": ".Listen"
-              },
-              {
-                "Type": "ParentState",
-                "State": "OnNeedsSeekFoodComplete"
+                "State": "OnNeedsSeekComplete"
               }
             ]
           }

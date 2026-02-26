@@ -31,7 +31,9 @@
     "MaxDelaySeconds": 45
   },
   "PassiveBreeding": {
-    "Enabled": true
+    "Enabled": true,
+    "SweepIntervalSeconds": 30,
+    "Basis": "REAL_TIME"
   },
   "Timing": {
     "Basis": "WORLD_TIME_SCALED"

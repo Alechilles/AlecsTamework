@@ -30,6 +30,7 @@
     "SweepIntervalSeconds": 15,
     "NearbyContainerFeedEnabled": true,
     "ContainerSearchRadius": 7.0,
+    "ContainerConsumeRadius": 1.5,
     "ContainerFoodItemIds": [
       "Plant_Fruit_Apple",
       "Plant_Fruit_Azure",
@@ -39,6 +40,7 @@
     "MaxContainerItemsConsumedPerSweep": 1,
     "NearbyWaterDrinkEnabled": true,
     "WaterSearchRadius": 4.0,
+    "WaterConsumeRadius": 1.5,
     "ThirstGainPerSweepNearWater": 20.0
   },
   "ManualRefill": {
