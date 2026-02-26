@@ -28,7 +28,7 @@ final class LinkedNpcPanelVitalsBinder {
         if (entry.hasHealth()) {
             commandBuilder.set(
                     healthTextSelector + ".Text",
-                    "Health: " + entry.currentHealth() + "/" + entry.maxHealth()
+                    entry.currentHealth() + "/" + entry.maxHealth()
             );
             commandBuilder.set(healthFillSelector + ".Visible", true);
             commandBuilder.setObject(
@@ -38,16 +38,16 @@ final class LinkedNpcPanelVitalsBinder {
             return;
         }
         if (entry.dead()) {
-            commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry));
+            commandBuilder.set(healthTextSelector + ".Text", "Dead");
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
         if (!entry.loaded()) {
-            commandBuilder.set(healthTextSelector + ".Text", LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(entry));
+            commandBuilder.set(healthTextSelector + ".Text", entry.captured() ? "Captured" : "Unloaded");
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
-        commandBuilder.set(healthTextSelector + ".Text", "Health: unavailable");
+        commandBuilder.set(healthTextSelector + ".Text", "N/A");
         commandBuilder.set(healthFillSelector + ".Visible", false);
     }
 

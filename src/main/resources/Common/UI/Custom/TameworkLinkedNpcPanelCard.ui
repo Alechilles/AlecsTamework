@@ -285,21 +285,27 @@ Group {
       Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
       Background: #6fc576;
     }
-  }
 
-  Label #HealthText {
-    Anchor: (Top: 50, Left: 0, Width: 206, Height: 16);
-    Text: "Health: ?/?";
-    Style: (
-      FontSize: 11,
-      TextColor: #bed0e3,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
+    Group #HealthTextBackdrop {
+      Anchor: (Top: 1, Left: 64, Width: 78, Height: 12);
+      Background: #081220(0.55);
+    }
+
+    Label #HealthText {
+      Anchor: (Top: 1, Left: 0, Width: 206, Height: 12);
+      Text: "?/?";
+      Style: (
+        FontSize: 9,
+        RenderBold: true,
+        TextColor: #eef4fa,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center
+      );
+    }
   }
 
   Group #NeedRingRow {
-    Anchor: (Top: 68, Left: 0, Width: 84, Height: 24);
+    Anchor: (Top: 52, Left: 0, Width: 84, Height: 24);
     LayoutMode: Left;
 
     Group #NeedHappiness {
