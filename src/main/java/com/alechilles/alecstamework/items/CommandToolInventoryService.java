@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
-import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
+import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -85,7 +85,7 @@ final class CommandToolInventoryService {
         return false;
     }
 
-    List<TameworkCommandSelectionPage.LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player, String toolId) {
+    List<LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player, String toolId) {
         if (player == null || toolId == null || toolId.isBlank()) {
             return List.of();
         }

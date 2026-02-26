@@ -97,7 +97,7 @@ public final class CompanionNeedsService {
     public static boolean tickNeeds(@Nullable Ref<EntityStore> npcRef,
                                     @Nullable Store<EntityStore> store,
                                     @Nullable String roleId) {
-        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, true, true, null);
+        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, null);
     }
 
     /**

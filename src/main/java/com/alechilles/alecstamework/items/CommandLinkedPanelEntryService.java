@@ -2,15 +2,18 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
+import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
-import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -53,10 +56,10 @@ final class CommandLinkedPanelEntryService {
         this.npcNameResolver = npcNameResolver;
     }
 
-    List<TameworkCommandSelectionPage.LinkedNpcEntry> buildEntries(Player player,
-                                                                   Store<EntityStore> store,
-                                                                   ItemStack stack,
-                                                                   String toolId) {
+    List<LinkedNpcEntry> buildEntries(Player player,
+                                      Store<EntityStore> store,
+                                      ItemStack stack,
+                                      String toolId) {
         if (player == null || store == null || stack == null || stack.isEmpty()) {
             return List.of();
         }
@@ -69,8 +72,9 @@ final class CommandLinkedPanelEntryService {
         World world = player.getWorld();
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         ComponentType<EntityStore, TameworkTraitsComponent> traitType = TameworkTraitsComponent.getComponentType();
-        ArrayList<TameworkCommandSelectionPage.LinkedNpcEntry> entries = new ArrayList<>(records.size());
+        ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
         for (LinkedNpcRecord record : records) {
             if (record == null || record.npcUuid == null) {
                 continue;
@@ -88,6 +92,10 @@ final class CommandLinkedPanelEntryService {
             int maxHealth = 0;
             int happiness = 0;
             int maxHappiness = 0;
+            int hunger = 0;
+            int maxHunger = 0;
+            int thirst = 0;
+            int maxThirst = 0;
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
             if (world != null) {
                 Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
@@ -115,6 +123,13 @@ final class CommandLinkedPanelEntryService {
                         if (happinessSnapshot != null) {
                             happiness = happinessSnapshot.current;
                             maxHappiness = happinessSnapshot.max;
+                        }
+                        NeedsSnapshot needsSnapshot = readNpcNeedsSnapshot(npcRef, store, needsType);
+                        if (needsSnapshot != null) {
+                            hunger = needsSnapshot.hungerCurrent;
+                            maxHunger = needsSnapshot.hungerMax;
+                            thirst = needsSnapshot.thirstCurrent;
+                            maxThirst = needsSnapshot.thirstMax;
                         }
                         traitIndicators = readTraitIndicators(npcRef, store, traitType);
                     }
@@ -150,13 +165,17 @@ final class CommandLinkedPanelEntryService {
                     }
                 }
             }
-            entries.add(new TameworkCommandSelectionPage.LinkedNpcEntry(
+            entries.add(new LinkedNpcEntry(
                     record.npcUuid,
                     displayName,
                     health,
                     maxHealth,
                     happiness,
                     maxHappiness,
+                    hunger,
+                    maxHunger,
+                    thirst,
+                    maxThirst,
                     loaded,
                     hasHome,
                     dead,
@@ -291,6 +310,39 @@ final class CommandLinkedPanelEntryService {
         int roundedMax = Math.max(1, Math.round((float) max));
         int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
         return new HappinessSnapshot(roundedValue, roundedMax);
+    }
+
+    private NeedsSnapshot readNpcNeedsSnapshot(Ref<EntityStore> npcRef,
+                                               Store<EntityStore> store,
+                                               ComponentType<EntityStore, TameworkNeedsComponent> needsType) {
+        if (npcRef == null || !npcRef.isValid() || store == null || needsType == null) {
+            return null;
+        }
+        TameworkNeedsComponent needs = store.getComponent(npcRef, needsType);
+        if (needs == null) {
+            return null;
+        }
+        TwNeedsConfig config = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
+        if (config == null || !config.isEnabled()) {
+            return null;
+        }
+        TwNeedsConfig.ValueSettings values = config.getValues();
+        double hungerMin = values.getHungerMin();
+        double hungerMax = values.getHungerMax();
+        double thirstMin = values.getThirstMin();
+        double thirstMax = values.getThirstMax();
+
+        int roundedHungerMax = Math.max(1, Math.round((float) hungerMax));
+        int roundedThirstMax = Math.max(1, Math.round((float) thirstMax));
+        int roundedHunger = Math.max(
+                0,
+                Math.min(roundedHungerMax, Math.round((float) clamp(needs.getHunger(), hungerMin, hungerMax)))
+        );
+        int roundedThirst = Math.max(
+                0,
+                Math.min(roundedThirstMax, Math.round((float) clamp(needs.getThirst(), thirstMin, thirstMax)))
+        );
+        return new NeedsSnapshot(roundedHunger, roundedHungerMax, roundedThirst, roundedThirstMax);
     }
 
     private String abbreviateUuid(UUID uuid) {
@@ -457,6 +509,20 @@ final class CommandLinkedPanelEntryService {
         private HappinessSnapshot(int current, int max) {
             this.current = current;
             this.max = max;
+        }
+    }
+
+    private static final class NeedsSnapshot {
+        private final int hungerCurrent;
+        private final int hungerMax;
+        private final int thirstCurrent;
+        private final int thirstMax;
+
+        private NeedsSnapshot(int hungerCurrent, int hungerMax, int thirstCurrent, int thirstMax) {
+            this.hungerCurrent = hungerCurrent;
+            this.hungerMax = hungerMax;
+            this.thirstCurrent = thirstCurrent;
+            this.thirstMax = thirstMax;
         }
     }
 }

@@ -74,7 +74,7 @@ $C = "Common.ui";
 );
 
 Group {
-  Anchor: (Top: 8, Left: 0, Right: 0, Height: 112);
+  Anchor: (Top: 8, Left: 0, Right: 0, Height: 176);
   Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
@@ -234,7 +234,7 @@ Group {
   }
 
   TextButton #RespawnButton {
-    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
+    Anchor: (Top: 120, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRespawnButtonStyle;
     Text: "";
     TooltipText: "Revive";
@@ -243,7 +243,7 @@ Group {
   }
 
   TextButton #RecallButton {
-    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
+    Anchor: (Top: 120, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRecallButtonStyle;
     Text: "";
     TooltipText: "Recall";
@@ -252,7 +252,7 @@ Group {
   }
 
   TextButton #SetHomeButton {
-    Anchor: (Top: 56, Right: 0, Width: 24, Height: 24);
+    Anchor: (Top: 120, Right: 0, Width: 24, Height: 24);
     Style: @LinkedActionSetHomeButtonStyle;
     Text: "";
     TooltipText: "Set Home";
@@ -261,7 +261,7 @@ Group {
   }
 
   TextButton #ReturnHomeButton {
-    Anchor: (Top: 56, Right: 28, Width: 24, Height: 24);
+    Anchor: (Top: 120, Right: 28, Width: 24, Height: 24);
     Style: @LinkedActionReturnHomeButtonStyle;
     Text: "";
     TooltipText: "Return Home";
@@ -299,7 +299,7 @@ Group {
   }
 
   Group #HappinessFrame {
-    Anchor: (Top: 68, Left: 0, Width: 206, Height: 14);
+    Anchor: (Top: 64, Left: 0, Width: 206, Height: 14);
     Background: #0a121b(0.95);
 
     Group #HappinessFill {
@@ -309,7 +309,7 @@ Group {
   }
 
   Label #HappinessText {
-    Anchor: (Top: 86, Left: 0, Width: 206, Height: 16);
+    Anchor: (Top: 82, Left: 0, Width: 206, Height: 16);
     Text: "Happiness: ?/?";
     Style: (
       FontSize: 11,
@@ -319,8 +319,50 @@ Group {
     );
   }
 
+  Group #HungerFrame {
+    Anchor: (Top: 98, Left: 0, Width: 206, Height: 14);
+    Background: #0a121b(0.95);
+
+    Group #HungerFill {
+      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
+      Background: #d9a066;
+    }
+  }
+
+  Label #HungerText {
+    Anchor: (Top: 116, Left: 0, Width: 206, Height: 16);
+    Text: "Hunger: ?/?";
+    Style: (
+      FontSize: 11,
+      TextColor: #bed0e3,
+      HorizontalAlignment: Start,
+      VerticalAlignment: Center
+    );
+  }
+
+  Group #ThirstFrame {
+    Anchor: (Top: 132, Left: 0, Width: 206, Height: 14);
+    Background: #0a121b(0.95);
+
+    Group #ThirstFill {
+      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
+      Background: #76b7ea;
+    }
+  }
+
+  Label #ThirstText {
+    Anchor: (Top: 150, Left: 0, Width: 206, Height: 16);
+    Text: "Thirst: ?/?";
+    Style: (
+      FontSize: 11,
+      TextColor: #bed0e3,
+      HorizontalAlignment: Start,
+      VerticalAlignment: Center
+    );
+  }
+
   Group #FutureStatAFrame {
-    Anchor: (Top: 70, Left: 0, Width: 360, Height: 10);
+    Anchor: (Top: 124, Left: 0, Width: 360, Height: 10);
     Background: #0a121b(0.95);
     Visible: false;
 
@@ -342,7 +384,7 @@ Group {
   }
 
   Group #FutureStatBFrame {
-    Anchor: (Top: 84, Left: 0, Width: 360, Height: 10);
+    Anchor: (Top: 138, Left: 0, Width: 360, Height: 10);
     Background: #0a121b(0.95);
     Visible: false;
 
@@ -364,7 +406,7 @@ Group {
   }
 
   Group #FutureActionBar {
-    Anchor: (Top: 98, Left: 0, Width: 360, Height: 24);
+    Anchor: (Top: 152, Left: 0, Width: 360, Height: 24);
     LayoutMode: Left;
     Visible: false;
 

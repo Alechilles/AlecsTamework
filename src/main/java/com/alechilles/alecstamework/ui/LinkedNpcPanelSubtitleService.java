@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage.LinkedNpcEntry;
 import java.util.UUID;
 
 /**

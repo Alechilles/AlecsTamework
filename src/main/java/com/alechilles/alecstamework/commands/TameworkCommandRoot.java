@@ -14,6 +14,9 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkGetNeedsCommand());
         addSubCommand(new TameworkGetLifeStageCommand());
         addSubCommand(new TameworkSetHappinessCommand());
+        addSubCommand(new TameworkSetNeedsCommand());
+        addSubCommand(new TameworkSetHungerCommand());
+        addSubCommand(new TameworkSetThirstCommand());
         addSubCommand(new TameworkSetBreedingReadyCommand());
         addSubCommand(new TameworkGetTraitsCommand());
         addSubCommand(new TameworkSetTraitsCommand());
