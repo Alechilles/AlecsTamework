@@ -105,13 +105,13 @@
           "Id": "social",
           "Label": "Social",
           "MinCount": 1,
-          "MaxCount": 3,
+          "MaxCount": 8,
           "Offset": 8.0
         },
         {
           "Id": "crowded",
           "Label": "Crowded",
-          "MinCount": 4,
+          "MinCount": 9,
           "MaxCount": -1,
           "Offset": -15.0
         }
