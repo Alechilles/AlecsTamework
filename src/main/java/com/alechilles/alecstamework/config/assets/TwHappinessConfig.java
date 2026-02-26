@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
  */
 public final class TwHappinessConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwHappinessConfig>> {
     private static final NeedBandSettings[] EMPTY_BANDS = new NeedBandSettings[0];
+    private static final PopulationBandSettings[] EMPTY_POPULATION_BANDS = new PopulationBandSettings[0];
 
     private static final BuilderCodec<ValueSettings> VALUE_CODEC = BuilderCodec.builder(
             ValueSettings.class,
@@ -146,6 +147,69 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         .add()
         .build();
 
+    private static final BuilderCodec<PopulationBandSettings> POPULATION_BAND_CODEC = BuilderCodec.builder(
+            PopulationBandSettings.class,
+            PopulationBandSettings::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Id", Codec.STRING),
+            (settings, value) -> settings.id = value,
+            settings -> settings.id
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Label", Codec.STRING),
+            (settings, value) -> settings.label = value,
+            settings -> settings.label
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("MinCount", Codec.INTEGER),
+            (settings, value) -> settings.minCount = value,
+            settings -> settings.minCount
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("MaxCount", Codec.INTEGER),
+            (settings, value) -> settings.maxCount = value,
+            settings -> settings.maxCount
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Offset", Codec.DOUBLE),
+            (settings, value) -> settings.offset = value,
+            settings -> settings.offset
+        )
+        .add()
+        .build();
+
+    private static final ArrayCodec<PopulationBandSettings> POPULATION_BAND_ARRAY_CODEC =
+            new ArrayCodec<>(POPULATION_BAND_CODEC, PopulationBandSettings[]::new);
+
+    private static final BuilderCodec<PopulationModifierSettings> POPULATION_MODIFIER_CODEC = BuilderCodec.builder(
+            PopulationModifierSettings.class,
+            PopulationModifierSettings::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            (settings, value) -> settings.enabled = value == null || value,
+            settings -> settings.enabled
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Radius", Codec.DOUBLE),
+            (settings, value) -> settings.radius = value,
+            settings -> settings.radius
+        )
+        .add()
+        .<PopulationBandSettings[]>append(
+            new KeyedCodec<>("Bands", POPULATION_BAND_ARRAY_CODEC),
+            (settings, value) -> settings.bands = value == null ? EMPTY_POPULATION_BANDS : value,
+            settings -> settings.bands
+        )
+        .add()
+        .build();
+
     private static final BuilderCodec<ModifierSettings> MODIFIER_CODEC = BuilderCodec.builder(
             ModifierSettings.class,
             ModifierSettings::new
@@ -160,6 +224,12 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             new KeyedCodec<>("Thirst", NEED_MODIFIER_CODEC),
             (settings, value) -> settings.thirst = value == null ? new NeedModifierSettings() : value,
             settings -> settings.thirst
+        )
+        .add()
+        .<PopulationModifierSettings>append(
+            new KeyedCodec<>("Population", POPULATION_MODIFIER_CODEC),
+            (settings, value) -> settings.population = value == null ? new PopulationModifierSettings() : value,
+            settings -> settings.population
         )
         .add()
         .<Double>append(
@@ -472,6 +542,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
     public static final class ModifierSettings {
         private NeedModifierSettings hunger = new NeedModifierSettings();
         private NeedModifierSettings thirst = new NeedModifierSettings();
+        private PopulationModifierSettings population = new PopulationModifierSettings();
         private double ownerNearbyOffset;
 
         public NeedModifierSettings getHunger() {
@@ -480,6 +551,10 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
 
         public NeedModifierSettings getThirst() {
             return thirst == null ? new NeedModifierSettings() : thirst;
+        }
+
+        public PopulationModifierSettings getPopulation() {
+            return population == null ? new PopulationModifierSettings() : population;
         }
 
         public double getOwnerNearbyOffset() {
@@ -501,6 +576,63 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
 
         public NeedBandSettings[] getBands() {
             return bands == null ? EMPTY_BANDS : bands;
+        }
+    }
+
+    /** Population band modifiers based on nearby same-type companion count. */
+    public static final class PopulationModifierSettings {
+        private boolean enabled;
+        private double radius = 14.0;
+        private PopulationBandSettings[] bands = EMPTY_POPULATION_BANDS;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public double getRadius() {
+            if (!Double.isFinite(radius) || radius <= 0.0) {
+                return 0.0;
+            }
+            return radius;
+        }
+
+        public PopulationBandSettings[] getBands() {
+            return bands == null ? EMPTY_POPULATION_BANDS : bands;
+        }
+    }
+
+    /** One nearby-count band contributing an equilibrium happiness offset. */
+    public static final class PopulationBandSettings {
+        private String id;
+        private String label;
+        private int minCount;
+        private int maxCount = -1;
+        private double offset;
+
+        public String getId() {
+            return id;
+        }
+
+        public String getLabel() {
+            return label;
+        }
+
+        public int getMinCount() {
+            return Math.max(0, minCount);
+        }
+
+        public int getMaxCount() {
+            if (maxCount < 0) {
+                return -1;
+            }
+            return Math.max(getMinCount(), maxCount);
+        }
+
+        public double getOffset() {
+            if (!Double.isFinite(offset)) {
+                return 0.0;
+            }
+            return offset;
         }
     }
 

@@ -90,6 +90,33 @@
         }
       ]
     },
-    "OwnerNearbyOffset": 0.0
+    "Population": {
+      "Enabled": true,
+      "Radius": 14.0,
+      "Bands": [
+        {
+          "Id": "lonely",
+          "Label": "Lonely",
+          "MinCount": 0,
+          "MaxCount": 0,
+          "Offset": -12.0
+        },
+        {
+          "Id": "social",
+          "Label": "Social",
+          "MinCount": 1,
+          "MaxCount": 3,
+          "Offset": 8.0
+        },
+        {
+          "Id": "crowded",
+          "Label": "Crowded",
+          "MinCount": 4,
+          "MaxCount": -1,
+          "Offset": -15.0
+        }
+      ]
+    },
+    "OwnerNearbyOffset": 5.0
   }
 }
