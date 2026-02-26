@@ -43,12 +43,12 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
     }
 
     Group #TameworkLinkedPanelListViewport {
-      Anchor: (Top: 2);
+      Anchor: (Top: 1);
       FlexWeight: 1;
       LayoutMode: TopScrolling;
       KeepScrollPosition: true;
       ScrollbarStyle: $C.@DefaultScrollbarStyle;
-      Padding: (Left: 7, Right: 2, Top: 2, Bottom: 7);
+      Padding: (Left: 7, Right: 2, Top: 1, Bottom: 7);
 
       Group #TameworkLinkedPanelList {
         LayoutMode: Top;
