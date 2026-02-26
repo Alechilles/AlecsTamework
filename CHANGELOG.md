@@ -59,6 +59,7 @@
 - Linked companions panel cards now keep health as a bar and render happiness/hunger/thirst as compact circular progress meters with hover tooltips, reducing card crowding while preserving quick-status visibility.
 - Linked companions panel cards now render health value text directly over the health bar (`current/max`) using a centered overlay for better space usage and readability.
 - Linked companions panel card container spacing has been tightened (reduced card height/top offset) to remove excess blank space between card content and the next entry.
+- Linked companions panel cards no longer render an additional framed panel background, removing the nested/double-layered panel look inside the framed list viewport.
 - Trait roll count per spawn now supports weighted variable outcomes (`Selection.RollCountWeights` for 0..4), with default weighting centered on 2 rolls and 4-roll outcomes kept rare.
 - Trait selection config has been simplified to remove stacked fallback layers: `Selection.MaxTraitsPerNpc` is now the single count/cap control, duplicate handling is unified under `Selection.AllowDuplicateTraits`, and legacy `Selection.RerollDuplicates` + `Stacking` fields are removed.
 - Trait inheritance now supports per-trait inheritance weighting (`Traits[].InheritanceWeight`) and same-direction parent alignment range bias (`Inheritance.PairAlignmentRangeInfluence`) so high-high or low-low pairings can push offspring values further toward configured trait bounds.
