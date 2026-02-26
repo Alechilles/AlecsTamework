@@ -23,19 +23,17 @@ public final class CompanionRoleIdResolver {
         if (npc == null) {
             return null;
         }
-        String roleName = npc.getRoleName();
-        if (roleName != null && !roleName.isBlank()) {
-            return roleName;
-        }
         int roleIndex = npc.getRoleIndex();
-        if (roleIndex < 0) {
-            return null;
+        if (roleIndex >= 0) {
+            NPCPlugin npcPlugin = NPCPlugin.get();
+            if (npcPlugin != null) {
+                String roleId = npcPlugin.getName(roleIndex);
+                if (roleId != null && !roleId.isBlank()) {
+                    return roleId;
+                }
+            }
         }
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin == null) {
-            return null;
-        }
-        String roleId = npcPlugin.getName(roleIndex);
-        return roleId == null || roleId.isBlank() ? null : roleId;
+        String roleName = npc.getRoleName();
+        return roleName == null || roleName.isBlank() ? null : roleName;
     }
 }

@@ -34,9 +34,11 @@ import javax.annotation.Nullable;
  */
 public final class PassiveBreedingSweepService {
     private final BreedingOffspringService offspringService;
+    private final BreedingPopulationTypeService populationTypeService;
 
     public PassiveBreedingSweepService() {
         this.offspringService = new BreedingOffspringService(new BreedingPartnerService());
+        this.populationTypeService = new BreedingPopulationTypeService();
     }
 
     public void runSweep(@Nullable Store<EntityStore> store, long nowMs) {
@@ -50,12 +52,12 @@ public final class PassiveBreedingSweepService {
             return;
         }
 
-        List<RoleSnapshot> roleSnapshots = new ArrayList<>();
         List<SweepCandidate> sweepCandidates = new ArrayList<>();
+        List<BirthReservation> birthReservations = new ArrayList<>();
         store.forEachChunk(
                 Query.and(npcType, transformType, breedingType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
-                        collectCandidates(chunk, npcType, transformType, breedingType, store, roleSnapshots, sweepCandidates)
+                        collectCandidates(chunk, npcType, transformType, breedingType, store, sweepCandidates)
         );
         if (sweepCandidates.isEmpty()) {
             return;
@@ -74,10 +76,15 @@ public final class PassiveBreedingSweepService {
             if (!shouldBeReady || breeding.isCooldownActive(nowMs)) {
                 continue;
             }
-            if (isOvercrowded(candidate, roleSnapshots)) {
+            if (isOvercrowded(candidate, store, birthReservations)) {
                 continue;
             }
-            offspringService.tryCompletePairing(candidate.ref(), store, breeding, candidate.config());
+            if (offspringService.tryCompletePairing(candidate.ref(), store, breeding, candidate.config())) {
+                String typeKey = populationTypeService.resolveTypeKey(candidate.roleId(), candidate.config());
+                if (typeKey != null && !typeKey.isBlank()) {
+                    birthReservations.add(new BirthReservation(typeKey, candidate.position()));
+                }
+            }
         }
     }
 
@@ -86,7 +93,6 @@ public final class PassiveBreedingSweepService {
                                           @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
                                           @Nonnull ComponentType<EntityStore, TameworkBreedingComponent> breedingType,
                                           @Nonnull Store<EntityStore> store,
-                                          @Nonnull List<RoleSnapshot> roleSnapshots,
                                           @Nonnull List<SweepCandidate> sweepCandidates) {
         int size = chunk.size();
         for (int i = 0; i < size; i++) {
@@ -102,7 +108,6 @@ public final class PassiveBreedingSweepService {
                 continue;
             }
 
-            roleSnapshots.add(new RoleSnapshot(ref, roleId, new Vector3d(transform.getPosition())));
             TwBreedingConfig config = BreedingConfigResolver.resolveConfig(ref, store, breeding);
             if (config == null || !config.isEnabled() || !config.getPassiveBreeding().isEnabled()) {
                 continue;
@@ -147,8 +152,9 @@ public final class PassiveBreedingSweepService {
         );
     }
 
-    private static boolean isOvercrowded(@Nonnull SweepCandidate candidate,
-                                         @Nonnull List<RoleSnapshot> snapshots) {
+    private boolean isOvercrowded(@Nonnull SweepCandidate candidate,
+                                  @Nonnull Store<EntityStore> store,
+                                  @Nonnull List<BirthReservation> birthReservations) {
         TwBreedingConfig.PairingSettings pairing = candidate.config().getPairing();
         if (pairing == null) {
             return false;
@@ -158,29 +164,41 @@ public final class PassiveBreedingSweepService {
             return false;
         }
         double radius = sanitizeRadius(pairing.getBreedRadius());
+        String typeKey = populationTypeService.resolveTypeKey(candidate.roleId(), candidate.config());
+        if (typeKey == null || typeKey.isBlank()) {
+            return false;
+        }
+        int nearbyExisting = populationTypeService.countNearbyOfType(
+                store,
+                candidate.position(),
+                radius,
+                candidate.config(),
+                typeKey
+        );
+        int nearbyReserved = countNearbyReservations(typeKey, candidate.position(), radius, birthReservations);
+        return nearbyExisting + nearbyReserved >= maxNearbySameType;
+    }
+
+    private static int countNearbyReservations(@Nonnull String typeKey,
+                                               @Nonnull Vector3d center,
+                                               double radius,
+                                               @Nonnull List<BirthReservation> birthReservations) {
         double radiusSq = radius * radius;
         int nearbyCount = 0;
-        int sourceIndex = candidate.ref().getIndex();
-        for (RoleSnapshot snapshot : snapshots) {
-            if (snapshot == null || snapshot.ref() == null || !snapshot.ref().isValid()) {
+        for (BirthReservation reservation : birthReservations) {
+            if (reservation == null || reservation.typeKey() == null || reservation.position() == null) {
                 continue;
             }
-            if (snapshot.ref().getIndex() == sourceIndex) {
+            if (!equalsIgnoreCase(typeKey, reservation.typeKey())) {
                 continue;
             }
-            if (!equalsIgnoreCase(candidate.roleId(), snapshot.roleId())) {
-                continue;
-            }
-            double distanceSq = new Vector3d(snapshot.position()).subtract(candidate.position()).squaredLength();
+            double distanceSq = new Vector3d(reservation.position()).subtract(center).squaredLength();
             if (!Double.isFinite(distanceSq) || distanceSq > radiusSq) {
                 continue;
             }
             nearbyCount++;
-            if (nearbyCount >= maxNearbySameType) {
-                return true;
-            }
         }
-        return false;
+        return nearbyCount;
     }
 
     private static boolean equalsIgnoreCase(@Nullable String left, @Nullable String right) {
@@ -235,13 +253,13 @@ public final class PassiveBreedingSweepService {
         return stateName.toLowerCase(Locale.ROOT);
     }
 
-    private record RoleSnapshot(Ref<EntityStore> ref, String roleId, Vector3d position) {
-    }
-
     private record SweepCandidate(Ref<EntityStore> ref,
                                   NPCEntity npc,
                                   String roleId,
                                   Vector3d position,
                                   TwBreedingConfig config) {
+    }
+
+    private record BirthReservation(String typeKey, Vector3d position) {
     }
 }

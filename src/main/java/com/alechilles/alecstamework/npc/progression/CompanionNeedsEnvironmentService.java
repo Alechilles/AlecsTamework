@@ -51,7 +51,7 @@ public final class CompanionNeedsEnvironmentService {
         if (transform == null || world == null || world.getChunkStore() == null) {
             return false;
         }
-        double radius = config.getPassiveRefill().getWaterSearchRadius();
+        double radius = config.getPassiveRefill().getWaterConsumeRadius();
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return false;
         }
@@ -262,6 +262,13 @@ public final class CompanionNeedsEnvironmentService {
     int consumeNearbyContainerFood(@Nullable Ref<EntityStore> npcRef,
                                    @Nullable Store<EntityStore> store,
                                    @Nonnull TwNeedsConfig config) {
+        return consumeNearbyContainerFood(npcRef, store, config, null);
+    }
+
+    int consumeNearbyContainerFood(@Nullable Ref<EntityStore> npcRef,
+                                   @Nullable Store<EntityStore> store,
+                                   @Nonnull TwNeedsConfig config,
+                                   @Nullable String[] preferredFoodItemIds) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return 0;
         }
@@ -270,7 +277,10 @@ public final class CompanionNeedsEnvironmentService {
         if (maxItems <= 0) {
             return 0;
         }
-        Set<String> allowedFoods = normalizeItemIds(passiveRefill.getContainerFoodItemIds());
+        Set<String> allowedFoods = normalizeItemIds(preferredFoodItemIds);
+        if (allowedFoods.isEmpty()) {
+            allowedFoods = normalizeItemIds(passiveRefill.getContainerFoodItemIds());
+        }
         if (allowedFoods.isEmpty()) {
             return 0;
         }
@@ -279,7 +289,7 @@ public final class CompanionNeedsEnvironmentService {
         if (transform == null || world == null || world.getChunkStore() == null) {
             return 0;
         }
-        double radius = passiveRefill.getContainerSearchRadius();
+        double radius = passiveRefill.getContainerConsumeRadius();
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return 0;
         }

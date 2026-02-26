@@ -166,6 +166,18 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             settings -> settings.enabled
         )
         .add()
+        .<Integer>append(
+            new KeyedCodec<>("SweepIntervalSeconds", Codec.INTEGER),
+            (settings, value) -> settings.sweepIntervalSeconds = value == null ? 30 : value,
+            settings -> settings.getSweepIntervalSeconds()
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Basis", Codec.STRING),
+            (settings, value) -> settings.timerBasis = TimerBasis.fromConfigValue(value),
+            settings -> settings.getTimerBasis().toConfigValue()
+        )
+        .add()
         .build();
 
     private static final BuilderCodec<TimingSettings> TIMING_CODEC = BuilderCodec.builder(
@@ -435,7 +447,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 cache = ROLE_CACHE;
             }
         }
-        return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+        return cache.get(normalizeRoleCacheKey(roleId));
     }
 
     @Nullable
@@ -499,11 +511,20 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         if (candidate == null || roleId == null || roleId.isBlank()) {
             return;
         }
-        String normalizedRole = roleId.trim().toLowerCase(Locale.ROOT);
+        String normalizedRole = normalizeRoleCacheKey(roleId);
         TwBreedingConfig existing = cache.get(normalizedRole);
         if (shouldReplaceCandidate(candidate, existing)) {
             cache.put(normalizedRole, candidate);
         }
+    }
+
+    private static String normalizeRoleCacheKey(@Nonnull String roleId) {
+        String normalized = roleId.trim().toLowerCase(Locale.ROOT);
+        int separator = normalized.lastIndexOf(':');
+        if (separator >= 0 && separator < normalized.length() - 1) {
+            return normalized.substring(separator + 1);
+        }
+        return normalized;
     }
 
     private static boolean shouldReplaceCandidate(@Nullable TwBreedingConfig candidate,
@@ -671,9 +692,19 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     /** Controls passive, non-interaction breeding candidate generation. */
     public static final class PassiveBreedingSettings {
         private boolean enabled;
+        private int sweepIntervalSeconds = 30;
+        private TimerBasis timerBasis = TimerBasis.REAL_TIME;
 
         public boolean isEnabled() {
             return enabled;
+        }
+
+        public int getSweepIntervalSeconds() {
+            return Math.max(1, sweepIntervalSeconds);
+        }
+
+        public TimerBasis getTimerBasis() {
+            return timerBasis == null ? TimerBasis.REAL_TIME : timerBasis;
         }
     }
 
@@ -928,7 +959,18 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             if (candidate == null || candidate.isBlank() || roleId == null || roleId.isBlank()) {
                 return false;
             }
-            return candidate.equalsIgnoreCase(roleId);
+            String normalizedCandidate = normalizeRoleId(candidate);
+            String normalizedRoleId = normalizeRoleId(roleId);
+            return normalizedCandidate.equals(normalizedRoleId);
+        }
+
+        private static String normalizeRoleId(@Nonnull String roleId) {
+            String normalized = roleId.trim().toLowerCase(Locale.ROOT);
+            int separator = normalized.lastIndexOf(':');
+            if (separator >= 0 && separator < normalized.length() - 1) {
+                return normalized.substring(separator + 1);
+            }
+            return normalized;
         }
     }
 }

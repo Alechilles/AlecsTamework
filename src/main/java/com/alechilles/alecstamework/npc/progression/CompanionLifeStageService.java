@@ -115,6 +115,14 @@ public final class CompanionLifeStageService {
                 lifecycle.adultFinalScale(),
                 true
         );
+        if (preResolvedFamily != null) {
+            component.setAdultRoleId(preResolvedFamily.getAdultRoleId());
+            component.setBabyRoleId(preResolvedFamily.getBabyRoleId());
+            component.setAdolescentRoleId(preResolvedFamily.getAdolescentRoleId());
+        } else {
+            component.setAdultRoleId(spawnedRoleId);
+            component.setBabyRoleId(spawnedRoleId);
+        }
         store.putComponent(childRef, type, component);
         double initialScale = lifecycle.babyStartScale();
         CompanionModelScaleService.applyScale(childRef, childNpc, store, initialScale);
@@ -148,13 +156,13 @@ public final class CompanionLifeStageService {
         if (stage.isGrowthScalingEnabled()) {
             double targetScale = resolveScale(stage, nowMs);
             CompanionModelScaleService.applyScale(npcRef, npc, store, targetScale);
-            if (stage.getFullyGrownAtMs() > 0L && nowMs >= stage.getFullyGrownAtMs()) {
+            if (hasTimelineTimestamp(stage.getFullyGrownAtMs()) && nowMs >= stage.getFullyGrownAtMs()) {
                 stage.setGrowthScalingEnabled(false);
                 changed = true;
             }
         }
 
-        if (applyLifecycleRoleForStage(npcRef, npc, store, resolvedStage)) {
+        if (applyLifecycleRoleForStage(npcRef, npc, store, resolvedStage, stage)) {
             changed = true;
         }
 
@@ -285,15 +293,15 @@ public final class CompanionLifeStageService {
         long adolescentAtMs = component.getAdolescentAtMs();
         long bornAtMs = component.getBornAtMs();
 
-        if (adultAtMs > 0L && nowMs >= adultAtMs) {
+        if (hasTimelineTimestamp(adultAtMs) && nowMs >= adultAtMs) {
             return STAGE_ADULT;
         }
-        if (adolescentAtMs > 0L
+        if (hasTimelineTimestamp(adolescentAtMs)
                 && adultAtMs > adolescentAtMs
                 && nowMs >= adolescentAtMs) {
             return STAGE_ADOLESCENT;
         }
-        if (bornAtMs > 0L) {
+        if (hasTimelineTimestamp(bornAtMs)) {
             return STAGE_BABY;
         }
         String normalized = normalizeStage(component.getStage());
@@ -333,7 +341,7 @@ public final class CompanionLifeStageService {
             double progress = (double) (nowMs - adolescentAtMs) / (double) (adultAtMs - adolescentAtMs);
             return lerp(adolescentStart, adultSwitch, progress);
         }
-        long adultStartAtMs = adultAtMs > 0L ? adultAtMs : Math.max(adolescentAtMs, bornAtMs);
+        long adultStartAtMs = hasTimelineTimestamp(adultAtMs) ? adultAtMs : Math.max(adolescentAtMs, bornAtMs);
         if (fullyGrownAtMs > adultStartAtMs && nowMs < fullyGrownAtMs) {
             double progress = (double) (nowMs - adultStartAtMs) / (double) (fullyGrownAtMs - adultStartAtMs);
             return lerp(adultStart, adultFinal, progress);
@@ -379,6 +387,32 @@ public final class CompanionLifeStageService {
             changed = true;
         }
 
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId != null && !roleId.isBlank()) {
+            TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
+            TwBreedingConfig.RoleFamily family = config != null ? config.resolveLifecycleFamilyForRole(roleId) : null;
+            if (family != null) {
+                if ((component.getAdultRoleId() == null || component.getAdultRoleId().isBlank())
+                        && family.getAdultRoleId() != null
+                        && !family.getAdultRoleId().isBlank()) {
+                    component.setAdultRoleId(family.getAdultRoleId());
+                    changed = true;
+                }
+                if ((component.getBabyRoleId() == null || component.getBabyRoleId().isBlank())
+                        && family.getBabyRoleId() != null
+                        && !family.getBabyRoleId().isBlank()) {
+                    component.setBabyRoleId(family.getBabyRoleId());
+                    changed = true;
+                }
+                if ((component.getAdolescentRoleId() == null || component.getAdolescentRoleId().isBlank())
+                        && family.getAdolescentRoleId() != null
+                        && !family.getAdolescentRoleId().isBlank()) {
+                    component.setAdolescentRoleId(family.getAdolescentRoleId());
+                    changed = true;
+                }
+            }
+        }
+
         changed |= migrateLegacyTimelineBasis(component, npcRef, store);
 
         if (component.getFullyGrownAtMs() < component.getAdultAtMs()) {
@@ -386,8 +420,8 @@ public final class CompanionLifeStageService {
             changed = true;
         }
         if (component.isGrowthScalingEnabled()
-                && component.getBornAtMs() > 0L
-                && component.getFullyGrownAtMs() > 0L
+                && hasTimelineTimestamp(component.getBornAtMs())
+                && hasTimelineTimestamp(component.getFullyGrownAtMs())
                 && component.getFullyGrownAtMs() <= component.getBornAtMs()) {
             component.setGrowthScalingEnabled(false);
             component.setStage(STAGE_ADULT);
@@ -536,7 +570,8 @@ public final class CompanionLifeStageService {
     private static boolean applyLifecycleRoleForStage(@Nullable Ref<EntityStore> npcRef,
                                                       @Nullable NPCEntity providedNpc,
                                                       @Nullable Store<EntityStore> store,
-                                                      @Nullable String stage) {
+                                                      @Nullable String stage,
+                                                      @Nullable TameworkLifeStageComponent lifeStage) {
         if (npcRef == null || !npcRef.isValid() || store == null || stage == null || stage.isBlank()) {
             return false;
         }
@@ -548,20 +583,24 @@ public final class CompanionLifeStageService {
         if (currentRoleId == null || currentRoleId.isBlank()) {
             return false;
         }
-        TwBreedingConfig config = TwBreedingConfig.resolveForRole(currentRoleId);
-        if (config == null || !config.isEnabled()) {
-            return false;
+        String targetRoleId = resolveTargetRoleIdForStage(stage, lifeStage, null);
+        if (targetRoleId == null || targetRoleId.isBlank()) {
+            TwBreedingConfig config = TwBreedingConfig.resolveForRole(currentRoleId);
+            if (config == null || !config.isEnabled()) {
+                return false;
+            }
+            TwBreedingConfig.OffspringLifecycleSettings lifecycle = config.getOffspringLifecycle();
+            if (lifecycle == null || !lifecycle.isEnabled()) {
+                return false;
+            }
+            TwBreedingConfig.RoleFamily family = config.resolveLifecycleFamilyForRole(currentRoleId);
+            targetRoleId = resolveTargetRoleIdForStage(stage, lifeStage, family);
+            if (targetRoleId == null || targetRoleId.isBlank()) {
+                family = config.resolveLifecycleFamilyForRole(resolveRoleIdFromIndex(npc));
+                targetRoleId = resolveTargetRoleIdForStage(stage, lifeStage, family);
+            }
         }
-        TwBreedingConfig.OffspringLifecycleSettings lifecycle = config.getOffspringLifecycle();
-        if (lifecycle == null || !lifecycle.isEnabled()) {
-            return false;
-        }
-        TwBreedingConfig.RoleFamily family = config.resolveLifecycleFamilyForRole(currentRoleId);
-        if (family == null) {
-            return false;
-        }
-        String targetRoleId = resolveTargetRoleIdForStage(stage, family);
-        if (targetRoleId == null || targetRoleId.isBlank() || targetRoleId.equalsIgnoreCase(currentRoleId)) {
+        if (targetRoleId == null || targetRoleId.isBlank()) {
             return false;
         }
         NPCPlugin plugin = NPCPlugin.get();
@@ -570,6 +609,9 @@ public final class CompanionLifeStageService {
         }
         int targetRoleIndex = plugin.getIndex(targetRoleId);
         if (targetRoleIndex < 0) {
+            return false;
+        }
+        if (npc.getRoleIndex() == targetRoleIndex) {
             return false;
         }
         Role role = npc.getRole();
@@ -583,21 +625,45 @@ public final class CompanionLifeStageService {
 
     @Nullable
     private static String resolveTargetRoleIdForStage(@Nullable String stage,
+                                                      @Nullable TameworkLifeStageComponent lifeStage,
                                                       @Nullable TwBreedingConfig.RoleFamily family) {
-        if (family == null || stage == null || stage.isBlank()) {
+        if (stage == null || stage.isBlank()) {
             return null;
         }
         if (STAGE_BABY.equals(stage)) {
+            if (lifeStage != null && lifeStage.getBabyRoleId() != null && !lifeStage.getBabyRoleId().isBlank()) {
+                return lifeStage.getBabyRoleId();
+            }
+            if (family == null) {
+                return null;
+            }
             if (family.getBabyRoleId() != null && !family.getBabyRoleId().isBlank()) {
                 return family.getBabyRoleId();
             }
             return family.getAdultRoleId();
         }
         if (STAGE_ADOLESCENT.equals(stage)) {
+            if (lifeStage != null
+                    && lifeStage.getAdolescentRoleId() != null
+                    && !lifeStage.getAdolescentRoleId().isBlank()) {
+                return lifeStage.getAdolescentRoleId();
+            }
+            if (lifeStage != null && lifeStage.getAdultRoleId() != null && !lifeStage.getAdultRoleId().isBlank()) {
+                return lifeStage.getAdultRoleId();
+            }
+            if (family == null) {
+                return null;
+            }
             if (family.getAdolescentRoleId() != null && !family.getAdolescentRoleId().isBlank()) {
                 return family.getAdolescentRoleId();
             }
             return family.getAdultRoleId();
+        }
+        if (lifeStage != null && lifeStage.getAdultRoleId() != null && !lifeStage.getAdultRoleId().isBlank()) {
+            return lifeStage.getAdultRoleId();
+        }
+        if (family == null) {
+            return null;
         }
         return family.getAdultRoleId();
     }
@@ -874,9 +940,21 @@ public final class CompanionLifeStageService {
         if (npc == null) {
             return null;
         }
+        String fromIndex = resolveRoleIdFromIndex(npc);
+        if (fromIndex != null && !fromIndex.isBlank()) {
+            return fromIndex;
+        }
         String roleName = npc.getRoleName();
         if (roleName != null && !roleName.isBlank()) {
             return roleName;
+        }
+        return null;
+    }
+
+    @Nullable
+    private static String resolveRoleIdFromIndex(@Nullable NPCEntity npc) {
+        if (npc == null) {
+            return null;
         }
         int roleIndex = npc.getRoleIndex();
         if (roleIndex < 0) {
@@ -924,6 +1002,10 @@ public final class CompanionLifeStageService {
         }
         double currentScale = CompanionModelScaleService.resolveCurrentScale(npcRef, store, 1.0);
         return Math.abs(currentScale - targetScale) <= 0.0001;
+    }
+
+    private static boolean hasTimelineTimestamp(long value) {
+        return value != 0L;
     }
 
     private static double lerp(double start, double end, double progress) {

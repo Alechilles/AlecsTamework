@@ -44,6 +44,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCapture
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestDrop;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPrompt;
+import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResourceConsume;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -64,6 +65,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNe
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
@@ -248,6 +250,9 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(
                 new CompanionProgressionBootstrapOnLoadSystem(NPCEntity.getComponentType(), tamedComponentType)
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)
         );
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
@@ -1061,6 +1066,7 @@ public class Tamework extends JavaPlugin {
             actionFactory.add(BuilderActionTameworkHarvestDrop.BUILDER_ID, BuilderActionTameworkHarvestDrop::new);
             actionFactory.add(BuilderActionTameworkInteract.BUILDER_ID, BuilderActionTameworkInteract::new);
             actionFactory.add(BuilderActionTameworkInteractPrompt.BUILDER_ID, BuilderActionTameworkInteractPrompt::new);
+            actionFactory.add(BuilderActionTameworkNeedsResourceConsume.BUILDER_ID, BuilderActionTameworkNeedsResourceConsume::new);
             actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
             actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);
         }

@@ -88,6 +88,24 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
             TameworkLifeStageComponent::isGrowthScalingEnabled
         )
         .add()
+        .append(
+            new KeyedCodec<>("AdultRoleId", Codec.STRING),
+            TameworkLifeStageComponent::setAdultRoleId,
+            TameworkLifeStageComponent::getAdultRoleId
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("BabyRoleId", Codec.STRING),
+            TameworkLifeStageComponent::setBabyRoleId,
+            TameworkLifeStageComponent::getBabyRoleId
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("AdolescentRoleId", Codec.STRING),
+            TameworkLifeStageComponent::setAdolescentRoleId,
+            TameworkLifeStageComponent::getAdolescentRoleId
+        )
+        .add()
         .build();
 
     private String stage = "Adult";
@@ -102,6 +120,9 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
     private double adultSwitchScale = 1.00;
     private double adultScale = 1.00;
     private boolean growthScalingEnabled;
+    private String adultRoleId;
+    private String babyRoleId;
+    private String adolescentRoleId;
 
     public TameworkLifeStageComponent() {
     }
@@ -233,9 +254,33 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
         this.growthScalingEnabled = growthScalingEnabled;
     }
 
+    public String getAdultRoleId() {
+        return adultRoleId;
+    }
+
+    public void setAdultRoleId(String adultRoleId) {
+        this.adultRoleId = adultRoleId;
+    }
+
+    public String getBabyRoleId() {
+        return babyRoleId;
+    }
+
+    public void setBabyRoleId(String babyRoleId) {
+        this.babyRoleId = babyRoleId;
+    }
+
+    public String getAdolescentRoleId() {
+        return adolescentRoleId;
+    }
+
+    public void setAdolescentRoleId(String adolescentRoleId) {
+        this.adolescentRoleId = adolescentRoleId;
+    }
+
     @Override
     public TameworkLifeStageComponent clone() {
-        return new TameworkLifeStageComponent(
+        TameworkLifeStageComponent clone = new TameworkLifeStageComponent(
                 stage,
                 bornAtMs,
                 adolescentAtMs,
@@ -249,5 +294,9 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
                 adultScale,
                 growthScalingEnabled
         );
+        clone.setAdultRoleId(adultRoleId);
+        clone.setBabyRoleId(babyRoleId);
+        clone.setAdolescentRoleId(adolescentRoleId);
+        return clone;
     }
 }
