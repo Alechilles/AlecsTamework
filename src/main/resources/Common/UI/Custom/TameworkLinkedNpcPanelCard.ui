@@ -74,7 +74,7 @@ $C = "Common.ui";
 );
 
 Group {
-  Anchor: (Top: 8, Left: 0, Right: 0, Height: 120);
+  Anchor: (Top: 3, Left: 0, Right: 0, Height: 92);
   Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
