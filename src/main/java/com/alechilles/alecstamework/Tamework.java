@@ -1,13 +1,10 @@
 package com.alechilles.alecstamework;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Locale;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
 
+import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -71,15 +68,11 @@ import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
-import com.hypixel.hytale.assetstore.AssetPack;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
-import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import com.hypixel.hytale.component.ComponentType;
-import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
-import com.hypixel.hytale.server.core.asset.LoadAssetEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
@@ -103,13 +96,11 @@ import com.hypixel.hytale.server.npc.instructions.Sensor;
 public class Tamework extends JavaPlugin {
 
     private static Tamework instance;
-    private static final short EARLY_ASSET_PACK_ORDER_PRIORITY = (short) -40;
-    private static final String BASE_ASSET_PACK_ID = "Hytale:Hytale";
-    private static final boolean ENABLE_EARLY_ASSET_PACK_ORDERING = true;
 
     private ItemFeatureRegistry itemFeatureRegistry;
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
+    private TameworkAssetPackCoordinator assetPackCoordinator;
 
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
@@ -156,7 +147,8 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         // Registry for command item configs.
         commandItemRegistry = new CommandItemRegistry();
-        registerEarlyAssetPackOrderingHook();
+        assetPackCoordinator = new TameworkAssetPackCoordinator(this);
+        assetPackCoordinator.registerEarlyAssetPackOrderingHook();
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         // Register the custom item interaction used by naming items.
@@ -345,6 +337,9 @@ public class Tamework extends JavaPlugin {
     protected void start() {
         // Called when the plugin is enabled
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
+        if (assetPackCoordinator != null) {
+            assetPackCoordinator.ensureAssetEditorPackVisible();
+        }
     }
 
     @Override
@@ -416,173 +411,6 @@ public class Tamework extends JavaPlugin {
         );
         return loadedSpawner + loadedNaming + loadedCommands;
     }
-
-    // Move Tamework's embedded asset pack before other mod packs before the core load pass.
-    private void registerEarlyAssetPackOrderingHook() {
-        if (!ENABLE_EARLY_ASSET_PACK_ORDERING) {
-            getLogger().at(Level.INFO).log(
-                    "Tamework asset pack ordering: early reorder hook disabled for compatibility diagnostics."
-            );
-            return;
-        }
-        if (getEventRegistry() == null) {
-            return;
-        }
-        getEventRegistry().register(
-                EARLY_ASSET_PACK_ORDER_PRIORITY,
-                LoadAssetEvent.class,
-                this::onEarlyAssetLoad
-        );
-    }
-
-    private void onEarlyAssetLoad(LoadAssetEvent event) {
-        AssetModule assetModule = AssetModule.get();
-        if (assetModule == null) {
-            getLogger().at(Level.WARNING).log(
-                    "Tamework asset pack ordering: AssetModule unavailable during LoadAssetEvent."
-            );
-            return;
-        }
-
-        String packId = new PluginIdentifier(getManifest()).toString();
-        Path pluginPackPath = normalizePath(getFile());
-        if (pluginPackPath == null) {
-            getLogger().at(Level.WARNING).log(
-                    "Tamework asset pack ordering: plugin file path unavailable during LoadAssetEvent."
-            );
-            return;
-        }
-
-        removeLegacyStandaloneAssetPack(assetModule, packId, pluginPackPath);
-
-        AssetPack existingPack = assetModule.getAssetPack(packId);
-        if (existingPack != null) {
-            Path existingPackPath = normalizePath(existingPack.getPackLocation());
-            if (!samePath(existingPackPath, pluginPackPath)) {
-                getLogger().at(Level.INFO).log(
-                        "Tamework asset pack ordering: replacing pre-registered pack '" + packId
-                                + "' from " + existingPackPath + " with " + pluginPackPath + "."
-                );
-                assetModule.unregisterPack(packId);
-                tryDeleteLegacyAssetsZip(existingPackPath, pluginPackPath);
-            }
-        }
-
-        if (assetModule.getAssetPack(packId) == null) {
-            try {
-                assetModule.registerPack(packId, getFile(), getManifest(), true);
-            } catch (RuntimeException ex) {
-                getLogger().at(Level.WARNING).withCause(ex)
-                        .log("Tamework asset pack ordering: failed to register missing embedded pack '" + packId + "'.");
-            }
-        }
-
-        List<AssetPack> packs = assetModule.getAssetPacks();
-        int currentIndex = indexOfPack(packs, packId);
-        if (currentIndex < 0) {
-            getLogger().at(Level.WARNING).log(
-                    "Tamework asset pack ordering: pack '" + packId + "' not found after registration attempt."
-            );
-            return;
-        }
-
-        int targetIndex = desiredTameworkPackIndex(packs);
-        if (currentIndex == targetIndex) {
-            getLogger().at(Level.INFO).log(
-                    "Tamework asset pack ordering: pack '" + packId + "' already ordered at index " + currentIndex + "."
-            );
-            return;
-        }
-
-        AssetPack tameworkPack = packs.remove(currentIndex);
-        if (currentIndex < targetIndex) {
-            targetIndex--;
-        }
-        packs.add(targetIndex, tameworkPack);
-        getLogger().at(Level.INFO).log(
-                "Tamework asset pack ordering: moved pack '" + packId + "' from index "
-                        + currentIndex + " to index " + targetIndex + "."
-        );
-    }
-
-    private void removeLegacyStandaloneAssetPack(AssetModule assetModule, String packId, Path pluginPackPath) {
-        String legacyPackId = packId + " (Assets)";
-        AssetPack legacyPack = assetModule.getAssetPack(legacyPackId);
-        if (legacyPack == null) {
-            return;
-        }
-        Path legacyPackPath = normalizePath(legacyPack.getPackLocation());
-        getLogger().at(Level.INFO).log(
-                "Tamework asset pack ordering: removing legacy standalone pack '"
-                        + legacyPackId + "' from " + legacyPackPath + "."
-        );
-        assetModule.unregisterPack(legacyPackId);
-        tryDeleteLegacyAssetsZip(legacyPackPath, pluginPackPath);
-    }
-
-    private void tryDeleteLegacyAssetsZip(Path existingPackPath, Path pluginPackPath) {
-        if (existingPackPath == null || !isLegacyAssetsZip(existingPackPath)) {
-            return;
-        }
-        Path pluginDir = pluginPackPath.getParent();
-        Path existingDir = existingPackPath.getParent();
-        if (pluginDir == null || existingDir == null || !pluginDir.equals(existingDir)) {
-            return;
-        }
-        try {
-            if (Files.deleteIfExists(existingPackPath)) {
-                getLogger().at(Level.INFO).log(
-                        "Tamework asset pack ordering: deleted legacy assets archive " + existingPackPath + "."
-                );
-            }
-        } catch (Exception ex) {
-            getLogger().at(Level.WARNING).withCause(ex).log(
-                    "Tamework asset pack ordering: failed to delete legacy assets archive " + existingPackPath + "."
-            );
-        }
-    }
-
-    private boolean isLegacyAssetsZip(Path path) {
-        String fileName = path.getFileName() == null
-                ? ""
-                : path.getFileName().toString().toLowerCase(Locale.ROOT);
-        return fileName.endsWith(".zip")
-                && fileName.contains("tamework")
-                && fileName.contains("assets");
-    }
-
-    private Path normalizePath(Path path) {
-        if (path == null) {
-            return null;
-        }
-        return path.toAbsolutePath().normalize();
-    }
-
-    private boolean samePath(Path a, Path b) {
-        if (a == null || b == null) {
-            return false;
-        }
-        return a.equals(b);
-    }
-
-    private int desiredTameworkPackIndex(List<AssetPack> packs) {
-        int basePackIndex = indexOfPack(packs, BASE_ASSET_PACK_ID);
-        if (basePackIndex < 0) {
-            return 0;
-        }
-        return basePackIndex + 1;
-    }
-
-    private int indexOfPack(List<AssetPack> packs, String packId) {
-        for (int i = 0; i < packs.size(); i++) {
-            AssetPack pack = packs.get(i);
-            if (pack != null && packId.equals(pack.getName())) {
-                return i;
-            }
-        }
-        return -1;
-    }
-
 
     private void registerSpawnerItemAssets() {
         if (spawnerAssetsRegistered) {
