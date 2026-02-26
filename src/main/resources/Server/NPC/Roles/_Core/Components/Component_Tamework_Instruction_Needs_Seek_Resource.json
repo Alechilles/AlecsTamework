@@ -77,6 +77,17 @@
         1.2
       ],
       "Description": "Short pause after reaching the resource before completing seek."
+    },
+    "NeedsSeekFailedCooldownName": {
+      "Value": "NeedsSeek_Failed_Cooldown",
+      "Description": "Timer name used to throttle repeated failed seek attempts."
+    },
+    "NeedsSeekFailedCooldownRange": {
+      "Value": [
+        4,
+        6
+      ],
+      "Description": "Cooldown duration after nav/path failures before another seek can be started."
     }
   },
   "Content": {
@@ -253,6 +264,24 @@
               ]
             },
             "Actions": [
+              {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                }
+              },
               {
                 "Type": "State",
                 "State": ".Default"

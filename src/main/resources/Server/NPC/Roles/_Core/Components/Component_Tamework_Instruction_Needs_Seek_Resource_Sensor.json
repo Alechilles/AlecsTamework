@@ -32,6 +32,10 @@
       "Value": [],
       "TypeHint": "String",
       "Description": "Allowed food item ids when seeking food containers."
+    },
+    "NeedsSeekFailedCooldownName": {
+      "Value": "NeedsSeek_Failed_Cooldown",
+      "Description": "Timer name used to throttle repeated failed seek attempts."
     }
   },
   "Content": {
@@ -58,6 +62,13 @@
             {
               "Type": "State",
               "State": ".Listen"
+            },
+            {
+              "Type": "Timer",
+              "Name": {
+                "Compute": "NeedsSeekFailedCooldownName"
+              },
+              "State": "Stopped"
             },
             {
               "Type": "TameworkNeedBelow",
@@ -101,6 +112,13 @@
             {
               "Type": "State",
               "State": ".Listen"
+            },
+            {
+              "Type": "Timer",
+              "Name": {
+                "Compute": "NeedsSeekFailedCooldownName"
+              },
+              "State": "Stopped"
             },
             {
               "Type": "TameworkNeedBelow",
