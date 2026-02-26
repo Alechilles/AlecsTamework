@@ -48,7 +48,6 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       LayoutMode: TopScrolling;
       KeepScrollPosition: true;
       ScrollbarStyle: $C.@DefaultScrollbarStyle;
-      Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
       Padding: (Left: 7, Right: 2, Top: 7, Bottom: 7);
 
       Group #TameworkLinkedPanelList {
