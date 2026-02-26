@@ -74,7 +74,7 @@ $C = "Common.ui";
 );
 
 Group {
-  Anchor: (Top: 8, Left: 0, Right: 0, Height: 176);
+  Anchor: (Top: 8, Left: 0, Right: 0, Height: 120);
   Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
@@ -234,7 +234,7 @@ Group {
   }
 
   TextButton #RespawnButton {
-    Anchor: (Top: 120, Right: 56, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRespawnButtonStyle;
     Text: "";
     TooltipText: "Revive";
@@ -243,7 +243,7 @@ Group {
   }
 
   TextButton #RecallButton {
-    Anchor: (Top: 120, Right: 56, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRecallButtonStyle;
     Text: "";
     TooltipText: "Recall";
@@ -252,7 +252,7 @@ Group {
   }
 
   TextButton #SetHomeButton {
-    Anchor: (Top: 120, Right: 0, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 0, Width: 24, Height: 24);
     Style: @LinkedActionSetHomeButtonStyle;
     Text: "";
     TooltipText: "Set Home";
@@ -261,7 +261,7 @@ Group {
   }
 
   TextButton #ReturnHomeButton {
-    Anchor: (Top: 120, Right: 28, Width: 24, Height: 24);
+    Anchor: (Top: 56, Right: 28, Width: 24, Height: 24);
     Style: @LinkedActionReturnHomeButtonStyle;
     Text: "";
     TooltipText: "Return Home";
@@ -298,67 +298,118 @@ Group {
     );
   }
 
-  Group #HappinessFrame {
-    Anchor: (Top: 64, Left: 0, Width: 206, Height: 14);
-    Background: #0a121b(0.95);
+  Group #NeedRingRow {
+    Anchor: (Top: 68, Left: 0, Width: 84, Height: 24);
+    LayoutMode: Left;
 
-    Group #HappinessFill {
-      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
-      Background: #f2c97c;
+    Group #NeedHappiness {
+      Anchor: (Width: 24, Height: 24);
+
+      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+
+      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #f2c97c; }
+      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #f2c97c; }
+      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #f2c97c; }
+      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #f2c97c; }
+
+      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Label #NeedIcon {
+        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+        Text: "M";
+        Style: (
+          FontSize: 10,
+          RenderBold: true,
+          TextColor: #deebff,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+
+      TextButton #NeedTooltip {
+        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "Happiness";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+      }
     }
-  }
 
-  Label #HappinessText {
-    Anchor: (Top: 82, Left: 0, Width: 206, Height: 16);
-    Text: "Happiness: ?/?";
-    Style: (
-      FontSize: 11,
-      TextColor: #bed0e3,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
-  }
+    Group { Anchor: (Width: 6); }
 
-  Group #HungerFrame {
-    Anchor: (Top: 98, Left: 0, Width: 206, Height: 14);
-    Background: #0a121b(0.95);
+    Group #NeedHunger {
+      Anchor: (Width: 24, Height: 24);
 
-    Group #HungerFill {
-      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
-      Background: #d9a066;
+      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+
+      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #d9a066; }
+      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #d9a066; }
+      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #d9a066; }
+      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #d9a066; }
+
+      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Label #NeedIcon {
+        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+        Text: "F";
+        Style: (
+          FontSize: 10,
+          RenderBold: true,
+          TextColor: #deebff,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+
+      TextButton #NeedTooltip {
+        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "Hunger";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+      }
     }
-  }
 
-  Label #HungerText {
-    Anchor: (Top: 116, Left: 0, Width: 206, Height: 16);
-    Text: "Hunger: ?/?";
-    Style: (
-      FontSize: 11,
-      TextColor: #bed0e3,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
-  }
+    Group { Anchor: (Width: 6); }
 
-  Group #ThirstFrame {
-    Anchor: (Top: 132, Left: 0, Width: 206, Height: 14);
-    Background: #0a121b(0.95);
+    Group #NeedThirst {
+      Anchor: (Width: 24, Height: 24);
 
-    Group #ThirstFill {
-      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
-      Background: #76b7ea;
+      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+
+      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #76b7ea; }
+      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #76b7ea; }
+      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #76b7ea; }
+      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #76b7ea; }
+
+      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Label #NeedIcon {
+        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+        Text: "W";
+        Style: (
+          FontSize: 10,
+          RenderBold: true,
+          TextColor: #deebff,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+
+      TextButton #NeedTooltip {
+        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "Thirst";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+      }
     }
-  }
-
-  Label #ThirstText {
-    Anchor: (Top: 150, Left: 0, Width: 206, Height: 16);
-    Text: "Thirst: ?/?";
-    Style: (
-      FontSize: 11,
-      TextColor: #bed0e3,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
   }
 
   Group #FutureStatAFrame {
