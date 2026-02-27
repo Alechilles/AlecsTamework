@@ -3,11 +3,14 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionAttachmentInheritanceService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
@@ -22,6 +25,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import java.time.Instant;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 
@@ -65,6 +70,15 @@ final class BreedingOffspringProgressionService {
         if (TamedStateResolver.isTamed(childRef, store)) {
             CompanionProgressionBootstrapService.ensureProgressionComponents(childRef, store);
         }
+        applyOffspringAttachments(
+                childRef,
+                childNpc,
+                parentARef,
+                parentBRef,
+                breedingConfig,
+                breedingConfigId,
+                store
+        );
         applyOffspringTraits(childRef, parentARef, parentBRef, childRoleId, childNpc, breedingConfigId, store);
         CompanionStatModifierService.applyTraitModifiers(childRef, store);
         CompanionLifeStageService.initializeOffspringLifeStage(
@@ -78,6 +92,60 @@ final class BreedingOffspringProgressionService {
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
         familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
+    }
+
+    private void applyOffspringAttachments(@Nullable Ref<EntityStore> childRef,
+                                           @Nullable NPCEntity childNpc,
+                                           @Nullable Ref<EntityStore> parentARef,
+                                           @Nullable Ref<EntityStore> parentBRef,
+                                           @Nullable TwBreedingConfig breedingConfig,
+                                           @Nullable String breedingConfigId,
+                                           @Nullable Store<EntityStore> store) {
+        if (childRef == null || !childRef.isValid() || store == null) {
+            return;
+        }
+        TwBreedingConfig.InheritanceSettings inheritance = breedingConfig != null
+                ? breedingConfig.getInheritance()
+                : null;
+        CompanionAttachmentInheritanceService.AttachmentInheritanceProfile profile =
+                CompanionAttachmentInheritanceService.AttachmentInheritanceProfile.fromConfig(inheritance);
+        if (!profile.enabled()) {
+            return;
+        }
+
+        Map<String, Set<String>> attachmentOptions = CompanionModelAttachmentService.resolveAttachmentOptionIds(
+                CompanionModelAttachmentService.resolveModelAsset(childRef, store)
+        );
+        if (attachmentOptions.isEmpty()) {
+            return;
+        }
+
+        long seed = resolveOffspringSeed(childNpc, parentARef, parentBRef, store);
+        Map<String, String> inheritedSelections = CompanionAttachmentInheritanceService.resolveInheritedSelections(
+                CompanionModelAttachmentService.resolveCurrentAttachments(parentARef, store),
+                CompanionModelAttachmentService.resolveCurrentAttachments(parentBRef, store),
+                attachmentOptions,
+                seed,
+                profile
+        );
+        if (inheritedSelections.isEmpty()) {
+            return;
+        }
+
+        CompanionModelAttachmentService.applyAttachments(childRef, childNpc, store, inheritedSelections);
+        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
+                TameworkAttachmentsComponent.getComponentType();
+        if (attachmentsType == null) {
+            return;
+        }
+        String resolvedConfigId = breedingConfig != null && breedingConfig.getId() != null && !breedingConfig.getId().isBlank()
+                ? breedingConfig.getId()
+                : breedingConfigId;
+        store.putComponent(
+                childRef,
+                attachmentsType,
+                new TameworkAttachmentsComponent(resolvedConfigId, inheritedSelections)
+        );
     }
 
     private void applyOffspringOwnershipAndTamedState(Ref<EntityStore> childRef,
