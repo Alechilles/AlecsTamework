@@ -41,8 +41,13 @@
   "Inheritance": {
     "InheritOwner": true,
     "InheritTamed": true,
-    "InheritAttachments": false,
-    "InheritTraits": true
+    "InheritAttachments": true,
+    "InheritTraits": true,
+    "AttachmentInheritance": {
+      "ParentWeight": 1.0,
+      "RandomWeight": 0.25,
+      "MutationChance": 0.05
+    }
   },
   "OffspringLifecycle": {
     "Enabled": true,

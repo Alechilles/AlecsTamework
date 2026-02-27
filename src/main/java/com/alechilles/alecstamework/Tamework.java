@@ -30,6 +30,7 @@ import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
@@ -63,6 +64,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNe
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
@@ -129,6 +131,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
+    private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -221,6 +224,12 @@ public class Tamework extends JavaPlugin {
                 TameworkTraitsComponent.CODEC
         );
 
+        attachmentsComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkAttachmentsComponent.class,
+                "TameworkAttachments",
+                TameworkAttachmentsComponent.CODEC
+        );
+
         lifeStageComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkLifeStageComponent.class,
                 "TameworkLifeStage",
@@ -246,6 +255,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)
         );
+        getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService();
@@ -772,6 +782,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkTraitsComponent> getTraitsComponentType() {
         return traitsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkAttachmentsComponent> getAttachmentsComponentType() {
+        return attachmentsComponentType;
     }
 
     public ComponentType<EntityStore, TameworkLifeStageComponent> getLifeStageComponentType() {

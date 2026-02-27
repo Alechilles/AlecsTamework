@@ -126,6 +126,30 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
+    private static final BuilderCodec<AttachmentInheritanceSettings> ATTACHMENT_INHERITANCE_CODEC = BuilderCodec.builder(
+            AttachmentInheritanceSettings.class,
+            AttachmentInheritanceSettings::new
+    )
+        .<Double>append(
+            new KeyedCodec<>("ParentWeight", Codec.DOUBLE),
+            (settings, value) -> settings.parentWeight = value,
+            settings -> settings.parentWeight
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
+            (settings, value) -> settings.randomWeight = value,
+            settings -> settings.randomWeight
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MutationChance", Codec.DOUBLE),
+            (settings, value) -> settings.mutationChance = value,
+            settings -> settings.mutationChance
+        )
+        .add()
+        .build();
+
     private static final BuilderCodec<InheritanceSettings> INHERITANCE_CODEC = BuilderCodec.builder(
             InheritanceSettings.class,
             InheritanceSettings::new
@@ -152,6 +176,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             new KeyedCodec<>("InheritTraits", Codec.BOOLEAN),
             (settings, value) -> settings.inheritTraits = value,
             settings -> settings.inheritTraits
+        )
+        .add()
+        .<AttachmentInheritanceSettings>append(
+            new KeyedCodec<>("AttachmentInheritance", ATTACHMENT_INHERITANCE_CODEC),
+            (settings, value) -> settings.attachmentInheritance =
+                    value == null ? new AttachmentInheritanceSettings() : value,
+            settings -> settings.attachmentInheritance
         )
         .add()
         .build();
@@ -746,6 +777,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private boolean inheritTamed = true;
         private boolean inheritAttachments;
         private boolean inheritTraits;
+        private AttachmentInheritanceSettings attachmentInheritance = new AttachmentInheritanceSettings();
 
         public boolean isInheritOwner() {
             return inheritOwner;
@@ -761,6 +793,46 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         public boolean isInheritTraits() {
             return inheritTraits;
+        }
+
+        public AttachmentInheritanceSettings getAttachmentInheritance() {
+            return attachmentInheritance == null
+                    ? new AttachmentInheritanceSettings()
+                    : attachmentInheritance;
+        }
+    }
+
+    /** Attachment inheritance weighting and mutation settings for offspring model selection. */
+    public static final class AttachmentInheritanceSettings {
+        private double parentWeight = 1.0;
+        private double randomWeight = 0.25;
+        private double mutationChance = 0.05;
+
+        public double getParentWeight() {
+            if (!Double.isFinite(parentWeight) || parentWeight < 0.0) {
+                return 1.0;
+            }
+            return parentWeight;
+        }
+
+        public double getRandomWeight() {
+            if (!Double.isFinite(randomWeight) || randomWeight < 0.0) {
+                return 0.25;
+            }
+            return randomWeight;
+        }
+
+        public double getMutationChance() {
+            if (!Double.isFinite(mutationChance)) {
+                return 0.05;
+            }
+            if (mutationChance < 0.0) {
+                return 0.0;
+            }
+            if (mutationChance > 1.0) {
+                return 1.0;
+            }
+            return mutationChance;
         }
     }
 
