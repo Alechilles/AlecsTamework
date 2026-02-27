@@ -8,6 +8,7 @@
 - New progression components: `TameworkBreedingComponent` and `TameworkTraitsComponent`, plus bootstrap initialization for newly tamed companions.
 - New shared progression component: `TameworkHappinessComponent` with config id, value, and last-update timestamp.
 - New shared progression component: `TameworkNeedsComponent` with hunger/thirst values, passive-sweep tracking, and applied happiness penalty state.
+- New progression component: `TameworkAttachmentsComponent` for persisted model attachment selections used by offspring appearance inheritance.
 - Progression persistence bridges for spawner capture/spawn and command-linked death/respawn snapshots (breeding + traits fields).
 - Initial `Breed` interaction handling for happiness-gated readiness state setup.
 - Unit tests for breeding/traits priority resolution and trait-value metadata codec round-trips.
@@ -43,6 +44,7 @@
 - Breeding pair movement now keeps parents in pair state briefly after arrival (about 1s) before resetting, and offspring spawn delay after hearts is slightly longer for clearer pacing.
 - Breeding hearts trigger sooner after pair arrival by using faster proximity checks and a less strict pairing-ready distance threshold.
 - Offspring spawning now supports role baby-variant selection with fallback juvenile scaling, trait inheritance via `TraitInheritanceService`, and alarm-backed parent/offspring breeding cooldown locks.
+- Breeding inheritance now supports deterministic random attachment inheritance with weighted parent/random selection and mutation (`TwBreedingConfig.Inheritance.AttachmentInheritance`), and offspring attachment selections now persist and reapply across runtime role/model transitions.
 - Breeding cooldown and offspring lifecycle growth durations now use game-time timestamps with configurable conversion basis (`TwBreedingConfig.Timing.Basis`), while remaining authored in human-readable seconds.
 - Adult breeding gates now use explicit life-stage progression when present (with role-name fallback), and life-stage state now persists through spawner capture/spawn and command death/respawn snapshots.
 - Breeding offspring spawn now retries nearby fallback positions and uses additional role-resolution fallbacks to prevent silent no-spawn outcomes after successful pairing/hearts.

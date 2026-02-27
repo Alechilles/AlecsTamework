@@ -28,6 +28,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - TwInteractionConfig supports preset interactions (Tame, Feed, Harvest, Mount, ModeCycle, Breed) plus fully custom requirements and effects.
 - Shared happiness progression is stored in `TameworkHappinessComponent` and resolved from `TwHappinessConfig`; breeding reads/mirrors this value for compatibility while partner/offspring logic evolves.
 - Life-stage progression is tracked in `TameworkLifeStageComponent` and used by breeding adult gates, offspring initialization, and progression persistence.
+- Offspring appearance inheritance persists deterministic attachment selections in `TameworkAttachmentsComponent`; runtime sync reapplies those selections after role/model transitions so baby/adult visual variants remain consistent.
 - The hook system allows interaction effects to emit a hook signal that can be consumed by NPC instruction sensors.
 - TwSpawnerConfig assets are converted into per-item feature configs and executed through dedicated spawner services (policy, metadata, identity/state, effects, placement, inventory).
 - TwNameItemConfig assets are resolved per item and executed through naming services (NPC info/ownership checks plus effect application).

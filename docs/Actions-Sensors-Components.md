@@ -30,6 +30,7 @@ This file maps the custom behavior surface area currently implemented in Alec's 
 - `TameworkHappinessComponent`: Stores shared per-NPC happiness progression state (config id, value, last update).
 - `TameworkBreedingComponent`: Stores per-NPC breeding progression state (config id, mirrored happiness/readiness, cooldown, partner).
 - `TameworkTraitsComponent`: Stores rolled trait values and deterministic trait seed per NPC (assigned during progression bootstrap when role trait config is enabled).
+- `TameworkAttachmentsComponent`: Stores deterministic attachment-set selections for NPC model appearance inheritance (used by breeding offspring and reapplied after role/model transitions).
 - `TameworkLifeStageComponent`: Stores companion life stage (`Baby`, `Adolescent`, `Adult`) plus growth timing/scaling data.
 
 ## Item interactions
