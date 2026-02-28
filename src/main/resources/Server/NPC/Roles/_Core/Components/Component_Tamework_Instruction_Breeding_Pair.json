@@ -209,6 +209,9 @@
                 "Compute": "BreedingPairSeekStopDistance + 0.15"
               }
             },
+            "HeadMotion": {
+              "Type": "Aim"
+            },
             "BodyMotion": {
               "Type": "Seek",
               "SlowDownDistance": {
@@ -233,6 +236,31 @@
         },
         "BodyMotion": {
           "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "While waiting for completion, keep facing the stored pair destination.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".CompleteDelay"
+            },
+            {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "BreedingPairTargetSlot"
+              },
+              "Range": {
+                "Compute": "BreedingPairReadRange"
+              }
+            }
+          ]
+        },
+        "HeadMotion": {
+          "Type": "Aim"
         }
       },
       {
