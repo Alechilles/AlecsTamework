@@ -37,8 +37,8 @@
     },
     "BabyDirectFollowDurationRange": {
       "Value": [
-        6,
-        12
+        "PT6S",
+        "PT12S"
       ],
       "Description": "How long to keep baby direct-follow active after a leash event."
     }

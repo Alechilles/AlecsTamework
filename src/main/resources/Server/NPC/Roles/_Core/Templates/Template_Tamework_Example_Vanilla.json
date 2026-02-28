@@ -133,6 +133,29 @@
       "Value": 0.2,
       "Description": "Relative speed used by flock follower local wander."
     },
+    "FlockBabyDirectFollowEnabled": {
+      "Value": false,
+      "Description": "Whether this role should use tighter baby-only direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowRadius": {
+      "Value": 1.75,
+      "Description": "Extra-close leash radius used during baby direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowStopDistance": {
+      "Value": 1,
+      "Description": "Stop distance used during baby direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowRelativeSpeed": {
+      "Value": 1.15,
+      "Description": "Relative speed used during baby direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowDurationRange": {
+      "Value": [
+        "PT3S",
+        "PT6S"
+      ],
+      "Description": "How long baby direct-follow stays active after a leash event."
+    },
     "MaxSpeed": {
       "Value": 6,
       "Description": "Maximum walking speed for this NPC."
@@ -853,10 +876,6 @@
         },
         {
           "Type": "State",
-          "State": "FlockFollow"
-        },
-        {
-          "Type": "State",
           "State": "CommandMove"
         },
         {
@@ -1006,10 +1025,26 @@
       ]
     },
     {
-      "$Comment": "Flock follower behavior while in FlockFollow state.",
+      "$Comment": "Overlay flock leash behavior while not in explicit follow/combat states.",
+      "Continue": true,
       "Sensor": {
-        "Type": "State",
-        "State": "FlockFollow"
+        "Type": "And",
+        "Sensors": [
+          {
+            "Type": "Not",
+            "Sensor": {
+              "Type": "State",
+              "State": "Follow"
+            }
+          },
+          {
+            "Type": "Not",
+            "Sensor": {
+              "Type": "State",
+              "State": "Defend"
+            }
+          }
+        ]
       },
       "Instructions": [
         {
@@ -1024,17 +1059,20 @@
             "FlockFollowerRelativeSpeed": {
               "Compute": "FlockFollowerRelativeSpeed"
             },
-            "FlockFollowerMoveDurationRange": {
-              "Compute": "FlockFollowerMoveDurationRange"
+            "BabyDirectFollowEnabled": {
+              "Compute": "FlockBabyDirectFollowEnabled"
             },
-            "FlockFollowerSettleDurationRange": {
-              "Compute": "FlockFollowerSettleDurationRange"
+            "BabyDirectFollowRadius": {
+              "Compute": "FlockBabyDirectFollowRadius"
             },
-            "FlockFollowerMaxHeadingChange": {
-              "Compute": "FlockFollowerMaxHeadingChange"
+            "BabyDirectFollowStopDistance": {
+              "Compute": "FlockBabyDirectFollowStopDistance"
             },
-            "FlockFollowerWanderSpeed": {
-              "Compute": "FlockFollowerWanderSpeed"
+            "BabyDirectFollowRelativeSpeed": {
+              "Compute": "FlockBabyDirectFollowRelativeSpeed"
+            },
+            "BabyDirectFollowDurationRange": {
+              "Compute": "FlockBabyDirectFollowDurationRange"
             }
           }
         }

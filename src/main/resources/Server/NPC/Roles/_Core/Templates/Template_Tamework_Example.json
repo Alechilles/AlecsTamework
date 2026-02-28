@@ -133,6 +133,29 @@
       "Value": 0.2,
       "Description": "Relative speed used by flock follower local wander."
     },
+    "FlockBabyDirectFollowEnabled": {
+      "Value": false,
+      "Description": "Whether this role should use tighter baby-only direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowRadius": {
+      "Value": 1.75,
+      "Description": "Extra-close leash radius used during baby direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowStopDistance": {
+      "Value": 1,
+      "Description": "Stop distance used during baby direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowRelativeSpeed": {
+      "Value": 1.15,
+      "Description": "Relative speed used during baby direct-follow catch-up."
+    },
+    "FlockBabyDirectFollowDurationRange": {
+      "Value": [
+        "PT3S",
+        "PT6S"
+      ],
+      "Description": "How long baby direct-follow stays active after a leash event."
+    },
     "MaxSpeed": {
       "Value": 6,
       "Description": "Maximum walking speed for this NPC."
@@ -931,10 +954,6 @@
         },
         {
           "Type": "State",
-          "State": "FlockFollow"
-        },
-        {
-          "Type": "State",
           "State": "CommandMove"
         },
         {
@@ -960,6 +979,60 @@
         {
           "Type": "State",
           "State": "$Harvest"
+        }
+      ]
+    },
+    {
+      "$Comment": "Overlay flock leash behavior while not in explicit follow/combat states.",
+      "Continue": true,
+      "Sensor": {
+        "Type": "And",
+        "Sensors": [
+          {
+            "Type": "Not",
+            "Sensor": {
+              "Type": "State",
+              "State": "Follow"
+            }
+          },
+          {
+            "Type": "Not",
+            "Sensor": {
+              "Type": "State",
+              "State": "Defend"
+            }
+          }
+        ]
+      },
+      "Instructions": [
+        {
+          "Reference": "Component_Tamework_Instruction_Flock_Follow_Wander",
+          "Modify": {
+            "FlockFollowerWanderRadius": {
+              "Compute": "FlockFollowerWanderRadius"
+            },
+            "FlockFollowerStopDistance": {
+              "Compute": "FlockFollowerStopDistance"
+            },
+            "FlockFollowerRelativeSpeed": {
+              "Compute": "FlockFollowerRelativeSpeed"
+            },
+            "BabyDirectFollowEnabled": {
+              "Compute": "FlockBabyDirectFollowEnabled"
+            },
+            "BabyDirectFollowRadius": {
+              "Compute": "FlockBabyDirectFollowRadius"
+            },
+            "BabyDirectFollowStopDistance": {
+              "Compute": "FlockBabyDirectFollowStopDistance"
+            },
+            "BabyDirectFollowRelativeSpeed": {
+              "Compute": "FlockBabyDirectFollowRelativeSpeed"
+            },
+            "BabyDirectFollowDurationRange": {
+              "Compute": "FlockBabyDirectFollowDurationRange"
+            }
+          }
         }
       ]
     },
@@ -1087,41 +1160,7 @@
         }
       ]
     },
-    {
-      "$Comment": "Flock follower behavior while in FlockFollow state.",
-      "Sensor": {
-        "Type": "State",
-        "State": "FlockFollow"
-      },
-      "Instructions": [
-        {
-          "Reference": "Component_Tamework_Instruction_Flock_Follow_Wander",
-          "Modify": {
-            "FlockFollowerWanderRadius": {
-              "Compute": "FlockFollowerWanderRadius"
-            },
-            "FlockFollowerStopDistance": {
-              "Compute": "FlockFollowerStopDistance"
-            },
-            "FlockFollowerRelativeSpeed": {
-              "Compute": "FlockFollowerRelativeSpeed"
-            },
-            "FlockFollowerMoveDurationRange": {
-              "Compute": "FlockFollowerMoveDurationRange"
-            },
-            "FlockFollowerSettleDurationRange": {
-              "Compute": "FlockFollowerSettleDurationRange"
-            },
-            "FlockFollowerMaxHeadingChange": {
-              "Compute": "FlockFollowerMaxHeadingChange"
-            },
-            "FlockFollowerWanderSpeed": {
-              "Compute": "FlockFollowerWanderSpeed"
-            }
-          }
-        }
-      ]
-    },
+    
     {
       "$Comment": "Hold (stay) behavior using Tamework component.",
       "Sensor": {

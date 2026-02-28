@@ -165,7 +165,16 @@
       "Hostile"
     ],
     "FlockArray": [
-      "Tamework_Example_Family"
+      "Mob_Tamework_Example",
+      "Mob_Tamework_Example_Baby"
+    ],
+    "FlockBabyDirectFollowEnabled": true,
+    "FlockBabyDirectFollowRadius": 1.5,
+    "FlockBabyDirectFollowStopDistance": 0.9,
+    "FlockBabyDirectFollowRelativeSpeed": 1.25,
+    "FlockBabyDirectFollowDurationRange": [
+      "PT4S",
+      "PT7S"
     ],
     "SpawnerEmptyItemID": [
       "Spawner_Tamework_Example"
