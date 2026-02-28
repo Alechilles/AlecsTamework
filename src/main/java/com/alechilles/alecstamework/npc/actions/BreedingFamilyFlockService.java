@@ -16,7 +16,6 @@ import javax.annotation.Nullable;
 final class BreedingFamilyFlockService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
     private static final String FLOCK_FOLLOW_STATE = "FlockFollow";
-    private static final String FALLBACK_FOLLOW_STATE = "Follow";
 
     boolean assignFamilyFlock(Ref<EntityStore> childRef,
                               @Nullable Ref<EntityStore> parentARef,
@@ -130,15 +129,11 @@ final class BreedingFamilyFlockService {
     @Nullable
     private String resolveFollowerState(StateSupport stateSupport) {
         if (stateSupport == null || stateSupport.getStateHelper() == null) {
-            return FALLBACK_FOLLOW_STATE;
+            return null;
         }
         int flockFollowStateIndex = stateSupport.getStateHelper().getStateIndex(FLOCK_FOLLOW_STATE);
         if (flockFollowStateIndex != StateSupport.NO_STATE) {
             return FLOCK_FOLLOW_STATE;
-        }
-        int followStateIndex = stateSupport.getStateHelper().getStateIndex(FALLBACK_FOLLOW_STATE);
-        if (followStateIndex != StateSupport.NO_STATE) {
-            return FALLBACK_FOLLOW_STATE;
         }
         return null;
     }
