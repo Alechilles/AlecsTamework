@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.flock.FlockMembership;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -145,12 +146,16 @@ public final class CompanionLifeStageService {
             return;
         }
 
+        String previousStage = normalizeStage(stage.getStage());
         boolean changed = normalizeComponentDefaults(stage, npcRef, store);
         long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
         String resolvedStage = resolveStageId(stage, nowMs);
         if (!resolvedStage.equals(stage.getStage())) {
             stage.setStage(resolvedStage);
             changed = true;
+        }
+        if (enteredAdultStage(previousStage, resolvedStage)) {
+            changed |= leaveFlockMembership(npcRef, store);
         }
 
         if (stage.isGrowthScalingEnabled()) {
@@ -1006,6 +1011,25 @@ public final class CompanionLifeStageService {
 
     private static boolean hasTimelineTimestamp(long value) {
         return value != 0L;
+    }
+
+    private static boolean enteredAdultStage(@Nullable String previousStage, @Nullable String resolvedStage) {
+        return STAGE_ADULT.equals(resolvedStage)
+                && previousStage != null
+                && !STAGE_ADULT.equals(previousStage);
+    }
+
+    private static boolean leaveFlockMembership(@Nullable Ref<EntityStore> npcRef,
+                                                @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        ComponentType<EntityStore, FlockMembership> flockType = FlockMembership.getComponentType();
+        if (flockType == null || store.getComponent(npcRef, flockType) == null) {
+            return false;
+        }
+        store.tryRemoveComponent(npcRef, flockType);
+        return true;
     }
 
     private static double lerp(double start, double end, double progress) {
