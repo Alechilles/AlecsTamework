@@ -59,6 +59,7 @@ import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHa
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
+import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkLifeStage;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedBelow;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
@@ -921,6 +922,7 @@ public class Tamework extends JavaPlugin {
             sensorFactory.add(BuilderSensorTameworkIsOwner.BUILDER_ID, BuilderSensorTameworkIsOwner::new);
             sensorFactory.add(BuilderSensorTameworkHasOwner.BUILDER_ID, BuilderSensorTameworkHasOwner::new);
             sensorFactory.add(BuilderSensorTameworkIsTamed.BUILDER_ID, BuilderSensorTameworkIsTamed::new);
+            sensorFactory.add(BuilderSensorTameworkLifeStage.BUILDER_ID, BuilderSensorTameworkLifeStage::new);
             sensorFactory.add(BuilderSensorTameworkHook.BUILDER_ID, BuilderSensorTameworkHook::new);
             sensorFactory.add(BuilderSensorTameworkNeedBelow.BUILDER_ID, BuilderSensorTameworkNeedBelow::new);
             sensorFactory.add(BuilderSensorTameworkNeedsResourceTarget.BUILDER_ID, BuilderSensorTameworkNeedsResourceTarget::new);

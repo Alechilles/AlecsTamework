@@ -1,8 +1,7 @@
 {
-  "$Comment": "Keeps flock followers close to their flock leader while allowing local wander movement.",
+  "$Comment": "Applies flock leash behavior as an overlay without requiring a dedicated flock-follow state.",
   "Type": "Component",
   "Class": "Instruction",
-  "DefaultState": ".Default",
   "Parameters": {
     "LeashEnabled": {
       "Value": true,
@@ -20,27 +19,28 @@
       "Value": 1,
       "Description": "Relative speed used by leash seek behavior."
     },
-    "FlockFollowerMoveDurationRange": {
+    "BabyDirectFollowEnabled": {
+      "Value": false,
+      "Description": "Whether baby followers should tighten formation after leash catch-up."
+    },
+    "BabyDirectFollowRadius": {
+      "Value": 3,
+      "Description": "Extra-close leash radius used for baby direct-follow catch-up."
+    },
+    "BabyDirectFollowStopDistance": {
+      "Value": 1.5,
+      "Description": "How close baby followers stop during direct-follow catch-up."
+    },
+    "BabyDirectFollowRelativeSpeed": {
+      "Value": 1,
+      "Description": "Relative speed used during baby direct-follow catch-up."
+    },
+    "BabyDirectFollowDurationRange": {
       "Value": [
-        1,
-        3
+        6,
+        12
       ],
-      "Description": "How long each local wander burst lasts."
-    },
-    "FlockFollowerSettleDurationRange": {
-      "Value": [
-        1,
-        2
-      ],
-      "Description": "How long followers pause between wander bursts."
-    },
-    "FlockFollowerMaxHeadingChange": {
-      "Value": 60,
-      "Description": "Maximum heading change used while wandering."
-    },
-    "FlockFollowerWanderSpeed": {
-      "Value": 0.2,
-      "Description": "Relative speed for local follower wander motion."
+      "Description": "How long to keep baby direct-follow active after a leash event."
     }
   },
   "Content": {
@@ -50,8 +50,213 @@
     },
     "Instructions": [
       {
-        "$Comment": "Use vanilla flock leash behavior so followers stay near the flock leader.",
+        "$Comment": "Safety: non-babies must never retain the baby direct-follow flag.",
         "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkLifeStage",
+                "Stage": "Baby"
+              }
+            },
+            {
+              "Type": "Flag",
+              "Name": "Tamework_Baby_DirectFollow",
+              "Set": true
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Baby_DirectFollow",
+            "SetTo": false
+          }
+        ]
+      },
+      {
+        "$Comment": "Safety: if no direct-follow alarm exists, clear any stale follow flag.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Flag",
+              "Name": "Tamework_Baby_DirectFollow",
+              "Set": true
+            },
+            {
+              "Type": "Alarm",
+              "Name": "Tamework_Baby_DirectFollow_Window",
+              "State": "Unset"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Baby_DirectFollow",
+            "SetTo": false
+          }
+        ]
+      },
+      {
+        "$Comment": "Safety: when direct-follow alarm expires, clear flag and consume passed alarm state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Flag",
+              "Name": "Tamework_Baby_DirectFollow",
+              "Set": true
+            },
+            {
+              "Type": "Alarm",
+              "Name": "Tamework_Baby_DirectFollow_Window",
+              "State": "Passed",
+              "Clear": true
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Baby_DirectFollow",
+            "SetTo": false
+          }
+        ]
+      },
+      {
+        "$Comment": "Arm the baby direct-follow window when a baby follower triggers leash catch-up.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "BabyDirectFollowEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "TameworkLifeStage",
+              "Stage": "Baby"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Flag",
+                "Name": "Tamework_Baby_DirectFollow",
+                "Set": true
+              }
+            },
+            {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Type": "Leash",
+              "Range": {
+                "Compute": "BabyDirectFollowRadius"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Baby_DirectFollow",
+            "SetTo": true
+          },
+          {
+            "Type": "SetAlarm",
+            "Name": "Tamework_Baby_DirectFollow_Window",
+            "DurationRange": {
+              "Compute": "BabyDirectFollowDurationRange"
+            }
+          }
+        ]
+      },
+      {
+        "$Comment": "During the active window, babies directly follow their flock leader even after closing distance.",
+        "Enabled": {
+          "Compute": "BabyDirectFollowEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "TameworkLifeStage",
+              "Stage": "Baby"
+            },
+            {
+              "Type": "Flag",
+              "Name": "Tamework_Baby_DirectFollow",
+              "Set": true
+            },
+            {
+              "Type": "Alarm",
+              "Name": "Tamework_Baby_DirectFollow_Window",
+              "State": "Set"
+            },
+            {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "Seek",
+          "SlowDownDistance": {
+            "Compute": "BabyDirectFollowStopDistance + 1"
+          },
+          "StopDistance": {
+            "Compute": "BabyDirectFollowStopDistance"
+          },
+          "RelativeSpeed": {
+            "Compute": "BabyDirectFollowRelativeSpeed"
+          },
+          "AbortDistance": 100
+        }
+      },
+      {
+        "$Comment": "Default follower leash: only pulls back when follower drifts beyond configured wander radius.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Not",
+          "Sensor": {
+            "Type": "Flag",
+            "Name": "Tamework_Baby_DirectFollow",
+            "Set": true
+          }
+        },
         "Reference": "Component_Instruction_Leash_To_Flock_Leader",
         "Modify": {
           "Enabled": {
@@ -66,46 +271,6 @@
           "RelativeSpeed": {
             "Compute": "FlockFollowerRelativeSpeed"
           }
-        }
-      },
-      {
-        "$Comment": "Followers wander locally while the leash component handles regrouping.",
-        "Sensor": {
-          "Type": "State",
-          "State": ".Default"
-        },
-        "BodyMotion": {
-          "Type": "Sequence",
-          "Looped": true,
-          "Motions": [
-            {
-              "Type": "Timer",
-              "Time": {
-                "Compute": "FlockFollowerMoveDurationRange"
-              },
-              "Motion": {
-                "Type": "WanderInCircle",
-                "Radius": {
-                  "Compute": "FlockFollowerWanderRadius"
-                },
-                "MaxHeadingChange": {
-                  "Compute": "FlockFollowerMaxHeadingChange"
-                },
-                "RelativeSpeed": {
-                  "Compute": "FlockFollowerWanderSpeed"
-                }
-              }
-            },
-            {
-              "Type": "Timer",
-              "Time": {
-                "Compute": "FlockFollowerSettleDurationRange"
-              },
-              "Motion": {
-                "Type": "Nothing"
-              }
-            }
-          ]
         }
       }
     ]
