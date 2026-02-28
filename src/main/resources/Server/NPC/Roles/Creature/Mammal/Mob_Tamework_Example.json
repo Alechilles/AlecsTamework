@@ -164,7 +164,9 @@
     "WakeupAttitudes": [
       "Hostile"
     ],
-    "FlockArray": [],
+    "FlockArray": [
+      "Tamework_Example_Family"
+    ],
     "SpawnerEmptyItemID": [
       "Spawner_Tamework_Example"
     ],

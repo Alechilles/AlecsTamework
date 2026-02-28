@@ -29,13 +29,13 @@ final class BreedingFamilyFlockService {
         if (leaderRef == null || !leaderRef.isValid()) {
             return false;
         }
-        boolean childFollowing = applyFollowerTargetAndState(childRef, leaderRef, store, true);
+        boolean childFollowing = applyFollowerTargetAndState(childRef, leaderRef, store);
         if (!childFollowing) {
             return false;
         }
 
-        applyFollowerTargetAndState(parentARef, leaderRef, store, false);
-        applyFollowerTargetAndState(parentBRef, leaderRef, store, false);
+        applyFollowerTargetAndState(parentARef, leaderRef, store);
+        applyFollowerTargetAndState(parentBRef, leaderRef, store);
 
         NPCEntity leaderNpc = store.getComponent(leaderRef, NPCEntity.getComponentType());
         Role leaderRole = leaderNpc != null ? leaderNpc.getRole() : null;
@@ -74,7 +74,7 @@ final class BreedingFamilyFlockService {
             return;
         }
         joinFlockMember(followerRef, flockRef, store);
-        applyFollowerTargetAndState(followerRef, leaderRef, store, false);
+        applyFollowerTargetAndState(followerRef, leaderRef, store);
     }
 
     private void joinFlockMember(Ref<EntityStore> memberRef,
@@ -88,8 +88,7 @@ final class BreedingFamilyFlockService {
 
     private boolean applyFollowerTargetAndState(@Nullable Ref<EntityStore> followerRef,
                                                 Ref<EntityStore> leaderRef,
-                                                Store<EntityStore> store,
-                                                boolean preferDirectFollowState) {
+                                                Store<EntityStore> store) {
         if (followerRef == null || !followerRef.isValid() || followerRef.equals(leaderRef)) {
             return false;
         }
@@ -102,19 +101,18 @@ final class BreedingFamilyFlockService {
             return false;
         }
         role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, leaderRef);
-        return setFollowState(followerRef, followerNpc, store, preferDirectFollowState);
+        return setFollowState(followerRef, followerNpc, store);
     }
 
     private boolean setFollowState(Ref<EntityStore> followerRef,
                                    NPCEntity followerNpc,
-                                   Store<EntityStore> store,
-                                   boolean preferDirectFollowState) {
+                                   Store<EntityStore> store) {
         Role role = followerNpc.getRole();
         if (role == null || role.getStateSupport() == null) {
             return false;
         }
         StateSupport stateSupport = role.getStateSupport();
-        String resolvedState = resolveFollowerState(stateSupport, preferDirectFollowState);
+        String resolvedState = resolveFollowerState(stateSupport);
         if (resolvedState == null) {
             return false;
         }
@@ -130,15 +128,9 @@ final class BreedingFamilyFlockService {
     }
 
     @Nullable
-    private String resolveFollowerState(StateSupport stateSupport, boolean preferDirectFollowState) {
+    private String resolveFollowerState(StateSupport stateSupport) {
         if (stateSupport == null || stateSupport.getStateHelper() == null) {
             return FALLBACK_FOLLOW_STATE;
-        }
-        if (preferDirectFollowState) {
-            int followStateIndex = stateSupport.getStateHelper().getStateIndex(FALLBACK_FOLLOW_STATE);
-            if (followStateIndex != StateSupport.NO_STATE) {
-                return FALLBACK_FOLLOW_STATE;
-            }
         }
         int flockFollowStateIndex = stateSupport.getStateHelper().getStateIndex(FLOCK_FOLLOW_STATE);
         if (flockFollowStateIndex != StateSupport.NO_STATE) {
