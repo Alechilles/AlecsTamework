@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.npc.progression.TraitRollService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
@@ -28,6 +29,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import javax.annotation.Nullable;
 
 /**
@@ -35,6 +38,8 @@ import javax.annotation.Nullable;
  */
 final class BreedingOffspringProgressionService {
     private static final String BREEDING_COOLDOWN_ALARM_NAME = "Breeding_Cooldown";
+    private static final long FAMILY_FLOCK_RETRY_INTERVAL_MS = 100L;
+    private static final int FAMILY_FLOCK_RETRY_MAX_ATTEMPTS = 12;
     private final BreedingFamilyFlockService familyFlockService;
 
     BreedingOffspringProgressionService() {
@@ -91,7 +96,46 @@ final class BreedingOffspringProgressionService {
         );
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
-        familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
+        boolean familyAssigned = familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
+        if (!familyAssigned) {
+            scheduleFamilyFlockRetry(childRef, parentARef, parentBRef, store, FAMILY_FLOCK_RETRY_MAX_ATTEMPTS);
+        }
+    }
+
+    private void scheduleFamilyFlockRetry(@Nullable Ref<EntityStore> childRef,
+                                          @Nullable Ref<EntityStore> parentARef,
+                                          @Nullable Ref<EntityStore> parentBRef,
+                                          @Nullable Store<EntityStore> store,
+                                          int attemptsRemaining) {
+        if (childRef == null || !childRef.isValid() || store == null || attemptsRemaining <= 0) {
+            return;
+        }
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        if (world == null) {
+            return;
+        }
+        CompletableFuture.runAsync(
+                () -> world.execute(() -> onFamilyFlockRetry(childRef, parentARef, parentBRef, world, attemptsRemaining)),
+                CompletableFuture.delayedExecutor(FAMILY_FLOCK_RETRY_INTERVAL_MS, TimeUnit.MILLISECONDS)
+        );
+    }
+
+    private void onFamilyFlockRetry(@Nullable Ref<EntityStore> childRef,
+                                    @Nullable Ref<EntityStore> parentARef,
+                                    @Nullable Ref<EntityStore> parentBRef,
+                                    @Nullable World world,
+                                    int attemptsRemaining) {
+        if (world == null || childRef == null || !childRef.isValid() || attemptsRemaining <= 0) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+        if (store == null) {
+            return;
+        }
+        boolean assigned = familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
+        if (!assigned) {
+            scheduleFamilyFlockRetry(childRef, parentARef, parentBRef, store, attemptsRemaining - 1);
+        }
     }
 
     private void applyOffspringAttachments(@Nullable Ref<EntityStore> childRef,
