@@ -112,6 +112,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
+    private volatile boolean debugLagLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -174,7 +175,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
-        commandNpcRelocationService = new CommandNpcRelocationService();
+        commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
                 getDataDirectory().resolve("CommandLinkedNpcCaptures.dat")
         );
@@ -783,6 +784,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugPromptEnabled() {
         debugPromptLogs = !debugPromptLogs;
         return debugPromptLogs;
+    }
+
+    public boolean isDebugLagEnabled() {
+        return debugLagLogs;
+    }
+
+    public boolean setDebugLagEnabled(boolean enabled) {
+        debugLagLogs = enabled;
+        return debugLagLogs;
+    }
+
+    public boolean toggleDebugLagEnabled() {
+        debugLagLogs = !debugLagLogs;
+        return debugLagLogs;
     }
 
     // Logs a warning if required global config fields are missing.
