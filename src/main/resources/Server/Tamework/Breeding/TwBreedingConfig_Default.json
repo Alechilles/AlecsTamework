@@ -45,8 +45,8 @@
     "InheritTraits": true,
     "AttachmentInheritance": {
       "ParentWeight": 1.0,
-      "RandomWeight": 0.25,
-      "MutationChance": 0.05
+      "RandomWeight": 0,
+      "MutationChance": 0
     }
   },
   "OffspringLifecycle": {
