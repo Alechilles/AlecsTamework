@@ -8,7 +8,7 @@
       "Description": "Whether follower-to-leader leash behavior is enabled."
     },
     "FlockFollowerWanderRadius": {
-      "Value": 6,
+      "Value": 4,
       "Description": "How far followers are allowed to drift from their flock leader."
     },
     "FlockFollowerStopDistance": {
@@ -63,9 +63,19 @@
               }
             },
             {
-              "Type": "Flag",
-              "Name": "Tamework_Baby_DirectFollow",
-              "Set": true
+              "Type": "Or",
+              "Sensors": [
+                {
+                  "Type": "Flag",
+                  "Name": "Tamework_Baby_DirectFollow",
+                  "Set": true
+                },
+                {
+                  "Type": "Flag",
+                  "Name": "Tamework_Baby_DirectFollow_LeashLatch",
+                  "Set": true
+                }
+              ]
             }
           ]
         },
@@ -200,6 +210,10 @@
         "Sensor": {
           "Type": "And",
           "Sensors": [
+            {
+              "Type": "TameworkLifeStage",
+              "Stage": "Baby"
+            },
             {
               "Type": "Not",
               "Sensor": {
