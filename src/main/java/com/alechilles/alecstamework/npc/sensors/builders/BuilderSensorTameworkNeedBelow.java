@@ -78,7 +78,6 @@ public final class BuilderSensorTameworkNeedBelow extends TameworkSensorBuilderB
         return this.need.get(support.getExecutionContext());
     }
 
-    @Nonnull
     public double getRatioBelow(@Nonnull BuilderSupport support) {
         return this.ratioBelow.get(support.getExecutionContext());
     }

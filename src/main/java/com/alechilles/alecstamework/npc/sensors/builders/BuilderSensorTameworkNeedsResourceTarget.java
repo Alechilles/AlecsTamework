@@ -92,7 +92,6 @@ public final class BuilderSensorTameworkNeedsResourceTarget extends TameworkSens
         return this.resourceType.get(support.getExecutionContext());
     }
 
-    @Nonnull
     public double getRange(@Nonnull BuilderSupport support) {
         return this.range.get(support.getExecutionContext());
     }
