@@ -79,10 +79,6 @@
             }
           },
           {
-            "Type": "ReleaseTarget",
-            "TargetSlot": "LockedTarget"
-          },
-          {
             "Type": "PlayAnimation",
             "Slot": "Status"
           },
@@ -117,6 +113,20 @@
           "State": ".Move"
         },
         "Instructions": [
+          {
+            "$Comment": "While moving, keep aiming at the paired NPC target when available.",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Target",
+              "TargetSlot": "LockedTarget",
+              "Range": {
+                "Compute": "BreedingPairReadRange"
+              }
+            },
+            "HeadMotion": {
+              "Type": "Aim"
+            }
+          },
           {
             "$Comment": "When close enough, complete pair movement.",
             "Continue": true,
@@ -167,6 +177,10 @@
             },
             "Actions": [
               {
+                "Type": "ReleaseTarget",
+                "TargetSlot": "LockedTarget"
+              },
+              {
                 "Type": "State",
                 "State": ".Listen"
               },
@@ -185,6 +199,10 @@
               "State": "Stopped"
             },
             "Actions": [
+              {
+                "Type": "ReleaseTarget",
+                "TargetSlot": "LockedTarget"
+              },
               {
                 "Type": "State",
                 "State": ".Listen"
@@ -208,9 +226,6 @@
               "MinRange": {
                 "Compute": "BreedingPairSeekStopDistance + 0.15"
               }
-            },
-            "HeadMotion": {
-              "Type": "Aim"
             },
             "BodyMotion": {
               "Type": "Seek",
@@ -239,7 +254,7 @@
         }
       },
       {
-        "$Comment": "While waiting for completion, keep facing the stored pair destination.",
+        "$Comment": "While waiting for completion, keep aiming at the paired NPC target.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
@@ -249,10 +264,8 @@
               "State": ".CompleteDelay"
             },
             {
-              "Type": "ReadPosition",
-              "Slot": {
-                "Compute": "BreedingPairTargetSlot"
-              },
+              "Type": "Target",
+              "TargetSlot": "LockedTarget",
               "Range": {
                 "Compute": "BreedingPairReadRange"
               }
@@ -277,6 +290,10 @@
               "State": "Stopped"
             },
             "Actions": [
+              {
+                "Type": "ReleaseTarget",
+                "TargetSlot": "LockedTarget"
+              },
               {
                 "Type": "State",
                 "State": ".Listen"

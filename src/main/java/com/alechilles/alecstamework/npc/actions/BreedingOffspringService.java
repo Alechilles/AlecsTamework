@@ -41,6 +41,7 @@ final class BreedingOffspringService {
     private static final String HEARTS_PARTICLE = "Hearts";
     private static final String BREEDING_PAIR_HOOK_ID = "Tamework.Breeding.Pair.Start";
     private static final String BREEDING_PAIR_STATE = "BreedPair";
+    private static final String LOCKED_TARGET_SLOT = "LockedTarget";
     private static final long PAIRING_PROXIMITY_CHECK_INTERVAL_MS = 100L;
     private static final long PAIRING_PROXIMITY_TIMEOUT_MS = 5000L;
     private static final long OFFSPRING_SPAWN_DELAY_AFTER_HEARTS_MS = 2200L;
@@ -187,6 +188,8 @@ final class BreedingOffspringService {
                                               Ref<EntityStore> parentBRef,
                                               NPCEntity parentBNpc,
                                               Store<EntityStore> store) {
+        setPairLookTarget(parentARef, parentANpc, parentBRef, store);
+        setPairLookTarget(parentBRef, parentBNpc, parentARef, store);
         TransformComponent parentATransform = getTransform(parentARef, store);
         TransformComponent parentBTransform = getTransform(parentBRef, store);
         if (parentATransform == null && parentBTransform == null) {
@@ -195,6 +198,26 @@ final class BreedingOffspringService {
         PairingTargets targets = resolvePairingTargets(parentATransform, parentBTransform);
         moveNpcToPairingTarget(parentANpc, parentARef, targets.parentATarget(), store);
         moveNpcToPairingTarget(parentBNpc, parentBRef, targets.parentBTarget(), store);
+    }
+
+    private void setPairLookTarget(@Nullable Ref<EntityStore> sourceRef,
+                                   @Nullable NPCEntity sourceNpc,
+                                   @Nullable Ref<EntityStore> targetRef,
+                                   @Nullable Store<EntityStore> store) {
+        if (store == null
+                || sourceRef == null
+                || !sourceRef.isValid()
+                || sourceNpc == null
+                || targetRef == null
+                || !targetRef.isValid()
+                || sourceRef.equals(targetRef)) {
+            return;
+        }
+        Role role = sourceNpc.getRole();
+        if (role == null || role.getMarkedEntitySupport() == null) {
+            return;
+        }
+        role.getMarkedEntitySupport().setMarkedEntity(LOCKED_TARGET_SLOT, targetRef);
     }
 
     private void moveNpcToPairingTarget(@Nullable NPCEntity npc,
