@@ -29,6 +29,7 @@ import javax.annotation.Nullable;
  */
 public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
     private static final String FERTILITY_MULTIPLIER_KEY = "FertilityMultiplier";
+    private static final String BREED_COOLDOWN_MULTIPLIER_KEY = "BreedCooldownMultiplier";
 
     public TameworkGetHappinessCommand() {
         super("gethappiness", "Get happiness of the NPC you are looking at.");
@@ -116,6 +117,17 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         Boolean eligible = threshold != null
                 ? BreedingEligibilityService.isEligible(effective, threshold)
                 : null;
+        TwBreedingConfig.TimerBasis timerBasis = config != null
+                ? config.getTiming().getTimerBasis()
+                : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
+        double rateCurrent = BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store);
+        double rateBaseline = BreedingTimeService.resolveBaselineGameSecondsPerRealSecond(store);
+        double cooldownMultiplier = TraitModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                BREED_COOLDOWN_MULTIPLIER_KEY,
+                1.0
+        );
         String configId = normalizeBlank(breeding.getConfigId());
         if (configId == null && config != null) {
             configId = normalizeBlank(config.getId());
@@ -126,6 +138,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         long cooldownRemainingMs = cooldownActive
                 ? Math.max(0L, cooldownUntilMs - now)
                 : 0L;
+        double cooldownRemainingRealSeconds = resolveApproximateRealSeconds(cooldownRemainingMs, rateCurrent);
         return new BreedingSnapshot(
                 true,
                 breeding.isReady(),
@@ -135,6 +148,11 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
                 configId,
                 threshold,
                 fertilityMultiplier,
+                cooldownMultiplier,
+                timerBasis,
+                rateCurrent,
+                rateBaseline,
+                cooldownRemainingRealSeconds,
                 effective,
                 eligible
         );
@@ -183,6 +201,13 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
             message.append(", config=").append(breeding.configId());
         }
         message.append(", fertilityOffspringFactor=").append(formatDouble(breeding.fertilityMultiplier()));
+        message.append(", cooldownTraitFactor=").append(formatDouble(breeding.cooldownMultiplier()));
+        message.append(", timerBasis=").append(breeding.timerBasis());
+        message.append(", gameSecPerRealSecCurrent=").append(formatDouble(breeding.rateCurrent()));
+        message.append(", gameSecPerRealSecBaseline=").append(formatDouble(breeding.rateBaseline()));
+        if (breeding.cooldownActive()) {
+            message.append(", cooldownRemainingRealSec~=").append(formatDouble(breeding.cooldownRemainingRealSeconds()));
+        }
         message.append(", effective=").append(formatDouble(breeding.effectiveHappiness()));
         if (breeding.threshold() != null) {
             message.append(", threshold=").append(formatDouble(breeding.threshold()));
@@ -224,6 +249,13 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
 
     private static String formatDouble(double value) {
         return String.format(Locale.ROOT, "%.2f", value);
+    }
+
+    private static double resolveApproximateRealSeconds(long gameDurationMs, double gameSecondsPerRealSecond) {
+        if (gameDurationMs <= 0L || !Double.isFinite(gameSecondsPerRealSecond) || gameSecondsPerRealSecond <= 0.0) {
+            return 0.0;
+        }
+        return (double) gameDurationMs / (gameSecondsPerRealSecond * 1000.0);
     }
 
     @Nullable
@@ -280,10 +312,31 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
                                     @Nullable String configId,
                                     @Nullable Double threshold,
                                     double fertilityMultiplier,
+                                    double cooldownMultiplier,
+                                    TwBreedingConfig.TimerBasis timerBasis,
+                                    double rateCurrent,
+                                    double rateBaseline,
+                                    double cooldownRemainingRealSeconds,
                                     double effectiveHappiness,
                                     @Nullable Boolean eligible) {
         private static BreedingSnapshot empty() {
-            return new BreedingSnapshot(false, false, false, 0L, 0L, null, null, 1.0, 0.0, null);
+            return new BreedingSnapshot(
+                    false,
+                    false,
+                    false,
+                    0L,
+                    0L,
+                    null,
+                    null,
+                    1.0,
+                    1.0,
+                    TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED,
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0,
+                    null
+            );
         }
     }
 }

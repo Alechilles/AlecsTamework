@@ -30,6 +30,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -46,19 +47,18 @@ final class BreedingOffspringService {
     private static final double APPROACH_SPACING = 0.45;
     private static final double PAIRING_READY_DISTANCE = 2.20;
     private static final double OFFSPRING_SPAWN_HEIGHT_OFFSET = 1.00;
+    private static final String BREED_COOLDOWN_MULTIPLIER_EFFECT_KEY = "BreedCooldownMultiplier";
 
     private final BreedingPartnerService partnerService;
     private final BreedingOffspringSpawnService spawnService;
     private final BreedingFertilityOffspringService fertilityOffspringService;
     private final BreedingOffspringProgressionService progressionService;
-    private final BreedingOffspringPresenceProbeService presenceProbeService;
 
     BreedingOffspringService(BreedingPartnerService partnerService) {
         this.partnerService = partnerService;
         this.spawnService = new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
         this.fertilityOffspringService = new BreedingFertilityOffspringService();
         this.progressionService = new BreedingOffspringProgressionService();
-        this.presenceProbeService = new BreedingOffspringPresenceProbeService();
     }
 
     boolean tryCompletePairing(Ref<EntityStore> sourceRef,
@@ -89,10 +89,28 @@ final class BreedingOffspringService {
         }
 
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
-        long sourceCooldownMs = resolveCooldownMs(config, sourceRef, store);
-        long partnerCooldownMs = resolveCooldownMs(config, partner.ref, store);
-        applyParentCooldown(sourceRef, sourceBreeding, sourceNpc, partnerNpc.getUuid(), sourceCooldownMs, now, store);
-        applyParentCooldown(partner.ref, livePartnerBreeding, partnerNpc, sourceNpc.getUuid(), partnerCooldownMs, now, store);
+        CooldownResolution sourceCooldown = resolveCooldown(config, sourceRef, store);
+        CooldownResolution partnerCooldown = resolveCooldown(config, partner.ref, store);
+        applyParentCooldown(
+                sourceRef,
+                sourceBreeding,
+                sourceNpc,
+                partnerNpc.getUuid(),
+                sourceCooldown.durationMs(),
+                now,
+                store
+        );
+        applyParentCooldown(
+                partner.ref,
+                livePartnerBreeding,
+                partnerNpc,
+                sourceNpc.getUuid(),
+                partnerCooldown.durationMs(),
+                now,
+                store
+        );
+        logCooldownApplied(sourceNpc, sourceCooldown);
+        logCooldownApplied(partnerNpc, partnerCooldown);
         moveParentsToPairingPosition(sourceRef, sourceNpc, partner.ref, partnerNpc, store);
 
         OffspringSpawnContext context = new OffspringSpawnContext(
@@ -288,9 +306,10 @@ final class BreedingOffspringService {
         ParticleUtil.spawnParticleEffect(HEARTS_PARTICLE, position, store);
     }
 
-    private long resolveCooldownMs(@Nullable TwBreedingConfig config,
-                                   Ref<EntityStore> npcRef,
-                                   Store<EntityStore> store) {
+    @Nonnull
+    private CooldownResolution resolveCooldown(@Nullable TwBreedingConfig config,
+                                               Ref<EntityStore> npcRef,
+                                               Store<EntityStore> store) {
         TwBreedingConfig.CooldownSettings settings = config != null ? config.getCooldowns() : null;
         int baseSeconds = settings != null ? Math.max(0, settings.getBaseCooldownSeconds()) : 600;
         int minDelay = settings != null ? Math.max(0, settings.getMinDelaySeconds()) : 15;
@@ -304,7 +323,12 @@ final class BreedingOffspringService {
                 ? ThreadLocalRandom.current().nextInt(minDelay, maxDelay + 1)
                 : minDelay;
         double baseSecondsWithDelay = (double) baseSeconds + (double) randomDelay;
-        double multiplier = TraitModifierService.resolveMultiplier(npcRef, store, "BreedCooldownMultiplier", 1.0);
+        double multiplier = TraitModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                BREED_COOLDOWN_MULTIPLIER_EFFECT_KEY,
+                1.0
+        );
         if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
             multiplier = 1.0;
         }
@@ -312,7 +336,47 @@ final class BreedingOffspringService {
         TwBreedingConfig.TimerBasis timerBasis = config != null
                 ? config.getTiming().getTimerBasis()
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
-        return BreedingTimeService.toGameDurationMs(adjustedSeconds, timerBasis, store);
+        long durationMs = BreedingTimeService.toGameDurationMs(adjustedSeconds, timerBasis, store);
+        double currentRate = BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store);
+        double baselineRate = BreedingTimeService.resolveBaselineGameSecondsPerRealSecond(store);
+        double approximateRealSeconds = estimateRealSeconds(durationMs, currentRate);
+        return new CooldownResolution(
+                baseSeconds,
+                randomDelay,
+                multiplier,
+                adjustedSeconds,
+                timerBasis,
+                durationMs,
+                currentRate,
+                baselineRate,
+                approximateRealSeconds
+        );
+    }
+
+    private static double estimateRealSeconds(long gameDurationMs, double currentRate) {
+        if (gameDurationMs <= 0L || !Double.isFinite(currentRate) || currentRate <= 0.0) {
+            return 0.0;
+        }
+        return (double) gameDurationMs / (currentRate * 1000.0);
+    }
+
+    private void logCooldownApplied(@Nullable NPCEntity npc, @Nonnull CooldownResolution cooldown) {
+        if (npc == null || npc.getUuid() == null) {
+            return;
+        }
+        logInfo(String.format(
+                "Breeding cooldown applied: npc=%s basis=%s base=%ds random=%ds traitMult=%.3f configured=%.2fs gameMs=%d realApprox=%.2fs rateCurrent=%.4f rateBaseline=%.4f.",
+                npc.getUuid(),
+                cooldown.basis(),
+                cooldown.baseSeconds(),
+                cooldown.randomDelaySeconds(),
+                cooldown.traitMultiplier(),
+                cooldown.configuredSeconds(),
+                cooldown.durationMs(),
+                cooldown.approximateRealSeconds(),
+                cooldown.currentRate(),
+                cooldown.baselineRate()
+        ));
     }
 
     private void schedulePairingEffects(OffspringSpawnContext context, Store<EntityStore> sourceStore) {
@@ -514,7 +578,7 @@ final class BreedingOffspringService {
             }
             Ref<EntityStore> childRef = spawned.first();
             NPCEntity childNpc = spawned.second();
-            long childCooldownMs = resolveCooldownMs(childBreedingConfig, childRef, store);
+            CooldownResolution childCooldown = resolveCooldown(childBreedingConfig, childRef, store);
             progressionService.applyOffspringState(
                     childRef,
                     childNpc,
@@ -526,11 +590,12 @@ final class BreedingOffspringService {
                     context.parentATamed(),
                     context.parentBTamed(),
                     context.breedingConfigId(),
-                    childCooldownMs,
+                    childCooldown.durationMs(),
                     spawnRole.lifecycleFamily(),
                     store
             );
             spawnHeartsParticle(childRef, store);
+            logCooldownApplied(childNpc, childCooldown);
             logInfo(String.format(
                     "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s.",
                     childNpc.getUuid(),
@@ -538,13 +603,6 @@ final class BreedingOffspringService {
                     context.parentAUuid(),
                     context.parentBUuid()
             ));
-            presenceProbeService.schedulePresenceChecks(
-                    world,
-                    childNpc.getUuid(),
-                    spawnRole.roleId(),
-                    context.parentAUuid(),
-                    context.parentBUuid()
-            );
             spawnedCount++;
         }
         if (spawnedCount > 1) {
@@ -748,6 +806,17 @@ final class BreedingOffspringService {
     }
 
     private record PairingTargets(Vector3d parentATarget, Vector3d parentBTarget) {
+    }
+
+    private record CooldownResolution(int baseSeconds,
+                                      int randomDelaySeconds,
+                                      double traitMultiplier,
+                                      double configuredSeconds,
+                                      TwBreedingConfig.TimerBasis basis,
+                                      long durationMs,
+                                      double currentRate,
+                                      double baselineRate,
+                                      double approximateRealSeconds) {
     }
 
     private record OffspringSpawnContext(UUID parentAUuid,
