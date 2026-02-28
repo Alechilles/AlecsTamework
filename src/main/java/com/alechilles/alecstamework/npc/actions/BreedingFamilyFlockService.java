@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.flock.FlockMembership;
 import com.hypixel.hytale.server.flock.FlockMembershipSystems;
 import com.hypixel.hytale.server.flock.FlockPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -28,29 +29,20 @@ final class BreedingFamilyFlockService {
         if (leaderRef == null || !leaderRef.isValid()) {
             return false;
         }
-        boolean childFollowing = applyFollowerTargetAndState(childRef, leaderRef, store);
-        if (!childFollowing) {
+        Ref<EntityStore> flockRef = resolveOrCreateFlockRef(leaderRef, parentARef, parentBRef, store);
+        if (flockRef == null || !flockRef.isValid()) {
             return false;
         }
-
-        applyFollowerTargetAndState(parentARef, leaderRef, store);
-        applyFollowerTargetAndState(parentBRef, leaderRef, store);
-
-        NPCEntity leaderNpc = store.getComponent(leaderRef, NPCEntity.getComponentType());
-        Role leaderRole = leaderNpc != null ? leaderNpc.getRole() : null;
-        if (leaderRole == null) {
-            return true;
+        if (!ensureJoined(leaderRef, flockRef, store)) {
+            return false;
         }
-        Ref<EntityStore> flockRef = FlockPlugin.createFlock(store, leaderRole);
-        if (flockRef == null || !flockRef.isValid()) {
-            return true;
+        // Keep parents in the same flock but do not force their behavior state.
+        ensureJoined(parentARef, flockRef, store);
+        ensureJoined(parentBRef, flockRef, store);
+        if (!ensureJoined(childRef, flockRef, store)) {
+            return false;
         }
-
-        joinFlockMember(leaderRef, flockRef, store);
-        joinFollower(parentARef, leaderRef, flockRef, store);
-        joinFollower(parentBRef, leaderRef, flockRef, store);
-        joinFollower(childRef, leaderRef, flockRef, store);
-        return true;
+        return applyFollowerTargetAndState(childRef, leaderRef, store);
     }
 
     @Nullable
@@ -65,24 +57,58 @@ final class BreedingFamilyFlockService {
         return null;
     }
 
-    private void joinFollower(@Nullable Ref<EntityStore> followerRef,
-                              Ref<EntityStore> leaderRef,
-                              Ref<EntityStore> flockRef,
-                              Store<EntityStore> store) {
-        if (followerRef == null || !followerRef.isValid() || followerRef.equals(leaderRef)) {
-            return;
+    @Nullable
+    private Ref<EntityStore> resolveOrCreateFlockRef(Ref<EntityStore> leaderRef,
+                                                     @Nullable Ref<EntityStore> parentARef,
+                                                     @Nullable Ref<EntityStore> parentBRef,
+                                                     Store<EntityStore> store) {
+        Ref<EntityStore> flockRef = resolveExistingFlockRef(leaderRef, store);
+        if (flockRef != null && flockRef.isValid()) {
+            return flockRef;
         }
-        joinFlockMember(followerRef, flockRef, store);
-        applyFollowerTargetAndState(followerRef, leaderRef, store);
+        flockRef = resolveExistingFlockRef(parentARef, store);
+        if (flockRef != null && flockRef.isValid()) {
+            return flockRef;
+        }
+        flockRef = resolveExistingFlockRef(parentBRef, store);
+        if (flockRef != null && flockRef.isValid()) {
+            return flockRef;
+        }
+
+        NPCEntity leaderNpc = store.getComponent(leaderRef, NPCEntity.getComponentType());
+        Role leaderRole = leaderNpc != null ? leaderNpc.getRole() : null;
+        if (leaderRole == null) {
+            return null;
+        }
+        return FlockPlugin.createFlock(store, leaderRole);
     }
 
-    private void joinFlockMember(Ref<EntityStore> memberRef,
+    @Nullable
+    private Ref<EntityStore> resolveExistingFlockRef(@Nullable Ref<EntityStore> memberRef,
+                                                     Store<EntityStore> store) {
+        if (memberRef == null || !memberRef.isValid()) {
+            return null;
+        }
+        Ref<EntityStore> flockRef = FlockPlugin.getFlockReference(memberRef, store);
+        return flockRef != null && flockRef.isValid() ? flockRef : null;
+    }
+
+    private boolean ensureJoined(@Nullable Ref<EntityStore> memberRef,
                                  Ref<EntityStore> flockRef,
                                  Store<EntityStore> store) {
         if (memberRef == null || !memberRef.isValid() || flockRef == null || !flockRef.isValid() || store == null) {
-            return;
+            return false;
+        }
+        FlockMembership membership = store.getComponent(memberRef, FlockMembership.getComponentType());
+        Ref<EntityStore> currentFlockRef = membership != null ? membership.getFlockRef() : null;
+        if (currentFlockRef != null && currentFlockRef.equals(flockRef)) {
+            return true;
+        }
+        if (!FlockMembershipSystems.canJoinFlock(memberRef, flockRef, store)) {
+            return false;
         }
         FlockMembershipSystems.join(memberRef, flockRef, store);
+        return true;
     }
 
     private boolean applyFollowerTargetAndState(@Nullable Ref<EntityStore> followerRef,
