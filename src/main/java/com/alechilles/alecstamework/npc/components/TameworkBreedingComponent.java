@@ -134,7 +134,7 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
     }
 
     public boolean isCooldownActive(long nowMs) {
-        return cooldownUntilMs > 0L && nowMs < cooldownUntilMs;
+        return cooldownUntilMs != 0L && nowMs < cooldownUntilMs;
     }
 
     @Override

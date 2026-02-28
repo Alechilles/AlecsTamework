@@ -190,7 +190,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
 
         message.append(". Breeding: readyFlag=").append(breeding.readyFlag());
         message.append(", cooldownActive=").append(breeding.cooldownActive());
-        if (breeding.cooldownUntilMs() > 0L) {
+        if (breeding.cooldownUntilMs() != 0L) {
             message.append(", cooldownUntilMs=").append(breeding.cooldownUntilMs());
         }
         if (breeding.cooldownActive()) {

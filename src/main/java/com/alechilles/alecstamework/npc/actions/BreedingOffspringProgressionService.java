@@ -258,7 +258,7 @@ final class BreedingOffspringProgressionService {
                                     @Nullable NPCEntity npc,
                                     long cooldownUntilMs,
                                     @Nullable Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || npc == null || store == null || cooldownUntilMs <= 0L) {
+        if (npcRef == null || !npcRef.isValid() || npc == null || store == null || cooldownUntilMs == 0L) {
             return;
         }
         AlarmStore alarmStore = npc.getAlarmStore();
