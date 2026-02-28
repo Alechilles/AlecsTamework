@@ -8,7 +8,7 @@
       "Description": "Whether follower-to-leader leash behavior is enabled."
     },
     "FlockFollowerWanderRadius": {
-      "Value": 3,
+      "Value": 6,
       "Description": "How far followers are allowed to drift from their flock leader."
     },
     "FlockFollowerStopDistance": {
@@ -73,6 +73,67 @@
           {
             "Type": "SetFlag",
             "Name": "Tamework_Baby_DirectFollow",
+            "SetTo": false
+          },
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Baby_DirectFollow_LeashLatch",
+            "SetTo": false
+          }
+        ]
+      },
+      {
+        "$Comment": "Re-arm direct-follow only after the leash trigger condition fully clears.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Flag",
+              "Name": "Tamework_Baby_DirectFollow_LeashLatch",
+              "Set": true
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "TameworkLifeStage",
+                    "Stage": "Baby"
+                  },
+                  {
+                    "Type": "And",
+                    "Sensors": [
+                      {
+                        "Type": "FlockLeader"
+                      },
+                      {
+                        "Type": "Self",
+                        "Filters": [
+                          {
+                            "Type": "Flock",
+                            "FlockStatus": "Follower"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "Type": "Leash",
+                    "Range": {
+                      "Compute": "BabyDirectFollowRadius"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Baby_DirectFollow_LeashLatch",
             "SetTo": false
           }
         ]
@@ -140,8 +201,12 @@
           "Type": "And",
           "Sensors": [
             {
-              "Type": "TameworkLifeStage",
-              "Stage": "Baby"
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Flag",
+                "Name": "Tamework_Baby_DirectFollow_LeashLatch",
+                "Set": true
+              }
             },
             {
               "Type": "Not",
@@ -177,6 +242,11 @@
           ]
         },
         "Actions": [
+          {
+            "Type": "SetFlag",
+            "Name": "Tamework_Baby_DirectFollow_LeashLatch",
+            "SetTo": true
+          },
           {
             "Type": "SetFlag",
             "Name": "Tamework_Baby_DirectFollow",
