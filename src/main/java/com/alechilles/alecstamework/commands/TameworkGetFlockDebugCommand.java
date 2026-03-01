@@ -57,6 +57,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
 
         String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
         String stage = CompanionLifeStageService.resolveCurrentStage(candidate.ref, store, roleId);
+        String currentState = resolveStateName(npc);
 
         AlarmSnapshot alarm = resolveAlarmSnapshot(npc, store, DIRECT_FOLLOW_ALARM);
         Boolean flag = readDirectFollowFlag(npc);
@@ -71,6 +72,8 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                 .append(roleId != null ? roleId : "<unknown>")
                 .append(", stage=")
                 .append(stage)
+                .append(", state=")
+                .append(currentState)
                 .append(", ")
                 .append(DIRECT_FOLLOW_FLAG)
                 .append("=")
@@ -119,6 +122,16 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
 
     private static boolean deriveDirectFollowFlag(@Nonnull String stage, @Nonnull AlarmSnapshot alarm) {
         return "Baby".equalsIgnoreCase(stage) && "active".equalsIgnoreCase(alarm.status);
+    }
+
+    @Nonnull
+    private static String resolveStateName(@Nonnull NPCEntity npc) {
+        Role role = npc.getRole();
+        if (role == null || role.getStateSupport() == null) {
+            return "<unknown>";
+        }
+        String state = role.getStateSupport().getStateName();
+        return state != null && !state.isBlank() ? state : "<unknown>";
     }
 
     @Nullable
