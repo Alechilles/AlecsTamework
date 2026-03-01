@@ -45,8 +45,8 @@
     },
     "BabyDirectFollowDurationRange": {
       "Value": [
-        6,
-        12
+        "PT6S",
+        "PT12S"
       ],
       "Description": "How long timed baby direct-follow runs after a leash trigger."
     }
