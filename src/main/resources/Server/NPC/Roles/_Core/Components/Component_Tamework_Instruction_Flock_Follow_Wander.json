@@ -331,15 +331,137 @@
         }
       },
       {
-        "$Comment": "Default follower leash: only pulls back when follower drifts beyond configured wander radius.",
+        "$Comment": "Enter local flock-follow substate only when leash pullback is actually needed.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "LeashEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Flag",
+                "Name": "Tamework_Baby_DirectFollow",
+                "Set": true
+              }
+            },
+            {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Type": "Leash",
+              "Range": {
+                "Compute": "FlockFollowerWanderRadius"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".FlockFollow"
+          }
+        ]
+      },
+      {
+        "$Comment": "Leave local flock-follow substate after regrouping or if direct-follow takes over.",
         "Continue": true,
         "Sensor": {
-          "Type": "Not",
-          "Sensor": {
-            "Type": "Flag",
-            "Name": "Tamework_Baby_DirectFollow",
-            "Set": true
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
+              "Type": "Or",
+              "Sensors": [
+                {
+                  "Type": "Flag",
+                  "Name": "Tamework_Baby_DirectFollow",
+                  "Set": true
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "And",
+                    "Sensors": [
+                      {
+                        "Type": "And",
+                        "Sensors": [
+                          {
+                            "Type": "FlockLeader"
+                          },
+                          {
+                            "Type": "Self",
+                            "Filters": [
+                              {
+                                "Type": "Flock",
+                                "FlockStatus": "Follower"
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "Type": "Leash",
+                        "Range": {
+                          "Compute": "FlockFollowerWanderRadius"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Default"
           }
+        ]
+      },
+      {
+        "$Comment": "While in local flock-follow substate, run follower leash movement.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Flag",
+                "Name": "Tamework_Baby_DirectFollow",
+                "Set": true
+              }
+            }
+          ]
         },
         "Reference": "Component_Instruction_Leash_To_Flock_Leader",
         "Modify": {
