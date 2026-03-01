@@ -6,8 +6,11 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.group.EntityGroup;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -25,6 +28,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.function.DoubleSupplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -67,6 +71,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         boolean derivedFlag = deriveDirectFollowFlag(stage, alarm);
         boolean usingDerivedFlag = flag == null;
         FlockSnapshot flock = resolveFlockSnapshot(candidate.ref, store);
+        LeashDebugSnapshot leash = resolveLeashSnapshot(candidate.ref, npc, store, stageGate, currentState);
 
         StringBuilder message = new StringBuilder();
         message.append("Flock debug for NPC ")
@@ -117,6 +122,37 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                 .append(", flockId=")
                 .append(flock.flockId != null ? flock.flockId : "<none>");
         commandContext.sender().sendMessage(Message.raw(message.toString()));
+
+        StringBuilder leashMessage = new StringBuilder();
+        leashMessage.append("Flock leash debug: stateDefault=")
+                .append(leash.stateDefault)
+                .append(", leashEnabled=")
+                .append(leash.leashEnabled)
+                .append(", follower=")
+                .append(leash.follower)
+                .append(", hasLeader=")
+                .append(leash.hasLeader)
+                .append(", stageBaby=")
+                .append(leash.stageBaby)
+                .append(", stageAdult=")
+                .append(leash.stageAdult)
+                .append(", distToLeash=")
+                .append(formatNumber(leash.distanceToLeash))
+                .append(", distToLeader=")
+                .append(formatNumber(leash.distanceToLeader))
+                .append(", leashRadius=")
+                .append(formatNumber(leash.leashRadius))
+                .append(", stopDistance=")
+                .append(formatNumber(leash.stopDistance))
+                .append(", relSpeed=")
+                .append(formatNumber(leash.relativeSpeed))
+                .append(", outOfRange=")
+                .append(leash.outOfRange)
+                .append(", withinStopDistance=")
+                .append(leash.withinStopDistance)
+                .append(", adultLeashGateApprox=")
+                .append(leash.adultLeashGateApprox);
+        commandContext.sender().sendMessage(Message.raw(leashMessage.toString()));
     }
 
     @Nonnull
@@ -148,6 +184,86 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
 
     private static boolean deriveDirectFollowFlag(@Nonnull String stage, @Nonnull AlarmSnapshot alarm) {
         return "Baby".equalsIgnoreCase(stage) && "active".equalsIgnoreCase(alarm.status);
+    }
+
+    @Nonnull
+    private static LeashDebugSnapshot resolveLeashSnapshot(@Nonnull Ref<EntityStore> npcRef,
+                                                           @Nonnull NPCEntity npc,
+                                                           @Nonnull Store<EntityStore> store,
+                                                           @Nonnull StageGateSnapshot stageGate,
+                                                           @Nonnull String currentState) {
+        Role role = npc.getRole();
+        StdScope scope = (role != null && role.getEntitySupport() != null)
+                ? role.getEntitySupport().getSensorScope()
+                : null;
+
+        Boolean leashEnabledValue = getBooleanFromScope(scope, "LeashEnabled");
+        Double leashRadiusValue = getNumberFromScope(scope, "FlockFollowerWanderRadius");
+        Double stopDistanceValue = getNumberFromScope(scope, "FlockFollowerStopDistance");
+        Double relativeSpeedValue = getNumberFromScope(scope, "FlockFollowerRelativeSpeed");
+
+        boolean leashEnabled = leashEnabledValue == null || leashEnabledValue;
+        double leashRadius = leashRadiusValue != null ? leashRadiusValue : Double.NaN;
+        double stopDistance = stopDistanceValue != null ? stopDistanceValue : Double.NaN;
+        double relativeSpeed = relativeSpeedValue != null ? relativeSpeedValue : Double.NaN;
+
+        TransformComponent npcTransform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        Vector3d npcPosition = npcTransform != null ? npcTransform.getPosition() : null;
+        Vector3d leashPoint = npc.getLeashPoint();
+        double distanceToLeash = (npcPosition != null && leashPoint != null)
+                ? npcPosition.distanceTo(leashPoint)
+                : Double.NaN;
+
+        FlockMembership membership = store.getComponent(npcRef, FlockMembership.getComponentType());
+        boolean follower = membership != null && membership.getMembershipType() == FlockMembership.Type.MEMBER;
+        boolean hasLeader = false;
+        double distanceToLeader = Double.NaN;
+        if (membership != null) {
+            Ref<EntityStore> flockRef = membership.getFlockRef();
+            if (flockRef != null && flockRef.isValid()) {
+                EntityGroup group = store.getComponent(flockRef, EntityGroup.getComponentType());
+                if (group != null) {
+                    Ref<EntityStore> leaderRef = group.getLeaderRef();
+                    if (leaderRef != null && leaderRef.isValid() && !leaderRef.equals(npcRef)) {
+                        hasLeader = true;
+                        TransformComponent leaderTransform = store.getComponent(leaderRef, TransformComponent.getComponentType());
+                        if (npcPosition != null && leaderTransform != null) {
+                            distanceToLeader = npcPosition.distanceTo(leaderTransform.getPosition());
+                        }
+                    }
+                }
+            }
+        }
+
+        boolean outOfRange = !Double.isNaN(distanceToLeash)
+                && !Double.isNaN(leashRadius)
+                && distanceToLeash > leashRadius;
+        boolean withinStopDistance = !Double.isNaN(distanceToLeash)
+                && !Double.isNaN(stopDistance)
+                && distanceToLeash <= stopDistance;
+        boolean stateDefault = currentState.endsWith(".Default");
+        boolean adultLeashGateApprox = stateDefault
+                && leashEnabled
+                && follower
+                && hasLeader
+                && outOfRange
+                && !stageGate.isBaby;
+        return new LeashDebugSnapshot(
+                stateDefault,
+                leashEnabled,
+                follower,
+                hasLeader,
+                stageGate.isBaby,
+                stageGate.isAdult,
+                distanceToLeash,
+                distanceToLeader,
+                leashRadius,
+                stopDistance,
+                relativeSpeed,
+                outOfRange,
+                withinStopDistance,
+                adultLeashGateApprox
+        );
     }
 
     @Nonnull
@@ -291,6 +407,40 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         return !normalized.contains("baby") && !normalized.contains("adolescent");
     }
 
+    @Nullable
+    private static Boolean getBooleanFromScope(@Nullable StdScope scope, @Nonnull String key) {
+        if (scope == null) {
+            return null;
+        }
+        try {
+            BooleanSupplier supplier = scope.getBooleanSupplier(key);
+            return supplier != null ? supplier.getAsBoolean() : null;
+        } catch (IllegalStateException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Double getNumberFromScope(@Nullable StdScope scope, @Nonnull String key) {
+        if (scope == null) {
+            return null;
+        }
+        try {
+            DoubleSupplier supplier = scope.getNumberSupplier(key);
+            return supplier != null ? supplier.getAsDouble() : null;
+        } catch (IllegalStateException ignored) {
+            return null;
+        }
+    }
+
+    @Nonnull
+    private static String formatNumber(double value) {
+        if (!Double.isFinite(value)) {
+            return "n/a";
+        }
+        return String.format(Locale.ROOT, "%.2f", value);
+    }
+
     private record AlarmSnapshot(String status, @Nullable String remainingText) {
     }
 
@@ -308,5 +458,21 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                                      long adultAtMs,
                                      boolean growthScaling,
                                      boolean fallbackAdultRole) {
+    }
+
+    private record LeashDebugSnapshot(boolean stateDefault,
+                                      boolean leashEnabled,
+                                      boolean follower,
+                                      boolean hasLeader,
+                                      boolean stageBaby,
+                                      boolean stageAdult,
+                                      double distanceToLeash,
+                                      double distanceToLeader,
+                                      double leashRadius,
+                                      double stopDistance,
+                                      double relativeSpeed,
+                                      boolean outOfRange,
+                                      boolean withinStopDistance,
+                                      boolean adultLeashGateApprox) {
     }
 }
