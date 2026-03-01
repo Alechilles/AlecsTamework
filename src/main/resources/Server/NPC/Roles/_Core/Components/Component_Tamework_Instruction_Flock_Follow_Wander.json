@@ -31,6 +31,10 @@
       "Value": false,
       "Description": "Whether babies should use dedicated direct-follow speed/timing."
     },
+    "BabyDirectFollowRadius": {
+      "Value": 4,
+      "Description": "Leash radius used while baby direct-follow is active."
+    },
     "BabyDirectFollowStopDistance": {
       "Value": 1.5,
       "Description": "How close baby followers stop during timed direct-follow."
@@ -158,18 +162,20 @@
         "Instructions": [
           {
             "Continue": true,
-            "BodyMotion": {
-              "Type": "Seek",
-              "SlowDownDistance": {
-                "Compute": "BabyDirectFollowStopDistance + 1"
+            "Reference": "Component_Instruction_Leash_To_Flock_Leader",
+            "Modify": {
+              "Enabled": {
+                "Compute": "LeashEnabled"
+              },
+              "WanderRadius": {
+                "Compute": "BabyDirectFollowRadius"
               },
               "StopDistance": {
                 "Compute": "BabyDirectFollowStopDistance"
               },
               "RelativeSpeed": {
                 "Compute": "BabyDirectFollowRelativeSpeed"
-              },
-              "AbortDistance": 100
+              }
             }
           },
           {
@@ -334,6 +340,13 @@
         },
         "BodyMotion": {
           "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "One-tick local stop state to flush motion before returning to default.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".StopFollow"
         },
         "Instructions": [
           {
