@@ -20,6 +20,14 @@
       "TypeHint": "String",
       "Description": "Optional allowed food item ids passed to consume action for container intake."
     },
+    "NeedsSeekWhenHungerBelowRatio": {
+      "Value": 0.85,
+      "Description": "Hunger ratio gate used to decide whether food seek should keep running."
+    },
+    "NeedsSeekWhenThirstBelowRatio": {
+      "Value": 0.85,
+      "Description": "Thirst ratio gate used to decide whether water seek should keep running."
+    },
     "NeedsSeekSlowDownDistance": {
       "Value": 2.4,
       "Description": "Distance where needs-seek movement starts slowing down."
@@ -137,6 +145,114 @@
         ]
       },
       {
+        "$Comment": "Water seek: if thirst is no longer below threshold, stop seek immediately.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "NeedsSeekResourceType == \"Water\""
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkNeedBelow",
+                "Need": "Thirst",
+                "RatioBelow": {
+                  "Compute": "NeedsSeekWhenThirstBelowRatio"
+                }
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Complete"
+          }
+        ]
+      },
+      {
+        "$Comment": "Food seek: if hunger is no longer below threshold, stop seek immediately.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "NeedsSeekResourceType == \"FoodContainer\""
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkNeedBelow",
+                "Need": "Hunger",
+                "RatioBelow": {
+                  "Compute": "NeedsSeekWhenHungerBelowRatio"
+                }
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Complete"
+          }
+        ]
+      },
+      {
+        "$Comment": "Auto mode: if neither hunger nor thirst are below threshold, stop seek immediately.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "NeedsSeekResourceType == \"Auto\""
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Or",
+                "Sensors": [
+                  {
+                    "Type": "TameworkNeedBelow",
+                    "Need": "Hunger",
+                    "RatioBelow": {
+                      "Compute": "NeedsSeekWhenHungerBelowRatio"
+                    }
+                  },
+                  {
+                    "Type": "TameworkNeedBelow",
+                    "Need": "Thirst",
+                    "RatioBelow": {
+                      "Compute": "NeedsSeekWhenThirstBelowRatio"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Complete"
+          }
+        ]
+      },
+      {
         "$Comment": "Initialize runtime when not already moving/consuming and a target exists.",
         "Continue": true,
         "Sensor": {
@@ -199,6 +315,87 @@
           "State": ".Move"
         },
         "Instructions": [
+          {
+            "$Comment": "Water seek: if thirst no longer needs refill during travel, stop immediately.",
+            "Continue": true,
+            "Enabled": {
+              "Compute": "NeedsSeekResourceType == \"Water\""
+            },
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkNeedBelow",
+                "Need": "Thirst",
+                "RatioBelow": {
+                  "Compute": "NeedsSeekWhenThirstBelowRatio"
+                }
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Complete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Food seek: if hunger no longer needs refill during travel, stop immediately.",
+            "Continue": true,
+            "Enabled": {
+              "Compute": "NeedsSeekResourceType == \"FoodContainer\""
+            },
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkNeedBelow",
+                "Need": "Hunger",
+                "RatioBelow": {
+                  "Compute": "NeedsSeekWhenHungerBelowRatio"
+                }
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Complete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Auto mode: if all refill conditions clear during travel, stop immediately.",
+            "Continue": true,
+            "Enabled": {
+              "Compute": "NeedsSeekResourceType == \"Auto\""
+            },
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Or",
+                "Sensors": [
+                  {
+                    "Type": "TameworkNeedBelow",
+                    "Need": "Hunger",
+                    "RatioBelow": {
+                      "Compute": "NeedsSeekWhenHungerBelowRatio"
+                    }
+                  },
+                  {
+                    "Type": "TameworkNeedBelow",
+                    "Need": "Thirst",
+                    "RatioBelow": {
+                      "Compute": "NeedsSeekWhenThirstBelowRatio"
+                    }
+                  }
+                ]
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Complete"
+              }
+            ]
+          },
           {
             "$Comment": "When close enough, start a short consume delay.",
             "Continue": true,
@@ -368,6 +565,87 @@
           "State": ".ConsumeDelay"
         },
         "Instructions": [
+          {
+            "$Comment": "Water seek: if thirst no longer needs refill while waiting, finish immediately.",
+            "Continue": true,
+            "Enabled": {
+              "Compute": "NeedsSeekResourceType == \"Water\""
+            },
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkNeedBelow",
+                "Need": "Thirst",
+                "RatioBelow": {
+                  "Compute": "NeedsSeekWhenThirstBelowRatio"
+                }
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Complete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Food seek: if hunger no longer needs refill while waiting, finish immediately.",
+            "Continue": true,
+            "Enabled": {
+              "Compute": "NeedsSeekResourceType == \"FoodContainer\""
+            },
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkNeedBelow",
+                "Need": "Hunger",
+                "RatioBelow": {
+                  "Compute": "NeedsSeekWhenHungerBelowRatio"
+                }
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Complete"
+              }
+            ]
+          },
+          {
+            "$Comment": "Auto mode: if all refill conditions clear while waiting, finish immediately.",
+            "Continue": true,
+            "Enabled": {
+              "Compute": "NeedsSeekResourceType == \"Auto\""
+            },
+            "Sensor": {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Or",
+                "Sensors": [
+                  {
+                    "Type": "TameworkNeedBelow",
+                    "Need": "Hunger",
+                    "RatioBelow": {
+                      "Compute": "NeedsSeekWhenHungerBelowRatio"
+                    }
+                  },
+                  {
+                    "Type": "TameworkNeedBelow",
+                    "Need": "Thirst",
+                    "RatioBelow": {
+                      "Compute": "NeedsSeekWhenThirstBelowRatio"
+                    }
+                  }
+                ]
+              }
+            },
+            "Actions": [
+              {
+                "Type": "State",
+                "State": ".Complete"
+              }
+            ]
+          },
           {
             "Sensor": {
               "Type": "Timer",
