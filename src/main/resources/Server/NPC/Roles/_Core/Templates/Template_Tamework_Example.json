@@ -847,6 +847,43 @@
       ]
     },
     {
+      "$Comment": "Update flock follower leash positions to match current leader position.",
+      "Continue": true,
+      "Enabled": {
+        "Compute": "!isEmptyStringArray(FlockArray)"
+      },
+      "Sensor": {
+        "Type": "And",
+        "Sensors": [
+          {
+            "Type": "FlockLeader"
+          },
+          {
+            "Type": "Self",
+            "Filters": [
+              {
+                "Type": "Flock",
+                "FlockStatus": "Follower"
+              }
+            ]
+          }
+        ]
+      },
+      "Actions": [
+        {
+          "Type": "Timeout",
+          "Delay": [
+            0.5,
+            2
+          ],
+          "Action": {
+            "Type": "SetLeashPosition",
+            "ToTarget": true
+          }
+        }
+      ]
+    },
+    {
       "$Comment": "No-op branch to pair the CommandMove state with a state sensor.",
       "Continue": true,
       "Sensor": {
