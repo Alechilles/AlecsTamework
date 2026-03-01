@@ -60,6 +60,8 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
 
         AlarmSnapshot alarm = resolveAlarmSnapshot(npc, store, DIRECT_FOLLOW_ALARM);
         Boolean flag = readDirectFollowFlag(npc);
+        boolean derivedFlag = deriveDirectFollowFlag(stage, alarm);
+        boolean usingDerivedFlag = flag == null;
         FlockSnapshot flock = resolveFlockSnapshot(candidate.ref, store);
 
         StringBuilder message = new StringBuilder();
@@ -72,7 +74,8 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                 .append(", ")
                 .append(DIRECT_FOLLOW_FLAG)
                 .append("=")
-                .append(flag != null ? flag : "<unavailable>")
+                .append(flag != null ? flag : derivedFlag)
+                .append(usingDerivedFlag ? " (derived)" : "")
                 .append(", ")
                 .append(DIRECT_FOLLOW_ALARM)
                 .append("=")
@@ -112,6 +115,10 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
             return new AlarmSnapshot("active", "0s");
         }
         return new AlarmSnapshot("active", formatDuration(remaining));
+    }
+
+    private static boolean deriveDirectFollowFlag(@Nonnull String stage, @Nonnull AlarmSnapshot alarm) {
+        return "Baby".equalsIgnoreCase(stage) && "active".equalsIgnoreCase(alarm.status);
     }
 
     @Nullable
