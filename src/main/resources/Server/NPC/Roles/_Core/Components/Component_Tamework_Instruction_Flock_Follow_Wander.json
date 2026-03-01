@@ -97,6 +97,14 @@
         },
         "Actions": [
           {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          },
+          {
+            "Type": "ParentState",
+            "State": "Idle"
+          },
+          {
             "Type": "State",
             "State": ".FlockFollow"
           }
@@ -196,6 +204,20 @@
                 "State": ".LeashLatch"
               }
             ]
+          }
+        ]
+      },
+      {
+        "$Comment": "Keep status slot clear while following so locomotion animations can play.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".FlockFollow"
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
           }
         ]
       },
