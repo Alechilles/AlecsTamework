@@ -58,7 +58,7 @@
     },
     "Instructions": [
       {
-        "$Comment": "Enter local follow substate when a flock follower is outside leash range.",
+        "$Comment": "Non-baby followers: leash toward leader while remaining in default behavior flow.",
         "Continue": true,
         "Enabled": {
           "Compute": "LeashEnabled"
@@ -92,6 +92,71 @@
               "Range": {
                 "Compute": "FlockFollowerWanderRadius"
               }
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkLifeStage",
+                "Stage": "Baby"
+              }
+            }
+          ]
+        },
+        "Reference": "Component_Instruction_Leash_To_Flock_Leader",
+        "Modify": {
+          "Enabled": {
+            "Compute": "LeashEnabled"
+          },
+          "WanderRadius": {
+            "Compute": "FlockFollowerWanderRadius"
+          },
+          "StopDistance": {
+            "Compute": "FlockFollowerStopDistance"
+          },
+          "RelativeSpeed": {
+            "Compute": "FlockFollowerRelativeSpeed"
+          }
+        }
+      },
+      {
+        "$Comment": "Enter baby-only direct-follow substate when a baby follower is outside leash range.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "LeashEnabled && BabyDirectFollowEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Type": "Leash",
+              "Range": {
+                "Compute": "FlockFollowerWanderRadius"
+              }
+            },
+            {
+              "Type": "TameworkLifeStage",
+              "Stage": "Baby"
             }
           ]
         },
@@ -214,60 +279,6 @@
           {
             "Type": "PlayAnimation",
             "Slot": "Status"
-          }
-        ]
-      },
-      {
-        "$Comment": "Standard follower leash motion while in local follow state.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "LeashEnabled"
-        },
-        "Sensor": {
-          "Type": "State",
-          "State": ".FlockFollow"
-        },
-        "Reference": "Component_Instruction_Leash_To_Flock_Leader",
-        "Modify": {
-          "Enabled": {
-            "Compute": "LeashEnabled"
-          },
-          "WanderRadius": {
-            "Compute": "FlockFollowerWanderRadius"
-          },
-          "StopDistance": {
-            "Compute": "FlockFollowerStopDistance"
-          },
-          "RelativeSpeed": {
-            "Compute": "FlockFollowerRelativeSpeed"
-          }
-        }
-      },
-      {
-        "$Comment": "Run a timed follow window for standard branch, then wait for leash clear before allowing retrigger.",
-        "Sensor": {
-          "Type": "State",
-          "State": ".FlockFollow"
-        },
-        "Instructions": [
-          {
-            "Sensor": {
-              "Type": "Any",
-              "Once": true
-            },
-            "ActionsBlocking": true,
-            "Actions": [
-              {
-                "Type": "Timeout",
-                "Delay": {
-                  "Compute": "FlockFollowDurationRange"
-                }
-              },
-              {
-                "Type": "State",
-                "State": ".LeashLatch"
-              }
-            ]
           }
         ]
       },
