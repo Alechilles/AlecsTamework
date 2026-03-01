@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.commands;
 
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ComponentType;
@@ -21,6 +22,7 @@ import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import javax.annotation.Nonnull;
@@ -57,6 +59,7 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
 
         String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
         String stage = CompanionLifeStageService.resolveCurrentStage(candidate.ref, store, roleId);
+        StageGateSnapshot stageGate = resolveStageGate(candidate.ref, store, roleId, stage);
         String currentState = resolveStateName(npc);
 
         AlarmSnapshot alarm = resolveAlarmSnapshot(npc, store, DIRECT_FOLLOW_ALARM);
@@ -72,6 +75,29 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
                 .append(roleId != null ? roleId : "<unknown>")
                 .append(", stage=")
                 .append(stage)
+                .append(" [baby=")
+                .append(stageGate.isBaby)
+                .append(", adolescent=")
+                .append(stageGate.isAdolescent)
+                .append(", adult=")
+                .append(stageGate.isAdult)
+                .append("]")
+                .append(", stageSource=")
+                .append(stageGate.stageSource)
+                .append(", worldTimeMs=")
+                .append(stageGate.worldTimeMs)
+                .append(", componentStage=")
+                .append(stageGate.componentStage)
+                .append(", bornAtMs=")
+                .append(stageGate.bornAtMs)
+                .append(", adolescentAtMs=")
+                .append(stageGate.adolescentAtMs)
+                .append(", adultAtMs=")
+                .append(stageGate.adultAtMs)
+                .append(", growthScaling=")
+                .append(stageGate.growthScaling)
+                .append(", fallbackAdultRole=")
+                .append(stageGate.fallbackAdultRole)
                 .append(", state=")
                 .append(currentState)
                 .append(", ")
@@ -122,6 +148,47 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
 
     private static boolean deriveDirectFollowFlag(@Nonnull String stage, @Nonnull AlarmSnapshot alarm) {
         return "Baby".equalsIgnoreCase(stage) && "active".equalsIgnoreCase(alarm.status);
+    }
+
+    @Nonnull
+    private static StageGateSnapshot resolveStageGate(@Nonnull Ref<EntityStore> npcRef,
+                                                      @Nonnull Store<EntityStore> store,
+                                                      @Nullable String roleId,
+                                                      @Nonnull String resolvedStage) {
+        ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
+        TameworkLifeStageComponent component = type != null ? store.getComponent(npcRef, type) : null;
+        String normalizedResolved = normalizeStage(resolvedStage);
+        boolean fallbackAdult = isAdultRoleFallback(roleId);
+        long worldTimeMs = resolveGameTime(store).toEpochMilli();
+        if (component == null) {
+            return new StageGateSnapshot(
+                    CompanionLifeStageService.STAGE_BABY.equals(normalizedResolved),
+                    CompanionLifeStageService.STAGE_ADOLESCENT.equals(normalizedResolved),
+                    CompanionLifeStageService.STAGE_ADULT.equals(normalizedResolved),
+                    "fallback-role",
+                    worldTimeMs,
+                    "<none>",
+                    0L,
+                    0L,
+                    0L,
+                    false,
+                    fallbackAdult
+            );
+        }
+        String componentStage = component.getStage();
+        return new StageGateSnapshot(
+                CompanionLifeStageService.STAGE_BABY.equals(normalizedResolved),
+                CompanionLifeStageService.STAGE_ADOLESCENT.equals(normalizedResolved),
+                CompanionLifeStageService.STAGE_ADULT.equals(normalizedResolved),
+                "component",
+                worldTimeMs,
+                componentStage != null && !componentStage.isBlank() ? componentStage : "<blank>",
+                component.getBornAtMs(),
+                component.getAdolescentAtMs(),
+                component.getAdultAtMs(),
+                component.isGrowthScalingEnabled(),
+                fallbackAdult
+        );
     }
 
     @Nonnull
@@ -201,9 +268,45 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
         return minutes + "m " + remainingSeconds + "s";
     }
 
+    @Nonnull
+    private static String normalizeStage(@Nullable String stage) {
+        if (stage == null || stage.isBlank()) {
+            return CompanionLifeStageService.STAGE_ADULT;
+        }
+        String normalized = stage.trim().toLowerCase(Locale.ROOT);
+        if ("baby".equals(normalized)) {
+            return CompanionLifeStageService.STAGE_BABY;
+        }
+        if ("adolescent".equals(normalized) || "juvenile".equals(normalized)) {
+            return CompanionLifeStageService.STAGE_ADOLESCENT;
+        }
+        return CompanionLifeStageService.STAGE_ADULT;
+    }
+
+    private static boolean isAdultRoleFallback(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return true;
+        }
+        String normalized = roleId.trim().toLowerCase(Locale.ROOT);
+        return !normalized.contains("baby") && !normalized.contains("adolescent");
+    }
+
     private record AlarmSnapshot(String status, @Nullable String remainingText) {
     }
 
     private record FlockSnapshot(String membershipType, @Nullable UUID flockId) {
+    }
+
+    private record StageGateSnapshot(boolean isBaby,
+                                     boolean isAdolescent,
+                                     boolean isAdult,
+                                     String stageSource,
+                                     long worldTimeMs,
+                                     String componentStage,
+                                     long bornAtMs,
+                                     long adolescentAtMs,
+                                     long adultAtMs,
+                                     boolean growthScaling,
+                                     boolean fallbackAdultRole) {
     }
 }
