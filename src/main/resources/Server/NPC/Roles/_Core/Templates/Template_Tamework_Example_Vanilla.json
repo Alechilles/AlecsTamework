@@ -785,12 +785,14 @@
       "Instructions": [
         {
           "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
-          "Modify": {
-            "NeedsSeekResourceType": "Water",
-            "_ExportStates": [
-              "Idle"
-            ]
-          }
+            "Modify": {
+              "NeedsSeekResourceType": "Water",
+              "NeedsSeekCheckThirst": true,
+              "NeedsSeekCheckHunger": false,
+              "_ExportStates": [
+                "Idle"
+              ]
+            }
         }
       ]
     },
@@ -804,12 +806,14 @@
       "Instructions": [
         {
           "Reference": "Component_Tamework_Instruction_Needs_Seek_Resource",
-          "Modify": {
-            "NeedsSeekResourceType": "FoodContainer",
-            "NeedsSeekFoodItemIDs": {
-              "Compute": "FoodItemIDs"
-            },
-            "_ExportStates": [
+            "Modify": {
+              "NeedsSeekResourceType": "FoodContainer",
+              "NeedsSeekCheckHunger": true,
+              "NeedsSeekCheckThirst": false,
+              "NeedsSeekFoodItemIDs": {
+                "Compute": "FoodItemIDs"
+              },
+              "_ExportStates": [
               "Idle"
             ]
           }
