@@ -115,6 +115,10 @@
       "Value": 0.3,
       "Description": "Relative movement speed used when flock followers regroup to their leader."
     },
+    "FlockRemoveOnAdult": {
+      "Value": false,
+      "Description": "If true, remove flock membership when this NPC enters adult stage."
+    },
     "FlockFollowerMoveDurationRange": {
       "Value": [
         1,
