@@ -100,7 +100,7 @@
       "Description": "Duration to hold the idle animation in the spin state."
     },
     "FlockFollowerWanderRadius": {
-      "Value": 3,
+      "Value": 6,
       "Description": "How far flock followers can wander from their flock leader."
     },
     "FlockFollowerStopDistance": {
@@ -151,8 +151,8 @@
     },
     "FlockBabyDirectFollowDurationRange": {
       "Value": [
-        "PT3S",
-        "PT6S"
+        3,
+        6
       ],
       "Description": "How long baby direct-follow stays active after a leash event."
     },
@@ -738,7 +738,7 @@
     "Compute": "FlockArray"
   },
   "ApplySeparation": true,
-  "SeparationDistance": 0.5,
+  "SeparationDistance": 1,
   "SeparationWeight": 1.2,
   "SeparationDistanceTarget": 1.5,
   "SeparationNearRadiusTarget": 3,
@@ -1322,9 +1322,9 @@
             "_ExportStates": [
               "Defend",
               "Defend",
-              "Hold",
-              "Hold",
-              "Hold"
+              "Idle",
+              "Idle",
+              "Idle"
             ],
             "DayTimePeriod": {
               "Compute": "DayTimePeriod"

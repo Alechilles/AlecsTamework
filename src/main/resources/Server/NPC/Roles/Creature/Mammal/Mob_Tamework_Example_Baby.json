@@ -169,12 +169,12 @@
       "Mob_Tamework_Example_Baby"
     ],
     "FlockBabyDirectFollowEnabled": true,
-    "FlockBabyDirectFollowRadius": 1.5,
-    "FlockBabyDirectFollowStopDistance": 0.9,
-    "FlockBabyDirectFollowRelativeSpeed": 1.25,
+    "FlockBabyDirectFollowRadius": 3,
+    "FlockBabyDirectFollowStopDistance": 1.25,
+    "FlockBabyDirectFollowRelativeSpeed": 1,
     "FlockBabyDirectFollowDurationRange": [
-      "PT4S",
-      "PT7S"
+      4,
+      7
     ],
     "SpawnerEmptyItemID": [
       "Spawner_Tamework_Example"
