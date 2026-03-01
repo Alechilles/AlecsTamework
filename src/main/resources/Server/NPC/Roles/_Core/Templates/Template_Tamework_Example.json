@@ -104,11 +104,11 @@
       "Description": "How far flock followers can wander from their flock leader."
     },
     "FlockFollowerStopDistance": {
-      "Value": 2,
+      "Value": 3,
       "Description": "How close flock followers stop when regrouping with their leader."
     },
     "FlockFollowerRelativeSpeed": {
-      "Value": 1,
+      "Value": 0.3,
       "Description": "Relative movement speed used when flock followers regroup to their leader."
     },
     "FlockFollowerMoveDurationRange": {
@@ -1006,26 +1006,11 @@
       ]
     },
     {
-      "$Comment": "Overlay flock leash behavior while not in explicit follow/combat states.",
+      "$Comment": "Overlay flock leash behavior while in Idle.",
       "Continue": true,
       "Sensor": {
-        "Type": "And",
-        "Sensors": [
-          {
-            "Type": "Not",
-            "Sensor": {
-              "Type": "State",
-              "State": "Follow"
-            }
-          },
-          {
-            "Type": "Not",
-            "Sensor": {
-              "Type": "State",
-              "State": "Defend"
-            }
-          }
-        ]
+        "Type": "State",
+        "State": "Idle"
       },
       "Instructions": [
         {
