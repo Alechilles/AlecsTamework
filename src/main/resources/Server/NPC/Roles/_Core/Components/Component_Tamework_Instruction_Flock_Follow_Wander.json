@@ -2,6 +2,7 @@
   "$Comment": "Applies flock leash behavior as an overlay without requiring a dedicated flock-follow state.",
   "Type": "Component",
   "Class": "Instruction",
+  "DefaultState": ".Default",
   "Parameters": {
     "LeashEnabled": {
       "Value": true,
