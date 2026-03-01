@@ -90,7 +90,7 @@
             {
               "Type": "Leash",
               "Range": {
-                "Compute": "FlockFollowerWanderRadius"
+                "Compute": "BabyDirectFollowRadius"
               }
             },
             {
