@@ -1,5 +1,5 @@
 {
-  "$Comment": "Applies flock leash behavior as an overlay. Babies can use a tighter leash profile but the same leash behavior.",
+  "$Comment": "Applies flock leash behavior as an overlay. Uses FlockFollower* params for all roles; baby roles should override those params directly.",
   "Type": "Component",
   "Class": "Instruction",
   "Parameters": {
@@ -8,11 +8,11 @@
       "Description": "Whether follower-to-leader leash behavior is enabled."
     },
     "FlockFollowerWanderRadius": {
-      "Value": 4,
+      "Value": 7,
       "Description": "How far followers are allowed to drift from their flock leader."
     },
     "FlockFollowerStopDistance": {
-      "Value": 2,
+      "Value": 4,
       "Description": "How close followers stop when moving back toward their leader."
     },
     "FlockFollowerRelativeSpeed": {
@@ -28,26 +28,26 @@
     },
     "BabyDirectFollowEnabled": {
       "Value": false,
-      "Description": "If true, use baby leash profile (tighter radius/stop) instead of adult leash profile."
+      "Description": "Deprecated compatibility field. Not used by leash-only mode."
     },
     "BabyDirectFollowRadius": {
-      "Value": 3,
-      "Description": "Tighter leash radius used for babies."
+      "Value": 7,
+      "Description": "Deprecated compatibility field. Not used by leash-only mode."
     },
     "BabyDirectFollowStopDistance": {
-      "Value": 1.5,
-      "Description": "Stop distance used for babies when regrouping."
+      "Value": 4,
+      "Description": "Deprecated compatibility field. Not used by leash-only mode."
     },
     "BabyDirectFollowRelativeSpeed": {
       "Value": 0.7,
-      "Description": "Relative speed used for babies when regrouping."
+      "Description": "Deprecated compatibility field. Not used by leash-only mode."
     },
     "BabyDirectFollowDurationRange": {
       "Value": [
         6,
         12
       ],
-      "Description": "Deprecated compatibility field. Leash-only mode does not use timed follow windows."
+      "Description": "Deprecated compatibility field. Not used by leash-only mode."
     }
   },
   "Content": {
@@ -57,10 +57,10 @@
     },
     "Instructions": [
       {
-        "$Comment": "Adult/default leash profile.",
+        "$Comment": "Leash profile using role/template FlockFollower* values.",
         "Continue": true,
         "Enabled": {
-          "Compute": "LeashEnabled && !BabyDirectFollowEnabled"
+          "Compute": "LeashEnabled"
         },
         "Sensor": {
           "Type": "And",
@@ -103,56 +103,6 @@
           },
           "RelativeSpeed": {
             "Compute": "FlockFollowerRelativeSpeed"
-          }
-        }
-      },
-      {
-        "$Comment": "Baby leash profile: same leash behavior as adults, but tighter radius/stop/speed.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "LeashEnabled && BabyDirectFollowEnabled"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "FlockLeader"
-                },
-                {
-                  "Type": "Self",
-                  "Filters": [
-                    {
-                      "Type": "Flock",
-                      "FlockStatus": "Follower"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "Type": "Leash",
-              "Range": {
-                "Compute": "BabyDirectFollowRadius"
-              }
-            }
-          ]
-        },
-        "Reference": "Component_Instruction_Leash_To_Flock_Leader",
-        "Modify": {
-          "Enabled": {
-            "Compute": "LeashEnabled"
-          },
-          "WanderRadius": {
-            "Compute": "BabyDirectFollowRadius"
-          },
-          "StopDistance": {
-            "Compute": "BabyDirectFollowStopDistance"
-          },
-          "RelativeSpeed": {
-            "Compute": "BabyDirectFollowRelativeSpeed"
           }
         }
       }

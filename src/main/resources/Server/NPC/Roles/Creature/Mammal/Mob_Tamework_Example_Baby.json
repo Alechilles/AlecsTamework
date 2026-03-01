@@ -164,17 +164,12 @@
     "WakeupAttitudes": [
       "Hostile"
     ],
+    "FlockFollowerWanderRadius": 3,
+    "FlockFollowerStopDistance": 1.5,
+    "FlockFollowerRelativeSpeed": 0.45,
     "FlockArray": [
       "Mob_Tamework_Example",
       "Mob_Tamework_Example_Baby"
-    ],
-    "FlockBabyDirectFollowEnabled": true,
-    "FlockBabyDirectFollowRadius": 3,
-    "FlockBabyDirectFollowStopDistance": 1.25,
-    "FlockBabyDirectFollowRelativeSpeed": 1,
-    "FlockBabyDirectFollowDurationRange": [
-      4,
-      7
     ],
     "SpawnerEmptyItemID": [
       "Spawner_Tamework_Example"

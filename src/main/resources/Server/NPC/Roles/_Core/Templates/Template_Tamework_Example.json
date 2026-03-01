@@ -13,6 +13,10 @@
       "Value": "server.npcRoles.Tamework_Example.name",
       "Description": "Translation key for NPC name display."
     },
+    "SeparationDistance": {
+      "Value": 1,
+      "Description": "The separation distance between this and other NPCs."
+    },
     "MasterTargetSlot": {
       "Value": "MasterTarget",
       "Description": "Target slot used to store the owner/master."
@@ -738,11 +742,15 @@
     "Compute": "FlockArray"
   },
   "ApplySeparation": true,
-  "SeparationDistance": 1,
-  "SeparationWeight": 1.2,
-  "SeparationDistanceTarget": 1.5,
-  "SeparationNearRadiusTarget": 3,
-  "SeparationFarRadiusTarget": 8,
+  "SeparationDistance": {
+    "Compute": "SeparationDistance"
+  },
+  "SeparationWeight": 1,
+  "SeparationDistanceTarget": {
+    "Compute": "SeparationDistance"
+  },
+  "SeparationNearRadiusTarget": 2,
+  "SeparationFarRadiusTarget": 7,
   "KnockbackScale": {
     "Compute": "KnockbackScale"
   },
@@ -1061,21 +1069,6 @@
             },
             "FlockFollowerRelativeSpeed": {
               "Compute": "FlockFollowerRelativeSpeed"
-            },
-            "BabyDirectFollowEnabled": {
-              "Compute": "FlockBabyDirectFollowEnabled"
-            },
-            "BabyDirectFollowRadius": {
-              "Compute": "FlockBabyDirectFollowRadius"
-            },
-            "BabyDirectFollowStopDistance": {
-              "Compute": "FlockBabyDirectFollowStopDistance"
-            },
-            "BabyDirectFollowRelativeSpeed": {
-              "Compute": "FlockBabyDirectFollowRelativeSpeed"
-            },
-            "BabyDirectFollowDurationRange": {
-              "Compute": "FlockBabyDirectFollowDurationRange"
             }
           }
         }

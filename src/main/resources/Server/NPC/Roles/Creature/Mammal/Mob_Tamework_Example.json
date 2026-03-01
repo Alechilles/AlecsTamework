@@ -164,8 +164,12 @@
     "WakeupAttitudes": [
       "Hostile"
     ],
+    "FlockFollowerWanderRadius": 6,
+    "FlockFollowerStopDistance": 3,
+    "FlockFollowerRelativeSpeed": 0.3,
     "FlockArray": [
-      "Tamework_Example_Family"
+      "Mob_Tamework_Example",
+      "Mob_Tamework_Example_Baby"
     ],
     "SpawnerEmptyItemID": [
       "Spawner_Tamework_Example"

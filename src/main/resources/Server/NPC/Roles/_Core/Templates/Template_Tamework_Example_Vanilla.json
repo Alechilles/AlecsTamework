@@ -1103,21 +1103,6 @@
             },
             "FlockFollowerRelativeSpeed": {
               "Compute": "FlockFollowerRelativeSpeed"
-            },
-            "BabyDirectFollowEnabled": {
-              "Compute": "FlockBabyDirectFollowEnabled"
-            },
-            "BabyDirectFollowRadius": {
-              "Compute": "FlockBabyDirectFollowRadius"
-            },
-            "BabyDirectFollowStopDistance": {
-              "Compute": "FlockBabyDirectFollowStopDistance"
-            },
-            "BabyDirectFollowRelativeSpeed": {
-              "Compute": "FlockBabyDirectFollowRelativeSpeed"
-            },
-            "BabyDirectFollowDurationRange": {
-              "Compute": "FlockBabyDirectFollowDurationRange"
             }
           }
         }
