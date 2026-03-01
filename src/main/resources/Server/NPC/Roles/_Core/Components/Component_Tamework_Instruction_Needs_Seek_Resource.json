@@ -20,22 +20,6 @@
       "TypeHint": "String",
       "Description": "Optional allowed food item ids passed to consume action for container intake."
     },
-    "NeedsSeekWhenHungerBelowRatio": {
-      "Value": 0.85,
-      "Description": "Hunger ratio gate used to decide whether food seek should keep running."
-    },
-    "NeedsSeekWhenThirstBelowRatio": {
-      "Value": 0.85,
-      "Description": "Thirst ratio gate used to decide whether water seek should keep running."
-    },
-    "NeedsSeekCheckHunger": {
-      "Value": false,
-      "Description": "Whether hunger threshold checks should gate seek continuation."
-    },
-    "NeedsSeekCheckThirst": {
-      "Value": false,
-      "Description": "Whether thirst threshold checks should gate seek continuation."
-    },
     "NeedsSeekSlowDownDistance": {
       "Value": 2.4,
       "Description": "Distance where needs-seek movement starts slowing down."
@@ -147,72 +131,8 @@
         },
         "Actions": [
           {
-            "Type": "State",
-            "State": ".Complete"
-          }
-        ]
-      },
-      {
-        "$Comment": "Water seek: if thirst is no longer below threshold, stop seek immediately.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "NeedsSeekCheckThirst"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Default"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkNeedBelow",
-                "Need": "Thirst",
-                "RatioBelow": {
-                  "Compute": "NeedsSeekWhenThirstBelowRatio"
-                }
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".Complete"
-          }
-        ]
-      },
-      {
-        "$Comment": "Food seek: if hunger is no longer below threshold, stop seek immediately.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "NeedsSeekCheckHunger"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Default"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkNeedBelow",
-                "Need": "Hunger",
-                "RatioBelow": {
-                  "Compute": "NeedsSeekWhenHungerBelowRatio"
-                }
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".Complete"
+            "Type": "ParentState",
+            "State": "OnNeedsSeekComplete"
           }
         ]
       },
@@ -249,10 +169,6 @@
         },
         "Actions": [
           {
-            "Type": "PlayAnimation",
-            "Slot": "Status"
-          },
-          {
             "Type": "TimerStart",
             "Name": "NeedsSeek_Move_Timeout",
             "StartValueRange": {
@@ -279,52 +195,6 @@
           "State": ".Move"
         },
         "Instructions": [
-          {
-            "$Comment": "Water seek: if thirst no longer needs refill during travel, stop immediately.",
-            "Continue": true,
-            "Enabled": {
-              "Compute": "NeedsSeekCheckThirst"
-            },
-            "Sensor": {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkNeedBelow",
-                "Need": "Thirst",
-                "RatioBelow": {
-                  "Compute": "NeedsSeekWhenThirstBelowRatio"
-                }
-              }
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": ".Complete"
-              }
-            ]
-          },
-          {
-            "$Comment": "Food seek: if hunger no longer needs refill during travel, stop immediately.",
-            "Continue": true,
-            "Enabled": {
-              "Compute": "NeedsSeekCheckHunger"
-            },
-            "Sensor": {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkNeedBelow",
-                "Need": "Hunger",
-                "RatioBelow": {
-                  "Compute": "NeedsSeekWhenHungerBelowRatio"
-                }
-              }
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": ".Complete"
-              }
-            ]
-          },
           {
             "$Comment": "When close enough, start a short consume delay.",
             "Continue": true,
@@ -376,7 +246,11 @@
             "Actions": [
               {
                 "Type": "State",
-                "State": ".Complete"
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
               }
             ]
           },
@@ -410,7 +284,11 @@
               },
               {
                 "Type": "State",
-                "State": ".Complete"
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
               }
             ]
           },
@@ -425,7 +303,11 @@
             "Actions": [
               {
                 "Type": "State",
-                "State": ".Complete"
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
               }
             ]
           },
@@ -495,52 +377,6 @@
         },
         "Instructions": [
           {
-            "$Comment": "Water seek: if thirst no longer needs refill while waiting, finish immediately.",
-            "Continue": true,
-            "Enabled": {
-              "Compute": "NeedsSeekCheckThirst"
-            },
-            "Sensor": {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkNeedBelow",
-                "Need": "Thirst",
-                "RatioBelow": {
-                  "Compute": "NeedsSeekWhenThirstBelowRatio"
-                }
-              }
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": ".Complete"
-              }
-            ]
-          },
-          {
-            "$Comment": "Food seek: if hunger no longer needs refill while waiting, finish immediately.",
-            "Continue": true,
-            "Enabled": {
-              "Compute": "NeedsSeekCheckHunger"
-            },
-            "Sensor": {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkNeedBelow",
-                "Need": "Hunger",
-                "RatioBelow": {
-                  "Compute": "NeedsSeekWhenHungerBelowRatio"
-                }
-              }
-            },
-            "Actions": [
-              {
-                "Type": "State",
-                "State": ".Complete"
-              }
-            ]
-          },
-          {
             "Sensor": {
               "Type": "Timer",
               "Name": "NeedsSeek_Consume_Delay",
@@ -555,60 +391,6 @@
                 "FoodItemIDs": {
                   "Compute": "NeedsSeekFoodItemIDs"
                 }
-              },
-              {
-                "Type": "State",
-                "State": ".Complete"
-              }
-            ]
-          }
-        ]
-      },
-      {
-        "$Comment": "Completion local state: clear movement/pose before returning to parent idle flow.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "State",
-          "State": ".Complete"
-        },
-        "BodyMotion": {
-          "Type": "Nothing"
-        }
-      },
-      {
-        "$Comment": "Clear status slot while completing to avoid posture slide carryover.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "State",
-          "State": ".Complete"
-        },
-        "Actions": [
-          {
-            "Type": "PlayAnimation",
-            "Slot": "Status"
-          }
-        ]
-      },
-      {
-        "$Comment": "Exit completion local state and return to parent completion state.",
-        "Sensor": {
-          "Type": "State",
-          "State": ".Complete"
-        },
-        "Instructions": [
-          {
-            "Sensor": {
-              "Type": "Any",
-              "Once": true
-            },
-            "ActionsBlocking": true,
-            "Actions": [
-              {
-                "Type": "Timeout",
-                "Delay": [
-                  0,
-                  0
-                ]
               },
               {
                 "Type": "State",
