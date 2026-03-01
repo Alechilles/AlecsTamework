@@ -1,5 +1,5 @@
 {
-  "$Comment": "Applies flock leash behavior as an overlay without requiring a dedicated flock-follow state.",
+  "$Comment": "Applies flock leash behavior as an overlay using local substates and timers.",
   "Type": "Component",
   "Class": "Instruction",
   "DefaultState": ".Default",
@@ -26,7 +26,7 @@
     },
     "BabyDirectFollowRadius": {
       "Value": 3,
-      "Description": "Extra-close leash radius used for baby direct-follow catch-up."
+      "Description": "Extra-close leash radius used to trigger baby direct-follow catch-up."
     },
     "BabyDirectFollowStopDistance": {
       "Value": 1.5,
@@ -41,7 +41,7 @@
         "PT6S",
         "PT12S"
       ],
-      "Description": "How long to keep baby direct-follow active after a leash event."
+      "Description": "How long babies remain in direct-follow after a leash trigger."
     }
   },
   "Content": {
@@ -51,159 +51,7 @@
     },
     "Instructions": [
       {
-        "$Comment": "Safety: non-babies must never retain the baby direct-follow flag.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkLifeStage",
-                "Stage": "Baby"
-              }
-            },
-            {
-              "Type": "Or",
-              "Sensors": [
-                {
-                  "Type": "Flag",
-                  "Name": "Tamework_Baby_DirectFollow",
-                  "Set": true
-                },
-                {
-                  "Type": "Flag",
-                  "Name": "Tamework_Baby_DirectFollow_LeashLatch",
-                  "Set": true
-                }
-              ]
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "SetFlag",
-            "Name": "Tamework_Baby_DirectFollow",
-            "SetTo": false
-          },
-          {
-            "Type": "SetFlag",
-            "Name": "Tamework_Baby_DirectFollow_LeashLatch",
-            "SetTo": false
-          }
-        ]
-      },
-      {
-        "$Comment": "Re-arm direct-follow only after the leash trigger condition fully clears.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "Flag",
-              "Name": "Tamework_Baby_DirectFollow_LeashLatch",
-              "Set": true
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "And",
-                "Sensors": [
-                  {
-                    "Type": "TameworkLifeStage",
-                    "Stage": "Baby"
-                  },
-                  {
-                    "Type": "And",
-                    "Sensors": [
-                      {
-                        "Type": "FlockLeader"
-                      },
-                      {
-                        "Type": "Self",
-                        "Filters": [
-                          {
-                            "Type": "Flock",
-                            "FlockStatus": "Follower"
-                          }
-                        ]
-                      }
-                    ]
-                  },
-                  {
-                    "Type": "Leash",
-                    "Range": {
-                      "Compute": "BabyDirectFollowRadius"
-                    }
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "SetFlag",
-            "Name": "Tamework_Baby_DirectFollow_LeashLatch",
-            "SetTo": false
-          }
-        ]
-      },
-      {
-        "$Comment": "Safety: if no direct-follow alarm exists, clear any stale follow flag.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "Flag",
-              "Name": "Tamework_Baby_DirectFollow",
-              "Set": true
-            },
-            {
-              "Type": "Alarm",
-              "Name": "Tamework_Baby_DirectFollow_Window",
-              "State": "Unset"
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "SetFlag",
-            "Name": "Tamework_Baby_DirectFollow",
-            "SetTo": false
-          }
-        ]
-      },
-      {
-        "$Comment": "Safety: when direct-follow alarm expires, clear flag and consume passed alarm state.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "Flag",
-              "Name": "Tamework_Baby_DirectFollow",
-              "Set": true
-            },
-            {
-              "Type": "Alarm",
-              "Name": "Tamework_Baby_DirectFollow_Window",
-              "State": "Passed",
-              "Clear": true
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "SetFlag",
-            "Name": "Tamework_Baby_DirectFollow",
-            "SetTo": false
-          }
-        ]
-      },
-      {
-        "$Comment": "Arm the baby direct-follow window when a baby follower triggers leash catch-up.",
+        "$Comment": "Enter timed baby direct-follow when a baby follower leashes too far.",
         "Continue": true,
         "Enabled": {
           "Compute": "BabyDirectFollowEnabled"
@@ -212,24 +60,12 @@
           "Type": "And",
           "Sensors": [
             {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
               "Type": "TameworkLifeStage",
               "Stage": "Baby"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "Flag",
-                "Name": "Tamework_Baby_DirectFollow_LeashLatch",
-                "Set": true
-              }
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "Flag",
-                "Name": "Tamework_Baby_DirectFollow",
-                "Set": true
-              }
             },
             {
               "Type": "And",
@@ -258,26 +94,112 @@
         },
         "Actions": [
           {
-            "Type": "SetFlag",
-            "Name": "Tamework_Baby_DirectFollow_LeashLatch",
-            "SetTo": true
-          },
-          {
-            "Type": "SetFlag",
-            "Name": "Tamework_Baby_DirectFollow",
-            "SetTo": true
-          },
-          {
             "Type": "SetAlarm",
             "Name": "Tamework_Baby_DirectFollow_Window",
             "DurationRange": {
               "Compute": "BabyDirectFollowDurationRange"
             }
+          },
+          {
+            "Type": "State",
+            "State": ".FlockFollow"
           }
         ]
       },
       {
-        "$Comment": "During the active window, babies directly follow their flock leader even after closing distance.",
+        "$Comment": "Enter standard flock-follow for non-babies when leash is needed.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "LeashEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkLifeStage",
+                "Stage": "Baby"
+              }
+            },
+            {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Type": "Leash",
+              "Range": {
+                "Compute": "FlockFollowerWanderRadius"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".FlockFollow"
+          }
+        ]
+      },
+      {
+        "$Comment": "Safety: if follower/leader preconditions are lost, leave flock-follow.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "FlockLeader"
+                  },
+                  {
+                    "Type": "Self",
+                    "Filters": [
+                      {
+                        "Type": "Flock",
+                        "FlockStatus": "Follower"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "Exit timed baby direct-follow when its timer expires.",
+        "Continue": true,
         "Enabled": {
           "Compute": "BabyDirectFollowEnabled"
         },
@@ -285,13 +207,112 @@
           "Type": "And",
           "Sensors": [
             {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
               "Type": "TameworkLifeStage",
               "Stage": "Baby"
             },
             {
-              "Type": "Flag",
-              "Name": "Tamework_Baby_DirectFollow",
-              "Set": true
+              "Type": "Alarm",
+              "Name": "Tamework_Baby_DirectFollow_Window",
+              "State": "Passed",
+              "Clear": true
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "Safety: if baby timed follow has no active timer, exit flock-follow.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "BabyDirectFollowEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
+              "Type": "TameworkLifeStage",
+              "Stage": "Baby"
+            },
+            {
+              "Type": "Alarm",
+              "Name": "Tamework_Baby_DirectFollow_Window",
+              "State": "Unset"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "Exit standard flock-follow for non-babies once regrouped.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "LeashEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkLifeStage",
+                "Stage": "Baby"
+              }
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Leash",
+                "Range": {
+                  "Compute": "FlockFollowerWanderRadius"
+                }
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
+        "$Comment": "Timed direct-follow motion for babies while the follow timer is active.",
+        "Enabled": {
+          "Compute": "BabyDirectFollowEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
+              "Type": "TameworkLifeStage",
+              "Stage": "Baby"
             },
             {
               "Type": "Alarm",
@@ -332,7 +353,7 @@
         }
       },
       {
-        "$Comment": "Enter local flock-follow substate only when leash pullback is actually needed.",
+        "$Comment": "Standard flock leash motion while in flock-follow substate for non-babies.",
         "Continue": true,
         "Enabled": {
           "Compute": "LeashEnabled"
@@ -342,124 +363,13 @@
           "Sensors": [
             {
               "Type": "State",
-              "State": ".Default"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "Flag",
-                "Name": "Tamework_Baby_DirectFollow",
-                "Set": true
-              }
-            },
-            {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "FlockLeader"
-                },
-                {
-                  "Type": "Self",
-                  "Filters": [
-                    {
-                      "Type": "Flock",
-                      "FlockStatus": "Follower"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "Type": "Leash",
-              "Range": {
-                "Compute": "FlockFollowerWanderRadius"
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".FlockFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Leave local flock-follow substate after regrouping or if direct-follow takes over.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "Or",
-              "Sensors": [
-                {
-                  "Type": "Flag",
-                  "Name": "Tamework_Baby_DirectFollow",
-                  "Set": true
-                },
-                {
-                  "Type": "Not",
-                  "Sensor": {
-                    "Type": "And",
-                    "Sensors": [
-                      {
-                        "Type": "And",
-                        "Sensors": [
-                          {
-                            "Type": "FlockLeader"
-                          },
-                          {
-                            "Type": "Self",
-                            "Filters": [
-                              {
-                                "Type": "Flock",
-                                "FlockStatus": "Follower"
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      {
-                        "Type": "Leash",
-                        "Range": {
-                          "Compute": "FlockFollowerWanderRadius"
-                        }
-                      }
-                    ]
-                  }
-                }
-              ]
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".Default"
-          }
-        ]
-      },
-      {
-        "$Comment": "While in local flock-follow substate, run follower leash movement.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
               "State": ".FlockFollow"
             },
             {
               "Type": "Not",
               "Sensor": {
-                "Type": "Flag",
-                "Name": "Tamework_Baby_DirectFollow",
-                "Set": true
+                "Type": "TameworkLifeStage",
+                "Stage": "Baby"
               }
             }
           ]
