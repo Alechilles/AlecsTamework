@@ -17,22 +17,22 @@
       "Description": "How close followers stop when moving back toward their leader."
     },
     "FlockFollowerRelativeSpeed": {
-      "Value": 1,
+      "Value": 0.7,
       "Description": "Relative speed used by leash seek behavior."
     },
     "FlockFollowDurationRange": {
       "Value": [
-        4,
-        7
+        0,
+        0
       ],
       "Description": "How long standard flock-follow runs after a leash trigger."
     },
     "BabyDirectFollowEnabled": {
       "Value": false,
-      "Description": "Whether babies should use dedicated direct-follow speed/timing."
+      "Description": "Whether mob should use dedicated direct-follow speed/timing."
     },
     "BabyDirectFollowRadius": {
-      "Value": 4,
+      "Value": 3,
       "Description": "Leash radius used while baby direct-follow is active."
     },
     "BabyDirectFollowStopDistance": {
@@ -40,7 +40,7 @@
       "Description": "How close baby followers stop during timed direct-follow."
     },
     "BabyDirectFollowRelativeSpeed": {
-      "Value": 1,
+      "Value": 0.7,
       "Description": "Relative speed used during timed baby direct-follow."
     },
     "BabyDirectFollowDurationRange": {
@@ -274,20 +274,35 @@
         "Instructions": [
           {
             "Continue": true,
-            "Reference": "Component_Instruction_Leash_To_Flock_Leader",
-            "Modify": {
-              "Enabled": {
-                "Compute": "LeashEnabled"
-              },
-              "WanderRadius": {
-                "Compute": "BabyDirectFollowRadius"
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            },
+            "BodyMotion": {
+              "Type": "Seek",
+              "SlowDownDistance": {
+                "Compute": "BabyDirectFollowRadius + 1.5"
               },
               "StopDistance": {
                 "Compute": "BabyDirectFollowStopDistance"
               },
               "RelativeSpeed": {
                 "Compute": "BabyDirectFollowRelativeSpeed"
-              }
+              },
+              "AbortDistance": 100
             }
           },
           {
