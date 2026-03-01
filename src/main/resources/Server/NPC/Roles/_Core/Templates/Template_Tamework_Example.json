@@ -788,11 +788,34 @@
         {
           "From": [
             "Hold",
-            "Sleep"
+            "Sleep",
+            "NeedsSeekWater",
+            "NeedsSeekFood"
           ],
           "To": [
             "Idle",
             "Defend"
+          ]
+        }
+      ],
+      "Actions": [
+        {
+          "Type": "PlayAnimation",
+          "Slot": "Status"
+        }
+      ]
+    },
+    {
+      "$Comment": "Clear looping status animation when entering needs seek from hold/sleep.",
+      "States": [
+        {
+          "From": [
+            "Hold",
+            "Sleep"
+          ],
+          "To": [
+            "NeedsSeekWater",
+            "NeedsSeekFood"
           ]
         }
       ],
