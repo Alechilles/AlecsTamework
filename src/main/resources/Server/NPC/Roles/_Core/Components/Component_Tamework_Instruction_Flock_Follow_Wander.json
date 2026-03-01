@@ -122,7 +122,7 @@
         "$Comment": "Enter baby-only direct-follow substate when a baby follower is outside leash range.",
         "Continue": true,
         "Enabled": {
-          "Compute": "LeashEnabled && BabyDirectFollowEnabled"
+          "Compute": "LeashEnabled"
         },
         "Sensor": {
           "Type": "And",
@@ -168,6 +168,49 @@
           {
             "Type": "State",
             "State": ".FlockFollow"
+          }
+        ]
+      },
+      {
+        "$Comment": "Safety: non-babies must never remain in direct-follow state.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".FlockFollow"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "TameworkLifeStage",
+                "Stage": "Baby"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".StopFollow"
+          }
+        ]
+      },
+      {
+        "$Comment": "Safety: if baby direct-follow is disabled, exit direct-follow state immediately.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "!BabyDirectFollowEnabled"
+        },
+        "Sensor": {
+          "Type": "State",
+          "State": ".FlockFollow"
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".StopFollow"
           }
         ]
       },
