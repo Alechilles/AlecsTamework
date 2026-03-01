@@ -1,8 +1,7 @@
 {
-  "$Comment": "Applies flock leash behavior as an overlay using local substates and timeout chains.",
+  "$Comment": "Applies flock leash behavior as an overlay. Babies can use a tighter leash profile but the same leash behavior.",
   "Type": "Component",
   "Class": "Instruction",
-  "DefaultState": ".Default",
   "Parameters": {
     "LeashEnabled": {
       "Value": true,
@@ -25,30 +24,30 @@
         0,
         0
       ],
-      "Description": "How long standard flock-follow runs after a leash trigger."
+      "Description": "Deprecated compatibility field. Leash-only mode does not use timed follow windows."
     },
     "BabyDirectFollowEnabled": {
       "Value": false,
-      "Description": "Whether mob should use dedicated direct-follow speed/timing."
+      "Description": "If true, use baby leash profile (tighter radius/stop) instead of adult leash profile."
     },
     "BabyDirectFollowRadius": {
       "Value": 3,
-      "Description": "Leash radius used while baby direct-follow is active."
+      "Description": "Tighter leash radius used for babies."
     },
     "BabyDirectFollowStopDistance": {
       "Value": 1.5,
-      "Description": "How close baby followers stop during timed direct-follow."
+      "Description": "Stop distance used for babies when regrouping."
     },
     "BabyDirectFollowRelativeSpeed": {
       "Value": 0.7,
-      "Description": "Relative speed used during timed baby direct-follow."
+      "Description": "Relative speed used for babies when regrouping."
     },
     "BabyDirectFollowDurationRange": {
       "Value": [
         6,
         12
       ],
-      "Description": "How long timed baby direct-follow runs after a leash trigger."
+      "Description": "Deprecated compatibility field. Leash-only mode does not use timed follow windows."
     }
   },
   "Content": {
@@ -58,7 +57,7 @@
     },
     "Instructions": [
       {
-        "$Comment": "Non-baby followers: leash toward leader while remaining in default behavior flow.",
+        "$Comment": "Adult/default leash profile.",
         "Continue": true,
         "Enabled": {
           "Compute": "LeashEnabled && !BabyDirectFollowEnabled"
@@ -66,10 +65,6 @@
         "Sensor": {
           "Type": "And",
           "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Default"
-            },
             {
               "Type": "And",
               "Sensors": [
@@ -112,7 +107,7 @@
         }
       },
       {
-        "$Comment": "Enter baby-only direct-follow substate when a baby follower is outside leash range.",
+        "$Comment": "Baby leash profile: same leash behavior as adults, but tighter radius/stop/speed.",
         "Continue": true,
         "Enabled": {
           "Compute": "LeashEnabled && BabyDirectFollowEnabled"
@@ -120,10 +115,6 @@
         "Sensor": {
           "Type": "And",
           "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Default"
-            },
             {
               "Type": "And",
               "Sensors": [
@@ -149,268 +140,21 @@
             }
           ]
         },
-        "Actions": [
-          {
-            "Type": "PlayAnimation",
-            "Slot": "Status"
+        "Reference": "Component_Instruction_Leash_To_Flock_Leader",
+        "Modify": {
+          "Enabled": {
+            "Compute": "LeashEnabled"
           },
-          {
-            "Type": "State",
-            "State": ".FlockFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Safety: if baby direct-follow is disabled, exit direct-follow state immediately.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "!BabyDirectFollowEnabled"
-        },
-        "Sensor": {
-          "Type": "State",
-          "State": ".FlockFollow"
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".StopFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Safety: if flock leader/follower requirements are lost, leave local follow state.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "And",
-                "Sensors": [
-                  {
-                    "Type": "FlockLeader"
-                  },
-                  {
-                    "Type": "Self",
-                    "Filters": [
-                      {
-                        "Type": "Flock",
-                        "FlockStatus": "Follower"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".StopFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Baby direct-follow branch (if enabled).",
-        "Enabled": {
-          "Compute": "BabyDirectFollowEnabled"
-        },
-        "Sensor": {
-          "Type": "State",
-          "State": ".FlockFollow"
-        },
-        "Instructions": [
-          {
-            "Continue": true,
-            "Sensor": {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "FlockLeader"
-                },
-                {
-                  "Type": "Self",
-                  "Filters": [
-                    {
-                      "Type": "Flock",
-                      "FlockStatus": "Follower"
-                    }
-                  ]
-                }
-              ]
-            },
-            "BodyMotion": {
-              "Type": "Seek",
-              "SlowDownDistance": {
-                "Compute": "BabyDirectFollowRadius + 1.5"
-              },
-              "StopDistance": {
-                "Compute": "BabyDirectFollowStopDistance"
-              },
-              "RelativeSpeed": {
-                "Compute": "BabyDirectFollowRelativeSpeed"
-              },
-              "AbortDistance": 100
-            }
+          "WanderRadius": {
+            "Compute": "BabyDirectFollowRadius"
           },
-          {
-            "Sensor": {
-              "Type": "Any",
-              "Once": true
-            },
-            "ActionsBlocking": true,
-            "Actions": [
-              {
-                "Type": "Timeout",
-                "Delay": {
-                  "Compute": "BabyDirectFollowDurationRange"
-                }
-              },
-              {
-                "Type": "State",
-                "State": ".LeashLatch"
-              }
-            ]
+          "StopDistance": {
+            "Compute": "BabyDirectFollowStopDistance"
+          },
+          "RelativeSpeed": {
+            "Compute": "BabyDirectFollowRelativeSpeed"
           }
-        ]
-      },
-      {
-        "$Comment": "Keep status slot clear while following so locomotion animations can play.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "State",
-          "State": ".FlockFollow"
-        },
-        "Actions": [
-          {
-            "Type": "PlayAnimation",
-            "Slot": "Status"
-          }
-        ]
-      },
-      {
-        "$Comment": "Cancel seek motion while latched, waiting for leash clear.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "State",
-          "State": ".LeashLatch"
-        },
-        "BodyMotion": {
-          "Type": "Nothing"
         }
-      },
-      {
-        "$Comment": "Latch release: once leash condition clears, return to default and allow future trigger.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".LeashLatch"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "Leash",
-                "Range": {
-                  "Compute": "FlockFollowerWanderRadius"
-                }
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".StopFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Safety: if leader/follower relationship is gone while latched, return to default.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".LeashLatch"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "And",
-                "Sensors": [
-                  {
-                    "Type": "FlockLeader"
-                  },
-                  {
-                    "Type": "Self",
-                    "Filters": [
-                      {
-                        "Type": "Flock",
-                        "FlockStatus": "Follower"
-                      }
-                    ]
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".StopFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Hard stop: clear any lingering seek before returning to default behaviors.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "State",
-          "State": ".StopFollow"
-        },
-        "BodyMotion": {
-          "Type": "Nothing"
-        }
-      },
-      {
-        "$Comment": "One-tick local stop state to flush motion before returning to default.",
-        "Sensor": {
-          "Type": "State",
-          "State": ".StopFollow"
-        },
-        "Instructions": [
-          {
-            "Sensor": {
-              "Type": "Any",
-              "Once": true
-            },
-            "ActionsBlocking": true,
-            "Actions": [
-              {
-                "Type": "Timeout",
-                "Delay": [
-                  0,
-                  0
-                ]
-              },
-              {
-                "Type": "State",
-                "State": ".Default"
-              }
-            ]
-          }
-        ]
       }
     ]
   }
