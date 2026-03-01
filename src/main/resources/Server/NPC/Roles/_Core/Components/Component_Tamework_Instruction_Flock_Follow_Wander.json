@@ -1,5 +1,5 @@
 {
-  "$Comment": "Applies flock leash behavior as an overlay using local substates and timers.",
+  "$Comment": "Applies flock leash behavior as an overlay using local substates and timeout chains.",
   "Type": "Component",
   "Class": "Instruction",
   "DefaultState": ".Default",
@@ -20,28 +20,31 @@
       "Value": 1,
       "Description": "Relative speed used by leash seek behavior."
     },
+    "FlockFollowDurationRange": {
+      "Value": [
+        4,
+        7
+      ],
+      "Description": "How long standard flock-follow runs after a leash trigger."
+    },
     "BabyDirectFollowEnabled": {
       "Value": false,
-      "Description": "Whether baby followers should tighten formation after leash catch-up."
-    },
-    "BabyDirectFollowRadius": {
-      "Value": 3,
-      "Description": "Extra-close leash radius used to trigger baby direct-follow catch-up."
+      "Description": "Whether babies should use dedicated direct-follow speed/timing."
     },
     "BabyDirectFollowStopDistance": {
       "Value": 1.5,
-      "Description": "How close baby followers stop during direct-follow catch-up."
+      "Description": "How close baby followers stop during timed direct-follow."
     },
     "BabyDirectFollowRelativeSpeed": {
       "Value": 1,
-      "Description": "Relative speed used during baby direct-follow catch-up."
+      "Description": "Relative speed used during timed baby direct-follow."
     },
     "BabyDirectFollowDurationRange": {
       "Value": [
-        "PT6S",
-        "PT12S"
+        6,
+        12
       ],
-      "Description": "How long babies remain in direct-follow after a leash trigger."
+      "Description": "How long timed baby direct-follow runs after a leash trigger."
     }
   },
   "Content": {
@@ -51,63 +54,7 @@
     },
     "Instructions": [
       {
-        "$Comment": "Enter timed baby direct-follow when a baby follower leashes too far.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "BabyDirectFollowEnabled"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Default"
-            },
-            {
-              "Type": "TameworkLifeStage",
-              "Stage": "Baby"
-            },
-            {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "FlockLeader"
-                },
-                {
-                  "Type": "Self",
-                  "Filters": [
-                    {
-                      "Type": "Flock",
-                      "FlockStatus": "Follower"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "Type": "Leash",
-              "Range": {
-                "Compute": "BabyDirectFollowRadius"
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "SetAlarm",
-            "Name": "Tamework_Baby_DirectFollow_Window",
-            "DurationRange": {
-              "Compute": "BabyDirectFollowDurationRange"
-            }
-          },
-          {
-            "Type": "State",
-            "State": ".FlockFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Enter standard flock-follow for non-babies when leash is needed.",
+        "$Comment": "Enter local follow substate when a flock follower is outside leash range.",
         "Continue": true,
         "Enabled": {
           "Compute": "LeashEnabled"
@@ -118,13 +65,6 @@
             {
               "Type": "State",
               "State": ".Default"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkLifeStage",
-                "Stage": "Baby"
-              }
             },
             {
               "Type": "And",
@@ -159,7 +99,7 @@
         ]
       },
       {
-        "$Comment": "Safety: if follower/leader preconditions are lost, leave flock-follow.",
+        "$Comment": "Safety: if flock leader/follower requirements are lost, leave local follow state.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
@@ -193,13 +133,12 @@
         "Actions": [
           {
             "Type": "State",
-            "State": ".Default"
+            "State": ".StopFollow"
           }
         ]
       },
       {
-        "$Comment": "Exit timed baby direct-follow when its timer expires.",
-        "Continue": true,
+        "$Comment": "Baby direct-follow branch (if enabled).",
         "Enabled": {
           "Compute": "BabyDirectFollowEnabled"
         },
@@ -213,166 +152,56 @@
             {
               "Type": "TameworkLifeStage",
               "Stage": "Baby"
-            },
-            {
-              "Type": "Alarm",
-              "Name": "Tamework_Baby_DirectFollow_Window",
-              "State": "Passed",
-              "Clear": true
             }
           ]
         },
-        "Actions": [
+        "Instructions": [
           {
-            "Type": "State",
-            "State": ".Default"
+            "Continue": true,
+            "BodyMotion": {
+              "Type": "Seek",
+              "SlowDownDistance": {
+                "Compute": "BabyDirectFollowStopDistance + 1"
+              },
+              "StopDistance": {
+                "Compute": "BabyDirectFollowStopDistance"
+              },
+              "RelativeSpeed": {
+                "Compute": "BabyDirectFollowRelativeSpeed"
+              },
+              "AbortDistance": 100
+            }
+          },
+          {
+            "Sensor": {
+              "Type": "Any",
+              "Once": true
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "BabyDirectFollowDurationRange"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".LeashLatch"
+              }
+            ]
           }
         ]
       },
       {
-        "$Comment": "Safety: if baby timed follow has no active timer, exit flock-follow.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "BabyDirectFollowEnabled"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "TameworkLifeStage",
-              "Stage": "Baby"
-            },
-            {
-              "Type": "Alarm",
-              "Name": "Tamework_Baby_DirectFollow_Window",
-              "State": "Unset"
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".Default"
-          }
-        ]
-      },
-      {
-        "$Comment": "Exit standard flock-follow for non-babies once regrouped.",
+        "$Comment": "Standard follower leash motion while in local follow state.",
         "Continue": true,
         "Enabled": {
           "Compute": "LeashEnabled"
         },
         "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkLifeStage",
-                "Stage": "Baby"
-              }
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "Leash",
-                "Range": {
-                  "Compute": "FlockFollowerWanderRadius"
-                }
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".Default"
-          }
-        ]
-      },
-      {
-        "$Comment": "Timed direct-follow motion for babies while the follow timer is active.",
-        "Enabled": {
-          "Compute": "BabyDirectFollowEnabled"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "TameworkLifeStage",
-              "Stage": "Baby"
-            },
-            {
-              "Type": "Alarm",
-              "Name": "Tamework_Baby_DirectFollow_Window",
-              "State": "Set"
-            },
-            {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "FlockLeader"
-                },
-                {
-                  "Type": "Self",
-                  "Filters": [
-                    {
-                      "Type": "Flock",
-                      "FlockStatus": "Follower"
-                    }
-                  ]
-                }
-              ]
-            }
-          ]
-        },
-        "BodyMotion": {
-          "Type": "Seek",
-          "SlowDownDistance": {
-            "Compute": "BabyDirectFollowStopDistance + 1"
-          },
-          "StopDistance": {
-            "Compute": "BabyDirectFollowStopDistance"
-          },
-          "RelativeSpeed": {
-            "Compute": "BabyDirectFollowRelativeSpeed"
-          },
-          "AbortDistance": 100
-        }
-      },
-      {
-        "$Comment": "Standard flock leash motion while in flock-follow substate for non-babies.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "LeashEnabled"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkLifeStage",
-                "Stage": "Baby"
-              }
-            }
-          ]
+          "Type": "State",
+          "State": ".FlockFollow"
         },
         "Reference": "Component_Instruction_Leash_To_Flock_Leader",
         "Modify": {
@@ -389,6 +218,145 @@
             "Compute": "FlockFollowerRelativeSpeed"
           }
         }
+      },
+      {
+        "$Comment": "Run a timed follow window for standard branch, then wait for leash clear before allowing retrigger.",
+        "Sensor": {
+          "Type": "State",
+          "State": ".FlockFollow"
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "Any",
+              "Once": true
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": {
+                  "Compute": "FlockFollowDurationRange"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".LeashLatch"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "$Comment": "Cancel seek motion while latched, waiting for leash clear.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".LeashLatch"
+        },
+        "BodyMotion": {
+          "Type": "Nothing"
+        }
+      },
+      {
+        "$Comment": "Latch release: once leash condition clears, return to default and allow future trigger.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".LeashLatch"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Leash",
+                "Range": {
+                  "Compute": "FlockFollowerWanderRadius"
+                }
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".StopFollow"
+          }
+        ]
+      },
+      {
+        "$Comment": "Safety: if leader/follower relationship is gone while latched, return to default.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".LeashLatch"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "And",
+                "Sensors": [
+                  {
+                    "Type": "FlockLeader"
+                  },
+                  {
+                    "Type": "Self",
+                    "Filters": [
+                      {
+                        "Type": "Flock",
+                        "FlockStatus": "Follower"
+                      }
+                    ]
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "State",
+            "State": ".StopFollow"
+          }
+        ]
+      },
+      {
+        "$Comment": "Hard stop: clear any lingering seek before returning to default behaviors.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".StopFollow"
+        },
+        "BodyMotion": {
+          "Type": "Nothing"
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "Any",
+              "Once": true
+            },
+            "ActionsBlocking": true,
+            "Actions": [
+              {
+                "Type": "Timeout",
+                "Delay": [
+                  0,
+                  0
+                ]
+              },
+              {
+                "Type": "State",
+                "State": ".Default"
+              }
+            ]
+          }
+        ]
       }
     ]
   }
