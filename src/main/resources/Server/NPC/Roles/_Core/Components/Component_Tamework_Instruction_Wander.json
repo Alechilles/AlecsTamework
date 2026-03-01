@@ -294,6 +294,28 @@
         ]
       },
       {
+        "$Comment": "Clear lingering status posture on move entry so locomotion animation can take over.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": ".Move"
+        },
+        "Instructions": [
+          {
+            "Sensor": {
+              "Type": "Any",
+              "Once": true
+            },
+            "Actions": [
+              {
+                "Type": "PlayAnimation",
+                "Slot": "Status"
+              }
+            ]
+          }
+        ]
+      },
+      {
         "$Comment": "Movement burst.",
         "Continue": true,
         "Sensor": {
@@ -421,6 +443,10 @@
             "Delay": {
               "Compute": "WanderSettleDurationRange"
             }
+          },
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
           },
           {
             "Type": "State",
