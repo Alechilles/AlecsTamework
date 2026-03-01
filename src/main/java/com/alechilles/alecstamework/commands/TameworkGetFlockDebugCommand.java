@@ -17,8 +17,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
@@ -117,22 +117,19 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
     @Nullable
     private static Boolean readDirectFollowFlag(@Nonnull NPCEntity npc) {
         Role role = npc.getRole();
-        if (role == null || role.getMarkedEntitySupport() == null) {
+        if (role == null || role.getEntitySupport() == null) {
             return null;
         }
-        Object entitySupport = invokeObjectGetter(role.getMarkedEntitySupport(), "getEntitySupport");
-        if (entitySupport == null) {
-            return null;
-        }
-        Object sensorScope = invokeObjectGetter(entitySupport, "getSensorScope");
+        StdScope sensorScope = role.getEntitySupport().getSensorScope();
         if (sensorScope == null) {
             return null;
         }
-        Boolean direct = invokeScopeBoolean(sensorScope, DIRECT_FOLLOW_FLAG);
-        if (direct != null) {
-            return direct;
+        try {
+            BooleanSupplier supplier = sensorScope.getBooleanSupplier(DIRECT_FOLLOW_FLAG);
+            return supplier != null ? supplier.getAsBoolean() : null;
+        } catch (IllegalStateException ignored) {
+            return null;
         }
-        return null;
     }
 
     @Nonnull
@@ -171,47 +168,6 @@ public final class TameworkGetFlockDebugCommand extends AbstractPlayerCommand {
             return null;
         }
         return null;
-    }
-
-    @Nullable
-    private static Boolean invokeScopeBoolean(@Nonnull Object scope, @Nonnull String name) {
-        try {
-            Method getBoolean = scope.getClass().getMethod("getBoolean", String.class);
-            Object value = getBoolean.invoke(scope, name);
-            if (value instanceof Boolean bool) {
-                return bool;
-            }
-        } catch (ReflectiveOperationException ignored) {
-            // Fallback below.
-        } catch (RuntimeException ignored) {
-            // Missing symbol/type mismatch in scope.
-            return null;
-        }
-        try {
-            Method getBooleanSupplier = scope.getClass().getMethod("getBooleanSupplier", String.class);
-            Object supplierObj = getBooleanSupplier.invoke(scope, name);
-            if (supplierObj instanceof BooleanSupplier supplier) {
-                return supplier.getAsBoolean();
-            }
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        } catch (RuntimeException ignored) {
-            return null;
-        }
-        return null;
-    }
-
-    @Nullable
-    private static Object invokeObjectGetter(@Nullable Object target, @Nonnull String methodName) {
-        if (target == null) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
     }
 
     @Nonnull
