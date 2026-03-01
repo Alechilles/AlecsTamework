@@ -61,68 +61,7 @@
         "$Comment": "Non-baby followers: leash toward leader while remaining in default behavior flow.",
         "Continue": true,
         "Enabled": {
-          "Compute": "LeashEnabled"
-        },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".Default"
-            },
-            {
-              "Type": "And",
-              "Sensors": [
-                {
-                  "Type": "FlockLeader"
-                },
-                {
-                  "Type": "Self",
-                  "Filters": [
-                    {
-                      "Type": "Flock",
-                      "FlockStatus": "Follower"
-                    }
-                  ]
-                }
-              ]
-            },
-            {
-              "Type": "Leash",
-              "Range": {
-                "Compute": "BabyDirectFollowRadius"
-              }
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkLifeStage",
-                "Stage": "Baby"
-              }
-            }
-          ]
-        },
-        "Reference": "Component_Instruction_Leash_To_Flock_Leader",
-        "Modify": {
-          "Enabled": {
-            "Compute": "LeashEnabled"
-          },
-          "WanderRadius": {
-            "Compute": "FlockFollowerWanderRadius"
-          },
-          "StopDistance": {
-            "Compute": "FlockFollowerStopDistance"
-          },
-          "RelativeSpeed": {
-            "Compute": "FlockFollowerRelativeSpeed"
-          }
-        }
-      },
-      {
-        "$Comment": "Enter baby-only direct-follow substate when a baby follower is outside leash range.",
-        "Continue": true,
-        "Enabled": {
-          "Compute": "LeashEnabled"
+          "Compute": "LeashEnabled && !BabyDirectFollowEnabled"
         },
         "Sensor": {
           "Type": "And",
@@ -153,10 +92,60 @@
               "Range": {
                 "Compute": "FlockFollowerWanderRadius"
               }
+            }
+          ]
+        },
+        "Reference": "Component_Instruction_Leash_To_Flock_Leader",
+        "Modify": {
+          "Enabled": {
+            "Compute": "LeashEnabled"
+          },
+          "WanderRadius": {
+            "Compute": "FlockFollowerWanderRadius"
+          },
+          "StopDistance": {
+            "Compute": "FlockFollowerStopDistance"
+          },
+          "RelativeSpeed": {
+            "Compute": "FlockFollowerRelativeSpeed"
+          }
+        }
+      },
+      {
+        "$Comment": "Enter baby-only direct-follow substate when a baby follower is outside leash range.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "LeashEnabled && BabyDirectFollowEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".Default"
             },
             {
-              "Type": "TameworkLifeStage",
-              "Stage": "Baby"
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Type": "Leash",
+              "Range": {
+                "Compute": "BabyDirectFollowRadius"
+              }
             }
           ]
         },
@@ -168,32 +157,6 @@
           {
             "Type": "State",
             "State": ".FlockFollow"
-          }
-        ]
-      },
-      {
-        "$Comment": "Safety: non-babies must never remain in direct-follow state.",
-        "Continue": true,
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "TameworkLifeStage",
-                "Stage": "Baby"
-              }
-            }
-          ]
-        },
-        "Actions": [
-          {
-            "Type": "State",
-            "State": ".StopFollow"
           }
         ]
       },
@@ -259,17 +222,8 @@
           "Compute": "BabyDirectFollowEnabled"
         },
         "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "State",
-              "State": ".FlockFollow"
-            },
-            {
-              "Type": "TameworkLifeStage",
-              "Stage": "Baby"
-            }
-          ]
+          "Type": "State",
+          "State": ".FlockFollow"
         },
         "Instructions": [
           {
