@@ -131,12 +131,16 @@ public final class CompanionHappinessService {
             );
             happinessChanged = true;
         }
-        if ((happiness.getConfigId() == null || happiness.getConfigId().isBlank())
-                && happinessConfig != null
+        if (happinessConfig != null
                 && happinessConfig.getId() != null
-                    && !happinessConfig.getId().isBlank()) {
-            happiness.setConfigId(happinessConfig.getId());
-            happinessChanged = true;
+                && !happinessConfig.getId().isBlank()) {
+            String resolvedConfigId = happinessConfig.getId();
+            if (happiness.getConfigId() == null
+                    || happiness.getConfigId().isBlank()
+                    || !resolvedConfigId.equalsIgnoreCase(happiness.getConfigId())) {
+                happiness.setConfigId(resolvedConfigId);
+                happinessChanged = true;
+            }
         }
         double previous = resolveCurrent(happiness, breeding, rules.defaultValue);
         CompanionHappinessModifierService.ModifierSnapshot modifierSnapshot =
@@ -178,11 +182,14 @@ public final class CompanionHappinessService {
                     breeding.setReady(ready);
                     breedingChanged = true;
                 }
-                if ((breeding.getConfigId() == null || breeding.getConfigId().isBlank())
-                        && breedingConfig.getId() != null
-                        && !breedingConfig.getId().isBlank()) {
-                    breeding.setConfigId(breedingConfig.getId());
-                    breedingChanged = true;
+                if (breedingConfig.getId() != null && !breedingConfig.getId().isBlank()) {
+                    String resolvedBreedingConfigId = breedingConfig.getId();
+                    if (breeding.getConfigId() == null
+                            || breeding.getConfigId().isBlank()
+                            || !resolvedBreedingConfigId.equalsIgnoreCase(breeding.getConfigId())) {
+                        breeding.setConfigId(resolvedBreedingConfigId);
+                        breedingChanged = true;
+                    }
                 }
             }
             if (breedingChanged) {

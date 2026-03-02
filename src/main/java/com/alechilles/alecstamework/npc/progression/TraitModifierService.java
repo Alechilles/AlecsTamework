@@ -80,18 +80,23 @@ public final class TraitModifierService {
     private static TwTraitConfig resolveTraitConfig(@Nullable TameworkTraitsComponent component,
                                                     @Nullable Ref<EntityStore> npcRef,
                                                     @Nullable Store<EntityStore> store) {
-        if (component == null) {
-            return null;
-        }
-        String configId = component.getConfigId();
-        if (configId != null && !configId.isBlank()) {
-            TwTraitConfig config = TwTraitConfig.resolveById(configId);
-            if (config != null) {
-                return config;
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId != null && !roleId.isBlank()) {
+            TwTraitConfig byRole = TwTraitConfig.resolveForRole(roleId);
+            if (byRole != null) {
+                return byRole;
             }
         }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        return roleId != null ? TwTraitConfig.resolveForRole(roleId) : null;
+        if (component != null) {
+            String configId = component.getConfigId();
+            if (configId != null && !configId.isBlank()) {
+                TwTraitConfig config = TwTraitConfig.resolveById(configId);
+                if (config != null) {
+                    return config;
+                }
+            }
+        }
+        return null;
     }
 
     private static Map<String, TwTraitConfig.TraitDefinition> buildDefinitionMap(TwTraitConfig config) {

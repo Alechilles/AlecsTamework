@@ -8,7 +8,10 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nullable;
 
 /**
- * Resolves needs config for an NPC from explicit config ID or role mapping.
+ * Resolves needs config for an NPC.
+ *
+ * <p>Role-based resolution is preferred so priority selection stays consistent across reloads and
+ * config edits. Component config IDs are treated as fallback only.
  */
 public final class NeedsConfigResolver {
     private NeedsConfigResolver() {
@@ -18,16 +21,20 @@ public final class NeedsConfigResolver {
     public static TwNeedsConfig resolveConfig(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store,
                                               @Nullable TameworkNeedsComponent component) {
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId != null && !roleId.isBlank()) {
+            TwNeedsConfig byRole = TwNeedsConfig.resolveForRole(roleId);
+            if (byRole != null) {
+                return byRole;
+            }
+        }
+
         if (component != null && component.getConfigId() != null && !component.getConfigId().isBlank()) {
             TwNeedsConfig config = TwNeedsConfig.resolveById(component.getConfigId());
             if (config != null) {
                 return config;
             }
         }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        if (roleId == null || roleId.isBlank()) {
-            return null;
-        }
-        return TwNeedsConfig.resolveForRole(roleId);
+        return null;
     }
 }

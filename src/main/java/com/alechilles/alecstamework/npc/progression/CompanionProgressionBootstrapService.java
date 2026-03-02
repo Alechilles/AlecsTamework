@@ -95,12 +95,14 @@ public final class CompanionProgressionBootstrapService {
         long now = System.currentTimeMillis();
         if (existing != null) {
             boolean changed = false;
-            if ((existing.getConfigId() == null || existing.getConfigId().isBlank())
-                    && config != null
-                    && config.getId() != null
-                    && !config.getId().isBlank()) {
-                existing.setConfigId(config.getId());
-                changed = true;
+            if (config != null && config.getId() != null && !config.getId().isBlank()) {
+                String resolvedConfigId = config.getId();
+                if (existing.getConfigId() == null
+                        || existing.getConfigId().isBlank()
+                        || !resolvedConfigId.equalsIgnoreCase(existing.getConfigId())) {
+                    existing.setConfigId(resolvedConfigId);
+                    changed = true;
+                }
             }
             double fallback = resolveInitialHappinessValue(npcRef, store, config);
             double current = existing.getValue();
@@ -165,8 +167,13 @@ public final class CompanionProgressionBootstrapService {
         TameworkBreedingComponent existing = store.getComponent(npcRef, breedingType);
         if (existing != null) {
             boolean changed = false;
-            if ((existing.getConfigId() == null || existing.getConfigId().isBlank()) && config.getId() != null) {
-                existing.setConfigId(config.getId());
+            String resolvedConfigId = config.getId();
+            if (resolvedConfigId != null
+                    && !resolvedConfigId.isBlank()
+                    && (existing.getConfigId() == null
+                    || existing.getConfigId().isBlank()
+                    || !resolvedConfigId.equalsIgnoreCase(existing.getConfigId()))) {
+                existing.setConfigId(resolvedConfigId);
                 changed = true;
             }
             if (!Double.isFinite(existing.getHappiness())
@@ -222,9 +229,14 @@ public final class CompanionProgressionBootstrapService {
         TameworkTraitsComponent existing = store.getComponent(npcRef, traitsType);
         if (existing != null) {
             boolean changed = false;
-            if ((existing.getConfigId() == null || existing.getConfigId().isBlank()) && config.getId() != null) {
-                existing.setConfigId(config.getId());
-                changed = true;
+            if (config.getId() != null && !config.getId().isBlank()) {
+                String resolvedConfigId = config.getId();
+                if (existing.getConfigId() == null
+                        || existing.getConfigId().isBlank()
+                        || !resolvedConfigId.equalsIgnoreCase(existing.getConfigId())) {
+                    existing.setConfigId(resolvedConfigId);
+                    changed = true;
+                }
             }
             long seed = existing.getRollSeed();
             if (seed == 0L) {

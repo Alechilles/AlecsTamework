@@ -59,10 +59,13 @@ public final class CompanionNeedsService {
             return created;
         }
         boolean changed = false;
-        if ((existing.getConfigId() == null || existing.getConfigId().isBlank())
-                && config.getId() != null
-                && !config.getId().isBlank()) {
-            existing.setConfigId(config.getId());
+        String resolvedConfigId = config.getId();
+        if (resolvedConfigId != null
+                && !resolvedConfigId.isBlank()
+                && (existing.getConfigId() == null
+                || existing.getConfigId().isBlank()
+                || !resolvedConfigId.equalsIgnoreCase(existing.getConfigId()))) {
+            existing.setConfigId(resolvedConfigId);
             changed = true;
         }
         double hunger = sanitizeAndClamp(existing.getHunger(), values.getHungerDefault(), values.getHungerMin(), values.getHungerMax());
@@ -252,19 +255,26 @@ public final class CompanionNeedsService {
                                                     @Nullable Store<EntityStore> store,
                                                     @Nullable String roleId,
                                                     @Nullable TameworkNeedsComponent component) {
-        if (component != null && component.getConfigId() != null && !component.getConfigId().isBlank()) {
-            TwNeedsConfig byId = TwNeedsConfig.resolveById(component.getConfigId());
-            if (byId != null) {
-                return byId;
-            }
-        }
         if (roleId != null && !roleId.isBlank()) {
             TwNeedsConfig byRoleId = TwNeedsConfig.resolveForRole(roleId);
             if (byRoleId != null) {
                 return byRoleId;
             }
         }
-        return NeedsConfigResolver.resolveConfig(npcRef, store, component);
+        String resolvedRoleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (resolvedRoleId != null && !resolvedRoleId.isBlank()) {
+            TwNeedsConfig byResolvedRole = TwNeedsConfig.resolveForRole(resolvedRoleId);
+            if (byResolvedRole != null) {
+                return byResolvedRole;
+            }
+        }
+        if (component != null && component.getConfigId() != null && !component.getConfigId().isBlank()) {
+            TwNeedsConfig byId = TwNeedsConfig.resolveById(component.getConfigId());
+            if (byId != null) {
+                return byId;
+            }
+        }
+        return null;
     }
 
     @Nonnull
