@@ -226,6 +226,7 @@ final class CommandLinkedPanelEntryService {
             String label = resolveLabel(definition);
             indicators.add(new LinkedNpcTraitIndicator(
                     resolveIconGlyph(definition),
+                    resolveIconTexturePath(definition),
                     label,
                     buildTooltip(label, value, min, defaultValue, max),
                     fillRatio,
@@ -397,6 +398,17 @@ final class CommandLinkedPanelEntryService {
             }
         }
         return "?";
+    }
+
+    private String resolveIconTexturePath(TwTraitConfig.TraitDefinition definition) {
+        if (definition == null) {
+            return null;
+        }
+        String iconPath = definition.getIconPath();
+        if (iconPath == null || iconPath.isBlank()) {
+            return null;
+        }
+        return iconPath;
     }
 
     private String resolveLabel(TwTraitConfig.TraitDefinition definition) {

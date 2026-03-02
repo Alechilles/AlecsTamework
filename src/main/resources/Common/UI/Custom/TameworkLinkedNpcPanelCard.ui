@@ -122,6 +122,11 @@ Group {
       Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
 
       Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Group #TraitIconImage {
+        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+        Visible: false;
+      }
       Label #TraitIcon {
         Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
         Text: "?";
@@ -160,6 +165,11 @@ Group {
       Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
 
       Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Group #TraitIconImage {
+        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+        Visible: false;
+      }
       Label #TraitIcon {
         Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
         Text: "?";
@@ -198,6 +208,11 @@ Group {
       Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
 
       Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Group #TraitIconImage {
+        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+        Visible: false;
+      }
       Label #TraitIcon {
         Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
         Text: "?";
@@ -329,6 +344,11 @@ Group {
       Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #f2c97c; }
 
       Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Group #NeedIconImage {
+        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Happiness.png");
+        Visible: false;
+      }
       Label #NeedIcon {
         Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
         Text: "M";
@@ -366,6 +386,11 @@ Group {
       Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #d9a066; }
 
       Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Group #NeedIconImage {
+        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Hunger.png");
+        Visible: false;
+      }
       Label #NeedIcon {
         Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
         Text: "F";
@@ -403,6 +428,11 @@ Group {
       Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #76b7ea; }
 
       Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Group #NeedIconImage {
+        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Thirst.png");
+        Visible: false;
+      }
       Label #NeedIcon {
         Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
         Text: "W";

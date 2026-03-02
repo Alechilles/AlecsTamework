@@ -36,7 +36,18 @@ final class LinkedNpcTraitIndicatorBinder {
                                  String slotSelector,
                                  LinkedNpcTraitIndicator indicator) {
         String fillColor = indicator.belowDefault() ? NEGATIVE_FILL_COLOR : POSITIVE_FILL_COLOR;
-        commandBuilder.set(slotSelector + " #TraitIcon.Text", indicator.iconText());
+        if (indicator.hasIconTexturePath()) {
+            commandBuilder.set(slotSelector + " #TraitIcon.Visible", false);
+            commandBuilder.set(slotSelector + " #TraitIconImage.Visible", true);
+            commandBuilder.set(
+                    slotSelector + " #TraitIconImage.Background",
+                    indicator.iconTexturePath()
+            );
+        } else {
+            commandBuilder.set(slotSelector + " #TraitIconImage.Visible", false);
+            commandBuilder.set(slotSelector + " #TraitIcon.Visible", true);
+            commandBuilder.set(slotSelector + " #TraitIcon.Text", indicator.iconText());
+        }
         commandBuilder.set(slotSelector + " #TraitTooltip.TooltipText", indicator.tooltipText());
         commandBuilder.set(slotSelector + " #RingFillTop.Background", fillColor);
         commandBuilder.set(slotSelector + " #RingFillRight.Background", fillColor);

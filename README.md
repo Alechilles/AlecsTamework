@@ -134,6 +134,9 @@ Optional prompt updater (see the example template for full usage):
   Location: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 - **TwCommandItemConfig**: command-tool behavior and command list.
   Location: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
+- **TwTraitConfig**: role-scoped trait pools and inheritance behavior.
+  Location: `<ModRoot>/Server/Tamework/Traits/*.json`
+  Notes: each trait definition can now optionally set `IconPath` for linked-panel icon rendering; when omitted, the UI falls back to first-letter glyphs.
 - After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
 
 ## Contributor Architecture Snapshot

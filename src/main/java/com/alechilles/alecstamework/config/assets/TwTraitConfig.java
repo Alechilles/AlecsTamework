@@ -147,6 +147,12 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             definition -> definition.effectKey
         )
         .add()
+        .<String>append(
+            new KeyedCodec<>("IconPath", Codec.STRING),
+            (definition, value) -> definition.iconPath = value,
+            definition -> definition.iconPath
+        )
+        .add()
         .<Double>append(
             new KeyedCodec<>("Weight", Codec.DOUBLE),
             (definition, value) -> definition.weight = value,
@@ -504,6 +510,7 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         private String id;
         private String displayName;
         private String effectKey;
+        private String iconPath;
         private double weight = 1.0;
         private double inheritanceWeight = 1.0;
         private double naturalMin = 0.9;
@@ -524,6 +531,14 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String getEffectKey() {
             return effectKey;
+        }
+
+        @Nullable
+        public String getIconPath() {
+            if (iconPath == null || iconPath.isBlank()) {
+                return null;
+            }
+            return iconPath;
         }
 
         public double getWeight() {

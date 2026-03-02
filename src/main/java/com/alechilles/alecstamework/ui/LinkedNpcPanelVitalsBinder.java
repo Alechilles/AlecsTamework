@@ -13,6 +13,9 @@ final class LinkedNpcPanelVitalsBinder {
     private static final String HUNGER_FILL_COLOR = "#d9a066";
     private static final String THIRST_FILL_COLOR = "#76b7ea";
     private static final String UNAVAILABLE_FILL_COLOR = "#4e6077";
+    private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
+    private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
+    private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
 
     private LinkedNpcPanelVitalsBinder() {
     }
@@ -59,21 +62,21 @@ final class LinkedNpcPanelVitalsBinder {
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedHappiness",
-                "M",
+                new NeedIcon("M", ICON_NEED_HAPPINESS),
                 resolveHappinessNeed(entry),
                 HAPPINESS_FILL_COLOR
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedHunger",
-                "F",
+                new NeedIcon("F", ICON_NEED_HUNGER),
                 resolveHungerNeed(entry),
                 HUNGER_FILL_COLOR
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedThirst",
-                "W",
+                new NeedIcon("W", ICON_NEED_THIRST),
                 resolveThirstNeed(entry),
                 THIRST_FILL_COLOR
         );
@@ -149,11 +152,19 @@ final class LinkedNpcPanelVitalsBinder {
 
     private static void bindNeedRing(UICommandBuilder commandBuilder,
                                      String slotSelector,
-                                     String iconText,
+                                     NeedIcon icon,
                                      NeedVisual visual,
                                      String activeFillColor) {
         commandBuilder.set(slotSelector + ".Visible", true);
-        commandBuilder.set(slotSelector + " #NeedIcon.Text", iconText);
+        if (icon.hasTexturePath()) {
+            commandBuilder.set(slotSelector + " #NeedIcon.Visible", false);
+            commandBuilder.set(slotSelector + " #NeedIconImage.Visible", true);
+            commandBuilder.set(slotSelector + " #NeedIconImage.Background", icon.texturePath());
+        } else {
+            commandBuilder.set(slotSelector + " #NeedIconImage.Visible", false);
+            commandBuilder.set(slotSelector + " #NeedIcon.Visible", true);
+            commandBuilder.set(slotSelector + " #NeedIcon.Text", icon.fallbackText());
+        }
         commandBuilder.set(slotSelector + " #NeedTooltip.TooltipText", visual.tooltipText());
         String fillColor = visual.available() ? activeFillColor : UNAVAILABLE_FILL_COLOR;
         commandBuilder.set(slotSelector + " #RingFillTop.Background", fillColor);
@@ -209,6 +220,12 @@ final class LinkedNpcPanelVitalsBinder {
     }
 
     private record NeedVisual(double fillRatio, String tooltipText, boolean available) {
+    }
+
+    private record NeedIcon(String fallbackText, String texturePath) {
+        private boolean hasTexturePath() {
+            return texturePath != null && !texturePath.isBlank();
+        }
     }
 
     private record SegmentFill(double top, double right, double bottom, double left) {

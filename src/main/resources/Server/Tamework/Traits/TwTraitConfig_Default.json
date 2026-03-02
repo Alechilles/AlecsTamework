@@ -32,6 +32,7 @@
     {
       "Id": "Trait_Disposition",
       "DisplayName": "Disposition",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Disposition.png",
       "EffectKey": "HappinessGainMultiplier",
       "Weight": 1.0,
       "InheritanceWeight": 1.0,
@@ -44,6 +45,7 @@
     {
       "Id": "Trait_Fertility",
       "DisplayName": "Fertility",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Fertility.png",
       "EffectKey": "FertilityMultiplier",
       "Weight": 0.8,
       "InheritanceWeight": 0.8,
@@ -68,6 +70,7 @@
     {
       "Id": "Trait_Size",
       "DisplayName": "Size",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Size.png",
       "EffectKey": "SizeMultiplier",
       "Weight": 0.8,
       "InheritanceWeight": 0.8,
@@ -80,6 +83,7 @@
     {
       "Id": "Trait_Swiftness",
       "DisplayName": "Swiftness",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Swiftness.png",
       "EffectKey": "MoveSpeedMultiplier",
       "Weight": 0.75,
       "InheritanceWeight": 0.75,
@@ -92,6 +96,7 @@
     {
       "Id": "Trait_Toughness",
       "DisplayName": "Toughness",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Toughness.png",
       "EffectKey": "DamageTakenMultiplier",
       "Weight": 0.85,
       "InheritanceWeight": 0.85,
@@ -104,6 +109,7 @@
     {
       "Id": "Trait_Strength",
       "DisplayName": "Strength",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Strength.png",
       "EffectKey": "DamageDealtMultiplier",
       "Weight": 0.85,
       "InheritanceWeight": 0.85,
@@ -116,6 +122,7 @@
     {
       "Id": "Trait_Bounty",
       "DisplayName": "Bounty",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Bounty.png",
       "EffectKey": "HarvestDoubleDropChanceMultiplier",
       "Weight": 0.65,
       "InheritanceWeight": 1,
