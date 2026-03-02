@@ -17,7 +17,7 @@
       "Description": "Maximum heading change for each wander update."
     },
     "WanderRelativeSpeed": {
-      "Value": 0.3,
+      "Value": 0.2,
       "Description": "Relative movement speed while wandering."
     },
     "WanderAvoidBlockDamage": {

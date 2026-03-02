@@ -26,9 +26,9 @@
     "RequireSameRoleId": true
   },
   "Cooldowns": {
-    "BaseCooldownSeconds": 600,
-    "MinDelaySeconds": 15,
-    "MaxDelaySeconds": 45
+    "BaseCooldownSeconds": 1440,
+    "MinDelaySeconds": 0,
+    "MaxDelaySeconds": 300
   },
   "PassiveBreeding": {
     "Enabled": true,
@@ -61,7 +61,7 @@
       {
         "AdultRoleId": "Mob_Tamework_Example",
         "BabyRoleId": "Mob_Tamework_Example_Baby",
-        "TimeToFullGrownSeconds": 60
+        "TimeToFullGrownSeconds": 2880
       }
     ]
   }

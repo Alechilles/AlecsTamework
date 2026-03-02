@@ -9,16 +9,14 @@ import com.hypixel.hytale.server.flock.FlockMembershipSystems;
 import com.hypixel.hytale.server.flock.FlockPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
-import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.concurrent.ThreadLocalRandom;
 import javax.annotation.Nullable;
 
 /**
- * Assigns parent-offspring breeding groups into a vanilla flock and follower behavior state.
+ * Assigns parent-offspring breeding groups into vanilla flock membership.
  */
 final class BreedingFamilyFlockService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
-    private static final String FLOCK_FOLLOW_STATE = "FlockFollow";
 
     boolean assignFamilyFlock(Ref<EntityStore> childRef,
                               @Nullable Ref<EntityStore> parentARef,
@@ -48,7 +46,7 @@ final class BreedingFamilyFlockService {
         if (!ensureJoined(childRef, plan.flockRef(), store)) {
             return false;
         }
-        return applyFollowerTargetAndState(childRef, plan.leaderRef(), store);
+        return applyFollowerLeaderTarget(childRef, plan.leaderRef(), store);
     }
 
     @Nullable
@@ -148,57 +146,22 @@ final class BreedingFamilyFlockService {
         return true;
     }
 
-    private boolean applyFollowerTargetAndState(@Nullable Ref<EntityStore> followerRef,
-                                                Ref<EntityStore> leaderRef,
-                                                Store<EntityStore> store) {
+    private boolean applyFollowerLeaderTarget(@Nullable Ref<EntityStore> followerRef,
+                                              Ref<EntityStore> leaderRef,
+                                              Store<EntityStore> store) {
         if (followerRef == null || !followerRef.isValid() || followerRef.equals(leaderRef)) {
-            return false;
+            return true;
         }
         NPCEntity followerNpc = store.getComponent(followerRef, NPCEntity.getComponentType());
         if (followerNpc == null) {
-            return false;
+            return true;
         }
         Role role = followerNpc.getRole();
         if (role == null || role.getMarkedEntitySupport() == null) {
-            return false;
+            return true;
         }
         role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, leaderRef);
-        return setFollowState(followerRef, followerNpc, store);
-    }
-
-    private boolean setFollowState(Ref<EntityStore> followerRef,
-                                   NPCEntity followerNpc,
-                                   Store<EntityStore> store) {
-        Role role = followerNpc.getRole();
-        if (role == null || role.getStateSupport() == null) {
-            return false;
-        }
-        StateSupport stateSupport = role.getStateSupport();
-        String resolvedState = resolveFollowerState(stateSupport);
-        if (resolvedState == null) {
-            return false;
-        }
-        String subState = "";
-        if (stateSupport.getStateHelper() != null) {
-            String defaultSubState = stateSupport.getStateHelper().getDefaultSubState();
-            if (defaultSubState != null && !defaultSubState.isBlank()) {
-                subState = defaultSubState;
-            }
-        }
-        stateSupport.setState(followerRef, resolvedState, subState, store);
         return true;
-    }
-
-    @Nullable
-    private String resolveFollowerState(StateSupport stateSupport) {
-        if (stateSupport == null || stateSupport.getStateHelper() == null) {
-            return null;
-        }
-        int flockFollowStateIndex = stateSupport.getStateHelper().getStateIndex(FLOCK_FOLLOW_STATE);
-        if (flockFollowStateIndex != StateSupport.NO_STATE) {
-            return FLOCK_FOLLOW_STATE;
-        }
-        return null;
     }
 
     private record ParentFlockContext(Ref<EntityStore> ref,

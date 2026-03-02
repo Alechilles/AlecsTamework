@@ -166,7 +166,7 @@
     ],
     "FlockFollowerWanderRadius": 3,
     "FlockFollowerStopDistance": 1.5,
-    "FlockFollowerRelativeSpeed": 0.45,
+    "FlockFollowerRelativeSpeed": 0.3,
     "FlockArray": [
       "Mob_Tamework_Example",
       "Mob_Tamework_Example_Baby"

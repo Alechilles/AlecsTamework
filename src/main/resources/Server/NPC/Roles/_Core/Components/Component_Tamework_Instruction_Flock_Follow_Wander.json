@@ -18,36 +18,6 @@
     "FlockFollowerRelativeSpeed": {
       "Value": 0.7,
       "Description": "Relative speed used by leash seek behavior."
-    },
-    "FlockFollowDurationRange": {
-      "Value": [
-        0,
-        0
-      ],
-      "Description": "Deprecated compatibility field. Leash-only mode does not use timed follow windows."
-    },
-    "BabyDirectFollowEnabled": {
-      "Value": false,
-      "Description": "Deprecated compatibility field. Not used by leash-only mode."
-    },
-    "BabyDirectFollowRadius": {
-      "Value": 7,
-      "Description": "Deprecated compatibility field. Not used by leash-only mode."
-    },
-    "BabyDirectFollowStopDistance": {
-      "Value": 4,
-      "Description": "Deprecated compatibility field. Not used by leash-only mode."
-    },
-    "BabyDirectFollowRelativeSpeed": {
-      "Value": 0.7,
-      "Description": "Deprecated compatibility field. Not used by leash-only mode."
-    },
-    "BabyDirectFollowDurationRange": {
-      "Value": [
-        6,
-        12
-      ],
-      "Description": "Deprecated compatibility field. Not used by leash-only mode."
     }
   },
   "Content": {
