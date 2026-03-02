@@ -58,6 +58,7 @@
     {
       "Id": "Trait_Health",
       "DisplayName": "Health",
+      "IconPath": "Tamework/LinkedPanelIcons/Trait_Health.png",
       "EffectKey": "MaxHealthMultiplier",
       "Weight": 0.9,
       "InheritanceWeight": 0.9,
