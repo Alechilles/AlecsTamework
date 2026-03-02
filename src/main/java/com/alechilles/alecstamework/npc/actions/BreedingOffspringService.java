@@ -54,12 +54,14 @@ final class BreedingOffspringService {
     private final BreedingOffspringSpawnService spawnService;
     private final BreedingFertilityOffspringService fertilityOffspringService;
     private final BreedingOffspringProgressionService progressionService;
+    private final BreedingParticleOffsetResolver particleOffsetResolver;
 
     BreedingOffspringService(BreedingPartnerService partnerService) {
         this.partnerService = partnerService;
         this.spawnService = new BreedingOffspringSpawnService(new BreedingOffspringRoleResolver());
         this.fertilityOffspringService = new BreedingFertilityOffspringService();
         this.progressionService = new BreedingOffspringProgressionService();
+        this.particleOffsetResolver = new BreedingParticleOffsetResolver();
     }
 
     boolean tryCompletePairing(Ref<EntityStore> sourceRef,
@@ -324,8 +326,12 @@ final class BreedingOffspringService {
         if (transform == null) {
             return;
         }
+        NPCEntity npcEntity = store.getComponent(npcRef, NPCEntity.getComponentType());
         Vector3d position = new Vector3d(transform.getPosition());
-        position.y += 1.0;
+        Vector3d offset = particleOffsetResolver.resolveOffset(npcEntity);
+        position.x += offset.x;
+        position.y += offset.y;
+        position.z += offset.z;
         ParticleUtil.spawnParticleEffect(HEARTS_PARTICLE, position, store);
     }
 
