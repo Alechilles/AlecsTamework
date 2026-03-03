@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -342,6 +343,7 @@ public final class SpawnerFeatureHandler {
         npcStateService.applyTamed(npcRef, tamed, world);
         npcStateService.applyCapturedName(itemStack, npcRef, store);
         progressionMetadataService.applyNpcProgressionFromItem(itemStack, npcRef, store);
+        refreshLifeStageAfterProgressionRestore(npcRef, npc, store);
         linkedNpcSyncService.restoreCommandLinksFromCapturedSnapshot(npcRef, store, ownerUuid, capturedSnapshot);
         UUID spawnedNpcUuid = npc.getUuid();
         if (capturedNpcUuid != null && spawnedNpcUuid != null) {
@@ -371,6 +373,22 @@ public final class SpawnerFeatureHandler {
 
         effectService.playSpawnEffects(world, npcRef, config);
         return true;
+    }
+
+    /**
+     * Re-applies restored lifecycle state to model scale and growth scheduling.
+     *
+     * <p>Spawn flows can bootstrap tamed progression before item metadata restore, which leaves same-role offspring
+     * (for example Cat_Pet babies) visually at adult scale unless lifecycle refresh is run again post-restore.
+     */
+    private void refreshLifeStageAfterProgressionRestore(@Nullable Ref<EntityStore> npcRef,
+                                                         @Nullable NPCEntity npc,
+                                                         @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        CompanionLifeStageService.refreshLifeStage(npcRef, npc, store);
+        CompanionLifeStageService.ensureGrowthTickScheduled(npcRef, npc, store);
     }
 
     private ItemFeatureConfig resolveConfigForItem(ItemStack itemStack) {
