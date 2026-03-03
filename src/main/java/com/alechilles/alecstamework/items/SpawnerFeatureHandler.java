@@ -24,6 +24,7 @@ import it.unimi.dsi.fastutil.Pair;
 import java.util.List;
 import java.util.UUID;
 import java.util.logging.Level;
+import javax.annotation.Nullable;
 
 /**
  * Capture/spawn logic for spawner items, including metadata and attachments.
