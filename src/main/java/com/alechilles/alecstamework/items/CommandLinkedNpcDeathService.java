@@ -5,10 +5,12 @@ import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -27,10 +29,14 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -40,6 +46,7 @@ public final class CommandLinkedNpcDeathService {
     private static final String FIELD_SEPARATOR = "\t";
     private static final String VECTOR_SEPARATOR = ",";
     private static final String ARRAY_SEPARATOR = ";";
+    private static final String ATTACHMENT_KV_SEPARATOR = ",";
 
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
     private final Path persistencePath;
@@ -152,6 +159,18 @@ public final class CommandLinkedNpcDeathService {
         double lifeStageAdultScale = lifeStageComponent != null ? lifeStageComponent.getAdultScale() : 1.00;
         boolean lifeStageGrowthScalingEnabled = lifeStageComponent != null
                 && lifeStageComponent.isGrowthScalingEnabled();
+        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
+                TameworkAttachmentsComponent.getComponentType();
+        TameworkAttachmentsComponent attachmentsComponent = attachmentsType != null
+                ? store.getComponent(reference, attachmentsType)
+                : null;
+        String attachmentsConfigId = attachmentsComponent != null ? attachmentsComponent.getConfigId() : null;
+        Map<String, String> attachmentSelections = attachmentsComponent != null
+                && attachmentsComponent.getAttachmentIds() != null
+                && !attachmentsComponent.getAttachmentIds().isEmpty()
+                ? attachmentsComponent.getAttachmentIds()
+                : CompanionModelAttachmentService.resolveCurrentAttachments(reference, store);
+        String attachmentsValues = encodeAttachmentSelections(attachmentSelections);
 
         TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
         Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
@@ -198,7 +217,9 @@ public final class CommandLinkedNpcDeathService {
                         lifeStageAdultStartScale,
                         lifeStageAdultSwitchScale,
                         lifeStageAdultScale,
-                        lifeStageGrowthScalingEnabled
+                        lifeStageGrowthScalingEnabled,
+                        attachmentsConfigId,
+                        attachmentsValues
                 )
         );
         persistSnapshots();
@@ -324,7 +345,9 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + snapshot.lifeStageAdultStartScale()
                 + FIELD_SEPARATOR + snapshot.lifeStageAdultSwitchScale()
                 + FIELD_SEPARATOR + snapshot.lifeStageAdultScale()
-                + FIELD_SEPARATOR + snapshot.lifeStageGrowthScalingEnabled();
+                + FIELD_SEPARATOR + snapshot.lifeStageGrowthScalingEnabled()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsConfigId())
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsValues());
     }
 
     @Nullable
@@ -390,6 +413,8 @@ public final class CommandLinkedNpcDeathService {
         boolean lifeStageGrowthScalingEnabled = legacyLifeStageLayout
                 ? (parts.length > 29 && Boolean.parseBoolean(parts[29]))
                 : (parts.length > 33 && Boolean.parseBoolean(parts[33]));
+        String attachmentsConfigId = parts.length > 34 ? decodeNullableString(parts[34]) : null;
+        String attachmentsValues = parts.length > 35 ? decodeNullableString(parts[35]) : null;
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -424,7 +449,9 @@ public final class CommandLinkedNpcDeathService {
                 lifeStageAdultStartScale,
                 lifeStageAdultSwitchScale,
                 lifeStageAdultScale,
-                lifeStageGrowthScalingEnabled
+                lifeStageGrowthScalingEnabled,
+                attachmentsConfigId,
+                attachmentsValues
         );
     }
 
@@ -503,6 +530,75 @@ public final class CommandLinkedNpcDeathService {
             out.add(decoded);
         }
         return out.toArray(new String[0]);
+    }
+
+    @Nullable
+    static String encodeAttachmentSelections(@Nullable Map<String, String> selections) {
+        if (selections == null || selections.isEmpty()) {
+            return null;
+        }
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, String> entry : selections.entrySet()) {
+            if (entry == null) {
+                continue;
+            }
+            String setId = entry.getKey();
+            String optionId = entry.getValue();
+            if (setId == null || setId.isBlank() || optionId == null || optionId.isBlank()) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(ARRAY_SEPARATOR);
+            }
+            builder.append(encodeAttachmentToken(setId))
+                    .append(ATTACHMENT_KV_SEPARATOR)
+                    .append(encodeAttachmentToken(optionId));
+        }
+        return builder.length() > 0 ? builder.toString() : null;
+    }
+
+    @Nonnull
+    static Map<String, String> decodeAttachmentSelections(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return Collections.emptyMap();
+        }
+        HashMap<String, String> decoded = new HashMap<>();
+        String[] parts = raw.split(ARRAY_SEPARATOR);
+        for (String part : parts) {
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            String[] pair = part.split(ATTACHMENT_KV_SEPARATOR, 2);
+            if (pair.length < 2) {
+                continue;
+            }
+            String setId = decodeAttachmentToken(pair[0]);
+            String optionId = decodeAttachmentToken(pair[1]);
+            if (setId == null || setId.isBlank() || optionId == null || optionId.isBlank()) {
+                continue;
+            }
+            decoded.put(setId, optionId);
+        }
+        return CompanionModelAttachmentService.sanitizeAttachmentSelections(decoded);
+    }
+
+    @Nullable
+    private static String decodeAttachmentToken(@Nullable String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] decoded = Base64.getUrlDecoder().decode(token);
+            String out = new String(decoded, StandardCharsets.UTF_8);
+            return out.isBlank() ? null : out;
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    @Nonnull
+    private static String encodeAttachmentToken(@Nonnull String value) {
+        return Base64.getUrlEncoder().encodeToString(value.getBytes(StandardCharsets.UTF_8));
     }
 
     private String encodeVector(@Nullable Vector3d vector) {
@@ -701,7 +797,9 @@ public final class CommandLinkedNpcDeathService {
                                          double lifeStageAdultStartScale,
                                          double lifeStageAdultSwitchScale,
                                          double lifeStageAdultScale,
-                                         boolean lifeStageGrowthScalingEnabled) {
+                                         boolean lifeStageGrowthScalingEnabled,
+                                         @Nullable String attachmentsConfigId,
+                                         @Nullable String attachmentsValues) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

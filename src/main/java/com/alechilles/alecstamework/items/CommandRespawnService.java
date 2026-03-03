@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
@@ -27,6 +29,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -128,6 +131,7 @@ final class CommandRespawnService {
                     new TameworkTamedComponent(deadSnapshot.tamed())
             );
         }
+        applyRespawnAttachmentState(spawnedRef, spawnedNpc, store, deadSnapshot);
         applyRespawnProgressionState(spawnedRef, store, deadSnapshot);
         if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
             ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
@@ -173,6 +177,30 @@ final class CommandRespawnService {
         applyRespawnBreedingState(spawnedRef, store, snapshot);
         applyRespawnTraitsState(spawnedRef, store, snapshot);
         applyRespawnLifeStageState(spawnedRef, store, snapshot);
+    }
+
+    private void applyRespawnAttachmentState(Ref<EntityStore> spawnedRef,
+                                             NPCEntity spawnedNpc,
+                                             Store<EntityStore> store,
+                                             CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        if (spawnedRef == null || !spawnedRef.isValid() || store == null || snapshot == null) {
+            return;
+        }
+        Map<String, String> attachmentSelections =
+                CommandLinkedNpcDeathService.decodeAttachmentSelections(snapshot.attachmentsValues());
+        if (!attachmentSelections.isEmpty()) {
+            CompanionModelAttachmentService.applyAttachments(spawnedRef, spawnedNpc, store, attachmentSelections);
+        }
+        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
+                TameworkAttachmentsComponent.getComponentType();
+        if (attachmentsType == null || attachmentSelections.isEmpty()) {
+            return;
+        }
+        store.putComponent(
+                spawnedRef,
+                attachmentsType,
+                new TameworkAttachmentsComponent(snapshot.attachmentsConfigId(), attachmentSelections)
+        );
     }
 
     private void applyRespawnHappinessState(Ref<EntityStore> spawnedRef,
