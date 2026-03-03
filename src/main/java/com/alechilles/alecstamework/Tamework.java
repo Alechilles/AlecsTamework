@@ -66,6 +66,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnL
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionDespawnProtectionSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
@@ -261,6 +262,7 @@ public class Tamework extends JavaPlugin {
                 new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)
         );
         getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
+        getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService();

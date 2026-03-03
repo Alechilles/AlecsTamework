@@ -83,6 +83,7 @@
 ### Fixed
 - Tamework's embedded jar asset pack now registers into AssetEditor's data-source map when missing, so Tamework assets appear in the pack dropdown as read-only and can be duplicated into custom packs.
 - Fixed a world-thread crash in `CommandLinkedNpcDeathService` when recording death snapshots for linked NPCs that had neither shared happiness nor breeding happiness (null-safe fallback now avoids `Double` auto-unboxing).
+- Tamed companions and companions with persisted custom names are now opted out of vanilla overpopulation despawn checks, preventing accidental despawn of owned/named NPCs.
 - Needs-seek runtime now immediately exits to parent completion state when no readable seek target is present, preventing companions from getting stuck in `NeedsSeekFood.Default` / `NeedsSeekWater.Default`.
 - Needs-seek movement now uses pathfinder by default and aborts immediately when nav reports `Defer`, preventing companions from remaining stuck against blocked/unreachable resource targets (for example encased food containers).
 - Needs-seek now applies a failed-seek cooldown timer (`NeedsSeek_Failed_Cooldown`) and sensor-side cooldown gating, preventing rapid re-entry loops into needs-seek states when nearby targets repeatedly fail pathing.
