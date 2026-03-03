@@ -70,6 +70,47 @@
         ]
       },
       {
+        "$Comment": "Clear status-slot posture loops so followers do not slide while leash movement is active.",
+        "Continue": true,
+        "Enabled": {
+          "Compute": "LeashEnabled"
+        },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "FlockLeader"
+                },
+                {
+                  "Type": "Self",
+                  "Filters": [
+                    {
+                      "Type": "Flock",
+                      "FlockStatus": "Follower"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "Type": "Leash",
+              "Range": {
+                "Compute": "FlockFollowerWanderRadius"
+              }
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          }
+        ]
+      },
+      {
         "$Comment": "Leash profile using role/template FlockFollower* values.",
         "Continue": true,
         "Enabled": {
