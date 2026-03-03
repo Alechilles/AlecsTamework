@@ -41,8 +41,9 @@ final class LinkedNpcPanelVitalsBinder {
             return;
         }
         if (entry.dead()) {
-            commandBuilder.set(healthTextSelector + ".Text", "Dead");
-            commandBuilder.set(healthTextShadowSelector + ".Text", "Dead");
+            String deadText = LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry);
+            commandBuilder.set(healthTextSelector + ".Text", deadText);
+            commandBuilder.set(healthTextShadowSelector + ".Text", deadText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
