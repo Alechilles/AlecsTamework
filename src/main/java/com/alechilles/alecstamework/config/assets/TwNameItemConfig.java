@@ -17,6 +17,7 @@ import com.hypixel.hytale.codec.schema.config.Schema;
 import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonNull;
@@ -26,7 +27,8 @@ import org.bson.BsonValue;
  * Asset-backed configuration for naming items.
  * Stored under Server/Tamework/Items/Naming.
  */
-public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwNameItemConfig>> {
+public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwNameItemConfig>>,
+        TwParentFallbackAsset<TwNameItemConfig> {
     public enum RoleFilterMode {
         AllowAll,
         Allowlist,
@@ -238,6 +240,8 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         .build();
 
     private static AssetStore<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -258,7 +262,27 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwNameItemConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwNameItemConfig> assetMap = (DefaultAssetMap<String, TwNameItemConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
+    }
+
+    public static void clearInheritanceFallbackCache() {
+        INHERITANCE_CACHE_DIRTY = true;
+    }
+
+    private static void ensureInheritanceFallbackApplied(
+            @Nullable DefaultAssetMap<String, TwNameItemConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
     }
 
     protected TwNameItemConfig() {
@@ -266,6 +290,23 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
 
     public String getId() {
         return id;
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwNameItemConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("ItemId")) itemId = parent.itemId;
+        if (!explicitTopLevelKeys.contains("AllowedRoles")) allowedRoles = parent.allowedRoles;
+        if (!explicitTopLevelKeys.contains("Naming")) naming = parent.naming;
     }
 
     public String getItemId() {

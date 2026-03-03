@@ -25,6 +25,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonNull;
@@ -34,7 +35,8 @@ import org.bson.BsonValue;
  * Asset-backed configuration for spawner items.
  * Stored under Server/Tamework/Items/Spawners.
  */
-public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwSpawnerConfig>> {
+public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwSpawnerConfig>>,
+        TwParentFallbackAsset<TwSpawnerConfig> {
     public enum RoleFilterMode {
         AllowAll,
         Allowlist,
@@ -341,6 +343,8 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         .build();
 
     private static AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -366,7 +370,27 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwSpawnerConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwSpawnerConfig> assetMap = (DefaultAssetMap<String, TwSpawnerConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
+    }
+
+    public static void clearInheritanceFallbackCache() {
+        INHERITANCE_CACHE_DIRTY = true;
+    }
+
+    private static void ensureInheritanceFallbackApplied(
+            @Nullable DefaultAssetMap<String, TwSpawnerConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
     }
 
     protected TwSpawnerConfig() {
@@ -374,6 +398,28 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
 
     public String getId() {
         return id;
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwSpawnerConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("EmptyItemId")) emptyItemId = parent.emptyItemId;
+        if (!explicitTopLevelKeys.contains("AllowedRoles")) allowedRoles = parent.allowedRoles;
+        if (!explicitTopLevelKeys.contains("FilledItemId")) filledItemId = parent.filledItemId;
+        if (!explicitTopLevelKeys.contains("IconDefault")) iconDefault = parent.iconDefault;
+        if (!explicitTopLevelKeys.contains("Capture")) capture = parent.capture;
+        if (!explicitTopLevelKeys.contains("Spawn")) spawn = parent.spawn;
+        if (!explicitTopLevelKeys.contains("IconOverrides")) iconOverrides = parent.iconOverrides;
+        if (!explicitTopLevelKeys.contains("IconOverridesByRole")) iconOverridesByRole = parent.iconOverridesByRole;
     }
 
     public String getEmptyItemId() {

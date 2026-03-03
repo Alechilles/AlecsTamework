@@ -14,13 +14,16 @@ import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Asset-backed trait configuration for role-scoped companion trait pools.
  * Stored under Server/Tamework/Traits.
  */
-public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwTraitConfig>> {
+public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwTraitConfig>>,
+        TwParentFallbackAsset<TwTraitConfig> {
     private static final TraitDefinition[] EMPTY_TRAITS = new TraitDefinition[0];
 
     private static final BuilderCodec<RollCountWeights> ROLL_COUNT_WEIGHTS_CODEC = BuilderCodec.builder(
@@ -261,6 +264,8 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         .build();
 
     private static AssetStore<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, TwTraitConfig> ROLE_CACHE = Map.of();
@@ -287,10 +292,13 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwTraitConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwTraitConfig> assetMap = (DefaultAssetMap<String, TwTraitConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
     }
 
     public static void clearRoleCache() {
+        INHERITANCE_CACHE_DIRTY = true;
         ROLE_CACHE_DIRTY = true;
     }
 
@@ -390,6 +398,39 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         String safeLeft = left == null ? "" : left;
         String safeRight = right == null ? "" : right;
         return safeLeft.compareToIgnoreCase(safeRight);
+    }
+
+    private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwTraitConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwTraitConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
+        if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
+        if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
+        if (!explicitTopLevelKeys.contains("Selection")) selection = parent.selection;
+        if (!explicitTopLevelKeys.contains("Inheritance")) inheritance = parent.inheritance;
+        if (!explicitTopLevelKeys.contains("Traits")) traits = parent.traits;
     }
 
     protected TwTraitConfig() {

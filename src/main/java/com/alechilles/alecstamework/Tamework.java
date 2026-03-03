@@ -70,6 +70,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSys
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
+import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
@@ -239,6 +240,9 @@ public class Tamework extends JavaPlugin {
 
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
+        );
+        getEntityStoreRegistry().registerSystem(
+                new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType())
         );
         getEntityStoreRegistry().registerSystem(
                 new CompanionTraitStatSyncSystem(
@@ -570,31 +574,37 @@ public class Tamework extends JavaPlugin {
 
     private void onSpawnerAssetsLoaded(
             LoadedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
+        TwSpawnerConfig.clearInheritanceFallbackCache();
         reloadItemFeatureConfigs();
     }
 
     private void onSpawnerAssetsRemoved(
             RemovedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
+        TwSpawnerConfig.clearInheritanceFallbackCache();
         reloadItemFeatureConfigs();
     }
 
     private void onNamingAssetsLoaded(
             LoadedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
+        TwNameItemConfig.clearInheritanceFallbackCache();
         reloadItemFeatureConfigs();
     }
 
     private void onNamingAssetsRemoved(
             RemovedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
+        TwNameItemConfig.clearInheritanceFallbackCache();
         reloadItemFeatureConfigs();
     }
 
     private void onCommandAssetsLoaded(
             LoadedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
+        TwCommandItemConfig.clearInheritanceFallbackCache();
         reloadItemFeatureConfigs();
     }
 
     private void onCommandAssetsRemoved(
             RemovedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
+        TwCommandItemConfig.clearInheritanceFallbackCache();
         reloadItemFeatureConfigs();
     }
 

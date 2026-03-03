@@ -11,13 +11,16 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Asset-backed global configuration for Alec's Tamework.
  * Stored under Server/Tamework/Global.
  */
-public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwGlobalConfig>> {
+public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwGlobalConfig>>,
+        TwParentFallbackAsset<TwGlobalConfig> {
     private static final BuilderCodec<GeneralSection> GENERAL_SECTION_CODEC = BuilderCodec.builder(
                     GeneralSection.class, GeneralSection::new
             )
@@ -260,6 +263,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .build();
 
     private static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
     private static final Object CACHE_LOCK = new Object();
     private static volatile boolean CACHE_DIRTY = true;
     private static volatile TwGlobalConfig ACTIVE_CONFIG;
@@ -310,11 +315,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwGlobalConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwGlobalConfig> assetMap = (DefaultAssetMap<String, TwGlobalConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
     }
 
     // Clears the cached active global config.
     public static void clearCache() {
+        INHERITANCE_CACHE_DIRTY = true;
         CACHE_DIRTY = true;
     }
 
@@ -377,11 +385,76 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return safeLeft.compareToIgnoreCase(safeRight);
     }
 
+    private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwGlobalConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
+    }
+
     protected TwGlobalConfig() {
     }
 
     public String getId() {
         return id;
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwGlobalConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("General")) {
+            enabled = parent.enabled;
+            priority = parent.priority;
+        }
+        if (!explicitTopLevelKeys.contains("OwnershipProtection")) {
+            blockOwnerDamage = parent.blockOwnerDamage;
+            blockAllPlayerDamageIfOwned = parent.blockAllPlayerDamageIfOwned;
+            invulnerableIfOwned = parent.invulnerableIfOwned;
+        }
+        if (!explicitTopLevelKeys.contains("InteractionDefaults")) {
+            interactionConfigParam = parent.interactionConfigParam;
+            lovedItemsParam = parent.lovedItemsParam;
+            isHarvestableParam = parent.isHarvestableParam;
+            isMountableParam = parent.isMountableParam;
+            harvestContextParam = parent.harvestContextParam;
+            harvestAlarmName = parent.harvestAlarmName;
+            interactionCooldownAlarmPrefix = parent.interactionCooldownAlarmPrefix;
+        }
+        if (!explicitTopLevelKeys.contains("Command")) {
+            commandReturnHomeTeleportDistance = parent.commandReturnHomeTeleportDistance;
+            commandReturnHomePathDistanceBeforeTeleport = parent.commandReturnHomePathDistanceBeforeTeleport;
+            commandReturnHomeTeleportDelayMs = parent.commandReturnHomeTeleportDelayMs;
+            commandRecallSafeSpawnDistance = parent.commandRecallSafeSpawnDistance;
+            commandRecallForceRelocateDistance = parent.commandRecallForceRelocateDistance;
+            commandRelocationRetryIntervalMs = parent.commandRelocationRetryIntervalMs;
+            commandRelocationMaxWaitMs = parent.commandRelocationMaxWaitMs;
+            commandRelocationMaxRetryAttempts = parent.commandRelocationMaxRetryAttempts;
+            commandDeadRespawnEnabled = parent.commandDeadRespawnEnabled;
+            commandDeadRespawnCooldownMs = parent.commandDeadRespawnCooldownMs;
+            commandDeadRespawnFollowRetryDelayMs = parent.commandDeadRespawnFollowRetryDelayMs;
+            commandDeadRespawnDistanceClose = parent.commandDeadRespawnDistanceClose;
+            commandDeadRespawnDistanceNear = parent.commandDeadRespawnDistanceNear;
+            commandDeadRespawnDistanceMid = parent.commandDeadRespawnDistanceMid;
+            commandDeadRespawnDistanceFar = parent.commandDeadRespawnDistanceFar;
+            commandPlacementMinRelativeY = parent.commandPlacementMinRelativeY;
+            commandPlacementMaxRelativeY = parent.commandPlacementMaxRelativeY;
+            commandLinkedPanelRequireUnlinkConfirm = parent.commandLinkedPanelRequireUnlinkConfirm;
+        }
     }
 
     public boolean isEnabled() {

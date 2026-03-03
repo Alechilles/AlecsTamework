@@ -17,13 +17,16 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Asset-backed configuration for optimized interaction rules.
  * Stored under Server/Tamework/Interactions.
  */
-public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwInteractionConfig>> {
+public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwInteractionConfig>>,
+        TwParentFallbackAsset<TwInteractionConfig> {
     public enum ParamOperator {
         Equals,
         NotEquals,
@@ -114,6 +117,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final AssetBuilderCodec<String, TwInteractionConfig> CODEC = TwInteractionConfigCodecs.CODEC;
 
     static AssetStore<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, TwInteractionConfig> ROLE_CACHE = Map.of();
@@ -139,10 +144,13 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwInteractionConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwInteractionConfig> assetMap = (DefaultAssetMap<String, TwInteractionConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
     }
 
     public static void clearRoleCache() {
+        INHERITANCE_CACHE_DIRTY = true;
         ROLE_CACHE_DIRTY = true;
     }
 
@@ -196,11 +204,45 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         return cache;
     }
 
+    private static void ensureInheritanceFallbackApplied(
+            @Nullable DefaultAssetMap<String, TwInteractionConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
+    }
+
     protected TwInteractionConfig() {
     }
 
     public String getId() {
         return id;
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwInteractionConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
+        if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
+        if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
+        if (!explicitTopLevelKeys.contains("Interactions")) interactions = parent.interactions;
+        if (!explicitTopLevelKeys.contains("Cooldowns")) cooldowns = parent.cooldowns;
     }
 
     public boolean isEnabled() {

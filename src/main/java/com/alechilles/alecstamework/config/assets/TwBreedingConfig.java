@@ -14,6 +14,7 @@ import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -21,7 +22,8 @@ import javax.annotation.Nullable;
  * Asset-backed breeding configuration for role-scoped companion breeding rules.
  * Stored under Server/Tamework/Breeding.
  */
-public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwBreedingConfig>> {
+public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwBreedingConfig>>,
+        TwParentFallbackAsset<TwBreedingConfig> {
     private static final RoleFamily[] EMPTY_ROLE_FAMILIES = new RoleFamily[0];
 
     private static final BuilderCodec<HappinessSettings> HAPPINESS_CODEC = BuilderCodec.builder(
@@ -421,6 +423,8 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .build();
 
     private static AssetStore<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, TwBreedingConfig> ROLE_CACHE = Map.of();
@@ -452,10 +456,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwBreedingConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwBreedingConfig> assetMap = (DefaultAssetMap<String, TwBreedingConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
     }
 
     public static void clearRoleCache() {
+        INHERITANCE_CACHE_DIRTY = true;
         ROLE_CACHE_DIRTY = true;
     }
 
@@ -534,6 +541,45 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             }
         }
         return cache;
+    }
+
+    private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwBreedingConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwBreedingConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
+        if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
+        if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
+        if (!explicitTopLevelKeys.contains("Happiness")) happiness = parent.happiness;
+        if (!explicitTopLevelKeys.contains("Eligibility")) eligibility = parent.eligibility;
+        if (!explicitTopLevelKeys.contains("Pairing")) pairing = parent.pairing;
+        if (!explicitTopLevelKeys.contains("Cooldowns")) cooldowns = parent.cooldowns;
+        if (!explicitTopLevelKeys.contains("PassiveBreeding")) passiveBreeding = parent.passiveBreeding;
+        if (!explicitTopLevelKeys.contains("Timing")) timing = parent.timing;
+        if (!explicitTopLevelKeys.contains("Inheritance")) inheritance = parent.inheritance;
+        if (!explicitTopLevelKeys.contains("OffspringLifecycle")) offspringLifecycle = parent.offspringLifecycle;
     }
 
     private static void registerRoleCacheEntry(@Nonnull Map<String, TwBreedingConfig> cache,

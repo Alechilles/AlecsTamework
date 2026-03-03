@@ -13,13 +13,16 @@ import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Asset-backed hunger/thirst needs configuration for role-scoped companion progression.
  * Stored under Server/Tamework/Needs.
  */
-public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwNeedsConfig>> {
+public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwNeedsConfig>>,
+        TwParentFallbackAsset<TwNeedsConfig> {
     private static final BuilderCodec<ValueSettings> VALUE_CODEC = BuilderCodec.builder(
             ValueSettings.class,
             ValueSettings::new
@@ -279,6 +282,8 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         .build();
 
     private static AssetStore<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, TwNeedsConfig> ROLE_CACHE = Map.of();
@@ -308,10 +313,13 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwNeedsConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwNeedsConfig> assetMap = (DefaultAssetMap<String, TwNeedsConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
     }
 
     public static void clearRoleCache() {
+        INHERITANCE_CACHE_DIRTY = true;
         ROLE_CACHE_DIRTY = true;
     }
 
@@ -410,6 +418,42 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         String safeLeft = left == null ? "" : left;
         String safeRight = right == null ? "" : right;
         return safeLeft.compareToIgnoreCase(safeRight);
+    }
+
+    private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwNeedsConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwNeedsConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
+        if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
+        if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
+        if (!explicitTopLevelKeys.contains("Values")) values = parent.values;
+        if (!explicitTopLevelKeys.contains("Decay")) decay = parent.decay;
+        if (!explicitTopLevelKeys.contains("HappinessImpact")) happinessImpact = parent.happinessImpact;
+        if (!explicitTopLevelKeys.contains("PassiveRefill")) passiveRefill = parent.passiveRefill;
+        if (!explicitTopLevelKeys.contains("ManualRefill")) manualRefill = parent.manualRefill;
+        if (!explicitTopLevelKeys.contains("Timing")) timing = parent.timing;
     }
 
     protected TwNeedsConfig() {

@@ -24,6 +24,7 @@ import com.hypixel.hytale.math.vector.Vector3d;
 import java.util.Collections;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import org.bson.BsonNull;
@@ -33,7 +34,8 @@ import org.bson.BsonValue;
  * Asset-backed configuration for command items.
  * Stored under Server/Tamework/Items/Commands.
  */
-public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwCommandItemConfig>> {
+public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwCommandItemConfig>>,
+        TwParentFallbackAsset<TwCommandItemConfig> {
     public enum MembershipMode {
         LinkedOnly,
         OwnerScope,
@@ -591,6 +593,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .build();
 
     private static AssetStore<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -621,7 +625,28 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwCommandItemConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwCommandItemConfig> assetMap =
+                (DefaultAssetMap<String, TwCommandItemConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
+    }
+
+    public static void clearInheritanceFallbackCache() {
+        INHERITANCE_CACHE_DIRTY = true;
+    }
+
+    private static void ensureInheritanceFallbackApplied(
+            @Nullable DefaultAssetMap<String, TwCommandItemConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
     }
 
     protected TwCommandItemConfig() {
@@ -629,6 +654,36 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public String getId() {
         return id;
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwCommandItemConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
+        if (!explicitTopLevelKeys.contains("ItemIds")) itemIds = parent.itemIds;
+        if (!explicitTopLevelKeys.contains("Radius")) radius = parent.radius;
+        if (!explicitTopLevelKeys.contains("MembershipMode")) membershipMode = parent.membershipMode;
+        if (!explicitTopLevelKeys.contains("LinkEnabled")) linkEnabled = parent.linkEnabled;
+        if (!explicitTopLevelKeys.contains("LinkUseTogglesMembership")) {
+            linkUseTogglesMembership = parent.linkUseTogglesMembership;
+        }
+        if (!explicitTopLevelKeys.contains("RequireTamed")) requireTamed = parent.requireTamed;
+        if (!explicitTopLevelKeys.contains("RequireOwner")) requireOwner = parent.requireOwner;
+        if (!explicitTopLevelKeys.contains("MaxTargets")) maxTargets = parent.maxTargets;
+        if (!explicitTopLevelKeys.contains("CooldownSeconds")) cooldownSeconds = parent.cooldownSeconds;
+        if (!explicitTopLevelKeys.contains("RequireLineOfSight")) requireLineOfSight = parent.requireLineOfSight;
+        if (!explicitTopLevelKeys.contains("AllowedRoles")) allowedRoles = parent.allowedRoles;
+        if (!explicitTopLevelKeys.contains("CommandList")) commandList = parent.commandList;
     }
 
     public boolean isEnabled() {

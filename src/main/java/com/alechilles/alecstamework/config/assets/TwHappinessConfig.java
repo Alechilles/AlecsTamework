@@ -14,13 +14,16 @@ import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
  * Asset-backed companion happiness configuration for role-scoped happiness progression.
  * Stored under Server/Tamework/Happiness.
  */
-public final class TwHappinessConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwHappinessConfig>> {
+public final class TwHappinessConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwHappinessConfig>>,
+        TwParentFallbackAsset<TwHappinessConfig> {
     private static final NeedBandSettings[] EMPTY_BANDS = new NeedBandSettings[0];
     private static final PopulationBandSettings[] EMPTY_POPULATION_BANDS = new PopulationBandSettings[0];
 
@@ -295,6 +298,8 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         .build();
 
     private static AssetStore<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> ASSET_STORE;
+    private static final Object INHERITANCE_CACHE_LOCK = new Object();
+    private static volatile boolean INHERITANCE_CACHE_DIRTY = true;
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, TwHappinessConfig> ROLE_CACHE = Map.of();
@@ -322,10 +327,13 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         if (store == null) {
             return null;
         }
-        return (DefaultAssetMap<String, TwHappinessConfig>) store.getAssetMap();
+        DefaultAssetMap<String, TwHappinessConfig> assetMap = (DefaultAssetMap<String, TwHappinessConfig>) store.getAssetMap();
+        ensureInheritanceFallbackApplied(assetMap);
+        return assetMap;
     }
 
     public static void clearRoleCache() {
+        INHERITANCE_CACHE_DIRTY = true;
         ROLE_CACHE_DIRTY = true;
     }
 
@@ -425,6 +433,41 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         String safeLeft = left == null ? "" : left;
         String safeRight = right == null ? "" : right;
         return safeLeft.compareToIgnoreCase(safeRight);
+    }
+
+    private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwHappinessConfig> assetMap) {
+        if (!INHERITANCE_CACHE_DIRTY || assetMap == null || assetMap.getAssetMap() == null) {
+            return;
+        }
+        synchronized (INHERITANCE_CACHE_LOCK) {
+            if (!INHERITANCE_CACHE_DIRTY || assetMap.getAssetMap() == null) {
+                return;
+            }
+            TwAssetInheritanceFallback.repairAll(assetMap);
+            INHERITANCE_CACHE_DIRTY = false;
+        }
+    }
+
+    @Override
+    @Nullable
+    public String getParentIdForFallback() {
+        if (data == null || data.getParentKey() == null) {
+            return null;
+        }
+        String parentId = data.getParentKey().toString();
+        return parentId == null || parentId.isBlank() ? null : parentId;
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwHappinessConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys) {
+        if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
+        if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
+        if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
+        if (!explicitTopLevelKeys.contains("Values")) values = parent.values;
+        if (!explicitTopLevelKeys.contains("Equilibrium")) equilibrium = parent.equilibrium;
+        if (!explicitTopLevelKeys.contains("Impulses")) impulses = parent.impulses;
+        if (!explicitTopLevelKeys.contains("Modifiers")) modifiers = parent.modifiers;
     }
 
     protected TwHappinessConfig() {
