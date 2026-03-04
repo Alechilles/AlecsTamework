@@ -1,0 +1,12 @@
+{
+  "Enabled": false,
+  "Priority": 0,
+  "CoopId": "Coop_Chicken",
+  "CapturePolicy": {
+    "RequireTamed": false,
+    "OwnerRestricted": false,
+    "RequireOwner": false,
+    "ParticleSystem": "Entities/Basic/Particles/Love/Hearts",
+    "SoundEvent": "SFX_Pet_Interact_Success"
+  }
+}
