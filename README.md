@@ -121,9 +121,12 @@ Optional prompt updater (see the example template for full usage):
 }
 ```
 
-10. After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
+10. Coop intake policy overlays (optional):
+   Create a `TwCoopConfig` under `<ModRoot>/Server/Tamework/Farming/Coops/` keyed to your coop id (`CoopId`, for example `Coop_Chicken`) to enforce Tamework capture policy checks before coop admission.
 
-11. Add translations in `Server/Languages/en-US/server.lang`.
+11. After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
+
+12. Add translations in `Server/Languages/en-US/server.lang`.
 
 ## Configuration Overview
 - **TwGlobalConfig**: sectioned global defaults and runtime tuning (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`).
@@ -137,6 +140,8 @@ Optional prompt updater (see the example template for full usage):
 - **TwTraitConfig**: role-scoped trait pools and inheritance behavior.
   Location: `<ModRoot>/Server/Tamework/Traits/*.json`
   Notes: each trait definition can now optionally set `IconPath` for linked-panel icon rendering; when omitted, the UI falls back to first-letter glyphs.
+- **TwCoopConfig**: coop-id scoped intake policy overlays for captured NPC insertion.
+  Location: `<ModRoot>/Server/Tamework/Farming/Coops/*.json`
 - After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
 
 ## Contributor Architecture Snapshot

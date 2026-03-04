@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -27,6 +28,7 @@ import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
+import com.alechilles.alecstamework.items.CoopFeatureHandler;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
@@ -111,6 +113,7 @@ public class Tamework extends JavaPlugin {
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
+    private CoopFeatureHandler coopFeatureHandler;
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
@@ -120,6 +123,7 @@ public class Tamework extends JavaPlugin {
     private boolean namingAssetsRegistered;
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
+    private boolean coopAssetsRegistered;
     private boolean happinessAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
@@ -147,11 +151,8 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void setup() {
-        // Registry for item-level feature configs and spawn/capture behaviors.
         itemFeatureRegistry = new ItemFeatureRegistry();
-        // Registry for naming item configs.
         nameItemRegistry = new NameItemRegistry();
-        // Registry for command item configs.
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
@@ -163,6 +164,7 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class, TameworkCommandInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
+        registerCoopAssets();
         registerSpawnerItemAssets();
         registerNamingItemAssets();
         registerCommandItemAssets();
@@ -298,7 +300,6 @@ public class Tamework extends JavaPlugin {
         int loadedSpawner = loadSpawnerItemAssets();
         int loadedNaming = loadNameItemAssets();
         int loadedCommands = loadCommandItemAssets();
-        int loaded = loadedSpawner + loadedNaming + loadedCommands;
 
         // Load translation entries from mods so messages can be localized.
         translationRegistry = new TranslationRegistry();
@@ -316,13 +317,21 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcDeathService,
                 commandLinkedNpcCaptureService
         );
+        // Core handler for coop intake policy overlays.
+        coopFeatureHandler = new CoopFeatureHandler(getLogger());
 
         // Register /tw commands if the server supports it.
         if (getCommandRegistry() != null) {
             getCommandRegistry().registerCommand(new TameworkCommandRoot());
         }
 
-        // Global listener to handle spawner capture/spawn interactions.
+        // Global listener to enforce coop capture-intake policies where configured.
+        if (coopFeatureHandler != null) {
+            getEventRegistry().registerGlobal(
+                    PlayerInteractEvent.class,
+                    coopFeatureHandler::onPlayerInteract
+            );
+        }
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());
@@ -352,7 +361,6 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void start() {
-        // Called when the plugin is enabled
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (assetPackCoordinator != null) {
             assetPackCoordinator.ensureAssetEditorPackVisible();
@@ -361,10 +369,8 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
-        // Called when the plugin is disabled
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
-
 
     public ItemFeatureRegistry getItemFeatureRegistry() {
         return itemFeatureRegistry;
@@ -477,7 +483,6 @@ public class Tamework extends JavaPlugin {
         commandAssetsRegistered = true;
     }
 
-    // Registers global config assets stored under Server/Tamework/Global.
     private void registerGlobalConfigAssets() {
         if (globalAssetsRegistered) {
             return;
@@ -508,6 +513,22 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwInteractionConfig.class, this::onInteractionAssetsRemoved);
         interactionAssetsRegistered = true;
+    }
+
+    private void registerCoopAssets() {
+        if (coopAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwCoopConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Farming/Coops")
+                        .setCodec(TwCoopConfig.CODEC)
+                        .setKeyFunction(TwCoopConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwCoopConfig.class, this::onCoopAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwCoopConfig.class, this::onCoopAssetsRemoved);
+        coopAssetsRegistered = true;
     }
 
     private void registerHappinessAssets() {
@@ -610,14 +631,12 @@ public class Tamework extends JavaPlugin {
         reloadItemFeatureConfigs();
     }
 
-    // Clears cached global config when assets change.
     private void onGlobalAssetsLoaded(
             LoadedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
     }
 
-    // Clears cached global config when assets change.
     private void onGlobalAssetsRemoved(
             RemovedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
@@ -632,6 +651,16 @@ public class Tamework extends JavaPlugin {
     private void onInteractionAssetsRemoved(
             RemovedAssetsEvent<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> event) {
         TwInteractionConfig.clearRoleCache();
+    }
+
+    private void onCoopAssetsLoaded(
+            LoadedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
+        TwCoopConfig.clearCoopCache();
+    }
+
+    private void onCoopAssetsRemoved(
+            RemovedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
+        TwCoopConfig.clearCoopCache();
     }
 
     private void onHappinessAssetsLoaded(

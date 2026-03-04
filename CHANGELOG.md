@@ -5,6 +5,7 @@
 - Foundation breeding and traits asset types: `TwBreedingConfig` and `TwTraitConfig`, including role-priority resolution and default example assets.
 - Foundation shared happiness asset type: `TwHappinessConfig`, including role-priority resolution and default example assets.
 - Foundation needs asset type: `TwNeedsConfig`, including role-priority resolution and default hunger/thirst config under `Server/Tamework/Needs`.
+- New coop integration asset type: `TwCoopConfig` under `Server/Tamework/Farming/Coops`, keyed by `CoopId` with priority-aware selection and parent fallback support.
 - New progression components: `TameworkBreedingComponent` and `TameworkTraitsComponent`, plus bootstrap initialization for newly tamed companions.
 - New shared progression component: `TameworkHappinessComponent` with config id, value, and last-update timestamp.
 - New shared progression component: `TameworkNeedsComponent` with hunger/thirst values, passive-sweep tracking, and applied happiness penalty state.
@@ -27,6 +28,7 @@
 
 ### Changed
 - Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
+- Coop capture-crate intake now supports optional Tamework policy overlays when a matching `TwCoopConfig` exists, while still using vanilla coop admission gates (`tryPutResident`) for resident-capacity/species acceptance parity.
 - Interaction/docs coverage updated to reflect current breeding behavior (no longer a pure stub path).
 - Trait bootstrap now backfills empty trait components with deterministic rolls and role-config IDs.
 - Feeding interactions now apply shared happiness gains from happiness config (or shared defaults when no happiness config resolves), including trait-based `HappinessGainMultiplier` scaling.
