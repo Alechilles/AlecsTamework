@@ -44,7 +44,7 @@ final class BreedingFamilyFlockService {
         ensureJoined(parentARef, plan.flockRef(), store);
         ensureJoined(parentBRef, plan.flockRef(), store);
         if (!ensureJoined(childRef, plan.flockRef(), store)) {
-            return false;
+            return reassignFamilyToFreshLeaderFlock(childRef, parentARef, parentBRef, plan.leaderRef(), store);
         }
         return applyFollowerLeaderTarget(childRef, plan.leaderRef(), store);
     }
@@ -162,6 +162,36 @@ final class BreedingFamilyFlockService {
         }
         role.getMarkedEntitySupport().setMarkedEntity(MASTER_TARGET_SLOT, leaderRef);
         return true;
+    }
+
+    private boolean reassignFamilyToFreshLeaderFlock(@Nullable Ref<EntityStore> childRef,
+                                                     @Nullable Ref<EntityStore> parentARef,
+                                                     @Nullable Ref<EntityStore> parentBRef,
+                                                     @Nullable Ref<EntityStore> leaderRef,
+                                                     @Nullable Store<EntityStore> store) {
+        if (childRef == null || !childRef.isValid() || leaderRef == null || !leaderRef.isValid() || store == null) {
+            return false;
+        }
+        Ref<EntityStore> freshFlockRef = createFlockForLeader(leaderRef, store);
+        if (freshFlockRef == null || !freshFlockRef.isValid()) {
+            return false;
+        }
+
+        // Detach the immediate family from any previous flock metadata before re-joining.
+        leaveFlock(childRef, store);
+        leaveFlock(parentARef, store);
+        leaveFlock(parentBRef, store);
+        leaveFlock(leaderRef, store);
+
+        if (!ensureJoined(leaderRef, freshFlockRef, store)) {
+            return false;
+        }
+        ensureJoined(parentARef, freshFlockRef, store);
+        ensureJoined(parentBRef, freshFlockRef, store);
+        if (!ensureJoined(childRef, freshFlockRef, store)) {
+            return false;
+        }
+        return applyFollowerLeaderTarget(childRef, leaderRef, store);
     }
 
     private record ParentFlockContext(Ref<EntityStore> ref,
