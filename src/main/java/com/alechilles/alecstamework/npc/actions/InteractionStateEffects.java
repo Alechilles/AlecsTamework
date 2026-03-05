@@ -26,6 +26,12 @@ import java.util.UUID;
 /** Applies interaction effects that change NPC ownership, stats, or states. */
 final class InteractionStateEffects {
     private static final String HEALTH_STAT_ID = "Health";
+    /**
+     * Cross-template swaps (for example wild -> tamed livestock) can fail when preserving
+     * state/substate names from the source role. Interaction-driven role changes should
+     * start from the target role's default state.
+     */
+    private static final boolean PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE = false;
 
     // Marks the NPC as tamed and assigns owner based on the interacting player.
     boolean applyStartTaming(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
@@ -191,7 +197,13 @@ final class InteractionStateEffects {
         if (roleIndex < 0) {
             return false;
         }
-        RoleChangeSystem.requestRoleChange(npcRef, role, roleIndex, true, store);
+        RoleChangeSystem.requestRoleChange(
+                npcRef,
+                role,
+                roleIndex,
+                PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE,
+                store
+        );
         return true;
     }
 

@@ -115,7 +115,7 @@ final class InteractionItemRequirementResolver {
         if (itemId == null) {
             return false;
         }
-        return Arrays.stream(items).anyMatch(itemId::equalsIgnoreCase);
+        return Arrays.stream(items).anyMatch(requiredItemId -> isHeldItemMatch(requiredItemId, itemId));
     }
 
     // Checks if the active item matches the list and has enough quantity.
@@ -370,6 +370,51 @@ final class InteractionItemRequirementResolver {
             return 1;
         }
         return Math.max(1, quantity);
+    }
+
+    // Matches held items with exact id first, then base-id fallback for stateful held ids.
+    private boolean isHeldItemMatch(String requiredItemId, String heldItemId) {
+        if (requiredItemId == null || requiredItemId.isBlank()
+                || heldItemId == null || heldItemId.isBlank()) {
+            return false;
+        }
+        if (requiredItemId.equalsIgnoreCase(heldItemId)) {
+            return true;
+        }
+        String normalizedRequired = removeLeadingStatePrefix(requiredItemId);
+        String normalizedHeld = removeLeadingStatePrefix(heldItemId);
+        if (normalizedRequired.equalsIgnoreCase(normalizedHeld)) {
+            return true;
+        }
+        // If the requirement is state-specific, do not broaden matching.
+        if (containsStateSuffix(normalizedRequired)) {
+            return false;
+        }
+        String heldBase = toBaseItemId(normalizedHeld);
+        return normalizedRequired.equalsIgnoreCase(heldBase);
+    }
+
+    private String removeLeadingStatePrefix(String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return "";
+        }
+        String trimmed = itemId.trim();
+        return trimmed.startsWith("*") ? trimmed.substring(1) : trimmed;
+    }
+
+    private boolean containsStateSuffix(String itemId) {
+        return itemId != null && itemId.contains("_State_");
+    }
+
+    private String toBaseItemId(String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return "";
+        }
+        int stateIndex = itemId.indexOf("_State_");
+        if (stateIndex > 0) {
+            return itemId.substring(0, stateIndex);
+        }
+        return itemId;
     }
 
     // Encapsulates which armor and utility slots are included in matching.

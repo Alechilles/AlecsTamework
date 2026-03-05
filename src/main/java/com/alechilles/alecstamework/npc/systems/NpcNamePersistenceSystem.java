@@ -46,7 +46,16 @@ public final class NpcNamePersistenceSystem extends RefSystem<EntityStore> {
         if (name == null || name.isBlank()) {
             return;
         }
-        EntitySupport.setDisplayName(reference, name, true, commandBuffer);
+        commandBuffer.run(bufferStore -> {
+            if (bufferStore == null || reference == null || !reference.isValid()) {
+                return;
+            }
+            if (bufferStore.getComponent(reference, npcType) == null) {
+                return;
+            }
+            // Keep persistence path consistent with naming/spawner flows.
+            EntitySupport.setDisplayName(reference, name, bufferStore);
+        });
     }
 
     @Override

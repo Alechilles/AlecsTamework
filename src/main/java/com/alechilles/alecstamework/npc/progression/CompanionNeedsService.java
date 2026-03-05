@@ -20,6 +20,7 @@ import javax.annotation.Nullable;
 public final class CompanionNeedsService {
     private static final double EPSILON = 0.000001;
     private static final double SECONDS_PER_MINUTE = 60.0;
+    private static final double ACTION_FOOD_CONSUME_RADIUS_FLOOR = 2.0;
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
 
     private CompanionNeedsService() {
@@ -147,7 +148,19 @@ public final class CompanionNeedsService {
             if (effectiveFoodIds == null || effectiveFoodIds.length == 0) {
                 effectiveFoodIds = resolveRoleFoodItemIds(npcRef, store);
             }
-            int consumed = ENVIRONMENT_SERVICE.consumeNearbyContainerFood(npcRef, store, config, effectiveFoodIds);
+            // Seek flow targets an adjacent stand position, so allow a small radius floor to
+            // reliably include the intended container even with minor stop-position variance.
+            double consumeRadius = Math.max(
+                    passiveRefill.getContainerConsumeRadius(),
+                    ACTION_FOOD_CONSUME_RADIUS_FLOOR
+            );
+            int consumed = ENVIRONMENT_SERVICE.consumeNearbyContainerFood(
+                    npcRef,
+                    store,
+                    config,
+                    effectiveFoodIds,
+                    consumeRadius
+            );
             if (consumed > 0) {
                 hungerGain = consumed * passiveRefill.getHungerGainPerConsumedItem();
             }

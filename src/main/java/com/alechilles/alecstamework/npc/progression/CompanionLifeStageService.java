@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -586,8 +587,14 @@ public final class CompanionLifeStageService {
         if (npc == null) {
             return false;
         }
+        if (isMounted(npcRef, store)) {
+            return false;
+        }
         String currentRoleId = resolveRoleId(npc);
         if (currentRoleId == null || currentRoleId.isBlank()) {
+            return false;
+        }
+        if ("Empty_Role".equalsIgnoreCase(currentRoleId)) {
             return false;
         }
         String targetRoleId = resolveTargetRoleIdForStage(stage, lifeStage, null);
@@ -973,6 +980,19 @@ public final class CompanionLifeStageService {
         }
         String resolved = plugin.getName(roleIndex);
         return resolved == null || resolved.isBlank() ? null : resolved;
+    }
+
+    private static boolean isMounted(@Nullable Ref<EntityStore> npcRef,
+                                     @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        try {
+            ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
+            return mountType != null && store.getComponent(npcRef, mountType) != null;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private static double resolveAdultScale(Ref<EntityStore> npcRef, Store<EntityStore> store) {

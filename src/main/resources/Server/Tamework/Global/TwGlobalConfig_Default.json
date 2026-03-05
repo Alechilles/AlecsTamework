@@ -27,7 +27,7 @@
     "RelocationMaxWaitMs": 120000,
     "RelocationMaxRetryAttempts": 60,
     "DeadRespawnEnabled": true,
-    "DeadRespawnCooldownMs": 600000,
+    "DeadRespawnCooldownMs": 10000,
     "DeadRespawnFollowRetryDelayMs": 1250,
     "DeadRespawnDistanceClose": 5.0,
     "DeadRespawnDistanceNear": 8.0,

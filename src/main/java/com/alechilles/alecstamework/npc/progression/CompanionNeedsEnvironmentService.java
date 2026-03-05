@@ -269,6 +269,14 @@ public final class CompanionNeedsEnvironmentService {
                                    @Nullable Store<EntityStore> store,
                                    @Nonnull TwNeedsConfig config,
                                    @Nullable String[] preferredFoodItemIds) {
+        return consumeNearbyContainerFood(npcRef, store, config, preferredFoodItemIds, Double.NaN);
+    }
+
+    int consumeNearbyContainerFood(@Nullable Ref<EntityStore> npcRef,
+                                   @Nullable Store<EntityStore> store,
+                                   @Nonnull TwNeedsConfig config,
+                                   @Nullable String[] preferredFoodItemIds,
+                                   double consumeRadiusOverride) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return 0;
         }
@@ -290,6 +298,9 @@ public final class CompanionNeedsEnvironmentService {
             return 0;
         }
         double radius = passiveRefill.getContainerConsumeRadius();
+        if (Double.isFinite(consumeRadiusOverride) && consumeRadiusOverride > 0.0) {
+            radius = consumeRadiusOverride;
+        }
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return 0;
         }
