@@ -14,7 +14,7 @@
       "Description": "Range used to retain/refresh the owner lock target for follow orchestration."
     },
     "FollowSeekRange": {
-      "Value": 15,
+      "Value": 25,
       "Description": "Distance threshold where seek is used; outside this threshold, teleport fallback is used."
     },
     "FollowSeekSlowDownDistance": {

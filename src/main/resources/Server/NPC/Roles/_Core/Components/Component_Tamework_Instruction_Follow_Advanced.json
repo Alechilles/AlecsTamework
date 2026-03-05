@@ -14,8 +14,12 @@
       "Description": "Range used for the initial close-range spot check."
     },
     "FollowLockOnRange": {
-      "Value": 15,
-      "Description": "Range used to lock onto the master target."
+      "Value": 128,
+      "Description": "Range used to retain/refresh the owner lock target for follow orchestration."
+    },
+    "FollowSeekRange": {
+      "Value": 25,
+      "Description": "Distance threshold where seek is used; outside this threshold, teleport fallback is used."
     },
     "FollowSeekSlowDownDistance": {
       "Value": 5,
@@ -131,6 +135,9 @@
               "Type": "Target",
               "TargetSlot": {
                 "Compute": "MasterTargetSlot"
+              },
+              "Range": {
+                "Compute": "FollowSeekRange"
               }
             },
             "BodyMotion": {
