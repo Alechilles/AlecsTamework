@@ -29,8 +29,8 @@ import javax.annotation.Nullable;
  * Handles world-environment probes for needs progression (nearby water and nearby container food).
  */
 public final class CompanionNeedsEnvironmentService {
-    private static final int CONTAINER_VERTICAL_SCAN_RADIUS = 2;
-    private static final int WATER_VERTICAL_SCAN_RADIUS = 1;
+    private static final int DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS = 2;
+    private static final int DEFAULT_WATER_VERTICAL_SCAN_RADIUS = 1;
     private static final int[][] HORIZONTAL_NEIGHBOR_OFFSETS = {
             {1, 0},
             {-1, 0},
@@ -51,7 +51,9 @@ public final class CompanionNeedsEnvironmentService {
         if (transform == null || world == null || world.getChunkStore() == null) {
             return false;
         }
-        double radius = config.getPassiveRefill().getWaterConsumeRadius();
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
+        double radius = passiveRefill.getWaterConsumeRadius();
+        int verticalScanRadius = passiveRefill.getWaterVerticalScanRadius();
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return false;
         }
@@ -66,7 +68,7 @@ public final class CompanionNeedsEnvironmentService {
         int searchRadius = Math.max(1, (int) Math.ceil(radius));
         double radiusSq = radius * radius;
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        for (int y = blockY - WATER_VERTICAL_SCAN_RADIUS; y <= blockY + WATER_VERTICAL_SCAN_RADIUS; y++) {
+        for (int y = blockY - verticalScanRadius; y <= blockY + verticalScanRadius; y++) {
             for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
                 for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
                     double dx = x - blockX;
@@ -94,10 +96,12 @@ public final class CompanionNeedsEnvironmentService {
         if (config == null) {
             return null;
         }
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
         return findNearestWaterDrinkingPosition(
                 npcRef,
                 store,
-                config.getPassiveRefill().getWaterSearchRadius()
+                passiveRefill.getWaterSearchRadius(),
+                passiveRefill.getWaterVerticalScanRadius()
         );
     }
 
@@ -105,6 +109,19 @@ public final class CompanionNeedsEnvironmentService {
     public Vector3d findNearestWaterDrinkingPosition(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store,
                                                      double radius) {
+        return findNearestWaterDrinkingPosition(
+                npcRef,
+                store,
+                radius,
+                DEFAULT_WATER_VERTICAL_SCAN_RADIUS
+        );
+    }
+
+    @Nullable
+    public Vector3d findNearestWaterDrinkingPosition(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store,
+                                                     double radius,
+                                                     int verticalScanRadius) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return null;
         }
@@ -127,10 +144,11 @@ public final class CompanionNeedsEnvironmentService {
         int blockZ = (int) Math.floor(transform.getPosition().z);
         int searchRadius = Math.max(1, (int) Math.ceil(radius));
         double radiusSq = radius * radius;
+        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
-        for (int y = blockY - WATER_VERTICAL_SCAN_RADIUS; y <= blockY + WATER_VERTICAL_SCAN_RADIUS; y++) {
+        for (int y = blockY - clampedVerticalRadius; y <= blockY + clampedVerticalRadius; y++) {
             for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
                 for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
                     double dx = x - blockX;
@@ -178,7 +196,8 @@ public final class CompanionNeedsEnvironmentService {
                 npcRef,
                 store,
                 passive.getContainerSearchRadius(),
-                passive.getContainerFoodItemIds()
+                passive.getContainerFoodItemIds(),
+                passive.getContainerVerticalScanRadius()
         );
     }
 
@@ -187,6 +206,21 @@ public final class CompanionNeedsEnvironmentService {
                                                      @Nullable Store<EntityStore> store,
                                                      double radius,
                                                      @Nullable String[] allowedItemIds) {
+        return findNearestFoodContainerPosition(
+                npcRef,
+                store,
+                radius,
+                allowedItemIds,
+                DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS
+        );
+    }
+
+    @Nullable
+    public Vector3d findNearestFoodContainerPosition(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store,
+                                                     double radius,
+                                                     @Nullable String[] allowedItemIds,
+                                                     int verticalScanRadius) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return null;
         }
@@ -213,10 +247,11 @@ public final class CompanionNeedsEnvironmentService {
         int blockZ = (int) Math.floor(transform.getPosition().z);
         int searchRadius = Math.max(1, (int) Math.ceil(radius));
         double radiusSq = radius * radius;
+        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
-        for (int y = blockY - CONTAINER_VERTICAL_SCAN_RADIUS; y <= blockY + CONTAINER_VERTICAL_SCAN_RADIUS; y++) {
+        for (int y = blockY - clampedVerticalRadius; y <= blockY + clampedVerticalRadius; y++) {
             for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
                 for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
                     double dx = x - blockX;
@@ -282,6 +317,7 @@ public final class CompanionNeedsEnvironmentService {
         }
         TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
         int maxItems = passiveRefill.getMaxContainerItemsConsumedPerSweep();
+        int verticalScanRadius = passiveRefill.getContainerVerticalScanRadius();
         if (maxItems <= 0) {
             return 0;
         }
@@ -316,7 +352,7 @@ public final class CompanionNeedsEnvironmentService {
         int searchRadius = Math.max(1, (int) Math.ceil(radius));
         double radiusSq = radius * radius;
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
-        for (int y = blockY - CONTAINER_VERTICAL_SCAN_RADIUS; y <= blockY + CONTAINER_VERTICAL_SCAN_RADIUS; y++) {
+        for (int y = blockY - verticalScanRadius; y <= blockY + verticalScanRadius; y++) {
             for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
                 for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
                     double dx = x - blockX;

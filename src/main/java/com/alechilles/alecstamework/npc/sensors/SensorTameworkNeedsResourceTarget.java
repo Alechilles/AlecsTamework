@@ -77,15 +77,30 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
     private Vector3d resolveWaterTarget(@Nonnull Ref<EntityStore> ref,
                                         @Nonnull Store<EntityStore> store,
                                         @Nullable TwNeedsConfig needsConfig) {
-        Vector3d target = ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, range);
-        if (target != null || needsConfig == null) {
+        if (needsConfig == null) {
+            return ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, range);
+        }
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
+        int verticalScanRadius = passiveRefill.getWaterVerticalScanRadius();
+        Vector3d target = ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(
+                ref,
+                store,
+                range,
+                verticalScanRadius
+        );
+        if (target != null) {
             return target;
         }
-        double fallbackRange = needsConfig.getPassiveRefill().getWaterSearchRadius();
+        double fallbackRange = passiveRefill.getWaterSearchRadius();
         if (fallbackRange <= 0.0 || approximatelyEqual(fallbackRange, range)) {
             return null;
         }
-        return ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(ref, store, fallbackRange);
+        return ENVIRONMENT_SERVICE.findNearestWaterDrinkingPosition(
+                ref,
+                store,
+                fallbackRange,
+                verticalScanRadius
+        );
     }
 
     @Nullable
@@ -96,15 +111,32 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
         if (effectiveItemIds == null || effectiveItemIds.length == 0) {
             return null;
         }
-        Vector3d target = ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, range, effectiveItemIds);
-        if (target != null || needsConfig == null) {
+        if (needsConfig == null) {
+            return ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, range, effectiveItemIds);
+        }
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = needsConfig.getPassiveRefill();
+        int verticalScanRadius = passiveRefill.getContainerVerticalScanRadius();
+        Vector3d target = ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(
+                ref,
+                store,
+                range,
+                effectiveItemIds,
+                verticalScanRadius
+        );
+        if (target != null) {
             return target;
         }
-        double fallbackRange = needsConfig.getPassiveRefill().getContainerSearchRadius();
+        double fallbackRange = passiveRefill.getContainerSearchRadius();
         if (fallbackRange <= 0.0 || approximatelyEqual(fallbackRange, range)) {
             return null;
         }
-        return ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(ref, store, fallbackRange, effectiveItemIds);
+        return ENVIRONMENT_SERVICE.findNearestFoodContainerPosition(
+                ref,
+                store,
+                fallbackRange,
+                effectiveItemIds,
+                verticalScanRadius
+        );
     }
 
     @Nullable

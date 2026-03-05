@@ -30,6 +30,7 @@
     "SweepIntervalSeconds": 15,
     "NearbyContainerFeedEnabled": true,
     "ContainerSearchRadius": 7.0,
+    "ContainerVerticalScanRadius": 2,
     "ContainerConsumeRadius": 1.5,
     "ContainerFoodItemIds": [
       "Plant_Fruit_Apple",
@@ -40,6 +41,7 @@
     "MaxContainerItemsConsumedPerSweep": 1,
     "NearbyWaterDrinkEnabled": true,
     "WaterSearchRadius": 4.0,
+    "WaterVerticalScanRadius": 1,
     "WaterConsumeRadius": 1.5,
     "ThirstGainPerSweepNearWater": 20.0
   },

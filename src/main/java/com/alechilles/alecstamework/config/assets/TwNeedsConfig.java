@@ -129,6 +129,12 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             settings -> settings.containerSearchRadius
         )
         .add()
+        .<Integer>append(
+            new KeyedCodec<>("ContainerVerticalScanRadius", Codec.INTEGER),
+            (settings, value) -> settings.containerVerticalScanRadius = value,
+            settings -> settings.containerVerticalScanRadius
+        )
+        .add()
         .<Double>append(
             new KeyedCodec<>("ContainerConsumeRadius", Codec.DOUBLE),
             (settings, value) -> settings.containerConsumeRadius = value,
@@ -163,6 +169,12 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             new KeyedCodec<>("WaterSearchRadius", Codec.DOUBLE),
             (settings, value) -> settings.waterSearchRadius = value,
             settings -> settings.waterSearchRadius
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("WaterVerticalScanRadius", Codec.INTEGER),
+            (settings, value) -> settings.waterVerticalScanRadius = value,
+            settings -> settings.waterVerticalScanRadius
         )
         .add()
         .<Double>append(
@@ -574,12 +586,14 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         private int sweepIntervalSeconds = 15;
         private boolean nearbyContainerFeedEnabled = true;
         private double containerSearchRadius = 6.0;
+        private int containerVerticalScanRadius = 2;
         private double containerConsumeRadius = 1.5;
         private String[] containerFoodItemIds = ArrayUtil.EMPTY_STRING_ARRAY;
         private double hungerGainPerConsumedItem = 25.0;
         private int maxContainerItemsConsumedPerSweep = 1;
         private boolean nearbyWaterDrinkEnabled = true;
         private double waterSearchRadius = 4.0;
+        private int waterVerticalScanRadius = 1;
         private double waterConsumeRadius = 1.5;
         private double thirstGainPerSweepNearWater = 20.0;
 
@@ -593,6 +607,10 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public double getContainerSearchRadius() {
             return sanitizeNonNegative(containerSearchRadius, 6.0);
+        }
+
+        public int getContainerVerticalScanRadius() {
+            return Math.max(0, containerVerticalScanRadius);
         }
 
         public double getContainerConsumeRadius() {
@@ -617,6 +635,10 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public double getWaterSearchRadius() {
             return sanitizeNonNegative(waterSearchRadius, 4.0);
+        }
+
+        public int getWaterVerticalScanRadius() {
+            return Math.max(0, waterVerticalScanRadius);
         }
 
         public double getWaterConsumeRadius() {
