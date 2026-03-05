@@ -131,6 +131,24 @@
         },
         "Actions": [
           {
+            "Type": "TimerStart",
+            "Name": {
+              "Compute": "NeedsSeekFailedCooldownName"
+            },
+            "StartValueRange": {
+              "Compute": "NeedsSeekFailedCooldownRange"
+            },
+            "RestartValueRange": {
+              "Compute": "NeedsSeekFailedCooldownRange"
+            }
+          },
+          {
+            "Type": "TimerRestart",
+            "Name": {
+              "Compute": "NeedsSeekFailedCooldownName"
+            }
+          },
+          {
             "Type": "ParentState",
             "State": "OnNeedsSeekComplete"
           }
@@ -245,6 +263,24 @@
             },
             "Actions": [
               {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                }
+              },
+              {
                 "Type": "State",
                 "State": ".Default"
               },
@@ -301,6 +337,24 @@
               "State": "Stopped"
             },
             "Actions": [
+              {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                }
+              },
               {
                 "Type": "State",
                 "State": ".Default"
@@ -390,6 +444,24 @@
                 },
                 "FoodItemIDs": {
                   "Compute": "NeedsSeekFoodItemIDs"
+                }
+              },
+              {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
                 }
               },
               {
