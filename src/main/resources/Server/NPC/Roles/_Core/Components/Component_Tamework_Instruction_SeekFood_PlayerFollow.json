@@ -1,0 +1,161 @@
+{
+  "$Comment": "SeekFood helper that keeps player-held-attractive-item follow stable and exits to parent cleanly.",
+  "Type": "Component",
+  "Class": "Instruction",
+  "Interface": "Tamework.Instruction.SeekFood.PlayerFollow",
+  "Parameters": {
+    "_ImportStates": [ "Complete" ],
+    "AlertedRange": {
+      "Value": 18,
+      "Description": "Range used to keep watching/following the current target while in SeekFood."
+    },
+    "AttractiveItemSet": {
+      "Value": [ "Tool_Feedbag" ],
+      "TypeHint": "String",
+      "Description": "Items that keep the NPC interested in the current target."
+    },
+    "FollowItemAttitudes": {
+      "Value": [ "Revered", "Friendly", "Ignore" ],
+      "TypeHint": "String",
+      "Description": "Attitudes allowed for attractive-item follow behavior."
+    },
+    "FollowItemDistance": {
+      "Value": [ 2, 2.5 ],
+      "Description": "Desired maintain-distance range while following an attractive item."
+    }
+  },
+  "Content": {
+    "Continue": true,
+    "Sensor": {
+      "Type": "Any"
+    },
+    "Instructions": [
+      {
+        "$Comment": "Re-lock player targets holding attractive items so flock/other targeting does not steal LockedTarget.",
+        "Continue": true,
+        "Enabled": { "Compute": "!isEmptyStringArray(AttractiveItemSet)" },
+        "Sensor": {
+          "Type": "Mob",
+          "Range": { "Compute": "AlertedRange" },
+          "LockOnTarget": true,
+          "GetPlayers": true,
+          "GetNPCs": false,
+          "Filters": [
+            {
+              "Type": "ItemInHand",
+              "Items": { "Compute": "AttractiveItemSet" }
+            }
+          ],
+          "Prioritiser": {
+            "Type": "Attitude",
+            "AttitudesByPriority": { "Compute": "FollowItemAttitudes" }
+          }
+        }
+      },
+      {
+        "Continue": true,
+        "Sensor": {
+          "Type": "Target",
+          "TargetSlot": "LockedTarget",
+          "Range": { "Compute": "AlertedRange" }
+        },
+        "HeadMotion": {
+          "Type": "Watch"
+        }
+      },
+      {
+        "Enabled": { "Compute": "!isEmptyStringArray(AttractiveItemSet)" },
+        "$Comment": "If the target is holding a liked item, follow it.",
+        "Sensor": {
+          "Type": "Target",
+          "TargetSlot": "LockedTarget",
+          "Filters": [
+            {
+              "Type": "ItemInHand",
+              "Items": { "Compute": "AttractiveItemSet" }
+            },
+            {
+              "Type": "Attitude",
+              "Attitudes": { "Compute": "FollowItemAttitudes" }
+            }
+          ]
+        },
+        "BodyMotion": {
+          "Type": "MaintainDistance",
+          "DesiredDistanceRange": { "Compute": "FollowItemDistance" },
+          "RelativeForwardsSpeed": 0.3,
+          "RelativeBackwardsSpeed": 0.3
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status",
+            "Animation": "Curious"
+          }
+        ]
+      },
+      {
+        "$Comment": "If we still have a target but item-follow conditions are no longer met, release and return to parent completion.",
+        "Enabled": { "Compute": "!isEmptyStringArray(AttractiveItemSet)" },
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Target",
+              "TargetSlot": "LockedTarget"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": "LockedTarget",
+                "Filters": [
+                  {
+                    "Type": "ItemInHand",
+                    "Items": { "Compute": "AttractiveItemSet" }
+                  },
+                  {
+                    "Type": "Attitude",
+                    "Attitudes": { "Compute": "FollowItemAttitudes" }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "ActionsBlocking": true,
+        "ActionsAtomic": true,
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "ParentState",
+            "State": "Complete"
+          }
+        ]
+      },
+      {
+        "$Comment": "If we have no target, finish SeekFood.",
+        "Sensor": {
+          "Type": "Not",
+          "Sensor": {
+            "Type": "Target",
+            "TargetSlot": "LockedTarget"
+          }
+        },
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": [ 2, 3 ],
+            "Action": {
+              "Type": "ParentState",
+              "State": "Complete"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}
