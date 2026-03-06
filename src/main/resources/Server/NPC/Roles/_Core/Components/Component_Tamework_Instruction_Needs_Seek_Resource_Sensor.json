@@ -12,6 +12,10 @@
       "Value": "TameworkNeedsSeekTarget",
       "Description": "Stored destination slot used while a needs resource seek is active."
     },
+    "NeedsSeekClearTargetSlot": {
+      "Value": "TameworkNeedsSeekTransientTarget",
+      "Description": "Target slot cleared when starting a needs-seek pass. Keep separate from LockedTarget to avoid clobbering unrelated follow/interaction targets."
+    },
     "NeedsSeekWhenHungerBelowRatio": {
       "Value": 0.85,
       "Description": "Start food seeking when normalized hunger is at or below this ratio."
@@ -95,7 +99,9 @@
           },
           {
             "Type": "ReleaseTarget",
-            "TargetSlot": "LockedTarget"
+            "TargetSlot": {
+              "Compute": "NeedsSeekClearTargetSlot"
+            }
           },
           {
             "Type": "ParentState",
@@ -148,7 +154,9 @@
           },
           {
             "Type": "ReleaseTarget",
-            "TargetSlot": "LockedTarget"
+            "TargetSlot": {
+              "Compute": "NeedsSeekClearTargetSlot"
+            }
           },
           {
             "Type": "ParentState",
