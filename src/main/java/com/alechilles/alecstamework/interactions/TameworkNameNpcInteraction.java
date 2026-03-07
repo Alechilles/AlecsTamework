@@ -17,12 +17,16 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHandler;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInteraction;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
  * Custom interaction handler used by naming items.
  */
 public class TameworkNameNpcInteraction extends SimpleInteraction {
+    private static final long SLOW_INTERACTION_THRESHOLD_NS = TimeUnit.MILLISECONDS.toNanos(20L);
+
     public static final BuilderCodec<TameworkNameNpcInteraction> CODEC = BuilderCodec.builder(
             TameworkNameNpcInteraction.class,
             TameworkNameNpcInteraction::new,
@@ -203,6 +207,8 @@ public class TameworkNameNpcInteraction extends SimpleInteraction {
                 cooldownMs
         );
 
+        boolean debugLag = plugin != null && plugin.isDebugLagEnabled();
+        long startedNs = debugLag ? System.nanoTime() : 0L;
         commandBuffer.run(store -> handler.beginNaming(
                 player,
                 heldItem,
@@ -210,6 +216,9 @@ public class TameworkNameNpcInteraction extends SimpleInteraction {
                 configId,
                 overrides
         ));
+        if (debugLag) {
+            logSlowInteraction(plugin, startedNs, player, heldItem, targetEntity);
+        }
         context.setHeldItem(heldItem);
         super.tick0(true, time, type, context, cooldownHandler);
     }
@@ -224,5 +233,35 @@ public class TameworkNameNpcInteraction extends SimpleInteraction {
             context.getState().state = InteractionState.Failed;
         }
         super.tick0(firstRun, time, type, context, cooldownHandler);
+    }
+
+    private void logSlowInteraction(Tamework plugin,
+                                    long startedNs,
+                                    Player player,
+                                    ItemStack heldItem,
+                                    Ref<EntityStore> targetEntity) {
+        if (plugin == null || startedNs <= 0L || plugin.getLogger() == null) {
+            return;
+        }
+        long elapsedNs = System.nanoTime() - startedNs;
+        if (elapsedNs < SLOW_INTERACTION_THRESHOLD_NS) {
+            return;
+        }
+        double elapsedMs = elapsedNs / 1_000_000.0;
+        String playerName = player != null ? player.getDisplayName() : "<unknown>";
+        String itemId = heldItem != null ? heldItem.getItemId() : "<none>";
+        plugin.getLogger().at(Level.WARNING).log(
+                "Tamework lag probe: naming interaction took "
+                        + elapsedMs
+                        + "ms (player="
+                        + playerName
+                        + ", item="
+                        + itemId
+                        + ", configId="
+                        + configId
+                        + ", target="
+                        + targetEntity
+                        + ")."
+        );
     }
 }

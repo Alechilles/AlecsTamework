@@ -22,6 +22,8 @@
         <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/UserData</hytale.userdata.path>
         <hytale.toolkit.path>C:/Users/22ale/AppData/Local/Hytale-Toolkit</hytale.toolkit.path>
         <hytale.jdk.path>C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot</hytale.jdk.path>
+        <hytale.server.jvm.args />
+        <hytale.server.extra.args />
     </properties>
 
     <dependencies>
@@ -192,16 +194,7 @@
                                 <configuration>
                                     <executable>${hytale.jdk.path}/bin/java</executable>
                                     <workingDirectory>${hytale.install.path}/Server</workingDirectory>
-                                    <arguments>
-                                        <argument>--enable-native-access=ALL-UNNAMED</argument>
-                                        <argument>-jar</argument>
-                                        <argument>HytaleServer.jar</argument>
-                                        <argument>--assets</argument>
-                                        <argument>${hytale.install.path}/Assets.zip</argument>
-                                        <argument>--assets</argument>
-                                        <argument>${project.basedir}/src/main/resources</argument>
-                                        <argument>--allow-op</argument>
-                                    </arguments>
+                                    <commandlineArgs>--enable-native-access=ALL-UNNAMED ${hytale.server.jvm.args} -jar "HytaleServer.jar" --assets "${hytale.install.path}/Assets.zip" --assets "${project.basedir}/src/main/resources" --allow-op ${hytale.server.extra.args}</commandlineArgs>
                                 </configuration>
                             </execution>
                         </executions>

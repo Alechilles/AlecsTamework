@@ -16,29 +16,31 @@ if not exist "%WRAPPER_JAR%" (
     exit /b 1
 )
 
-@rem Prefer local toolkit JDK, then JAVA_HOME, then PATH.
-set "LOCAL_JAVA_EXE=C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot\bin\java.exe"
+@rem Resolve Java in order:
+@rem 1) JAVA_HOME (CI and local)
+@rem 2) java.exe on PATH
+@rem 3) Local fallback JDK path used by the Hytale toolkit
 set "JAVACMD="
 
-if exist "%LOCAL_JAVA_EXE%" (
-    set "JAVACMD=%LOCAL_JAVA_EXE%"
-) else (
-    if not "%JAVA_HOME%"=="" (
-        if exist "%JAVA_HOME%\bin\java.exe" (
-            set "JAVACMD=%JAVA_HOME%\bin\java.exe"
-        )
+if not "%JAVA_HOME%"=="" (
+    if exist "%JAVA_HOME%\bin\java.exe" (
+        set "JAVACMD=%JAVA_HOME%\bin\java.exe"
     )
 )
 
 if "%JAVACMD%"=="" (
-    set "JAVACMD=java.exe"
+    for %%I in (java.exe) do set "JAVACMD=%%~$PATH:I"
 )
 
-if not exist "%JAVACMD%" (
-    for %%I in ("%JAVACMD%") do set "JAVA_ON_PATH=%%~$PATH:I"
+if "%JAVACMD%"=="" (
+    set "LOCAL_JAVA=C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot\bin\java.exe"
+    if exist "%LOCAL_JAVA%" (
+        set "JAVACMD=%LOCAL_JAVA%"
+    )
 )
-if not exist "%JAVACMD%" if "%JAVA_ON_PATH%"=="" (
-    echo Error: Java runtime not found. Set JAVA_HOME or ensure java.exe is on PATH.
+
+if "%JAVACMD%"=="" (
+    echo Error: Java runtime not found. Set JAVA_HOME or add java.exe to PATH.
     exit /b 1
 )
 

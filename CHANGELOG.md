@@ -1,6 +1,12 @@
 # Changelog
 
 ## Unreleased
+### Added
+- New lag diagnostics toggle command: `/tw debuglag [on|off]` for targeted server performance logging.
+
+### Changed
+- Added guarded lag-probe logging in command, spawner, and naming item interactions, owner-interaction filtering, owner damage filtering, and command relocation retries/chunk requests when lag diagnostics are enabled.
+- `-Prun-server` now supports optional JVM/server argument passthrough properties (`-Dhytale.server.jvm.args` and `-Dhytale.server.extra.args`) for local resource-constrained runs.
 
 ## 2.2.0 - Progression, Coop Integration, and UI/Behavior Refinements - 2026-03-07
 ### Added

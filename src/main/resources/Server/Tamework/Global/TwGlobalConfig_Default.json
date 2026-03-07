@@ -4,7 +4,7 @@
     "Priority": 0
   },
   "OwnershipProtection": {
-    "BlockOwnerDamage": false,
+    "BlockOwnerDamage": true,
     "BlockAllPlayerDamageIfOwned": false,
     "InvulnerableIfOwned": false
   },

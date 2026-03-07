@@ -21,7 +21,7 @@
       "children": [
         {
           "id": "2",
-          "name": "Node",
+          "name": "VisualRoot",
           "position": {"x": 0, "y": 3, "z": 0},
           "orientation": {"x": 0.47238, "y": -0.83343, "z": -0.27157, "w": -0.09219},
           "shape": {
