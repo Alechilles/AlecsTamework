@@ -64,7 +64,7 @@ public final class CompanionProgressionBootstrapService {
         bootstrapTraitsComponent(npcRef, store, roleId);
         double nextSizeMultiplier = resolveSizeMultiplier(npcRef, store, traitConfig);
         CompanionStatModifierService.applyTraitModifiers(npcRef, store);
-        CompanionLifeStageService.ensureLifeStageComponent(npcRef, store);
+        CompanionLifeStageService.ensureLifeStageComponent(npcRef, store, roleId);
         CompanionLifeStageService.applySizeMultiplierDelta(
                 npcRef,
                 store,

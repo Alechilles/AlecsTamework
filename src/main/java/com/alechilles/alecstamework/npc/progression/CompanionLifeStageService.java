@@ -47,6 +47,12 @@ public final class CompanionLifeStageService {
 
     public static void ensureLifeStageComponent(@Nullable Ref<EntityStore> npcRef,
                                                 @Nullable Store<EntityStore> store) {
+        ensureLifeStageComponent(npcRef, store, null);
+    }
+
+    public static void ensureLifeStageComponent(@Nullable Ref<EntityStore> npcRef,
+                                                @Nullable Store<EntityStore> store,
+                                                @Nullable String roleIdHint) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
@@ -56,22 +62,11 @@ public final class CompanionLifeStageService {
         }
         TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
         if (existing == null) {
-            double adultScale = resolveAdultScale(npcRef, store);
-            double adolescentScale = resolveAdolescentScale(adultScale);
-            TameworkLifeStageComponent created = new TameworkLifeStageComponent(
-                    STAGE_ADULT,
-                    0L,
-                    0L,
-                    0L,
-                    0L,
-                    resolveBabyScale(adultScale),
-                    adolescentScale,
-                    adolescentScale,
-                    adolescentScale,
-                    adultScale,
-                    adultScale,
-                    false
-            );
+            String roleId = roleIdHint;
+            if (roleId == null || roleId.isBlank()) {
+                roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+            }
+            TameworkLifeStageComponent created = createInitialLifeStageComponent(npcRef, store, roleId);
             store.putComponent(npcRef, type, created);
             return;
         }
@@ -132,6 +127,96 @@ public final class CompanionLifeStageService {
         CompanionModelScaleService.applyScale(childRef, childNpc, store, initialScale);
         scheduleInitialScaleRetry(childRef, childNpc, store, INITIAL_SCALE_MAX_RETRIES, null);
         ensureGrowthTickScheduled(childRef, childNpc, store);
+    }
+
+    private static TameworkLifeStageComponent createInitialLifeStageComponent(Ref<EntityStore> npcRef,
+                                                                              Store<EntityStore> store,
+                                                                              @Nullable String roleId) {
+        double adultScale = resolveAdultScale(npcRef, store);
+        double defaultAdolescentScale = resolveAdolescentScale(adultScale);
+        double babyScale = resolveBabyScale(adultScale);
+        double adolescentScale = defaultAdolescentScale;
+        double adolescentSwitchScale = defaultAdolescentScale;
+        double adultStartScale = defaultAdolescentScale;
+        double adultSwitchScale = adultScale;
+        double adultFinalScale = adultScale;
+        long bornAtMs = 0L;
+        long adolescentAtMs = 0L;
+        long adultAtMs = 0L;
+        long fullyGrownAtMs = 0L;
+        boolean growthScalingEnabled = false;
+        String stage = STAGE_ADULT;
+        TwBreedingConfig.RoleFamily family = null;
+
+        if (roleId != null && !roleId.isBlank()) {
+            TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
+            if (config != null && config.isEnabled()) {
+                TwBreedingConfig.OffspringLifecycleSettings lifecycleSettings = config.getOffspringLifecycle();
+                if (lifecycleSettings != null && lifecycleSettings.isEnabled()) {
+                    family = config.resolveLifecycleFamilyForRole(roleId);
+                    String inferredStage = inferStageFromFamilyRole(roleId, family);
+                    if (STAGE_BABY.equals(inferredStage) || STAGE_ADOLESCENT.equals(inferredStage)) {
+                        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
+                        LifecycleComputation lifecycle = computeLifecycle(
+                                nowMs,
+                                adultScale,
+                                config,
+                                family,
+                                roleId,
+                                store
+                        );
+                        babyScale = lifecycle.babyStartScale();
+                        adolescentScale = lifecycle.adolescentStartScale();
+                        adolescentSwitchScale = lifecycle.adolescentSwitchScale();
+                        adultStartScale = lifecycle.adultStartScale();
+                        adultSwitchScale = lifecycle.adultSwitchScale();
+                        adultFinalScale = lifecycle.adultFinalScale();
+                        stage = inferredStage;
+                        growthScalingEnabled = true;
+                        bornAtMs = nowMs;
+                        adolescentAtMs = lifecycle.adolescentAtMs();
+                        adultAtMs = lifecycle.adultAtMs();
+                        fullyGrownAtMs = lifecycle.fullyGrownAtMs();
+                        if (STAGE_ADOLESCENT.equals(inferredStage)) {
+                            long babyDurationMs = Math.max(1L, lifecycle.adolescentAtMs() - nowMs);
+                            long adolescentDurationMs = Math.max(1L, lifecycle.adultAtMs() - lifecycle.adolescentAtMs());
+                            long adultDurationMs = Math.max(1L, lifecycle.fullyGrownAtMs() - lifecycle.adultAtMs());
+                            bornAtMs = nowMs - babyDurationMs;
+                            adolescentAtMs = nowMs;
+                            adultAtMs = nowMs + adolescentDurationMs;
+                            fullyGrownAtMs = adultAtMs + adultDurationMs;
+                        }
+                    }
+                }
+            }
+        }
+
+        TameworkLifeStageComponent created = new TameworkLifeStageComponent(
+                stage,
+                bornAtMs,
+                adolescentAtMs,
+                adultAtMs,
+                fullyGrownAtMs,
+                babyScale,
+                adolescentScale,
+                adolescentSwitchScale,
+                adultStartScale,
+                adultSwitchScale,
+                adultFinalScale,
+                growthScalingEnabled
+        );
+        if (family != null) {
+            if (family.getAdultRoleId() != null && !family.getAdultRoleId().isBlank()) {
+                created.setAdultRoleId(family.getAdultRoleId());
+            }
+            if (family.getBabyRoleId() != null && !family.getBabyRoleId().isBlank()) {
+                created.setBabyRoleId(family.getBabyRoleId());
+            }
+            if (family.getAdolescentRoleId() != null && !family.getAdolescentRoleId().isBlank()) {
+                created.setAdolescentRoleId(family.getAdolescentRoleId());
+            }
+        }
+        return created;
     }
 
     public static void refreshLifeStage(@Nullable Ref<EntityStore> npcRef,
@@ -921,6 +1006,40 @@ public final class CompanionLifeStageService {
         }
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
         return stage != null && stage.isGrowthScalingEnabled();
+    }
+
+    @Nullable
+    private static String inferStageFromFamilyRole(@Nullable String roleId,
+                                                   @Nullable TwBreedingConfig.RoleFamily family) {
+        if (roleId == null || roleId.isBlank() || family == null) {
+            return null;
+        }
+        if (roleIdsMatch(roleId, family.getBabyRoleId())) {
+            return STAGE_BABY;
+        }
+        if (roleIdsMatch(roleId, family.getAdolescentRoleId())) {
+            return STAGE_ADOLESCENT;
+        }
+        if (roleIdsMatch(roleId, family.getAdultRoleId())) {
+            return STAGE_ADULT;
+        }
+        return null;
+    }
+
+    private static boolean roleIdsMatch(@Nullable String left, @Nullable String right) {
+        if (left == null || left.isBlank() || right == null || right.isBlank()) {
+            return false;
+        }
+        return normalizeRoleId(left).equals(normalizeRoleId(right));
+    }
+
+    private static String normalizeRoleId(String roleId) {
+        String normalized = roleId.trim().toLowerCase(Locale.ROOT);
+        int separator = normalized.lastIndexOf(':');
+        if (separator >= 0 && separator < normalized.length() - 1) {
+            return normalized.substring(separator + 1);
+        }
+        return normalized;
     }
 
     private static boolean isAdultRoleFallback(@Nullable String roleId) {

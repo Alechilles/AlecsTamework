@@ -1,8 +1,12 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
 
 class CompanionLifeStageServiceTest {
@@ -67,5 +71,45 @@ class CompanionLifeStageServiceTest {
                 false
         );
         assertEquals(1.35, CompanionLifeStageService.resolveScale(component, 1500L), 0.000001);
+    }
+
+    @Test
+    void inferStageFromFamilyRoleTreatsConfiguredBabyAsBaby() throws Exception {
+        TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
+        setPrivateField(family, "adultRoleId", "Tamed_Cow");
+        setPrivateField(family, "babyRoleId", "Tamed_Cow_Calf");
+
+        Method inferStage = CompanionLifeStageService.class.getDeclaredMethod(
+                "inferStageFromFamilyRole",
+                String.class,
+                TwBreedingConfig.RoleFamily.class
+        );
+        inferStage.setAccessible(true);
+
+        Object stage = inferStage.invoke(null, "Tamed_Cow_Calf", family);
+        assertEquals(CompanionLifeStageService.STAGE_BABY, stage);
+    }
+
+    @Test
+    void inferStageFromFamilyRoleReturnsNullWhenRoleNotInFamily() throws Exception {
+        TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
+        setPrivateField(family, "adultRoleId", "Tamed_Cow");
+        setPrivateField(family, "babyRoleId", "Tamed_Cow_Calf");
+
+        Method inferStage = CompanionLifeStageService.class.getDeclaredMethod(
+                "inferStageFromFamilyRole",
+                String.class,
+                TwBreedingConfig.RoleFamily.class
+        );
+        inferStage.setAccessible(true);
+
+        Object stage = inferStage.invoke(null, "Tamed_Piglet", family);
+        assertNull(stage);
+    }
+
+    private static void setPrivateField(Object target, String fieldName, String value) throws Exception {
+        Field field = target.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.set(target, value);
     }
 }
