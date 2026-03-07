@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -32,12 +33,32 @@ public final class CompanionNeedsConsumeService {
                                                @Nullable String roleId,
                                                @Nullable String resourceType,
                                                @Nullable String[] preferredFoodItemIds) {
+        return applyResourceConsume(
+                npcRef,
+                store,
+                roleId,
+                resourceType,
+                preferredFoodItemIds,
+                null
+        );
+    }
+
+    /**
+     * Applies an explicit consume attempt for water and/or food from action-driven seek flow.
+     */
+    public static boolean applyResourceConsume(@Nullable Ref<EntityStore> npcRef,
+                                               @Nullable Store<EntityStore> store,
+                                               @Nullable String roleId,
+                                               @Nullable String resourceType,
+                                               @Nullable String[] preferredFoodItemIds,
+                                               @Nullable Vector3d consumeOriginOverride) {
         return applyResourceConsumeInternal(
                 npcRef,
                 store,
                 roleId,
                 resourceType,
                 preferredFoodItemIds,
+                consumeOriginOverride,
                 false
         );
     }
@@ -50,12 +71,32 @@ public final class CompanionNeedsConsumeService {
                                                               @Nullable String roleId,
                                                               @Nullable String resourceType,
                                                               @Nullable String[] preferredFoodItemIds) {
+        return applyResourceConsumeWithDiagnostics(
+                npcRef,
+                store,
+                roleId,
+                resourceType,
+                preferredFoodItemIds,
+                null
+        );
+    }
+
+    /**
+     * Applies an explicit consume attempt and emits structured diagnostics for failed attempts.
+     */
+    public static boolean applyResourceConsumeWithDiagnostics(@Nullable Ref<EntityStore> npcRef,
+                                                              @Nullable Store<EntityStore> store,
+                                                              @Nullable String roleId,
+                                                              @Nullable String resourceType,
+                                                              @Nullable String[] preferredFoodItemIds,
+                                                              @Nullable Vector3d consumeOriginOverride) {
         return applyResourceConsumeInternal(
                 npcRef,
                 store,
                 roleId,
                 resourceType,
                 preferredFoodItemIds,
+                consumeOriginOverride,
                 true
         );
     }
@@ -65,6 +106,7 @@ public final class CompanionNeedsConsumeService {
                                                         @Nullable String roleId,
                                                         @Nullable String resourceType,
                                                         @Nullable String[] preferredFoodItemIds,
+                                                        @Nullable Vector3d consumeOriginOverride,
                                                         boolean diagnostics) {
         String npcId = NeedsConsumeDiagnostics.resolveNpcId(npcRef, store);
         NeedsResourceConsumeMode mode = NeedsResourceConsumeMode.from(resourceType);
@@ -147,7 +189,8 @@ public final class CompanionNeedsConsumeService {
                             store,
                             config,
                             effectiveFoodIds,
-                            consumeRadius
+                            consumeRadius,
+                            consumeOriginOverride
                     );
                     consumedItems = containerResult.getConsumedItems();
                     if (consumedItems > 0) {

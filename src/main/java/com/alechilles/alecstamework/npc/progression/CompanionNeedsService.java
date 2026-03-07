@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -120,12 +121,32 @@ public final class CompanionNeedsService {
                                                @Nullable String roleId,
                                                @Nullable String resourceType,
                                                @Nullable String[] preferredFoodItemIds) {
+        return applyResourceConsume(
+                npcRef,
+                store,
+                roleId,
+                resourceType,
+                preferredFoodItemIds,
+                null
+        );
+    }
+
+    /**
+     * Applies an explicit consume attempt for water and/or food from action-driven seek flow.
+     */
+    public static boolean applyResourceConsume(@Nullable Ref<EntityStore> npcRef,
+                                               @Nullable Store<EntityStore> store,
+                                               @Nullable String roleId,
+                                               @Nullable String resourceType,
+                                               @Nullable String[] preferredFoodItemIds,
+                                               @Nullable Vector3d consumeOriginOverride) {
         return CompanionNeedsConsumeService.applyResourceConsume(
                 npcRef,
                 store,
                 roleId,
                 resourceType,
-                preferredFoodItemIds
+                preferredFoodItemIds,
+                consumeOriginOverride
         );
     }
 
@@ -137,12 +158,32 @@ public final class CompanionNeedsService {
                                                               @Nullable String roleId,
                                                               @Nullable String resourceType,
                                                               @Nullable String[] preferredFoodItemIds) {
+        return applyResourceConsumeWithDiagnostics(
+                npcRef,
+                store,
+                roleId,
+                resourceType,
+                preferredFoodItemIds,
+                null
+        );
+    }
+
+    /**
+     * Applies an explicit consume attempt and emits diagnostic logs for failed attempts.
+     */
+    public static boolean applyResourceConsumeWithDiagnostics(@Nullable Ref<EntityStore> npcRef,
+                                                              @Nullable Store<EntityStore> store,
+                                                              @Nullable String roleId,
+                                                              @Nullable String resourceType,
+                                                              @Nullable String[] preferredFoodItemIds,
+                                                              @Nullable Vector3d consumeOriginOverride) {
         return CompanionNeedsConsumeService.applyResourceConsumeWithDiagnostics(
                 npcRef,
                 store,
                 roleId,
                 resourceType,
-                preferredFoodItemIds
+                preferredFoodItemIds,
+                consumeOriginOverride
         );
     }
 

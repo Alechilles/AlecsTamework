@@ -4,9 +4,11 @@ import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.sensorinfo.IPositionProvider;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import javax.annotation.Nullable;
 
@@ -44,12 +46,32 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
             return false;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        Vector3d consumeOrigin = resolveConsumeOrigin(infoProvider);
         return CompanionNeedsService.applyResourceConsumeWithDiagnostics(
                 npcRef,
                 store,
                 roleId,
                 resourceType,
-                foodItemIds
+                foodItemIds,
+                consumeOrigin
         );
+    }
+
+    @Nullable
+    private static Vector3d resolveConsumeOrigin(@Nullable InfoProvider infoProvider) {
+        if (infoProvider == null || !infoProvider.hasPosition()) {
+            return null;
+        }
+        IPositionProvider provider = infoProvider.getPositionProvider();
+        if (provider == null || !provider.hasPosition()) {
+            return null;
+        }
+        double x = provider.getX();
+        double y = provider.getY();
+        double z = provider.getZ();
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
+            return null;
+        }
+        return new Vector3d(x, y, z);
     }
 }

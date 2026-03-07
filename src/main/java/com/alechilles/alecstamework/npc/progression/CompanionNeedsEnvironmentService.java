@@ -64,9 +64,13 @@ public final class CompanionNeedsEnvironmentService {
         private final int maxItems;
         private final double radius;
         private final int verticalScanRadius;
+        private final int scanBlockX;
+        private final int scanBlockY;
+        private final int scanBlockZ;
         private final int npcBlockX;
         private final int npcBlockY;
         private final int npcBlockZ;
+        private final boolean scanFromOverride;
         private final double nearestContainerDistance;
         private final double nearestAllowedContainerDistance;
         @Nonnull
@@ -81,9 +85,13 @@ public final class CompanionNeedsEnvironmentService {
                                int maxItems,
                                double radius,
                                int verticalScanRadius,
+                               int scanBlockX,
+                               int scanBlockY,
+                               int scanBlockZ,
                                int npcBlockX,
                                int npcBlockY,
                                int npcBlockZ,
+                               boolean scanFromOverride,
                                double nearestContainerDistance,
                                double nearestAllowedContainerDistance,
                                @Nonnull ContainerConsumeStatus status) {
@@ -96,9 +104,13 @@ public final class CompanionNeedsEnvironmentService {
             this.maxItems = maxItems;
             this.radius = radius;
             this.verticalScanRadius = verticalScanRadius;
+            this.scanBlockX = scanBlockX;
+            this.scanBlockY = scanBlockY;
+            this.scanBlockZ = scanBlockZ;
             this.npcBlockX = npcBlockX;
             this.npcBlockY = npcBlockY;
             this.npcBlockZ = npcBlockZ;
+            this.scanFromOverride = scanFromOverride;
             this.nearestContainerDistance = nearestContainerDistance;
             this.nearestAllowedContainerDistance = nearestAllowedContainerDistance;
             this.status = status;
@@ -124,6 +136,8 @@ public final class CompanionNeedsEnvironmentService {
                     + ",maxItems=" + maxItems
                     + ",radius=" + String.format(Locale.ROOT, "%.2f", radius)
                     + ",vScan=" + verticalScanRadius
+                    + ",scanSource=" + (scanFromOverride ? "TARGET" : "NPC")
+                    + ",scanBlock=[" + scanBlockX + "," + scanBlockY + "," + scanBlockZ + "]"
                     + ",npcBlock=[" + npcBlockX + "," + npcBlockY + "," + npcBlockZ + "]"
                     + ",nearestContainerDist=" + formatDistance(nearestContainerDistance)
                     + ",nearestAllowedContainerDist=" + formatDistance(nearestAllowedContainerDistance);
@@ -429,7 +443,8 @@ public final class CompanionNeedsEnvironmentService {
                 store,
                 config,
                 preferredFoodItemIds,
-                consumeRadiusOverride
+                consumeRadiusOverride,
+                null
         ).getConsumedItems();
     }
 
@@ -438,11 +453,15 @@ public final class CompanionNeedsEnvironmentService {
                                                               @Nullable Store<EntityStore> store,
                                                               @Nonnull TwNeedsConfig config,
                                                               @Nullable String[] preferredFoodItemIds,
-                                                              double consumeRadiusOverride) {
+                                                              double consumeRadiusOverride,
+                                                              @Nullable Vector3d scanCenterOverride) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, 0, 0.0, 0,
-                    0, 0, 0, Double.NaN, Double.NaN,
+                    0, 0, 0,
+                    0, 0, 0,
+                    false,
+                    Double.NaN, Double.NaN,
                     ContainerConsumeStatus.INVALID_CONTEXT
             );
         }
@@ -452,7 +471,10 @@ public final class CompanionNeedsEnvironmentService {
         if (maxItems <= 0) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
-                    0, 0, 0, Double.NaN, Double.NaN,
+                    0, 0, 0,
+                    0, 0, 0,
+                    false,
+                    Double.NaN, Double.NaN,
                     ContainerConsumeStatus.MAX_ITEMS_NON_POSITIVE
             );
         }
@@ -463,7 +485,10 @@ public final class CompanionNeedsEnvironmentService {
         if (allowedFoods.isEmpty()) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
-                    0, 0, 0, Double.NaN, Double.NaN,
+                    0, 0, 0,
+                    0, 0, 0,
+                    false,
+                    Double.NaN, Double.NaN,
                     ContainerConsumeStatus.ALLOWED_FOODS_EMPTY
             );
         }
@@ -472,7 +497,10 @@ public final class CompanionNeedsEnvironmentService {
         if (transform == null || world == null || world.getChunkStore() == null) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
-                    0, 0, 0, Double.NaN, Double.NaN,
+                    0, 0, 0,
+                    0, 0, 0,
+                    false,
+                    Double.NaN, Double.NaN,
                     ContainerConsumeStatus.WORLD_CONTEXT_MISSING
             );
         }
@@ -483,7 +511,10 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
-                    0, 0, 0, Double.NaN, Double.NaN,
+                    0, 0, 0,
+                    0, 0, 0,
+                    false,
+                    Double.NaN, Double.NaN,
                     ContainerConsumeStatus.INVALID_RADIUS
             );
         }
@@ -492,7 +523,10 @@ public final class CompanionNeedsEnvironmentService {
         if (chunkStoreStore == null) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
-                    0, 0, 0, Double.NaN, Double.NaN,
+                    0, 0, 0,
+                    0, 0, 0,
+                    false,
+                    Double.NaN, Double.NaN,
                     ContainerConsumeStatus.CHUNK_STORE_UNAVAILABLE
             );
         }
@@ -502,10 +536,18 @@ public final class CompanionNeedsEnvironmentService {
         int matchingStacksSeen = 0;
         int removalAttempts = 0;
         int removalFailures = 0;
-        int blockX = (int) Math.floor(transform.getPosition().x);
-        int blockY = (int) Math.floor(transform.getPosition().y);
-        int blockZ = (int) Math.floor(transform.getPosition().z);
         Vector3d npcPosition = transform.getPosition();
+        int npcBlockX = (int) Math.floor(npcPosition.x);
+        int npcBlockY = (int) Math.floor(npcPosition.y);
+        int npcBlockZ = (int) Math.floor(npcPosition.z);
+        boolean scanFromOverride = scanCenterOverride != null
+                && Double.isFinite(scanCenterOverride.x)
+                && Double.isFinite(scanCenterOverride.y)
+                && Double.isFinite(scanCenterOverride.z);
+        Vector3d scanCenter = scanFromOverride ? scanCenterOverride : npcPosition;
+        int blockX = (int) Math.floor(scanCenter.x);
+        int blockY = (int) Math.floor(scanCenter.y);
+        int blockZ = (int) Math.floor(scanCenter.z);
         double nearestContainerDistanceSq = Double.POSITIVE_INFINITY;
         double nearestAllowedContainerDistanceSq = Double.POSITIVE_INFINITY;
         int searchRadius = Math.max(1, (int) Math.ceil(radius));
@@ -528,7 +570,7 @@ public final class CompanionNeedsEnvironmentService {
                         continue;
                     }
                     scannedContainers++;
-                    double containerDistanceSq = distanceSquaredToBlockCenter(npcPosition, x, y, z);
+                    double containerDistanceSq = distanceSquaredToBlockCenter(scanCenter, x, y, z);
                     if (containerDistanceSq < nearestContainerDistanceSq) {
                         nearestContainerDistanceSq = containerDistanceSq;
                     }
@@ -563,6 +605,10 @@ public final class CompanionNeedsEnvironmentService {
                                 blockX,
                                 blockY,
                                 blockZ,
+                                npcBlockX,
+                                npcBlockY,
+                                npcBlockZ,
+                                scanFromOverride,
                                 distanceSquaredToDistanceOrNaN(nearestContainerDistanceSq),
                                 distanceSquaredToDistanceOrNaN(nearestAllowedContainerDistanceSq),
                                 ContainerConsumeStatus.SUCCESS
@@ -596,6 +642,10 @@ public final class CompanionNeedsEnvironmentService {
                 blockX,
                 blockY,
                 blockZ,
+                npcBlockX,
+                npcBlockY,
+                npcBlockZ,
+                scanFromOverride,
                 distanceSquaredToDistanceOrNaN(nearestContainerDistanceSq),
                 distanceSquaredToDistanceOrNaN(nearestAllowedContainerDistanceSq),
                 status
