@@ -30,6 +30,8 @@
 - Plugin bootstrapping now registers breeding/traits asset stores and component codecs.
 - Coop capture-crate intake now supports optional Tamework policy overlays when a matching `TwCoopConfig` exists, while still using vanilla coop admission gates (`tryPutResident`) for resident-capacity/species acceptance parity.
 - Interaction/docs coverage updated to reflect current breeding behavior (no longer a pure stub path).
+- Interaction requirement buckets now support `PlayerHandEmpty` for explicit empty-hand gating.
+- Interaction `Requires.Parameter` matching now evaluates all resolved role scopes (role/global/exec/sensor fallback) instead of only a single scope, fixing false negatives for valid params such as boolean flags.
 - Trait bootstrap now backfills empty trait components with deterministic rolls and role-config IDs.
 - Feeding interactions now apply shared happiness gains from happiness config (or shared defaults when no happiness config resolves), including trait-based `HappinessGainMultiplier` scaling.
 - Feeding interactions now also apply manual needs refill (`hunger`, plus optional `thirst` for configured water-bucket items), while the new `CompanionNeedsSystem` handles periodic hunger/thirst decay, passive container feed, passive water drinking, and needs-driven happiness penalties.
@@ -38,6 +40,7 @@
 - Breeding config resolution now supports direct config-id lookup (`resolveById`) and shared resolver usage across breeding/spawner/respawn paths.
 - Happiness updates now route through shared `CompanionHappinessService` (with `BreedingHappinessService` retained as a compatibility shim), keeping architecture open for non-breeding consumers.
 - Equilibrium happiness modifiers now support population bands (`Modifiers.Population`) with configurable nearby same-type radius and count ranges, enabling lonely/social/crowded offsets.
+- Disposition (`HappinessGainMultiplier`) now scales all happiness deltas and equilibrium modifiers: positive contributions scale directly by disposition, while negative contributions are inversely scaled so high disposition softens detractors and low disposition amplifies them.
 - Spawner metadata and command death/respawn snapshots now persist shared happiness state and restore breeding happiness from that shared source for backward-compatible migration.
 - Breed interaction eligibility now evaluates effective fertility using trait key `FertilityMultiplier` plus optional interaction `FertilityBonus` before readiness is set.
 - Breed interaction eligibility now enforces `TwBreedingConfig.Eligibility.RequireNotSleeping` and `RequireNotInCombat` state gates in addition to tame checks.
