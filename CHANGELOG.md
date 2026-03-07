@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 2.2.0 - Progression, Coop Integration, and UI/Behavior Refinements - 2026-03-07
 ### Added
 - Foundation breeding and traits asset types: `TwBreedingConfig` and `TwTraitConfig`, including role-priority resolution and default example assets.
 - Foundation shared happiness asset type: `TwHappinessConfig`, including role-priority resolution and default example assets.

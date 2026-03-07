@@ -52,12 +52,12 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 - **Attitude group override system**
   - Vanilla attitude groups can't be changed at runtime, but this will be a parallel system that we will have more freedom to work with
 
-## Quick Start (2.1.x)
+## Quick Start (2.2.x)
 1. Add the dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.1.3"
+  "Alechilles:Alec's Tamework!": "2.2.0"
 },
 "IncludesAssetPack": true
 ```
