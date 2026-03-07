@@ -61,14 +61,24 @@ public final class CompanionLifeStageService {
             return;
         }
         TameworkLifeStageComponent existing = store.getComponent(npcRef, type);
+        String roleId = roleIdHint;
+        if (roleId == null || roleId.isBlank()) {
+            roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        }
         if (existing == null) {
-            String roleId = roleIdHint;
-            if (roleId == null || roleId.isBlank()) {
-                roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-            }
             TameworkLifeStageComponent created = createInitialLifeStageComponent(npcRef, store, roleId);
             store.putComponent(npcRef, type, created);
             return;
+        }
+        if (roleId != null
+                && !roleId.isBlank()
+                && isUninitializedAdultComponent(existing)) {
+            TameworkLifeStageComponent replacement = createInitialLifeStageComponent(npcRef, store, roleId);
+            String replacementStage = normalizeStage(replacement.getStage());
+            if (STAGE_BABY.equals(replacementStage) || STAGE_ADOLESCENT.equals(replacementStage)) {
+                store.putComponent(npcRef, type, replacement);
+                return;
+            }
         }
         boolean changed = normalizeComponentDefaults(existing, npcRef, store);
         if (changed) {
@@ -1006,6 +1016,22 @@ public final class CompanionLifeStageService {
         }
         TameworkLifeStageComponent stage = store.getComponent(npcRef, type);
         return stage != null && stage.isGrowthScalingEnabled();
+    }
+
+    private static boolean isUninitializedAdultComponent(@Nullable TameworkLifeStageComponent component) {
+        if (component == null) {
+            return false;
+        }
+        if (!STAGE_ADULT.equals(normalizeStage(component.getStage()))) {
+            return false;
+        }
+        if (component.isGrowthScalingEnabled()) {
+            return false;
+        }
+        return component.getBornAtMs() == 0L
+                && component.getAdolescentAtMs() == 0L
+                && component.getAdultAtMs() == 0L
+                && component.getFullyGrownAtMs() == 0L;
     }
 
     @Nullable

@@ -27,10 +27,19 @@ public final class CompanionProgressionBootstrapService {
     }
 
     public static void ensureProgressionComponents(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        ensureProgressionComponents(npcRef, store, null);
+    }
+
+    public static void ensureProgressionComponents(Ref<EntityStore> npcRef,
+                                                   Store<EntityStore> store,
+                                                   @Nullable String roleIdHint) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        String roleId = roleIdHint;
+        if (roleId == null || roleId.isBlank()) {
+            roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        }
         if (roleId == null || roleId.isBlank()) {
             return;
         }

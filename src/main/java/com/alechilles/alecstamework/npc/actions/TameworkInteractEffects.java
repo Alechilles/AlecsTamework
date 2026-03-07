@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameIntera
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -144,7 +145,11 @@ final class TameworkInteractEffects {
         if (roleId == null || roleId.isBlank()) {
             return false;
         }
-        return stateEffects.applySetRole(roleId, npcRef, role, store);
+        boolean changed = stateEffects.applySetRole(roleId, npcRef, role, store);
+        if (changed) {
+            CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store, roleId);
+        }
+        return changed;
     }
 
     private boolean applySetRole(SetRoleEffect effect,

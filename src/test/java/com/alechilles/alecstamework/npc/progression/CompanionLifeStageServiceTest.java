@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
@@ -105,6 +107,47 @@ class CompanionLifeStageServiceTest {
 
         Object stage = inferStage.invoke(null, "Tamed_Piglet", family);
         assertNull(stage);
+    }
+
+    @Test
+    void isUninitializedAdultComponentDetectsDefaultAdultShell() throws Exception {
+        TameworkLifeStageComponent uninitialized = new TameworkLifeStageComponent(
+                CompanionLifeStageService.STAGE_ADULT,
+                0L,
+                0L,
+                0L,
+                0L,
+                0.55,
+                0.80,
+                0.90,
+                0.80,
+                1.00,
+                1.00,
+                false
+        );
+        TameworkLifeStageComponent initialized = new TameworkLifeStageComponent(
+                CompanionLifeStageService.STAGE_BABY,
+                10L,
+                20L,
+                30L,
+                40L,
+                0.55,
+                0.80,
+                0.90,
+                0.80,
+                1.00,
+                1.00,
+                true
+        );
+
+        Method detector = CompanionLifeStageService.class.getDeclaredMethod(
+                "isUninitializedAdultComponent",
+                TameworkLifeStageComponent.class
+        );
+        detector.setAccessible(true);
+
+        assertTrue((boolean) detector.invoke(null, uninitialized));
+        assertFalse((boolean) detector.invoke(null, initialized));
     }
 
     private static void setPrivateField(Object target, String fieldName, String value) throws Exception {
