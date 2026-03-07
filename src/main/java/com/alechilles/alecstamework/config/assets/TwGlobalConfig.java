@@ -11,6 +11,7 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -417,44 +418,17 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwGlobalConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
-        if (!explicitTopLevelKeys.contains("General")) {
-            enabled = parent.enabled;
-            priority = parent.priority;
-        }
-        if (!explicitTopLevelKeys.contains("OwnershipProtection")) {
-            blockOwnerDamage = parent.blockOwnerDamage;
-            blockAllPlayerDamageIfOwned = parent.blockAllPlayerDamageIfOwned;
-            invulnerableIfOwned = parent.invulnerableIfOwned;
-        }
-        if (!explicitTopLevelKeys.contains("InteractionDefaults")) {
-            interactionConfigParam = parent.interactionConfigParam;
-            lovedItemsParam = parent.lovedItemsParam;
-            isHarvestableParam = parent.isHarvestableParam;
-            isMountableParam = parent.isMountableParam;
-            harvestContextParam = parent.harvestContextParam;
-            harvestAlarmName = parent.harvestAlarmName;
-            interactionCooldownAlarmPrefix = parent.interactionCooldownAlarmPrefix;
-        }
-        if (!explicitTopLevelKeys.contains("Command")) {
-            commandReturnHomeTeleportDistance = parent.commandReturnHomeTeleportDistance;
-            commandReturnHomePathDistanceBeforeTeleport = parent.commandReturnHomePathDistanceBeforeTeleport;
-            commandReturnHomeTeleportDelayMs = parent.commandReturnHomeTeleportDelayMs;
-            commandRecallSafeSpawnDistance = parent.commandRecallSafeSpawnDistance;
-            commandRecallForceRelocateDistance = parent.commandRecallForceRelocateDistance;
-            commandRelocationRetryIntervalMs = parent.commandRelocationRetryIntervalMs;
-            commandRelocationMaxWaitMs = parent.commandRelocationMaxWaitMs;
-            commandRelocationMaxRetryAttempts = parent.commandRelocationMaxRetryAttempts;
-            commandDeadRespawnEnabled = parent.commandDeadRespawnEnabled;
-            commandDeadRespawnCooldownMs = parent.commandDeadRespawnCooldownMs;
-            commandDeadRespawnFollowRetryDelayMs = parent.commandDeadRespawnFollowRetryDelayMs;
-            commandDeadRespawnDistanceClose = parent.commandDeadRespawnDistanceClose;
-            commandDeadRespawnDistanceNear = parent.commandDeadRespawnDistanceNear;
-            commandDeadRespawnDistanceMid = parent.commandDeadRespawnDistanceMid;
-            commandDeadRespawnDistanceFar = parent.commandDeadRespawnDistanceFar;
-            commandPlacementMinRelativeY = parent.commandPlacementMinRelativeY;
-            commandPlacementMaxRelativeY = parent.commandPlacementMaxRelativeY;
-            commandLinkedPanelRequireUnlinkConfirm = parent.commandLinkedPanelRequireUnlinkConfirm;
-        }
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwGlobalConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        inheritGeneralSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritOwnershipProtectionSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritInteractionDefaultsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritCommandSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
     }
 
     public boolean isEnabled() {
@@ -757,6 +731,182 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private void collectMissing(List<String> missing, String fieldName, String value) {
         if (value == null || value.isBlank()) {
             missing.add(fieldName);
+        }
+    }
+
+    private void inheritGeneralSection(@Nonnull TwGlobalConfig parent,
+                                       @Nonnull Set<String> explicitTopLevelKeys,
+                                       @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("General")) {
+            enabled = parent.enabled;
+            priority = parent.priority;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("General");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("Enabled")) {
+            enabled = parent.enabled;
+        }
+        if (!nestedExplicit.contains("Priority")) {
+            priority = parent.priority;
+        }
+    }
+
+    private void inheritOwnershipProtectionSection(@Nonnull TwGlobalConfig parent,
+                                                   @Nonnull Set<String> explicitTopLevelKeys,
+                                                   @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("OwnershipProtection")) {
+            blockOwnerDamage = parent.blockOwnerDamage;
+            blockAllPlayerDamageIfOwned = parent.blockAllPlayerDamageIfOwned;
+            invulnerableIfOwned = parent.invulnerableIfOwned;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("OwnershipProtection");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("BlockOwnerDamage")) {
+            blockOwnerDamage = parent.blockOwnerDamage;
+        }
+        if (!nestedExplicit.contains("BlockAllPlayerDamageIfOwned")) {
+            blockAllPlayerDamageIfOwned = parent.blockAllPlayerDamageIfOwned;
+        }
+        if (!nestedExplicit.contains("InvulnerableIfOwned")) {
+            invulnerableIfOwned = parent.invulnerableIfOwned;
+        }
+    }
+
+    private void inheritInteractionDefaultsSection(@Nonnull TwGlobalConfig parent,
+                                                   @Nonnull Set<String> explicitTopLevelKeys,
+                                                   @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("InteractionDefaults")) {
+            interactionConfigParam = parent.interactionConfigParam;
+            lovedItemsParam = parent.lovedItemsParam;
+            isHarvestableParam = parent.isHarvestableParam;
+            isMountableParam = parent.isMountableParam;
+            harvestContextParam = parent.harvestContextParam;
+            harvestAlarmName = parent.harvestAlarmName;
+            interactionCooldownAlarmPrefix = parent.interactionCooldownAlarmPrefix;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("InteractionDefaults");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("InteractionConfigParam")) {
+            interactionConfigParam = parent.interactionConfigParam;
+        }
+        if (!nestedExplicit.contains("LovedItemsParam")) {
+            lovedItemsParam = parent.lovedItemsParam;
+        }
+        if (!nestedExplicit.contains("IsHarvestableParam")) {
+            isHarvestableParam = parent.isHarvestableParam;
+        }
+        if (!nestedExplicit.contains("IsMountableParam")) {
+            isMountableParam = parent.isMountableParam;
+        }
+        if (!nestedExplicit.contains("HarvestContextParam")) {
+            harvestContextParam = parent.harvestContextParam;
+        }
+        if (!nestedExplicit.contains("HarvestAlarmName")) {
+            harvestAlarmName = parent.harvestAlarmName;
+        }
+        if (!nestedExplicit.contains("InteractionCooldownAlarmPrefix")) {
+            interactionCooldownAlarmPrefix = parent.interactionCooldownAlarmPrefix;
+        }
+    }
+
+    private void inheritCommandSection(@Nonnull TwGlobalConfig parent,
+                                       @Nonnull Set<String> explicitTopLevelKeys,
+                                       @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("Command")) {
+            commandReturnHomeTeleportDistance = parent.commandReturnHomeTeleportDistance;
+            commandReturnHomePathDistanceBeforeTeleport = parent.commandReturnHomePathDistanceBeforeTeleport;
+            commandReturnHomeTeleportDelayMs = parent.commandReturnHomeTeleportDelayMs;
+            commandRecallSafeSpawnDistance = parent.commandRecallSafeSpawnDistance;
+            commandRecallForceRelocateDistance = parent.commandRecallForceRelocateDistance;
+            commandRelocationRetryIntervalMs = parent.commandRelocationRetryIntervalMs;
+            commandRelocationMaxWaitMs = parent.commandRelocationMaxWaitMs;
+            commandRelocationMaxRetryAttempts = parent.commandRelocationMaxRetryAttempts;
+            commandDeadRespawnEnabled = parent.commandDeadRespawnEnabled;
+            commandDeadRespawnCooldownMs = parent.commandDeadRespawnCooldownMs;
+            commandDeadRespawnFollowRetryDelayMs = parent.commandDeadRespawnFollowRetryDelayMs;
+            commandDeadRespawnDistanceClose = parent.commandDeadRespawnDistanceClose;
+            commandDeadRespawnDistanceNear = parent.commandDeadRespawnDistanceNear;
+            commandDeadRespawnDistanceMid = parent.commandDeadRespawnDistanceMid;
+            commandDeadRespawnDistanceFar = parent.commandDeadRespawnDistanceFar;
+            commandPlacementMinRelativeY = parent.commandPlacementMinRelativeY;
+            commandPlacementMaxRelativeY = parent.commandPlacementMaxRelativeY;
+            commandLinkedPanelRequireUnlinkConfirm = parent.commandLinkedPanelRequireUnlinkConfirm;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("Command");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("ReturnHomeTeleportDistance")) {
+            commandReturnHomeTeleportDistance = parent.commandReturnHomeTeleportDistance;
+        }
+        if (!nestedExplicit.contains("ReturnHomePathDistanceBeforeTeleport")) {
+            commandReturnHomePathDistanceBeforeTeleport = parent.commandReturnHomePathDistanceBeforeTeleport;
+        }
+        if (!nestedExplicit.contains("ReturnHomeTeleportDelayMs")) {
+            commandReturnHomeTeleportDelayMs = parent.commandReturnHomeTeleportDelayMs;
+        }
+        if (!nestedExplicit.contains("RecallSafeSpawnDistance")) {
+            commandRecallSafeSpawnDistance = parent.commandRecallSafeSpawnDistance;
+        }
+        if (!nestedExplicit.contains("RecallForceRelocateDistance")) {
+            commandRecallForceRelocateDistance = parent.commandRecallForceRelocateDistance;
+        }
+        if (!nestedExplicit.contains("RelocationRetryIntervalMs")) {
+            commandRelocationRetryIntervalMs = parent.commandRelocationRetryIntervalMs;
+        }
+        if (!nestedExplicit.contains("RelocationMaxWaitMs")) {
+            commandRelocationMaxWaitMs = parent.commandRelocationMaxWaitMs;
+        }
+        if (!nestedExplicit.contains("RelocationMaxRetryAttempts")) {
+            commandRelocationMaxRetryAttempts = parent.commandRelocationMaxRetryAttempts;
+        }
+        if (!nestedExplicit.contains("DeadRespawnEnabled")) {
+            commandDeadRespawnEnabled = parent.commandDeadRespawnEnabled;
+        }
+        if (!nestedExplicit.contains("DeadRespawnCooldownMs")) {
+            commandDeadRespawnCooldownMs = parent.commandDeadRespawnCooldownMs;
+        }
+        if (!nestedExplicit.contains("DeadRespawnFollowRetryDelayMs")) {
+            commandDeadRespawnFollowRetryDelayMs = parent.commandDeadRespawnFollowRetryDelayMs;
+        }
+        if (!nestedExplicit.contains("DeadRespawnDistanceClose")) {
+            commandDeadRespawnDistanceClose = parent.commandDeadRespawnDistanceClose;
+        }
+        if (!nestedExplicit.contains("DeadRespawnDistanceNear")) {
+            commandDeadRespawnDistanceNear = parent.commandDeadRespawnDistanceNear;
+        }
+        if (!nestedExplicit.contains("DeadRespawnDistanceMid")) {
+            commandDeadRespawnDistanceMid = parent.commandDeadRespawnDistanceMid;
+        }
+        if (!nestedExplicit.contains("DeadRespawnDistanceFar")) {
+            commandDeadRespawnDistanceFar = parent.commandDeadRespawnDistanceFar;
+        }
+        if (!nestedExplicit.contains("PlacementMinRelativeY")) {
+            commandPlacementMinRelativeY = parent.commandPlacementMinRelativeY;
+        }
+        if (!nestedExplicit.contains("PlacementMaxRelativeY")) {
+            commandPlacementMaxRelativeY = parent.commandPlacementMaxRelativeY;
+        }
+        if (!nestedExplicit.contains("LinkedPanelRequireUnlinkConfirm")) {
+            commandLinkedPanelRequireUnlinkConfirm = parent.commandLinkedPanelRequireUnlinkConfirm;
         }
     }
 

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.config.assets;
 
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.assetstore.map.JsonAssetWithMap;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -29,4 +30,16 @@ interface TwParentFallbackAsset<T extends TwParentFallbackAsset<T>>
      * Copies missing top-level fields from {@code parent}, honoring explicitly present child keys.
      */
     void inheritMissingTopLevelFrom(@Nonnull T parent, @Nonnull Set<String> explicitTopLevelKeys);
+
+    /**
+     * Copies missing fields from {@code parent}, honoring explicitly present child top-level and nested keys.
+     *
+     * <p>Default behavior delegates to legacy top-level handling for asset types that do not need nested
+     * key awareness.
+     */
+    default void inheritMissingTopLevelFrom(@Nonnull T parent,
+                                            @Nonnull Set<String> explicitTopLevelKeys,
+                                            @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys);
+    }
 }

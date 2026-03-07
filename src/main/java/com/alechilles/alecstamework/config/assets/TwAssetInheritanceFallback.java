@@ -58,8 +58,9 @@ final class TwAssetInheritanceFallback {
             }
             repairParentFallback(parent, context);
             Set<String> explicit = loadExplicitTopLevelKeys(candidate, context);
+            Map<String, Set<String>> explicitNested = loadExplicitNestedKeysByTopLevel(candidate, context);
             if (explicit != null) {
-                candidate.inheritMissingTopLevelFrom(parent, explicit);
+                candidate.inheritMissingTopLevelFrom(parent, explicit, explicitNested);
             }
         } finally {
             context.repairing.remove(idKey);
@@ -90,11 +91,35 @@ final class TwAssetInheritanceFallback {
             }
             JsonObject object = parsed.getAsJsonObject();
             Set<String> keys = new HashSet<>(object.keySet());
+            Map<String, Set<String>> nestedKeysByTopLevel = new HashMap<>();
+            object.entrySet().forEach(entry -> {
+                if (!entry.getValue().isJsonObject()) {
+                    return;
+                }
+                nestedKeysByTopLevel.put(entry.getKey(), new HashSet<>(entry.getValue().getAsJsonObject().keySet()));
+            });
             context.explicitTopLevelKeys.put(idKey, keys);
+            context.explicitNestedKeysByTopLevel.put(idKey, nestedKeysByTopLevel);
             return keys;
         } catch (Exception ignored) {
             return null;
         }
+    }
+
+    @Nonnull
+    private static <T extends TwParentFallbackAsset<T>> Map<String, Set<String>> loadExplicitNestedKeysByTopLevel(
+            @Nonnull T config,
+            @Nonnull Context<T> context) {
+        String id = config.getId();
+        if (id == null || id.isBlank()) {
+            return Map.of();
+        }
+        String idKey = id.trim().toLowerCase(Locale.ROOT);
+        if (!context.explicitTopLevelKeys.containsKey(idKey)) {
+            loadExplicitTopLevelKeys(config, context);
+        }
+        Map<String, Set<String>> nested = context.explicitNestedKeysByTopLevel.get(idKey);
+        return nested == null ? Map.of() : nested;
     }
 
     @Nullable
@@ -121,6 +146,7 @@ final class TwAssetInheritanceFallback {
     static final class Context<T extends TwParentFallbackAsset<T>> {
         private final DefaultAssetMap<String, T> assetMap;
         private final Map<String, Set<String>> explicitTopLevelKeys = new HashMap<>();
+        private final Map<String, Map<String, Set<String>>> explicitNestedKeysByTopLevel = new HashMap<>();
         private final Set<String> repairing = new HashSet<>();
         private final Set<String> repaired = new HashSet<>();
 
