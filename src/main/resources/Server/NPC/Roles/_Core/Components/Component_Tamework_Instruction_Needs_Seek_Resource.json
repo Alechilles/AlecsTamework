@@ -683,6 +683,84 @@
                 "State": "OnNeedsSeekComplete"
               }
             ]
+          },
+          {
+            "$Comment": "Fallback finalize when consume delay elapsed and NPC is close enough but outside strict maintain band (commonly too-close push/collision cases).",
+            "Sensor": {
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Timer",
+                  "Name": "NeedsSeek_Consume_Delay",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                  }
+                },
+                {
+                  "Type": "Not",
+                  "Sensor": {
+                    "Type": "ReadPosition",
+                    "Slot": {
+                      "Compute": "NeedsSeekTargetSlot"
+                    },
+                    "Range": {
+                      "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                    },
+                    "MinRange": {
+                      "Compute": "NeedsSeekConsumeMaintainMinDistance"
+                    }
+                  }
+                }
+              ]
+            },
+            "Actions": [
+              {
+                "Type": "TameworkDebugMessage",
+                "Message": "needsseek:consume_attempt_relaxed_range"
+              },
+              {
+                "Type": "TameworkNeedsResourceConsume",
+                "ResourceType": {
+                  "Compute": "NeedsSeekResourceType"
+                },
+                "FoodItemIDs": {
+                  "Compute": "NeedsSeekFoodItemIDs"
+                }
+              },
+              {
+                "Type": "TimerStart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                },
+                "StartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                },
+                "RestartValueRange": {
+                  "Compute": "NeedsSeekFailedCooldownRange"
+                }
+              },
+              {
+                "Type": "TimerRestart",
+                "Name": {
+                  "Compute": "NeedsSeekFailedCooldownName"
+                }
+              },
+              {
+                "Type": "State",
+                "State": ".Default"
+              },
+              {
+                "Type": "ParentState",
+                "State": "OnNeedsSeekComplete"
+              }
+            ]
           }
         ]
       }
