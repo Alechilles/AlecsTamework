@@ -46,6 +46,11 @@ final class InteractionParamAccess {
         return paramResolver.resolveRoleScope(role);
     }
 
+    // Resolves ordered role scopes used for parameter fallback evaluation.
+    StdScope[] resolveRoleScopes(Role role) {
+        return paramResolver.resolveRoleScopes(role, null);
+    }
+
     // Resolves a string param from role scopes.
     String getRoleStringParam(Role role, InteractionContextSnapshot ctx, String paramName) {
         return paramResolver.getStringParam(role, ctx, paramName);

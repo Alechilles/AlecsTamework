@@ -587,6 +587,13 @@ public final class TwInteractionConfigCodecs {
         .documentation("Require the NPC to be untamed.")
         .add()
         .<Boolean>append(
+            new KeyedCodec<>("PlayerHandEmpty", Codec.BOOLEAN),
+            (bucket, value) -> bucket.playerHandEmpty = value != null && value,
+            bucket -> bucket.playerHandEmpty
+        )
+        .documentation("Require the player to have an empty hand.")
+        .add()
+        .<Boolean>append(
             new KeyedCodec<>("PlayerCrouching", Codec.BOOLEAN),
             (bucket, value) -> bucket.playerCrouching = value != null && value,
             bucket -> bucket.playerCrouching

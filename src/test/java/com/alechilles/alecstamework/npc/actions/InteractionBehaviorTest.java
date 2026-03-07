@@ -4,8 +4,11 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -93,6 +96,49 @@ class InteractionBehaviorTest {
         assertFalse(interact.matchesParamRequirement(all, role));
     }
 
+    @Test
+    void paramRequirementFallsBackToGlobalScopeWhenRoleScopeMissing() throws Exception {
+        StdScope globalScope = new StdScope(null);
+        globalScope.addConst("IsPettable", true);
+
+        InteractionParamResolver resolver = new InteractionParamResolver(globalScope, null, null);
+        InteractionParamAccess paramAccess = new InteractionParamAccess(
+                resolver,
+                false,
+                null,
+                null,
+                null,
+                "LovedItems",
+                "IsHarvestable",
+                "IsMountable"
+        );
+        InteractionParamMatcher matcher = new InteractionParamMatcher(paramAccess);
+
+        ParamRequirement requirement = new ParamRequirement();
+        setField(requirement, "name", "IsPettable");
+        setField(requirement, "operator", TwInteractionConfig.ParamOperator.Equals);
+        setField(requirement, "match", TwInteractionConfig.MatchType.Any);
+        setField(requirement, "values", new String[] { "true" });
+
+        assertTrue(matcher.matchesParamRequirement(requirement, null));
+    }
+
+    @Test
+    void playerHandEmptyRequirementTreatsMissingHeldItemAsEmpty() throws Exception {
+        ActionTameworkInteract interact = newInteract();
+        InteractionContextSnapshot ctx = InteractionContextSnapshot.from(null, new StdScope[0]);
+
+        assertTrue(interact.isPlayerHandEmpty(ctx));
+    }
+
+    @Test
+    void playerHandEmptyRequirementFailsWhenHeldItemIdPresent() throws Exception {
+        ActionTameworkInteract interact = newInteract();
+        InteractionContextSnapshot ctx = newContextSnapshotWithHeldItemId("Item_Test");
+
+        assertFalse(interact.isPlayerHandEmpty(ctx));
+    }
+
     private static ActionTameworkInteract newInteract() throws Exception {
         Unsafe unsafe = getUnsafe();
         ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
@@ -170,6 +216,28 @@ class InteractionBehaviorTest {
         entitySupportField.set(role, entitySupport);
 
         return role;
+    }
+
+    private static InteractionContextSnapshot newContextSnapshotWithHeldItemId(String heldItemId) throws Exception {
+        Constructor<InteractionContextSnapshot> constructor = InteractionContextSnapshot.class.getDeclaredConstructor(
+                com.hypixel.hytale.server.core.entity.entities.Player.class,
+                com.hypixel.hytale.server.core.inventory.Inventory.class,
+                com.hypixel.hytale.server.core.inventory.container.CombinedItemContainer.class,
+                ItemStack.class,
+                String.class,
+                UUID.class,
+                StdScope[].class
+        );
+        constructor.setAccessible(true);
+        return constructor.newInstance(
+                null,
+                null,
+                null,
+                null,
+                heldItemId,
+                null,
+                new StdScope[0]
+        );
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

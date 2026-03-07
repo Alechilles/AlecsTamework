@@ -26,40 +26,48 @@ final class InteractionParamMatcher {
         if (targets == null || targets.length == 0) {
             return false;
         }
-        StdScope scope = paramAccess.resolveRoleScope(role);
-        if (scope == null) {
+        StdScope[] scopes = paramAccess.resolveRoleScopes(role);
+        if (scopes == null || scopes.length == 0) {
             return false;
         }
         ParamOperator operator = requirement.getOperator();
         TwInteractionConfig.MatchType matchType = requirement.getMatch();
-
-        BooleanSupplier booleanSupplier;
-        try {
-            booleanSupplier = scope.getBooleanSupplier(requirement.getName());
-        } catch (IllegalStateException ignored) {
-            booleanSupplier = null;
-        }
-
-        DoubleSupplier numberSupplier;
-        try {
-            numberSupplier = scope.getNumberSupplier(requirement.getName());
-        } catch (IllegalStateException ignored) {
-            numberSupplier = null;
-        }
-
-        Supplier<String> stringSupplier;
-        try {
-            stringSupplier = scope.getStringSupplier(requirement.getName());
-        } catch (IllegalStateException ignored) {
-            stringSupplier = null;
-        }
 
         boolean anyMatched = false;
         for (String target : targets) {
             if (target == null) {
                 continue;
             }
-            boolean matched = evaluateParamTarget(operator, target, booleanSupplier, numberSupplier, stringSupplier);
+            boolean matched = false;
+            for (StdScope scope : scopes) {
+                if (scope == null) {
+                    continue;
+                }
+                BooleanSupplier booleanSupplier;
+                try {
+                    booleanSupplier = scope.getBooleanSupplier(requirement.getName());
+                } catch (IllegalStateException ignored) {
+                    booleanSupplier = null;
+                }
+
+                DoubleSupplier numberSupplier;
+                try {
+                    numberSupplier = scope.getNumberSupplier(requirement.getName());
+                } catch (IllegalStateException ignored) {
+                    numberSupplier = null;
+                }
+
+                Supplier<String> stringSupplier;
+                try {
+                    stringSupplier = scope.getStringSupplier(requirement.getName());
+                } catch (IllegalStateException ignored) {
+                    stringSupplier = null;
+                }
+                matched = evaluateParamTarget(operator, target, booleanSupplier, numberSupplier, stringSupplier);
+                if (matched) {
+                    break;
+                }
+            }
             if (matchType == TwInteractionConfig.MatchType.Any) {
                 if (matched) {
                     return true;

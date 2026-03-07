@@ -83,6 +83,11 @@ final class InteractionSelection {
         return itemRequirements.isHeldItemInList(items, ctx);
     }
 
+    // Returns true when the player has no active held item.
+    boolean isPlayerHandEmpty(InteractionContextSnapshot ctx) {
+        return itemRequirements.isPlayerHandEmpty(ctx);
+    }
+
     // Resolves items from a role param for requirements.
     String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
         return itemRequirements.resolveItemsParam(role, ctx, itemsParam);

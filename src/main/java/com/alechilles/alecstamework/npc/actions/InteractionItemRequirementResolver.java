@@ -35,6 +35,18 @@ final class InteractionItemRequirementResolver {
         return isHeldItemInList(items, quantity, ctx);
     }
 
+    // Returns true if the player has no active held item.
+    boolean isPlayerHandEmpty(InteractionContextSnapshot ctx) {
+        if (ctx == null) {
+            return true;
+        }
+        if (ctx.activeItemId != null && !ctx.activeItemId.isBlank()) {
+            return false;
+        }
+        ItemStack stack = ctx.activeItem;
+        return stack == null || stack.isEmpty();
+    }
+
     // Returns true if the inventory contains any listed item with the required quantity.
     boolean matchesItemsInInventory(ItemsInInventoryRequirement requirement, Role role, InteractionContextSnapshot ctx) {
         if (requirement == null || ctx == null) {

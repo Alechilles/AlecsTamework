@@ -501,6 +501,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         boolean isMountable;
         boolean isTamed;
         boolean isNotTamed;
+        boolean playerHandEmpty;
         boolean playerCrouching;
         boolean playerIsOwner;
         boolean harvestAlarmReady;
@@ -532,6 +533,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isNotTamed() {
             return isNotTamed;
+        }
+
+        public boolean isPlayerHandEmpty() {
+            return playerHandEmpty;
         }
 
         public boolean isPlayerCrouching() {
@@ -588,6 +593,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
                     && !isMountable
                     && !isTamed
                     && !isNotTamed
+                    && !playerHandEmpty
                     && !playerCrouching
                     && !playerIsOwner
                     && !harvestAlarmReady

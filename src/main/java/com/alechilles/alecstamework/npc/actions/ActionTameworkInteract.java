@@ -241,6 +241,11 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return selection.isHeldItemInList(items, ctx);
     }
 
+    // Returns true if the interacting player is not holding any item.
+    boolean isPlayerHandEmpty(InteractionContextSnapshot ctx) {
+        return selection.isPlayerHandEmpty(ctx);
+    }
+
     // Delegates item param resolution for requirement parsing.
     String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
         return selection.resolveItemsParam(role, ctx, itemsParam);

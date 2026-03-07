@@ -140,6 +140,10 @@ final class TameworkInteractRequirements {
                 && owner.isTamed(npcRef, store)) {
             return false;
         }
+        if (bucket.isPlayerHandEmpty()
+                && !owner.isPlayerHandEmpty(ctx)) {
+            return false;
+        }
         if (bucket.isPlayerCrouching()
                 && !owner.isPlayerCrouching(role, infoProvider, store)) {
             return false;
@@ -222,6 +226,10 @@ final class TameworkInteractRequirements {
         }
         if (bucket.isNotTamed()
                 && !owner.isTamed(npcRef, store)) {
+            return true;
+        }
+        if (bucket.isPlayerHandEmpty()
+                && owner.isPlayerHandEmpty(ctx)) {
             return true;
         }
         if (bucket.isPlayerCrouching()
