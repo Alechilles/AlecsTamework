@@ -16,8 +16,31 @@ if not exist "%WRAPPER_JAR%" (
     exit /b 1
 )
 
-@rem Use bundled JDK from Hytale Toolkit
-set JAVACMD=C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot\bin\java.exe
+@rem Prefer local toolkit JDK, then JAVA_HOME, then PATH.
+set "LOCAL_JAVA_EXE=C:\Program Files\Eclipse Adoptium\jdk-25.0.1.8-hotspot\bin\java.exe"
+set "JAVACMD="
+
+if exist "%LOCAL_JAVA_EXE%" (
+    set "JAVACMD=%LOCAL_JAVA_EXE%"
+) else (
+    if not "%JAVA_HOME%"=="" (
+        if exist "%JAVA_HOME%\bin\java.exe" (
+            set "JAVACMD=%JAVA_HOME%\bin\java.exe"
+        )
+    )
+)
+
+if "%JAVACMD%"=="" (
+    set "JAVACMD=java.exe"
+)
+
+if not exist "%JAVACMD%" (
+    for %%I in ("%JAVACMD%") do set "JAVA_ON_PATH=%%~$PATH:I"
+)
+if not exist "%JAVACMD%" if "%JAVA_ON_PATH%"=="" (
+    echo Error: Java runtime not found. Set JAVA_HOME or ensure java.exe is on PATH.
+    exit /b 1
+)
 
 set MAVEN_PROJECTBASEDIR=%BASEDIR%
 
