@@ -44,7 +44,7 @@ public final class ActionTameworkNeedsResourceConsume extends TameworkActionBase
             return false;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        return CompanionNeedsService.applyResourceConsume(
+        return CompanionNeedsService.applyResourceConsumeWithDiagnostics(
                 npcRef,
                 store,
                 roleId,

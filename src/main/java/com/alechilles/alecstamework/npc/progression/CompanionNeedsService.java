@@ -6,11 +6,6 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.role.support.EntitySupport;
-import com.hypixel.hytale.server.npc.util.expression.StdScope;
-import java.util.Locale;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -20,7 +15,6 @@ import javax.annotation.Nullable;
 public final class CompanionNeedsService {
     private static final double EPSILON = 0.000001;
     private static final double SECONDS_PER_MINUTE = 60.0;
-    private static final double ACTION_FOOD_CONSUME_RADIUS_FLOOR = 2.0;
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
 
     private CompanionNeedsService() {
@@ -126,66 +120,39 @@ public final class CompanionNeedsService {
                                                @Nullable String roleId,
                                                @Nullable String resourceType,
                                                @Nullable String[] preferredFoodItemIds) {
-        if (npcRef == null || store == null || !npcRef.isValid()) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
-        if (needsType == null) {
-            return false;
-        }
-        TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
-        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
-        if (config == null || !config.isEnabled()) {
-            return false;
-        }
-        TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
-        NeedsResourceConsumeMode mode = NeedsResourceConsumeMode.from(resourceType);
-        double hungerGain = 0.0;
-        double thirstGain = 0.0;
-
-        if (mode.consumesFood() && passiveRefill.isNearbyContainerFeedEnabled()) {
-            String[] effectiveFoodIds = preferredFoodItemIds;
-            if (effectiveFoodIds == null || effectiveFoodIds.length == 0) {
-                effectiveFoodIds = resolveRoleFoodItemIds(npcRef, store);
-            }
-            // Seek flow targets an adjacent stand position, so allow a small radius floor to
-            // reliably include the intended container even with minor stop-position variance.
-            double consumeRadius = Math.max(
-                    passiveRefill.getContainerConsumeRadius(),
-                    ACTION_FOOD_CONSUME_RADIUS_FLOOR
-            );
-            int consumed = ENVIRONMENT_SERVICE.consumeNearbyContainerFood(
-                    npcRef,
-                    store,
-                    config,
-                    effectiveFoodIds,
-                    consumeRadius
-            );
-            if (consumed > 0) {
-                hungerGain = consumed * passiveRefill.getHungerGainPerConsumedItem();
-            }
-        }
-        if (mode.consumesWater()
-                && passiveRefill.isNearbyWaterDrinkEnabled()) {
-            if (mode == NeedsResourceConsumeMode.WATER) {
-                thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
-            } else if (ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config)) {
-                thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
-            }
-        }
-        if (hungerGain <= 0.0 && thirstGain <= 0.0) {
-            return false;
-        }
-        return runNeedsUpdate(npcRef, store, roleId, hungerGain, thirstGain, false, null);
+        return CompanionNeedsConsumeService.applyResourceConsume(
+                npcRef,
+                store,
+                roleId,
+                resourceType,
+                preferredFoodItemIds
+        );
     }
 
-    private static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,
-                                          @Nullable Store<EntityStore> store,
-                                          @Nullable String roleId,
-                                          double explicitHungerGain,
-                                          double explicitThirstGain,
-                                          boolean includeConfiguredManualGains,
-                                          @Nullable String heldItemId) {
+    /**
+     * Applies an explicit consume attempt and emits diagnostic logs for failed attempts.
+     */
+    public static boolean applyResourceConsumeWithDiagnostics(@Nullable Ref<EntityStore> npcRef,
+                                                              @Nullable Store<EntityStore> store,
+                                                              @Nullable String roleId,
+                                                              @Nullable String resourceType,
+                                                              @Nullable String[] preferredFoodItemIds) {
+        return CompanionNeedsConsumeService.applyResourceConsumeWithDiagnostics(
+                npcRef,
+                store,
+                roleId,
+                resourceType,
+                preferredFoodItemIds
+        );
+    }
+
+    static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,
+                                  @Nullable Store<EntityStore> store,
+                                  @Nullable String roleId,
+                                  double explicitHungerGain,
+                                  double explicitThirstGain,
+                                  boolean includeConfiguredManualGains,
+                                  @Nullable String heldItemId) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -264,10 +231,10 @@ public final class CompanionNeedsService {
     }
 
     @Nullable
-    private static TwNeedsConfig resolveNeedsConfig(@Nullable Ref<EntityStore> npcRef,
-                                                    @Nullable Store<EntityStore> store,
-                                                    @Nullable String roleId,
-                                                    @Nullable TameworkNeedsComponent component) {
+    static TwNeedsConfig resolveNeedsConfig(@Nullable Ref<EntityStore> npcRef,
+                                            @Nullable Store<EntityStore> store,
+                                            @Nullable String roleId,
+                                            @Nullable TameworkNeedsComponent component) {
         if (roleId != null && !roleId.isBlank()) {
             TwNeedsConfig byRoleId = TwNeedsConfig.resolveForRole(roleId);
             if (byRoleId != null) {
@@ -288,71 +255,6 @@ public final class CompanionNeedsService {
             }
         }
         return null;
-    }
-
-    @Nonnull
-    private static String[] resolveRoleFoodItemIds(@Nullable Ref<EntityStore> npcRef,
-                                                   @Nullable Store<EntityStore> store) {
-        if (npcRef == null || store == null || !npcRef.isValid()) {
-            return new String[0];
-        }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        if (npc == null || npc.getRole() == null || npc.getRole().getEntitySupport() == null) {
-            return new String[0];
-        }
-        EntitySupport entitySupport = npc.getRole().getEntitySupport();
-        StdScope sensorScope = entitySupport.getSensorScope();
-        if (sensorScope == null) {
-            return new String[0];
-        }
-        try {
-            Supplier<String[]> arraySupplier = sensorScope.getStringArraySupplier("FoodItemIDs");
-            if (arraySupplier != null) {
-                String[] values = sanitizeItemIds(arraySupplier.get());
-                if (values.length > 0) {
-                    return values;
-                }
-            }
-        } catch (IllegalStateException ignored) {
-            // Fall through to string-param fallback.
-        }
-        try {
-            Supplier<String> stringSupplier = sensorScope.getStringSupplier("FoodItemIDs");
-            if (stringSupplier == null) {
-                return new String[0];
-            }
-            String value = stringSupplier.get();
-            if (value == null || value.isBlank()) {
-                return new String[0];
-            }
-            return sanitizeItemIds(new String[] { value });
-        } catch (IllegalStateException ignored) {
-            return new String[0];
-        }
-    }
-
-    @Nonnull
-    private static String[] sanitizeItemIds(@Nullable String[] values) {
-        if (values == null || values.length == 0) {
-            return new String[0];
-        }
-        int count = 0;
-        String[] sanitized = new String[values.length];
-        for (String value : values) {
-            if (value == null || value.isBlank()) {
-                continue;
-            }
-            sanitized[count++] = value.trim();
-        }
-        if (count == 0) {
-            return new String[0];
-        }
-        if (count == sanitized.length) {
-            return sanitized;
-        }
-        String[] resized = new String[count];
-        System.arraycopy(sanitized, 0, resized, 0, count);
-        return resized;
     }
 
     private static long resolveNowMs(@Nonnull TwNeedsConfig config, @Nullable Store<EntityStore> store) {
@@ -380,35 +282,4 @@ public final class CompanionNeedsService {
         return value;
     }
 
-    /**
-     * Consume routing mode for action-triggered resource refill.
-     */
-    private enum NeedsResourceConsumeMode {
-        AUTO,
-        FOOD_CONTAINER,
-        WATER;
-
-        boolean consumesFood() {
-            return this == AUTO || this == FOOD_CONTAINER;
-        }
-
-        boolean consumesWater() {
-            return this == AUTO || this == WATER;
-        }
-
-        @Nonnull
-        static NeedsResourceConsumeMode from(@Nullable String value) {
-            if (value == null || value.isBlank()) {
-                return AUTO;
-            }
-            String normalized = value.trim().toLowerCase(Locale.ROOT);
-            if (normalized.equals("food") || normalized.equals("foodcontainer") || normalized.equals("food_container")) {
-                return FOOD_CONTAINER;
-            }
-            if (normalized.equals("water")) {
-                return WATER;
-            }
-            return AUTO;
-        }
-    }
 }
