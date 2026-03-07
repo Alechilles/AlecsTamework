@@ -36,18 +36,7 @@ public final class CompanionHappinessService {
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
         HappinessRules rules = resolveRules(happinessConfig);
-        double gain = rules.feedGain;
-        double gainMultiplier = TraitModifierService.resolveMultiplier(
-                npcRef,
-                store,
-                "HappinessGainMultiplier",
-                1.0
-        );
-        double adjustedGain = gain * gainMultiplier;
-        if (!Double.isFinite(adjustedGain)) {
-            adjustedGain = 0.0;
-        }
-        return applyImpulse(npcRef, store, adjustedGain);
+        return applyImpulse(npcRef, store, rules.feedGain);
     }
 
     public static boolean reconcile(@Nullable Ref<EntityStore> npcRef,
@@ -119,6 +108,7 @@ public final class CompanionHappinessService {
         if (!Double.isFinite(impulseDelta)) {
             impulseDelta = 0.0;
         }
+        impulseDelta = applyDispositionToImpulse(npcRef, store, impulseDelta);
         long now = System.currentTimeMillis();
         boolean happinessChanged = false;
         if (happiness == null) {
@@ -250,6 +240,21 @@ public final class CompanionHappinessService {
             return breeding.getHappiness();
         }
         return fallback;
+    }
+
+    private static double applyDispositionToImpulse(@Nullable Ref<EntityStore> npcRef,
+                                                    @Nullable Store<EntityStore> store,
+                                                    double impulseDelta) {
+        if (!Double.isFinite(impulseDelta) || Math.abs(impulseDelta) <= EPSILON) {
+            return 0.0;
+        }
+        double dispositionMultiplier = TraitModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                "HappinessGainMultiplier",
+                1.0
+        );
+        return CompanionHappinessModifierService.applyDispositionToOffset(impulseDelta, dispositionMultiplier);
     }
 
     private static double moveToward(double current, double target, double maxStep) {

@@ -27,6 +27,7 @@ import javax.annotation.Nullable;
  */
 public final class CompanionHappinessModifierService {
     private static final double PERCENT_EPSILON = 0.000001;
+    private static final double MIN_DISPOSITION_MULTIPLIER = 0.01;
 
     private CompanionHappinessModifierService() {
     }
@@ -41,6 +42,7 @@ public final class CompanionHappinessModifierService {
         double baseSetpoint = happinessConfig.getEquilibrium().getBaseSetpoint();
         ArrayList<ModifierEntry> modifiers = new ArrayList<>();
         double offsetTotal = 0.0;
+        double dispositionMultiplier = resolveDispositionMultiplier(npcRef, store);
 
         TameworkNeedsComponent needs = resolveNeedsComponent(npcRef, store);
         TwNeedsConfig needsConfig = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
@@ -52,6 +54,7 @@ public final class CompanionHappinessModifierService {
                     needs.getHunger(),
                     needsConfig.getValues().getHungerMin(),
                     needsConfig.getValues().getHungerMax(),
+                    dispositionMultiplier,
                     modifiers
             );
             offsetTotal += resolveNeedOffset(
@@ -61,15 +64,19 @@ public final class CompanionHappinessModifierService {
                     needs.getThirst(),
                     needsConfig.getValues().getThirstMin(),
                     needsConfig.getValues().getThirstMax(),
+                    dispositionMultiplier,
                     modifiers
             );
         }
-        offsetTotal += resolvePopulationOffset(npcRef, store, happinessConfig, modifiers);
+        offsetTotal += resolvePopulationOffset(npcRef, store, happinessConfig, dispositionMultiplier, modifiers);
 
         double ownerNearbyOffset = happinessConfig.getModifiers().getOwnerNearbyOffset();
         if (Math.abs(ownerNearbyOffset) > PERCENT_EPSILON) {
-            modifiers.add(new ModifierEntry("owner_nearby", "Owner Nearby", ownerNearbyOffset));
-            offsetTotal += ownerNearbyOffset;
+            double adjustedOwnerNearbyOffset = applyDispositionToOffset(ownerNearbyOffset, dispositionMultiplier);
+            if (Math.abs(adjustedOwnerNearbyOffset) > PERCENT_EPSILON) {
+                modifiers.add(new ModifierEntry("owner_nearby", "Owner Nearby", adjustedOwnerNearbyOffset));
+                offsetTotal += adjustedOwnerNearbyOffset;
+            }
         }
 
         double target = baseSetpoint + offsetTotal;
@@ -92,6 +99,7 @@ public final class CompanionHappinessModifierService {
     private static double resolvePopulationOffset(@Nullable Ref<EntityStore> npcRef,
                                                   @Nullable Store<EntityStore> store,
                                                   @Nonnull TwHappinessConfig happinessConfig,
+                                                  double dispositionMultiplier,
                                                   @Nonnull List<ModifierEntry> outModifiers) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return 0.0;
@@ -136,6 +144,10 @@ public final class CompanionHappinessModifierService {
         if (!Double.isFinite(offset) || Math.abs(offset) <= PERCENT_EPSILON) {
             return 0.0;
         }
+        double adjustedOffset = applyDispositionToOffset(offset, dispositionMultiplier);
+        if (Math.abs(adjustedOffset) <= PERCENT_EPSILON) {
+            return 0.0;
+        }
         String suffix = band.getLabel();
         if (suffix == null || suffix.isBlank()) {
             suffix = band.getId();
@@ -145,8 +157,8 @@ public final class CompanionHappinessModifierService {
         }
         String entryId = "population_" + normalizeToken(suffix);
         String entryLabel = "Population: " + suffix;
-        outModifiers.add(new ModifierEntry(entryId, entryLabel, offset));
-        return offset;
+        outModifiers.add(new ModifierEntry(entryId, entryLabel, adjustedOffset));
+        return adjustedOffset;
     }
 
     private static double resolveNeedOffset(@Nonnull String idPrefix,
@@ -155,6 +167,7 @@ public final class CompanionHappinessModifierService {
                                             double currentValue,
                                             double minValue,
                                             double maxValue,
+                                            double dispositionMultiplier,
                                             @Nonnull List<ModifierEntry> outModifiers) {
         if (!modifierSettings.isEnabled()) {
             return 0.0;
@@ -175,6 +188,10 @@ public final class CompanionHappinessModifierService {
         if (!Double.isFinite(offset) || Math.abs(offset) <= PERCENT_EPSILON) {
             return 0.0;
         }
+        double adjustedOffset = applyDispositionToOffset(offset, dispositionMultiplier);
+        if (Math.abs(adjustedOffset) <= PERCENT_EPSILON) {
+            return 0.0;
+        }
         String suffix = band.getLabel();
         if (suffix == null || suffix.isBlank()) {
             suffix = band.getId();
@@ -184,8 +201,37 @@ public final class CompanionHappinessModifierService {
         }
         String entryId = idPrefix + "_" + normalizeToken(suffix);
         String entryLabel = labelPrefix + ": " + suffix;
-        outModifiers.add(new ModifierEntry(entryId, entryLabel, offset));
-        return offset;
+        outModifiers.add(new ModifierEntry(entryId, entryLabel, adjustedOffset));
+        return adjustedOffset;
+    }
+
+    private static double resolveDispositionMultiplier(@Nullable Ref<EntityStore> npcRef,
+                                                       @Nullable Store<EntityStore> store) {
+        double multiplier = TraitModifierService.resolveMultiplier(
+                npcRef,
+                store,
+                "HappinessGainMultiplier",
+                1.0
+        );
+        return sanitizeDispositionMultiplier(multiplier);
+    }
+
+    static double applyDispositionToOffset(double offset, double dispositionMultiplier) {
+        if (!Double.isFinite(offset) || Math.abs(offset) <= PERCENT_EPSILON) {
+            return 0.0;
+        }
+        double sanitizedMultiplier = sanitizeDispositionMultiplier(dispositionMultiplier);
+        if (offset > 0.0) {
+            return offset * sanitizedMultiplier;
+        }
+        return offset / sanitizedMultiplier;
+    }
+
+    private static double sanitizeDispositionMultiplier(double multiplier) {
+        if (!Double.isFinite(multiplier) || multiplier <= 0.0) {
+            return 1.0;
+        }
+        return Math.max(MIN_DISPOSITION_MULTIPLIER, multiplier);
     }
 
     @Nullable
