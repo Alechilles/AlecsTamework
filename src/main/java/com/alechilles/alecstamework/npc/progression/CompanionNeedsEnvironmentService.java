@@ -64,6 +64,11 @@ public final class CompanionNeedsEnvironmentService {
         private final int maxItems;
         private final double radius;
         private final int verticalScanRadius;
+        private final int npcBlockX;
+        private final int npcBlockY;
+        private final int npcBlockZ;
+        private final double nearestContainerDistance;
+        private final double nearestAllowedContainerDistance;
         @Nonnull
         private final ContainerConsumeStatus status;
 
@@ -76,6 +81,11 @@ public final class CompanionNeedsEnvironmentService {
                                int maxItems,
                                double radius,
                                int verticalScanRadius,
+                               int npcBlockX,
+                               int npcBlockY,
+                               int npcBlockZ,
+                               double nearestContainerDistance,
+                               double nearestAllowedContainerDistance,
                                @Nonnull ContainerConsumeStatus status) {
             this.consumedItems = consumedItems;
             this.scannedContainers = scannedContainers;
@@ -86,6 +96,11 @@ public final class CompanionNeedsEnvironmentService {
             this.maxItems = maxItems;
             this.radius = radius;
             this.verticalScanRadius = verticalScanRadius;
+            this.npcBlockX = npcBlockX;
+            this.npcBlockY = npcBlockY;
+            this.npcBlockZ = npcBlockZ;
+            this.nearestContainerDistance = nearestContainerDistance;
+            this.nearestAllowedContainerDistance = nearestAllowedContainerDistance;
             this.status = status;
         }
 
@@ -108,7 +123,18 @@ public final class CompanionNeedsEnvironmentService {
                     + ",failures=" + removalFailures
                     + ",maxItems=" + maxItems
                     + ",radius=" + String.format(Locale.ROOT, "%.2f", radius)
-                    + ",vScan=" + verticalScanRadius;
+                    + ",vScan=" + verticalScanRadius
+                    + ",npcBlock=[" + npcBlockX + "," + npcBlockY + "," + npcBlockZ + "]"
+                    + ",nearestContainerDist=" + formatDistance(nearestContainerDistance)
+                    + ",nearestAllowedContainerDist=" + formatDistance(nearestAllowedContainerDistance);
+        }
+
+        @Nonnull
+        private static String formatDistance(double value) {
+            if (!Double.isFinite(value)) {
+                return "n/a";
+            }
+            return String.format(Locale.ROOT, "%.2f", value);
         }
     }
 
@@ -416,6 +442,7 @@ public final class CompanionNeedsEnvironmentService {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, 0, 0.0, 0,
+                    0, 0, 0, Double.NaN, Double.NaN,
                     ContainerConsumeStatus.INVALID_CONTEXT
             );
         }
@@ -425,6 +452,7 @@ public final class CompanionNeedsEnvironmentService {
         if (maxItems <= 0) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
+                    0, 0, 0, Double.NaN, Double.NaN,
                     ContainerConsumeStatus.MAX_ITEMS_NON_POSITIVE
             );
         }
@@ -435,6 +463,7 @@ public final class CompanionNeedsEnvironmentService {
         if (allowedFoods.isEmpty()) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
+                    0, 0, 0, Double.NaN, Double.NaN,
                     ContainerConsumeStatus.ALLOWED_FOODS_EMPTY
             );
         }
@@ -443,6 +472,7 @@ public final class CompanionNeedsEnvironmentService {
         if (transform == null || world == null || world.getChunkStore() == null) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
+                    0, 0, 0, Double.NaN, Double.NaN,
                     ContainerConsumeStatus.WORLD_CONTEXT_MISSING
             );
         }
@@ -453,6 +483,7 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    0, 0, 0, Double.NaN, Double.NaN,
                     ContainerConsumeStatus.INVALID_RADIUS
             );
         }
@@ -461,6 +492,7 @@ public final class CompanionNeedsEnvironmentService {
         if (chunkStoreStore == null) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    0, 0, 0, Double.NaN, Double.NaN,
                     ContainerConsumeStatus.CHUNK_STORE_UNAVAILABLE
             );
         }
@@ -473,6 +505,9 @@ public final class CompanionNeedsEnvironmentService {
         int blockX = (int) Math.floor(transform.getPosition().x);
         int blockY = (int) Math.floor(transform.getPosition().y);
         int blockZ = (int) Math.floor(transform.getPosition().z);
+        Vector3d npcPosition = transform.getPosition();
+        double nearestContainerDistanceSq = Double.POSITIVE_INFINITY;
+        double nearestAllowedContainerDistanceSq = Double.POSITIVE_INFINITY;
         int searchRadius = Math.max(1, (int) Math.ceil(radius));
         double radiusSq = radius * radius;
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
@@ -493,11 +528,18 @@ public final class CompanionNeedsEnvironmentService {
                         continue;
                     }
                     scannedContainers++;
+                    double containerDistanceSq = distanceSquaredToBlockCenter(npcPosition, x, y, z);
+                    if (containerDistanceSq < nearestContainerDistanceSq) {
+                        nearestContainerDistanceSq = containerDistanceSq;
+                    }
                     ItemContainer container = containerState.getItemContainer();
                     if (!containsAllowedFood(container, allowedFoods)) {
                         continue;
                     }
                     containersWithAllowedFood++;
+                    if (containerDistanceSq < nearestAllowedContainerDistanceSq) {
+                        nearestAllowedContainerDistanceSq = containerDistanceSq;
+                    }
                     SlotConsumeResult slotResult = consumeFoodFromContainerDetailed(
                             container,
                             allowedFoods,
@@ -518,6 +560,11 @@ public final class CompanionNeedsEnvironmentService {
                                 maxItems,
                                 radius,
                                 verticalScanRadius,
+                                blockX,
+                                blockY,
+                                blockZ,
+                                distanceSquaredToDistanceOrNaN(nearestContainerDistanceSq),
+                                distanceSquaredToDistanceOrNaN(nearestAllowedContainerDistanceSq),
                                 ContainerConsumeStatus.SUCCESS
                         );
                     }
@@ -546,6 +593,11 @@ public final class CompanionNeedsEnvironmentService {
                 maxItems,
                 radius,
                 verticalScanRadius,
+                blockX,
+                blockY,
+                blockZ,
+                distanceSquaredToDistanceOrNaN(nearestContainerDistanceSq),
+                distanceSquaredToDistanceOrNaN(nearestAllowedContainerDistanceSq),
                 status
         );
     }
@@ -757,5 +809,25 @@ public final class CompanionNeedsEnvironmentService {
         double dy = left.y - right.y;
         double dz = left.z - right.z;
         return (dx * dx) + (dy * dy) + (dz * dz);
+    }
+
+    private static double distanceSquaredToBlockCenter(@Nonnull Vector3d origin,
+                                                       int blockX,
+                                                       int blockY,
+                                                       int blockZ) {
+        double dx = origin.x - (blockX + 0.5);
+        double dy = origin.y - (blockY + 0.5);
+        double dz = origin.z - (blockZ + 0.5);
+        return (dx * dx) + (dy * dy) + (dz * dz);
+    }
+
+    private static double distanceSquaredToDistanceOrNaN(double squaredDistance) {
+        if (!Double.isFinite(squaredDistance) || squaredDistance == Double.POSITIVE_INFINITY) {
+            return Double.NaN;
+        }
+        if (squaredDistance < 0.0) {
+            return Double.NaN;
+        }
+        return Math.sqrt(squaredDistance);
     }
 }
