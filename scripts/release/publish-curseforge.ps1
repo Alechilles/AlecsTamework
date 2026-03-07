@@ -44,6 +44,8 @@ $metadataObject = @{
     gameVersionTypeIds = $gameVersionTypeIds
 }
 $metadataJson = $metadataObject | ConvertTo-Json -Depth 16 -Compress
+$metadataTempFile = New-TemporaryFile
+Set-Content -Path $metadataTempFile -Value $metadataJson -NoNewline -Encoding utf8
 
 if ($DryRun) {
     Write-Host "Dry-run: would publish '$ArtifactPath' to CurseForge project '$projectId'."
@@ -55,6 +57,7 @@ if ($DryRun) {
     if ($gameVersionTypeIds.Count -eq 0) {
         Write-Host "Note: curseforge.gameVersionTypeIds is empty in $ConfigPath."
     }
+    Remove-Item -Path $metadataTempFile -Force -ErrorAction SilentlyContinue
     exit 0
 }
 
@@ -77,14 +80,16 @@ $statusCode = & curl.exe `
     -X POST `
     $endpoint `
     -H "X-Api-Token: $ApiToken" `
-    -F "metadata=$metadataJson" `
+    -F "metadata=<$metadataTempFile;type=application/json" `
     -F "file=@$ArtifactPath"
 $statusCode = $statusCode.Trim()
 
 if ($LASTEXITCODE -ne 0) {
+    Remove-Item -Path $metadataTempFile -Force -ErrorAction SilentlyContinue
     Remove-Item -Path $responseTempFile -Force -ErrorAction SilentlyContinue
     throw "CurseForge upload failed with exit code $LASTEXITCODE."
 }
+Remove-Item -Path $metadataTempFile -Force -ErrorAction SilentlyContinue
 
 $response = ""
 if (Test-Path -Path $responseTempFile) {
