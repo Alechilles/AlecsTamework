@@ -40,6 +40,92 @@ public final class CompanionNeedsEnvironmentService {
     private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
 
+    enum ContainerConsumeStatus {
+        SUCCESS,
+        INVALID_CONTEXT,
+        MAX_ITEMS_NON_POSITIVE,
+        ALLOWED_FOODS_EMPTY,
+        WORLD_CONTEXT_MISSING,
+        INVALID_RADIUS,
+        CHUNK_STORE_UNAVAILABLE,
+        NO_CONTAINER_IN_RANGE,
+        NO_ALLOWED_FOOD_IN_RANGE,
+        REMOVE_TRANSACTION_FAILED,
+        NO_ITEMS_CONSUMED
+    }
+
+    static final class ContainerConsumeResult {
+        private final int consumedItems;
+        private final int scannedContainers;
+        private final int containersWithAllowedFood;
+        private final int matchingStacksSeen;
+        private final int removalAttempts;
+        private final int removalFailures;
+        private final int maxItems;
+        private final double radius;
+        private final int verticalScanRadius;
+        @Nonnull
+        private final ContainerConsumeStatus status;
+
+        ContainerConsumeResult(int consumedItems,
+                               int scannedContainers,
+                               int containersWithAllowedFood,
+                               int matchingStacksSeen,
+                               int removalAttempts,
+                               int removalFailures,
+                               int maxItems,
+                               double radius,
+                               int verticalScanRadius,
+                               @Nonnull ContainerConsumeStatus status) {
+            this.consumedItems = consumedItems;
+            this.scannedContainers = scannedContainers;
+            this.containersWithAllowedFood = containersWithAllowedFood;
+            this.matchingStacksSeen = matchingStacksSeen;
+            this.removalAttempts = removalAttempts;
+            this.removalFailures = removalFailures;
+            this.maxItems = maxItems;
+            this.radius = radius;
+            this.verticalScanRadius = verticalScanRadius;
+            this.status = status;
+        }
+
+        int getConsumedItems() {
+            return consumedItems;
+        }
+
+        @Nonnull
+        ContainerConsumeStatus getStatus() {
+            return status;
+        }
+
+        @Nonnull
+        String toSummary() {
+            return "status=" + status
+                    + ",containers=" + scannedContainers
+                    + ",allowedContainers=" + containersWithAllowedFood
+                    + ",matchingStacks=" + matchingStacksSeen
+                    + ",attempts=" + removalAttempts
+                    + ",failures=" + removalFailures
+                    + ",maxItems=" + maxItems
+                    + ",radius=" + String.format(Locale.ROOT, "%.2f", radius)
+                    + ",vScan=" + verticalScanRadius;
+        }
+    }
+
+    private static final class SlotConsumeResult {
+        private final int consumed;
+        private final int matchingStacksSeen;
+        private final int removalAttempts;
+        private final int removalFailures;
+
+        private SlotConsumeResult(int consumed, int matchingStacksSeen, int removalAttempts, int removalFailures) {
+            this.consumed = consumed;
+            this.matchingStacksSeen = matchingStacksSeen;
+            this.removalAttempts = removalAttempts;
+            this.removalFailures = removalFailures;
+        }
+    }
+
     boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
                         @Nullable Store<EntityStore> store,
                         @Nonnull TwNeedsConfig config) {
@@ -312,40 +398,78 @@ public final class CompanionNeedsEnvironmentService {
                                    @Nonnull TwNeedsConfig config,
                                    @Nullable String[] preferredFoodItemIds,
                                    double consumeRadiusOverride) {
+        return consumeNearbyContainerFoodDetailed(
+                npcRef,
+                store,
+                config,
+                preferredFoodItemIds,
+                consumeRadiusOverride
+        ).getConsumedItems();
+    }
+
+    @Nonnull
+    ContainerConsumeResult consumeNearbyContainerFoodDetailed(@Nullable Ref<EntityStore> npcRef,
+                                                              @Nullable Store<EntityStore> store,
+                                                              @Nonnull TwNeedsConfig config,
+                                                              @Nullable String[] preferredFoodItemIds,
+                                                              double consumeRadiusOverride) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
-            return 0;
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, 0, 0.0, 0,
+                    ContainerConsumeStatus.INVALID_CONTEXT
+            );
         }
         TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
         int maxItems = passiveRefill.getMaxContainerItemsConsumedPerSweep();
         int verticalScanRadius = passiveRefill.getContainerVerticalScanRadius();
         if (maxItems <= 0) {
-            return 0;
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
+                    ContainerConsumeStatus.MAX_ITEMS_NON_POSITIVE
+            );
         }
         Set<String> allowedFoods = normalizeItemIds(preferredFoodItemIds);
         if (allowedFoods.isEmpty()) {
             allowedFoods = normalizeItemIds(passiveRefill.getContainerFoodItemIds());
         }
         if (allowedFoods.isEmpty()) {
-            return 0;
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
+                    ContainerConsumeStatus.ALLOWED_FOODS_EMPTY
+            );
         }
         TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
         World world = resolveWorld(store);
         if (transform == null || world == null || world.getChunkStore() == null) {
-            return 0;
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
+                    ContainerConsumeStatus.WORLD_CONTEXT_MISSING
+            );
         }
         double radius = passiveRefill.getContainerConsumeRadius();
         if (Double.isFinite(consumeRadiusOverride) && consumeRadiusOverride > 0.0) {
             radius = consumeRadiusOverride;
         }
         if (!Double.isFinite(radius) || radius <= 0.0) {
-            return 0;
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    ContainerConsumeStatus.INVALID_RADIUS
+            );
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
         if (chunkStoreStore == null) {
-            return 0;
+            return new ContainerConsumeResult(
+                    0, 0, 0, 0, 0, 0, maxItems, radius, verticalScanRadius,
+                    ContainerConsumeStatus.CHUNK_STORE_UNAVAILABLE
+            );
         }
         int consumed = 0;
+        int scannedContainers = 0;
+        int containersWithAllowedFood = 0;
+        int matchingStacksSeen = 0;
+        int removalAttempts = 0;
+        int removalFailures = 0;
         int blockX = (int) Math.floor(transform.getPosition().x);
         int blockY = (int) Math.floor(transform.getPosition().y);
         int blockZ = (int) Math.floor(transform.getPosition().z);
@@ -368,18 +492,62 @@ public final class CompanionNeedsEnvironmentService {
                     if (!(state instanceof ItemContainerState containerState)) {
                         continue;
                     }
-                    consumed += consumeFoodFromContainer(
-                            containerState.getItemContainer(),
+                    scannedContainers++;
+                    ItemContainer container = containerState.getItemContainer();
+                    if (!containsAllowedFood(container, allowedFoods)) {
+                        continue;
+                    }
+                    containersWithAllowedFood++;
+                    SlotConsumeResult slotResult = consumeFoodFromContainerDetailed(
+                            container,
                             allowedFoods,
                             maxItems - consumed
                     );
+                    consumed += slotResult.consumed;
+                    matchingStacksSeen += slotResult.matchingStacksSeen;
+                    removalAttempts += slotResult.removalAttempts;
+                    removalFailures += slotResult.removalFailures;
                     if (consumed >= maxItems) {
-                        return consumed;
+                        return new ContainerConsumeResult(
+                                consumed,
+                                scannedContainers,
+                                containersWithAllowedFood,
+                                matchingStacksSeen,
+                                removalAttempts,
+                                removalFailures,
+                                maxItems,
+                                radius,
+                                verticalScanRadius,
+                                ContainerConsumeStatus.SUCCESS
+                        );
                     }
                 }
             }
         }
-        return consumed;
+        ContainerConsumeStatus status;
+        if (consumed > 0) {
+            status = ContainerConsumeStatus.SUCCESS;
+        } else if (scannedContainers <= 0) {
+            status = ContainerConsumeStatus.NO_CONTAINER_IN_RANGE;
+        } else if (containersWithAllowedFood <= 0) {
+            status = ContainerConsumeStatus.NO_ALLOWED_FOOD_IN_RANGE;
+        } else if (removalAttempts > 0 && removalFailures >= removalAttempts) {
+            status = ContainerConsumeStatus.REMOVE_TRANSACTION_FAILED;
+        } else {
+            status = ContainerConsumeStatus.NO_ITEMS_CONSUMED;
+        }
+        return new ContainerConsumeResult(
+                consumed,
+                scannedContainers,
+                containersWithAllowedFood,
+                matchingStacksSeen,
+                removalAttempts,
+                removalFailures,
+                maxItems,
+                radius,
+                verticalScanRadius,
+                status
+        );
     }
 
     boolean isConfiguredWaterBucketItem(@Nullable String itemId, @Nonnull TwNeedsConfig config) {
@@ -525,10 +693,20 @@ public final class CompanionNeedsEnvironmentService {
     private static int consumeFoodFromContainer(@Nullable ItemContainer container,
                                                 @Nonnull Set<String> allowedFoods,
                                                 int maxItems) {
+        return consumeFoodFromContainerDetailed(container, allowedFoods, maxItems).consumed;
+    }
+
+    @Nonnull
+    private static SlotConsumeResult consumeFoodFromContainerDetailed(@Nullable ItemContainer container,
+                                                                      @Nonnull Set<String> allowedFoods,
+                                                                      int maxItems) {
         if (container == null || maxItems <= 0 || allowedFoods.isEmpty()) {
-            return 0;
+            return new SlotConsumeResult(0, 0, 0, 0);
         }
         int consumed = 0;
+        int matchingStacksSeen = 0;
+        int removalAttempts = 0;
+        int removalFailures = 0;
         short capacity = container.getCapacity();
         for (short slot = 0; slot < capacity && consumed < maxItems; slot++) {
             ItemStack stack = container.getItemStack(slot);
@@ -542,9 +720,12 @@ public final class CompanionNeedsEnvironmentService {
             if (!allowedFoods.contains(itemId.trim().toLowerCase(Locale.ROOT))) {
                 continue;
             }
+            matchingStacksSeen++;
             while (consumed < maxItems) {
+                removalAttempts++;
                 ItemStackSlotTransaction transaction = container.removeItemStackFromSlot(slot, 1, false, true);
                 if (transaction == null || !transaction.succeeded()) {
+                    removalFailures++;
                     break;
                 }
                 consumed++;
@@ -554,7 +735,7 @@ public final class CompanionNeedsEnvironmentService {
                 }
             }
         }
-        return consumed;
+        return new SlotConsumeResult(consumed, matchingStacksSeen, removalAttempts, removalFailures);
     }
 
     private static Set<String> normalizeItemIds(@Nullable String[] itemIds) {

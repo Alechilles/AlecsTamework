@@ -141,17 +141,22 @@ public final class CompanionNeedsConsumeService {
                             passiveRefill.getContainerConsumeRadius(),
                             ACTION_FOOD_CONSUME_RADIUS_FLOOR
                     );
-                    consumedItems = ENVIRONMENT_SERVICE.consumeNearbyContainerFood(
+                    CompanionNeedsEnvironmentService.ContainerConsumeResult containerResult =
+                            ENVIRONMENT_SERVICE.consumeNearbyContainerFoodDetailed(
                             npcRef,
                             store,
                             config,
                             effectiveFoodIds,
                             consumeRadius
                     );
+                    consumedItems = containerResult.getConsumedItems();
                     if (consumedItems > 0) {
                         hungerGain = consumedItems * passiveRefill.getHungerGainPerConsumedItem();
                     } else {
-                        NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "no_container_food_consumed");
+                        NeedsConsumeDiagnostics.appendFailureReason(
+                                failureReasons,
+                                "no_container_food_consumed(" + containerResult.toSummary() + ")"
+                        );
                     }
                 }
             }

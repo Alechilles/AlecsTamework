@@ -11,6 +11,8 @@ import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /** Tamework command targeting. */
@@ -82,6 +84,54 @@ final class TameworkCommandTargeting {
             return null;
         }
         return new Candidate(best.ref, best.npcUuid);
+    }
+
+    // Finds all NPCs within radius blocks around the player.
+    static List<Candidate> findNearbyNpcs(Store<EntityStore> store,
+                                          Ref<EntityStore> playerRef,
+                                          double radius) {
+        List<Candidate> results = new ArrayList<>();
+        if (store == null || playerRef == null || !playerRef.isValid()) {
+            return results;
+        }
+        if (!Double.isFinite(radius) || radius <= 0.0) {
+            return results;
+        }
+        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+        if (transform == null) {
+            return results;
+        }
+
+        Vector3d playerPos = new Vector3d(transform.getPosition());
+        double radiusSq = radius * radius;
+
+        store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
+            int size = chunk.size();
+            for (int i = 0; i < size; i++) {
+                NPCEntity npc = chunk.getComponent(i, NPCEntity.getComponentType());
+                if (npc == null || npc.getUuid() == null) {
+                    continue;
+                }
+                TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
+                if (npcTransform == null) {
+                    continue;
+                }
+                Vector3d npcPos = npcTransform.getPosition();
+                double dx = npcPos.x - playerPos.x;
+                double dy = npcPos.y - playerPos.y;
+                double dz = npcPos.z - playerPos.z;
+                double distanceSq = (dx * dx) + (dy * dy) + (dz * dz);
+                if (distanceSq > radiusSq) {
+                    continue;
+                }
+                Ref<EntityStore> npcRef = chunk.getReferenceTo(i);
+                if (npcRef == null || !npcRef.isValid()) {
+                    continue;
+                }
+                results.add(new Candidate(npcRef, npc.getUuid()));
+            }
+        });
+        return results;
     }
 
     static final class Candidate {
