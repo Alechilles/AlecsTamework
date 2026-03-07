@@ -47,13 +47,13 @@ final class InteractionModeCycleEffects {
             owner.logDebug("ModeToggle: no valid mode cycle states found for role " + role.getRoleName());
             return false;
         }
-        int currentIndex = findCurrentModeIndex(resolved, role, defaultSub);
+        int currentIndex = findCurrentModeIndex(resolved, role);
         int nextIndex = (currentIndex + 1) % resolved.length;
         if (currentIndex < 0) {
             nextIndex = 0;
         }
         ResolvedModeStep next = resolved[nextIndex];
-        role.getStateSupport().setState(npcRef, next.state, next.subState, store);
+        role.getStateSupport().setState(npcRef, next.state, resolveSetSubState(next.subState, defaultSub), store);
         if (next.message != null && !next.message.isBlank()) {
             boolean emitted = false;
             if (showFloatingText) {
@@ -84,45 +84,73 @@ final class InteractionModeCycleEffects {
                 continue;
             }
             String state = step.getState();
-            String sub = step.getSubState();
-            if (sub == null || sub.isBlank()) {
-                sub = defaultSub;
-            }
+            String sub = normalizeSubState(step.getSubState());
             int stateIndex = stateSupport.getStateHelper().getStateIndex(state);
             if (stateIndex == StateSupport.NO_STATE) {
                 continue;
             }
-            String resolvedSub = sub == null ? "" : sub;
-            if (!resolvedSub.isBlank()) {
-                int subIndex = stateSupport.getStateHelper().getSubStateIndex(stateIndex, resolvedSub);
+            String subToValidate = resolveSetSubState(sub, defaultSub);
+            if (!subToValidate.isBlank()) {
+                int subIndex = stateSupport.getStateHelper().getSubStateIndex(stateIndex, subToValidate);
                 if (subIndex == StateSupport.NO_STATE) {
                     continue;
                 }
             }
-            resolved.add(new ResolvedModeStep(state, resolvedSub, step.getMessage()));
+            resolved.add(new ResolvedModeStep(state, sub, step.getMessage()));
         }
         return resolved.toArray(new ResolvedModeStep[0]);
     }
 
     // Finds the index of the active mode step within the resolved cycle.
-    private int findCurrentModeIndex(ResolvedModeStep[] steps, Role role, String defaultSub) {
+    private int findCurrentModeIndex(ResolvedModeStep[] steps, Role role) {
         if (steps == null || steps.length == 0 || role == null || role.getStateSupport() == null) {
             return -1;
         }
+        StateSupport stateSupport = role.getStateSupport();
+        String currentStateName = resolveCurrentStateName(stateSupport);
         for (int i = 0; i < steps.length; i++) {
             ResolvedModeStep step = steps[i];
             if (step == null) {
                 continue;
             }
-            String sub = step.subState;
-            if (sub == null || sub.isBlank()) {
-                sub = defaultSub;
+            if (step.subState == null || step.subState.isBlank()) {
+                if (currentStateName != null && currentStateName.equals(step.state)) {
+                    return i;
+                }
+                continue;
             }
-            if (role.getStateSupport().inState(step.state, sub)) {
+            if (stateSupport.inState(step.state, step.subState)) {
                 return i;
             }
         }
         return -1;
+    }
+
+    private String normalizeSubState(String subState) {
+        if (subState == null) {
+            return "";
+        }
+        String normalized = subState.trim();
+        return normalized.isEmpty() ? "" : normalized;
+    }
+
+    private String resolveSetSubState(String subState, String defaultSub) {
+        String normalized = normalizeSubState(subState);
+        if (!normalized.isBlank()) {
+            return normalized;
+        }
+        return normalizeSubState(defaultSub);
+    }
+
+    private String resolveCurrentStateName(StateSupport stateSupport) {
+        if (stateSupport == null || stateSupport.getStateHelper() == null) {
+            return null;
+        }
+        int stateIndex = stateSupport.getStateIndex();
+        if (stateIndex == StateSupport.NO_STATE) {
+            return null;
+        }
+        return stateSupport.getStateHelper().getStateName(stateIndex);
     }
 
     // Represents a validated mode-cycle step.

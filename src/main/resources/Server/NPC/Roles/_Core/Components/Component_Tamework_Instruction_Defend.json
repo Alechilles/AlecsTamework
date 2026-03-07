@@ -141,6 +141,20 @@
     },
     "Instructions": [
       {
+        "$Comment": "Clear lingering status animation when entering Defend so locomotion can take over immediately.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "Any",
+          "Once": true
+        },
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          }
+        ]
+      },
+      {
         "$Comment": "If too far from the player, break off and return.",
         "Sensor": {
           "Type": "Not",

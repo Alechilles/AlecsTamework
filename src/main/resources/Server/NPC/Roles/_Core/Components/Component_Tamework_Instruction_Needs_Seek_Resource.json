@@ -225,6 +225,20 @@
         },
         "Instructions": [
           {
+            "$Comment": "Clear lingering status animation on move entry so locomotion can play (prevents sit/sleep sliding).",
+            "Continue": true,
+            "Sensor": {
+              "Type": "Any",
+              "Once": true
+            },
+            "Actions": [
+              {
+                "Type": "PlayAnimation",
+                "Slot": "Status"
+              }
+            ]
+          },
+          {
             "$Comment": "When close enough, start a short consume delay.",
             "Continue": true,
             "Sensor": {
