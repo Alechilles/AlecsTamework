@@ -21,16 +21,23 @@
       "Description": "Optional allowed food item ids passed to consume action for container intake."
     },
     "NeedsSeekSlowDownDistance": {
-      "Value": 2.4,
+      "Value": 4,
       "Description": "Distance where needs-seek movement starts slowing down."
     },
-    "NeedsSeekStopDistance": {
-      "Value": 0.35,
-      "Description": "Distance considered close enough to the resource target."
+    "NeedsSeekConsumeMaintainMinDistance": {
+      "Value": 1,
+      "Description": "Minimum distance to maintain from consume target before consume can complete."
     },
-    "NeedsSeekConsumeDistanceOffset": {
-      "Value": 0.2,
-      "Description": "Extra distance margin added to stop distance when allowing eat/drink completion."
+    "NeedsSeekConsumeMaintainMaxDistance": {
+      "Value": 2,
+      "Description": "Maximum distance to maintain from consume target before consume can complete."
+    },
+    "NeedsSeekConsumeMaintainDistanceRange": {
+      "Value": [
+        1,
+        2
+      ],
+      "Description": "Desired distance band used by MaintainDistance while recovering consume position."
     },
     "NeedsSeekRelativeSpeed": {
       "Value": 0.55,
@@ -73,10 +80,14 @@
     },
     "NeedsSeekConsumeDelayRange": {
       "Value": [
-        1,
-        1.2
+        0.5,
+        0.75
       ],
       "Description": "Short pause after reaching the resource before completing seek."
+    },
+    "NeedsSeekConsumeAnimation": {
+      "Value": "Eat",
+      "Description": "Status animation played while completing needs resource consumption."
     },
     "NeedsSeekFailedCooldownName": {
       "Value": "NeedsSeek_Failed_Cooldown",
@@ -130,6 +141,10 @@
           ]
         },
         "Actions": [
+          {
+            "Type": "TameworkDebugMessage",
+            "Message": "needsseek:exit_default_no_target"
+          },
           {
             "Type": "TimerStart",
             "Name": {
@@ -187,6 +202,10 @@
         },
         "Actions": [
           {
+            "Type": "TameworkDebugMessage",
+            "Message": "needsseek:enter_move"
+          },
+          {
             "Type": "TimerStart",
             "Name": "NeedsSeek_Move_Timeout",
             "StartValueRange": {
@@ -222,10 +241,21 @@
                 "Compute": "NeedsSeekTargetSlot"
               },
               "Range": {
-                "Compute": "NeedsSeekStopDistance + NeedsSeekConsumeDistanceOffset"
+                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
               }
             },
             "Actions": [
+              {
+                "Type": "TameworkDebugMessage",
+                "Message": "needsseek:enter_consume_delay"
+              },
+              {
+                "Type": "PlayAnimation",
+                "Slot": "Status",
+                "Animation": {
+                  "Compute": "NeedsSeekConsumeAnimation"
+                }
+              },
               {
                 "Type": "TimerStart",
                 "Name": "NeedsSeek_Consume_Delay",
@@ -262,6 +292,10 @@
               }
             },
             "Actions": [
+              {
+                "Type": "TameworkDebugMessage",
+                "Message": "needsseek:exit_move_target_lost"
+              },
               {
                 "Type": "TimerStart",
                 "Name": {
@@ -301,6 +335,10 @@
             },
             "Actions": [
               {
+                "Type": "TameworkDebugMessage",
+                "Message": "needsseek:exit_move_nav_defer"
+              },
+              {
                 "Type": "TimerStart",
                 "Name": {
                   "Compute": "NeedsSeekFailedCooldownName"
@@ -337,6 +375,10 @@
               "State": "Stopped"
             },
             "Actions": [
+              {
+                "Type": "TameworkDebugMessage",
+                "Message": "needsseek:exit_move_timeout"
+              },
               {
                 "Type": "TimerStart",
                 "Name": {
@@ -376,7 +418,7 @@
                 "Compute": "NeedsSeekReadRange"
               },
               "MinRange": {
-                "Compute": "NeedsSeekStopDistance + NeedsSeekConsumeDistanceOffset"
+                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
               }
             },
             "BodyMotion": {
@@ -403,7 +445,7 @@
                 "Compute": "NeedsSeekSlowDownDistance"
               },
               "StopDistance": {
-                "Compute": "NeedsSeekStopDistance"
+                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
               },
               "RelativeSpeed": {
                 "Compute": "NeedsSeekRelativeSpeed"
@@ -413,15 +455,130 @@
         ]
       },
       {
-        "$Comment": "Stop movement while waiting out consume delay.",
+        "$Comment": "If outside consume maintain band during consume delay, re-seek the stored adjacent stand position.",
         "Continue": true,
         "Sensor": {
-          "Type": "State",
-          "State": ".ConsumeDelay"
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".ConsumeDelay"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "ReadPosition",
+                "Slot": {
+                  "Compute": "NeedsSeekTargetSlot"
+                },
+                "Range": {
+                  "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                },
+                "MinRange": {
+                  "Compute": "NeedsSeekConsumeMaintainMinDistance"
+                }
+              }
+            }
+          ]
         },
         "BodyMotion": {
-          "Type": "Nothing"
+          "Type": "MaintainDistance",
+          "DesiredDistanceRange": {
+            "Compute": "NeedsSeekConsumeMaintainDistanceRange"
+          },
+          "MoveThreshold": 0.1,
+          "StrafingDurationRange": [
+            0,
+            0
+          ],
+          "RelativeForwardsSpeed": {
+            "Compute": "NeedsSeekRelativeSpeed"
+          },
+          "RelativeBackwardsSpeed": {
+            "Compute": "NeedsSeekRelativeSpeed"
+          }
         }
+      },
+      {
+        "$Comment": "When within consume maintain band, keep facing the consume target while waiting out delay.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".ConsumeDelay"
+            },
+            {
+              "Type": "ReadPosition",
+              "Slot": {
+                "Compute": "NeedsSeekTargetSlot"
+              },
+              "Range": {
+                "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+              },
+              "MinRange": {
+                "Compute": "NeedsSeekConsumeMaintainMinDistance"
+              }
+            }
+          ]
+        },
+        "HeadMotion": {
+          "Type": "Aim"
+        },
+        "BodyMotion": {
+          "Type": "MatchLook"
+        }
+      },
+      {
+        "$Comment": "Fail-safe completion if consume delay cannot recover target before move timeout.",
+        "Continue": true,
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "State",
+              "State": ".ConsumeDelay"
+            },
+            {
+              "Type": "Timer",
+              "Name": "NeedsSeek_Move_Timeout",
+              "State": "Stopped"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "TameworkDebugMessage",
+            "Message": "needsseek:exit_consume_delay_timeout"
+          },
+          {
+            "Type": "TimerStart",
+            "Name": {
+              "Compute": "NeedsSeekFailedCooldownName"
+            },
+            "StartValueRange": {
+              "Compute": "NeedsSeekFailedCooldownRange"
+            },
+            "RestartValueRange": {
+              "Compute": "NeedsSeekFailedCooldownRange"
+            }
+          },
+          {
+            "Type": "TimerRestart",
+            "Name": {
+              "Compute": "NeedsSeekFailedCooldownName"
+            }
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnNeedsSeekComplete"
+          }
+        ]
       },
       {
         "$Comment": "Finalize seek after consume delay.",
@@ -432,11 +589,32 @@
         "Instructions": [
           {
             "Sensor": {
-              "Type": "Timer",
-              "Name": "NeedsSeek_Consume_Delay",
-              "State": "Stopped"
+              "Type": "And",
+              "Sensors": [
+                {
+                  "Type": "Timer",
+                  "Name": "NeedsSeek_Consume_Delay",
+                  "State": "Stopped"
+                },
+                {
+                  "Type": "ReadPosition",
+                  "Slot": {
+                    "Compute": "NeedsSeekTargetSlot"
+                  },
+                  "Range": {
+                    "Compute": "NeedsSeekConsumeMaintainMaxDistance"
+                  },
+                  "MinRange": {
+                    "Compute": "NeedsSeekConsumeMaintainMinDistance"
+                  }
+                }
+              ]
             },
             "Actions": [
+              {
+                "Type": "TameworkDebugMessage",
+                "Message": "needsseek:consume_attempt"
+              },
               {
                 "Type": "TameworkNeedsResourceConsume",
                 "ResourceType": {
