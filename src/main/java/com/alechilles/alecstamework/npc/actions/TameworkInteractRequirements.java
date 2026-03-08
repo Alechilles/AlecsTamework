@@ -70,7 +70,7 @@ final class TameworkInteractRequirements {
         }
         boolean baseRequirementsMet = false;
         if (entry instanceof TameInteraction) {
-            baseRequirementsMet = meetsTameRequirements((TameInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
+            baseRequirementsMet = meetsTameRequirements((TameInteraction) entry, npcRef, role, infoProvider, store, player, ctx, forPrompt);
         } else if (entry instanceof FeedInteraction) {
             baseRequirementsMet = meetsFeedRequirements((FeedInteraction) entry, npcRef, role, infoProvider, store, player, ctx);
         } else if (entry instanceof HarvestInteraction) {
@@ -315,9 +315,13 @@ final class TameworkInteractRequirements {
                                           InfoProvider infoProvider,
                                           Store<EntityStore> store,
                                           Player player,
-                                          InteractionContextSnapshot ctx) {
+                                          InteractionContextSnapshot ctx,
+                                          boolean forPrompt) {
         if (owner.isTamed(npcRef, store)) {
             return false;
+        }
+        if (forPrompt) {
+            return true;
         }
         return matchesPresetItems(
                 interaction.getUseLovedItems(),

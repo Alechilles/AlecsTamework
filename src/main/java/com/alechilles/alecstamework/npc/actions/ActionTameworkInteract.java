@@ -45,6 +45,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
     private final InteractionResolution resolution;
     private final InteractionSelection selection;
     private final InteractionExecution execution;
+    private final InteractionTameFallbackService tameFallbackService;
 
     public ActionTameworkInteract(BuilderActionTameworkInteract builder, BuilderSupport support) {
         super(builder);
@@ -127,6 +128,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
                 diagnostics
         );
         this.execution = new InteractionExecution(executor, cooldowns);
+        this.tameFallbackService = new InteractionTameFallbackService(this);
     }
 
     @Override
@@ -177,6 +179,9 @@ public class ActionTameworkInteract extends TameworkActionBase {
         }
         ResolvedInteraction interaction = selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
         if (interaction == null) {
+            if (tameFallbackService.applyNoMatchTameFeedback(config, npcRef, role, store, player, ctx)) {
+                return true;
+            }
             maybeNotifyOwnerDenied(npcRef, store, player);
             selection.logDebug(selection.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx));
             return false;
