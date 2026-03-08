@@ -13,6 +13,7 @@
 - `-Prun-server` now supports optional JVM/server argument passthrough properties (`-Dhytale.server.jvm.args` and `-Dhytale.server.extra.args`) for local resource-constrained runs.
 - Owner damage filtering and command companion behavior now resolve policy by companion role through `TwCompanionConfig`, with automatic fallback to `TwGlobalConfig` when no role-scoped companion policy is configured.
 - Command dead-respawn cooldown windows are now captured per companion role at death-snapshot time (role policy aware) instead of using a single global cooldown.
+- `TwGlobalConfig_Default` now only includes truly global settings (`General`, `InteractionDefaults`, command relocation infrastructure + linked-panel unlink confirmation); ownership protection and per-companion command behavior defaults now live under `TwCompanionConfig`.
 
 ### Fixed
 - `Component_Tamework_Instruction_SeekFood_PlayerFollow` now uses valid sensor/filter combinations (no invalid `Player` filter builder), restoring clean NPC builder validation for livestock templates that reference it.

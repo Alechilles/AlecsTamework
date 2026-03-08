@@ -203,6 +203,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     private static final Object ROLE_CACHE_LOCK = new Object();
     private static volatile boolean ROLE_CACHE_DIRTY = true;
     private static volatile Map<String, TwCompanionConfig> ROLE_CACHE = Map.of();
+    private static volatile TwCompanionConfig ROLELESS_DEFAULT_CONFIG;
 
     private AssetExtraInfo.Data data;
     private String id;
@@ -234,6 +235,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     public static void clearRoleCache() {
         INHERITANCE_CACHE_DIRTY = true;
         ROLE_CACHE_DIRTY = true;
+        ROLELESS_DEFAULT_CONFIG = null;
     }
 
     @Nullable
@@ -245,17 +247,19 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (assetMap == null) {
             return null;
         }
+        ensureRoleCacheBuilt(assetMap);
         Map<String, TwCompanionConfig> cache = ROLE_CACHE;
-        if (ROLE_CACHE_DIRTY || cache == null) {
-            synchronized (ROLE_CACHE_LOCK) {
-                if (ROLE_CACHE_DIRTY || ROLE_CACHE == null) {
-                    ROLE_CACHE = buildRoleCache(assetMap);
-                    ROLE_CACHE_DIRTY = false;
-                }
-                cache = ROLE_CACHE;
-            }
-        }
         return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
+    }
+
+    @Nullable
+    public static TwCompanionConfig resolveDefaultConfig() {
+        DefaultAssetMap<String, TwCompanionConfig> assetMap = getAssetMap();
+        if (assetMap == null) {
+            return null;
+        }
+        ensureRoleCacheBuilt(assetMap);
+        return ROLELESS_DEFAULT_CONFIG;
     }
 
     @Nullable
@@ -286,8 +290,29 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
 
     public static EffectiveSettings resolveEffectiveForRole(@Nullable String roleId) {
         TwCompanionConfig scoped = resolveForRole(roleId);
+        if (scoped == null) {
+            scoped = resolveDefaultConfig();
+        }
         TwGlobalConfig global = TwGlobalConfig.resolveActive();
         return EffectiveSettings.from(scoped, global);
+    }
+
+    private static void ensureRoleCacheBuilt(@Nullable DefaultAssetMap<String, TwCompanionConfig> assetMap) {
+        if (assetMap == null) {
+            return;
+        }
+        Map<String, TwCompanionConfig> cache = ROLE_CACHE;
+        if (!ROLE_CACHE_DIRTY && cache != null) {
+            return;
+        }
+        synchronized (ROLE_CACHE_LOCK) {
+            if (!ROLE_CACHE_DIRTY && ROLE_CACHE != null) {
+                return;
+            }
+            ROLE_CACHE = buildRoleCache(assetMap);
+            ROLELESS_DEFAULT_CONFIG = selectRolelessDefaultConfig(assetMap);
+            ROLE_CACHE_DIRTY = false;
+        }
     }
 
     private static Map<String, TwCompanionConfig> buildRoleCache(@Nullable DefaultAssetMap<String, TwCompanionConfig> assetMap) {
@@ -300,7 +325,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                 continue;
             }
             String[] candidateRoles = candidate.getRoleIds();
-            if (candidateRoles == null || candidateRoles.length == 0) {
+            if (!hasAnyRoleIds(candidateRoles)) {
                 continue;
             }
             for (String roleId : candidateRoles) {
@@ -315,6 +340,39 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             }
         }
         return cache;
+    }
+
+    @Nullable
+    private static TwCompanionConfig selectRolelessDefaultConfig(
+            @Nullable DefaultAssetMap<String, TwCompanionConfig> assetMap) {
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return null;
+        }
+        TwCompanionConfig best = null;
+        for (TwCompanionConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate == null || !candidate.isEnabled()) {
+                continue;
+            }
+            if (hasAnyRoleIds(candidate.getRoleIds())) {
+                continue;
+            }
+            if (shouldReplaceCandidate(candidate, best)) {
+                best = candidate;
+            }
+        }
+        return best;
+    }
+
+    private static boolean hasAnyRoleIds(@Nullable String[] roleIds) {
+        if (roleIds == null || roleIds.length == 0) {
+            return false;
+        }
+        for (String roleId : roleIds) {
+            if (roleId != null && !roleId.isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean shouldReplaceCandidate(@Nullable TwCompanionConfig candidate,
