@@ -16,7 +16,7 @@
     "RecallSafeSpawnDistance": 20.0,
     "RecallForceRelocateDistance": 80.0,
     "DeadRespawnEnabled": true,
-    "DeadRespawnCooldownMs": 10000,
+    "DeadRespawnCooldownMins": 10,
     "DeadRespawnFollowRetryDelayMs": 1250,
     "DeadRespawnDistanceClose": 5.0,
     "DeadRespawnDistanceNear": 8.0,
