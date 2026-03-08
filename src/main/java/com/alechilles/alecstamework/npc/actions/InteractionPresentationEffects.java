@@ -1,24 +1,31 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParticleAttachTarget;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.PlaySoundEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParticlesEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.spatial.SpatialResource;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.protocol.CombatTextUpdate;
 import com.hypixel.hytale.protocol.Color;
 import com.hypixel.hytale.protocol.SoundCategory;
+import com.hypixel.hytale.protocol.Vector3f;
+import com.hypixel.hytale.protocol.packets.entities.SpawnModelParticles;
 import com.hypixel.hytale.server.core.asset.type.soundevent.config.SoundEvent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.modules.entity.EntityModule;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.tracker.EntityTrackerSystems;
+import com.hypixel.hytale.server.core.modules.entity.tracker.NetworkId;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
+import it.unimi.dsi.fastutil.objects.ObjectList;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -132,6 +139,9 @@ final class InteractionPresentationEffects {
         }
         String particleSystem = resolved.particleSystem;
         Vector3d position = resolved.position;
+        if (resolved.attachTarget != ParticleAttachTarget.Position) {
+            return applySpawnModelParticles(effect, npcRef, store, player, resolved);
+        }
         boolean attachToNpc = resolved.attachToNpc;
         Color color = effect.getColor();
         if (effect.isPlayerOnly()) {
@@ -246,6 +256,54 @@ final class InteractionPresentationEffects {
         return true;
     }
 
+    // Uses the same model-particle packet path as vanilla ActionSpawnParticles for entity/node attachment.
+    private boolean applySpawnModelParticles(SpawnParticlesEffect effect,
+                                             Ref<EntityStore> npcRef,
+                                             Store<EntityStore> store,
+                                             Player player,
+                                             InteractionParticleSpawnResolver.ResolvedParticleSpawn resolved) {
+        NetworkId networkId = store.getComponent(npcRef, NetworkId.getComponentType());
+        if (networkId == null) {
+            return false;
+        }
+
+        List<Ref<EntityStore>> viewers = resolveModelParticleViewers(effect, player, resolved.position, store);
+        if (viewers.isEmpty()) {
+            return false;
+        }
+
+        com.hypixel.hytale.server.core.asset.type.model.config.ModelParticle modelParticle =
+                new com.hypixel.hytale.server.core.asset.type.model.config.ModelParticle();
+        modelParticle.setSystemId(resolved.particleSystem);
+        Vector3d offset = resolved.offset != null ? resolved.offset : new Vector3d(0.0, 0.0, 0.0);
+        modelParticle.setPositionOffset(new Vector3f((float) offset.x, (float) offset.y, (float) offset.z));
+        if (resolved.attachTarget == ParticleAttachTarget.Node
+                && resolved.attachNode != null
+                && !resolved.attachNode.isBlank()) {
+            modelParticle.setTargetNodeName(resolved.attachNode);
+        }
+        if (effect.getColor() != null) {
+            modelParticle.setColor(effect.getColor());
+        }
+
+        com.hypixel.hytale.protocol.ModelParticle[] modelParticles =
+                new com.hypixel.hytale.protocol.ModelParticle[]{modelParticle.toPacket()};
+        SpawnModelParticles packet = new SpawnModelParticles(networkId.getId(), modelParticles);
+        boolean sent = false;
+        for (Ref<EntityStore> viewerRef : viewers) {
+            if (viewerRef == null || !viewerRef.isValid()) {
+                continue;
+            }
+            PlayerRef playerRefComponent = store.getComponent(viewerRef, PlayerRef.getComponentType());
+            if (playerRefComponent == null) {
+                continue;
+            }
+            playerRefComponent.getPacketHandler().write(packet);
+            sent = true;
+        }
+        return sent;
+    }
+
     // Shows floating combat text with a custom message.
     boolean applyFloatingText(FloatingTextEffect effect,
                               Ref<EntityStore> npcRef,
@@ -329,6 +387,50 @@ final class InteractionPresentationEffects {
             }
         }
         return refs;
+    }
+
+    // Resolves packet recipients for model-bound particle spawns.
+    private List<Ref<EntityStore>> resolveModelParticleViewers(SpawnParticlesEffect effect,
+                                                               Player player,
+                                                               Vector3d position,
+                                                               Store<EntityStore> store) {
+        if (effect.isPlayerOnly()) {
+            if (player == null) {
+                return List.of();
+            }
+            Ref<EntityStore> playerRef = player.getReference();
+            if (playerRef == null || !playerRef.isValid()) {
+                return List.of();
+            }
+            return Collections.singletonList(playerRef);
+        }
+
+        List<Ref<EntityStore>> refs = resolveViewerRefs(player);
+        if (!refs.isEmpty()) {
+            return refs;
+        }
+
+        if (position == null || store == null) {
+            return List.of();
+        }
+        SpatialResource<Ref<EntityStore>, EntityStore> playerSpatialResource =
+                store.getResource(EntityModule.get().getPlayerSpatialResourceType());
+        if (playerSpatialResource == null) {
+            return List.of();
+        }
+
+        ObjectList<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
+        playerSpatialResource.getSpatialStructure().collect(position, ParticleUtil.DEFAULT_PARTICLE_DISTANCE, results);
+        if (results.isEmpty()) {
+            return List.of();
+        }
+        List<Ref<EntityStore>> collected = new ArrayList<>(results.size());
+        for (Ref<EntityStore> result : results) {
+            if (result != null && result.isValid()) {
+                collected.add(result);
+            }
+        }
+        return collected;
     }
 
     // Queues a combat text update for the NPC to the target player.
