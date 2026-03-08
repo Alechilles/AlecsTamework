@@ -62,8 +62,9 @@ final class InteractionParticleSpawnResolver {
         position.y += offset.y;
         position.z += offset.z;
 
-        boolean attachToNpc = attachTarget == ParticleAttachTarget.Entity
-                || attachTarget == ParticleAttachTarget.Node;
+        // Node currently resolves to a world-space fallback offset (head/body/etc.) rather than true model-node binding.
+        // Keep entity-attach only for explicit Entity mode so Node renders at the computed world position.
+        boolean attachToNpc = attachTarget == ParticleAttachTarget.Entity;
         return new ResolvedParticleSpawn(particleSystem, position, attachToNpc);
     }
 
