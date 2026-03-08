@@ -12,6 +12,7 @@
 - `-Prun-server` now supports optional JVM/server argument passthrough properties (`-Dhytale.server.jvm.args` and `-Dhytale.server.extra.args`) for local resource-constrained runs.
 
 ### Fixed
+- `Component_Tamework_Instruction_SeekFood_PlayerFollow` now uses valid sensor/filter combinations (no invalid `Player` filter builder), restoring clean NPC builder validation for livestock templates that reference it.
 - Interaction particle spawning now uses the vanilla-compatible model-particle packet path for node/entity attachments, with stable world-space positioning.
 - Particle tint application now uses packet-level color assignment (instead of unavailable `ModelParticle#setColor`), preventing interaction-triggered runtime errors.
 
