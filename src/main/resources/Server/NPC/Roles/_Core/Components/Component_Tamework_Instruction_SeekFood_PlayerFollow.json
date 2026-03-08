@@ -22,6 +22,10 @@
     "FollowItemDistance": {
       "Value": [ 2, 2.5 ],
       "Description": "Desired maintain-distance range while following an attractive item."
+    },
+    "FollowItemTargetSlot": {
+      "Value": "SeekFoodTarget",
+      "Description": "Dedicated target slot used by seek-food player follow to avoid collisions with flock/combat LockedTarget usage."
     }
   },
   "Content": {
@@ -31,13 +35,14 @@
     },
     "Instructions": [
       {
-        "$Comment": "Re-lock player targets holding attractive items so flock/other targeting does not steal LockedTarget.",
+        "$Comment": "Re-lock player targets holding attractive items into a dedicated seek-food slot so flock/combat targeting does not interfere.",
         "Continue": true,
         "Enabled": { "Compute": "!isEmptyStringArray(AttractiveItemSet)" },
         "Sensor": {
           "Type": "Mob",
           "Range": { "Compute": "AlertedRange" },
           "LockOnTarget": true,
+          "LockedTargetSlot": { "Compute": "FollowItemTargetSlot" },
           "GetPlayers": true,
           "GetNPCs": false,
           "Filters": [
@@ -56,7 +61,7 @@
         "Continue": true,
         "Sensor": {
           "Type": "Target",
-          "TargetSlot": "LockedTarget",
+          "TargetSlot": { "Compute": "FollowItemTargetSlot" },
           "Range": { "Compute": "AlertedRange" }
         },
         "HeadMotion": {
@@ -68,7 +73,7 @@
         "$Comment": "If the target is holding a liked item, follow it.",
         "Sensor": {
           "Type": "Target",
-          "TargetSlot": "LockedTarget",
+          "TargetSlot": { "Compute": "FollowItemTargetSlot" },
           "Filters": [
             {
               "Type": "ItemInHand",
@@ -101,15 +106,15 @@
           "Type": "And",
           "Sensors": [
             {
-              "Type": "Target",
-              "TargetSlot": "LockedTarget"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
                 "Type": "Target",
-                "TargetSlot": "LockedTarget",
-                "Filters": [
+                "TargetSlot": { "Compute": "FollowItemTargetSlot" }
+              },
+              {
+                "Type": "Not",
+                "Sensor": {
+                  "Type": "Target",
+                  "TargetSlot": { "Compute": "FollowItemTargetSlot" },
+                  "Filters": [
                   {
                     "Type": "ItemInHand",
                     "Items": { "Compute": "AttractiveItemSet" }
@@ -128,7 +133,7 @@
         "Actions": [
           {
             "Type": "ReleaseTarget",
-            "TargetSlot": "LockedTarget"
+            "TargetSlot": { "Compute": "FollowItemTargetSlot" }
           },
           {
             "Type": "ParentState",
@@ -142,7 +147,7 @@
           "Type": "Not",
           "Sensor": {
             "Type": "Target",
-            "TargetSlot": "LockedTarget"
+            "TargetSlot": { "Compute": "FollowItemTargetSlot" }
           }
         },
         "Actions": [
