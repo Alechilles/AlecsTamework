@@ -22,6 +22,7 @@ import javax.annotation.Nullable;
  */
 public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwGlobalConfig>>,
         TwParentFallbackAsset<TwGlobalConfig> {
+    private static final int MILLIS_PER_MINUTE = 60_000;
     private static final BuilderCodec<GeneralSection> GENERAL_SECTION_CODEC = BuilderCodec.builder(
                     GeneralSection.class, GeneralSection::new
             )
@@ -170,6 +171,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
                     (section, value) -> section.deadRespawnCooldownMs = value,
                     section -> section.deadRespawnCooldownMs
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("DeadRespawnCooldownMins", Codec.DOUBLE),
+                    (section, value) -> section.deadRespawnCooldownMins = value,
+                    section -> section.deadRespawnCooldownMins
             )
             .add()
             .<Integer>append(
@@ -663,7 +670,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.deadRespawnEnabled != null) {
             commandDeadRespawnEnabled = section.deadRespawnEnabled;
         }
-        if (section.deadRespawnCooldownMs != null) {
+        if (section.deadRespawnCooldownMins != null) {
+            commandDeadRespawnCooldownMs = minutesToMillis(
+                    section.deadRespawnCooldownMins,
+                    commandDeadRespawnCooldownMs
+            );
+        } else if (section.deadRespawnCooldownMs != null) {
             commandDeadRespawnCooldownMs = section.deadRespawnCooldownMs;
         }
         if (section.deadRespawnFollowRetryDelayMs != null) {
@@ -881,7 +893,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (!nestedExplicit.contains("DeadRespawnEnabled")) {
             commandDeadRespawnEnabled = parent.commandDeadRespawnEnabled;
         }
-        if (!nestedExplicit.contains("DeadRespawnCooldownMs")) {
+        if (!hasDeadRespawnCooldownOverride(nestedExplicit)) {
             commandDeadRespawnCooldownMs = parent.commandDeadRespawnCooldownMs;
         }
         if (!nestedExplicit.contains("DeadRespawnFollowRetryDelayMs")) {
@@ -908,6 +920,22 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (!nestedExplicit.contains("LinkedPanelRequireUnlinkConfirm")) {
             commandLinkedPanelRequireUnlinkConfirm = parent.commandLinkedPanelRequireUnlinkConfirm;
         }
+    }
+
+    private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
+        return nestedExplicit.contains("DeadRespawnCooldownMs")
+                || nestedExplicit.contains("DeadRespawnCooldownMins");
+    }
+
+    private static int minutesToMillis(double minutes, int fallbackMs) {
+        if (!Double.isFinite(minutes) || minutes < 0) {
+            return fallbackMs;
+        }
+        double millis = minutes * MILLIS_PER_MINUTE;
+        if (millis >= Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) Math.round(millis);
     }
 
     private static final class GeneralSection {
@@ -942,6 +970,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Integer relocationMaxRetryAttempts;
         private Boolean deadRespawnEnabled;
         private Integer deadRespawnCooldownMs;
+        private Double deadRespawnCooldownMins;
         private Integer deadRespawnFollowRetryDelayMs;
         private Double deadRespawnDistanceClose;
         private Double deadRespawnDistanceNear;

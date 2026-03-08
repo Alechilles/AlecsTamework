@@ -24,6 +24,7 @@ import javax.annotation.Nullable;
  */
 public final class TwCompanionConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwCompanionConfig>>,
         TwParentFallbackAsset<TwCompanionConfig> {
+    private static final int MILLIS_PER_MINUTE = 60_000;
     private static final double DEFAULT_RETURN_HOME_TELEPORT_DISTANCE = 96.0;
     private static final double DEFAULT_RETURN_HOME_PATH_DISTANCE_BEFORE_TELEPORT = 24.0;
     private static final int DEFAULT_RETURN_HOME_TELEPORT_DELAY_MS = 2500;
@@ -107,6 +108,16 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
                     (settings, value) -> settings.deadRespawnCooldownMs = value,
                     settings -> settings.deadRespawnCooldownMs
+            )
+            .add()
+            .<Double>append(
+                    new KeyedCodec<>("DeadRespawnCooldownMins", Codec.DOUBLE),
+                    (settings, value) -> {
+                        if (value != null) {
+                            settings.deadRespawnCooldownMs = minutesToMillis(value, settings.deadRespawnCooldownMs);
+                        }
+                    },
+                    settings -> null
             )
             .add()
             .<Integer>append(
@@ -535,7 +546,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (!nestedExplicit.contains("DeadRespawnEnabled")) {
             currentCommand.deadRespawnEnabled = parentCommand.deadRespawnEnabled;
         }
-        if (!nestedExplicit.contains("DeadRespawnCooldownMs")) {
+        if (!hasDeadRespawnCooldownOverride(nestedExplicit)) {
             currentCommand.deadRespawnCooldownMs = parentCommand.deadRespawnCooldownMs;
         }
         if (!nestedExplicit.contains("DeadRespawnFollowRetryDelayMs")) {
@@ -559,6 +570,22 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (!nestedExplicit.contains("PlacementMaxRelativeY")) {
             currentCommand.placementMaxRelativeY = parentCommand.placementMaxRelativeY;
         }
+    }
+
+    private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
+        return nestedExplicit.contains("DeadRespawnCooldownMs")
+                || nestedExplicit.contains("DeadRespawnCooldownMins");
+    }
+
+    private static int minutesToMillis(double minutes, int fallbackMs) {
+        if (!Double.isFinite(minutes) || minutes < 0) {
+            return fallbackMs;
+        }
+        double millis = minutes * MILLIS_PER_MINUTE;
+        if (millis >= Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) Math.round(millis);
     }
 
     public static final class OwnershipProtectionSettings {

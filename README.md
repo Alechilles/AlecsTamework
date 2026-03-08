@@ -138,6 +138,7 @@ Optional prompt updater (see the example template for full usage):
 - **TwGlobalConfig**: sectioned global defaults and runtime tuning (`General`, `InteractionDefaults`, `Command` infrastructure).
   Location: `<ModRoot>/Server/Tamework/Global/*.json`
 - **TwCompanionConfig**: role-scoped companion behavior policy (`OwnershipProtection` + per-role `Command` behavior tuning) with priority + parent fallback support.
+  - `Command.DeadRespawnCooldownMins` is supported as a human-friendly alias and overrides `Command.DeadRespawnCooldownMs` when both are set.
   Location: `<ModRoot>/Server/Tamework/Companion/*.json`
 - **TwSpawnerConfig**: spawner capture/spawn behavior.
   Location: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`

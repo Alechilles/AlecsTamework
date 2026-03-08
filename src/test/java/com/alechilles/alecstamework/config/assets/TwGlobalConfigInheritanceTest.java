@@ -74,6 +74,22 @@ class TwGlobalConfigInheritanceTest {
         assertEquals(5, child.getPriority());
     }
 
+    @Test
+    void deadRespawnCooldownMinutesKeyCountsAsExplicitCooldownOverride() throws Exception {
+        TwGlobalConfig parent = new TwGlobalConfig();
+        TwGlobalConfig child = new TwGlobalConfig();
+
+        setField(parent, "commandDeadRespawnCooldownMs", 240000);
+        setField(child, "commandDeadRespawnCooldownMs", 90000);
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put("Command", Set.of("DeadRespawnCooldownMins"));
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Command"), explicitNestedKeysByTopLevel);
+
+        assertEquals(90000, child.getCommandDeadRespawnCooldownMs());
+    }
+
     private void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
