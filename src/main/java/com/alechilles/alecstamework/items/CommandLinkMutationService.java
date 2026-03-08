@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -45,7 +46,9 @@ final class CommandLinkMutationService {
         if (playerId == null) {
             return LinkToggleResult.notToggled();
         }
-        UUID ownerId = linkPolicyService.resolveOwnerId(targetRef, store);
+        LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
+                LegacyTamedOwnershipBridge.claimForPlayerIfEligible(targetRef, store, player);
+        UUID ownerId = ownerBridgeResult.getOwnerId();
         if (ownerId != null && !ownerId.equals(playerId)) {
             return LinkToggleResult.notToggled();
         }

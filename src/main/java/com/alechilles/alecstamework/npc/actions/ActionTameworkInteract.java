@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInv
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
+import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -168,6 +169,11 @@ public class ActionTameworkInteract extends TameworkActionBase {
                     roleName
             ));
             return false;
+        }
+        LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
+                LegacyTamedOwnershipBridge.claimForPlayerIfEligible(npcRef, store, player);
+        if (ownerBridgeResult.isClaimed()) {
+            selection.logDebug("TameworkInteract: claimed legacy tamed ownership for player interaction.");
         }
         ResolvedInteraction interaction = selection.selectInteraction(config, npcRef, role, infoProvider, store, player, ctx);
         if (interaction == null) {

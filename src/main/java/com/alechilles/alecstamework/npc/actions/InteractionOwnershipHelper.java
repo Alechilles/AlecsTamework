@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -26,7 +27,7 @@ final class InteractionOwnershipHelper {
         if (player == null) {
             return false;
         }
-        UUID ownerId = owner.resolveOwnerUuid(npcRef, store);
+        UUID ownerId = LegacyTamedOwnershipBridge.resolveOwner(npcRef, store).getOwnerId();
         return ownerId != null && ownerId.equals(owner.getPlayerUuid(player));
     }
 
@@ -37,13 +38,14 @@ final class InteractionOwnershipHelper {
         if (player == null) {
             return;
         }
-        UUID ownerUuid = owner.resolveOwnerUuid(npcRef, store);
+        LegacyTamedOwnershipBridge.ClaimResult ownerInfo = LegacyTamedOwnershipBridge.resolveOwner(npcRef, store);
+        UUID ownerUuid = ownerInfo.getOwnerId();
         UUID playerUuid = owner.getPlayerUuid(player);
         if (ownerUuid == null || playerUuid == null || ownerUuid.equals(playerUuid)) {
             return;
         }
         String npcName = owner.resolveNpcName(owner.resolveNpcEntity(npcRef, store));
-        String ownerName = owner.resolveOwnerName(npcRef, store);
+        String ownerName = ownerInfo.getOwnerName();
         OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "interact with");
     }
 }
