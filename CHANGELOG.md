@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 2.2.1 - Companion Policy, Interaction QoL, and Config Scope Updates - 2026-03-08
 ### Added
 - New lag diagnostics toggle command: `/tw debuglag [on|off]` for targeted server performance logging.
 - Legacy-tamed ownership bridge for mid-playthrough installs: vanilla `Tamed_*` NPCs without Tamework owner data can now be claimed on first eligible owner interaction/link flow.
