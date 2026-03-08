@@ -53,6 +53,48 @@
         }
       },
       {
+        "Enabled": { "Compute": "!isEmptyStringArray(AttractiveItemSet)" },
+        "$Comment": "If the locked target no longer holds an attractive item, exit SeekFood immediately.",
+        "Sensor": {
+          "Type": "And",
+          "Sensors": [
+            {
+              "Type": "Target",
+              "TargetSlot": "LockedTarget"
+            },
+            {
+              "Type": "Not",
+              "Sensor": {
+                "Type": "Target",
+                "TargetSlot": "LockedTarget",
+                "Filters": [
+                  {
+                    "Type": "ItemInHand",
+                    "Items": { "Compute": "AttractiveItemSet" }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        "ActionsBlocking": true,
+        "ActionsAtomic": true,
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          },
+          {
+            "Type": "ParentState",
+            "State": "Complete"
+          }
+        ]
+      },
+      {
         "Continue": true,
         "Sensor": {
           "Type": "Target",
