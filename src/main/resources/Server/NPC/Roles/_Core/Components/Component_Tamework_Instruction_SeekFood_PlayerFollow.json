@@ -42,6 +42,9 @@
           "GetNPCs": false,
           "Filters": [
             {
+              "Type": "Player"
+            },
+            {
               "Type": "ItemInHand",
               "Items": { "Compute": "AttractiveItemSet" }
             }
@@ -71,6 +74,9 @@
           "TargetSlot": "LockedTarget",
           "Filters": [
             {
+              "Type": "Player"
+            },
+            {
               "Type": "ItemInHand",
               "Items": { "Compute": "AttractiveItemSet" }
             },
@@ -91,48 +97,6 @@
             "Type": "PlayAnimation",
             "Slot": "Status",
             "Animation": "Curious"
-          }
-        ]
-      },
-      {
-        "$Comment": "If we still have a target but item-follow conditions are no longer met, release and return to parent completion.",
-        "Enabled": { "Compute": "!isEmptyStringArray(AttractiveItemSet)" },
-        "Sensor": {
-          "Type": "And",
-          "Sensors": [
-            {
-              "Type": "Target",
-              "TargetSlot": "LockedTarget"
-            },
-            {
-              "Type": "Not",
-              "Sensor": {
-                "Type": "Target",
-                "TargetSlot": "LockedTarget",
-                "Filters": [
-                  {
-                    "Type": "ItemInHand",
-                    "Items": { "Compute": "AttractiveItemSet" }
-                  },
-                  {
-                    "Type": "Attitude",
-                    "Attitudes": { "Compute": "FollowItemAttitudes" }
-                  }
-                ]
-              }
-            }
-          ]
-        },
-        "ActionsBlocking": true,
-        "ActionsAtomic": true,
-        "Actions": [
-          {
-            "Type": "ReleaseTarget",
-            "TargetSlot": "LockedTarget"
-          },
-          {
-            "Type": "ParentState",
-            "State": "Complete"
           }
         ]
       },
