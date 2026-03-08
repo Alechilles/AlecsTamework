@@ -17,9 +17,8 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - Global and per-role behavior controls for who can interact with or damage owned NPCs.
 - **Capture/Spawn NPCs With Metadata** - Capture saves metadata and restores the same NPC on spawn.
   - Includes random attachments such as varying textures, models, etc.
-  - Also includes components like tamed status and ownership
-    - Ownership can optionally be cleared on capture and re-set on spawn to enable player trading of captured NPCs
-  - This will be expanded in the near future as new systems such as breeding, traits, talents, etc. are added. Everything will always be saved on capture.
+  - Includes persisted progression state such as ownership/tamed, happiness, needs, breeding readiness/cooldowns, traits, life stage, and attachment selections.
+  - Ownership can optionally be cleared on capture and re-set on spawn to enable player trading of captured NPCs.
 - **Naming Items** - Name tamed NPCs with an in-game input UI using `TwNameItemConfig` + `TameworkNameNpc`.
   - Works with any custom item; not a fixed nametag item
   - Per-item rules for roles, ownership, allowed characters, rename rules, and more
@@ -32,17 +31,17 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - Supports command steps like state changes, target assignment, move-to-ping, set/return-home, and hook triggers.
   - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation with safer placement for recall/revive.
   - Command relocation and revive tuning is configurable in `TwGlobalConfig.Command`.
+- **Progression Systems (2.2.x)** - Shared systems for long-term companion behavior and balancing.
+  - Happiness, needs, breeding, traits, and life stage progression with role-priority config resolution.
+  - Deterministic trait rolling/inheritance with trait modifiers for health, damage, movement speed, and harvest outcomes.
+  - In-game debug/authoring commands for progression balancing (for example `/tw gethappiness`, `/tw getneeds`, `/tw gettraits`, `/tw getlifestage`).
+- **Coop Integration** - Optional Tamework intake policy overlays for vanilla coops.
+  - Configure per-coop behavior through `TwCoopConfig` assets keyed by `CoopId`.
+  - Tamework policy checks run before vanilla coop admission flow to keep compatibility with vanilla capacity/species gates.
 - **Examples and Documentation** - Plenty of examples and thorough documentation to help you integrate Tamework.
   - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
-## Coming Soon
-- **Needs System**
-  - Hunger, thirst, happiness, space etc.
-- **Breeding**
-  - Passive happiness-based system *and* simpler more Minecraft-like breed on interact system
-- **Trait system**
-  - Highly integrated with breeding
-  - Size, attachments (so colors, models, etc), harvest rates, strength, health, etc.
+## Roadmap
 - **NPC XP/leveling system**
   - Gain XP passively when with owner or when doing certain configurable actions
 - **Talent trees**
@@ -137,6 +136,12 @@ Optional prompt updater (see the example template for full usage):
   Location: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
 - **TwCommandItemConfig**: command-tool behavior and command list.
   Location: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
+- **TwBreedingConfig**: breeding eligibility/timing/inheritance behavior.
+  Location: `<ModRoot>/Server/Tamework/Breeding/*.json`
+- **TwHappinessConfig**: shared happiness progression and equilibrium modifiers.
+  Location: `<ModRoot>/Server/Tamework/Happiness/*.json`
+- **TwNeedsConfig**: hunger/thirst progression, passive refill, and needs-resource seek behavior.
+  Location: `<ModRoot>/Server/Tamework/Needs/*.json`
 - **TwTraitConfig**: role-scoped trait pools and inheritance behavior.
   Location: `<ModRoot>/Server/Tamework/Traits/*.json`
   Notes: each trait definition can now optionally set `IconPath` for linked-panel icon rendering; when omitted, the UI falls back to first-letter glyphs.
