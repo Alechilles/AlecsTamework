@@ -3,8 +3,9 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -126,31 +127,41 @@ final class CommandMenuMoveService {
                 );
                 return;
             }
-            TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-            double returnHomeTeleportDistance = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDistance() : 0.0,
-                    defaultReturnHomeTeleportDistance
-            );
-            double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandReturnHomePathDistanceBeforeTeleport() : 0.0,
-                    defaultReturnHomePathDistanceBeforeTeleport
-            );
-            long returnHomeTeleportDelayMs = resolvePositiveLong(
-                    globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDelayMs() : 0L,
-                    defaultReturnHomeTeleportDelayMs
-            );
-            double recallSafeSpawnDistance = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
-                    defaultRecallSafeSpawnDistance
-            );
-            double recallForceRelocateDistance = resolvePositiveDouble(
-                    globalConfig != null ? globalConfig.getCommandRecallForceRelocateDistance() : 0.0,
-                    defaultRecallForceRelocateDistance
-            );
             Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
             NPCEntity npc = (npcRef != null && npcRef.isValid())
                     ? store.getComponent(npcRef, NPCEntity.getComponentType())
                     : null;
+            String roleId = null;
+            if (npcRef != null && npcRef.isValid()) {
+                roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+            }
+            if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+                roleId = record.cachedRoleId;
+            }
+            if ((roleId == null || roleId.isBlank()) && npc != null) {
+                roleId = npc.getRoleName();
+            }
+            TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+            double returnHomeTeleportDistance = resolvePositiveDouble(
+                    settings.getReturnHomeTeleportDistance(),
+                    defaultReturnHomeTeleportDistance
+            );
+            double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
+                    settings.getReturnHomePathDistanceBeforeTeleport(),
+                    defaultReturnHomePathDistanceBeforeTeleport
+            );
+            long returnHomeTeleportDelayMs = resolvePositiveLong(
+                    settings.getReturnHomeTeleportDelayMs(),
+                    defaultReturnHomeTeleportDelayMs
+            );
+            double recallSafeSpawnDistance = resolvePositiveDouble(
+                    settings.getRecallSafeSpawnDistance(),
+                    defaultRecallSafeSpawnDistance
+            );
+            double recallForceRelocateDistance = resolvePositiveDouble(
+                    settings.getRecallForceRelocateDistance(),
+                    defaultRecallForceRelocateDistance
+            );
             if (returnHome) {
                 boolean hasHome = record.homePosition != null;
                 if (!hasHome && npcRef != null && npcRef.isValid()) {
@@ -177,8 +188,8 @@ final class CommandMenuMoveService {
                     commandTarget,
                     raycastPosition,
                     stack,
-                    globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
-                    globalConfig != null && globalConfig.isInvulnerableIfOwned(),
+                    settings.isBlockAllPlayerDamageIfOwned(),
+                    settings.isInvulnerableIfOwned(),
                     returnHomeTeleportDistance,
                     returnHomePathDistanceBeforeTeleport,
                     returnHomeTeleportDelayMs,

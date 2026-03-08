@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -16,6 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.annotation.Nullable;
 
 /**
  * Computes companion placement positions for recall and respawn flows.
@@ -32,45 +33,33 @@ final class CommandCompanionPlacementService {
     private static final double COMMAND_PLACEMENT_MIN_RELATIVE_Y = -2.0;
     private static final double COMMAND_PLACEMENT_MAX_RELATIVE_Y = 4.0;
 
-    Vector3d computeSafeRecallPosition(Context context, Vector3d sourcePosition) {
-        if (context == null) {
-            return null;
-        }
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        return computeSafeCompanionPlacementPosition(
-                context.playerRef,
-                context.store,
-                context.recallSafeSpawnDistance,
-                sourcePosition,
-                globalConfig
-        );
-    }
-
     Vector3d computeSafeRecallPosition(Ref<EntityStore> playerRef,
                                        Store<EntityStore> store,
                                        double safeSpawnDistance,
+                                       @Nullable String roleId,
                                        Vector3d sourcePosition) {
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
         return computeSafeCompanionPlacementPosition(
                 playerRef,
                 store,
                 safeSpawnDistance,
                 sourcePosition,
-                globalConfig
+                settings
         );
     }
 
     Vector3d computeSafeRespawnPosition(Ref<EntityStore> playerRef,
                                         Store<EntityStore> store,
                                         double safeSpawnDistance,
+                                        @Nullable String roleId,
                                         Vector3d sourcePosition) {
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
         return computeSafeCompanionPlacementPosition(
                 playerRef,
                 store,
                 safeSpawnDistance,
                 sourcePosition,
-                globalConfig
+                settings
         );
     }
 
@@ -78,7 +67,7 @@ final class CommandCompanionPlacementService {
                                                            Store<EntityStore> store,
                                                            double safeSpawnDistance,
                                                            Vector3d sourcePosition,
-                                                           TwGlobalConfig globalConfig) {
+                                                           @Nullable TwCompanionConfig.EffectiveSettings companionSettings) {
         if (store == null || playerRef == null || !playerRef.isValid()) {
             return null;
         }
@@ -88,8 +77,8 @@ final class CommandCompanionPlacementService {
         }
         Vector3d playerPos = new Vector3d(playerTransform.getPosition());
         Vector3d desired = computeDesiredPlacementPosition(playerPos, safeSpawnDistance, sourcePosition);
-        double minRelativeY = resolvePlacementMinRelativeY(globalConfig);
-        double maxRelativeY = resolvePlacementMaxRelativeY(globalConfig, minRelativeY);
+        double minRelativeY = resolvePlacementMinRelativeY(companionSettings);
+        double maxRelativeY = resolvePlacementMaxRelativeY(companionSettings, minRelativeY);
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null) {
             if (desired != null) {
@@ -112,7 +101,7 @@ final class CommandCompanionPlacementService {
         }
         double baseAngle = Math.atan2(dirZ, dirX);
         double targetDistance = Math.max(2.0, safeSpawnDistance);
-        double[] distanceCandidates = resolvePlacementDistanceCandidates(globalConfig, targetDistance);
+        double[] distanceCandidates = resolvePlacementDistanceCandidates(companionSettings, targetDistance);
         double[] angleOffsets = resolvePlacementAngleOffsets();
         for (double distance : distanceCandidates) {
             if (distance < 2.0) {
@@ -167,21 +156,22 @@ final class CommandCompanionPlacementService {
         );
     }
 
-    private double[] resolvePlacementDistanceCandidates(TwGlobalConfig globalConfig, double fallbackDistance) {
+    private double[] resolvePlacementDistanceCandidates(@Nullable TwCompanionConfig.EffectiveSettings companionSettings,
+                                                        double fallbackDistance) {
         double close = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceClose() : 0.0,
+                companionSettings != null ? companionSettings.getDeadRespawnDistanceClose() : 0.0,
                 RESPAWN_DISTANCE_CLOSE
         );
         double near = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceNear() : 0.0,
+                companionSettings != null ? companionSettings.getDeadRespawnDistanceNear() : 0.0,
                 RESPAWN_DISTANCE_NEAR
         );
         double mid = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceMid() : 0.0,
+                companionSettings != null ? companionSettings.getDeadRespawnDistanceMid() : 0.0,
                 RESPAWN_DISTANCE_MID
         );
         double far = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandDeadRespawnDistanceFar() : 0.0,
+                companionSettings != null ? companionSettings.getDeadRespawnDistanceFar() : 0.0,
                 RESPAWN_DISTANCE_FAR
         );
         return new double[] {
@@ -217,16 +207,17 @@ final class CommandCompanionPlacementService {
         return ordered;
     }
 
-    private double resolvePlacementMinRelativeY(TwGlobalConfig globalConfig) {
+    private double resolvePlacementMinRelativeY(@Nullable TwCompanionConfig.EffectiveSettings companionSettings) {
         return resolveFiniteDouble(
-                globalConfig != null ? globalConfig.getCommandPlacementMinRelativeY() : Double.NaN,
+                companionSettings != null ? companionSettings.getPlacementMinRelativeY() : Double.NaN,
                 COMMAND_PLACEMENT_MIN_RELATIVE_Y
         );
     }
 
-    private double resolvePlacementMaxRelativeY(TwGlobalConfig globalConfig, double minRelativeY) {
+    private double resolvePlacementMaxRelativeY(@Nullable TwCompanionConfig.EffectiveSettings companionSettings,
+                                                double minRelativeY) {
         double maxRelativeY = resolveFiniteDouble(
-                globalConfig != null ? globalConfig.getCommandPlacementMaxRelativeY() : Double.NaN,
+                companionSettings != null ? companionSettings.getPlacementMaxRelativeY() : Double.NaN,
                 COMMAND_PLACEMENT_MAX_RELATIVE_Y
         );
         return maxRelativeY < minRelativeY ? minRelativeY : maxRelativeY;

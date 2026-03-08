@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
@@ -120,6 +121,7 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
     private boolean npcActionsRegistered;
     private boolean globalAssetsRegistered;
+    private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
     private boolean namingAssetsRegistered;
     private boolean commandAssetsRegistered;
@@ -166,6 +168,7 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class, TameworkCommandInteraction.CODEC);
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
+        registerCompanionAssets();
         registerCoopAssets();
         registerSpawnerItemAssets();
         registerNamingItemAssets();
@@ -289,12 +292,7 @@ public class Tamework extends JavaPlugin {
 
         // Register damage filter system (configurable owner protection).
         getEntityStoreRegistry().registerSystem(
-                new OwnerDamageFilterSystem(
-                        () -> getGlobalConfig().isBlockOwnerDamage(),
-                        () -> getGlobalConfig().isBlockAllPlayerDamageIfOwned(),
-                        () -> getGlobalConfig().isInvulnerableIfOwned(),
-                        getLogger()
-                )
+                new OwnerDamageFilterSystem(getLogger())
         );
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
 
@@ -501,6 +499,22 @@ public class Tamework extends JavaPlugin {
         globalAssetsRegistered = true;
     }
 
+    private void registerCompanionAssets() {
+        if (companionAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwCompanionConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Companion")
+                        .setCodec(TwCompanionConfig.CODEC)
+                        .setKeyFunction(TwCompanionConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwCompanionConfig.class, this::onCompanionAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwCompanionConfig.class, this::onCompanionAssetsRemoved);
+        companionAssetsRegistered = true;
+    }
+
     private void registerInteractionAssets() {
         if (interactionAssetsRegistered) {
             return;
@@ -643,6 +657,16 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
+    }
+
+    private void onCompanionAssetsLoaded(
+            LoadedAssetsEvent<String, TwCompanionConfig, DefaultAssetMap<String, TwCompanionConfig>> event) {
+        TwCompanionConfig.clearRoleCache();
+    }
+
+    private void onCompanionAssetsRemoved(
+            RemovedAssetsEvent<String, TwCompanionConfig, DefaultAssetMap<String, TwCompanionConfig>> event) {
+        TwCompanionConfig.clearRoleCache();
     }
 
     private void onInteractionAssetsLoaded(

@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -73,7 +75,19 @@ final class CommandRelocationDispatchService {
                 continue;
             }
             Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
-            Vector3d safeDestination = companionPlacementService.computeSafeRecallPosition(context, sourceHint);
+            TwCompanionConfig.EffectiveSettings settings =
+                    TwCompanionConfig.resolveEffectiveForRole(record.cachedRoleId);
+            double safeSpawnDistance = resolvePositiveDouble(
+                    settings.getRecallSafeSpawnDistance(),
+                    context.recallSafeSpawnDistance
+            );
+            Vector3d safeDestination = companionPlacementService.computeSafeRecallPosition(
+                    context.playerRef,
+                    context.store,
+                    safeSpawnDistance,
+                    record.cachedRoleId,
+                    sourceHint
+            );
             if (safeDestination == null) {
                 continue;
             }
@@ -113,16 +127,36 @@ final class CommandRelocationDispatchService {
         double dy = npcPos.y - playerPos.y;
         double dz = npcPos.z - playerPos.z;
         double distSq = dx * dx + dy * dy + dz * dz;
-        if (distSq < context.recallForceRelocateDistance * context.recallForceRelocateDistance) {
+        String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, context.store);
+        if ((roleId == null || roleId.isBlank()) && candidate.npc != null) {
+            roleId = candidate.npc.getRoleName();
+        }
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+        double forceRelocateDistance = resolvePositiveDouble(
+                settings.getRecallForceRelocateDistance(),
+                context.recallForceRelocateDistance
+        );
+        if (distSq < forceRelocateDistance * forceRelocateDistance) {
             return;
         }
+        double safeSpawnDistance = resolvePositiveDouble(
+                settings.getRecallSafeSpawnDistance(),
+                context.recallSafeSpawnDistance
+        );
         Vector3d safePosition = companionPlacementService.computeSafeRecallPosition(
-                context,
+                context.playerRef,
+                context.store,
+                safeSpawnDistance,
+                roleId,
                 new Vector3d(npcPos)
         );
         if (safePosition == null) {
             return;
         }
         candidate.npc.moveTo(candidate.ref, safePosition.x, safePosition.y, safePosition.z, context.store);
+    }
+
+    private double resolvePositiveDouble(double configured, double fallback) {
+        return configured > 0.0 ? configured : fallback;
     }
 }

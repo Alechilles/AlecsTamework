@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -179,7 +179,7 @@ public final class CommandLinkedNpcDeathService {
         String customName = resolveCustomName(reference, store);
         String displayName = resolveDisplayName(reference, store, npc, roleId, customName);
         long diedAtMs = System.currentTimeMillis();
-        long respawnAvailableAtMs = diedAtMs + resolveRespawnCooldownMs();
+        long respawnAvailableAtMs = diedAtMs + resolveRespawnCooldownMs(roleId);
 
         deadByNpc.put(
                 npcUuid,
@@ -683,9 +683,9 @@ public final class CommandLinkedNpcDeathService {
         return normalized.contains("death") || normalized.contains("killed");
     }
 
-    private long resolveRespawnCooldownMs() {
-        TwGlobalConfig config = TwGlobalConfig.resolveActive();
-        long configured = config != null ? config.getCommandDeadRespawnCooldownMs() : 0L;
+    private long resolveRespawnCooldownMs(@Nullable String roleId) {
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+        long configured = settings.getDeadRespawnCooldownMs();
         return Math.max(0L, configured);
     }
 

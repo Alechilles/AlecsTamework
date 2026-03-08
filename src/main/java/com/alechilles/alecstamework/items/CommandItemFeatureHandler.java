@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearCombatStep;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.ClearTargetStep;
@@ -250,24 +251,26 @@ public final class CommandItemFeatureHandler {
         Ref<EntityStore> commandTarget = resolutionService.resolveCommandTarget(playerRef, store, config, command, targetRef);
         Vector3d raycastPosition = resolutionService.resolveRaycastPosition(playerRef, store, config, command);
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        TwCompanionConfig.EffectiveSettings defaultCompanionSettings =
+                TwCompanionConfig.EffectiveSettings.fromGlobal(globalConfig);
         double returnHomeTeleportDistance = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDistance() : 0.0,
+                defaultCompanionSettings.getReturnHomeTeleportDistance(),
                 HYBRID_TELEPORT_DISTANCE_THRESHOLD
         );
         double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandReturnHomePathDistanceBeforeTeleport() : 0.0,
+                defaultCompanionSettings.getReturnHomePathDistanceBeforeTeleport(),
                 HYBRID_PATH_DISTANCE_BEFORE_TELEPORT
         );
         long returnHomeTeleportDelayMs = resolvePositiveLong(
-                globalConfig != null ? globalConfig.getCommandReturnHomeTeleportDelayMs() : 0L,
+                defaultCompanionSettings.getReturnHomeTeleportDelayMs(),
                 HYBRID_TELEPORT_DELAY_MS
         );
         double recallSafeSpawnDistance = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandRecallSafeSpawnDistance() : 0.0,
+                defaultCompanionSettings.getRecallSafeSpawnDistance(),
                 RECALL_SAFE_SPAWN_DISTANCE
         );
         double recallForceRelocateDistance = resolvePositiveDouble(
-                globalConfig != null ? globalConfig.getCommandRecallForceRelocateDistance() : 0.0,
+                defaultCompanionSettings.getRecallForceRelocateDistance(),
                 RECALL_FORCE_RELOCATE_DISTANCE
         );
         Context context = new Context(
@@ -281,8 +284,8 @@ public final class CommandItemFeatureHandler {
                 commandTarget,
                 raycastPosition,
                 working,
-                globalConfig != null && globalConfig.isBlockAllPlayerDamageIfOwned(),
-                globalConfig != null && globalConfig.isInvulnerableIfOwned(),
+                defaultCompanionSettings.isBlockAllPlayerDamageIfOwned(),
+                defaultCompanionSettings.isInvulnerableIfOwned(),
                 returnHomeTeleportDistance,
                 returnHomePathDistanceBeforeTeleport,
                 returnHomeTeleportDelayMs,
@@ -474,11 +477,6 @@ public final class CommandItemFeatureHandler {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        if (globalConfig == null || !globalConfig.isCommandDeadRespawnEnabled()) {
-            feedbackService.showWarning(player, "Dead companion respawn is disabled.");
-            return;
-        }
         if (deathService == null) {
             feedbackService.showWarning(player, "Dead companion tracking is unavailable.");
             return;
@@ -521,17 +519,26 @@ public final class CommandItemFeatureHandler {
                 feedbackService.showWarning(player, "That companion is not marked as dead.");
                 return;
             }
+            String roleId = deadSnapshot.roleId();
+            if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+                roleId = record.cachedRoleId;
+            }
+            TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+            if (!companionSettings.isDeadRespawnEnabled()) {
+                feedbackService.showWarning(player, "Dead companion respawn is disabled.");
+                return;
+            }
             long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
             if (remainingMs > 0L) {
                 feedbackService.showWarning(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
                 return;
             }
             double safeSpawnDistance = resolvePositiveDouble(
-                    globalConfig.getCommandRecallSafeSpawnDistance(),
+                    companionSettings.getRecallSafeSpawnDistance(),
                     RECALL_SAFE_SPAWN_DISTANCE
             );
             long followRetryDelayMs = resolvePositiveLong(
-                    globalConfig.getCommandDeadRespawnFollowRetryDelayMs(),
+                    companionSettings.getDeadRespawnFollowRetryDelayMs(),
                     RESPAWN_FOLLOW_RETRY_DELAY_MS
             );
             ItemStack updatedStack = respawnService.respawnDeadLinkedNpc(

@@ -6,10 +6,13 @@
 - Legacy-tamed ownership bridge for mid-playthrough installs: vanilla `Tamed_*` NPCs without Tamework owner data can now be claimed on first eligible owner interaction/link flow.
 - Interaction requirement item matching now supports inverse operators (for example `ItemsInHand.Operator: NoneOf`) for custom "wrong item"/"not holding item set" flows.
 - Interaction particle effects now support param-driven attachment targeting (`AttachTarget`, `AttachNode`, `OffsetParam`) with optional player-only visibility control.
+- New role-scoped companion policy asset type: `TwCompanionConfig` (`Server/Tamework/Companion`), with priority + parent fallback support for ownership protection and command behavior tuning.
 
 ### Changed
 - Added guarded lag-probe logging in command, spawner, and naming item interactions, owner-interaction filtering, owner damage filtering, and command relocation retries/chunk requests when lag diagnostics are enabled.
 - `-Prun-server` now supports optional JVM/server argument passthrough properties (`-Dhytale.server.jvm.args` and `-Dhytale.server.extra.args`) for local resource-constrained runs.
+- Owner damage filtering and command companion behavior now resolve policy by companion role through `TwCompanionConfig`, with automatic fallback to `TwGlobalConfig` when no role-scoped companion policy is configured.
+- Command dead-respawn cooldown windows are now captured per companion role at death-snapshot time (role policy aware) instead of using a single global cooldown.
 
 ### Fixed
 - `Component_Tamework_Instruction_SeekFood_PlayerFollow` now uses valid sensor/filter combinations (no invalid `Player` filter builder), restoring clean NPC builder validation for livestock templates that reference it.

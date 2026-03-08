@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -17,7 +19,6 @@ import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
-import java.util.function.BooleanSupplier;
 
 /**
  * Cancels damage based on owner/tamework protection settings.
@@ -30,19 +31,10 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         return DamageModule.get().getFilterDamageGroup();
     }
 
-    private final BooleanSupplier blockOwnerDamage;
-    private final BooleanSupplier blockAllPlayerDamageIfOwned;
-    private final BooleanSupplier invulnerableIfOwned;
     private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
     private final HytaleLogger logger;
 
-    public OwnerDamageFilterSystem(BooleanSupplier blockOwnerDamage,
-                                   BooleanSupplier blockAllPlayerDamageIfOwned,
-                                   BooleanSupplier invulnerableIfOwned,
-                                   HytaleLogger logger) {
-        this.blockOwnerDamage = blockOwnerDamage != null ? blockOwnerDamage : () -> false;
-        this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned != null ? blockAllPlayerDamageIfOwned : () -> false;
-        this.invulnerableIfOwned = invulnerableIfOwned != null ? invulnerableIfOwned : () -> false;
+    public OwnerDamageFilterSystem(HytaleLogger logger) {
         this.ownerType = TameworkOwnerComponent.getComponentType();
         this.logger = logger;
     }
@@ -67,12 +59,6 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
             if (damage == null || damage.isCancelled()) {
                 return;
             }
-            // Fast path if all protections are disabled.
-            if (!blockOwnerDamage.getAsBoolean()
-                    && !blockAllPlayerDamageIfOwned.getAsBoolean()
-                    && !invulnerableIfOwned.getAsBoolean()) {
-                return;
-            }
             ComponentType<EntityStore, TameworkOwnerComponent> type = ownerType != null
                     ? ownerType
                     : TameworkOwnerComponent.getComponentType();
@@ -84,8 +70,17 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
             if (owner == null || owner.getOwnerId() == null) {
                 return;
             }
+            Ref<EntityStore> targetRef = chunk.getReferenceTo(index);
+            String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
+            TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+            boolean blockOwnerDamage = settings.isBlockOwnerDamage();
+            boolean blockAllPlayerDamageIfOwned = settings.isBlockAllPlayerDamageIfOwned();
+            boolean invulnerableIfOwned = settings.isInvulnerableIfOwned();
+            if (!blockOwnerDamage && !blockAllPlayerDamageIfOwned && !invulnerableIfOwned) {
+                return;
+            }
             // Optional full invulnerability for owned pets.
-            if (invulnerableIfOwned.getAsBoolean()) {
+            if (invulnerableIfOwned) {
                 cancelDamage(damage);
                 return;
             }
@@ -103,11 +98,11 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
                 return;
             }
             // Optionally block all player damage against owned pets.
-            if (blockAllPlayerDamageIfOwned.getAsBoolean()) {
+            if (blockAllPlayerDamageIfOwned) {
                 cancelDamage(damage);
                 return;
             }
-            if (blockOwnerDamage.getAsBoolean() && owner.getOwnerId().equals(player.getUuid())) {
+            if (blockOwnerDamage && owner.getOwnerId().equals(player.getUuid())) {
                 cancelDamage(damage);
             }
         } finally {

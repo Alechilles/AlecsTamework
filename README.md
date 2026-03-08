@@ -30,7 +30,8 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - Unlink safety is configurable via `TwGlobalConfig.Command.LinkedPanelRequireUnlinkConfirm`.
   - Supports command steps like state changes, target assignment, move-to-ping, set/return-home, and hook triggers.
   - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation with safer placement for recall/revive.
-  - Command relocation and revive tuning is configurable in `TwGlobalConfig.Command`.
+  - Companion command behavior (recall/return-home/respawn distances and timing) can be scoped per role with `TwCompanionConfig`.
+  - Command relocation infrastructure tuning remains global in `TwGlobalConfig.Command` (`RelocationRetryIntervalMs`, `RelocationMaxWaitMs`, `RelocationMaxRetryAttempts`).
 - **Happiness and Needs System** - Shared progression state for companion wellbeing and behavior pressure.
   - Role-priority config resolution for happiness (`TwHappinessConfig`) and needs (`TwNeedsConfig`).
   - Hunger/thirst decay, passive refill, resource-seek support, and needs-driven happiness penalties.
@@ -134,8 +135,10 @@ Optional prompt updater (see the example template for full usage):
 12. Add translations in `Server/Languages/en-US/server.lang`.
 
 ## Configuration Overview
-- **TwGlobalConfig**: sectioned global defaults and runtime tuning (`General`, `OwnershipProtection`, `InteractionDefaults`, `Command`).
+- **TwGlobalConfig**: sectioned global defaults and runtime tuning (`General`, `InteractionDefaults`, `Command` infrastructure).
   Location: `<ModRoot>/Server/Tamework/Global/*.json`
+- **TwCompanionConfig**: role-scoped companion behavior policy (`OwnershipProtection` + per-role `Command` behavior tuning) with priority + parent fallback support.
+  Location: `<ModRoot>/Server/Tamework/Companion/*.json`
 - **TwSpawnerConfig**: spawner capture/spawn behavior.
   Location: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - **TwNameItemConfig**: naming item behavior.

@@ -92,6 +92,7 @@ final class CommandRespawnService {
                 playerRef,
                 store,
                 safeSpawnDistance,
+                roleId,
                 sourceHint
         );
         if (destination == null) {

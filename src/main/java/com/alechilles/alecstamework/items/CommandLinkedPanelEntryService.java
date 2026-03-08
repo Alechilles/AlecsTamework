@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.items;
 
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -66,8 +66,6 @@ final class CommandLinkedPanelEntryService {
         if (records.isEmpty()) {
             return List.of();
         }
-        TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-        boolean deadRespawnEnabled = globalConfig != null && globalConfig.isCommandDeadRespawnEnabled();
         World world = player.getWorld();
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         ComponentType<EntityStore, TameworkTraitsComponent> traitType = TameworkTraitsComponent.getComponentType();
@@ -144,6 +142,12 @@ final class CommandLinkedPanelEntryService {
                     if (deadName != null && !deadName.isBlank()) {
                         displayName = deadName;
                     }
+                    String roleId = deadSnapshot.roleId();
+                    if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+                        roleId = record.cachedRoleId;
+                    }
+                    boolean deadRespawnEnabled =
+                            TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled();
                     if (deadRespawnEnabled) {
                         deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
                     } else {

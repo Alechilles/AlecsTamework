@@ -14,9 +14,11 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreHomeS
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -50,6 +52,7 @@ final class CommandStepExecutionService {
     }
 
     StepResult executeCommand(Context context, Candidate candidate) {
+        TwCompanionConfig.EffectiveSettings companionSettings = resolveCompanionSettings(context, candidate);
         CommandStep[] steps = context.command.getSteps();
         if (steps == null || steps.length == 0) {
             return executeModeMapping(context, candidate);
@@ -59,7 +62,7 @@ final class CommandStepExecutionService {
             if (step == null) {
                 continue;
             }
-            boolean ok = applyStep(step, context, candidate);
+            boolean ok = applyStep(step, context, candidate, companionSettings);
             if (ok) {
                 applied = true;
                 continue;
@@ -146,12 +149,15 @@ final class CommandStepExecutionService {
         return new StepResult(ok, false);
     }
 
-    private boolean applyStep(CommandStep step, Context context, Candidate candidate) {
+    private boolean applyStep(CommandStep step,
+                              Context context,
+                              Candidate candidate,
+                              TwCompanionConfig.EffectiveSettings companionSettings) {
         if (step instanceof SetStateStep stateStep) {
             return applyState(candidate.ref, candidate.npc, context.store, stateStep.getState(), stateStep.getSubState());
         }
         if (step instanceof SetTargetStep targetStep) {
-            return applySetTarget(targetStep, context, candidate);
+            return applySetTarget(targetStep, context, candidate, companionSettings);
         }
         if (step instanceof ClearTargetStep clearStep) {
             String slot = clearStep.getTargetSlot();
@@ -169,7 +175,7 @@ final class CommandStepExecutionService {
             return applyClearCombat(clearCombatStep, context, candidate);
         }
         if (step instanceof MoveToPositionStep moveStep) {
-            return applyMove(moveStep, context, candidate);
+            return applyMove(moveStep, context, candidate, companionSettings);
         }
         if (step instanceof StoreHomeStep storeHomeStep) {
             return applyStoreHome(storeHomeStep, context, candidate);
@@ -180,7 +186,10 @@ final class CommandStepExecutionService {
         return false;
     }
 
-    private boolean applySetTarget(SetTargetStep targetStep, Context context, Candidate candidate) {
+    private boolean applySetTarget(SetTargetStep targetStep,
+                                   Context context,
+                                   Candidate candidate,
+                                   TwCompanionConfig.EffectiveSettings companionSettings) {
         Role role = candidate.npc.getRole();
         if (role == null || role.getMarkedEntitySupport() == null) {
             return false;
@@ -199,14 +208,17 @@ final class CommandStepExecutionService {
             return false;
         }
         if ((source == TargetSource.CrosshairTarget || source == TargetSource.LastAttackTarget)
-                && !isHostileTargetAllowed(target, context, candidate)) {
+                && !isHostileTargetAllowed(target, context, candidate, companionSettings)) {
             return false;
         }
         role.getMarkedEntitySupport().setMarkedEntity(slot, target);
         return true;
     }
 
-    private boolean isHostileTargetAllowed(Ref<EntityStore> target, Context context, Candidate candidate) {
+    private boolean isHostileTargetAllowed(Ref<EntityStore> target,
+                                           Context context,
+                                           Candidate candidate,
+                                           TwCompanionConfig.EffectiveSettings companionSettings) {
         if (target == null || !target.isValid()) {
             return false;
         }
@@ -226,8 +238,8 @@ final class CommandStepExecutionService {
                 playerTargetingAllowed,
                 targetPlayerSpawnProtected,
                 targetOwnerId != null,
-                context.blockAllPlayerDamageIfOwned,
-                context.invulnerableIfOwned
+                companionSettings.isBlockAllPlayerDamageIfOwned(),
+                companionSettings.isInvulnerableIfOwned()
         );
     }
 
@@ -255,7 +267,10 @@ final class CommandStepExecutionService {
         return null;
     }
 
-    private boolean applyMove(MoveToPositionStep moveStep, Context context, Candidate candidate) {
+    private boolean applyMove(MoveToPositionStep moveStep,
+                              Context context,
+                              Candidate candidate,
+                              TwCompanionConfig.EffectiveSettings companionSettings) {
         MoveSource source = moveStep.getSource() != null ? moveStep.getSource() : MoveSource.RaycastHit;
         Vector3d targetPosition = null;
         if (source == MoveSource.RaycastHit) {
@@ -277,8 +292,20 @@ final class CommandStepExecutionService {
         if (source == MoveSource.StoredHome && targetPosition != null) {
             TransformComponent npcTransform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());
             Vector3d start = npcTransform != null ? new Vector3d(npcTransform.getPosition()) : null;
-            if (start != null && start.distanceTo(targetPosition) > context.returnHomeTeleportDistance) {
-                Vector3d intermediate = computeIntermediatePoint(start, targetPosition, context.returnHomePathDistanceBeforeTeleport);
+            double returnHomeTeleportDistance = resolvePositiveDouble(
+                    companionSettings.getReturnHomeTeleportDistance(),
+                    context.returnHomeTeleportDistance
+            );
+            double returnHomePathDistanceBeforeTeleport = resolvePositiveDouble(
+                    companionSettings.getReturnHomePathDistanceBeforeTeleport(),
+                    context.returnHomePathDistanceBeforeTeleport
+            );
+            long returnHomeTeleportDelayMs = resolvePositiveLong(
+                    companionSettings.getReturnHomeTeleportDelayMs(),
+                    context.returnHomeTeleportDelayMs
+            );
+            if (start != null && start.distanceTo(targetPosition) > returnHomeTeleportDistance) {
+                Vector3d intermediate = computeIntermediatePoint(start, targetPosition, returnHomePathDistanceBeforeTeleport);
                 RelocationState postRelocationState = resolveRelocationState(context.command, true, false);
                 World world = context.player != null ? context.player.getWorld() : null;
                 UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
@@ -293,7 +320,7 @@ final class CommandStepExecutionService {
                             true,
                             postRelocationState.state,
                             postRelocationState.subState,
-                            context.returnHomeTeleportDelayMs,
+                            returnHomeTeleportDelayMs,
                             start,
                             targetPosition
                     );
@@ -425,6 +452,22 @@ final class CommandStepExecutionService {
                 )
         );
         return true;
+    }
+
+    private TwCompanionConfig.EffectiveSettings resolveCompanionSettings(Context context, Candidate candidate) {
+        String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, context.store);
+        if ((roleId == null || roleId.isBlank()) && candidate.npc != null) {
+            roleId = candidate.npc.getRoleName();
+        }
+        return TwCompanionConfig.resolveEffectiveForRole(roleId);
+    }
+
+    private double resolvePositiveDouble(double configured, double fallback) {
+        return configured > 0.0 ? configured : fallback;
+    }
+
+    private long resolvePositiveLong(long configured, long fallback) {
+        return configured > 0L ? configured : fallback;
     }
 
     private Vector3d computeIntermediatePoint(Vector3d from, Vector3d to, double distance) {
