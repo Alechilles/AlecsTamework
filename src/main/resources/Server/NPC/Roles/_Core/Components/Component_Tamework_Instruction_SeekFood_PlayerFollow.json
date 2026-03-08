@@ -42,9 +42,6 @@
           "GetNPCs": false,
           "Filters": [
             {
-              "Type": "Player"
-            },
-            {
               "Type": "ItemInHand",
               "Items": { "Compute": "AttractiveItemSet" }
             }
@@ -73,9 +70,6 @@
           "Type": "Target",
           "TargetSlot": "LockedTarget",
           "Filters": [
-            {
-              "Type": "Player"
-            },
             {
               "Type": "ItemInHand",
               "Items": { "Compute": "AttractiveItemSet" }
