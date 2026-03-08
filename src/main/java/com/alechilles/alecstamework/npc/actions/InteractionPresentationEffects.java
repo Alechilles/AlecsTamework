@@ -282,12 +282,12 @@ final class InteractionPresentationEffects {
                 && !resolved.attachNode.isBlank()) {
             modelParticle.setTargetNodeName(resolved.attachNode);
         }
+        com.hypixel.hytale.protocol.ModelParticle packetParticle = modelParticle.toPacket();
         if (effect.getColor() != null) {
-            modelParticle.setColor(effect.getColor());
+            packetParticle.color = effect.getColor();
         }
-
         com.hypixel.hytale.protocol.ModelParticle[] modelParticles =
-                new com.hypixel.hytale.protocol.ModelParticle[]{modelParticle.toPacket()};
+                new com.hypixel.hytale.protocol.ModelParticle[]{packetParticle};
         SpawnModelParticles packet = new SpawnModelParticles(networkId.getId(), modelParticles);
         boolean sent = false;
         for (Ref<EntityStore> viewerRef : viewers) {
