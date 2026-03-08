@@ -31,10 +31,18 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - Supports command steps like state changes, target assignment, move-to-ping, set/return-home, and hook triggers.
   - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation with safer placement for recall/revive.
   - Command relocation and revive tuning is configurable in `TwGlobalConfig.Command`.
-- **Progression Systems (2.2.x)** - Shared systems for long-term companion behavior and balancing.
-  - Happiness, needs, breeding, traits, and life stage progression with role-priority config resolution.
-  - Deterministic trait rolling/inheritance with trait modifiers for health, damage, movement speed, and harvest outcomes.
-  - In-game debug/authoring commands for progression balancing (for example `/tw gethappiness`, `/tw getneeds`, `/tw gettraits`, `/tw getlifestage`).
+- **Happiness and Needs System** - Shared progression state for companion wellbeing and behavior pressure.
+  - Role-priority config resolution for happiness (`TwHappinessConfig`) and needs (`TwNeedsConfig`).
+  - Hunger/thirst decay, passive refill, resource-seek support, and needs-driven happiness penalties.
+  - In-game balancing commands such as `/tw gethappiness`, `/tw sethappiness`, `/tw getneeds`, and `/tw setneeds`.
+- **Breeding System** - Config-driven breeding flow with readiness, pairing, and offspring lifecycle handling.
+  - Readiness/cooldown rules from `TwBreedingConfig`, including alarm/timer-backed gating.
+  - Nearby partner matching, pair approach sequencing, hearts timing, and offspring spawn flow.
+  - Supports baby variants and life-stage progression integration.
+- **Traits and Inheritance System** - Deterministic trait assignment and inheritance for long-term variation.
+  - Deterministic trait rolls with duplicate/conflict controls and role-scoped trait pools (`TwTraitConfig`).
+  - Inheritance/mutation flows with trait modifiers for health, speed, damage, harvest, and other gameplay effects.
+  - In-game authoring/debug commands such as `/tw gettraits`, `/tw settraits`, `/tw addtrait`, and `/tw getlifestage`.
 - **Coop Integration** - Optional Tamework intake policy overlays for vanilla coops.
   - Configure per-coop behavior through `TwCoopConfig` assets keyed by `CoopId`.
   - Tamework policy checks run before vanilla coop admission flow to keep compatibility with vanilla capacity/species gates.
@@ -48,8 +56,6 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - Create your own talent trees for your NPCs
   - Allow unlocking new behaviors, stat increases, etc.
   - Will include a talent tree UI
-- **Attitude group override system**
-  - Vanilla attitude groups can't be changed at runtime, but this will be a parallel system that we will have more freedom to work with
 
 ## Quick Start (2.2.x)
 1. Add the dependency in your `manifest.json`:
