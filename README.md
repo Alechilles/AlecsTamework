@@ -37,7 +37,7 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - In-game balancing commands such as `/tw gethappiness`, `/tw sethappiness`, `/tw getneeds`, and `/tw setneeds`.
 - **Breeding System** - Config-driven breeding flow with readiness, pairing, and offspring lifecycle handling.
   - Readiness/cooldown rules from `TwBreedingConfig`, including alarm/timer-backed gating.
-  - Nearby partner matching, pair approach sequencing, hearts timing, and offspring spawn flow.
+  - Nearby partner matching, pair approach sequencing and offspring spawn flow.
   - Supports baby variants and life-stage progression integration.
 - **Traits and Inheritance System** - Deterministic trait assignment and inheritance for long-term variation.
   - Deterministic trait rolls with duplicate/conflict controls and role-scoped trait pools (`TwTraitConfig`).
