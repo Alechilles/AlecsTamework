@@ -43,7 +43,7 @@ final class TameworkInteractEffects {
     TameworkInteractEffects(ActionTameworkInteract owner) {
         this.owner = owner;
         this.inventoryEffects = new InteractionInventoryEffects(owner);
-        this.presentationEffects = new InteractionPresentationEffects();
+        this.presentationEffects = new InteractionPresentationEffects(owner);
         this.stateEffects = new InteractionStateEffects();
         this.modeCycleEffects = new InteractionModeCycleEffects(owner, presentationEffects, stateEffects);
         this.mountEffects = new InteractionMountEffects(owner);
@@ -108,7 +108,7 @@ final class TameworkInteractEffects {
         }
         SpawnParticlesEffect spawnParticles = effects.getSpawnParticles();
         if (spawnParticles != null) {
-            applied |= presentationEffects.applySpawnParticles(spawnParticles, npcRef, store, player);
+            applied |= presentationEffects.applySpawnParticles(spawnParticles, npcRef, role, store, player, ctx);
         }
         DropItemEffect dropItem = effects.getDropItem();
         if (dropItem != null) {

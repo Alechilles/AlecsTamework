@@ -389,6 +389,14 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return resolution.getRoleNumberParam(role, ctx, paramName, defaultValue);
     }
 
+    double[] getRoleNumberArrayParam(Role role, String paramName) {
+        return resolution.getRoleNumberArrayParam(role, null, paramName);
+    }
+
+    double[] getRoleNumberArrayParam(Role role, InteractionContextSnapshot ctx, String paramName) {
+        return resolution.getRoleNumberArrayParam(role, ctx, paramName);
+    }
+
     void logUnsupported(String message) {
         selection.logUnsupported(message);
     }

@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquippedRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInventoryRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsMatchOperator;
 import com.hypixel.hytale.protocol.ItemArmorSlot;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -31,6 +32,12 @@ final class InteractionItemRequirementResolver {
             return false;
         }
         String[] items = resolveItemsInHand(requirement, role, ctx);
+        if (!hasItems(items)) {
+            return false;
+        }
+        if (requirement.getOperator() == ItemsMatchOperator.NoneOf) {
+            return !isHeldItemInList(items, ctx);
+        }
         int quantity = resolveRequiredQuantity(requirement.getQuantity());
         return isHeldItemInList(items, quantity, ctx);
     }
@@ -119,15 +126,21 @@ final class InteractionItemRequirementResolver {
         if (ctx == null || items == null || items.length == 0) {
             return false;
         }
+        String itemId = null;
         ItemStack stack = ctx.activeItem;
-        if (stack == null || stack.isEmpty()) {
-            return false;
+        if (stack != null && !stack.isEmpty()) {
+            itemId = stack.getItemId();
         }
-        String itemId = stack.getItemId();
+        if ((itemId == null || itemId.isBlank())
+                && ctx.activeItemId != null
+                && !ctx.activeItemId.isBlank()) {
+            itemId = ctx.activeItemId;
+        }
         if (itemId == null) {
             return false;
         }
-        return Arrays.stream(items).anyMatch(requiredItemId -> isHeldItemMatch(requiredItemId, itemId));
+        String heldItemId = itemId;
+        return Arrays.stream(items).anyMatch(requiredItemId -> isHeldItemMatch(requiredItemId, heldItemId));
     }
 
     // Checks if the active item matches the list and has enough quantity.
@@ -205,6 +218,18 @@ final class InteractionItemRequirementResolver {
             set.add(item.trim().toLowerCase(Locale.ROOT));
         }
         return set;
+    }
+
+    private boolean hasItems(String[] items) {
+        if (items == null || items.length == 0) {
+            return false;
+        }
+        for (String item : items) {
+            if (item != null && !item.isBlank()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // Resolves the equipped slot selection flags from config values.

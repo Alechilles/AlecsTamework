@@ -33,6 +33,10 @@ public final class TwInteractionConfigCodecs {
             new EnumCodec<>(ParamOperator.class);
     private static final EnumCodec<MatchType> MATCH_TYPE_CODEC =
             new EnumCodec<>(MatchType.class);
+    private static final EnumCodec<ItemsMatchOperator> ITEMS_MATCH_OPERATOR_CODEC =
+            new EnumCodec<>(ItemsMatchOperator.class);
+    private static final EnumCodec<ParticleAttachTarget> PARTICLE_ATTACH_TARGET_CODEC =
+            new EnumCodec<>(ParticleAttachTarget.class);
     private static final EnumCodec<OwnerSource> OWNER_SOURCE_CODEC =
             new EnumCodec<>(OwnerSource.class);
 
@@ -344,6 +348,17 @@ public final class TwInteractionConfigCodecs {
             requirement -> requirement.quantity
         )
         .documentation("Minimum stack size required.")
+        .add()
+        .<ItemsMatchOperator>append(
+            new KeyedCodec<>("Operator", ITEMS_MATCH_OPERATOR_CODEC),
+            (requirement, value) -> {
+                if (value != null) {
+                    requirement.operator = value;
+                }
+            },
+            requirement -> requirement.operator
+        )
+        .documentation("How held item matching is evaluated: AnyOf (default) or NoneOf.")
         .add()
         .build();
 
@@ -763,12 +778,44 @@ public final class TwInteractionConfigCodecs {
         )
         .documentation("Particle system asset to spawn.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("ParticleSystemParam", Codec.STRING),
+            (effect, value) -> effect.particleSystemParam = value,
+            effect -> effect.particleSystemParam
+        )
+        .documentation("Role param that resolves the particle system asset id.")
+        .add()
         .<Vector3d>append(
             new KeyedCodec<>("Offset", VECTOR3D_CODEC),
             (effect, value) -> effect.offset = value,
             effect -> effect.offset
         )
         .documentation("Offset from the NPC position.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("OffsetParam", Codec.STRING),
+            (effect, value) -> effect.offsetParam = value,
+            effect -> effect.offsetParam
+        )
+        .documentation("Role param that resolves the particle offset vector.")
+        .add()
+        .<ParticleAttachTarget>append(
+            new KeyedCodec<>("AttachTarget", PARTICLE_ATTACH_TARGET_CODEC),
+            (effect, value) -> {
+                if (value != null) {
+                    effect.attachTarget = value;
+                }
+            },
+            effect -> effect.attachTarget
+        )
+        .documentation("Attachment strategy: Position (default), Entity, or Node.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("AttachNode", Codec.STRING),
+            (effect, value) -> effect.attachNode = value,
+            effect -> effect.attachNode
+        )
+        .documentation("Optional node name when AttachTarget is Node.")
         .add()
         .<Color>append(
             new KeyedCodec<>("Color", COLOR_CODEC),

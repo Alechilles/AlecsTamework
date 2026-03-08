@@ -89,6 +89,19 @@ final class InteractionParamResolver {
         return defaultValue;
     }
 
+    double[] getNumberArrayParam(Role role, InteractionContextSnapshot ctx, String paramName) {
+        if (paramName == null || paramName.isBlank()) {
+            return null;
+        }
+        for (StdScope scope : resolveRoleScopes(role, ctx)) {
+            double[] values = getNumberArrayFromScope(scope, paramName);
+            if (values != null && values.length > 0) {
+                return values;
+            }
+        }
+        return null;
+    }
+
     private StdScope[] orderedScopes(StdScope primary) {
         StdScope[] scopes = new StdScope[4];
         int count = 0;
@@ -179,5 +192,18 @@ final class InteractionParamResolver {
             return null;
         }
         return supplier != null ? supplier.getAsDouble() : null;
+    }
+
+    private double[] getNumberArrayFromScope(StdScope scope, String paramName) {
+        if (scope == null) {
+            return null;
+        }
+        Supplier<double[]> supplier;
+        try {
+            supplier = scope.getNumberArraySupplier(paramName);
+        } catch (IllegalStateException ignored) {
+            return null;
+        }
+        return supplier != null ? supplier.get() : null;
     }
 }

@@ -44,6 +44,11 @@ final class InteractionResolution {
         return paramAccess.getRoleNumberParam(role, ctx, paramName, defaultValue);
     }
 
+    // Resolves a numeric array param from role scopes.
+    double[] getRoleNumberArrayParam(Role role, InteractionContextSnapshot ctx, String paramName) {
+        return paramAccess.getRoleNumberArrayParam(role, ctx, paramName);
+    }
+
     // Resolves loved items from overrides or role params.
     String[] resolveLovedItems(Role role, InteractionContextSnapshot ctx) {
         return paramAccess.resolveLovedItems(role, ctx);

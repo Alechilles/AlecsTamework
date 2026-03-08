@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -139,6 +140,30 @@ class InteractionBehaviorTest {
         assertFalse(interact.isPlayerHandEmpty(ctx));
     }
 
+    @Test
+    void itemsInHandNoneOfOperatorRejectsMatchingHeldItem() throws Exception {
+        InteractionItemRequirementResolver resolver =
+                new InteractionItemRequirementResolver(new InteractionParamResolver(null, null, null));
+        ItemsInHandRequirement requirement = new ItemsInHandRequirement();
+        setField(requirement, "items", new String[] { "Item_Carrot" });
+        setField(requirement, "operator", TwInteractionConfig.ItemsMatchOperator.NoneOf);
+
+        InteractionContextSnapshot ctx = newContextSnapshotWithHeldItemId("Item_Carrot");
+        assertFalse(resolver.matchesItemsInHand(requirement, null, ctx));
+    }
+
+    @Test
+    void itemsInHandNoneOfOperatorAcceptsDifferentHeldItem() throws Exception {
+        InteractionItemRequirementResolver resolver =
+                new InteractionItemRequirementResolver(new InteractionParamResolver(null, null, null));
+        ItemsInHandRequirement requirement = new ItemsInHandRequirement();
+        setField(requirement, "items", new String[] { "Item_Carrot" });
+        setField(requirement, "operator", TwInteractionConfig.ItemsMatchOperator.NoneOf);
+
+        InteractionContextSnapshot ctx = newContextSnapshotWithHeldItemId("Item_Lettuce");
+        assertTrue(resolver.matchesItemsInHand(requirement, null, ctx));
+    }
+
     private static ActionTameworkInteract newInteract() throws Exception {
         Unsafe unsafe = getUnsafe();
         ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
@@ -219,6 +244,10 @@ class InteractionBehaviorTest {
     }
 
     private static InteractionContextSnapshot newContextSnapshotWithHeldItemId(String heldItemId) throws Exception {
+        return newContextSnapshot(null, heldItemId);
+    }
+
+    private static InteractionContextSnapshot newContextSnapshot(ItemStack activeItem, String heldItemId) throws Exception {
         Constructor<InteractionContextSnapshot> constructor = InteractionContextSnapshot.class.getDeclaredConstructor(
                 com.hypixel.hytale.server.core.entity.entities.Player.class,
                 com.hypixel.hytale.server.core.inventory.Inventory.class,
@@ -233,7 +262,7 @@ class InteractionBehaviorTest {
                 null,
                 null,
                 null,
-                null,
+                activeItem,
                 heldItemId,
                 null,
                 new StdScope[0]

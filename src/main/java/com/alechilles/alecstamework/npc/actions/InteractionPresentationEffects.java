@@ -18,6 +18,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.role.Role;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -29,6 +30,11 @@ import java.util.Locale;
 /** Handles presentation-facing effects like UI messages, sounds, particles, and combat text. */
 final class InteractionPresentationEffects {
     private final InteractionUiMessageService uiMessageService = new InteractionUiMessageService();
+    private final InteractionParticleSpawnResolver particleSpawnResolver;
+
+    InteractionPresentationEffects(ActionTameworkInteract owner) {
+        this.particleSpawnResolver = new InteractionParticleSpawnResolver(owner);
+    }
 
     // Shows floating combat text above the NPC for a feeding heal.
     void showFeedingCombatText(Ref<EntityStore> npcRef,
@@ -107,19 +113,26 @@ final class InteractionPresentationEffects {
     // Spawns a particle system at the NPC (optionally scoped to the player).
     boolean applySpawnParticles(SpawnParticlesEffect effect,
                                 Ref<EntityStore> npcRef,
+                                Role role,
                                 Store<EntityStore> store,
-                                Player player) {
+                                Player player,
+                                InteractionContextSnapshot ctx) {
         if (effect == null || npcRef == null || store == null) {
             return false;
         }
-        String particleSystem = effect.getParticleSystem();
-        if (particleSystem == null || particleSystem.isBlank()) {
+        InteractionParticleSpawnResolver.ResolvedParticleSpawn resolved = particleSpawnResolver.resolve(
+                effect,
+                npcRef,
+                role,
+                store,
+                ctx
+        );
+        if (resolved == null) {
             return false;
         }
-        Vector3d position = resolveNpcPosition(npcRef, store, effect.getOffset());
-        if (position == null) {
-            return false;
-        }
+        String particleSystem = resolved.particleSystem;
+        Vector3d position = resolved.position;
+        boolean attachToNpc = resolved.attachToNpc;
         Color color = effect.getColor();
         if (effect.isPlayerOnly()) {
             if (player == null) {
@@ -130,30 +143,21 @@ final class InteractionPresentationEffects {
                 return false;
             }
             if (color != null) {
-                ParticleUtil.spawnParticleEffect(
-                        particleSystem,
-                        position,
-                        0f,
-                        0f,
-                        0f,
-                        1f,
-                        color,
-                        Collections.singletonList(playerRef),
-                        store
-                );
-            } else {
-                ParticleUtil.spawnParticleEffect(
-                        particleSystem,
-                        position,
-                        Collections.singletonList(playerRef),
-                        store
-                );
-            }
-        } else {
-            if (color != null) {
-                List<Ref<EntityStore>> viewers = resolveViewerRefs(player);
-                if (viewers.isEmpty()) {
-                    ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                if (attachToNpc) {
+                    ParticleUtil.spawnParticleEffect(
+                            particleSystem,
+                            position.x,
+                            position.y,
+                            position.z,
+                            0f,
+                            0f,
+                            0f,
+                            1f,
+                            color,
+                            npcRef,
+                            Collections.singletonList(playerRef),
+                            store
+                    );
                 } else {
                     ParticleUtil.spawnParticleEffect(
                             particleSystem,
@@ -163,12 +167,80 @@ final class InteractionPresentationEffects {
                             0f,
                             1f,
                             color,
-                            viewers,
+                            Collections.singletonList(playerRef),
                             store
                     );
                 }
             } else {
-                ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                if (attachToNpc) {
+                    ParticleUtil.spawnParticleEffect(
+                            particleSystem,
+                            position,
+                            npcRef,
+                            Collections.singletonList(playerRef),
+                            store
+                    );
+                } else {
+                    ParticleUtil.spawnParticleEffect(
+                            particleSystem,
+                            position,
+                            Collections.singletonList(playerRef),
+                            store
+                    );
+                }
+            }
+        } else {
+            if (color != null) {
+                List<Ref<EntityStore>> viewers = resolveViewerRefs(player);
+                if (viewers.isEmpty()) {
+                    ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                } else {
+                    if (attachToNpc) {
+                        ParticleUtil.spawnParticleEffect(
+                                particleSystem,
+                                position.x,
+                                position.y,
+                                position.z,
+                                0f,
+                                0f,
+                                0f,
+                                1f,
+                                color,
+                                npcRef,
+                                viewers,
+                                store
+                        );
+                    } else {
+                        ParticleUtil.spawnParticleEffect(
+                                particleSystem,
+                                position,
+                                0f,
+                                0f,
+                                0f,
+                                1f,
+                                color,
+                                viewers,
+                                store
+                        );
+                    }
+                }
+            } else {
+                if (attachToNpc) {
+                    List<Ref<EntityStore>> viewers = resolveViewerRefs(player);
+                    if (viewers.isEmpty()) {
+                        ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                    } else {
+                        ParticleUtil.spawnParticleEffect(
+                                particleSystem,
+                                position,
+                                npcRef,
+                                viewers,
+                                store
+                        );
+                    }
+                } else {
+                    ParticleUtil.spawnParticleEffect(particleSystem, position, store);
+                }
             }
         }
         return true;

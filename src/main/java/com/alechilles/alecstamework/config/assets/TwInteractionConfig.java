@@ -41,6 +41,17 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         All
     }
 
+    public enum ItemsMatchOperator {
+        AnyOf,
+        NoneOf
+    }
+
+    public enum ParticleAttachTarget {
+        Position,
+        Entity,
+        Node
+    }
+
     public enum OwnerSource {
         Player,
         None,
@@ -613,6 +624,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         String itemsParam;
         String[] items = ArrayUtil.EMPTY_STRING_ARRAY;
         Integer quantity;
+        ItemsMatchOperator operator = ItemsMatchOperator.AnyOf;
 
         public String getItemsParam() {
             return itemsParam;
@@ -624,6 +636,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public Integer getQuantity() {
             return quantity;
+        }
+
+        public ItemsMatchOperator getOperator() {
+            return operator == null ? ItemsMatchOperator.AnyOf : operator;
         }
     }
 
@@ -1019,7 +1035,11 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public static final class SpawnParticlesEffect {
         String particleSystem;
+        String particleSystemParam;
         Vector3d offset;
+        String offsetParam;
+        ParticleAttachTarget attachTarget = ParticleAttachTarget.Position;
+        String attachNode;
         Color color;
         boolean playerOnly;
 
@@ -1027,8 +1047,24 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
             return particleSystem;
         }
 
+        public String getParticleSystemParam() {
+            return particleSystemParam;
+        }
+
         public Vector3d getOffset() {
             return offset;
+        }
+
+        public String getOffsetParam() {
+            return offsetParam;
+        }
+
+        public ParticleAttachTarget getAttachTarget() {
+            return attachTarget == null ? ParticleAttachTarget.Position : attachTarget;
+        }
+
+        public String getAttachNode() {
+            return attachNode;
         }
 
         public Color getColor() {
