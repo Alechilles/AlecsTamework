@@ -37,6 +37,7 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_RENAME_PREFIX = "__rename__:";
     private static final String ACTION_RECOLOR_PREFIX = "__recolor__:";
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
+    private static final String DEFAULT_GROUP_COLOR = "#4B657F";
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
     private final BiConsumer<String, String> createCallback;
@@ -45,6 +46,8 @@ public final class TameworkCommandGroupManagerPage
     private final Consumer<String> deleteCallback;
     private final Runnable closeCallback;
     private GroupEntry[] entries;
+    private String draftName;
+    private String draftColor;
     private boolean handled;
 
     public TameworkCommandGroupManagerPage(@Nonnull PlayerRef playerRef,
@@ -62,6 +65,8 @@ public final class TameworkCommandGroupManagerPage
         this.deleteCallback = deleteCallback;
         this.closeCallback = closeCallback;
         this.entries = new GroupEntry[0];
+        this.draftName = "";
+        this.draftColor = DEFAULT_GROUP_COLOR;
         this.handled = false;
     }
 
@@ -72,7 +77,8 @@ public final class TameworkCommandGroupManagerPage
                       @Nonnull Store<EntityStore> store) {
         refreshGroups();
         commandBuilder.append(UI_PATH);
-        commandBuilder.set("#TameworkGroupColorInput.Value", "#4B657F");
+        commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
+        commandBuilder.set("#TameworkGroupColorInput.Value", draftColor);
         bindList(commandBuilder, eventBuilder);
         bindHeaderEvents(eventBuilder);
     }
@@ -81,8 +87,17 @@ public final class TameworkCommandGroupManagerPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull GroupManagerEventData data) {
+        if (data.nameInput != null) {
+            draftName = data.nameInput;
+        }
+        if (data.colorInput != null) {
+            draftColor = data.colorInput;
+        }
         String action = data.action != null ? data.action.trim() : "";
-        if (action.isBlank() || ACTION_CLOSE.equals(action)) {
+        if (action.isBlank()) {
+            return;
+        }
+        if (ACTION_CLOSE.equals(action)) {
             handled = true;
             close();
             if (closeCallback != null) {
@@ -92,15 +107,16 @@ public final class TameworkCommandGroupManagerPage
         }
         if (ACTION_CREATE.equals(action)) {
             if (createCallback != null) {
-                createCallback.accept(data.nameInput, data.colorInput);
+                createCallback.accept(draftName, draftColor);
             }
+            draftName = "";
             refreshAndSend();
             return;
         }
         if (action.startsWith(ACTION_RENAME_PREFIX)) {
             String groupId = action.substring(ACTION_RENAME_PREFIX.length()).trim();
             if (!groupId.isBlank() && renameCallback != null) {
-                renameCallback.accept(groupId, data.nameInput);
+                renameCallback.accept(groupId, draftName);
             }
             refreshAndSend();
             return;
@@ -108,7 +124,7 @@ public final class TameworkCommandGroupManagerPage
         if (action.startsWith(ACTION_RECOLOR_PREFIX)) {
             String groupId = action.substring(ACTION_RECOLOR_PREFIX.length()).trim();
             if (!groupId.isBlank() && recolorCallback != null) {
-                recolorCallback.accept(groupId, data.colorInput);
+                recolorCallback.accept(groupId, draftColor);
             }
             refreshAndSend();
             return;
@@ -143,6 +159,8 @@ public final class TameworkCommandGroupManagerPage
         refreshGroups();
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
+        commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
+        commandBuilder.set("#TameworkGroupColorInput.Value", draftColor);
         bindList(commandBuilder, eventBuilder);
         bindHeaderEvents(eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
@@ -160,7 +178,7 @@ public final class TameworkCommandGroupManagerPage
                 continue;
             }
             String name = value.name == null || value.name.isBlank() ? value.groupId : value.name;
-            String color = value.colorHex == null || value.colorHex.isBlank() ? "#4B657F" : value.colorHex;
+            String color = value.colorHex == null || value.colorHex.isBlank() ? DEFAULT_GROUP_COLOR : value.colorHex;
             out.add(new GroupEntry(value.groupId, name, color));
         }
         entries = out.toArray(new GroupEntry[0]);
@@ -168,11 +186,21 @@ public final class TameworkCommandGroupManagerPage
 
     private void bindHeaderEvents(UIEventBuilder eventBuilder) {
         eventBuilder.addEventBinding(
+                CustomUIEventBindingType.ValueChanged,
+                "#TameworkGroupNameInput",
+                EventData.of(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.ValueChanged,
+                "#TameworkGroupColorInput",
+                EventData.of(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
+                false
+        );
+        eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCreateButton",
-                EventData.of(KEY_ACTION, ACTION_CREATE)
-                        .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value")
-                        .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
+                EventData.of(KEY_ACTION, ACTION_CREATE),
                 false
         );
         eventBuilder.addEventBinding(
@@ -202,15 +230,13 @@ public final class TameworkCommandGroupManagerPage
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #RenameButton",
-                    EventData.of(KEY_ACTION, ACTION_RENAME_PREFIX + entry.groupId)
-                            .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
+                    EventData.of(KEY_ACTION, ACTION_RENAME_PREFIX + entry.groupId),
                     false
             );
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #ColorButton",
-                    EventData.of(KEY_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId)
-                            .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
+                    EventData.of(KEY_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId),
                     false
             );
             eventBuilder.addEventBinding(
