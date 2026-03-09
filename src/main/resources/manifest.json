@@ -19,5 +19,8 @@
     "LoadBefore": {},
     "DisabledByDefault": false,
     "IncludesAssetPack": true,
-    "SubPlugins": []
+    "SubPlugins": [],
+    "UpdateChecker": {
+        "CurseForge": "1447962"
+    }
 }
