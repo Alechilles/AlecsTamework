@@ -82,6 +82,7 @@ public final class CommandItemFeatureHandler {
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkedPanelEntryService panelEntryService;
+    private final CommandPanelEntrySourceService panelEntrySourceService;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandResolutionService resolutionService;
     private final CommandLinkPolicyService linkPolicyService;
@@ -92,6 +93,8 @@ public final class CommandItemFeatureHandler {
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandRespawnService respawnService;
     private final CommandMenuMoveService menuMoveService;
+    private final CommandPanelPreferenceService panelPreferenceService;
+    private final CommandPanelActionService panelActionService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -110,11 +113,26 @@ public final class CommandItemFeatureHandler {
                 captureService,
                 npcNameResolver
         );
-        this.toolInventoryService = new CommandToolInventoryService(panelEntryService);
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.linkPolicyService = new CommandLinkPolicyService();
+        this.panelPreferenceService = new CommandPanelPreferenceService();
+        this.panelEntrySourceService = new CommandPanelEntrySourceService(
+                panelEntryService,
+                panelPreferenceService,
+                linkPolicyService,
+                npcNameResolver
+        );
+        this.toolInventoryService = new CommandToolInventoryService(
+                panelEntryService,
+                panelEntrySourceService,
+                panelPreferenceService
+        );
         this.companionPlacementService = new CommandCompanionPlacementService();
-        this.recipientService = new CommandRecipientService(linkPolicyService, linkedNpcRecordStore);
+        this.recipientService = new CommandRecipientService(
+                linkPolicyService,
+                linkedNpcRecordStore,
+                panelPreferenceService
+        );
         this.stepExecutionService = new CommandStepExecutionService(
                 relocationService,
                 linkedNpcRecordStore,
@@ -152,6 +170,12 @@ public final class CommandItemFeatureHandler {
                 HYBRID_TELEPORT_DELAY_MS,
                 RECALL_SAFE_SPAWN_DISTANCE,
                 RECALL_FORCE_RELOCATE_DISTANCE
+        );
+        this.panelActionService = new CommandPanelActionService(
+                linkMutationService,
+                toolInventoryService,
+                panelPreferenceService,
+                feedbackService
         );
     }
 
@@ -299,7 +323,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            feedbackService.showWarning(player, "No linked NPCs matched this command.");
+            feedbackService.showWarning(player, "No companions matched this command.");
             return false;
         }
 
@@ -399,12 +423,19 @@ public final class CommandItemFeatureHandler {
                 config,
                 selectedId,
                 requireUnlinkConfirm,
-                () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId),
+                () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
+                () -> toolInventoryService.resolvePanelModeLabelForTool(player, toolId, config),
+                () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
+                npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
+                npcUuid -> panelActionService.applyToggleActive(player, toolId, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, npcUuid),
+                () -> panelActionService.applyTogglePanelMode(player, toolId, config),
+                () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
+                () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);

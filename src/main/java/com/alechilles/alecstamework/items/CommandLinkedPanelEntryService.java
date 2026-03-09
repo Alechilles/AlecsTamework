@@ -79,10 +79,13 @@ final class CommandLinkedPanelEntryService {
             boolean captured = false;
             long deadRespawnRemainingMs = 0L;
             boolean hasHome = record.homePosition != null;
+            boolean active = record.active;
             String displayName = npcNameResolver.resolveCachedUnloadedDisplayName(record);
             if (displayName == null || displayName.isBlank()) {
                 displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
             }
+            String speciesId = normalize(record.cachedRoleId);
+            String speciesLabel = speciesId;
             int health = 0;
             int maxHealth = 0;
             int happiness = 0;
@@ -100,6 +103,11 @@ final class CommandLinkedPanelEntryService {
                     if (npc != null) {
                         loaded = true;
                         displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
+                        String resolvedRoleId = normalize(npcNameResolver.resolveNpcRoleId(npc));
+                        if (resolvedRoleId != null) {
+                            speciesId = resolvedRoleId;
+                            speciesLabel = resolvedRoleId;
+                        }
                         TameworkCommandLinksComponent links =
                                 store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
                         if (links != null && links.hasHome()) {
@@ -146,6 +154,11 @@ final class CommandLinkedPanelEntryService {
                     if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
                         roleId = record.cachedRoleId;
                     }
+                    String normalizedRoleId = normalize(roleId);
+                    if (normalizedRoleId != null) {
+                        speciesId = normalizedRoleId;
+                        speciesLabel = normalizedRoleId;
+                    }
                     boolean deadRespawnEnabled =
                             TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled();
                     if (deadRespawnEnabled) {
@@ -183,7 +196,23 @@ final class CommandLinkedPanelEntryService {
                     dead,
                     captured,
                     deadRespawnRemainingMs,
-                    traitIndicators
+                    null,
+                    null,
+                    traitIndicators,
+                    false,
+                    false,
+                    false,
+                    false,
+                    true,
+                    active,
+                    speciesId,
+                    speciesLabel,
+                    record.groupId,
+                    null,
+                    null,
+                    false,
+                    0L,
+                    0.0
             ));
         }
         return entries;

@@ -22,6 +22,11 @@ import java.util.UUID;
 final class CommandLinkedNpcRecordStore {
     private static final String LINK_RECORD_SEPARATOR = "\n";
     private static final String LINK_RECORD_PARTS_SEPARATOR = "\\|";
+    private static final String TOKEN_DISPLAY_NAME = "dn=";
+    private static final String TOKEN_NAME_KEY = "nk=";
+    private static final String TOKEN_ROLE_ID = "rid=";
+    private static final String TOKEN_ACTIVE = "ac=";
+    private static final String TOKEN_GROUP_ID = "gid=";
 
     List<LinkedNpcRecord> read(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -75,13 +80,19 @@ final class CommandLinkedNpcRecordStore {
                 builder.append('|').append(record.homePosition.z);
             }
             if (record.cachedDisplayName != null && !record.cachedDisplayName.isBlank()) {
-                builder.append('|').append("dn=").append(encodeRecordText(record.cachedDisplayName));
+                builder.append('|').append(TOKEN_DISPLAY_NAME).append(encodeRecordText(record.cachedDisplayName));
             }
             if (record.cachedNameKey != null && !record.cachedNameKey.isBlank()) {
-                builder.append('|').append("nk=").append(encodeRecordText(record.cachedNameKey));
+                builder.append('|').append(TOKEN_NAME_KEY).append(encodeRecordText(record.cachedNameKey));
             }
             if (record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
-                builder.append('|').append("rid=").append(encodeRecordText(record.cachedRoleId));
+                builder.append('|').append(TOKEN_ROLE_ID).append(encodeRecordText(record.cachedRoleId));
+            }
+            if (!record.active) {
+                builder.append('|').append(TOKEN_ACTIVE).append('0');
+            }
+            if (record.groupId != null && !record.groupId.isBlank()) {
+                builder.append('|').append(TOKEN_GROUP_ID).append(encodeRecordText(record.groupId));
             }
         }
         return stack.withMetadata(TameworkMetadataKeys.COMMAND_LINKED_NPCS, Codec.STRING, builder.toString());
@@ -119,7 +130,9 @@ final class CommandLinkedNpcRecordStore {
                     mergedHome,
                     mergedDisplayName,
                     mergedNameKey,
-                    mergedRoleId
+                    mergedRoleId,
+                    record.active,
+                    record.groupId
             ));
             updated = true;
             break;
@@ -131,10 +144,81 @@ final class CommandLinkedNpcRecordStore {
                     homePosition,
                     firstNonBlank(cachedDisplayName, null),
                     firstNonBlank(cachedNameKey, null),
-                    firstNonBlank(cachedRoleId, null)
+                    firstNonBlank(cachedRoleId, null),
+                    true,
+                    null
             ));
         }
         return write(stack, records);
+    }
+
+    ItemStack setActive(ItemStack stack, UUID npcUuid, boolean active) {
+        if (stack == null || stack.isEmpty() || npcUuid == null) {
+            return stack;
+        }
+        List<LinkedNpcRecord> records = new ArrayList<>(read(stack));
+        boolean changed = false;
+        String key = npcUuid.toString().toLowerCase(Locale.ROOT);
+        for (int i = 0; i < records.size(); i++) {
+            LinkedNpcRecord record = records.get(i);
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (!key.equals(record.npcUuid.toString().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            if (record.active == active) {
+                break;
+            }
+            records.set(i, new LinkedNpcRecord(
+                    record.npcUuid,
+                    record.lastKnownPosition,
+                    record.homePosition,
+                    record.cachedDisplayName,
+                    record.cachedNameKey,
+                    record.cachedRoleId,
+                    active,
+                    record.groupId
+            ));
+            changed = true;
+            break;
+        }
+        return changed ? write(stack, records) : stack;
+    }
+
+    ItemStack setGroup(ItemStack stack, UUID npcUuid, String groupId) {
+        if (stack == null || stack.isEmpty() || npcUuid == null) {
+            return stack;
+        }
+        List<LinkedNpcRecord> records = new ArrayList<>(read(stack));
+        boolean changed = false;
+        String key = npcUuid.toString().toLowerCase(Locale.ROOT);
+        for (int i = 0; i < records.size(); i++) {
+            LinkedNpcRecord record = records.get(i);
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (!key.equals(record.npcUuid.toString().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            String normalizedGroupId = normalizeOptionalValue(groupId);
+            if (equalsIgnoreCase(record.groupId, normalizedGroupId)) {
+                break;
+            }
+            records.set(i, new LinkedNpcRecord(
+                    record.npcUuid,
+                    record.lastKnownPosition,
+                    record.homePosition,
+                    record.cachedDisplayName,
+                    record.cachedNameKey,
+                    record.cachedRoleId,
+                    record.active,
+                    normalizedGroupId
+            ));
+            changed = true;
+            break;
+        }
+        return changed ? write(stack, records) : stack;
     }
 
     ItemStack remove(ItemStack stack, UUID npcUuid) {
@@ -194,6 +278,8 @@ final class CommandLinkedNpcRecordStore {
         String cachedDisplayName = null;
         String cachedNameKey = null;
         String cachedRoleId = null;
+        boolean active = true;
+        String groupId = null;
         int index = 1;
         if (parts.length >= 4) {
             try {
@@ -225,19 +311,37 @@ final class CommandLinkedNpcRecordStore {
             if (token == null || token.isBlank()) {
                 continue;
             }
-            if (token.startsWith("dn=")) {
-                cachedDisplayName = decodeRecordText(token.substring(3));
+            if (token.startsWith(TOKEN_DISPLAY_NAME)) {
+                cachedDisplayName = decodeRecordText(token.substring(TOKEN_DISPLAY_NAME.length()));
                 continue;
             }
-            if (token.startsWith("nk=")) {
-                cachedNameKey = decodeRecordText(token.substring(3));
+            if (token.startsWith(TOKEN_NAME_KEY)) {
+                cachedNameKey = decodeRecordText(token.substring(TOKEN_NAME_KEY.length()));
                 continue;
             }
-            if (token.startsWith("rid=")) {
-                cachedRoleId = decodeRecordText(token.substring(4));
+            if (token.startsWith(TOKEN_ROLE_ID)) {
+                cachedRoleId = decodeRecordText(token.substring(TOKEN_ROLE_ID.length()));
+                continue;
+            }
+            if (token.startsWith(TOKEN_ACTIVE)) {
+                String flag = token.substring(TOKEN_ACTIVE.length()).trim();
+                active = !"0".equals(flag) && !"false".equalsIgnoreCase(flag);
+                continue;
+            }
+            if (token.startsWith(TOKEN_GROUP_ID)) {
+                groupId = decodeRecordText(token.substring(TOKEN_GROUP_ID.length()));
             }
         }
-        return new LinkedNpcRecord(uuid, position, homePosition, cachedDisplayName, cachedNameKey, cachedRoleId);
+        return new LinkedNpcRecord(
+                uuid,
+                position,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                active,
+                groupId
+        );
     }
 
     private String encodeRecordText(String raw) {
@@ -268,6 +372,23 @@ final class CommandLinkedNpcRecordStore {
             return second;
         }
         return null;
+    }
+
+    private String normalizeOptionalValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private boolean equalsIgnoreCase(String left, String right) {
+        if (left == null && right == null) {
+            return true;
+        }
+        if (left == null || right == null) {
+            return false;
+        }
+        return left.equalsIgnoreCase(right);
     }
 }
 

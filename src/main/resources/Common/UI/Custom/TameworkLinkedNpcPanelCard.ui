@@ -248,6 +248,35 @@ Group {
     Visible: false;
   }
 
+  Label #StatusInactive {
+    Anchor: (Top: 2, Right: 34, Width: 74, Height: 18);
+    Text: "INACTIVE";
+    Style: (
+      FontSize: 10,
+      RenderBold: true,
+      TextColor: #ffbd9a,
+      HorizontalAlignment: Center,
+      VerticalAlignment: Center
+    );
+    Visible: false;
+  }
+
+  TextButton #LinkButton {
+    Anchor: (Top: 56, Left: 92, Width: 92, Height: 24);
+    Text: "Link";
+    TooltipText: "Link companion";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
+  }
+
+  TextButton #ActiveToggleButton {
+    Anchor: (Top: 56, Left: 92, Width: 92, Height: 24);
+    Text: "Set Inactive";
+    TooltipText: "Toggle active state";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
+  }
+
   TextButton #RespawnButton {
     Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
     Style: @LinkedActionRespawnButtonStyle;

@@ -19,10 +19,20 @@ public final class LinkedNpcEntry {
     private final int currentThirst;
     private final int maxThirst;
     private final boolean loaded;
+    private final boolean linked;
+    private final boolean active;
     private final boolean dead;
     private final boolean captured;
     private final boolean hasHome;
     private final long deadRespawnRemainingMs;
+    private final String speciesId;
+    private final String speciesLabel;
+    private final String groupId;
+    private final String groupName;
+    private final String groupColorHex;
+    private final boolean breedingCooldownActive;
+    private final long breedingCooldownRemainingMs;
+    private final double breedingCooldownRatio;
     private final FutureStat futureStatA;
     private final FutureStat futureStatB;
     private final LinkedNpcTraitIndicator[] traitIndicators;
@@ -71,7 +81,17 @@ public final class LinkedNpcEntry {
                 false,
                 false,
                 false,
-                false
+                false,
+                true,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                0L,
+                0.0
         );
     }
 
@@ -98,6 +118,76 @@ public final class LinkedNpcEntry {
                           boolean traitsActionEnabled,
                           boolean talentsActionVisible,
                           boolean talentsActionEnabled) {
+        this(
+                npcUuid,
+                displayName,
+                currentHealth,
+                maxHealth,
+                currentHappiness,
+                maxHappiness,
+                happinessModifierBreakdown,
+                currentHunger,
+                maxHunger,
+                currentThirst,
+                maxThirst,
+                loaded,
+                hasHome,
+                dead,
+                captured,
+                deadRespawnRemainingMs,
+                futureStatA,
+                futureStatB,
+                traitIndicators,
+                traitsActionVisible,
+                traitsActionEnabled,
+                talentsActionVisible,
+                talentsActionEnabled,
+                true,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                0L,
+                0.0
+        );
+    }
+
+    public LinkedNpcEntry(UUID npcUuid,
+                          String displayName,
+                          int currentHealth,
+                          int maxHealth,
+                          int currentHappiness,
+                          int maxHappiness,
+                          String happinessModifierBreakdown,
+                          int currentHunger,
+                          int maxHunger,
+                          int currentThirst,
+                          int maxThirst,
+                          boolean loaded,
+                          boolean hasHome,
+                          boolean dead,
+                          boolean captured,
+                          long deadRespawnRemainingMs,
+                          FutureStat futureStatA,
+                          FutureStat futureStatB,
+                          LinkedNpcTraitIndicator[] traitIndicators,
+                          boolean traitsActionVisible,
+                          boolean traitsActionEnabled,
+                          boolean talentsActionVisible,
+                          boolean talentsActionEnabled,
+                          boolean linked,
+                          boolean active,
+                          String speciesId,
+                          String speciesLabel,
+                          String groupId,
+                          String groupName,
+                          String groupColorHex,
+                          boolean breedingCooldownActive,
+                          long breedingCooldownRemainingMs,
+                          double breedingCooldownRatio) {
         this.npcUuid = npcUuid;
         this.displayName = displayName;
         this.currentHealth = currentHealth;
@@ -110,10 +200,20 @@ public final class LinkedNpcEntry {
         this.currentThirst = currentThirst;
         this.maxThirst = maxThirst;
         this.loaded = loaded;
+        this.linked = linked;
+        this.active = active;
         this.hasHome = hasHome;
         this.dead = dead;
         this.captured = captured;
         this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
+        this.speciesId = speciesId;
+        this.speciesLabel = speciesLabel;
+        this.groupId = groupId;
+        this.groupName = groupName;
+        this.groupColorHex = groupColorHex;
+        this.breedingCooldownActive = breedingCooldownActive;
+        this.breedingCooldownRemainingMs = Math.max(0L, breedingCooldownRemainingMs);
+        this.breedingCooldownRatio = sanitizeRatio(breedingCooldownRatio);
         this.futureStatA = futureStatA;
         this.futureStatB = futureStatB;
         this.traitIndicators = sanitizeTraitIndicators(traitIndicators);
@@ -175,6 +275,14 @@ public final class LinkedNpcEntry {
         return loaded;
     }
 
+    public boolean linked() {
+        return linked;
+    }
+
+    public boolean active() {
+        return active;
+    }
+
     public boolean dead() {
         return dead;
     }
@@ -189,6 +297,38 @@ public final class LinkedNpcEntry {
 
     public long deadRespawnRemainingMs() {
         return deadRespawnRemainingMs;
+    }
+
+    public String speciesId() {
+        return speciesId;
+    }
+
+    public String speciesLabel() {
+        return speciesLabel;
+    }
+
+    public String groupId() {
+        return groupId;
+    }
+
+    public String groupName() {
+        return groupName;
+    }
+
+    public String groupColorHex() {
+        return groupColorHex;
+    }
+
+    public boolean breedingCooldownActive() {
+        return breedingCooldownActive;
+    }
+
+    public long breedingCooldownRemainingMs() {
+        return breedingCooldownRemainingMs;
+    }
+
+    public double breedingCooldownRatio() {
+        return breedingCooldownRatio;
     }
 
     public double healthRatio() {
@@ -286,6 +426,13 @@ public final class LinkedNpcEntry {
             }
         }
         return out.isEmpty() ? LinkedNpcTraitIndicator.EMPTY : out.toArray(new LinkedNpcTraitIndicator[0]);
+    }
+
+    private static double sanitizeRatio(double value) {
+        if (!Double.isFinite(value)) {
+            return 0.0;
+        }
+        return Math.max(0.0, Math.min(1.0, value));
     }
 
     /**

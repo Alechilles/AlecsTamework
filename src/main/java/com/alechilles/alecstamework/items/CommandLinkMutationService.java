@@ -191,11 +191,48 @@ final class CommandLinkMutationService {
         return linkedNpcRecordStore.remove(stack, npcUuid);
     }
 
+    ActiveToggleResult toggleLinkedNpcActive(ItemStack stack, UUID npcUuid) {
+        if (stack == null || stack.isEmpty() || npcUuid == null) {
+            return ActiveToggleResult.notToggled(stack);
+        }
+        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        LinkedNpcRecord record = linkedNpcRecordStore.find(records, npcUuid);
+        if (record == null) {
+            return ActiveToggleResult.notToggled(stack);
+        }
+        boolean nextActive = !record.active;
+        ItemStack updated = linkedNpcRecordStore.setActive(stack, npcUuid, nextActive);
+        if (updated == stack) {
+            return ActiveToggleResult.notToggled(stack);
+        }
+        return new ActiveToggleResult(updated, true, nextActive);
+    }
+
+    ItemStack setLinkedNpcGroup(ItemStack stack, UUID npcUuid, String groupId) {
+        return linkedNpcRecordStore.setGroup(stack, npcUuid, groupId);
+    }
+
     List<LinkedNpcRecord> readLinkedNpcRecords(ItemStack stack) {
         return linkedNpcRecordStore.read(stack);
     }
 
     ItemStack writeLinkedNpcRecords(ItemStack stack, List<LinkedNpcRecord> records) {
         return linkedNpcRecordStore.write(stack, records);
+    }
+
+    static final class ActiveToggleResult {
+        final ItemStack updatedItem;
+        final boolean toggled;
+        final boolean active;
+
+        private ActiveToggleResult(ItemStack updatedItem, boolean toggled, boolean active) {
+            this.updatedItem = updatedItem;
+            this.toggled = toggled;
+            this.active = active;
+        }
+
+        static ActiveToggleResult notToggled(ItemStack stack) {
+            return new ActiveToggleResult(stack, false, false);
+        }
     }
 }

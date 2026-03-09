@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.List;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 /**
  * Handles command-item hotbar lookups and metadata writes.
@@ -20,9 +21,17 @@ import java.util.UUID;
  */
 final class CommandToolInventoryService {
     private final CommandLinkedPanelEntryService panelEntryService;
+    private final CommandPanelEntrySourceService panelEntrySourceService;
+    private final CommandPanelPreferenceService panelPreferenceService;
 
-    CommandToolInventoryService(CommandLinkedPanelEntryService panelEntryService) {
+    CommandToolInventoryService(CommandLinkedPanelEntryService panelEntryService,
+                                CommandPanelEntrySourceService panelEntrySourceService,
+                                CommandPanelPreferenceService panelPreferenceService) {
         this.panelEntryService = panelEntryService;
+        this.panelEntrySourceService = panelEntrySourceService;
+        this.panelPreferenceService = panelPreferenceService != null
+                ? panelPreferenceService
+                : new CommandPanelPreferenceService();
     }
 
     ToolResolution ensureToolId(ItemStack itemStack) {
@@ -86,6 +95,12 @@ final class CommandToolInventoryService {
     }
 
     List<LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player, String toolId) {
+        return buildLinkedPanelEntriesForTool(player, toolId, null);
+    }
+
+    List<LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player,
+                                                        String toolId,
+                                                        com.alechilles.alecstamework.config.assets.TwCommandItemConfig config) {
         if (player == null || toolId == null || toolId.isBlank()) {
             return List.of();
         }
@@ -112,9 +127,80 @@ final class CommandToolInventoryService {
             if (store == null) {
                 return List.of();
             }
+            if (panelEntrySourceService != null) {
+                return panelEntrySourceService.buildEntries(player, store, stack, config, toolId);
+            }
             return panelEntryService.buildEntries(player, store, stack, toolId);
         }
         return List.of();
+    }
+
+    boolean mutateToolStack(Player player, String toolId, UnaryOperator<ItemStack> mutator) {
+        if (player == null || toolId == null || toolId.isBlank() || mutator == null) {
+            return false;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return false;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            ItemStack updated = mutator.apply(stack);
+            if (updated == null || updated == stack) {
+                return false;
+            }
+            hotbar.setItemStackForSlot(slot, updated);
+            inventory.markChanged();
+            player.sendInventory();
+            return true;
+        }
+        return false;
+    }
+
+    String resolvePanelModeLabelForTool(Player player,
+                                        String toolId,
+                                        com.alechilles.alecstamework.config.assets.TwCommandItemConfig config) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveModeLabel(stack, config);
+    }
+
+    String resolvePanelRadiusLabelForTool(Player player,
+                                          String toolId,
+                                          com.alechilles.alecstamework.config.assets.TwCommandItemConfig config) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveRadiusLabel(stack, config);
+    }
+
+    private ItemStack findToolStack(Player player, String toolId) {
+        if (player == null || toolId == null || toolId.isBlank()) {
+            return null;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return null;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId != null && stackToolId.equals(toolId)) {
+                return stack;
+            }
+        }
+        return null;
     }
 
     static final class ToolResolution {

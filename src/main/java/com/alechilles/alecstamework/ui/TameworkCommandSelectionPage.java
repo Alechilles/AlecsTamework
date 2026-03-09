@@ -37,27 +37,39 @@ public final class TameworkCommandSelectionPage
     public static final String LINKED_PANEL_CARD_UI_PATH = "TameworkLinkedNpcPanelCard.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String CLOSE_COMMAND_ID = "__close__";
+    private static final String LINK_COMMAND_PREFIX = "__link__:";
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
+    private static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
     private static final String RETURN_HOME_COMMAND_PREFIX = "__returnhome__:";
+    private static final String PANEL_MODE_TOGGLE_COMMAND_ID = "__panel_mode_toggle__";
+    private static final String PANEL_RADIUS_DECREASE_COMMAND_ID = "__panel_radius_dec__";
+    private static final String PANEL_RADIUS_INCREASE_COMMAND_ID = "__panel_radius_inc__";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
 
     private final CommandOption[] options;
     private final boolean requireUnlinkConfirm;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier;
+    private final Supplier<String> panelModeLabelSupplier;
+    private final Supplier<String> panelRadiusLabelSupplier;
     private LinkedNpcEntry[] linkedNpcEntries;
     private int renderedLinkedNpcCardCount;
     private UUID pendingUnlinkNpcUuid;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
+    private final Consumer<UUID> linkCallback;
     private final Consumer<UUID> unlinkCallback;
+    private final Consumer<UUID> toggleActiveCallback;
     private final Consumer<UUID> respawnCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
     private final Consumer<UUID> returnHomeCallback;
+    private final Runnable panelModeToggleCallback;
+    private final Runnable panelRadiusDecreaseCallback;
+    private final Runnable panelRadiusIncreaseCallback;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
 
@@ -66,25 +78,39 @@ public final class TameworkCommandSelectionPage
                                         String selectedCommandId,
                                         boolean requireUnlinkConfirm,
                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier,
+                                        @Nonnull Supplier<String> panelModeLabelSupplier,
+                                        @Nonnull Supplier<String> panelRadiusLabelSupplier,
+                                        @Nonnull Consumer<UUID> linkCallback,
                                         @Nonnull Consumer<UUID> unlinkCallback,
+                                        @Nonnull Consumer<UUID> toggleActiveCallback,
                                         @Nonnull Consumer<UUID> respawnCallback,
                                         @Nonnull Consumer<UUID> recallCallback,
                                         @Nonnull Consumer<UUID> setHomeCallback,
                                         @Nonnull Consumer<UUID> returnHomeCallback,
+                                        @Nonnull Runnable panelModeToggleCallback,
+                                        @Nonnull Runnable panelRadiusDecreaseCallback,
+                                        @Nonnull Runnable panelRadiusIncreaseCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
         this.requireUnlinkConfirm = requireUnlinkConfirm;
         this.linkedNpcEntriesSupplier = linkedNpcEntriesSupplier;
+        this.panelModeLabelSupplier = panelModeLabelSupplier;
+        this.panelRadiusLabelSupplier = panelRadiusLabelSupplier;
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.renderedLinkedNpcCardCount = 0;
         this.pendingUnlinkNpcUuid = null;
         this.selectedCommandId = selectedCommandId;
+        this.linkCallback = linkCallback;
         this.unlinkCallback = unlinkCallback;
+        this.toggleActiveCallback = toggleActiveCallback;
         this.respawnCallback = respawnCallback;
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
         this.returnHomeCallback = returnHomeCallback;
+        this.panelModeToggleCallback = panelModeToggleCallback;
+        this.panelRadiusDecreaseCallback = panelRadiusDecreaseCallback;
+        this.panelRadiusIncreaseCallback = panelRadiusIncreaseCallback;
         this.selectionCallback = selectionCallback;
         this.refreshLoopStarted = false;
         this.dismissed = false;
@@ -108,9 +134,12 @@ public final class TameworkCommandSelectionPage
                 "#TameworkLinkedPanelSubtitle.Text",
                 LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
         );
+        commandBuilder.set("#TameworkLinkedPanelModeButton.Text", resolvePanelModeLabel());
+        commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
 
         buildCommandButtons(commandBuilder, eventBuilder);
         buildLinkedNpcPanel(commandBuilder, eventBuilder);
+        bindPanelControlEvents(eventBuilder);
         bindCloseButtonEvent(eventBuilder);
         startRefreshLoop();
     }
@@ -122,6 +151,46 @@ public final class TameworkCommandSelectionPage
         if (data.commandId == null || data.commandId.isBlank() || CLOSE_COMMAND_ID.equals(data.commandId)) {
             pendingUnlinkNpcUuid = null;
             close();
+            return;
+        }
+        if (PANEL_MODE_TOGGLE_COMMAND_ID.equals(data.commandId)) {
+            if (panelModeToggleCallback != null) {
+                panelModeToggleCallback.run();
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (PANEL_RADIUS_DECREASE_COMMAND_ID.equals(data.commandId)) {
+            if (panelRadiusDecreaseCallback != null) {
+                panelRadiusDecreaseCallback.run();
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (PANEL_RADIUS_INCREASE_COMMAND_ID.equals(data.commandId)) {
+            if (panelRadiusIncreaseCallback != null) {
+                panelRadiusIncreaseCallback.run();
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (data.commandId.startsWith(LINK_COMMAND_PREFIX)) {
+            if (linkCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, LINK_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                linkCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
             return;
         }
         if (data.commandId.startsWith(UNLINK_COMMAND_PREFIX)) {
@@ -136,6 +205,19 @@ public final class TameworkCommandSelectionPage
                     return;
                 }
                 unlinkCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (data.commandId.startsWith(TOGGLE_ACTIVE_COMMAND_PREFIX)) {
+            if (toggleActiveCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, TOGGLE_ACTIVE_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                toggleActiveCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
@@ -300,6 +382,8 @@ public final class TameworkCommandSelectionPage
                 "#TameworkLinkedPanelSubtitle.Text",
                 LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
         );
+        commandBuilder.set("#TameworkLinkedPanelModeButton.Text", resolvePanelModeLabel());
+        commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
@@ -318,6 +402,7 @@ public final class TameworkCommandSelectionPage
             }
         }
         bindCommandButtonEvents(eventBuilder);
+        bindPanelControlEvents(eventBuilder);
         bindCloseButtonEvent(eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
     }
@@ -335,6 +420,27 @@ public final class TameworkCommandSelectionPage
                     false
             );
         }
+    }
+
+    private void bindPanelControlEvents(@Nonnull UIEventBuilder eventBuilder) {
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelModeButton",
+                EventData.of(EVENT_COMMAND_ID, PANEL_MODE_TOGGLE_COMMAND_ID),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelRadiusDec",
+                EventData.of(EVENT_COMMAND_ID, PANEL_RADIUS_DECREASE_COMMAND_ID),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelRadiusInc",
+                EventData.of(EVENT_COMMAND_ID, PANEL_RADIUS_INCREASE_COMMAND_ID),
+                false
+        );
     }
 
     private void bindCloseButtonEvent(@Nonnull UIEventBuilder eventBuilder) {
@@ -360,7 +466,10 @@ public final class TameworkCommandSelectionPage
         String futureActionBarSelector = entrySelector + " #FutureActionBar";
         String traitsButtonSelector = entrySelector + " #TraitsButton";
         String talentsButtonSelector = entrySelector + " #TalentsButton";
+        String linkSelector = entrySelector + " #LinkButton";
         String removeSelector = entrySelector + " #RemoveButton";
+        String activeToggleSelector = entrySelector + " #ActiveToggleButton";
+        String inactiveBadgeSelector = entrySelector + " #StatusInactive";
         String respawnSelector = entrySelector + " #RespawnButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
@@ -370,14 +479,24 @@ public final class TameworkCommandSelectionPage
             commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
         }
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
-        boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
-        boolean showRespawn = entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
-        boolean showRecall = !entry.dead() && !entry.captured() && !pendingUnlink;
-        boolean showSetHome = entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
-        boolean showReturnHome = !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
+        boolean isLinked = entry.linked();
+        boolean pendingUnlink = isLinked && isPendingUnlink(entry.npcUuid());
+        boolean showRespawn = isLinked && entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
+        boolean showRecall = isLinked && !entry.dead() && !entry.captured() && !pendingUnlink;
+        boolean showSetHome = isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
+        boolean showReturnHome = isLinked && !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
+        boolean showLink = !isLinked;
+        boolean showUnlink = isLinked;
+        boolean showActiveToggle = isLinked && !pendingUnlink;
+        boolean showInactiveBadge = isLinked && !entry.active() && !pendingUnlink;
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
+        commandBuilder.set(linkSelector + ".Visible", showLink);
+        commandBuilder.set(removeSelector + ".Visible", showUnlink);
+        commandBuilder.set(activeToggleSelector + ".Visible", showActiveToggle);
+        commandBuilder.set(activeToggleSelector + ".Text", entry.active() ? "Set Inactive" : "Set Active");
+        commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
         commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
@@ -389,13 +508,31 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
         commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
         LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
-        commandBuilder.set(removeSelector + ".Text", "");
-        eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                removeSelector,
-                EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid()),
-                false
-        );
+        if (showLink) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    linkSelector,
+                    EventData.of(EVENT_COMMAND_ID, LINK_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showUnlink) {
+            commandBuilder.set(removeSelector + ".Text", "");
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    removeSelector,
+                    EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showActiveToggle) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    activeToggleSelector,
+                    EventData.of(EVENT_COMMAND_ID, TOGGLE_ACTIVE_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
         if (showRespawn) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
@@ -463,6 +600,22 @@ public final class TameworkCommandSelectionPage
         return "Current: " + selectedCommandId;
     }
 
+    private String resolvePanelModeLabel() {
+        if (panelModeLabelSupplier == null) {
+            return "Mode: Linked";
+        }
+        String value = panelModeLabelSupplier.get();
+        return value == null || value.isBlank() ? "Mode: Linked" : value;
+    }
+
+    private String resolvePanelRadiusLabel() {
+        if (panelRadiusLabelSupplier == null) {
+            return "Radius: 24m";
+        }
+        String value = panelRadiusLabelSupplier.get();
+        return value == null || value.isBlank() ? "Radius: 24m" : value;
+    }
+
     private static CommandOption[] buildOptions(TwCommandItemConfig config) {
         if (config == null || config.getCommandList() == null || config.getCommandList().length == 0) {
             return new CommandOption[0];
@@ -524,13 +677,24 @@ public final class TameworkCommandSelectionPage
                     entry.isTraitsActionVisible(),
                     entry.isTraitsActionEnabled(),
                     entry.isTalentsActionVisible(),
-                    entry.isTalentsActionEnabled()
+                    entry.isTalentsActionEnabled(),
+                    entry.linked(),
+                    entry.active(),
+                    entry.speciesId(),
+                    entry.speciesLabel(),
+                    entry.groupId(),
+                    entry.groupName(),
+                    entry.groupColorHex(),
+                    entry.breedingCooldownActive(),
+                    entry.breedingCooldownRemainingMs(),
+                    entry.breedingCooldownRatio()
             ));
         }
         out.sort(
-                Comparator.comparing(LinkedNpcEntry::loaded).reversed()
-                        .thenComparing(LinkedNpcEntry::dead).reversed()
-                        .thenComparing(LinkedNpcEntry::captured).reversed()
+                Comparator.comparing((LinkedNpcEntry value) -> value.active() ? 0 : 1)
+                        .thenComparing(value -> value.loaded() ? 0 : 1)
+                        .thenComparing(value -> value.dead() ? 1 : 0)
+                        .thenComparing(value -> value.captured() ? 1 : 0)
                         .thenComparing(LinkedNpcEntry::displayName, String.CASE_INSENSITIVE_ORDER)
                         .thenComparing(entry -> entry.npcUuid().toString())
         );

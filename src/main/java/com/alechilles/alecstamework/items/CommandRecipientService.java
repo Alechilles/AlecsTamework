@@ -6,14 +6,17 @@ import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -23,20 +26,36 @@ import java.util.UUID;
 final class CommandRecipientService {
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
+    private final CommandPanelPreferenceService panelPreferenceService;
 
     CommandRecipientService(CommandLinkPolicyService linkPolicyService,
-                            CommandLinkedNpcRecordStore linkedNpcRecordStore) {
+                            CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                            CommandPanelPreferenceService panelPreferenceService) {
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
+        this.panelPreferenceService = panelPreferenceService != null
+                ? panelPreferenceService
+                : new CommandPanelPreferenceService();
     }
 
     List<Candidate> queryRecipients(Context context) {
         ArrayList<Candidate> out = new ArrayList<>();
         TransformComponent playerTransform = context.store.getComponent(context.playerRef, TransformComponent.getComponentType());
         Vector3d playerPos = playerTransform != null ? new Vector3d(playerTransform.getPosition()) : null;
-        double radiusSq = context.config.getRadius() >= 0 ? context.config.getRadius() * context.config.getRadius() : -1;
+        CommandPanelPreferenceService.PanelMode panelModeOverride =
+                panelPreferenceService.readPanelModeOverride(context.workingItem);
+        MembershipMode recipientMembershipMode = panelPreferenceService.resolveRecipientMembershipMode(
+                context.workingItem,
+                context.config
+        );
+        double effectiveRadius = context.config.getRadius();
+        if (panelModeOverride == CommandPanelPreferenceService.PanelMode.NearbyMode) {
+            effectiveRadius = panelPreferenceService.resolveNearbyRadius(context.workingItem, context.config);
+        }
+        double radiusSq = effectiveRadius >= 0 ? effectiveRadius * effectiveRadius : -1;
         int maxTargets = Math.max(1, context.config.getMaxTargets());
         UUID playerUuid = context.player.getUuid();
+        Map<UUID, LinkedNpcRecord> linkedRecordByUuid = readLinkedRecordByUuid(context.workingItem);
 
         context.store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
             for (int i = 0; i < chunk.size(); i++) {
@@ -49,7 +68,7 @@ final class CommandRecipientService {
                     continue;
                 }
                 if (!linkPolicyService.matchesMembership(
-                        context.config.getMembershipMode(),
+                        recipientMembershipMode,
                         npcRef,
                         npc,
                         context.playerRef,
@@ -69,6 +88,10 @@ final class CommandRecipientService {
                     continue;
                 }
                 if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), context.config)) {
+                    continue;
+                }
+                UUID npcUuid = npc.getUuid();
+                if (isInactiveLinkedRecord(linkedRecordByUuid, npcUuid)) {
                     continue;
                 }
                 TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
@@ -96,10 +119,12 @@ final class CommandRecipientService {
     }
 
     List<LinkedNpcRecord> queryUnloadedLinkedRecords(Context context, List<Candidate> loadedRecipients) {
-        MembershipMode mode = context.config.getMembershipMode() != null
-                ? context.config.getMembershipMode()
-                : MembershipMode.LinkedOnly;
-        if (mode != MembershipMode.LinkedOnly && mode != MembershipMode.LinkedOrMasterTarget) {
+        CommandPanelPreferenceService.PanelMode panelModeOverride =
+                panelPreferenceService.readPanelModeOverride(context.workingItem);
+        MembershipMode mode = panelPreferenceService.resolveRecipientMembershipMode(context.workingItem, context.config);
+        if (panelModeOverride == null
+                && mode != MembershipMode.LinkedOnly
+                && mode != MembershipMode.LinkedOrMasterTarget) {
             return List.of();
         }
         List<LinkedNpcRecord> linkedRecords = linkedNpcRecordStore.read(context.workingItem);
@@ -128,6 +153,9 @@ final class CommandRecipientService {
             if (record == null || record.npcUuid == null || loadedUuids.contains(record.npcUuid)) {
                 continue;
             }
+            if (!record.active) {
+                continue;
+            }
             Ref<EntityStore> ref = world.getEntityRef(record.npcUuid);
             if (ref != null && ref.isValid()) {
                 NPCEntity npc = context.store.getComponent(ref, NPCEntity.getComponentType());
@@ -141,5 +169,28 @@ final class CommandRecipientService {
             }
         }
         return unloaded;
+    }
+
+    private Map<UUID, LinkedNpcRecord> readLinkedRecordByUuid(ItemStack stack) {
+        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        if (records.isEmpty()) {
+            return Map.of();
+        }
+        HashMap<UUID, LinkedNpcRecord> byUuid = new HashMap<>();
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            byUuid.put(record.npcUuid, record);
+        }
+        return byUuid;
+    }
+
+    private boolean isInactiveLinkedRecord(Map<UUID, LinkedNpcRecord> linkedRecordByUuid, UUID npcUuid) {
+        if (linkedRecordByUuid == null || linkedRecordByUuid.isEmpty() || npcUuid == null) {
+            return false;
+        }
+        LinkedNpcRecord record = linkedRecordByUuid.get(npcUuid);
+        return record != null && !record.active;
     }
 }

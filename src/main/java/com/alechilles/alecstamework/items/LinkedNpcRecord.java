@@ -16,6 +16,8 @@ final class LinkedNpcRecord {
     final String cachedDisplayName;
     final String cachedNameKey;
     final String cachedRoleId;
+    final boolean active;
+    final String groupId;
 
     LinkedNpcRecord(UUID npcUuid,
                     Vector3d lastKnownPosition,
@@ -23,12 +25,34 @@ final class LinkedNpcRecord {
                     String cachedDisplayName,
                     String cachedNameKey,
                     String cachedRoleId) {
+        this(
+                npcUuid,
+                lastKnownPosition,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                true,
+                null
+        );
+    }
+
+    LinkedNpcRecord(UUID npcUuid,
+                    Vector3d lastKnownPosition,
+                    Vector3d homePosition,
+                    String cachedDisplayName,
+                    String cachedNameKey,
+                    String cachedRoleId,
+                    boolean active,
+                    String groupId) {
         this.npcUuid = npcUuid;
         this.lastKnownPosition = lastKnownPosition != null ? new Vector3d(lastKnownPosition) : null;
         this.homePosition = homePosition != null ? new Vector3d(homePosition) : null;
         this.cachedDisplayName = (cachedDisplayName != null && !cachedDisplayName.isBlank()) ? cachedDisplayName : null;
         this.cachedNameKey = (cachedNameKey != null && !cachedNameKey.isBlank()) ? cachedNameKey : null;
         this.cachedRoleId = (cachedRoleId != null && !cachedRoleId.isBlank()) ? cachedRoleId : null;
+        this.active = active;
+        this.groupId = (groupId != null && !groupId.isBlank()) ? groupId : null;
     }
 }
 

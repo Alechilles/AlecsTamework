@@ -19,9 +19,20 @@ final class LinkedNpcPanelSubtitleService {
             return "Click X again to remove " + pendingName;
         }
         if (total <= 0) {
-            return "No linked companions";
+            return "No companions";
         }
-        return total + " linked companion" + (total == 1 ? "" : "s");
+        int linkedCount = 0;
+        if (entries != null) {
+            for (LinkedNpcEntry entry : entries) {
+                if (entry != null && entry.linked()) {
+                    linkedCount++;
+                }
+            }
+        }
+        if (linkedCount < total) {
+            return total + " companions (" + linkedCount + " linked)";
+        }
+        return linkedCount + " linked companion" + (linkedCount == 1 ? "" : "s");
     }
 
     static boolean containsEntry(LinkedNpcEntry[] entries, UUID npcUuid) {
