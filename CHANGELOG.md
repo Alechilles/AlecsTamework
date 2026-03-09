@@ -13,6 +13,10 @@
 ### Changed
 - Command panel entry building now resolves group display metadata from persisted tool groups, so group sorting/filtering and card tabs use player-facing group names/colors instead of raw ids.
 - Command group delete operations now clear matching linked-record group assignments in the same mutation flow to avoid orphaned group ids on companions.
+- Linked companions panel mode selection now renders as a header dropdown in the top-right title area (instead of an inline control-row button), while keeping per-tool mode persistence.
+
+### Fixed
+- Species filtering now uses consistent role-id resolution across linked and nearby entries, including fallback extraction from legacy cached name keys when role metadata is missing, so linked companions no longer disappear incorrectly under Species filter.
 
 ## 2.2.1 - Companion Policy, Interaction QoL, and Config Scope Updates - 2026-03-08
 ### Added

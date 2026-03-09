@@ -129,6 +129,10 @@ final class CommandPanelPreferenceService {
         return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_MODE, Codec.STRING, mode.name());
     }
 
+    ItemStack setPanelMode(@Nullable ItemStack stack, @Nullable String rawMode) {
+        return setPanelMode(stack, PanelMode.fromMetadata(rawMode));
+    }
+
     double resolveNearbyRadius(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
         double fallback = resolveConfiguredRadius(config);
         if (stack == null || stack.isEmpty()) {
@@ -157,6 +161,10 @@ final class CommandPanelPreferenceService {
     String resolveModeLabel(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
         PanelMode mode = resolveEffectivePanelMode(stack, config);
         return mode == PanelMode.NearbyMode ? "Mode: Nearby" : "Mode: Linked";
+    }
+
+    String resolveModeValue(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
+        return resolveEffectivePanelMode(stack, config).name();
     }
 
     String resolveRadiusLabel(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {

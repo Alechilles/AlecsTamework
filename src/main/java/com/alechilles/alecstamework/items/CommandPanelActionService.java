@@ -111,6 +111,19 @@ final class CommandPanelActionService {
         }
     }
 
+    void applySetPanelMode(Player player,
+                           String toolId,
+                           String modeValue) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setPanelMode(stack, modeValue)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update panel mode.");
+        }
+    }
+
     void applyAdjustPanelRadius(Player player,
                                 String toolId,
                                 TwCommandItemConfig config,

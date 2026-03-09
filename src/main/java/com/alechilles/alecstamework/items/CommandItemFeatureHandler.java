@@ -110,15 +110,16 @@ public final class CommandItemFeatureHandler {
         this.groupService = new CommandGroupService();
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
         this.npcNameResolver = new CommandNpcNameResolver();
+        this.linkPolicyService = new CommandLinkPolicyService();
         this.panelEntryService = new CommandLinkedPanelEntryService(
                 linkedNpcRecordStore,
                 deathService,
                 captureService,
                 npcNameResolver,
+                linkPolicyService,
                 this.groupService
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
-        this.linkPolicyService = new CommandLinkPolicyService();
         this.panelPreferenceService = new CommandPanelPreferenceService();
         this.panelEntrySourceService = new CommandPanelEntrySourceService(
                 panelEntryService,
@@ -433,7 +434,7 @@ public final class CommandItemFeatureHandler {
                 selectedId,
                 requireUnlinkConfirm,
                 () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
-                () -> toolInventoryService.resolvePanelModeLabelForTool(player, toolId, config),
+                () -> toolInventoryService.resolvePanelModeValueForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
@@ -446,7 +447,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, npcUuid),
-                () -> panelActionService.applyTogglePanelMode(player, toolId, config),
+                value -> panelActionService.applySetPanelMode(player, toolId, value),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
                 () -> groupManagerPageService.openGroupManagerPage(player, toolId),

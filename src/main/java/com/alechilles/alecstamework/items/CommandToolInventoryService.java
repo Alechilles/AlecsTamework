@@ -166,11 +166,11 @@ final class CommandToolInventoryService {
         return false;
     }
 
-    String resolvePanelModeLabelForTool(Player player,
+    String resolvePanelModeValueForTool(Player player,
                                         String toolId,
                                         com.alechilles.alecstamework.config.assets.TwCommandItemConfig config) {
         ItemStack stack = findToolStack(player, toolId);
-        return panelPreferenceService.resolveModeLabel(stack, config);
+        return panelPreferenceService.resolveModeValue(stack, config);
     }
 
     String resolvePanelRadiusLabelForTool(Player player,

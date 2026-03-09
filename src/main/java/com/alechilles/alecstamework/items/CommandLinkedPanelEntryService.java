@@ -47,17 +47,20 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
     private final CommandNpcNameResolver npcNameResolver;
+    private final CommandLinkPolicyService linkPolicyService;
     private final CommandGroupService groupService;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
                                    CommandLinkedNpcCaptureService captureService,
                                    CommandNpcNameResolver npcNameResolver,
+                                   CommandLinkPolicyService linkPolicyService,
                                    CommandGroupService groupService) {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
         this.deathService = deathService;
         this.captureService = captureService;
         this.npcNameResolver = npcNameResolver;
+        this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();
     }
 
@@ -99,7 +102,7 @@ final class CommandLinkedPanelEntryService {
             if (displayName == null || displayName.isBlank()) {
                 displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
             }
-            String speciesId = normalize(record.cachedRoleId);
+            String speciesId = resolveCachedSpeciesId(record);
             String speciesLabel = speciesId;
             int health = 0;
             int maxHealth = 0;
@@ -122,7 +125,7 @@ final class CommandLinkedPanelEntryService {
                     if (npc != null) {
                         loaded = true;
                         displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
-                        String resolvedRoleId = normalize(npcNameResolver.resolveNpcRoleId(npc));
+                        String resolvedRoleId = resolveSpeciesRoleId(npc, record.cachedRoleId);
                         if (resolvedRoleId != null) {
                             speciesId = resolvedRoleId;
                             speciesLabel = resolvedRoleId;
@@ -506,11 +509,71 @@ final class CommandLinkedPanelEntryService {
         return Math.max(min, Math.min(max, value));
     }
 
+    private String resolveCachedSpeciesId(LinkedNpcRecord record) {
+        if (record == null) {
+            return null;
+        }
+        String roleId = firstNonBlank(
+                record.cachedRoleId,
+                extractRoleIdFromNameKey(record.cachedNameKey),
+                null
+        );
+        return normalize(roleId);
+    }
+
+    private String resolveSpeciesRoleId(NPCEntity npc, String fallbackRoleId) {
+        String roleId = firstNonBlank(
+                linkPolicyService.resolveRoleId(npc),
+                npcNameResolver.resolveNpcRoleId(npc),
+                fallbackRoleId
+        );
+        return normalize(roleId);
+    }
+
+    private String extractRoleIdFromNameKey(String nameKey) {
+        if (nameKey == null || nameKey.isBlank()) {
+            return null;
+        }
+        String trimmed = nameKey.trim();
+        String[] prefixes = {
+                "server.npcRole.",
+                "npcRole.",
+                "server.npcRoles.",
+                "npcRoles."
+        };
+        for (String prefix : prefixes) {
+            if (!trimmed.startsWith(prefix)) {
+                continue;
+            }
+            String remainder = trimmed.substring(prefix.length());
+            if (remainder.endsWith(".name")) {
+                remainder = remainder.substring(0, remainder.length() - ".name".length());
+            }
+            if (!remainder.isBlank()) {
+                return remainder;
+            }
+        }
+        return null;
+    }
+
     private String normalize(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String firstNonBlank(String first, String second, String third) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        if (third != null && !third.isBlank()) {
+            return third;
+        }
+        return null;
     }
 
     private String normalizeOptional(String value) {

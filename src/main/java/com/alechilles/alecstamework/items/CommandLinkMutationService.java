@@ -94,7 +94,7 @@ final class CommandLinkMutationService {
                         homePosition,
                         npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
                         npcNameResolver.resolveNpcNameKey(npc),
-                        npcNameResolver.resolveNpcRoleId(npc)
+                        resolveCachedRoleId(npc)
                 );
             } else {
                 updatedItem = linkedNpcRecordStore.remove(updatedItem, npcUuid);
@@ -181,10 +181,18 @@ final class CommandLinkMutationService {
                     homePosition,
                     npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, store),
                     npcNameResolver.resolveNpcNameKey(candidate.npc),
-                    npcNameResolver.resolveNpcRoleId(candidate.npc)
+                    resolveCachedRoleId(candidate.npc)
             );
         }
         return updated;
+    }
+
+    private String resolveCachedRoleId(NPCEntity npc) {
+        String roleId = linkPolicyService.resolveRoleId(npc);
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
+        }
+        return npcNameResolver.resolveNpcRoleId(npc);
     }
 
     ItemStack removeLinkedNpcRecord(ItemStack stack, UUID npcUuid) {

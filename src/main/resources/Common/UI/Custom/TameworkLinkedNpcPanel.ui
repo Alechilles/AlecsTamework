@@ -9,6 +9,32 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       @Alignment = Start;
       @Text = "Linked Companions";
     }
+
+    DropdownBox #TameworkLinkedPanelModeDropdown {
+      Anchor: (Top: 2, Right: 8, Width: 132, Height: 24);
+      Style: (
+        ...$C.@DefaultDropdownBoxStyle,
+        HorizontalPadding: 8,
+        LabelStyle: (
+          ...$C.@DefaultDropdownBoxLabelStyle,
+          RenderUppercase: false,
+          FontSize: 11
+        ),
+        EntryLabelStyle: (
+          ...$C.@DefaultDropdownBoxEntryLabelStyle,
+          RenderUppercase: false,
+          FontSize: 11
+        ),
+        SelectedEntryLabelStyle: (
+          ...$C.@DefaultDropdownBoxEntryLabelStyle,
+          RenderUppercase: false,
+          RenderBold: true,
+          FontSize: 11
+        )
+      );
+      MaxSelection: 1;
+      NoItemsText: "No modes";
+    }
   }
 
   #Content {
@@ -33,13 +59,6 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
     Group #TameworkLinkedPanelControls {
       Anchor: (Top: 2, Height: 28);
       LayoutMode: Left;
-
-      TextButton #TameworkLinkedPanelModeButton {
-        Anchor: (Width: 132, Height: 24);
-        Text: "Mode: Linked";
-      }
-
-      Group { Anchor: (Width: 6); }
 
       TextButton #TameworkLinkedPanelRadiusDec {
         Anchor: (Width: 24, Height: 24);
