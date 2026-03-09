@@ -107,12 +107,13 @@ public final class CommandItemFeatureHandler {
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
         this.npcNameResolver = new CommandNpcNameResolver();
+        CommandGroupService groupService = new CommandGroupService();
         this.panelEntryService = new CommandLinkedPanelEntryService(
                 linkedNpcRecordStore,
                 deathService,
                 captureService,
                 npcNameResolver,
-                new CommandGroupService()
+                groupService
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.linkPolicyService = new CommandLinkPolicyService();
@@ -176,7 +177,8 @@ public final class CommandItemFeatureHandler {
                 linkMutationService,
                 toolInventoryService,
                 panelPreferenceService,
-                feedbackService
+                feedbackService,
+                groupService
         );
     }
 

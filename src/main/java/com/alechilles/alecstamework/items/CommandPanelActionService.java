@@ -4,8 +4,11 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -16,15 +19,18 @@ final class CommandPanelActionService {
     private final CommandToolInventoryService toolInventoryService;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandFeedbackService feedbackService;
+    private final CommandGroupService groupService;
 
     CommandPanelActionService(CommandLinkMutationService linkMutationService,
                               CommandToolInventoryService toolInventoryService,
                               CommandPanelPreferenceService panelPreferenceService,
-                              CommandFeedbackService feedbackService) {
+                              CommandFeedbackService feedbackService,
+                              CommandGroupService groupService) {
         this.linkMutationService = linkMutationService;
         this.toolInventoryService = toolInventoryService;
         this.panelPreferenceService = panelPreferenceService;
         this.feedbackService = feedbackService;
+        this.groupService = groupService != null ? groupService : new CommandGroupService();
     }
 
     void applyLink(Player player,
@@ -172,5 +178,107 @@ final class CommandPanelActionService {
         if (!updated && player != null) {
             feedbackService.showWarning(player, "Unable to update group filter.");
         }
+    }
+
+    void applyCreateGroup(Player player, String toolId, String name, String colorHex) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> groupService.createGroup(stack, name, colorHex)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to create group.");
+            return;
+        }
+        if (player != null) {
+            feedbackService.showSuccess(player, "Group created.");
+        }
+    }
+
+    void applyRenameGroup(Player player, String toolId, String groupId, String name) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> groupService.renameGroup(stack, groupId, name)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to rename group.");
+            return;
+        }
+        if (player != null) {
+            feedbackService.showSuccess(player, "Group renamed.");
+        }
+    }
+
+    void applyRecolorGroup(Player player, String toolId, String groupId, String colorHex) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> groupService.recolorGroup(stack, groupId, colorHex)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update group color.");
+            return;
+        }
+        if (player != null) {
+            feedbackService.showSuccess(player, "Group color updated.");
+        }
+    }
+
+    void applyDeleteGroup(Player player, String toolId, String groupId) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> {
+                    ItemStack updatedStack = groupService.deleteGroup(stack, groupId);
+                    if (updatedStack == stack) {
+                        return stack;
+                    }
+                    return clearGroupAssignments(updatedStack, groupId);
+                }
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to delete group.");
+            return;
+        }
+        if (player != null) {
+            feedbackService.showSuccess(player, "Group deleted.");
+        }
+    }
+
+    private ItemStack clearGroupAssignments(ItemStack stack, String groupId) {
+        if (stack == null || stack.isEmpty() || groupId == null || groupId.isBlank()) {
+            return stack;
+        }
+        List<LinkedNpcRecord> records = linkMutationService.readLinkedNpcRecords(stack);
+        if (records.isEmpty()) {
+            return stack;
+        }
+        ArrayList<LinkedNpcRecord> updated = new ArrayList<>(records.size());
+        boolean changed = false;
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (record.groupId != null && record.groupId.equalsIgnoreCase(groupId.trim())) {
+                updated.add(new LinkedNpcRecord(
+                        record.npcUuid,
+                        record.lastKnownPosition,
+                        record.homePosition,
+                        record.cachedDisplayName,
+                        record.cachedNameKey,
+                        record.cachedRoleId,
+                        record.active,
+                        null
+                ));
+                changed = true;
+                continue;
+            }
+            updated.add(record);
+        }
+        if (!changed) {
+            return stack;
+        }
+        return linkMutationService.writeLinkedNpcRecords(stack, updated);
     }
 }
