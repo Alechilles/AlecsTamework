@@ -111,7 +111,8 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 deathService,
                 captureService,
-                npcNameResolver
+                npcNameResolver,
+                new CommandGroupService()
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.linkPolicyService = new CommandLinkPolicyService();

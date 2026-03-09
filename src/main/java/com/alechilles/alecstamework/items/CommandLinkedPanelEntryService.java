@@ -47,15 +47,18 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
     private final CommandNpcNameResolver npcNameResolver;
+    private final CommandGroupService groupService;
 
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
                                    CommandLinkedNpcCaptureService captureService,
-                                   CommandNpcNameResolver npcNameResolver) {
+                                   CommandNpcNameResolver npcNameResolver,
+                                   CommandGroupService groupService) {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
         this.deathService = deathService;
         this.captureService = captureService;
         this.npcNameResolver = npcNameResolver;
+        this.groupService = groupService != null ? groupService : new CommandGroupService();
     }
 
     List<LinkedNpcEntry> buildEntries(Player player,
@@ -69,6 +72,7 @@ final class CommandLinkedPanelEntryService {
         if (records.isEmpty()) {
             return List.of();
         }
+        Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
         World world = player.getWorld();
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         ComponentType<EntityStore, TameworkTraitsComponent> traitType = TameworkTraitsComponent.getComponentType();
@@ -83,6 +87,14 @@ final class CommandLinkedPanelEntryService {
             long deadRespawnRemainingMs = 0L;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
+            String groupId = normalizeOptional(record.groupId);
+            CommandGroupService.GroupRecord resolvedGroup = resolveGroup(groupById, groupId);
+            String groupName = resolvedGroup != null
+                    ? resolvedGroup.name
+                    : groupId;
+            String groupColor = resolvedGroup != null
+                    ? resolvedGroup.colorHex
+                    : null;
             String displayName = npcNameResolver.resolveCachedUnloadedDisplayName(record);
             if (displayName == null || displayName.isBlank()) {
                 displayName = "Unloaded companion (" + abbreviateUuid(record.npcUuid) + ")";
@@ -221,9 +233,9 @@ final class CommandLinkedPanelEntryService {
                     active,
                     speciesId,
                     speciesLabel,
-                    record.groupId,
-                    null,
-                    null,
+                    groupId,
+                    groupName,
+                    groupColor,
                     breedingCooldownActive,
                     breedingCooldownRemainingMs,
                     breedingCooldownRatio,
@@ -499,6 +511,36 @@ final class CommandLinkedPanelEntryService {
             return null;
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String normalizeOptional(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private Map<String, CommandGroupService.GroupRecord> buildGroupLookup(ItemStack stack) {
+        List<CommandGroupService.GroupRecord> groups = groupService.readGroups(stack);
+        if (groups == null || groups.isEmpty()) {
+            return Map.of();
+        }
+        HashMap<String, CommandGroupService.GroupRecord> out = new HashMap<>();
+        for (CommandGroupService.GroupRecord group : groups) {
+            if (group == null || group.groupId == null || group.groupId.isBlank()) {
+                continue;
+            }
+            out.put(normalize(group.groupId), group);
+        }
+        return out;
+    }
+
+    private CommandGroupService.GroupRecord resolveGroup(Map<String, CommandGroupService.GroupRecord> lookup,
+                                                         String groupId) {
+        if (lookup == null || lookup.isEmpty() || groupId == null || groupId.isBlank()) {
+            return null;
+        }
+        return lookup.get(normalize(groupId));
     }
 
     private String buildTooltip(String label,

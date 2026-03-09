@@ -78,6 +78,24 @@ Group {
   Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
+  Group #GroupTab {
+    Anchor: (Top: -6, Left: -8, Width: 116, Height: 16);
+    Background: #4b657f;
+    Visible: false;
+
+    Label #GroupTabText {
+      Anchor: (Top: 0, Left: 4, Right: 4, Height: 16);
+      Text: "Group";
+      Style: (
+        FontSize: 9,
+        RenderBold: true,
+        TextColor: #eff4fa,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center
+      );
+    }
+  }
+
   Label #Name {
     Anchor: (Top: 0, Left: 0, Width: 206, Height: 22);
     Text: "Companion";

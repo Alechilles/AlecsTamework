@@ -518,6 +518,8 @@ public final class TameworkCommandSelectionPage
         String removeSelector = entrySelector + " #RemoveButton";
         String activeToggleSelector = entrySelector + " #ActiveToggleButton";
         String inactiveBadgeSelector = entrySelector + " #StatusInactive";
+        String groupTabSelector = entrySelector + " #GroupTab";
+        String groupTabTextSelector = entrySelector + " #GroupTabText";
         String respawnSelector = entrySelector + " #RespawnButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
@@ -545,6 +547,7 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set(activeToggleSelector + ".Visible", showActiveToggle);
         commandBuilder.set(activeToggleSelector + ".Text", entry.active() ? "Set Inactive" : "Set Active");
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
+        LinkedNpcPanelGroupTabBinder.bind(commandBuilder, groupTabSelector, groupTabTextSelector, entry, pendingUnlink);
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
         commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
