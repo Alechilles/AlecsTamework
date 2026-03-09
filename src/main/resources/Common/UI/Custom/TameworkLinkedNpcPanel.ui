@@ -63,6 +63,13 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         Anchor: (Width: 24, Height: 24);
         Text: "+";
       }
+
+      Group { Anchor: (Width: 6); }
+
+      TextButton #TameworkLinkedPanelManageGroupsButton {
+        Anchor: (Width: 120, Height: 24);
+        Text: "Manage Groups";
+      }
     }
 
     Group #TameworkLinkedPanelControlsSecondary {

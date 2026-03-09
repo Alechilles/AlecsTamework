@@ -1,0 +1,101 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer #TameworkGroupManagerRoot {
+    Anchor: (Width: 520, Height: 420);
+
+    #Title {
+      $C.@Title #TameworkGroupManagerTitle {
+        @Text = "Manage Groups";
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Left: 10, Right: 8, Top: 8, Bottom: 10);
+
+      Label #TameworkGroupManagerSubtitle {
+        Anchor: (Height: 22);
+        Text: "Create, rename, recolor, or delete command groups.";
+        Style: (
+          FontSize: 14,
+          TextColor: #bfd0e5,
+          HorizontalAlignment: Start,
+          VerticalAlignment: Center
+        );
+      }
+
+      Group #TameworkGroupManagerInputRow {
+        Anchor: (Top: 4, Height: 28);
+        LayoutMode: Left;
+
+        TextField #TameworkGroupNameInput {
+          Style: $C.@DefaultInputFieldStyle;
+          PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+          Background: $C.@InputBoxBackground;
+          Anchor: (Width: 210, Height: 24);
+          Padding: (Horizontal: 8);
+          PlaceholderText: "Group name";
+          MaxLength: 24;
+        }
+
+        Group { Anchor: (Width: 6); }
+
+        TextField #TameworkGroupColorInput {
+          Style: $C.@DefaultInputFieldStyle;
+          PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+          Background: $C.@InputBoxBackground;
+          Anchor: (Width: 100, Height: 24);
+          Padding: (Horizontal: 8);
+          PlaceholderText: "#4B657F";
+          MaxLength: 7;
+        }
+
+        Group { Anchor: (Width: 6); }
+
+        TextButton #TameworkGroupCreateButton {
+          Anchor: (Width: 90, Height: 24);
+          Text: "Create";
+        }
+      }
+
+      Group #TameworkGroupManagerListViewport {
+        Anchor: (Top: 8);
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        KeepScrollPosition: true;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        Padding: (Left: 2, Right: 2, Top: 2, Bottom: 6);
+
+        Group #TameworkGroupManagerList {
+          LayoutMode: Top;
+          Anchor: (Bottom: 4);
+        }
+      }
+
+      Label #TameworkGroupManagerEmptyState {
+        Anchor: (Height: 28);
+        Text: "No groups yet. Enter a name and color, then click Create.";
+        Style: (
+          FontSize: 13,
+          TextColor: #b2c3d6,
+          HorizontalAlignment: Start,
+          VerticalAlignment: Center
+        );
+        Visible: false;
+      }
+
+      Group {
+        Anchor: (Top: 8, Height: 24);
+        LayoutMode: Right;
+
+        TextButton #TameworkGroupCloseButton {
+          Anchor: (Width: 100, Height: 24);
+          Text: "Close";
+        }
+      }
+    }
+  }
+}

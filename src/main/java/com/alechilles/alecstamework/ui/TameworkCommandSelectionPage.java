@@ -50,6 +50,7 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_MODE_TOGGLE_COMMAND_ID = "__panel_mode_toggle__";
     private static final String PANEL_RADIUS_DECREASE_COMMAND_ID = "__panel_radius_dec__";
     private static final String PANEL_RADIUS_INCREASE_COMMAND_ID = "__panel_radius_inc__";
+    private static final String PANEL_MANAGE_GROUPS_COMMAND_ID = "__panel_manage_groups__";
     private static final String PANEL_SORT_CYCLE_COMMAND_ID = "__panel_sort_cycle__";
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
     private static final int MAX_COMMAND_BUTTONS = 8;
@@ -77,6 +78,7 @@ public final class TameworkCommandSelectionPage
     private final Runnable panelModeToggleCallback;
     private final Runnable panelRadiusDecreaseCallback;
     private final Runnable panelRadiusIncreaseCallback;
+    private final Runnable panelManageGroupsCallback;
     private final Runnable panelSortCycleCallback;
     private final Runnable panelClearFiltersCallback;
     private final Consumer<String> panelSetNameFilterCallback;
@@ -104,6 +106,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Runnable panelModeToggleCallback,
                                         @Nonnull Runnable panelRadiusDecreaseCallback,
                                         @Nonnull Runnable panelRadiusIncreaseCallback,
+                                        @Nonnull Runnable panelManageGroupsCallback,
                                         @Nonnull Runnable panelSortCycleCallback,
                                         @Nonnull Runnable panelClearFiltersCallback,
                                         @Nonnull Consumer<String> panelSetNameFilterCallback,
@@ -132,6 +135,7 @@ public final class TameworkCommandSelectionPage
         this.panelModeToggleCallback = panelModeToggleCallback;
         this.panelRadiusDecreaseCallback = panelRadiusDecreaseCallback;
         this.panelRadiusIncreaseCallback = panelRadiusIncreaseCallback;
+        this.panelManageGroupsCallback = panelManageGroupsCallback;
         this.panelSortCycleCallback = panelSortCycleCallback;
         this.panelClearFiltersCallback = panelClearFiltersCallback;
         this.panelSetNameFilterCallback = panelSetNameFilterCallback;
@@ -232,6 +236,14 @@ public final class TameworkCommandSelectionPage
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (PANEL_MANAGE_GROUPS_COMMAND_ID.equals(data.commandId)) {
+            if (panelManageGroupsCallback != null) {
+                pendingUnlinkNpcUuid = null;
+                close();
+                panelManageGroupsCallback.run();
             }
             return;
         }
@@ -514,6 +526,12 @@ public final class TameworkCommandSelectionPage
                 CustomUIEventBindingType.Activating,
                 "#TameworkLinkedPanelRadiusInc",
                 EventData.of(EVENT_COMMAND_ID, PANEL_RADIUS_INCREASE_COMMAND_ID),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkLinkedPanelManageGroupsButton",
+                EventData.of(EVENT_COMMAND_ID, PANEL_MANAGE_GROUPS_COMMAND_ID),
                 false
         );
         eventBuilder.addEventBinding(

@@ -79,6 +79,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
+    private final CommandGroupService groupService;
     private final CommandFeedbackService feedbackService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkedPanelEntryService panelEntryService;
@@ -95,6 +96,7 @@ public final class CommandItemFeatureHandler {
     private final CommandMenuMoveService menuMoveService;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandPanelActionService panelActionService;
+    private final CommandGroupManagerPageService groupManagerPageService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -105,15 +107,15 @@ public final class CommandItemFeatureHandler {
         this.deathService = deathService;
         this.captureService = captureService;
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
+        this.groupService = new CommandGroupService();
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
         this.npcNameResolver = new CommandNpcNameResolver();
-        CommandGroupService groupService = new CommandGroupService();
         this.panelEntryService = new CommandLinkedPanelEntryService(
                 linkedNpcRecordStore,
                 deathService,
                 captureService,
                 npcNameResolver,
-                groupService
+                this.groupService
         );
         this.resolutionService = new CommandResolutionService(registry, DEFAULT_RAYCAST_DISTANCE);
         this.linkPolicyService = new CommandLinkPolicyService();
@@ -178,7 +180,11 @@ public final class CommandItemFeatureHandler {
                 toolInventoryService,
                 panelPreferenceService,
                 feedbackService,
-                groupService
+                this.groupService
+        );
+        this.groupManagerPageService = new CommandGroupManagerPageService(
+                panelActionService,
+                this.groupService
         );
     }
 
@@ -441,6 +447,7 @@ public final class CommandItemFeatureHandler {
                 () -> panelActionService.applyTogglePanelMode(player, toolId, config),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
+                () -> groupManagerPageService.openGroupManagerPage(player, toolId),
                 () -> panelActionService.applyCycleSort(player, toolId),
                 () -> panelActionService.applyClearFilters(player, toolId),
                 value -> panelActionService.applySetNameFilter(player, toolId, value),
