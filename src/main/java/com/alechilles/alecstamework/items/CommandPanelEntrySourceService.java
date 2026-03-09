@@ -20,6 +20,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -56,23 +57,23 @@ final class CommandPanelEntrySourceService {
         CommandPanelPreferenceService.PanelMode panelMode =
                 panelPreferenceService.resolveEffectivePanelMode(stack, config);
         if (panelMode != CommandPanelPreferenceService.PanelMode.NearbyMode) {
-            return linkedEntries;
+            return applyFiltersAndSort(linkedEntries, stack);
         }
         if (player == null || store == null) {
-            return linkedEntries;
+            return applyFiltersAndSort(linkedEntries, stack);
         }
         UUID playerUuid = player.getUuid();
         Ref<EntityStore> playerRef = player.getReference();
         if (playerUuid == null || playerRef == null || !playerRef.isValid()) {
-            return linkedEntries;
+            return applyFiltersAndSort(linkedEntries, stack);
         }
         TransformComponent playerTransform = store.getComponent(playerRef, TransformComponent.getComponentType());
         if (playerTransform == null) {
-            return linkedEntries;
+            return applyFiltersAndSort(linkedEntries, stack);
         }
         double radius = panelPreferenceService.resolveNearbyRadius(stack, config);
         if (!Double.isFinite(radius) || radius <= 0.0) {
-            return linkedEntries;
+            return applyFiltersAndSort(linkedEntries, stack);
         }
         double radiusSq = radius * radius;
 
@@ -164,7 +165,66 @@ final class CommandPanelEntrySourceService {
                 seen.add(npc.getUuid());
             }
         });
-        return out;
+        return applyFiltersAndSort(out, stack);
+    }
+
+    private List<LinkedNpcEntry> applyFiltersAndSort(List<LinkedNpcEntry> input, ItemStack stack) {
+        if (input == null || input.isEmpty()) {
+            return List.of();
+        }
+        String nameFilter = normalize(panelPreferenceService.resolveNameFilter(stack));
+        String speciesFilter = normalize(panelPreferenceService.resolveSpeciesFilter(stack));
+        String groupFilter = normalize(panelPreferenceService.resolveGroupFilter(stack));
+        ArrayList<LinkedNpcEntry> filtered = new ArrayList<>(input.size());
+        for (LinkedNpcEntry entry : input) {
+            if (entry == null || entry.npcUuid() == null) {
+                continue;
+            }
+            if (!matchesContains(entry.displayName(), nameFilter)) {
+                continue;
+            }
+            if (!matchesContains(firstNonBlank(entry.speciesLabel(), entry.speciesId()), speciesFilter)) {
+                continue;
+            }
+            if (!matchesContains(firstNonBlank(entry.groupName(), entry.groupId()), groupFilter)) {
+                continue;
+            }
+            filtered.add(entry);
+        }
+        Comparator<LinkedNpcEntry> comparator = buildComparator(panelPreferenceService.resolveSort(stack));
+        filtered.sort(comparator);
+        return filtered;
+    }
+
+    private Comparator<LinkedNpcEntry> buildComparator(CommandPanelPreferenceService.PanelSort sort) {
+        Comparator<LinkedNpcEntry> base = Comparator
+                .comparing((LinkedNpcEntry value) -> value.active() ? 0 : 1)
+                .thenComparing(value -> value.loaded() ? 0 : 1)
+                .thenComparing(value -> value.dead() ? 1 : 0)
+                .thenComparing(value -> value.captured() ? 1 : 0);
+        Comparator<LinkedNpcEntry> byName = Comparator
+                .comparing((LinkedNpcEntry value) -> safe(value.displayName()), String.CASE_INSENSITIVE_ORDER)
+                .thenComparing(value -> value.npcUuid().toString());
+        if (sort == null || sort == CommandPanelPreferenceService.PanelSort.Default) {
+            return base.thenComparing(byName);
+        }
+        if (sort == CommandPanelPreferenceService.PanelSort.Name) {
+            return base.thenComparing(byName);
+        }
+        if (sort == CommandPanelPreferenceService.PanelSort.Species) {
+            return base
+                    .thenComparing(
+                            (LinkedNpcEntry value) -> safe(firstNonBlank(value.speciesLabel(), value.speciesId())),
+                            String.CASE_INSENSITIVE_ORDER
+                    )
+                    .thenComparing(byName);
+        }
+        return base
+                .thenComparing(
+                        (LinkedNpcEntry value) -> safe(firstNonBlank(value.groupName(), value.groupId())),
+                        String.CASE_INSENSITIVE_ORDER
+                )
+                .thenComparing(byName);
     }
 
     private HealthSnapshot readHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
@@ -200,6 +260,30 @@ final class CommandPanelEntrySourceService {
             return null;
         }
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private boolean matchesContains(String candidate, String filterNormalized) {
+        if (filterNormalized == null || filterNormalized.isBlank()) {
+            return true;
+        }
+        if (candidate == null || candidate.isBlank()) {
+            return false;
+        }
+        return candidate.toLowerCase(Locale.ROOT).contains(filterNormalized);
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return "";
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value;
     }
 
     private record HealthSnapshot(int current, int max) {

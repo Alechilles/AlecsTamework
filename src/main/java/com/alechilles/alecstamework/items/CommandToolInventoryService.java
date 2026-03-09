@@ -180,6 +180,16 @@ final class CommandToolInventoryService {
         return panelPreferenceService.resolveRadiusLabel(stack, config);
     }
 
+    String resolvePanelSortLabelForTool(Player player, String toolId) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveSortLabel(stack);
+    }
+
+    String resolvePanelFilterSummaryForTool(Player player, String toolId) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveFilterSummaryLabel(stack);
+    }
+
     private ItemStack findToolStack(Player player, String toolId) {
         if (player == null || toolId == null || toolId.isBlank()) {
             return null;

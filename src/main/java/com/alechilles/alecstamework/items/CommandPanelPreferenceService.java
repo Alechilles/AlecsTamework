@@ -16,6 +16,7 @@ final class CommandPanelPreferenceService {
     private static final double MIN_NEARBY_RADIUS = 8.0;
     private static final double MAX_NEARBY_RADIUS = 96.0;
     private static final double NEARBY_RADIUS_STEP = 4.0;
+    private static final int MAX_FILTER_TEXT_LENGTH = 40;
 
     enum PanelMode {
         LinkedMode,
@@ -31,6 +32,25 @@ final class CommandPanelPreferenceService {
                 }
             }
             return LinkedMode;
+        }
+    }
+
+    enum PanelSort {
+        Default,
+        Name,
+        Species,
+        Group;
+
+        static PanelSort fromMetadata(String raw) {
+            if (raw == null || raw.isBlank()) {
+                return Default;
+            }
+            for (PanelSort mode : values()) {
+                if (mode.name().equalsIgnoreCase(raw.trim())) {
+                    return mode;
+                }
+            }
+            return Default;
         }
     }
 
@@ -86,11 +106,7 @@ final class CommandPanelPreferenceService {
         if (stack == null || stack.isEmpty() || mode == null) {
             return stack;
         }
-        ItemStack updated = stack.withMetadata(
-                TameworkMetadataKeys.COMMAND_PANEL_SCHEMA_VERSION,
-                Codec.INTEGER,
-                PANEL_SCHEMA_VERSION
-        );
+        ItemStack updated = withSchemaVersion(stack);
         return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_MODE, Codec.STRING, mode.name());
     }
 
@@ -115,11 +131,7 @@ final class CommandPanelPreferenceService {
         double current = resolveNearbyRadius(stack, config);
         double next = current + (increase ? NEARBY_RADIUS_STEP : -NEARBY_RADIUS_STEP);
         next = clampToStep(next);
-        ItemStack updated = stack.withMetadata(
-                TameworkMetadataKeys.COMMAND_PANEL_SCHEMA_VERSION,
-                Codec.INTEGER,
-                PANEL_SCHEMA_VERSION
-        );
+        ItemStack updated = withSchemaVersion(stack);
         return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_RADIUS, Codec.DOUBLE, next);
     }
 
@@ -131,6 +143,84 @@ final class CommandPanelPreferenceService {
     String resolveRadiusLabel(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
         int radius = (int) Math.round(resolveNearbyRadius(stack, config));
         return "Radius: " + radius + "m";
+    }
+
+    PanelSort resolveSort(@Nullable ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return PanelSort.Default;
+        }
+        String raw = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_PANEL_SORT, Codec.STRING);
+        return PanelSort.fromMetadata(raw);
+    }
+
+    ItemStack cycleSort(@Nullable ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return stack;
+        }
+        PanelSort current = resolveSort(stack);
+        PanelSort[] values = PanelSort.values();
+        int nextIndex = (current.ordinal() + 1) % values.length;
+        ItemStack updated = withSchemaVersion(stack);
+        return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_SORT, Codec.STRING, values[nextIndex].name());
+    }
+
+    String resolveSortLabel(@Nullable ItemStack stack) {
+        PanelSort sort = resolveSort(stack);
+        return "Sort: " + sort.name();
+    }
+
+    String resolveNameFilter(@Nullable ItemStack stack) {
+        return readFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_NAME);
+    }
+
+    String resolveSpeciesFilter(@Nullable ItemStack stack) {
+        return readFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_SPECIES);
+    }
+
+    String resolveGroupFilter(@Nullable ItemStack stack) {
+        return readFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_GROUP);
+    }
+
+    boolean hasActiveFilters(@Nullable ItemStack stack) {
+        return !isBlank(resolveNameFilter(stack))
+                || !isBlank(resolveSpeciesFilter(stack))
+                || !isBlank(resolveGroupFilter(stack));
+    }
+
+    String resolveFilterSummaryLabel(@Nullable ItemStack stack) {
+        int active = 0;
+        if (!isBlank(resolveNameFilter(stack))) {
+            active++;
+        }
+        if (!isBlank(resolveSpeciesFilter(stack))) {
+            active++;
+        }
+        if (!isBlank(resolveGroupFilter(stack))) {
+            active++;
+        }
+        return active <= 0 ? "Filters: none" : "Filters: " + active + " active";
+    }
+
+    ItemStack clearFilters(@Nullable ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return stack;
+        }
+        ItemStack updated = withSchemaVersion(stack);
+        updated = updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_NAME, Codec.STRING, "");
+        updated = updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_SPECIES, Codec.STRING, "");
+        return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_GROUP, Codec.STRING, "");
+    }
+
+    ItemStack setNameFilter(@Nullable ItemStack stack, @Nullable String value) {
+        return setFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_NAME, value);
+    }
+
+    ItemStack setSpeciesFilter(@Nullable ItemStack stack, @Nullable String value) {
+        return setFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_SPECIES, value);
+    }
+
+    ItemStack setGroupFilter(@Nullable ItemStack stack, @Nullable String value) {
+        return setFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_GROUP, value);
     }
 
     private double resolveConfiguredRadius(@Nullable TwCommandItemConfig config) {
@@ -151,5 +241,44 @@ final class CommandPanelPreferenceService {
         double clamped = Math.max(MIN_NEARBY_RADIUS, Math.min(MAX_NEARBY_RADIUS, value));
         double stepped = Math.round(clamped / NEARBY_RADIUS_STEP) * NEARBY_RADIUS_STEP;
         return Math.max(MIN_NEARBY_RADIUS, Math.min(MAX_NEARBY_RADIUS, stepped));
+    }
+
+    private String readFilterValue(@Nullable ItemStack stack, String key) {
+        if (stack == null || stack.isEmpty() || key == null || key.isBlank()) {
+            return "";
+        }
+        String raw = stack.getFromMetadataOrNull(key, Codec.STRING);
+        return normalizeFilterText(raw);
+    }
+
+    private ItemStack setFilterValue(@Nullable ItemStack stack, String key, @Nullable String value) {
+        if (stack == null || stack.isEmpty() || key == null || key.isBlank()) {
+            return stack;
+        }
+        ItemStack updated = withSchemaVersion(stack);
+        return updated.withMetadata(key, Codec.STRING, normalizeFilterText(value));
+    }
+
+    private ItemStack withSchemaVersion(ItemStack stack) {
+        return stack.withMetadata(
+                TameworkMetadataKeys.COMMAND_PANEL_SCHEMA_VERSION,
+                Codec.INTEGER,
+                PANEL_SCHEMA_VERSION
+        );
+    }
+
+    private String normalizeFilterText(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "";
+        }
+        String trimmed = raw.trim();
+        if (trimmed.length() > MAX_FILTER_TEXT_LENGTH) {
+            return trimmed.substring(0, MAX_FILTER_TEXT_LENGTH);
+        }
+        return trimmed;
+    }
+
+    private boolean isBlank(@Nullable String value) {
+        return value == null || value.isBlank();
     }
 }

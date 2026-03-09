@@ -65,6 +65,36 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       }
     }
 
+    Group #TameworkLinkedPanelControlsSecondary {
+      Anchor: (Top: 2, Height: 28);
+      LayoutMode: Left;
+
+      TextButton #TameworkLinkedPanelSortButton {
+        Anchor: (Width: 106, Height: 24);
+        Text: "Sort: Default";
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      Label #TameworkLinkedPanelFilterSummary {
+        Anchor: (Width: 204, Height: 24);
+        Text: "Filters: none";
+        Style: (
+          FontSize: 12,
+          TextColor: #bfd0e5,
+          HorizontalAlignment: Start,
+          VerticalAlignment: Center
+        );
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      TextButton #TameworkLinkedPanelFilterClearButton {
+        Anchor: (Width: 66, Height: 24);
+        Text: "Clear";
+      }
+    }
+
     Label #TameworkLinkedPanelEmptyState {
       Anchor: (Top: 8, Height: 48);
       Text: "No linked companions yet. Primary-use on an owned NPC to link it.";

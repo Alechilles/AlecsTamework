@@ -118,4 +118,59 @@ final class CommandPanelActionService {
             feedbackService.showWarning(player, "Unable to update panel radius.");
         }
     }
+
+    void applyCycleSort(Player player, String toolId) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                panelPreferenceService::cycleSort
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update sort mode.");
+        }
+    }
+
+    void applyClearFilters(Player player, String toolId) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                panelPreferenceService::clearFilters
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to clear filters.");
+        }
+    }
+
+    void applySetNameFilter(Player player, String toolId, String value) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setNameFilter(stack, value)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update name filter.");
+        }
+    }
+
+    void applySetSpeciesFilter(Player player, String toolId, String value) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setSpeciesFilter(stack, value)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update species filter.");
+        }
+    }
+
+    void applySetGroupFilter(Player player, String toolId, String value) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setGroupFilter(stack, value)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update group filter.");
+        }
+    }
 }

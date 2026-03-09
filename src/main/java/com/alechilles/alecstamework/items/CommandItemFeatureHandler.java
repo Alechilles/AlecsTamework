@@ -426,6 +426,8 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelModeLabelForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
+                () -> toolInventoryService.resolvePanelSortLabelForTool(player, toolId),
+                () -> toolInventoryService.resolvePanelFilterSummaryForTool(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, npcUuid),
@@ -436,6 +438,8 @@ public final class CommandItemFeatureHandler {
                 () -> panelActionService.applyTogglePanelMode(player, toolId, config),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
+                () -> panelActionService.applyCycleSort(player, toolId),
+                () -> panelActionService.applyClearFilters(player, toolId),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
