@@ -441,6 +441,9 @@ public final class CommandItemFeatureHandler {
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
                 () -> panelActionService.applyCycleSort(player, toolId),
                 () -> panelActionService.applyClearFilters(player, toolId),
+                value -> panelActionService.applySetNameFilter(player, toolId, value),
+                value -> panelActionService.applySetSpeciesFilter(player, toolId, value),
+                value -> panelActionService.applySetGroupFilter(player, toolId, value),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);

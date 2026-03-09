@@ -95,6 +95,42 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       }
     }
 
+    Group #TameworkLinkedPanelFilterInputRow {
+      Anchor: (Top: 2, Height: 28);
+      LayoutMode: Left;
+
+      TextField #TameworkLinkedPanelFilterInput {
+        Style: $C.@DefaultInputFieldStyle;
+        PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+        Background: $C.@InputBoxBackground;
+        Anchor: (Width: 198, Height: 24);
+        Padding: (Horizontal: 8);
+        PlaceholderText: "Filter text";
+        MaxLength: 40;
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      TextButton #TameworkLinkedPanelFilterNameSetButton {
+        Anchor: (Width: 64, Height: 24);
+        Text: "Name";
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      TextButton #TameworkLinkedPanelFilterSpeciesSetButton {
+        Anchor: (Width: 72, Height: 24);
+        Text: "Species";
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      TextButton #TameworkLinkedPanelFilterGroupSetButton {
+        Anchor: (Width: 64, Height: 24);
+        Text: "Group";
+      }
+    }
+
     Label #TameworkLinkedPanelEmptyState {
       Anchor: (Top: 8, Height: 48);
       Text: "No linked companions yet. Primary-use on an owned NPC to link it.";
