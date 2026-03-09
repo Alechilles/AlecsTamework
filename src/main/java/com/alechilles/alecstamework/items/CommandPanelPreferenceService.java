@@ -54,6 +54,25 @@ final class CommandPanelPreferenceService {
         }
     }
 
+    enum PanelFilterMode {
+        None,
+        Name,
+        Species,
+        Group;
+
+        static PanelFilterMode fromMetadata(String raw) {
+            if (raw == null || raw.isBlank()) {
+                return None;
+            }
+            for (PanelFilterMode mode : values()) {
+                if (mode.name().equalsIgnoreCase(raw.trim())) {
+                    return mode;
+                }
+            }
+            return None;
+        }
+    }
+
     @Nullable
     PanelMode readPanelModeOverride(@Nullable ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -153,6 +172,10 @@ final class CommandPanelPreferenceService {
         return PanelSort.fromMetadata(raw);
     }
 
+    String resolveSortValue(@Nullable ItemStack stack) {
+        return resolveSort(stack).name();
+    }
+
     ItemStack cycleSort(@Nullable ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
             return stack;
@@ -162,6 +185,19 @@ final class CommandPanelPreferenceService {
         int nextIndex = (current.ordinal() + 1) % values.length;
         ItemStack updated = withSchemaVersion(stack);
         return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_SORT, Codec.STRING, values[nextIndex].name());
+    }
+
+    ItemStack setSort(@Nullable ItemStack stack, @Nullable String rawSort) {
+        return setSort(stack, PanelSort.fromMetadata(rawSort));
+    }
+
+    ItemStack setSort(@Nullable ItemStack stack, @Nullable PanelSort sort) {
+        if (stack == null || stack.isEmpty()) {
+            return stack;
+        }
+        PanelSort normalized = sort != null ? sort : PanelSort.Default;
+        ItemStack updated = withSchemaVersion(stack);
+        return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_SORT, Codec.STRING, normalized.name());
     }
 
     String resolveSortLabel(@Nullable ItemStack stack) {
@@ -179,6 +215,67 @@ final class CommandPanelPreferenceService {
 
     String resolveGroupFilter(@Nullable ItemStack stack) {
         return readFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_GROUP);
+    }
+
+    PanelFilterMode resolveFilterMode(@Nullable ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return PanelFilterMode.None;
+        }
+        String raw = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_PANEL_FILTER_MODE, Codec.STRING);
+        PanelFilterMode stored = PanelFilterMode.fromMetadata(raw);
+        if (stored != PanelFilterMode.None) {
+            return stored;
+        }
+        if (!isBlank(resolveNameFilter(stack))) {
+            return PanelFilterMode.Name;
+        }
+        if (!isBlank(resolveSpeciesFilter(stack))) {
+            return PanelFilterMode.Species;
+        }
+        if (!isBlank(resolveGroupFilter(stack))) {
+            return PanelFilterMode.Group;
+        }
+        return PanelFilterMode.None;
+    }
+
+    String resolveFilterModeValue(@Nullable ItemStack stack) {
+        return resolveFilterMode(stack).name();
+    }
+
+    ItemStack setFilterMode(@Nullable ItemStack stack, @Nullable String rawMode) {
+        return setFilterMode(stack, PanelFilterMode.fromMetadata(rawMode));
+    }
+
+    ItemStack setFilterMode(@Nullable ItemStack stack, @Nullable PanelFilterMode mode) {
+        if (stack == null || stack.isEmpty()) {
+            return stack;
+        }
+        PanelFilterMode normalized = mode != null ? mode : PanelFilterMode.None;
+        String preserved = switch (normalized) {
+            case Name -> resolveNameFilter(stack);
+            case Species -> resolveSpeciesFilter(stack);
+            case Group -> resolveGroupFilter(stack);
+            case None -> "";
+        };
+        return setSingleFilter(stack, normalized, preserved);
+    }
+
+    String resolveSelectedFilterInput(@Nullable ItemStack stack) {
+        PanelFilterMode mode = resolveFilterMode(stack);
+        return switch (mode) {
+            case Name -> resolveNameFilter(stack);
+            case Species -> resolveSpeciesFilter(stack);
+            case Group -> resolveGroupFilter(stack);
+            case None -> "";
+        };
+    }
+
+    ItemStack applySelectedFilterText(@Nullable ItemStack stack, @Nullable String value) {
+        if (stack == null || stack.isEmpty()) {
+            return stack;
+        }
+        PanelFilterMode mode = resolveFilterMode(stack);
+        return setSingleFilter(stack, mode, value);
     }
 
     boolean hasActiveFilters(@Nullable ItemStack stack) {
@@ -206,21 +303,22 @@ final class CommandPanelPreferenceService {
             return stack;
         }
         ItemStack updated = withSchemaVersion(stack);
+        updated = updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_MODE, Codec.STRING, PanelFilterMode.None.name());
         updated = updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_NAME, Codec.STRING, "");
         updated = updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_SPECIES, Codec.STRING, "");
         return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_GROUP, Codec.STRING, "");
     }
 
     ItemStack setNameFilter(@Nullable ItemStack stack, @Nullable String value) {
-        return setFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_NAME, value);
+        return setSingleFilter(stack, PanelFilterMode.Name, value);
     }
 
     ItemStack setSpeciesFilter(@Nullable ItemStack stack, @Nullable String value) {
-        return setFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_SPECIES, value);
+        return setSingleFilter(stack, PanelFilterMode.Species, value);
     }
 
     ItemStack setGroupFilter(@Nullable ItemStack stack, @Nullable String value) {
-        return setFilterValue(stack, TameworkMetadataKeys.COMMAND_PANEL_FILTER_GROUP, value);
+        return setSingleFilter(stack, PanelFilterMode.Group, value);
     }
 
     private double resolveConfiguredRadius(@Nullable TwCommandItemConfig config) {
@@ -251,12 +349,31 @@ final class CommandPanelPreferenceService {
         return normalizeFilterText(raw);
     }
 
-    private ItemStack setFilterValue(@Nullable ItemStack stack, String key, @Nullable String value) {
-        if (stack == null || stack.isEmpty() || key == null || key.isBlank()) {
+    private ItemStack setSingleFilter(@Nullable ItemStack stack,
+                                      @Nullable PanelFilterMode mode,
+                                      @Nullable String value) {
+        if (stack == null || stack.isEmpty()) {
             return stack;
         }
+        PanelFilterMode normalizedMode = mode != null ? mode : PanelFilterMode.None;
+        String normalizedValue = normalizeFilterText(value);
         ItemStack updated = withSchemaVersion(stack);
-        return updated.withMetadata(key, Codec.STRING, normalizeFilterText(value));
+        updated = updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_FILTER_MODE, Codec.STRING, normalizedMode.name());
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.COMMAND_PANEL_FILTER_NAME,
+                Codec.STRING,
+                normalizedMode == PanelFilterMode.Name ? normalizedValue : ""
+        );
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.COMMAND_PANEL_FILTER_SPECIES,
+                Codec.STRING,
+                normalizedMode == PanelFilterMode.Species ? normalizedValue : ""
+        );
+        return updated.withMetadata(
+                TameworkMetadataKeys.COMMAND_PANEL_FILTER_GROUP,
+                Codec.STRING,
+                normalizedMode == PanelFilterMode.Group ? normalizedValue : ""
+        );
     }
 
     private ItemStack withSchemaVersion(ItemStack stack) {

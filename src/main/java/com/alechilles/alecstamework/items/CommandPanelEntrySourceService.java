@@ -192,21 +192,22 @@ final class CommandPanelEntrySourceService {
             }
             filtered.add(entry);
         }
-        Comparator<LinkedNpcEntry> comparator = buildComparator(panelPreferenceService.resolveSort(stack));
+        CommandPanelPreferenceService.PanelSort sort = panelPreferenceService.resolveSort(stack);
+        if (sort == CommandPanelPreferenceService.PanelSort.Default) {
+            return partitionByActive(filtered);
+        }
+        Comparator<LinkedNpcEntry> comparator = buildComparator(sort);
         filtered.sort(comparator);
         return filtered;
     }
 
     private Comparator<LinkedNpcEntry> buildComparator(CommandPanelPreferenceService.PanelSort sort) {
-        Comparator<LinkedNpcEntry> base = Comparator
-                .comparing((LinkedNpcEntry value) -> value.active() ? 0 : 1)
-                .thenComparing(value -> value.loaded() ? 0 : 1)
-                .thenComparing(value -> value.dead() ? 1 : 0)
-                .thenComparing(value -> value.captured() ? 1 : 0);
+        Comparator<LinkedNpcEntry> base =
+                Comparator.comparing((LinkedNpcEntry value) -> value.active() ? 0 : 1);
         Comparator<LinkedNpcEntry> byName = Comparator
                 .comparing((LinkedNpcEntry value) -> safe(value.displayName()), String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(value -> value.npcUuid().toString());
-        if (sort == null || sort == CommandPanelPreferenceService.PanelSort.Default) {
+        if (sort == null) {
             return base.thenComparing(byName);
         }
         if (sort == CommandPanelPreferenceService.PanelSort.Name) {
@@ -226,6 +227,32 @@ final class CommandPanelEntrySourceService {
                         String.CASE_INSENSITIVE_ORDER
                 )
                 .thenComparing(byName);
+    }
+
+    private List<LinkedNpcEntry> partitionByActive(List<LinkedNpcEntry> input) {
+        if (input == null || input.isEmpty()) {
+            return List.of();
+        }
+        ArrayList<LinkedNpcEntry> active = new ArrayList<>(input.size());
+        ArrayList<LinkedNpcEntry> inactive = new ArrayList<>(input.size());
+        for (LinkedNpcEntry entry : input) {
+            if (entry == null) {
+                continue;
+            }
+            if (entry.active()) {
+                active.add(entry);
+            } else {
+                inactive.add(entry);
+            }
+        }
+        if (inactive.isEmpty()) {
+            return active;
+        }
+        if (active.isEmpty()) {
+            return inactive;
+        }
+        active.addAll(inactive);
+        return active;
     }
 
     private HealthSnapshot readHealthSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {

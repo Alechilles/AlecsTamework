@@ -435,7 +435,9 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelModeLabelForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
-                () -> toolInventoryService.resolvePanelSortLabelForTool(player, toolId),
+                () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
+                () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
+                () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterSummaryForTool(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
@@ -448,11 +450,10 @@ public final class CommandItemFeatureHandler {
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
                 () -> groupManagerPageService.openGroupManagerPage(player, toolId),
-                () -> panelActionService.applyCycleSort(player, toolId),
+                value -> panelActionService.applySetSort(player, toolId, value),
+                value -> panelActionService.applySetFilterMode(player, toolId, value),
+                value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
                 () -> panelActionService.applyClearFilters(player, toolId),
-                value -> panelActionService.applySetNameFilter(player, toolId, value),
-                value -> panelActionService.applySetSpeciesFilter(player, toolId, value),
-                value -> panelActionService.applySetGroupFilter(player, toolId, value),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);

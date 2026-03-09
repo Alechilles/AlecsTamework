@@ -76,15 +76,64 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       Anchor: (Top: 2, Height: 28);
       LayoutMode: Left;
 
-      TextButton #TameworkLinkedPanelSortButton {
-        Anchor: (Width: 106, Height: 24);
-        Text: "Sort: Default";
+      DropdownBox #TameworkLinkedPanelSortDropdown {
+        Anchor: (Width: 118, Height: 24);
+        Style: (
+          ...$C.@DefaultDropdownBoxStyle,
+          HorizontalPadding: 8,
+          LabelStyle: (
+            ...$C.@DefaultDropdownBoxLabelStyle,
+            RenderUppercase: false,
+            FontSize: 11
+          ),
+          EntryLabelStyle: (
+            ...$C.@DefaultDropdownBoxEntryLabelStyle,
+            RenderUppercase: false,
+            FontSize: 11
+          ),
+          SelectedEntryLabelStyle: (
+            ...$C.@DefaultDropdownBoxEntryLabelStyle,
+            RenderUppercase: false,
+            RenderBold: true,
+            FontSize: 11
+          )
+        );
+        MaxSelection: 1;
+        NoItemsText: "No sort options";
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      DropdownBox #TameworkLinkedPanelFilterDropdown {
+        Anchor: (Width: 118, Height: 24);
+        Style: (
+          ...$C.@DefaultDropdownBoxStyle,
+          HorizontalPadding: 8,
+          LabelStyle: (
+            ...$C.@DefaultDropdownBoxLabelStyle,
+            RenderUppercase: false,
+            FontSize: 11
+          ),
+          EntryLabelStyle: (
+            ...$C.@DefaultDropdownBoxEntryLabelStyle,
+            RenderUppercase: false,
+            FontSize: 11
+          ),
+          SelectedEntryLabelStyle: (
+            ...$C.@DefaultDropdownBoxEntryLabelStyle,
+            RenderUppercase: false,
+            RenderBold: true,
+            FontSize: 11
+          )
+        );
+        MaxSelection: 1;
+        NoItemsText: "No filter options";
       }
 
       Group { Anchor: (Width: 6); }
 
       Label #TameworkLinkedPanelFilterSummary {
-        Anchor: (Width: 204, Height: 24);
+        Anchor: (Width: 116, Height: 24);
         Text: "Filters: none";
         Style: (
           FontSize: 12,
@@ -97,7 +146,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       Group { Anchor: (Width: 6); }
 
       TextButton #TameworkLinkedPanelFilterClearButton {
-        Anchor: (Width: 66, Height: 24);
+        Anchor: (Width: 58, Height: 24);
         Text: "Clear";
       }
     }
@@ -106,35 +155,27 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       Anchor: (Top: 2, Height: 28);
       LayoutMode: Left;
 
+      Label #TameworkLinkedPanelFilterInputLabel {
+        Anchor: (Width: 52, Height: 24);
+        Text: "Filter";
+        Style: (
+          FontSize: 12,
+          TextColor: #bfd0e5,
+          HorizontalAlignment: Start,
+          VerticalAlignment: Center
+        );
+      }
+
+      Group { Anchor: (Width: 6); }
+
       TextField #TameworkLinkedPanelFilterInput {
         Style: $C.@DefaultInputFieldStyle;
         PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
         Background: $C.@InputBoxBackground;
-        Anchor: (Width: 198, Height: 24);
+        Anchor: (Width: 344, Height: 24);
         Padding: (Horizontal: 8);
-        PlaceholderText: "Filter text";
+        PlaceholderText: "Type to filter selected field";
         MaxLength: 40;
-      }
-
-      Group { Anchor: (Width: 6); }
-
-      TextButton #TameworkLinkedPanelFilterNameSetButton {
-        Anchor: (Width: 64, Height: 24);
-        Text: "Name";
-      }
-
-      Group { Anchor: (Width: 6); }
-
-      TextButton #TameworkLinkedPanelFilterSpeciesSetButton {
-        Anchor: (Width: 72, Height: 24);
-        Text: "Species";
-      }
-
-      Group { Anchor: (Width: 6); }
-
-      TextButton #TameworkLinkedPanelFilterGroupSetButton {
-        Anchor: (Width: 64, Height: 24);
-        Text: "Group";
       }
     }
 

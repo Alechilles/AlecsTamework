@@ -185,9 +185,24 @@ final class CommandToolInventoryService {
         return panelPreferenceService.resolveSortLabel(stack);
     }
 
+    String resolvePanelSortValueForTool(Player player, String toolId) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveSortValue(stack);
+    }
+
     String resolvePanelFilterSummaryForTool(Player player, String toolId) {
         ItemStack stack = findToolStack(player, toolId);
         return panelPreferenceService.resolveFilterSummaryLabel(stack);
+    }
+
+    String resolvePanelFilterModeValueForTool(Player player, String toolId) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveFilterModeValue(stack);
+    }
+
+    String resolvePanelFilterInputForTool(Player player, String toolId) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveSelectedFilterInput(stack);
     }
 
     private ItemStack findToolStack(Player player, String toolId) {

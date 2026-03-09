@@ -10,6 +10,8 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
@@ -36,9 +38,9 @@ public final class TameworkCommandSelectionPage
     public static final String LINKED_PANEL_UI_PATH = "TameworkLinkedNpcPanel.ui";
     public static final String LINKED_PANEL_CARD_UI_PATH = "TameworkLinkedNpcPanelCard.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
-    private static final String KEY_FILTER_NAME_INPUT = "@PanelFilterNameInput";
-    private static final String KEY_FILTER_SPECIES_INPUT = "@PanelFilterSpeciesInput";
-    private static final String KEY_FILTER_GROUP_INPUT = "@PanelFilterGroupInput";
+    private static final String KEY_PANEL_SORT_VALUE = "@PanelSortValue";
+    private static final String KEY_PANEL_FILTER_MODE_VALUE = "@PanelFilterModeValue";
+    private static final String KEY_PANEL_FILTER_TEXT_INPUT = "@PanelFilterTextInput";
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final String LINK_COMMAND_PREFIX = "__link__:";
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
@@ -51,17 +53,30 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_RADIUS_DECREASE_COMMAND_ID = "__panel_radius_dec__";
     private static final String PANEL_RADIUS_INCREASE_COMMAND_ID = "__panel_radius_inc__";
     private static final String PANEL_MANAGE_GROUPS_COMMAND_ID = "__panel_manage_groups__";
-    private static final String PANEL_SORT_CYCLE_COMMAND_ID = "__panel_sort_cycle__";
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
+    private static final List<DropdownEntryInfo> SORT_DROPDOWN_ENTRIES = List.of(
+            new DropdownEntryInfo(LocalizableString.fromString("Default"), "Default"),
+            new DropdownEntryInfo(LocalizableString.fromString("Name"), "Name"),
+            new DropdownEntryInfo(LocalizableString.fromString("Species"), "Species"),
+            new DropdownEntryInfo(LocalizableString.fromString("Group"), "Group")
+    );
+    private static final List<DropdownEntryInfo> FILTER_MODE_DROPDOWN_ENTRIES = List.of(
+            new DropdownEntryInfo(LocalizableString.fromString("None"), "None"),
+            new DropdownEntryInfo(LocalizableString.fromString("Name"), "Name"),
+            new DropdownEntryInfo(LocalizableString.fromString("Species"), "Species"),
+            new DropdownEntryInfo(LocalizableString.fromString("Group"), "Group")
+    );
 
     private final CommandOption[] options;
     private final boolean requireUnlinkConfirm;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier;
     private final Supplier<String> panelModeLabelSupplier;
     private final Supplier<String> panelRadiusLabelSupplier;
-    private final Supplier<String> panelSortLabelSupplier;
+    private final Supplier<String> panelSortValueSupplier;
+    private final Supplier<String> panelFilterModeValueSupplier;
+    private final Supplier<String> panelFilterInputValueSupplier;
     private final Supplier<String> panelFilterSummarySupplier;
     private LinkedNpcEntry[] linkedNpcEntries;
     private int renderedLinkedNpcCardCount;
@@ -79,11 +94,10 @@ public final class TameworkCommandSelectionPage
     private final Runnable panelRadiusDecreaseCallback;
     private final Runnable panelRadiusIncreaseCallback;
     private final Runnable panelManageGroupsCallback;
-    private final Runnable panelSortCycleCallback;
+    private final Consumer<String> panelSetSortCallback;
+    private final Consumer<String> panelSetFilterModeCallback;
+    private final Consumer<String> panelSetFilterTextCallback;
     private final Runnable panelClearFiltersCallback;
-    private final Consumer<String> panelSetNameFilterCallback;
-    private final Consumer<String> panelSetSpeciesFilterCallback;
-    private final Consumer<String> panelSetGroupFilterCallback;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
 
@@ -94,7 +108,9 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier,
                                         @Nonnull Supplier<String> panelModeLabelSupplier,
                                         @Nonnull Supplier<String> panelRadiusLabelSupplier,
-                                        @Nonnull Supplier<String> panelSortLabelSupplier,
+                                        @Nonnull Supplier<String> panelSortValueSupplier,
+                                        @Nonnull Supplier<String> panelFilterModeValueSupplier,
+                                        @Nonnull Supplier<String> panelFilterInputValueSupplier,
                                         @Nonnull Supplier<String> panelFilterSummarySupplier,
                                         @Nonnull Consumer<UUID> linkCallback,
                                         @Nonnull Consumer<UUID> unlinkCallback,
@@ -107,11 +123,10 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Runnable panelRadiusDecreaseCallback,
                                         @Nonnull Runnable panelRadiusIncreaseCallback,
                                         @Nonnull Runnable panelManageGroupsCallback,
-                                        @Nonnull Runnable panelSortCycleCallback,
+                                        @Nonnull Consumer<String> panelSetSortCallback,
+                                        @Nonnull Consumer<String> panelSetFilterModeCallback,
+                                        @Nonnull Consumer<String> panelSetFilterTextCallback,
                                         @Nonnull Runnable panelClearFiltersCallback,
-                                        @Nonnull Consumer<String> panelSetNameFilterCallback,
-                                        @Nonnull Consumer<String> panelSetSpeciesFilterCallback,
-                                        @Nonnull Consumer<String> panelSetGroupFilterCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
@@ -119,7 +134,9 @@ public final class TameworkCommandSelectionPage
         this.linkedNpcEntriesSupplier = linkedNpcEntriesSupplier;
         this.panelModeLabelSupplier = panelModeLabelSupplier;
         this.panelRadiusLabelSupplier = panelRadiusLabelSupplier;
-        this.panelSortLabelSupplier = panelSortLabelSupplier;
+        this.panelSortValueSupplier = panelSortValueSupplier;
+        this.panelFilterModeValueSupplier = panelFilterModeValueSupplier;
+        this.panelFilterInputValueSupplier = panelFilterInputValueSupplier;
         this.panelFilterSummarySupplier = panelFilterSummarySupplier;
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.renderedLinkedNpcCardCount = 0;
@@ -136,11 +153,10 @@ public final class TameworkCommandSelectionPage
         this.panelRadiusDecreaseCallback = panelRadiusDecreaseCallback;
         this.panelRadiusIncreaseCallback = panelRadiusIncreaseCallback;
         this.panelManageGroupsCallback = panelManageGroupsCallback;
-        this.panelSortCycleCallback = panelSortCycleCallback;
+        this.panelSetSortCallback = panelSetSortCallback;
+        this.panelSetFilterModeCallback = panelSetFilterModeCallback;
+        this.panelSetFilterTextCallback = panelSetFilterTextCallback;
         this.panelClearFiltersCallback = panelClearFiltersCallback;
-        this.panelSetNameFilterCallback = panelSetNameFilterCallback;
-        this.panelSetSpeciesFilterCallback = panelSetSpeciesFilterCallback;
-        this.panelSetGroupFilterCallback = panelSetGroupFilterCallback;
         this.selectionCallback = selectionCallback;
         this.refreshLoopStarted = false;
         this.dismissed = false;
@@ -166,7 +182,11 @@ public final class TameworkCommandSelectionPage
         );
         commandBuilder.set("#TameworkLinkedPanelModeButton.Text", resolvePanelModeLabel());
         commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
-        commandBuilder.set("#TameworkLinkedPanelSortButton.Text", resolvePanelSortLabel());
+        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", buildSortDropdownEntries());
+        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
+        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", buildFilterModeDropdownEntries());
+        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
+        commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
         commandBuilder.set("#TameworkLinkedPanelFilterSummary.Text", resolvePanelFilterSummary());
 
         buildCommandButtons(commandBuilder, eventBuilder);
@@ -180,27 +200,27 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
-        if (data.panelFilterNameInput != null) {
-            if (panelSetNameFilterCallback != null) {
-                panelSetNameFilterCallback.accept(data.panelFilterNameInput);
+        if (data.panelSortValue != null) {
+            if (panelSetSortCallback != null) {
+                panelSetSortCallback.accept(data.panelSortValue);
             }
             pendingUnlinkNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
         }
-        if (data.panelFilterSpeciesInput != null) {
-            if (panelSetSpeciesFilterCallback != null) {
-                panelSetSpeciesFilterCallback.accept(data.panelFilterSpeciesInput);
+        if (data.panelFilterModeValue != null) {
+            if (panelSetFilterModeCallback != null) {
+                panelSetFilterModeCallback.accept(data.panelFilterModeValue);
             }
             pendingUnlinkNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
         }
-        if (data.panelFilterGroupInput != null) {
-            if (panelSetGroupFilterCallback != null) {
-                panelSetGroupFilterCallback.accept(data.panelFilterGroupInput);
+        if (data.panelFilterTextInput != null) {
+            if (panelSetFilterTextCallback != null) {
+                panelSetFilterTextCallback.accept(data.panelFilterTextInput);
             }
             pendingUnlinkNpcUuid = null;
             refreshLinkedNpcEntries();
@@ -244,15 +264,6 @@ public final class TameworkCommandSelectionPage
                 pendingUnlinkNpcUuid = null;
                 close();
                 panelManageGroupsCallback.run();
-            }
-            return;
-        }
-        if (PANEL_SORT_CYCLE_COMMAND_ID.equals(data.commandId)) {
-            if (panelSortCycleCallback != null) {
-                panelSortCycleCallback.run();
-                pendingUnlinkNpcUuid = null;
-                refreshLinkedNpcEntries();
-                sendCardRefreshUpdate();
             }
             return;
         }
@@ -469,7 +480,11 @@ public final class TameworkCommandSelectionPage
         );
         commandBuilder.set("#TameworkLinkedPanelModeButton.Text", resolvePanelModeLabel());
         commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
-        commandBuilder.set("#TameworkLinkedPanelSortButton.Text", resolvePanelSortLabel());
+        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", buildSortDropdownEntries());
+        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
+        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", buildFilterModeDropdownEntries());
+        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
+        commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
         commandBuilder.set("#TameworkLinkedPanelFilterSummary.Text", resolvePanelFilterSummary());
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
@@ -535,9 +550,9 @@ public final class TameworkCommandSelectionPage
                 false
         );
         eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TameworkLinkedPanelSortButton",
-                EventData.of(EVENT_COMMAND_ID, PANEL_SORT_CYCLE_COMMAND_ID),
+                CustomUIEventBindingType.ValueChanged,
+                "#TameworkLinkedPanelSortDropdown",
+                EventData.of(KEY_PANEL_SORT_VALUE, "#TameworkLinkedPanelSortDropdown.Value"),
                 false
         );
         eventBuilder.addEventBinding(
@@ -547,21 +562,15 @@ public final class TameworkCommandSelectionPage
                 false
         );
         eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TameworkLinkedPanelFilterNameSetButton",
-                EventData.of(KEY_FILTER_NAME_INPUT, "#TameworkLinkedPanelFilterInput.Value"),
+                CustomUIEventBindingType.ValueChanged,
+                "#TameworkLinkedPanelFilterDropdown",
+                EventData.of(KEY_PANEL_FILTER_MODE_VALUE, "#TameworkLinkedPanelFilterDropdown.Value"),
                 false
         );
         eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TameworkLinkedPanelFilterSpeciesSetButton",
-                EventData.of(KEY_FILTER_SPECIES_INPUT, "#TameworkLinkedPanelFilterInput.Value"),
-                false
-        );
-        eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TameworkLinkedPanelFilterGroupSetButton",
-                EventData.of(KEY_FILTER_GROUP_INPUT, "#TameworkLinkedPanelFilterInput.Value"),
+                CustomUIEventBindingType.ValueChanged,
+                "#TameworkLinkedPanelFilterInput",
+                EventData.of(KEY_PANEL_FILTER_TEXT_INPUT, "#TameworkLinkedPanelFilterInput.Value"),
                 false
         );
     }
@@ -742,12 +751,28 @@ public final class TameworkCommandSelectionPage
         return value == null || value.isBlank() ? "Radius: 24m" : value;
     }
 
-    private String resolvePanelSortLabel() {
-        if (panelSortLabelSupplier == null) {
-            return "Sort: Default";
+    private String resolvePanelSortValue() {
+        if (panelSortValueSupplier == null) {
+            return "Default";
         }
-        String value = panelSortLabelSupplier.get();
-        return value == null || value.isBlank() ? "Sort: Default" : value;
+        String value = panelSortValueSupplier.get();
+        return value == null || value.isBlank() ? "Default" : value;
+    }
+
+    private String resolvePanelFilterModeValue() {
+        if (panelFilterModeValueSupplier == null) {
+            return "None";
+        }
+        String value = panelFilterModeValueSupplier.get();
+        return value == null || value.isBlank() ? "None" : value;
+    }
+
+    private String resolvePanelFilterInputValue() {
+        if (panelFilterInputValueSupplier == null) {
+            return "";
+        }
+        String value = panelFilterInputValueSupplier.get();
+        return value == null ? "" : value;
     }
 
     private String resolvePanelFilterSummary() {
@@ -756,6 +781,14 @@ public final class TameworkCommandSelectionPage
         }
         String value = panelFilterSummarySupplier.get();
         return value == null || value.isBlank() ? "Filters: none" : value;
+    }
+
+    private List<DropdownEntryInfo> buildSortDropdownEntries() {
+        return SORT_DROPDOWN_ENTRIES;
+    }
+
+    private List<DropdownEntryInfo> buildFilterModeDropdownEntries() {
+        return FILTER_MODE_DROPDOWN_ENTRIES;
     }
 
     private static CommandOption[] buildOptions(TwCommandItemConfig config) {
@@ -862,28 +895,28 @@ public final class TameworkCommandSelectionPage
             )
             .add()
             .append(
-                new KeyedCodec<>(KEY_FILTER_NAME_INPUT, Codec.STRING),
-                (event, value) -> event.panelFilterNameInput = value,
-                event -> event.panelFilterNameInput
+                new KeyedCodec<>(KEY_PANEL_SORT_VALUE, Codec.STRING),
+                (event, value) -> event.panelSortValue = value,
+                event -> event.panelSortValue
             )
             .add()
             .append(
-                new KeyedCodec<>(KEY_FILTER_SPECIES_INPUT, Codec.STRING),
-                (event, value) -> event.panelFilterSpeciesInput = value,
-                event -> event.panelFilterSpeciesInput
+                new KeyedCodec<>(KEY_PANEL_FILTER_MODE_VALUE, Codec.STRING),
+                (event, value) -> event.panelFilterModeValue = value,
+                event -> event.panelFilterModeValue
             )
             .add()
             .append(
-                new KeyedCodec<>(KEY_FILTER_GROUP_INPUT, Codec.STRING),
-                (event, value) -> event.panelFilterGroupInput = value,
-                event -> event.panelFilterGroupInput
+                new KeyedCodec<>(KEY_PANEL_FILTER_TEXT_INPUT, Codec.STRING),
+                (event, value) -> event.panelFilterTextInput = value,
+                event -> event.panelFilterTextInput
             )
             .add()
             .build();
 
         private String commandId;
-        private String panelFilterNameInput;
-        private String panelFilterSpeciesInput;
-        private String panelFilterGroupInput;
+        private String panelSortValue;
+        private String panelFilterModeValue;
+        private String panelFilterTextInput;
     }
 }

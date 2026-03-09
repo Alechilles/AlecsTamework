@@ -48,6 +48,7 @@ public final class TameworkMetadataKeys {
     public static final String COMMAND_PANEL_MODE = "Tamework.Command.PanelMode";
     public static final String COMMAND_PANEL_RADIUS = "Tamework.Command.PanelRadius";
     public static final String COMMAND_PANEL_SORT = "Tamework.Command.PanelSort";
+    public static final String COMMAND_PANEL_FILTER_MODE = "Tamework.Command.PanelFilterMode";
     public static final String COMMAND_PANEL_FILTER_NAME = "Tamework.Command.PanelFilterName";
     public static final String COMMAND_PANEL_FILTER_SPECIES = "Tamework.Command.PanelFilterSpecies";
     public static final String COMMAND_PANEL_FILTER_GROUP = "Tamework.Command.PanelFilterGroup";

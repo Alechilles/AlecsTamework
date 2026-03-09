@@ -136,6 +136,39 @@ final class CommandPanelActionService {
         }
     }
 
+    void applySetSort(Player player, String toolId, String sortValue) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setSort(stack, sortValue)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update sort mode.");
+        }
+    }
+
+    void applySetFilterMode(Player player, String toolId, String filterModeValue) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setFilterMode(stack, filterModeValue)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update filter mode.");
+        }
+    }
+
+    void applySetSelectedFilterText(Player player, String toolId, String value) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.applySelectedFilterText(stack, value)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarning(player, "Unable to update filter.");
+        }
+    }
+
     void applyClearFilters(Player player, String toolId) {
         boolean updated = toolInventoryService.mutateToolStack(
                 player,
