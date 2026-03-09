@@ -751,7 +751,8 @@ public final class TameworkCommandSelectionPage
                     entry.groupColorHex(),
                     entry.breedingCooldownActive(),
                     entry.breedingCooldownRemainingMs(),
-                    entry.breedingCooldownRatio()
+                    entry.breedingCooldownRatio(),
+                    entry.breedingCooldownKnown()
             ));
         }
         return out.toArray(new LinkedNpcEntry[0]);

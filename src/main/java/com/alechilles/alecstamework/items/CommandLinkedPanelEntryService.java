@@ -1,11 +1,14 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
@@ -95,6 +98,10 @@ final class CommandLinkedPanelEntryService {
             int maxHunger = 0;
             int thirst = 0;
             int maxThirst = 0;
+            boolean breedingCooldownActive = false;
+            long breedingCooldownRemainingMs = 0L;
+            double breedingCooldownRatio = 0.0;
+            boolean breedingCooldownKnown = false;
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
             if (world != null) {
                 Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
@@ -133,6 +140,13 @@ final class CommandLinkedPanelEntryService {
                             maxHunger = needsSnapshot.hungerMax;
                             thirst = needsSnapshot.thirstCurrent;
                             maxThirst = needsSnapshot.thirstMax;
+                        }
+                        BreedingCooldownSnapshot breedingSnapshot = readBreedingCooldownSnapshot(npcRef, store, speciesId);
+                        if (breedingSnapshot != null) {
+                            breedingCooldownKnown = breedingSnapshot.known;
+                            breedingCooldownActive = breedingSnapshot.active;
+                            breedingCooldownRemainingMs = breedingSnapshot.remainingMs;
+                            breedingCooldownRatio = breedingSnapshot.ratio;
                         }
                         traitIndicators = readTraitIndicators(npcRef, store, traitType);
                     }
@@ -210,9 +224,10 @@ final class CommandLinkedPanelEntryService {
                     record.groupId,
                     null,
                     null,
-                    false,
-                    0L,
-                    0.0
+                    breedingCooldownActive,
+                    breedingCooldownRemainingMs,
+                    breedingCooldownRatio,
+                    breedingCooldownKnown
             ));
         }
         return entries;
@@ -543,6 +558,59 @@ final class CommandLinkedPanelEntryService {
         return percent + "%";
     }
 
+    private BreedingCooldownSnapshot readBreedingCooldownSnapshot(Ref<EntityStore> npcRef,
+                                                                  Store<EntityStore> store,
+                                                                  String resolvedRoleId) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        if (breedingType == null) {
+            return null;
+        }
+        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
+        if (breeding == null) {
+            return new BreedingCooldownSnapshot(false, false, 0L, 0.0);
+        }
+        long now = BreedingTimeService.resolveCurrentTimeMs(store);
+        long until = breeding.getCooldownUntilMs();
+        boolean active = until != 0L && now < until;
+        long remaining = active ? Math.max(0L, until - now) : 0L;
+        double ratio = active ? resolveBreedingCooldownRatio(breeding, npcRef, store, resolvedRoleId, remaining) : 1.0;
+        return new BreedingCooldownSnapshot(true, active, remaining, ratio);
+    }
+
+    private double resolveBreedingCooldownRatio(TameworkBreedingComponent breeding,
+                                                Ref<EntityStore> npcRef,
+                                                Store<EntityStore> store,
+                                                String resolvedRoleId,
+                                                long remainingMs) {
+        TwBreedingConfig config = null;
+        if (breeding != null && breeding.getConfigId() != null && !breeding.getConfigId().isBlank()) {
+            config = TwBreedingConfig.resolveById(breeding.getConfigId());
+        }
+        if (config == null) {
+            String roleId = resolvedRoleId;
+            if (roleId == null || roleId.isBlank()) {
+                roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+            }
+            config = TwBreedingConfig.resolveForRole(roleId);
+        }
+        if (config == null || config.getCooldowns() == null || config.getTiming() == null) {
+            return 0.0;
+        }
+        long baseDurationMs = BreedingTimeService.toGameDurationMs(
+                config.getCooldowns().getBaseCooldownSeconds(),
+                config.getTiming().getTimerBasis(),
+                store
+        );
+        if (baseDurationMs <= 0L) {
+            return 0.0;
+        }
+        double progress = 1.0 - ((double) remainingMs / (double) baseDurationMs);
+        return clamp(progress, 0.0, 1.0);
+    }
+
     private static final class HealthSnapshot {
         private final int current;
         private final int max;
@@ -576,6 +644,20 @@ final class CommandLinkedPanelEntryService {
             this.hungerMax = hungerMax;
             this.thirstCurrent = thirstCurrent;
             this.thirstMax = thirstMax;
+        }
+    }
+
+    private static final class BreedingCooldownSnapshot {
+        private final boolean known;
+        private final boolean active;
+        private final long remainingMs;
+        private final double ratio;
+
+        private BreedingCooldownSnapshot(boolean known, boolean active, long remainingMs, double ratio) {
+            this.known = known;
+            this.active = active;
+            this.remainingMs = Math.max(0L, remainingMs);
+            this.ratio = Math.max(0.0, Math.min(1.0, ratio));
         }
     }
 }

@@ -33,6 +33,7 @@ public final class LinkedNpcEntry {
     private final boolean breedingCooldownActive;
     private final long breedingCooldownRemainingMs;
     private final double breedingCooldownRatio;
+    private final boolean breedingCooldownKnown;
     private final FutureStat futureStatA;
     private final FutureStat futureStatB;
     private final LinkedNpcTraitIndicator[] traitIndicators;
@@ -91,7 +92,8 @@ public final class LinkedNpcEntry {
                 null,
                 false,
                 0L,
-                0.0
+                0.0,
+                false
         );
     }
 
@@ -151,7 +153,8 @@ public final class LinkedNpcEntry {
                 null,
                 false,
                 0L,
-                0.0
+                0.0,
+                false
         );
     }
 
@@ -187,7 +190,8 @@ public final class LinkedNpcEntry {
                           String groupColorHex,
                           boolean breedingCooldownActive,
                           long breedingCooldownRemainingMs,
-                          double breedingCooldownRatio) {
+                          double breedingCooldownRatio,
+                          boolean breedingCooldownKnown) {
         this.npcUuid = npcUuid;
         this.displayName = displayName;
         this.currentHealth = currentHealth;
@@ -214,6 +218,7 @@ public final class LinkedNpcEntry {
         this.breedingCooldownActive = breedingCooldownActive;
         this.breedingCooldownRemainingMs = Math.max(0L, breedingCooldownRemainingMs);
         this.breedingCooldownRatio = sanitizeRatio(breedingCooldownRatio);
+        this.breedingCooldownKnown = breedingCooldownKnown;
         this.futureStatA = futureStatA;
         this.futureStatB = futureStatB;
         this.traitIndicators = sanitizeTraitIndicators(traitIndicators);
@@ -329,6 +334,10 @@ public final class LinkedNpcEntry {
 
     public double breedingCooldownRatio() {
         return breedingCooldownRatio;
+    }
+
+    public boolean breedingCooldownKnown() {
+        return breedingCooldownKnown;
     }
 
     public double healthRatio() {

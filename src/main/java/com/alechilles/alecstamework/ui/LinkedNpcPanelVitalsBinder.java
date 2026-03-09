@@ -12,6 +12,8 @@ final class LinkedNpcPanelVitalsBinder {
     private static final String HAPPINESS_FILL_COLOR = "#f2c97c";
     private static final String HUNGER_FILL_COLOR = "#d9a066";
     private static final String THIRST_FILL_COLOR = "#76b7ea";
+    private static final String BREEDING_ACTIVE_FILL_COLOR = "#e8a574";
+    private static final String BREEDING_READY_FILL_COLOR = "#6fc576";
     private static final String UNAVAILABLE_FILL_COLOR = "#4e6077";
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
@@ -23,6 +25,7 @@ final class LinkedNpcPanelVitalsBinder {
     static void bind(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry) {
         bindHealth(commandBuilder, entrySelector, entry);
         bindNeedRings(commandBuilder, entrySelector, entry);
+        bindBreedingCooldown(commandBuilder, entrySelector, entry);
     }
 
     private static void bindHealth(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry) {
@@ -174,6 +177,51 @@ final class LinkedNpcPanelVitalsBinder {
         commandBuilder.set(slotSelector + " #RingFillLeft.Background", fillColor);
 
         SegmentFill fill = resolveSegmentFill(visual.available() ? visual.fillRatio() : 0.0);
+        commandBuilder.setObject(
+                slotSelector + " #RingFillTop.Anchor",
+                LinkedNpcPanelAnchorFactory.buildTraitTopFillAnchor(toPixels(fill.top()), true)
+        );
+        commandBuilder.setObject(
+                slotSelector + " #RingFillRight.Anchor",
+                LinkedNpcPanelAnchorFactory.buildTraitRightFillAnchor(toPixels(fill.right()), true)
+        );
+        commandBuilder.setObject(
+                slotSelector + " #RingFillBottom.Anchor",
+                LinkedNpcPanelAnchorFactory.buildTraitBottomFillAnchor(toPixels(fill.bottom()), true)
+        );
+        commandBuilder.setObject(
+                slotSelector + " #RingFillLeft.Anchor",
+                LinkedNpcPanelAnchorFactory.buildTraitLeftFillAnchor(toPixels(fill.left()), true)
+        );
+    }
+
+    private static void bindBreedingCooldown(UICommandBuilder commandBuilder,
+                                             String entrySelector,
+                                             LinkedNpcEntry entry) {
+        String slotSelector = entrySelector + " #BreedingCooldown";
+        commandBuilder.set(slotSelector + ".Visible", true);
+        commandBuilder.set(
+                slotSelector + " #BreedingCooldownTooltip.TooltipText",
+                LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry)
+        );
+        String fillColor = UNAVAILABLE_FILL_COLOR;
+        if (entry.breedingCooldownKnown()) {
+            fillColor = entry.breedingCooldownActive() ? BREEDING_ACTIVE_FILL_COLOR : BREEDING_READY_FILL_COLOR;
+        }
+        commandBuilder.set(slotSelector + " #RingFillTop.Background", fillColor);
+        commandBuilder.set(slotSelector + " #RingFillRight.Background", fillColor);
+        commandBuilder.set(slotSelector + " #RingFillBottom.Background", fillColor);
+        commandBuilder.set(slotSelector + " #RingFillLeft.Background", fillColor);
+
+        double fillRatio;
+        if (!entry.breedingCooldownKnown()) {
+            fillRatio = 0.0;
+        } else if (!entry.breedingCooldownActive()) {
+            fillRatio = 1.0;
+        } else {
+            fillRatio = entry.breedingCooldownRatio();
+        }
+        SegmentFill fill = resolveSegmentFill(fillRatio);
         commandBuilder.setObject(
                 slotSelector + " #RingFillTop.Anchor",
                 LinkedNpcPanelAnchorFactory.buildTraitTopFillAnchor(toPixels(fill.top()), true)

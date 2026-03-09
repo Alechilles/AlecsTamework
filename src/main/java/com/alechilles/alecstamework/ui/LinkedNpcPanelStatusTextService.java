@@ -55,6 +55,19 @@ final class LinkedNpcPanelStatusTextService {
         return "Happiness: unavailable (unloaded).";
     }
 
+    static String resolveBreedingCooldownTooltip(LinkedNpcEntry entry) {
+        if (entry == null || !entry.loaded()) {
+            return "Breeding cooldown: unavailable";
+        }
+        if (!entry.breedingCooldownKnown()) {
+            return "Breeding cooldown: unavailable";
+        }
+        if (!entry.breedingCooldownActive()) {
+            return "Breeding cooldown: ready";
+        }
+        return "Breeding cooldown: " + formatRemainingHms(entry.breedingCooldownRemainingMs()) + " remaining";
+    }
+
     private static String formatRemainingTime(long remainingMs) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long minutes = totalSeconds / 60L;
@@ -63,5 +76,13 @@ final class LinkedNpcPanelStatusTextService {
             return seconds + "s";
         }
         return minutes + "m " + seconds + "s";
+    }
+
+    private static String formatRemainingHms(long remainingMs) {
+        long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
+        long hours = totalSeconds / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        long seconds = totalSeconds % 60L;
+        return String.format("%02dh %02dm %02ds", hours, minutes, seconds);
     }
 }

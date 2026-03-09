@@ -484,6 +484,41 @@ Group {
     }
   }
 
+  Group #BreedingCooldown {
+    Anchor: (Top: 1, Right: 118, Width: 24, Height: 24);
+
+    Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+    Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+    Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+    Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+
+    Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
+    Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #e8a574; }
+    Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
+    Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #e8a574; }
+
+    Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+    Label #BreedingCooldownIcon {
+      Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+      Text: "B";
+      Style: (
+        FontSize: 10,
+        RenderBold: true,
+        TextColor: #deebff,
+        HorizontalAlignment: Center,
+        VerticalAlignment: Center
+      );
+    }
+
+    TextButton #BreedingCooldownTooltip {
+      Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+      Style: @TraitTooltipButtonStyle;
+      Text: "";
+      TooltipText: "Breeding cooldown";
+      TextTooltipStyle: @LinkedActionTooltipStyle;
+    }
+  }
+
   Group #FutureStatAFrame {
     Anchor: (Top: 124, Left: 0, Width: 360, Height: 10);
     Background: #0a121b(0.95);
