@@ -1,6 +1,18 @@
 # Changelog
 
 ## Unreleased
+### Added
+- Command item linked panel now supports explicit panel modes (`LinkedMode` and `NearbyMode`) with per-tool persistence and a configurable nearby-radius control.
+- Linked panel rows now support active/inactive companion state toggles; inactive companions remain visible and are excluded from bulk command dispatch while still supporting per-row recall/return-home actions.
+- Linked panel cards now show a breeding cooldown ring with tooltip state (`ready`, `remaining`, or unavailable) driven from live breeding component snapshots.
+- Linked panel now supports in-panel sorting (`Default`, `Name`, `Species`, `Group`) and per-tool persisted filtering (`Name`, `Species`, `Group`) with inline filter text actions.
+- Added command-group metadata support on command tools, including group registry persistence and linked-record group assignment fields.
+- Added a new `Manage Groups` flow from the linked panel header with a dedicated group manager page for create/rename/recolor/delete operations.
+- Linked companion cards now render a top-left group tab with group name and color when assigned.
+
+### Changed
+- Command panel entry building now resolves group display metadata from persisted tool groups, so group sorting/filtering and card tabs use player-facing group names/colors instead of raw ids.
+- Command group delete operations now clear matching linked-record group assignments in the same mutation flow to avoid orphaned group ids on companions.
 
 ## 2.2.1 - Companion Policy, Interaction QoL, and Config Scope Updates - 2026-03-08
 ### Added
