@@ -5,7 +5,7 @@
 - Command item linked panel now supports explicit panel modes (`LinkedMode` and `NearbyMode`) with per-tool persistence and a configurable nearby-radius control.
 - Linked panel rows now support active/inactive companion state toggles; inactive companions remain visible and are excluded from bulk command dispatch while still supporting per-row recall/return-home actions.
 - Linked panel cards now show a breeding cooldown ring with tooltip state (`ready`, `remaining`, or unavailable) driven from live breeding component snapshots.
-- Linked panel now supports in-panel sorting (`Default`, `Name`, `Species`, `Group`) and per-tool persisted filtering (`Name`, `Species`, `Group`) with inline filter text actions.
+- Linked panel now supports in-panel sorting (`Default`, `Name`, `Species`, `Group`) and per-tool persisted filtering (`Name`, `Species`, `Group`) through dropdown selectors.
 - Added command-group metadata support on command tools, including group registry persistence and linked-record group assignment fields.
 - Added a new `Manage Groups` flow from the linked panel header with a dedicated group manager page for create/rename/recolor/delete operations.
 - Linked companion cards now render a top-left group tab with group name and color when assigned.
@@ -31,6 +31,7 @@
 - `TwGlobalConfig_Default` now only includes truly global settings (`General`, `InteractionDefaults`, command relocation infrastructure + linked-panel unlink confirmation); ownership protection and per-companion command behavior defaults now live under `TwCompanionConfig`.
 
 ### Fixed
+- Manage Groups create/rename/recolor actions now use live input drafts reliably, fixing cases where group create/edit actions did not apply.
 - `Component_Tamework_Instruction_SeekFood_PlayerFollow` now uses valid sensor/filter combinations (no invalid `Player` filter builder), restoring clean NPC builder validation for livestock templates that reference it.
 - Interaction particle spawning now uses the vanilla-compatible model-particle packet path for node/entity attachments, with stable world-space positioning.
 - Particle tint application now uses packet-level color assignment (instead of unavailable `ModelParticle#setColor`), preventing interaction-triggered runtime errors.
