@@ -87,9 +87,15 @@ $curseforgeConfig = $config.curseforge
 $projectId = $curseforgeConfig.projectId
 $gameVersionTypeIds = @($curseforgeConfig.gameVersionTypeIds)
 $requiredProjectIdsProperty = $curseforgeConfig.PSObject.Properties["requiredProjectIds"]
-$requiredProjectIds = if ($null -eq $requiredProjectIdsProperty) { @() } else { @($requiredProjectIdsProperty.Value) }
+$requiredProjectIds = @()
+if ($null -ne $requiredProjectIdsProperty -and $null -ne $requiredProjectIdsProperty.Value) {
+    $requiredProjectIds = @($requiredProjectIdsProperty.Value)
+}
 $requiredProjectsProperty = $curseforgeConfig.PSObject.Properties["requiredProjects"]
-$requiredProjects = if ($null -eq $requiredProjectsProperty) { @() } else { @($requiredProjectsProperty.Value) }
+$requiredProjects = @()
+if ($null -ne $requiredProjectsProperty -and $null -ne $requiredProjectsProperty.Value) {
+    $requiredProjects = @($requiredProjectsProperty.Value)
+}
 
 $apiBaseUrl = "https://www.curseforge.com/api"
 $endpoint = if ([string]::IsNullOrWhiteSpace($projectId)) {
