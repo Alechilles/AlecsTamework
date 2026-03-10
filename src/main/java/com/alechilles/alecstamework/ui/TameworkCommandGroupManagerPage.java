@@ -31,8 +31,8 @@ public final class TameworkCommandGroupManagerPage
     public static final String UI_PATH = "TameworkCommandGroupManager.ui";
     public static final String ROW_UI_PATH = "TameworkCommandGroupManagerRow.ui";
     private static final String KEY_ACTION = "Action";
-    private static final String KEY_CREATE_EVENT = "@GroupCreateEvent";
-    private static final String KEY_CLOSE_EVENT = "@GroupCloseEvent";
+    private static final String KEY_CREATE_EVENT = "GroupCreateEvent";
+    private static final String KEY_CLOSE_EVENT = "GroupCloseEvent";
     private static final String KEY_NAME_INPUT = "@GroupNameInput";
     private static final String KEY_COLOR_INPUT = "@GroupColorInput";
     private static final String ACTION_CLOSE = "__close__";
