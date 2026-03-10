@@ -248,6 +248,11 @@ final class CommandLinkedPanelEntryService {
         return entries;
     }
 
+    LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
+                                                        Store<EntityStore> store) {
+        return readTraitIndicators(npcRef, store, TameworkTraitsComponent.getComponentType());
+    }
+
     private LinkedNpcTraitIndicator[] readTraitIndicators(Ref<EntityStore> npcRef,
                                                           Store<EntityStore> store,
                                                           ComponentType<EntityStore, TameworkTraitsComponent> traitType) {

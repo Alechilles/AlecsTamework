@@ -127,6 +127,8 @@ final class CommandPanelEntrySourceService {
                 TameworkCommandLinksComponent links =
                         store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
                 boolean hasHome = links != null && links.hasHome();
+                LinkedNpcTraitIndicator[] traitIndicators =
+                        linkedPanelEntryService.readLoadedTraitIndicators(npcRef, store);
                 out.add(new LinkedNpcEntry(
                         npc.getUuid(),
                         npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
@@ -146,7 +148,7 @@ final class CommandPanelEntrySourceService {
                         0L,
                         null,
                         null,
-                        LinkedNpcTraitIndicator.EMPTY,
+                        traitIndicators,
                         false,
                         false,
                         false,
