@@ -36,7 +36,6 @@ Group {
   TextButton #RenameButton {
     Anchor: (Top: 2, Right: 154, Width: 64, Height: 24);
     Text: "Rename";
-    Sounds: $C.@ButtonSounds;
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle,
       FontSize: 12
@@ -46,7 +45,6 @@ Group {
   TextButton #ColorButton {
     Anchor: (Top: 2, Right: 84, Width: 64, Height: 24);
     Text: "Color";
-    Sounds: $C.@ButtonSounds;
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle,
       FontSize: 12
@@ -56,7 +54,6 @@ Group {
   TextButton #DeleteButton {
     Anchor: (Top: 2, Right: 0, Width: 78, Height: 24);
     Text: "Delete";
-    Sounds: $C.@ButtonSounds;
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle,
       FontSize: 12
