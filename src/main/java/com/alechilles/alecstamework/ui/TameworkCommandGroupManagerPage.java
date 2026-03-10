@@ -210,19 +210,27 @@ public final class TameworkCommandGroupManagerPage
 
     private void bindHeaderEvents(UIEventBuilder eventBuilder) {
         eventBuilder.addEventBinding(
+                CustomUIEventBindingType.ValueChanged,
+                "#TameworkGroupNameInput",
+                EventData.of(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.ValueChanged,
+                "#TameworkGroupColorInput",
+                EventData.of(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
+                false
+        );
+        eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCreateButton",
-                new EventData()
-                        .append(EVENT_COMMAND_ID, ACTION_CREATE)
-                        .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value")
-                        .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
+                EventData.of(EVENT_COMMAND_ID, ACTION_CREATE),
                 false
         );
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCloseButton",
-                new EventData()
-                        .append(EVENT_COMMAND_ID, ACTION_CLOSE),
+                EventData.of(EVENT_COMMAND_ID, ACTION_CLOSE),
                 false
         );
     }
@@ -246,15 +254,13 @@ public final class TameworkCommandGroupManagerPage
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #RenameButton",
-                    EventData.of(EVENT_COMMAND_ID, ACTION_RENAME_PREFIX + entry.groupId)
-                            .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
+                    EventData.of(EVENT_COMMAND_ID, ACTION_RENAME_PREFIX + entry.groupId),
                     false
             );
                 eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #ColorButton",
-                    EventData.of(EVENT_COMMAND_ID, ACTION_RECOLOR_PREFIX + entry.groupId)
-                            .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
+                    EventData.of(EVENT_COMMAND_ID, ACTION_RECOLOR_PREFIX + entry.groupId),
                     false
             );
             eventBuilder.addEventBinding(
