@@ -191,6 +191,9 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", buildFilterModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
+        boolean showFilterInputControls = shouldShowFilterInputControls();
+        commandBuilder.set("#TameworkLinkedPanelFilterInputRow.Visible", showFilterInputControls);
+        commandBuilder.set("#TameworkLinkedPanelFilterClearButton.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
         commandBuilder.set("#TameworkLinkedPanelFilterSummary.Text", resolvePanelFilterSummary());
 
@@ -490,6 +493,9 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", buildFilterModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
+        boolean showFilterInputControls = shouldShowFilterInputControls();
+        commandBuilder.set("#TameworkLinkedPanelFilterInputRow.Visible", showFilterInputControls);
+        commandBuilder.set("#TameworkLinkedPanelFilterClearButton.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
         commandBuilder.set("#TameworkLinkedPanelFilterSummary.Text", resolvePanelFilterSummary());
         boolean hasEntries = linkedNpcEntries.length > 0;
@@ -771,6 +777,10 @@ public final class TameworkCommandSelectionPage
         }
         String value = panelFilterModeValueSupplier.get();
         return value == null || value.isBlank() ? "None" : value;
+    }
+
+    private boolean shouldShowFilterInputControls() {
+        return !"None".equalsIgnoreCase(resolvePanelFilterModeValue());
     }
 
     private String resolvePanelFilterInputValue() {

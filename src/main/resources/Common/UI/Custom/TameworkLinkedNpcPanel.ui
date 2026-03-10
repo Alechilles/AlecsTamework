@@ -167,18 +167,12 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
           VerticalAlignment: Center
         );
       }
-
-      Group { Anchor: (Width: 6); }
-
-      TextButton #TameworkLinkedPanelFilterClearButton {
-        Anchor: (Width: 58, Height: 24);
-        Text: "Clear";
-      }
     }
 
     Group #TameworkLinkedPanelFilterInputRow {
       Anchor: (Top: 2, Height: 28);
       LayoutMode: Left;
+      Visible: false;
 
       Label #TameworkLinkedPanelFilterInputLabel {
         Anchor: (Width: 52, Height: 24);
@@ -197,10 +191,17 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         Style: $C.@DefaultInputFieldStyle;
         PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
         Background: $C.@InputBoxBackground;
-        Anchor: (Width: 344, Height: 24);
+        Anchor: (Width: 280, Height: 24);
         Padding: (Horizontal: 8);
         PlaceholderText: "Type to filter selected field";
         MaxLength: 40;
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      TextButton #TameworkLinkedPanelFilterClearButton {
+        Anchor: (Width: 58, Height: 24);
+        Text: "Clear";
       }
     }
 

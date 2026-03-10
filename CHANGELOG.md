@@ -15,6 +15,7 @@
 - Command group delete operations now clear matching linked-record group assignments in the same mutation flow to avoid orphaned group ids on companions.
 - Linked companions panel mode selection now renders as a header dropdown in the top-right title area (instead of an inline control-row button), while keeping per-tool mode persistence.
 - Linked companions panel `Manage Groups` action now renders as a styled secondary button in the subtitle/header row (moved out of the radius control row).
+- Linked companions panel now places `Clear` on the filter-input row, and conditionally shows both filter input and clear controls only when a filter mode is selected (not `None`).
 
 ### Fixed
 - Species filtering now uses consistent role-id resolution across linked and nearby entries, including fallback extraction from legacy cached name keys when role metadata is missing, so linked companions no longer disappear incorrectly under Species filter.
