@@ -80,7 +80,7 @@ public final class TameworkCommandGroupManagerPage
         refreshGroups();
         commandBuilder.append(UI_PATH);
         commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
-        commandBuilder.set("#TameworkGroupColorInput.Value", draftColor);
+        commandBuilder.set("#TameworkGroupColorInput.Color", draftColor);
         bindList(commandBuilder, eventBuilder);
         bindHeaderEvents(eventBuilder);
     }
@@ -162,7 +162,7 @@ public final class TameworkCommandGroupManagerPage
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
         commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
-        commandBuilder.set("#TameworkGroupColorInput.Value", draftColor);
+        commandBuilder.set("#TameworkGroupColorInput.Color", draftColor);
         bindList(commandBuilder, eventBuilder);
         bindHeaderEvents(eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
@@ -192,7 +192,7 @@ public final class TameworkCommandGroupManagerPage
                 "#TameworkGroupCreateButton",
                 EventData.of(KEY_ACTION, ACTION_CREATE)
                         .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value")
-                        .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
+                        .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
                 false
         );
         eventBuilder.addEventBinding(
@@ -226,11 +226,11 @@ public final class TameworkCommandGroupManagerPage
                             .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
                     false
             );
-            eventBuilder.addEventBinding(
+                eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #ColorButton",
                     EventData.of(KEY_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId)
-                            .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
+                            .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
                     false
             );
             eventBuilder.addEventBinding(
