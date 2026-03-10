@@ -245,7 +245,7 @@ public final class TameworkCommandSelectionPage
         }
         if (data.commandId == null || data.commandId.isBlank() || CLOSE_COMMAND_ID.equals(data.commandId)) {
             pendingUnlinkNpcUuid = null;
-            close();
+            closePage();
             return;
         }
         if (PANEL_RADIUS_DECREASE_COMMAND_ID.equals(data.commandId)) {
@@ -269,7 +269,7 @@ public final class TameworkCommandSelectionPage
         if (PANEL_MANAGE_GROUPS_COMMAND_ID.equals(data.commandId)) {
             if (panelManageGroupsCallback != null) {
                 pendingUnlinkNpcUuid = null;
-                close();
+                closePage();
                 panelManageGroupsCallback.run();
             }
             return;
@@ -381,11 +381,11 @@ public final class TameworkCommandSelectionPage
         }
         if (!containsOption(data.commandId)) {
             pendingUnlinkNpcUuid = null;
-            close();
+            closePage();
             return;
         }
         pendingUnlinkNpcUuid = null;
-        close();
+        closePage();
         selectionCallback.accept(data.commandId);
     }
 
@@ -479,6 +479,9 @@ public final class TameworkCommandSelectionPage
     }
 
     private void sendCardRefreshUpdate() {
+        if (dismissed) {
+            return;
+        }
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
         commandBuilder.set(
@@ -517,6 +520,11 @@ public final class TameworkCommandSelectionPage
         bindPanelControlEvents(eventBuilder);
         bindCloseButtonEvent(eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
+    }
+
+    private void closePage() {
+        dismissed = true;
+        close();
     }
 
     private void bindCommandButtonEvents(@Nonnull UIEventBuilder eventBuilder) {
