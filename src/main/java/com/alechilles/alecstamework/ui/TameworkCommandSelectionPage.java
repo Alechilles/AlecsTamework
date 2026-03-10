@@ -18,11 +18,8 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
-import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -46,7 +43,6 @@ public final class TameworkCommandSelectionPage
     private static final String KEY_PANEL_SORT_VALUE = "@PanelSortValue";
     private static final String KEY_PANEL_FILTER_MODE_VALUE = "@PanelFilterModeValue";
     private static final String KEY_PANEL_FILTER_TEXT_INPUT = "@PanelFilterTextInput";
-    private static final String KEY_CARD_GROUP_VALUE = "@CardGroupValue";
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final String LINK_COMMAND_PREFIX = "__link__:";
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
@@ -84,8 +80,8 @@ public final class TameworkCommandSelectionPage
     private static final LinkedNpcPanelCardBinder.CardBindingConfig CARD_BINDING_CONFIG =
             new LinkedNpcPanelCardBinder.CardBindingConfig(
                     LINKED_PANEL_CARD_UI_PATH,
+                    LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH,
                     EVENT_COMMAND_ID,
-                    KEY_CARD_GROUP_VALUE,
                     LINK_COMMAND_PREFIX,
                     UNLINK_COMMAND_PREFIX,
                     OPEN_GROUP_PICKER_COMMAND_PREFIX,
@@ -229,7 +225,6 @@ public final class TameworkCommandSelectionPage
         boolean showFilterInputControls = shouldShowFilterInputControls();
         commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
-        bindGlobalGroupPicker(commandBuilder, eventBuilder);
 
         buildCommandButtons(commandBuilder, eventBuilder);
         buildLinkedNpcPanel(commandBuilder, eventBuilder);
@@ -356,7 +351,8 @@ public final class TameworkCommandSelectionPage
             if (panelSetGroupCallback == null) {
                 return;
             }
-            SetGroupSelection selection = parseSetGroupSelection(data.commandId, data.cardGroupValue);
+            LinkedNpcGroupSelectionCommandCodec.Selection selection =
+                    LinkedNpcGroupSelectionCommandCodec.parseCommandId(data.commandId, SET_GROUP_COMMAND_PREFIX);
             if (selection == null) {
                 return;
             }
@@ -606,7 +602,6 @@ public final class TameworkCommandSelectionPage
         boolean showFilterInputControls = shouldShowFilterInputControls();
         commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
-        bindGlobalGroupPicker(commandBuilder, eventBuilder);
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
@@ -737,6 +732,9 @@ public final class TameworkCommandSelectionPage
                                    LinkedNpcEntry entry,
                                    boolean appendCard) {
         boolean pendingUnlink = entry.linked() && isPendingUnlink(entry.npcUuid());
+        boolean showGroupPicker = isGroupPickerOpen(entry.npcUuid());
+        List<LinkedNpcGroupPickerOption> groupPickerOptions = resolveCardGroupPickerOptions(entry);
+        String selectedGroupValue = resolveCardGroupSelectedValue(entry);
         LinkedNpcPanelCardBinder.bind(
                 commandBuilder,
                 eventBuilder,
@@ -744,111 +742,11 @@ public final class TameworkCommandSelectionPage
                 entry,
                 appendCard,
                 pendingUnlink,
+                showGroupPicker,
+                groupPickerOptions,
+                selectedGroupValue,
                 CARD_BINDING_CONFIG
         );
-    }
-
-    private void bindGlobalGroupPicker(@Nonnull UICommandBuilder commandBuilder,
-                                       @Nonnull UIEventBuilder eventBuilder) {
-        LinkedNpcEntry targetEntry = findLinkedNpcEntry(openGroupPickerNpcUuid);
-        boolean showOverlay = targetEntry != null;
-        commandBuilder.set("#TameworkLinkedPanelGroupPickerOverlay.Visible", showOverlay);
-        commandBuilder.clear("#TameworkLinkedPanelGroupPickerList");
-        if (!showOverlay) {
-            return;
-        }
-        commandBuilder.set("#TameworkLinkedPanelGroupPickerTitle.Text", "Set Group: " + targetEntry.displayName());
-        List<LinkedNpcGroupPickerOption> options = resolveCardGroupPickerOptions(targetEntry);
-        String selectedValue = resolveCardGroupSelectedValue(targetEntry);
-        int rendered = 0;
-        for (LinkedNpcGroupPickerOption option : options) {
-            if (option == null) {
-                continue;
-            }
-            String optionValue = normalizeGroupPickerOptionValue(option.value());
-            if (optionValue == null) {
-                continue;
-            }
-            commandBuilder.append(
-                    "#TameworkLinkedPanelGroupPickerList",
-                    LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH
-            );
-            String optionSelector = "#TameworkLinkedPanelGroupPickerList[" + rendered + "]";
-            commandBuilder.set(
-                    optionSelector + " #OptionColor.Background",
-                    normalizeGroupPickerColor(option.colorHex())
-            );
-            String optionLabel = resolveGroupPickerOptionLabel(option, optionValue);
-            boolean selected = selectedValue != null && selectedValue.equalsIgnoreCase(optionValue);
-            commandBuilder.set(
-                    optionSelector + " #OptionButton.Text",
-                    selected ? "• " + optionLabel : optionLabel
-            );
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    optionSelector + " #OptionButton",
-                    EventData.of(EVENT_COMMAND_ID, buildSetGroupCommandId(targetEntry.npcUuid(), optionValue)),
-                    false
-            );
-            rendered++;
-        }
-    }
-
-    private String buildSetGroupCommandId(UUID npcUuid, String groupValue) {
-        String encodedGroupValue = encodeSetGroupValue(groupValue);
-        return SET_GROUP_COMMAND_PREFIX + npcUuid + "|" + encodedGroupValue;
-    }
-
-    private String encodeSetGroupValue(String groupValue) {
-        String value = groupValue == null ? GROUP_NONE_VALUE : groupValue.trim();
-        if (value.isBlank()) {
-            value = GROUP_NONE_VALUE;
-        }
-        return Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
-    }
-
-    private SetGroupSelection parseSetGroupSelection(String commandId, String fallbackGroupValue) {
-        if (commandId == null || !commandId.startsWith(SET_GROUP_COMMAND_PREFIX)) {
-            return null;
-        }
-        String payload = commandId.substring(SET_GROUP_COMMAND_PREFIX.length());
-        if (payload.isBlank()) {
-            return null;
-        }
-        int separatorIndex = payload.indexOf('|');
-        String uuidText = separatorIndex < 0 ? payload : payload.substring(0, separatorIndex);
-        if (uuidText == null || uuidText.isBlank()) {
-            return null;
-        }
-        UUID npcUuid;
-        try {
-            npcUuid = UUID.fromString(uuidText);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
-        String groupValue = fallbackGroupValue;
-        if (separatorIndex >= 0 && separatorIndex + 1 < payload.length()) {
-            String encoded = payload.substring(separatorIndex + 1);
-            String decoded = decodeSetGroupValue(encoded);
-            if (decoded != null) {
-                groupValue = decoded;
-            }
-        }
-        return new SetGroupSelection(npcUuid, groupValue);
-    }
-
-    private String decodeSetGroupValue(String encoded) {
-        if (encoded == null || encoded.isBlank()) {
-            return null;
-        }
-        try {
-            byte[] decoded = Base64.getUrlDecoder().decode(encoded);
-            return new String(decoded, StandardCharsets.UTF_8);
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
     }
 
     private void refreshLinkedNpcEntries() {
@@ -958,35 +856,6 @@ public final class TameworkCommandSelectionPage
         return selectedGroupId;
     }
 
-    private String resolveGroupPickerOptionLabel(LinkedNpcGroupPickerOption option, String fallbackValue) {
-        if (option == null) {
-            return fallbackValue == null ? "Group" : fallbackValue;
-        }
-        String label = option.label();
-        if (label == null || label.isBlank()) {
-            return fallbackValue == null ? "Group" : fallbackValue;
-        }
-        return label.trim();
-    }
-
-    private String normalizeGroupPickerOptionValue(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return null;
-        }
-        return raw.trim();
-    }
-
-    private String normalizeGroupPickerColor(String raw) {
-        if (raw == null || raw.isBlank()) {
-            return GROUP_NONE_COLOR;
-        }
-        String trimmed = raw.trim();
-        if (!trimmed.matches("^#[0-9A-Fa-f]{6}$")) {
-            return GROUP_NONE_COLOR;
-        }
-        return "#" + trimmed.substring(1).toUpperCase(Locale.ROOT);
-    }
-
     private String resolvePanelFilterSummary() {
         if (panelFilterSummarySupplier == null) {
             return "Filters: none";
@@ -1069,8 +938,6 @@ public final class TameworkCommandSelectionPage
         return npcUuid != null && openGroupPickerNpcUuid != null && openGroupPickerNpcUuid.equals(npcUuid);
     }
 
-    private record SetGroupSelection(UUID npcUuid, String groupValue) { }
-
     private record CommandOption(String id, String label) { }
 
     /** Event payload emitted by command-button clicks in the command selection page. */
@@ -1109,12 +976,6 @@ public final class TameworkCommandSelectionPage
                 event -> event.panelFilterTextInput
             )
             .add()
-            .append(
-                new KeyedCodec<>(KEY_CARD_GROUP_VALUE, Codec.STRING),
-                (event, value) -> event.cardGroupValue = value,
-                event -> event.cardGroupValue
-            )
-            .add()
             .build();
 
         private String commandId;
@@ -1122,6 +983,5 @@ public final class TameworkCommandSelectionPage
         private String panelSortValue;
         private String panelFilterModeValue;
         private String panelFilterTextInput;
-        private String cardGroupValue;
     }
 }
