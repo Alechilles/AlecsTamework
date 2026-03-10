@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -29,7 +30,8 @@ public final class TameworkCommandGroupManagerPage
         extends InteractiveCustomUIPage<TameworkCommandGroupManagerPage.GroupManagerEventData> {
     public static final String UI_PATH = "TameworkCommandGroupManager.ui";
     public static final String ROW_UI_PATH = "TameworkCommandGroupManagerRow.ui";
-    private static final String KEY_ACTION = "Action";
+    private static final String KEY_ACTION = "Submit";
+    private static final String KEY_ACTION_LEGACY = "Action";
     private static final String KEY_NAME_INPUT = "@GroupNameInput";
     private static final String KEY_COLOR_INPUT = "@GroupColorInput";
     private static final String ACTION_CLOSE = "__close__";
@@ -91,7 +93,7 @@ public final class TameworkCommandGroupManagerPage
             draftName = data.nameInput;
         }
         if (data.colorInput != null) {
-            draftColor = data.colorInput;
+            draftColor = normalizeDraftColor(data.colorInput);
         }
         String action = data.action != null ? data.action.trim() : "";
         if (action.isBlank()) {
@@ -186,21 +188,11 @@ public final class TameworkCommandGroupManagerPage
 
     private void bindHeaderEvents(UIEventBuilder eventBuilder) {
         eventBuilder.addEventBinding(
-                CustomUIEventBindingType.ValueChanged,
-                "#TameworkGroupNameInput",
-                EventData.of(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
-                false
-        );
-        eventBuilder.addEventBinding(
-                CustomUIEventBindingType.ValueChanged,
-                "#TameworkGroupColorInput",
-                EventData.of(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
-                false
-        );
-        eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCreateButton",
-                EventData.of(KEY_ACTION, ACTION_CREATE),
+                EventData.of(KEY_ACTION, ACTION_CREATE)
+                        .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value")
+                        .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
                 false
         );
         eventBuilder.addEventBinding(
@@ -230,13 +222,15 @@ public final class TameworkCommandGroupManagerPage
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #RenameButton",
-                    EventData.of(KEY_ACTION, ACTION_RENAME_PREFIX + entry.groupId),
+                    EventData.of(KEY_ACTION, ACTION_RENAME_PREFIX + entry.groupId)
+                            .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
                     false
             );
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #ColorButton",
-                    EventData.of(KEY_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId),
+                    EventData.of(KEY_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId)
+                            .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Value"),
                     false
             );
             eventBuilder.addEventBinding(
@@ -260,6 +254,12 @@ public final class TameworkCommandGroupManagerPage
                 )
                 .add()
                 .<String>append(
+                        new KeyedCodec<>(KEY_ACTION_LEGACY, Codec.STRING),
+                        (data, value) -> data.action = value,
+                        data -> data.action
+                )
+                .add()
+                .<String>append(
                         new KeyedCodec<>(KEY_NAME_INPUT, Codec.STRING),
                         (data, value) -> data.nameInput = value,
                         data -> data.nameInput
@@ -276,6 +276,24 @@ public final class TameworkCommandGroupManagerPage
         private String action;
         private String nameInput;
         private String colorInput;
+    }
+
+    private String normalizeDraftColor(String value) {
+        if (value == null || value.isBlank()) {
+            return DEFAULT_GROUP_COLOR;
+        }
+        String trimmed = value.trim();
+        String normalized = trimmed;
+        if (trimmed.length() > 7 && trimmed.startsWith("#")) {
+            normalized = trimmed.substring(0, 7);
+        }
+        if (normalized.matches("^[0-9A-Fa-f]{6}$")) {
+            normalized = "#" + normalized;
+        }
+        if (!normalized.matches("^#[0-9A-Fa-f]{6}$")) {
+            return DEFAULT_GROUP_COLOR;
+        }
+        return "#" + normalized.substring(1).toUpperCase(Locale.ROOT);
     }
 
     /**

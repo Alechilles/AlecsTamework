@@ -22,6 +22,8 @@
 
 ### Fixed
 - Species filtering now uses consistent role-id resolution across linked and nearby entries, including fallback extraction from legacy cached name keys when role metadata is missing, so linked companions no longer disappear incorrectly under Species filter.
+- Group manager actions now post explicit submit payloads with current draft inputs (create/rename/recolor/delete/close), fixing cases where create and close buttons did not respond.
+- Group manager color input now uses a native color picker dropdown control instead of freeform hex text entry.
 
 ## 2.2.1 - Companion Policy, Interaction QoL, and Config Scope Updates - 2026-03-08
 ### Added

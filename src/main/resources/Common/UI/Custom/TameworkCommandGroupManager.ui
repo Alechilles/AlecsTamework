@@ -43,14 +43,9 @@ $C.@PageOverlay {
 
         Group { Anchor: (Width: 6); }
 
-        TextField #TameworkGroupColorInput {
-          Style: $C.@DefaultInputFieldStyle;
-          PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-          Background: $C.@InputBoxBackground;
-          Anchor: (Width: 100, Height: 24);
-          Padding: (Horizontal: 8);
-          PlaceholderText: "#4B657F";
-          MaxLength: 7;
+        ColorPickerDropdownBox #TameworkGroupColorInput {
+          Style: $C.@DefaultColorPickerDropdownBoxStyle;
+          Anchor: (Width: 96, Height: 24);
         }
 
         Group { Anchor: (Width: 6); }
