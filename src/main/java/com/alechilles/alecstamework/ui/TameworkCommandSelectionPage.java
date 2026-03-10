@@ -193,10 +193,8 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", buildFilterModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
         boolean showFilterInputControls = shouldShowFilterInputControls();
-        commandBuilder.set("#TameworkLinkedPanelFilterInputRow.Visible", showFilterInputControls);
-        commandBuilder.set("#TameworkLinkedPanelFilterClearButton.Visible", showFilterInputControls);
+        commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
-        commandBuilder.set("#TameworkLinkedPanelFilterSummary.Text", resolvePanelFilterSummary());
 
         buildCommandButtons(commandBuilder, eventBuilder);
         buildLinkedNpcPanel(commandBuilder, eventBuilder);
@@ -496,10 +494,8 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", buildFilterModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
         boolean showFilterInputControls = shouldShowFilterInputControls();
-        commandBuilder.set("#TameworkLinkedPanelFilterInputRow.Visible", showFilterInputControls);
-        commandBuilder.set("#TameworkLinkedPanelFilterClearButton.Visible", showFilterInputControls);
+        commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
-        commandBuilder.set("#TameworkLinkedPanelFilterSummary.Text", resolvePanelFilterSummary());
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
@@ -567,12 +563,6 @@ public final class TameworkCommandSelectionPage
                 CustomUIEventBindingType.ValueChanged,
                 "#TameworkLinkedPanelSortDropdown",
                 EventData.of(KEY_PANEL_SORT_VALUE, "#TameworkLinkedPanelSortDropdown.Value"),
-                false
-        );
-        eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TameworkLinkedPanelFilterClearButton",
-                EventData.of(EVENT_COMMAND_ID, PANEL_FILTER_CLEAR_COMMAND_ID),
                 false
         );
         eventBuilder.addEventBinding(

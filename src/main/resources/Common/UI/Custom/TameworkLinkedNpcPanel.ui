@@ -111,7 +111,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       LayoutMode: Left;
 
       Label #TameworkLinkedPanelSortLabel {
-        Anchor: (Width: 30, Height: 24);
+        Anchor: (Width: 26, Height: 24);
         Text: "Sort:";
         Style: (
           FontSize: 12,
@@ -121,10 +121,10 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         );
       }
 
-      Group { Anchor: (Width: 4); }
+      Group { Anchor: (Width: 2); }
 
       DropdownBox #TameworkLinkedPanelSortDropdown {
-        Anchor: (Width: 104, Height: 24);
+        Anchor: (Width: 92, Height: 24);
         Style: (
           ...$C.@DefaultDropdownBoxStyle,
           HorizontalPadding: 8,
@@ -149,10 +149,10 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         NoItemsText: "No sort options";
       }
 
-      Group { Anchor: (Width: 10); }
+      Group { Anchor: (Width: 6); }
 
       Label #TameworkLinkedPanelFilterLabel {
-        Anchor: (Width: 38, Height: 24);
+        Anchor: (Width: 34, Height: 24);
         Text: "Filter:";
         Style: (
           FontSize: 12,
@@ -162,10 +162,10 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         );
       }
 
-      Group { Anchor: (Width: 4); }
+      Group { Anchor: (Width: 2); }
 
       DropdownBox #TameworkLinkedPanelFilterDropdown {
-        Anchor: (Width: 104, Height: 24);
+        Anchor: (Width: 92, Height: 24);
         Style: (
           ...$C.@DefaultDropdownBoxStyle,
           HorizontalPadding: 8,
@@ -190,53 +190,35 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         NoItemsText: "No filter options";
       }
 
-      Group { Anchor: (Width: 8); }
-
-      Label #TameworkLinkedPanelFilterSummary {
-        Anchor: (Width: 100, Height: 24);
-        Text: "Filters: none";
-        Style: (
-          FontSize: 12,
-          TextColor: #bfd0e5,
-          HorizontalAlignment: Start,
-          VerticalAlignment: Center
-        );
-      }
-    }
-
-    Group #TameworkLinkedPanelFilterInputRow {
-      Anchor: (Top: 1, Height: 28);
-      LayoutMode: Left;
-      Visible: false;
-
-      Label #TameworkLinkedPanelFilterInputLabel {
-        Anchor: (Width: 52, Height: 24);
-        Text: "Filter";
-        Style: (
-          FontSize: 12,
-          TextColor: #bfd0e5,
-          HorizontalAlignment: Start,
-          VerticalAlignment: Center
-        );
-      }
-
       Group { Anchor: (Width: 6); }
 
-      TextField #TameworkLinkedPanelFilterInput {
-        Style: $C.@DefaultInputFieldStyle;
-        PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-        Background: $C.@InputBoxBackground;
-        Anchor: (Width: 280, Height: 24);
-        Padding: (Horizontal: 8);
-        PlaceholderText: "Type to filter selected field";
-        MaxLength: 40;
-      }
+      Group #TameworkLinkedPanelInlineFilterTextControls {
+        Anchor: (Width: 138, Height: 24);
+        LayoutMode: Left;
+        Visible: false;
 
-      Group { Anchor: (Width: 6); }
+        Label #TameworkLinkedPanelFilterInputLabel {
+          Anchor: (Width: 26, Height: 24);
+          Text: "Text:";
+          Style: (
+            FontSize: 12,
+            TextColor: #bfd0e5,
+            HorizontalAlignment: Start,
+            VerticalAlignment: Center
+          );
+        }
 
-      TextButton #TameworkLinkedPanelFilterClearButton {
-        Anchor: (Width: 58, Height: 24);
-        Text: "Clear";
+        Group { Anchor: (Width: 2); }
+
+        TextField #TameworkLinkedPanelFilterInput {
+          Style: $C.@DefaultInputFieldStyle;
+          PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+          Background: $C.@InputBoxBackground;
+          Anchor: (Width: 110, Height: 24);
+          Padding: (Horizontal: 8);
+          PlaceholderText: "Type...";
+          MaxLength: 40;
+        }
       }
     }
 
