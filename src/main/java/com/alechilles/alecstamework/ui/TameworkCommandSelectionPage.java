@@ -604,7 +604,8 @@ public final class TameworkCommandSelectionPage
         String talentsButtonSelector = entrySelector + " #TalentsButton";
         String linkSelector = entrySelector + " #LinkButton";
         String removeSelector = entrySelector + " #RemoveButton";
-        String activeToggleSelector = entrySelector + " #ActiveToggleButton";
+        String activeToggleActiveSelector = entrySelector + " #ActiveToggleActiveButton";
+        String activeToggleInactiveSelector = entrySelector + " #ActiveToggleInactiveButton";
         String inactiveBadgeSelector = entrySelector + " #StatusInactive";
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabTextSelector = entrySelector + " #GroupTabText";
@@ -625,15 +626,16 @@ public final class TameworkCommandSelectionPage
         boolean showReturnHome = isLinked && !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
         boolean showLink = !isLinked;
         boolean showUnlink = isLinked;
-        boolean showActiveToggle = isLinked && !pendingUnlink;
+        boolean showActiveToggleActive = isLinked && entry.active() && !pendingUnlink;
+        boolean showActiveToggleInactive = isLinked && !entry.active() && !pendingUnlink;
         boolean showInactiveBadge = isLinked && !entry.active() && !pendingUnlink;
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
         commandBuilder.set(linkSelector + ".Visible", showLink);
         commandBuilder.set(removeSelector + ".Visible", showUnlink);
-        commandBuilder.set(activeToggleSelector + ".Visible", showActiveToggle);
-        commandBuilder.set(activeToggleSelector + ".Text", entry.active() ? "Set Inactive" : "Set Active");
+        commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
+        commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
         LinkedNpcPanelGroupTabBinder.bind(commandBuilder, groupTabSelector, groupTabTextSelector, entry, pendingUnlink);
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
@@ -664,10 +666,18 @@ public final class TameworkCommandSelectionPage
                     false
             );
         }
-        if (showActiveToggle) {
+        if (showActiveToggleActive) {
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
-                    activeToggleSelector,
+                    activeToggleActiveSelector,
+                    EventData.of(EVENT_COMMAND_ID, TOGGLE_ACTIVE_COMMAND_PREFIX + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showActiveToggleInactive) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    activeToggleInactiveSelector,
                     EventData.of(EVENT_COMMAND_ID, TOGGLE_ACTIVE_COMMAND_PREFIX + entry.npcUuid()),
                     false
             );

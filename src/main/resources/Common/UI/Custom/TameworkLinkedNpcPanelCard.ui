@@ -50,6 +50,27 @@ $C = "Common.ui";
   Sounds: $C.@ButtonSounds
 );
 
+@LinkedActiveStateButtonLabelStyle = LabelStyle(
+  FontSize: 1,
+  TextColor: #00000000
+);
+
+@LinkedActiveStateOnButtonStyle = TextButtonStyle(
+  Default: (Background: (Color: #4caf6f), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (Color: #67cb89), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (Color: #3f8f5c), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Sounds: $C.@ButtonSounds
+);
+
+@LinkedActiveStateOffButtonStyle = TextButtonStyle(
+  Default: (Background: (Color: #c08956), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (Color: #d39a63), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (Color: #9f7248), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Sounds: $C.@ButtonSounds
+);
+
 @LinkedActionTooltipStyle = TextTooltipStyle(
   Background: #0f1e30(0.96),
   MaxWidth: 220,
@@ -280,17 +301,27 @@ Group {
   }
 
   TextButton #LinkButton {
-    Anchor: (Top: 56, Left: 92, Width: 92, Height: 24);
+    Anchor: (Top: 56, Right: 0, Width: 92, Height: 24);
     Text: "Link";
     TooltipText: "Link companion";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
 
-  TextButton #ActiveToggleButton {
-    Anchor: (Top: 56, Left: 92, Width: 92, Height: 24);
-    Text: "Set Inactive";
-    TooltipText: "Toggle active state";
+  TextButton #ActiveToggleActiveButton {
+    Anchor: (Top: 1, Right: 18, Width: 14, Height: 14);
+    Style: @LinkedActiveStateOnButtonStyle;
+    Text: "";
+    TooltipText: "Active: receives bulk commands. Click to set inactive.";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
+  }
+
+  TextButton #ActiveToggleInactiveButton {
+    Anchor: (Top: 1, Right: 18, Width: 14, Height: 14);
+    Style: @LinkedActiveStateOffButtonStyle;
+    Text: "";
+    TooltipText: "Inactive: ignored by bulk commands. Click to set active.";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }
@@ -374,7 +405,7 @@ Group {
   }
 
   Group #NeedRingRow {
-    Anchor: (Top: 52, Left: 0, Width: 84, Height: 24);
+    Anchor: (Top: 52, Left: 0, Width: 114, Height: 24);
     LayoutMode: Left;
 
     Group #NeedHappiness {
@@ -500,40 +531,43 @@ Group {
         TextTooltipStyle: @LinkedActionTooltipStyle;
       }
     }
-  }
 
-  Group #BreedingCooldown {
-    Anchor: (Top: 1, Right: 118, Width: 24, Height: 24);
+    Group { Anchor: (Width: 6); }
 
-    Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-    Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-    Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-    Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+    Group #BreedingCooldown {
+      Anchor: (Width: 24, Height: 24);
+      Visible: false;
 
-    Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
-    Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #e8a574; }
-    Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
-    Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #e8a574; }
+      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
+      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
+      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
 
-    Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-    Label #BreedingCooldownIcon {
-      Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-      Text: "B";
-      Style: (
-        FontSize: 10,
-        RenderBold: true,
-        TextColor: #deebff,
-        HorizontalAlignment: Center,
-        VerticalAlignment: Center
-      );
-    }
+      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
+      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #e8a574; }
+      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
+      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #e8a574; }
 
-    TextButton #BreedingCooldownTooltip {
-      Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-      Style: @TraitTooltipButtonStyle;
-      Text: "";
-      TooltipText: "Breeding cooldown";
-      TextTooltipStyle: @LinkedActionTooltipStyle;
+      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
+      Label #BreedingCooldownIcon {
+        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+        Text: "B";
+        Style: (
+          FontSize: 10,
+          RenderBold: true,
+          TextColor: #deebff,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+
+      TextButton #BreedingCooldownTooltip {
+        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+        Style: @TraitTooltipButtonStyle;
+        Text: "";
+        TooltipText: "Breeding cooldown";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+      }
     }
   }
 

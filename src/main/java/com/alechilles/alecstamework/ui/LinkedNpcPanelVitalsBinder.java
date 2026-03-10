@@ -13,7 +13,6 @@ final class LinkedNpcPanelVitalsBinder {
     private static final String HUNGER_FILL_COLOR = "#d9a066";
     private static final String THIRST_FILL_COLOR = "#76b7ea";
     private static final String BREEDING_ACTIVE_FILL_COLOR = "#e8a574";
-    private static final String BREEDING_READY_FILL_COLOR = "#6fc576";
     private static final String UNAVAILABLE_FILL_COLOR = "#4e6077";
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
@@ -199,28 +198,22 @@ final class LinkedNpcPanelVitalsBinder {
                                              String entrySelector,
                                              LinkedNpcEntry entry) {
         String slotSelector = entrySelector + " #BreedingCooldown";
-        commandBuilder.set(slotSelector + ".Visible", true);
+        boolean cooldownRecharging = entry.breedingCooldownKnown() && entry.breedingCooldownActive();
+        commandBuilder.set(slotSelector + ".Visible", cooldownRecharging);
+        if (!cooldownRecharging) {
+            return;
+        }
         commandBuilder.set(
                 slotSelector + " #BreedingCooldownTooltip.TooltipText",
                 LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry)
         );
-        String fillColor = UNAVAILABLE_FILL_COLOR;
-        if (entry.breedingCooldownKnown()) {
-            fillColor = entry.breedingCooldownActive() ? BREEDING_ACTIVE_FILL_COLOR : BREEDING_READY_FILL_COLOR;
-        }
+        String fillColor = BREEDING_ACTIVE_FILL_COLOR;
         commandBuilder.set(slotSelector + " #RingFillTop.Background", fillColor);
         commandBuilder.set(slotSelector + " #RingFillRight.Background", fillColor);
         commandBuilder.set(slotSelector + " #RingFillBottom.Background", fillColor);
         commandBuilder.set(slotSelector + " #RingFillLeft.Background", fillColor);
 
-        double fillRatio;
-        if (!entry.breedingCooldownKnown()) {
-            fillRatio = 0.0;
-        } else if (!entry.breedingCooldownActive()) {
-            fillRatio = 1.0;
-        } else {
-            fillRatio = entry.breedingCooldownRatio();
-        }
+        double fillRatio = entry.breedingCooldownRatio();
         SegmentFill fill = resolveSegmentFill(fillRatio);
         commandBuilder.setObject(
                 slotSelector + " #RingFillTop.Anchor",
