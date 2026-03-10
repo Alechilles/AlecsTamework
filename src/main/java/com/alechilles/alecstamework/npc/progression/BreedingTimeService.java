@@ -71,6 +71,33 @@ public final class BreedingTimeService {
     }
 
     /**
+     * Converts a game-time duration to an estimated real-time duration using current world time speed.
+     *
+     * <p>Since cooldown progression is tracked in game-time timestamps, UI-facing "remaining time" should
+     * present a human-readable estimate in real time. This estimate adapts to the current world time rate.
+     */
+    public static long toEstimatedRealDurationMs(long gameDurationMs, @Nullable Store<EntityStore> store) {
+        if (gameDurationMs <= 0L) {
+            return 0L;
+        }
+        double gameSecondsPerRealSecond = resolveCurrentGameSecondsPerRealSecond(store);
+        if (!Double.isFinite(gameSecondsPerRealSecond) || gameSecondsPerRealSecond <= 0.0) {
+            gameSecondsPerRealSecond = resolveBaselineGameSecondsPerRealSecond(store);
+        }
+        if (!Double.isFinite(gameSecondsPerRealSecond) || gameSecondsPerRealSecond <= 0.0) {
+            gameSecondsPerRealSecond = DEFAULT_BASELINE_RATE;
+        }
+        double realMillis = (double) gameDurationMs / gameSecondsPerRealSecond;
+        if (!Double.isFinite(realMillis) || realMillis <= 0.0) {
+            return 0L;
+        }
+        if (realMillis >= Long.MAX_VALUE) {
+            return Long.MAX_VALUE;
+        }
+        return Math.max(0L, Math.round(realMillis));
+    }
+
+    /**
      * Returns game-seconds advanced per real second at current world time speed.
      */
     public static double resolveCurrentGameSecondsPerRealSecond(@Nullable Store<EntityStore> store) {

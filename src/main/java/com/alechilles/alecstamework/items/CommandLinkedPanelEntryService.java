@@ -685,9 +685,14 @@ final class CommandLinkedPanelEntryService {
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         long until = breeding.getCooldownUntilMs();
         boolean active = until != 0L && now < until;
-        long remaining = active ? Math.max(0L, until - now) : 0L;
-        double ratio = active ? resolveBreedingCooldownRatio(breeding, npcRef, store, resolvedRoleId, remaining) : 1.0;
-        return new BreedingCooldownSnapshot(true, active, remaining, ratio);
+        long remainingGameMs = active ? Math.max(0L, until - now) : 0L;
+        long remainingRealMs = active
+                ? BreedingTimeService.toEstimatedRealDurationMs(remainingGameMs, store)
+                : 0L;
+        double ratio = active
+                ? resolveBreedingCooldownRatio(breeding, npcRef, store, resolvedRoleId, remainingGameMs)
+                : 1.0;
+        return new BreedingCooldownSnapshot(true, active, remainingRealMs, ratio);
     }
 
     private double resolveBreedingCooldownRatio(TameworkBreedingComponent breeding,

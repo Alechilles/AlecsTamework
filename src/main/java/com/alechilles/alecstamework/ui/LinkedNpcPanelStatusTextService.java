@@ -65,7 +65,8 @@ final class LinkedNpcPanelStatusTextService {
         if (!entry.breedingCooldownActive()) {
             return "Breeding cooldown: ready";
         }
-        return "Breeding cooldown: " + formatRemainingHms(entry.breedingCooldownRemainingMs()) + " remaining";
+        return "Breeding cooldown: " + formatRemainingHms(entry.breedingCooldownRemainingMs())
+                + " real-time remaining";
     }
 
     private static String formatRemainingTime(long remainingMs) {
