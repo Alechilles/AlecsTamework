@@ -38,7 +38,6 @@ final class LinkedNpcPanelCardBinder {
         String activeToggleInactiveSelector = entrySelector + " #ActiveToggleInactiveButton";
         String inactiveBadgeSelector = entrySelector + " #StatusInactive";
         String groupTabSelector = entrySelector + " #GroupTab";
-        String groupTabColorSwatchSelector = entrySelector + " #GroupTabColorSwatch";
         String groupTabDropdownSelector = entrySelector + " #GroupTabDropdown";
         String respawnSelector = entrySelector + " #RespawnButton";
         String recallSelector = entrySelector + " #RecallButton";
@@ -71,7 +70,6 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcPanelGroupTabBinder.bind(
                 commandBuilder,
                 groupTabSelector,
-                groupTabColorSwatchSelector,
                 entry,
                 pendingUnlink
         );

@@ -100,23 +100,20 @@ Group {
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
   Group #GroupTab {
-    Anchor: (Top: -6, Left: -8, Width: 126, Height: 18);
+    Anchor: (Top: 8, Left: -10, Width: 6, Height: 72);
+    Background: #4b657f;
     Visible: false;
 
-    Group #GroupTabColorSwatch {
-      Anchor: (Top: 0, Left: 0, Width: 18, Height: 18);
-      Background: #4b657f;
-    }
-
     DropdownBox #GroupTabDropdown {
-      Anchor: (Top: 0, Left: 18, Width: 108, Height: 18);
+      Anchor: (Top: 0, Left: 0, Width: 6, Height: 72);
       Style: (
         ...$C.@DefaultDropdownBoxStyle,
-        HorizontalPadding: 6,
+        HorizontalPadding: 0,
         LabelStyle: (
           ...$C.@DefaultDropdownBoxLabelStyle,
           RenderUppercase: false,
-          FontSize: 9
+          FontSize: 1,
+          TextColor: #00000000
         ),
         EntryLabelStyle: (
           ...$C.@DefaultDropdownBoxEntryLabelStyle,
@@ -127,11 +124,14 @@ Group {
           ...$C.@DefaultDropdownBoxEntryLabelStyle,
           RenderUppercase: false,
           RenderBold: true,
-          FontSize: 9
+          FontSize: 1,
+          TextColor: #00000000
         )
       );
       MaxSelection: 1;
-      NoItemsText: "No groups";
+      NoItemsText: "Groups";
+      TooltipText: "Group";
+      TextTooltipStyle: @LinkedActionTooltipStyle;
     }
   }
 

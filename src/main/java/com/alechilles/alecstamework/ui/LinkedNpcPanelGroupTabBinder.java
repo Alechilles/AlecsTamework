@@ -14,10 +14,9 @@ final class LinkedNpcPanelGroupTabBinder {
 
     static void bind(UICommandBuilder commandBuilder,
                      String tabSelector,
-                     String colorSwatchSelector,
                      LinkedNpcEntry entry,
                      boolean pendingUnlink) {
-        if (commandBuilder == null || tabSelector == null || colorSwatchSelector == null || entry == null) {
+        if (commandBuilder == null || tabSelector == null || entry == null) {
             return;
         }
         boolean show = !pendingUnlink;
@@ -26,7 +25,7 @@ final class LinkedNpcPanelGroupTabBinder {
             return;
         }
         String color = normalizeColor(entry.groupColorHex());
-        commandBuilder.set(colorSwatchSelector + ".Background", color);
+        commandBuilder.set(tabSelector + ".Background", color);
     }
 
     private static String normalizeColor(String raw) {
