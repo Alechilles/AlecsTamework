@@ -53,8 +53,7 @@ $C.@PageOverlay {
           Anchor: (Width: 90, Height: 24);
           Text: "Create";
           Style: (
-            ...$C.@SmallSecondaryTextButtonStyle,
-            FontSize: 13
+            ...$C.@SmallSecondaryTextButtonStyle
           );
         }
       }
@@ -92,8 +91,7 @@ $C.@PageOverlay {
           Anchor: (Width: 100, Height: 24);
           Text: "Close";
           Style: (
-            ...$C.@SmallSecondaryTextButtonStyle,
-            FontSize: 13
+            ...$C.@SmallSecondaryTextButtonStyle
           );
         }
       }

@@ -37,8 +37,7 @@ Group {
     Anchor: (Top: 2, Right: 154, Width: 64, Height: 24);
     Text: "Rename";
     Style: (
-      ...$C.@SmallSecondaryTextButtonStyle,
-      FontSize: 12
+      ...$C.@SmallSecondaryTextButtonStyle
     );
   }
 
@@ -46,8 +45,7 @@ Group {
     Anchor: (Top: 2, Right: 84, Width: 64, Height: 24);
     Text: "Color";
     Style: (
-      ...$C.@SmallSecondaryTextButtonStyle,
-      FontSize: 12
+      ...$C.@SmallSecondaryTextButtonStyle
     );
   }
 
@@ -55,8 +53,7 @@ Group {
     Anchor: (Top: 2, Right: 0, Width: 78, Height: 24);
     Text: "Delete";
     Style: (
-      ...$C.@SmallSecondaryTextButtonStyle,
-      FontSize: 12
+      ...$C.@SmallSecondaryTextButtonStyle
     );
   }
 }
