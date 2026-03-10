@@ -441,7 +441,7 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterSummaryForTool(player, toolId),
-                () -> toolInventoryService.resolveGroupDropdownEntriesForTool(player, toolId),
+                () -> toolInventoryService.resolveGroupPickerOptionsForTool(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, npcUuid),

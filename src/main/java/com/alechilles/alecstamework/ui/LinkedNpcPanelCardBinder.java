@@ -1,11 +1,11 @@
 package com.alechilles.alecstamework.ui;
 
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
-import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Binds one linked-panel NPC card including visual state and per-row interaction handlers.
@@ -21,8 +21,8 @@ final class LinkedNpcPanelCardBinder {
                      boolean appendCard,
                      boolean pendingUnlink,
                      boolean showGroupPicker,
-                     List<DropdownEntryInfo> cardGroupEntries,
-                     String cardGroupValue,
+                     List<LinkedNpcGroupPickerOption> groupPickerOptions,
+                     String selectedGroupValue,
                      CardBindingConfig config) {
         String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
         String nameSelector = entrySelector + " #Name";
@@ -41,7 +41,7 @@ final class LinkedNpcPanelCardBinder {
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String groupPickerContainerSelector = entrySelector + " #GroupPickerContainer";
-        String groupPickerDropdownSelector = entrySelector + " #GroupPickerDropdown";
+        String groupPickerListSelector = entrySelector + " #GroupPickerList";
         String respawnSelector = entrySelector + " #RespawnButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
@@ -76,10 +76,19 @@ final class LinkedNpcPanelCardBinder {
                 entry,
                 pendingUnlink
         );
-        commandBuilder.set(groupPickerContainerSelector + ".Visible", !pendingUnlink && showGroupPicker);
-        if (!pendingUnlink) {
-            commandBuilder.set(groupPickerDropdownSelector + ".Entries", cardGroupEntries);
-            commandBuilder.set(groupPickerDropdownSelector + ".Value", cardGroupValue);
+        boolean showGroupPickerContainer = !pendingUnlink && showGroupPicker;
+        commandBuilder.set(groupPickerContainerSelector + ".Visible", showGroupPickerContainer);
+        commandBuilder.clear(groupPickerListSelector);
+        if (showGroupPickerContainer) {
+            bindGroupPickerOptions(
+                    commandBuilder,
+                    eventBuilder,
+                    entry,
+                    groupPickerListSelector,
+                    groupPickerOptions,
+                    selectedGroupValue,
+                    config
+            );
         }
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
@@ -133,13 +142,6 @@ final class LinkedNpcPanelCardBinder {
                     EventData.of(config.eventCommandId(), config.openGroupPickerCommandPrefix() + entry.npcUuid()),
                     false
             );
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.ValueChanged,
-                    groupPickerDropdownSelector,
-                    EventData.of(config.eventCommandId(), config.setGroupCommandPrefix() + entry.npcUuid())
-                            .append(config.keyCardGroupValue(), groupPickerDropdownSelector + ".Value"),
-                    false
-            );
         }
         if (showRespawn) {
             eventBuilder.addEventBinding(
@@ -175,7 +177,78 @@ final class LinkedNpcPanelCardBinder {
         }
     }
 
+    private static void bindGroupPickerOptions(UICommandBuilder commandBuilder,
+                                               UIEventBuilder eventBuilder,
+                                               LinkedNpcEntry entry,
+                                               String groupPickerListSelector,
+                                               List<LinkedNpcGroupPickerOption> groupPickerOptions,
+                                               String selectedGroupValue,
+                                               CardBindingConfig config) {
+        if (entry == null || groupPickerListSelector == null || config == null) {
+            return;
+        }
+        if (groupPickerOptions == null || groupPickerOptions.isEmpty()) {
+            return;
+        }
+        String normalizedSelectedValue = normalizeOptionValue(selectedGroupValue);
+        int visibleCount = 0;
+        for (LinkedNpcGroupPickerOption option : groupPickerOptions) {
+            if (option == null) {
+                continue;
+            }
+            String optionValue = normalizeOptionValue(option.value());
+            if (optionValue == null) {
+                continue;
+            }
+            String optionLabel = resolveOptionLabel(option, optionValue);
+            boolean selected = normalizedSelectedValue != null
+                    && normalizedSelectedValue.equalsIgnoreCase(optionValue);
+            commandBuilder.append(groupPickerListSelector, config.groupPickerOptionRowUiPath());
+            String optionSelector = groupPickerListSelector + "[" + visibleCount + "]";
+            commandBuilder.set(optionSelector + " #OptionColor.Background", normalizeColor(option.colorHex()));
+            commandBuilder.set(optionSelector + " #OptionButton.Text", selected ? "• " + optionLabel : optionLabel);
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    optionSelector + " #OptionButton",
+                    EventData.of(config.eventCommandId(), config.setGroupCommandPrefix() + entry.npcUuid())
+                            .append(config.keyCardGroupValue(), optionValue),
+                    false
+            );
+            visibleCount++;
+        }
+    }
+
+    private static String resolveOptionLabel(LinkedNpcGroupPickerOption option, String optionValue) {
+        if (option == null) {
+            return optionValue == null ? "Group" : optionValue;
+        }
+        String label = option.label();
+        if (label == null || label.isBlank()) {
+            return optionValue == null ? "Group" : optionValue;
+        }
+        return label.trim();
+    }
+
+    private static String normalizeOptionValue(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
+    }
+
+    private static String normalizeColor(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "#4B657F";
+        }
+        String trimmed = raw.trim();
+        if (!trimmed.matches("^#[0-9A-Fa-f]{6}$")) {
+            return "#4B657F";
+        }
+        return "#" + trimmed.substring(1).toUpperCase(Locale.ROOT);
+    }
+
     record CardBindingConfig(String linkedPanelCardUiPath,
+                             String groupPickerOptionRowUiPath,
                              String eventCommandId,
                              String keyCardGroupValue,
                              String linkCommandPrefix,

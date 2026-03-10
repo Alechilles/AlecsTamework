@@ -37,6 +37,7 @@ public final class TameworkCommandSelectionPage
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
     public static final String LINKED_PANEL_UI_PATH = "TameworkLinkedNpcPanel.ui";
     public static final String LINKED_PANEL_CARD_UI_PATH = "TameworkLinkedNpcPanelCard.ui";
+    public static final String LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH = "TameworkLinkedNpcGroupPickerOptionRow.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String KEY_PANEL_MODE_VALUE = "@PanelModeValue";
     private static final String KEY_PANEL_SORT_VALUE = "@PanelSortValue";
@@ -58,6 +59,7 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_MANAGE_GROUPS_COMMAND_ID = "__panel_manage_groups__";
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
     private static final String GROUP_NONE_VALUE = "None";
+    private static final String GROUP_NONE_COLOR = "#4B657F";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
     private static final List<DropdownEntryInfo> MODE_DROPDOWN_ENTRIES = List.of(
@@ -79,6 +81,7 @@ public final class TameworkCommandSelectionPage
     private static final LinkedNpcPanelCardBinder.CardBindingConfig CARD_BINDING_CONFIG =
             new LinkedNpcPanelCardBinder.CardBindingConfig(
                     LINKED_PANEL_CARD_UI_PATH,
+                    LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH,
                     EVENT_COMMAND_ID,
                     KEY_CARD_GROUP_VALUE,
                     LINK_COMMAND_PREFIX,
@@ -101,7 +104,7 @@ public final class TameworkCommandSelectionPage
     private final Supplier<String> panelFilterModeValueSupplier;
     private final Supplier<String> panelFilterInputValueSupplier;
     private final Supplier<String> panelFilterSummarySupplier;
-    private final Supplier<List<DropdownEntryInfo>> panelGroupDropdownEntriesSupplier;
+    private final Supplier<List<LinkedNpcGroupPickerOption>> panelGroupPickerOptionsSupplier;
     private LinkedNpcEntry[] linkedNpcEntries;
     private int renderedLinkedNpcCardCount;
     private UUID pendingUnlinkNpcUuid;
@@ -139,7 +142,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Supplier<String> panelFilterModeValueSupplier,
                                         @Nonnull Supplier<String> panelFilterInputValueSupplier,
                                         @Nonnull Supplier<String> panelFilterSummarySupplier,
-                                        @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupDropdownEntriesSupplier,
+                                        @Nonnull Supplier<List<LinkedNpcGroupPickerOption>> panelGroupPickerOptionsSupplier,
                                         @Nonnull Consumer<UUID> linkCallback,
                                         @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<UUID> toggleActiveCallback,
@@ -167,7 +170,7 @@ public final class TameworkCommandSelectionPage
         this.panelFilterModeValueSupplier = panelFilterModeValueSupplier;
         this.panelFilterInputValueSupplier = panelFilterInputValueSupplier;
         this.panelFilterSummarySupplier = panelFilterSummarySupplier;
-        this.panelGroupDropdownEntriesSupplier = panelGroupDropdownEntriesSupplier;
+        this.panelGroupPickerOptionsSupplier = panelGroupPickerOptionsSupplier;
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.renderedLinkedNpcCardCount = 0;
         this.pendingUnlinkNpcUuid = null;
@@ -730,8 +733,8 @@ public final class TameworkCommandSelectionPage
                                    boolean appendCard) {
         boolean pendingUnlink = entry.linked() && isPendingUnlink(entry.npcUuid());
         boolean showGroupPicker = isGroupPickerOpen(entry.npcUuid());
-        List<DropdownEntryInfo> cardGroupEntries = resolveCardGroupDropdownEntries(entry);
-        String cardGroupValue = resolveCardGroupDropdownValue(entry);
+        List<LinkedNpcGroupPickerOption> groupPickerOptions = resolveCardGroupPickerOptions(entry);
+        String selectedGroupValue = resolveCardGroupSelectedValue(entry);
         LinkedNpcPanelCardBinder.bind(
                 commandBuilder,
                 eventBuilder,
@@ -740,8 +743,8 @@ public final class TameworkCommandSelectionPage
                 appendCard,
                 pendingUnlink,
                 showGroupPicker,
-                cardGroupEntries,
-                cardGroupValue,
+                groupPickerOptions,
+                selectedGroupValue,
                 CARD_BINDING_CONFIG
         );
     }
@@ -831,21 +834,21 @@ public final class TameworkCommandSelectionPage
         return value == null ? "" : value;
     }
 
-    private List<DropdownEntryInfo> resolvePanelGroupDropdownEntries() {
-        List<DropdownEntryInfo> provided = panelGroupDropdownEntriesSupplier != null
-                ? panelGroupDropdownEntriesSupplier.get()
+    private List<LinkedNpcGroupPickerOption> resolvePanelGroupPickerOptions() {
+        List<LinkedNpcGroupPickerOption> provided = panelGroupPickerOptionsSupplier != null
+                ? panelGroupPickerOptionsSupplier.get()
                 : List.of();
         if (provided == null || provided.isEmpty()) {
-            return List.of(new DropdownEntryInfo(LocalizableString.fromString("None"), GROUP_NONE_VALUE));
+            return List.of(new LinkedNpcGroupPickerOption(GROUP_NONE_VALUE, "None", GROUP_NONE_COLOR));
         }
         return provided;
     }
 
-    private List<DropdownEntryInfo> resolveCardGroupDropdownEntries(LinkedNpcEntry entry) {
-        return resolvePanelGroupDropdownEntries();
+    private List<LinkedNpcGroupPickerOption> resolveCardGroupPickerOptions(LinkedNpcEntry entry) {
+        return resolvePanelGroupPickerOptions();
     }
 
-    private String resolveCardGroupDropdownValue(LinkedNpcEntry entry) {
+    private String resolveCardGroupSelectedValue(LinkedNpcEntry entry) {
         String selectedGroupId = entry != null ? normalizeSelectedGroupId(entry.groupId()) : null;
         if (isBlank(selectedGroupId)) {
             return GROUP_NONE_VALUE;
