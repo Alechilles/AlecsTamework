@@ -46,7 +46,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       LayoutMode: Left;
 
       Label #TameworkLinkedPanelSubtitle {
-        Anchor: (Width: 286, Height: 20);
+        Anchor: (Width: 150, Height: 20);
         Text: "No linked companions";
         Style: (
           FontSize: 14,
@@ -56,45 +56,50 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         );
       }
 
-      Group { Anchor: (Width: 6); }
+      Group { Anchor: (Width: 4); }
+
+      Group #TameworkLinkedPanelSubtitleRadiusGroup {
+        Anchor: (Width: 126, Height: 24);
+        LayoutMode: Left;
+        Visible: false;
+
+        TextButton #TameworkLinkedPanelRadiusDec {
+          Anchor: (Width: 24, Height: 24);
+          Text: "-";
+        }
+
+        Group { Anchor: (Width: 2); }
+
+        Label #TameworkLinkedPanelRadiusValue {
+          Anchor: (Width: 74, Height: 24);
+          Text: "Radius: 24m";
+          Style: (
+            FontSize: 12,
+            TextColor: #dbe8f6,
+            HorizontalAlignment: Center,
+            VerticalAlignment: Center
+          );
+        }
+
+        Group { Anchor: (Width: 2); }
+
+        TextButton #TameworkLinkedPanelRadiusInc {
+          Anchor: (Width: 24, Height: 24);
+          Text: "+";
+        }
+      }
+
+      Group { Anchor: (Width: 4); }
 
       $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
         @Sounds = $C.@ButtonSounds;
-        @Anchor = (Width: 120, Height: 24);
+        @Anchor = (Width: 130, Height: 24);
         @Text = "Manage Groups";
       }
     }
 
     $C.@PanelSeparatorFancy {
       @Anchor = (Top: 6, Bottom: 8);
-    }
-
-    Group #TameworkLinkedPanelControls {
-      Anchor: (Top: 2, Height: 28);
-      LayoutMode: Left;
-
-      TextButton #TameworkLinkedPanelRadiusDec {
-        Anchor: (Width: 24, Height: 24);
-        Text: "-";
-      }
-
-      Label #TameworkLinkedPanelRadiusValue {
-        Anchor: (Width: 96, Height: 24);
-        Text: "Radius: 24m";
-        Style: (
-          FontSize: 12,
-          TextColor: #dbe8f6,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
-
-      Group { Anchor: (Width: 4); }
-
-      TextButton #TameworkLinkedPanelRadiusInc {
-        Anchor: (Width: 24, Height: 24);
-        Text: "+";
-      }
     }
 
     Group #TameworkLinkedPanelControlsSecondary {

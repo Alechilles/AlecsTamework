@@ -16,6 +16,7 @@
 - Linked companions panel mode selection now renders as a header dropdown in the top-right title area (instead of an inline control-row button), while keeping per-tool mode persistence.
 - Linked companions panel `Manage Groups` action now renders as a styled secondary button in the subtitle/header row (moved out of the radius control row).
 - Linked companions panel now places `Clear` on the filter-input row, and conditionally shows both filter input and clear controls only when a filter mode is selected (not `None`).
+- Linked companions panel radius controls now render on the subtitle/header row between companion count and `Manage Groups`, and only appear while the panel mode is `NearbyMode`.
 
 ### Fixed
 - Species filtering now uses consistent role-id resolution across linked and nearby entries, including fallback extraction from legacy cached name keys when role metadata is missing, so linked companions no longer disappear incorrectly under Species filter.

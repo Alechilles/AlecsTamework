@@ -186,6 +186,7 @@ public final class TameworkCommandSelectionPage
         );
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", buildModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
+        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusGroup.Visible", shouldShowNearbyRadiusControls());
         commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", buildSortDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
@@ -488,6 +489,7 @@ public final class TameworkCommandSelectionPage
         );
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", buildModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
+        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusGroup.Visible", shouldShowNearbyRadiusControls());
         commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", buildSortDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
@@ -753,6 +755,10 @@ public final class TameworkCommandSelectionPage
         }
         String value = panelModeValueSupplier.get();
         return value == null || value.isBlank() ? "LinkedMode" : value;
+    }
+
+    private boolean shouldShowNearbyRadiusControls() {
+        return "NearbyMode".equalsIgnoreCase(resolvePanelModeValue());
     }
 
     private String resolvePanelRadiusLabel() {
