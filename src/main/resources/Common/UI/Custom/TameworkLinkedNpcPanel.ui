@@ -41,15 +41,28 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
     LayoutMode: Top;
     Padding: (Left: 10, Right: 6, Top: 8, Bottom: 10);
 
-    Label #TameworkLinkedPanelSubtitle {
-      Anchor: (Height: 20);
-      Text: "No linked companions";
-      Style: (
-        FontSize: 14,
-        TextColor: #c4d2e1,
-        HorizontalAlignment: Start,
-        VerticalAlignment: Center
-      );
+    Group #TameworkLinkedPanelSubtitleRow {
+      Anchor: (Height: 24);
+      LayoutMode: Left;
+
+      Label #TameworkLinkedPanelSubtitle {
+        Anchor: (Width: 286, Height: 20);
+        Text: "No linked companions";
+        Style: (
+          FontSize: 14,
+          TextColor: #c4d2e1,
+          HorizontalAlignment: Start,
+          VerticalAlignment: Center
+        );
+      }
+
+      Group { Anchor: (Width: 6); }
+
+      $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
+        @Sounds = $C.@ButtonSounds;
+        @Anchor = (Width: 120, Height: 24);
+        @Text = "Manage Groups";
+      }
     }
 
     $C.@PanelSeparatorFancy {
@@ -81,13 +94,6 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       TextButton #TameworkLinkedPanelRadiusInc {
         Anchor: (Width: 24, Height: 24);
         Text: "+";
-      }
-
-      Group { Anchor: (Width: 6); }
-
-      TextButton #TameworkLinkedPanelManageGroupsButton {
-        Anchor: (Width: 120, Height: 24);
-        Text: "Manage Groups";
       }
     }
 
