@@ -301,7 +301,7 @@ Group #TameworkLinkedPanelRoot {
           Anchor: (Top: 112, Left: 14, Width: 330, Height: 30);
           LayoutMode: Left;
 
-          Group { Anchor: (FlexWeight: 1); }
+          Group { Anchor: (Width: 138); }
 
           $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignCancelButton {
             @Sounds = $C.@ButtonSounds;
