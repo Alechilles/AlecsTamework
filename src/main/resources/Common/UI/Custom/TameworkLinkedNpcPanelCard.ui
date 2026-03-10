@@ -275,7 +275,7 @@ Group {
   }
 
   Label #StatusConfirm {
-    Anchor: (Top: 2, Right: 34, Width: 96, Height: 18);
+    Anchor: (Top: 30, Right: 34, Width: 96, Height: 18);
     Text: "CONFIRM REMOVE";
     Style: (
       FontSize: 10,
