@@ -18,7 +18,9 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
@@ -354,11 +356,12 @@ public final class TameworkCommandSelectionPage
             if (panelSetGroupCallback == null) {
                 return;
             }
-            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, SET_GROUP_COMMAND_PREFIX);
-            if (npcUuid == null) {
+            SetGroupSelection selection = parseSetGroupSelection(data.commandId, data.cardGroupValue);
+            if (selection == null) {
                 return;
             }
-            String selectedGroupId = normalizeSelectedGroupId(data.cardGroupValue);
+            UUID npcUuid = selection.npcUuid();
+            String selectedGroupId = normalizeSelectedGroupId(selection.groupValue());
             LinkedNpcEntry entry = findLinkedNpcEntry(npcUuid);
             if (!isBlank(selectedGroupId) && entry != null && !entry.linked() && linkCallback != null) {
                 linkCallback.accept(npcUuid);
@@ -775,7 +778,6 @@ public final class TameworkCommandSelectionPage
                     optionSelector + " #OptionColor.Background",
                     normalizeGroupPickerColor(option.colorHex())
             );
-            commandBuilder.set(optionSelector + " #OptionValue.Text", optionValue);
             String optionLabel = resolveGroupPickerOptionLabel(option, optionValue);
             boolean selected = selectedValue != null && selectedValue.equalsIgnoreCase(optionValue);
             commandBuilder.set(
@@ -785,11 +787,67 @@ public final class TameworkCommandSelectionPage
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     optionSelector + " #OptionButton",
-                    EventData.of(EVENT_COMMAND_ID, SET_GROUP_COMMAND_PREFIX + targetEntry.npcUuid())
-                            .append(KEY_CARD_GROUP_VALUE, optionSelector + " #OptionValue.Text"),
+                    EventData.of(EVENT_COMMAND_ID, buildSetGroupCommandId(targetEntry.npcUuid(), optionValue)),
                     false
             );
             rendered++;
+        }
+    }
+
+    private String buildSetGroupCommandId(UUID npcUuid, String groupValue) {
+        String encodedGroupValue = encodeSetGroupValue(groupValue);
+        return SET_GROUP_COMMAND_PREFIX + npcUuid + "|" + encodedGroupValue;
+    }
+
+    private String encodeSetGroupValue(String groupValue) {
+        String value = groupValue == null ? GROUP_NONE_VALUE : groupValue.trim();
+        if (value.isBlank()) {
+            value = GROUP_NONE_VALUE;
+        }
+        return Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(value.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private SetGroupSelection parseSetGroupSelection(String commandId, String fallbackGroupValue) {
+        if (commandId == null || !commandId.startsWith(SET_GROUP_COMMAND_PREFIX)) {
+            return null;
+        }
+        String payload = commandId.substring(SET_GROUP_COMMAND_PREFIX.length());
+        if (payload.isBlank()) {
+            return null;
+        }
+        int separatorIndex = payload.indexOf('|');
+        String uuidText = separatorIndex < 0 ? payload : payload.substring(0, separatorIndex);
+        if (uuidText == null || uuidText.isBlank()) {
+            return null;
+        }
+        UUID npcUuid;
+        try {
+            npcUuid = UUID.fromString(uuidText);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
+        String groupValue = fallbackGroupValue;
+        if (separatorIndex >= 0 && separatorIndex + 1 < payload.length()) {
+            String encoded = payload.substring(separatorIndex + 1);
+            String decoded = decodeSetGroupValue(encoded);
+            if (decoded != null) {
+                groupValue = decoded;
+            }
+        }
+        return new SetGroupSelection(npcUuid, groupValue);
+    }
+
+    private String decodeSetGroupValue(String encoded) {
+        if (encoded == null || encoded.isBlank()) {
+            return null;
+        }
+        try {
+            byte[] decoded = Base64.getUrlDecoder().decode(encoded);
+            return new String(decoded, StandardCharsets.UTF_8);
+        } catch (IllegalArgumentException ignored) {
+            return null;
         }
     }
 
@@ -1010,6 +1068,8 @@ public final class TameworkCommandSelectionPage
     private boolean isGroupPickerOpen(UUID npcUuid) {
         return npcUuid != null && openGroupPickerNpcUuid != null && openGroupPickerNpcUuid.equals(npcUuid);
     }
+
+    private record SetGroupSelection(UUID npcUuid, String groupValue) { }
 
     private record CommandOption(String id, String label) { }
 
