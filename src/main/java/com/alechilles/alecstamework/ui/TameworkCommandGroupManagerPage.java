@@ -32,6 +32,7 @@ public final class TameworkCommandGroupManagerPage
         extends InteractiveCustomUIPage<TameworkCommandGroupManagerPage.GroupManagerEventData> {
     public static final String UI_PATH = "TameworkCommandGroupManager.ui";
     public static final String ROW_UI_PATH = "TameworkCommandGroupManagerRow.ui";
+    private static final String EVENT_ACTION = "Action";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String KEY_NAME_INPUT = "@GroupNameInput";
     private static final String KEY_COLOR_INPUT = "@GroupColorInput";
@@ -97,7 +98,7 @@ public final class TameworkCommandGroupManagerPage
         if (data.colorInput != null) {
             draftColor = normalizeDraftColor(data.colorInput);
         }
-        String action = data.commandId != null ? data.commandId.trim() : "";
+        String action = resolveAction(data);
         LOGGER.log(
                 Level.INFO,
                 "Group manager event: commandId={0} name={1} color={2}",
@@ -218,7 +219,7 @@ public final class TameworkCommandGroupManagerPage
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCreateButton",
-                EventData.of(EVENT_COMMAND_ID, ACTION_CREATE)
+                EventData.of(EVENT_ACTION, ACTION_CREATE)
                         .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value")
                         .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
                 false
@@ -226,7 +227,7 @@ public final class TameworkCommandGroupManagerPage
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCloseButton",
-                EventData.of(EVENT_COMMAND_ID, ACTION_CLOSE),
+                EventData.of(EVENT_ACTION, ACTION_CLOSE),
                 false
         );
     }
@@ -250,24 +251,37 @@ public final class TameworkCommandGroupManagerPage
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #RenameButton",
-                    EventData.of(EVENT_COMMAND_ID, ACTION_RENAME_PREFIX + entry.groupId)
+                    EventData.of(EVENT_ACTION, ACTION_RENAME_PREFIX + entry.groupId)
                             .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
                     false
             );
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #ColorButton",
-                    EventData.of(EVENT_COMMAND_ID, ACTION_RECOLOR_PREFIX + entry.groupId)
+                    EventData.of(EVENT_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId)
                             .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
                     false
             );
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #DeleteButton",
-                    EventData.of(EVENT_COMMAND_ID, ACTION_DELETE_PREFIX + entry.groupId),
+                    EventData.of(EVENT_ACTION, ACTION_DELETE_PREFIX + entry.groupId),
                     false
             );
         }
+    }
+
+    private static String resolveAction(GroupManagerEventData data) {
+        if (data == null) {
+            return "";
+        }
+        if (data.action != null && !data.action.isBlank()) {
+            return data.action.trim();
+        }
+        if (data.commandId != null && !data.commandId.isBlank()) {
+            return data.commandId.trim();
+        }
+        return "";
     }
 
     public static final class GroupManagerEventData {
@@ -275,6 +289,12 @@ public final class TameworkCommandGroupManagerPage
                 GroupManagerEventData.class,
                 GroupManagerEventData::new
         )
+                .<String>append(
+                        new KeyedCodec<>(EVENT_ACTION, Codec.STRING),
+                        (data, value) -> data.action = value,
+                        data -> data.action
+                )
+                .add()
                 .<String>append(
                         new KeyedCodec<>(EVENT_COMMAND_ID, Codec.STRING),
                         (data, value) -> data.commandId = value,
@@ -295,6 +315,7 @@ public final class TameworkCommandGroupManagerPage
                 .add()
                 .build();
 
+        private String action;
         private String commandId;
         private String nameInput;
         private String colorInput;
