@@ -332,7 +332,7 @@ Group {
   }
 
   TextButton #RemoveButton {
-    Anchor: (Top: 4, Right: 2, Width: 14, Height: 14);
+    Anchor: (Top: 1, Right: 0, Width: 14, Height: 14);
     Style: @RemoveIconButtonStyle;
     Text: "";
     TooltipText: "Unlink";
