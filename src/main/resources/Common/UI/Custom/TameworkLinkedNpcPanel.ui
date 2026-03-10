@@ -74,7 +74,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
           Group { Anchor: (Width: 1); }
 
           Label #TameworkLinkedPanelRadiusValue {
-            Anchor: (Width: 68, Height: 24);
+            Anchor: (Width: 65, Height: 24);
             Text: "Radius: 24m";
             Style: (
               FontSize: 12,
@@ -84,7 +84,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
             );
           }
 
-          Group { Anchor: (Width: 1); }
+          Group { Anchor: (Width: 4); }
 
           TextButton #TameworkLinkedPanelRadiusInc {
             Anchor: (Width: 14, Height: 24);
