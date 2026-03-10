@@ -27,6 +27,8 @@
 - Group manager color picker bindings now target `ColorPickerDropdownBox.Color` (not `.Value`), fixing panel-open failures caused by invalid selector property access.
 - Group manager now uses a single `Action` event key path for button submit payloads, fixing create no-op cases caused by ambiguous dual action-key decoding.
 - Group manager color picker swatch is now square (24x24) for a compact header-row layout.
+- Group manager create/close button handling now includes dedicated submit flags in event payloads (in addition to `Action`) to harden against dropped action-field payloads on button activation.
+- Group manager create/close/row action buttons now use explicit small-secondary button styling for consistent visual affordance.
 - Command selection page now marks itself dismissed before close transitions (including `Groups` open), preventing late refresh-loop updates from targeting linked-panel selectors on the next page.
 
 ## 2.2.1 - Companion Policy, Interaction QoL, and Config Scope Updates - 2026-03-08

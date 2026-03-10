@@ -51,6 +51,7 @@ $C.@PageOverlay {
         Group { Anchor: (Width: 6); }
 
         TextButton #TameworkGroupCreateButton {
+          Style: $C.@SmallSecondaryTextButtonStyle;
           Anchor: (Width: 90, Height: 24);
           Text: "Create";
         }
@@ -87,6 +88,7 @@ $C.@PageOverlay {
         LayoutMode: Right;
 
         TextButton #TameworkGroupCloseButton {
+          Style: $C.@SmallSecondaryTextButtonStyle;
           Anchor: (Width: 100, Height: 24);
           Text: "Close";
         }

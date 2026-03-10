@@ -31,6 +31,8 @@ public final class TameworkCommandGroupManagerPage
     public static final String UI_PATH = "TameworkCommandGroupManager.ui";
     public static final String ROW_UI_PATH = "TameworkCommandGroupManagerRow.ui";
     private static final String KEY_ACTION = "Action";
+    private static final String KEY_CREATE_EVENT = "@GroupCreateEvent";
+    private static final String KEY_CLOSE_EVENT = "@GroupCloseEvent";
     private static final String KEY_NAME_INPUT = "@GroupNameInput";
     private static final String KEY_COLOR_INPUT = "@GroupColorInput";
     private static final String ACTION_CLOSE = "__close__";
@@ -39,6 +41,7 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_RECOLOR_PREFIX = "__recolor__:";
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
+    private static final String EVENT_TRUE = "1";
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
     private final BiConsumer<String, String> createCallback;
@@ -94,11 +97,10 @@ public final class TameworkCommandGroupManagerPage
         if (data.colorInput != null) {
             draftColor = normalizeDraftColor(data.colorInput);
         }
+        boolean closePressed = EVENT_TRUE.equals(data.closeEvent);
+        boolean createPressed = EVENT_TRUE.equals(data.createEvent);
         String action = data.action != null ? data.action.trim() : "";
-        if (action.isBlank()) {
-            return;
-        }
-        if (ACTION_CLOSE.equals(action)) {
+        if (closePressed || ACTION_CLOSE.equals(action)) {
             handled = true;
             close();
             if (closeCallback != null) {
@@ -106,12 +108,15 @@ public final class TameworkCommandGroupManagerPage
             }
             return;
         }
-        if (ACTION_CREATE.equals(action)) {
+        if (createPressed || ACTION_CREATE.equals(action)) {
             if (createCallback != null) {
                 createCallback.accept(draftName, draftColor);
             }
             draftName = "";
             refreshAndSend();
+            return;
+        }
+        if (action.isBlank()) {
             return;
         }
         if (action.startsWith(ACTION_RENAME_PREFIX)) {
@@ -189,7 +194,9 @@ public final class TameworkCommandGroupManagerPage
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCreateButton",
-                EventData.of(KEY_ACTION, ACTION_CREATE)
+                new EventData()
+                        .append(KEY_CREATE_EVENT, EVENT_TRUE)
+                        .append(KEY_ACTION, ACTION_CREATE)
                         .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value")
                         .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
                 false
@@ -197,7 +204,9 @@ public final class TameworkCommandGroupManagerPage
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCloseButton",
-                EventData.of(KEY_ACTION, ACTION_CLOSE),
+                new EventData()
+                        .append(KEY_CLOSE_EVENT, EVENT_TRUE)
+                        .append(KEY_ACTION, ACTION_CLOSE),
                 false
         );
     }
@@ -253,6 +262,18 @@ public final class TameworkCommandGroupManagerPage
                 )
                 .add()
                 .<String>append(
+                        new KeyedCodec<>(KEY_CREATE_EVENT, Codec.STRING),
+                        (data, value) -> data.createEvent = value,
+                        data -> data.createEvent
+                )
+                .add()
+                .<String>append(
+                        new KeyedCodec<>(KEY_CLOSE_EVENT, Codec.STRING),
+                        (data, value) -> data.closeEvent = value,
+                        data -> data.closeEvent
+                )
+                .add()
+                .<String>append(
                         new KeyedCodec<>(KEY_NAME_INPUT, Codec.STRING),
                         (data, value) -> data.nameInput = value,
                         data -> data.nameInput
@@ -267,6 +288,8 @@ public final class TameworkCommandGroupManagerPage
                 .build();
 
         private String action;
+        private String createEvent;
+        private String closeEvent;
         private String nameInput;
         private String colorInput;
     }
