@@ -46,7 +46,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       LayoutMode: Left;
 
       Label #TameworkLinkedPanelSubtitle {
-        Anchor: (Width: 182, Height: 20);
+        Anchor: (Width: 138, Height: 20);
         Text: "No linked NPCs";
         Style: (
           FontSize: 14,
@@ -58,11 +58,16 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
 
       Group { Anchor: (Width: 6); }
 
+      Group { Anchor: (Width: 1); }
+
       Group #TameworkLinkedPanelSubtitleRadiusSlot {
-        Anchor: (Width: 108, Height: 24);
+        Anchor: (Width: 124, Height: 24);
+        LayoutMode: Left;
+
+        Group { Anchor: (Width: 2); }
 
         Group #TameworkLinkedPanelSubtitleRadiusControls {
-          Anchor: (Width: 108, Height: 24);
+          Anchor: (Width: 120, Height: 24);
           LayoutMode: Left;
           Visible: false;
 
@@ -74,7 +79,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
           Group { Anchor: (Width: 3); }
 
           Label #TameworkLinkedPanelRadiusValue {
-            Anchor: (Width: 62, Height: 24);
+            Anchor: (Width: 72, Height: 24);
             Text: "Radius: 24m";
             Style: (
               FontSize: 12,
@@ -91,15 +96,19 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
             Text: "+";
           }
         }
+
+        Group { Anchor: (Width: 2); }
       }
 
       Group { Anchor: (Width: 6); }
 
       $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
         @Sounds = $C.@ButtonSounds;
-        @Anchor = (Width: 74, Height: 24);
+        @Anchor = (Width: 88, Height: 24);
         @Text = "Groups";
       }
+
+      Group { Anchor: (Width: 51); }
     }
 
     $C.@PanelSeparatorFancy {
