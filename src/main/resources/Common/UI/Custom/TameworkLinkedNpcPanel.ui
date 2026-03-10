@@ -59,22 +59,22 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         Anchor: (Left: 147, Width: 124, Height: 24);
         LayoutMode: Left;
 
-        Group { Anchor: (Width: 2); }
+        Group { Anchor: (Width: 13); }
 
         Group #TameworkLinkedPanelSubtitleRadiusControls {
-          Anchor: (Width: 120, Height: 24);
+          Anchor: (Width: 98, Height: 24);
           LayoutMode: Left;
           Visible: false;
 
           TextButton #TameworkLinkedPanelRadiusDec {
-            Anchor: (Width: 20, Height: 24);
+            Anchor: (Width: 14, Height: 24);
             Text: "-";
           }
 
-          Group { Anchor: (Width: 2); }
+          Group { Anchor: (Width: 1); }
 
           Label #TameworkLinkedPanelRadiusValue {
-            Anchor: (Width: 72, Height: 24);
+            Anchor: (Width: 68, Height: 24);
             Text: "Radius: 24m";
             Style: (
               FontSize: 12,
@@ -84,15 +84,15 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
             );
           }
 
-          Group { Anchor: (Width: 3); }
+          Group { Anchor: (Width: 1); }
 
           TextButton #TameworkLinkedPanelRadiusInc {
-            Anchor: (Width: 20, Height: 24);
+            Anchor: (Width: 14, Height: 24);
             Text: "+";
           }
         }
 
-        Group { Anchor: (Width: 2); }
+        Group { Anchor: (Width: 13); }
       }
 
       $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
