@@ -51,7 +51,7 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_COMPLETE_PREFIX = "__complete__:";
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
-    private static final String DEFAULT_SUBTITLE = "Create, edit, recolor, or delete command groups.";
+    private static final String DEFAULT_SUBTITLE = "Create, edit, recolor, or delete groups.";
     private static final Logger LOGGER = Logger.getLogger(TameworkCommandGroupManagerPage.class.getName());
 
     private final Supplier<List<GroupEntry>> groupsSupplier;

@@ -3,21 +3,21 @@ $C = "Common.ui";
 Group {
   Anchor: (Top: 0, Left: 0, Right: 0, Height: 32);
   Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
-  Padding: (Left: 8, Right: 8, Top: 4, Bottom: 4);
+  Padding: (Left: 6, Right: 6, Top: 4, Bottom: 4);
 
   Group #GroupColorSwatch {
-    Anchor: (Top: 1, Left: 0, Width: 22, Height: 22);
+    Anchor: (Top: 2, Left: 0, Width: 18, Height: 18);
     Background: #4b657f;
   }
 
   ColorPickerDropdownBox #GroupColorPicker {
     Style: $C.@DefaultColorPickerDropdownBoxStyle;
-    Anchor: (Top: 1, Left: 0, Width: 22, Height: 22);
+    Anchor: (Top: 2, Left: 0, Width: 18, Height: 18);
     Visible: false;
   }
 
   Label #GroupName {
-    Anchor: (Top: 1, Left: 28, Width: 250, Height: 22);
+    Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
     Text: "Group";
     Style: (
       FontSize: 14,
@@ -32,7 +32,7 @@ Group {
     Style: $C.@DefaultInputFieldStyle;
     PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
     Background: $C.@InputBoxBackground;
-    Anchor: (Top: 1, Left: 28, Width: 250, Height: 22);
+    Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
     Padding: (Horizontal: 6);
     PlaceholderText: "Group name";
     MaxLength: 24;
@@ -40,7 +40,7 @@ Group {
   }
 
   TextButton #EditButton {
-    Anchor: (Top: 1, Right: 84, Width: 64, Height: 24);
+    Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
     Text: "Edit";
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle
@@ -48,7 +48,7 @@ Group {
   }
 
   TextButton #CompleteButton {
-    Anchor: (Top: 1, Right: 84, Width: 64, Height: 24);
+    Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
     Text: "Done";
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle
@@ -57,7 +57,7 @@ Group {
   }
 
   TextButton #DeleteButton {
-    Anchor: (Top: 1, Right: 0, Width: 78, Height: 24);
+    Anchor: (Top: 1, Right: 0, Width: 58, Height: 24);
     Text: "Delete";
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle
