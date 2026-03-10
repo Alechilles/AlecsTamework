@@ -238,11 +238,9 @@ final class LinkedNpcPanelCardBinder {
         boolean hasPrevPage = safePageIndex > 0;
         boolean hasNextPage = safePageIndex < totalPages - 1;
         boolean showPagingControls = totalPages > 1;
-        commandBuilder.set(groupPickerPrevButtonSelector + ".Visible", showPagingControls);
-        commandBuilder.set(groupPickerNextButtonSelector + ".Visible", showPagingControls);
+        commandBuilder.set(groupPickerPrevButtonSelector + ".Visible", showPagingControls && hasPrevPage);
+        commandBuilder.set(groupPickerNextButtonSelector + ".Visible", showPagingControls && hasNextPage);
         commandBuilder.set(groupPickerPageLabelSelector + ".Visible", showPagingControls);
-        commandBuilder.set(groupPickerPrevButtonSelector + ".Enabled", hasPrevPage);
-        commandBuilder.set(groupPickerNextButtonSelector + ".Enabled", hasNextPage);
         commandBuilder.set(groupPickerPageLabelSelector + ".Text", (safePageIndex + 1) + "/" + totalPages);
         String normalizedSelectedValue = normalizeOptionValue(selectedGroupValue);
         int visibleCount = 0;
