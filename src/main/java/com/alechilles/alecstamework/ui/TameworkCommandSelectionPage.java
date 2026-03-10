@@ -20,6 +20,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -81,7 +82,6 @@ public final class TameworkCommandSelectionPage
     private static final LinkedNpcPanelCardBinder.CardBindingConfig CARD_BINDING_CONFIG =
             new LinkedNpcPanelCardBinder.CardBindingConfig(
                     LINKED_PANEL_CARD_UI_PATH,
-                    LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH,
                     EVENT_COMMAND_ID,
                     KEY_CARD_GROUP_VALUE,
                     LINK_COMMAND_PREFIX,
@@ -227,6 +227,7 @@ public final class TameworkCommandSelectionPage
         boolean showFilterInputControls = shouldShowFilterInputControls();
         commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
+        bindGlobalGroupPicker(commandBuilder, eventBuilder);
 
         buildCommandButtons(commandBuilder, eventBuilder);
         buildLinkedNpcPanel(commandBuilder, eventBuilder);
@@ -602,6 +603,7 @@ public final class TameworkCommandSelectionPage
         boolean showFilterInputControls = shouldShowFilterInputControls();
         commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
         commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
+        bindGlobalGroupPicker(commandBuilder, eventBuilder);
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
@@ -732,9 +734,6 @@ public final class TameworkCommandSelectionPage
                                    LinkedNpcEntry entry,
                                    boolean appendCard) {
         boolean pendingUnlink = entry.linked() && isPendingUnlink(entry.npcUuid());
-        boolean showGroupPicker = isGroupPickerOpen(entry.npcUuid());
-        List<LinkedNpcGroupPickerOption> groupPickerOptions = resolveCardGroupPickerOptions(entry);
-        String selectedGroupValue = resolveCardGroupSelectedValue(entry);
         LinkedNpcPanelCardBinder.bind(
                 commandBuilder,
                 eventBuilder,
@@ -742,11 +741,55 @@ public final class TameworkCommandSelectionPage
                 entry,
                 appendCard,
                 pendingUnlink,
-                showGroupPicker,
-                groupPickerOptions,
-                selectedGroupValue,
                 CARD_BINDING_CONFIG
         );
+    }
+
+    private void bindGlobalGroupPicker(@Nonnull UICommandBuilder commandBuilder,
+                                       @Nonnull UIEventBuilder eventBuilder) {
+        LinkedNpcEntry targetEntry = findLinkedNpcEntry(openGroupPickerNpcUuid);
+        boolean showOverlay = targetEntry != null;
+        commandBuilder.set("#TameworkLinkedPanelGroupPickerOverlay.Visible", showOverlay);
+        commandBuilder.clear("#TameworkLinkedPanelGroupPickerList");
+        if (!showOverlay) {
+            return;
+        }
+        commandBuilder.set("#TameworkLinkedPanelGroupPickerTitle.Text", "Set Group: " + targetEntry.displayName());
+        List<LinkedNpcGroupPickerOption> options = resolveCardGroupPickerOptions(targetEntry);
+        String selectedValue = resolveCardGroupSelectedValue(targetEntry);
+        int rendered = 0;
+        for (LinkedNpcGroupPickerOption option : options) {
+            if (option == null) {
+                continue;
+            }
+            String optionValue = normalizeGroupPickerOptionValue(option.value());
+            if (optionValue == null) {
+                continue;
+            }
+            commandBuilder.append(
+                    "#TameworkLinkedPanelGroupPickerList",
+                    LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH
+            );
+            String optionSelector = "#TameworkLinkedPanelGroupPickerList[" + rendered + "]";
+            commandBuilder.set(
+                    optionSelector + " #OptionColor.Background",
+                    normalizeGroupPickerColor(option.colorHex())
+            );
+            String optionLabel = resolveGroupPickerOptionLabel(option, optionValue);
+            boolean selected = selectedValue != null && selectedValue.equalsIgnoreCase(optionValue);
+            commandBuilder.set(
+                    optionSelector + " #OptionButton.Text",
+                    selected ? "• " + optionLabel : optionLabel
+            );
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    optionSelector + " #OptionButton",
+                    EventData.of(EVENT_COMMAND_ID, SET_GROUP_COMMAND_PREFIX + targetEntry.npcUuid())
+                            .append(KEY_CARD_GROUP_VALUE, optionValue),
+                    false
+            );
+            rendered++;
+        }
     }
 
     private void refreshLinkedNpcEntries() {
@@ -854,6 +897,35 @@ public final class TameworkCommandSelectionPage
             return GROUP_NONE_VALUE;
         }
         return selectedGroupId;
+    }
+
+    private String resolveGroupPickerOptionLabel(LinkedNpcGroupPickerOption option, String fallbackValue) {
+        if (option == null) {
+            return fallbackValue == null ? "Group" : fallbackValue;
+        }
+        String label = option.label();
+        if (label == null || label.isBlank()) {
+            return fallbackValue == null ? "Group" : fallbackValue;
+        }
+        return label.trim();
+    }
+
+    private String normalizeGroupPickerOptionValue(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        return raw.trim();
+    }
+
+    private String normalizeGroupPickerColor(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return GROUP_NONE_COLOR;
+        }
+        String trimmed = raw.trim();
+        if (!trimmed.matches("^#[0-9A-Fa-f]{6}$")) {
+            return GROUP_NONE_COLOR;
+        }
+        return "#" + trimmed.substring(1).toUpperCase(Locale.ROOT);
     }
 
     private String resolvePanelFilterSummary() {

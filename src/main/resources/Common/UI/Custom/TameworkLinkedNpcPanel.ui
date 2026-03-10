@@ -234,5 +234,37 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         Anchor: (Bottom: 6);
       }
     }
+
+  }
+
+  Group #TameworkLinkedPanelGroupPickerOverlay {
+    Anchor: (Top: 108, Left: -158, Width: 152, Height: 146);
+    Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
+    Padding: (Left: 4, Right: 4, Top: 4, Bottom: 4);
+    Visible: false;
+
+    Label #TameworkLinkedPanelGroupPickerTitle {
+      Anchor: (Top: 0, Left: 2, Right: 2, Height: 16);
+      Text: "Set Group";
+      Style: (
+        FontSize: 11,
+        RenderBold: true,
+        TextColor: #c8d9ec,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center
+      );
+    }
+
+    Group #TameworkLinkedPanelGroupPickerListViewport {
+      Anchor: (Top: 18, Left: 0, Right: 0, Bottom: 0);
+      LayoutMode: TopScrolling;
+      KeepScrollPosition: true;
+      ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+      Group #TameworkLinkedPanelGroupPickerList {
+        LayoutMode: Top;
+        Anchor: (Bottom: 0);
+      }
+    }
   }
 }

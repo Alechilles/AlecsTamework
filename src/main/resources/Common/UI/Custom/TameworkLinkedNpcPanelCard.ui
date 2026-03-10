@@ -113,25 +113,6 @@ Group {
     }
   }
 
-  Group #GroupPickerContainer {
-    Anchor: (Top: 0, Left: -156, Width: 148, Height: 84);
-    Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
-    Padding: (Left: 4, Right: 4, Top: 4, Bottom: 4);
-    Visible: false;
-
-    Group #GroupPickerListViewport {
-      Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-      LayoutMode: TopScrolling;
-      KeepScrollPosition: true;
-      ScrollbarStyle: $C.@DefaultScrollbarStyle;
-
-      Group #GroupPickerList {
-        LayoutMode: Top;
-        Anchor: (Bottom: 0);
-      }
-    }
-  }
-
   Label #Name {
     Anchor: (Top: 0, Left: 18, Width: 188, Height: 22);
     Text: "Companion";
