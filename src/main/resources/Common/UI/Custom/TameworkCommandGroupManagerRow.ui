@@ -22,17 +22,6 @@ Group {
     );
   }
 
-  Label #GroupMeta {
-    Anchor: (Top: 4, Left: 246, Width: 140, Height: 18);
-    Text: "id";
-    Style: (
-      FontSize: 11,
-      TextColor: #9fb3c8,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
-  }
-
   TextButton #RenameButton {
     Anchor: (Top: 2, Right: 154, Width: 64, Height: 24);
     Text: "Rename";

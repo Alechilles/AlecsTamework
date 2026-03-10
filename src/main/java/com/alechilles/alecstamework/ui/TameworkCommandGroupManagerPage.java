@@ -47,6 +47,10 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_RECOLOR_PREFIX = "__recolor__:";
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
+    private static final String DEFAULT_SUBTITLE = "Create, rename, recolor, or delete command groups.";
+    private static final String BUTTON_TEXT_CREATE = "Create";
+    private static final String BUTTON_TEXT_RENAME = "Rename";
+    private static final String BUTTON_TEXT_RECOLOR = "Update Color";
     private static final Logger LOGGER = Logger.getLogger(TameworkCommandGroupManagerPage.class.getName());
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
@@ -58,6 +62,8 @@ public final class TameworkCommandGroupManagerPage
     private GroupEntry[] entries;
     private String draftName;
     private String draftColor;
+    private EditMode editMode;
+    private String editGroupId;
     private boolean handled;
 
     public TameworkCommandGroupManagerPage(@Nonnull PlayerRef playerRef,
@@ -77,6 +83,8 @@ public final class TameworkCommandGroupManagerPage
         this.entries = new GroupEntry[0];
         this.draftName = "";
         this.draftColor = DEFAULT_GROUP_COLOR;
+        this.editMode = EditMode.CREATE;
+        this.editGroupId = null;
         this.handled = false;
     }
 
@@ -87,8 +95,10 @@ public final class TameworkCommandGroupManagerPage
                       @Nonnull Store<EntityStore> store) {
         refreshGroups();
         commandBuilder.append(UI_PATH);
+        commandBuilder.set("#TameworkGroupManagerSubtitle.Text", resolveSubtitleText());
         commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
         commandBuilder.set("#TameworkGroupColorInput.Color", draftColor);
+        commandBuilder.set("#TameworkGroupCreateButton.Text", resolvePrimaryButtonText());
         bindList(commandBuilder, eventBuilder);
         bindHeaderEvents(eventBuilder);
     }
@@ -162,12 +172,14 @@ public final class TameworkCommandGroupManagerPage
             return;
         }
         if (ACTION_CREATE.equals(normalizedAction)) {
-            LOGGER.log(Level.INFO, "Group manager create requested for name={0} color={1}",
-                    new Object[] { safeForLog(draftName), safeForLog(draftColor) });
-            if (createCallback != null) {
-                createCallback.accept(draftName, draftColor);
-            }
-            draftName = "";
+            LOGGER.log(Level.INFO, "Group manager primary action requested for mode={0} groupId={1} name={2} color={3}",
+                    new Object[] {
+                            safeForLog(editMode.name()),
+                            safeForLog(editGroupId),
+                            safeForLog(draftName),
+                            safeForLog(draftColor)
+                    });
+            applyPrimaryAction();
             refreshAndSend();
             return;
         }
@@ -177,21 +189,13 @@ public final class TameworkCommandGroupManagerPage
         }
         if (normalizedAction.startsWith(ACTION_RENAME_PREFIX)) {
             String groupId = normalizedAction.substring(ACTION_RENAME_PREFIX.length()).trim();
-            if (!groupId.isBlank() && renameCallback != null) {
-                LOGGER.log(Level.INFO, "Group manager rename requested for groupId={0} newName={1}",
-                        new Object[] { safeForLog(groupId), safeForLog(draftName) });
-                renameCallback.accept(groupId, draftName);
-            }
+            beginRename(groupId);
             refreshAndSend();
             return;
         }
         if (normalizedAction.startsWith(ACTION_RECOLOR_PREFIX)) {
             String groupId = normalizedAction.substring(ACTION_RECOLOR_PREFIX.length()).trim();
-            if (!groupId.isBlank() && recolorCallback != null) {
-                LOGGER.log(Level.INFO, "Group manager recolor requested for groupId={0} color={1}",
-                        new Object[] { safeForLog(groupId), safeForLog(draftColor) });
-                recolorCallback.accept(groupId, draftColor);
-            }
+            beginRecolor(groupId);
             refreshAndSend();
             return;
         }
@@ -201,6 +205,9 @@ public final class TameworkCommandGroupManagerPage
                 LOGGER.log(Level.INFO, "Group manager delete requested for groupId={0}",
                         new Object[] { safeForLog(groupId) });
                 deleteCallback.accept(groupId);
+            }
+            if (!groupId.isBlank() && groupId.equalsIgnoreCase(editGroupId)) {
+                clearEditMode(false);
             }
             refreshAndSend();
             return;
@@ -228,8 +235,10 @@ public final class TameworkCommandGroupManagerPage
         refreshGroups();
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
+        commandBuilder.set("#TameworkGroupManagerSubtitle.Text", resolveSubtitleText());
         commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
         commandBuilder.set("#TameworkGroupColorInput.Color", draftColor);
+        commandBuilder.set("#TameworkGroupCreateButton.Text", resolvePrimaryButtonText());
         bindList(commandBuilder, eventBuilder);
         bindHeaderEvents(eventBuilder);
         sendUpdate(commandBuilder, eventBuilder, false);
@@ -290,20 +299,17 @@ public final class TameworkCommandGroupManagerPage
             commandBuilder.append("#TameworkGroupManagerList", ROW_UI_PATH);
             commandBuilder.set(root + " #GroupName.Text", entry.name);
             commandBuilder.set(root + " #GroupColorSwatch.Background", entry.colorHex);
-            commandBuilder.set(root + " #GroupMeta.Text", entry.groupId);
 
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #RenameButton",
-                    EventData.of(EVENT_ACTION, ACTION_RENAME_PREFIX + entry.groupId)
-                            .append(KEY_NAME_INPUT, "#TameworkGroupNameInput.Value"),
+                    EventData.of(EVENT_ACTION, ACTION_RENAME_PREFIX + entry.groupId),
                     false
             );
             eventBuilder.addEventBinding(
                     CustomUIEventBindingType.Activating,
                     root + " #ColorButton",
-                    EventData.of(EVENT_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId)
-                            .append(KEY_COLOR_INPUT, "#TameworkGroupColorInput.Color"),
+                    EventData.of(EVENT_ACTION, ACTION_RECOLOR_PREFIX + entry.groupId),
                     false
             );
             eventBuilder.addEventBinding(
@@ -313,6 +319,118 @@ public final class TameworkCommandGroupManagerPage
                     false
             );
         }
+    }
+
+    private void applyPrimaryAction() {
+        if (editMode == EditMode.RENAME && editGroupId != null && !editGroupId.isBlank()) {
+            GroupEntry target = findEntry(editGroupId);
+            String nextName = draftName == null ? "" : draftName.trim();
+            if (target == null) {
+                clearEditMode(false);
+                return;
+            }
+            if (nextName.isBlank()) {
+                nextName = target.name;
+            }
+            if (!target.name.equals(nextName) && renameCallback != null) {
+                LOGGER.log(Level.INFO, "Group manager rename requested for groupId={0} newName={1}",
+                        new Object[] { safeForLog(editGroupId), safeForLog(nextName) });
+                renameCallback.accept(editGroupId, nextName);
+            }
+            clearEditMode(false);
+            return;
+        }
+        if (editMode == EditMode.RECOLOR && editGroupId != null && !editGroupId.isBlank()) {
+            GroupEntry target = findEntry(editGroupId);
+            String nextColor = normalizeDraftColor(draftColor);
+            if (target == null) {
+                clearEditMode(false);
+                return;
+            }
+            if (!target.colorHex.equalsIgnoreCase(nextColor) && recolorCallback != null) {
+                LOGGER.log(Level.INFO, "Group manager recolor requested for groupId={0} color={1}",
+                        new Object[] { safeForLog(editGroupId), safeForLog(nextColor) });
+                recolorCallback.accept(editGroupId, nextColor);
+            }
+            clearEditMode(false);
+            return;
+        }
+        if (createCallback != null) {
+            createCallback.accept(draftName, draftColor);
+        }
+        draftName = "";
+    }
+
+    private void beginRename(String groupId) {
+        GroupEntry target = findEntry(groupId);
+        if (target == null) {
+            clearEditMode(false);
+            return;
+        }
+        editMode = EditMode.RENAME;
+        editGroupId = target.groupId;
+        draftName = target.name;
+        draftColor = normalizeDraftColor(target.colorHex);
+    }
+
+    private void beginRecolor(String groupId) {
+        GroupEntry target = findEntry(groupId);
+        if (target == null) {
+            clearEditMode(false);
+            return;
+        }
+        editMode = EditMode.RECOLOR;
+        editGroupId = target.groupId;
+        draftName = target.name;
+        draftColor = normalizeDraftColor(target.colorHex);
+    }
+
+    private GroupEntry findEntry(String groupId) {
+        if (groupId == null || groupId.isBlank() || entries.length == 0) {
+            return null;
+        }
+        for (GroupEntry entry : entries) {
+            if (entry == null || entry.groupId == null) {
+                continue;
+            }
+            if (entry.groupId.equalsIgnoreCase(groupId.trim())) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private void clearEditMode(boolean clearName) {
+        editMode = EditMode.CREATE;
+        editGroupId = null;
+        if (clearName) {
+            draftName = "";
+        }
+    }
+
+    private String resolvePrimaryButtonText() {
+        if (editMode == EditMode.RENAME) {
+            return BUTTON_TEXT_RENAME;
+        }
+        if (editMode == EditMode.RECOLOR) {
+            return BUTTON_TEXT_RECOLOR;
+        }
+        return BUTTON_TEXT_CREATE;
+    }
+
+    private String resolveSubtitleText() {
+        if (editGroupId == null || editGroupId.isBlank()) {
+            return DEFAULT_SUBTITLE;
+        }
+        GroupEntry entry = findEntry(editGroupId);
+        String groupName = entry != null ? entry.name : editGroupId;
+        if (editMode == EditMode.RENAME) {
+            return "Rename \"" + groupName + "\" then click Rename.";
+        }
+        if (editMode == EditMode.RECOLOR) {
+            return "Pick a color for \"" + groupName + "\" then click Update Color.";
+        }
+        return DEFAULT_SUBTITLE;
     }
 
     private static String resolveAction(GroupManagerEventData data) {
@@ -437,5 +555,11 @@ public final class TameworkCommandGroupManagerPage
             this.name = name;
             this.colorHex = colorHex;
         }
+    }
+
+    private enum EditMode {
+        CREATE,
+        RENAME,
+        RECOLOR
     }
 }
