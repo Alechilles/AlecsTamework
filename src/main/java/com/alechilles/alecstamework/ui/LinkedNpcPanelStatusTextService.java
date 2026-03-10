@@ -57,16 +57,15 @@ final class LinkedNpcPanelStatusTextService {
 
     static String resolveBreedingCooldownTooltip(LinkedNpcEntry entry) {
         if (entry == null || !entry.loaded()) {
-            return "Breeding cooldown: unavailable";
+            return "Breeding CD: unavailable";
         }
         if (!entry.breedingCooldownKnown()) {
-            return "Breeding cooldown: unavailable";
+            return "Breeding CD: unavailable";
         }
         if (!entry.breedingCooldownActive()) {
-            return "Breeding cooldown: ready";
+            return "Breeding CD: ready";
         }
-        return "Breeding cooldown: " + formatRemainingHms(entry.breedingCooldownRemainingMs())
-                + " real-time remaining";
+        return "Breeding CD: " + formatRemainingClock(entry.breedingCooldownRemainingMs());
     }
 
     private static String formatRemainingTime(long remainingMs) {
@@ -79,11 +78,14 @@ final class LinkedNpcPanelStatusTextService {
         return minutes + "m " + seconds + "s";
     }
 
-    private static String formatRemainingHms(long remainingMs) {
+    private static String formatRemainingClock(long remainingMs) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long hours = totalSeconds / 3600L;
         long minutes = (totalSeconds % 3600L) / 60L;
         long seconds = totalSeconds % 60L;
-        return String.format("%02dh %02dm %02ds", hours, minutes, seconds);
+        if (hours > 0L) {
+            return String.format("%d:%02d:%02d", hours, minutes, seconds);
+        }
+        return String.format("%d:%02d", minutes, seconds);
     }
 }
