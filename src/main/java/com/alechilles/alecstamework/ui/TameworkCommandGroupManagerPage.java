@@ -44,6 +44,7 @@ public final class TameworkCommandGroupManagerPage
     private static final String KEY_ROW_NAME_INPUT = "@GroupRowNameInput";
     private static final String KEY_ROW_COLOR_INPUT = "@GroupRowColorInput";
     private static final String ACTION_CLOSE = "__close__";
+    private static final String ACTION_BACK = "__back__";
     private static final String ACTION_CREATE = "__create__";
     private static final String ACTION_EDIT_PREFIX = "__edit__:";
     private static final String ACTION_COMPLETE_PREFIX = "__complete__:";
@@ -57,6 +58,7 @@ public final class TameworkCommandGroupManagerPage
     private final BiConsumer<String, String> renameCallback;
     private final BiConsumer<String, String> recolorCallback;
     private final Consumer<String> deleteCallback;
+    private final Runnable backCallback;
     private final Runnable closeCallback;
     private GroupEntry[] entries;
     private String draftName;
@@ -70,6 +72,7 @@ public final class TameworkCommandGroupManagerPage
                                            @Nonnull BiConsumer<String, String> renameCallback,
                                            @Nonnull BiConsumer<String, String> recolorCallback,
                                            @Nonnull Consumer<String> deleteCallback,
+                                           @Nonnull Runnable backCallback,
                                            @Nonnull Runnable closeCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, GroupManagerEventData.CODEC);
         this.groupsSupplier = groupsSupplier;
@@ -77,6 +80,7 @@ public final class TameworkCommandGroupManagerPage
         this.renameCallback = renameCallback;
         this.recolorCallback = recolorCallback;
         this.deleteCallback = deleteCallback;
+        this.backCallback = backCallback;
         this.closeCallback = closeCallback;
         this.entries = new GroupEntry[0];
         this.draftName = "";
@@ -183,6 +187,15 @@ public final class TameworkCommandGroupManagerPage
             }
             return;
         }
+        if (ACTION_BACK.equals(normalizedAction)) {
+            LOGGER.log(Level.INFO, "Group manager back requested.");
+            handled = true;
+            close();
+            if (backCallback != null) {
+                backCallback.run();
+            }
+            return;
+        }
         if (ACTION_CREATE.equals(normalizedAction)) {
             LOGGER.log(Level.INFO, "Group manager create requested for name={0} color={1}",
                     new Object[] {
@@ -285,6 +298,12 @@ public final class TameworkCommandGroupManagerPage
                 CustomUIEventBindingType.Activating,
                 "#TameworkGroupCloseButton",
                 EventData.of(EVENT_ACTION, ACTION_CLOSE),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkGroupBackButton",
+                EventData.of(EVENT_ACTION, ACTION_BACK),
                 false
         );
     }

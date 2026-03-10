@@ -450,7 +450,7 @@ public final class CommandItemFeatureHandler {
                 value -> panelActionService.applySetPanelMode(player, toolId, value),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
-                () -> groupManagerPageService.openGroupManagerPage(player, toolId),
+                () -> openGroupManagerFromSelection(player, config, toolId),
                 value -> panelActionService.applySetSort(player, toolId, value),
                 value -> panelActionService.applySetFilterMode(player, toolId, value),
                 value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
@@ -459,6 +459,43 @@ public final class CommandItemFeatureHandler {
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
         return true;
+    }
+
+    private void openGroupManagerFromSelection(Player player,
+                                               TwCommandItemConfig config,
+                                               String toolId) {
+        groupManagerPageService.openGroupManagerPage(
+                player,
+                toolId,
+                () -> reopenSelectionMenu(player, config, toolId)
+        );
+    }
+
+    private void reopenSelectionMenu(Player player,
+                                     TwCommandItemConfig config,
+                                     String toolId) {
+        if (player == null || config == null || toolId == null || toolId.isBlank()) {
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            feedbackService.showWarning(player, "Unable to reopen the command panel.");
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            feedbackService.showWarning(player, "Unable to reopen the command panel.");
+            return;
+        }
+        ItemStack toolStack = findCommandToolStack(player, toolId);
+        if (toolStack == null || toolStack.isEmpty()) {
+            feedbackService.showWarning(player, "Unable to find that command item.");
+            return;
+        }
+        boolean opened = openSelectionMenu(player, store, config, toolStack, toolId);
+        if (!opened) {
+            feedbackService.showWarning(player, "Unable to reopen the command panel.");
+        }
     }
 
     private void applyMenuSelection(Player player,
@@ -732,6 +769,29 @@ public final class CommandItemFeatureHandler {
             return seconds + "s";
         }
         return minutes + "m " + seconds + "s";
+    }
+
+    private ItemStack findCommandToolStack(Player player, String toolId) {
+        if (player == null || toolId == null || toolId.isBlank()) {
+            return null;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return null;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId != null && stackToolId.equals(toolId)) {
+                return stack;
+            }
+        }
+        return null;
     }
 
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {

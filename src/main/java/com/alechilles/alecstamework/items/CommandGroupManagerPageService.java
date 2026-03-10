@@ -28,7 +28,7 @@ final class CommandGroupManagerPageService {
         this.groupService = groupService != null ? groupService : new CommandGroupService();
     }
 
-    void openGroupManagerPage(Player player, String toolId) {
+    void openGroupManagerPage(Player player, String toolId, Runnable backCallback) {
         if (player == null || toolId == null || toolId.isBlank()) {
             return;
         }
@@ -52,6 +52,7 @@ final class CommandGroupManagerPageService {
                 (groupId, name) -> panelActionService.applyRenameGroup(player, toolId, groupId, name),
                 (groupId, colorHex) -> panelActionService.applyRecolorGroup(player, toolId, groupId, colorHex),
                 groupId -> panelActionService.applyDeleteGroup(player, toolId, groupId),
+                backCallback != null ? backCallback : () -> { },
                 () -> { }
         );
         player.getPageManager().openCustomPage(playerRef, store, page);

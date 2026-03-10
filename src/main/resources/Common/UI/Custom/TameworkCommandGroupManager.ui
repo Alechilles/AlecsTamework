@@ -14,7 +14,7 @@ $C.@PageOverlay {
 
     #Content {
       LayoutMode: Top;
-      Padding: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+      Padding: (Left: 0, Right: 0, Top: 0, Bottom: 8);
 
       Label #TameworkGroupManagerSubtitle {
         Anchor: (Top: 4, Left: 10, Right: 10, Height: 18);
@@ -91,10 +91,17 @@ $C.@PageOverlay {
 
       Group #TameworkGroupManagerFooter {
         Anchor: (Top: 4, Left: 10, Right: 10, Height: 24);
-        LayoutMode: Right;
+
+        TextButton #TameworkGroupBackButton {
+          Anchor: (Left: 0, Width: 100, Height: 24);
+          Text: "Back";
+          Style: (
+            ...$C.@SmallSecondaryTextButtonStyle
+          );
+        }
 
         TextButton #TameworkGroupCloseButton {
-          Anchor: (Width: 100, Height: 24);
+          Anchor: (Right: 0, Width: 100, Height: 24);
           Text: "Close";
           Style: (
             ...$C.@SmallSecondaryTextButtonStyle
