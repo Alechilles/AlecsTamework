@@ -56,6 +56,7 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
+    private static final long MANAGE_GROUPS_NAVIGATION_DELAY_MS = 80L;
     private static final List<DropdownEntryInfo> MODE_DROPDOWN_ENTRIES = List.of(
             new DropdownEntryInfo(LocalizableString.fromString("Linked"), "LinkedMode"),
             new DropdownEntryInfo(LocalizableString.fromString("Nearby"), "NearbyMode")
@@ -270,7 +271,7 @@ public final class TameworkCommandSelectionPage
             if (panelManageGroupsCallback != null) {
                 pendingUnlinkNpcUuid = null;
                 closePage();
-                panelManageGroupsCallback.run();
+                navigateAfterUiDrain(panelManageGroupsCallback);
             }
             return;
         }
@@ -525,6 +526,35 @@ public final class TameworkCommandSelectionPage
     private void closePage() {
         dismissed = true;
         close();
+    }
+
+    private void navigateAfterUiDrain(@Nonnull Runnable action) {
+        CompletableFuture.runAsync(
+                () -> dispatchNavigationAction(action),
+                CompletableFuture.delayedExecutor(MANAGE_GROUPS_NAVIGATION_DELAY_MS, TimeUnit.MILLISECONDS)
+        );
+    }
+
+    private void dispatchNavigationAction(@Nonnull Runnable action) {
+        Ref<EntityStore> ref = playerRef.getReference();
+        if (ref == null || !ref.isValid()) {
+            return;
+        }
+        Store<EntityStore> store = ref.getStore();
+        if (store == null || store.getExternalData() == null) {
+            return;
+        }
+        World world = store.getExternalData().getWorld();
+        if (world == null) {
+            return;
+        }
+        world.execute(() -> {
+            Ref<EntityStore> activeRef = playerRef.getReference();
+            if (activeRef == null || !activeRef.isValid()) {
+                return;
+            }
+            action.run();
+        });
     }
 
     private void bindCommandButtonEvents(@Nonnull UIEventBuilder eventBuilder) {

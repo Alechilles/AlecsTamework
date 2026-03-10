@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.ui;
 
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.codecs.map.MapCodec;
+import com.hypixel.hytale.codec.util.RawJsonReader;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
@@ -13,9 +16,11 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.function.BiConsumer;
@@ -91,24 +96,63 @@ public final class TameworkCommandGroupManagerPage
     @Override
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
+                                @Nonnull String rawData) {
+        Map<String, String> rawEventData = decodeRawEventData(rawData);
+        if (rawEventData.isEmpty()) {
+            super.handleDataEvent(ref, store, rawData);
+            return;
+        }
+        String action = firstNonBlank(
+                rawEventData.get(EVENT_ACTION),
+                rawEventData.get("action"),
+                rawEventData.get(EVENT_COMMAND_ID),
+                rawEventData.get("commandId")
+        );
+        String nameInput = firstNonBlank(
+                rawEventData.get(KEY_NAME_INPUT),
+                rawEventData.get("GroupNameInput"),
+                rawEventData.get("nameInput")
+        );
+        String colorInput = firstNonBlank(
+                rawEventData.get(KEY_COLOR_INPUT),
+                rawEventData.get("GroupColorInput"),
+                rawEventData.get("colorInput")
+        );
+        if (action == null && nameInput == null && colorInput == null) {
+            super.handleDataEvent(ref, store, rawData);
+            return;
+        }
+        handleResolvedEvent(action, nameInput, colorInput);
+    }
+
+    @Override
+    public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
+                                @Nonnull Store<EntityStore> store,
                                 @Nonnull GroupManagerEventData data) {
-        if (data.nameInput != null) {
-            draftName = data.nameInput;
+        String action = data != null ? resolveAction(data) : null;
+        String nameInput = data != null ? data.nameInput : null;
+        String colorInput = data != null ? data.colorInput : null;
+        handleResolvedEvent(action, nameInput, colorInput);
+    }
+
+    private void handleResolvedEvent(String action, String nameInput, String colorInput) {
+        if (nameInput != null) {
+            draftName = nameInput;
         }
-        if (data.colorInput != null) {
-            draftColor = normalizeDraftColor(data.colorInput);
+        if (colorInput != null) {
+            draftColor = normalizeDraftColor(colorInput);
         }
-        String action = resolveAction(data);
+        String normalizedAction = action != null ? action.trim() : "";
         LOGGER.log(
                 Level.INFO,
                 "Group manager event: commandId={0} name={1} color={2}",
                 new Object[] {
-                        safeForLog(action),
+                        safeForLog(normalizedAction),
                         safeForLog(draftName),
                         safeForLog(draftColor)
                 }
         );
-        if (ACTION_CLOSE.equals(action)) {
+        if (ACTION_CLOSE.equals(normalizedAction)) {
             LOGGER.log(Level.INFO, "Group manager close requested.");
             handled = true;
             close();
@@ -117,7 +161,7 @@ public final class TameworkCommandGroupManagerPage
             }
             return;
         }
-        if (ACTION_CREATE.equals(action)) {
+        if (ACTION_CREATE.equals(normalizedAction)) {
             LOGGER.log(Level.INFO, "Group manager create requested for name={0} color={1}",
                     new Object[] { safeForLog(draftName), safeForLog(draftColor) });
             if (createCallback != null) {
@@ -127,12 +171,12 @@ public final class TameworkCommandGroupManagerPage
             refreshAndSend();
             return;
         }
-        if (action.isBlank()) {
+        if (normalizedAction.isBlank()) {
             LOGGER.log(Level.INFO, "Group manager event ignored because no action payload was provided.");
             return;
         }
-        if (action.startsWith(ACTION_RENAME_PREFIX)) {
-            String groupId = action.substring(ACTION_RENAME_PREFIX.length()).trim();
+        if (normalizedAction.startsWith(ACTION_RENAME_PREFIX)) {
+            String groupId = normalizedAction.substring(ACTION_RENAME_PREFIX.length()).trim();
             if (!groupId.isBlank() && renameCallback != null) {
                 LOGGER.log(Level.INFO, "Group manager rename requested for groupId={0} newName={1}",
                         new Object[] { safeForLog(groupId), safeForLog(draftName) });
@@ -141,8 +185,8 @@ public final class TameworkCommandGroupManagerPage
             refreshAndSend();
             return;
         }
-        if (action.startsWith(ACTION_RECOLOR_PREFIX)) {
-            String groupId = action.substring(ACTION_RECOLOR_PREFIX.length()).trim();
+        if (normalizedAction.startsWith(ACTION_RECOLOR_PREFIX)) {
+            String groupId = normalizedAction.substring(ACTION_RECOLOR_PREFIX.length()).trim();
             if (!groupId.isBlank() && recolorCallback != null) {
                 LOGGER.log(Level.INFO, "Group manager recolor requested for groupId={0} color={1}",
                         new Object[] { safeForLog(groupId), safeForLog(draftColor) });
@@ -151,8 +195,8 @@ public final class TameworkCommandGroupManagerPage
             refreshAndSend();
             return;
         }
-        if (action.startsWith(ACTION_DELETE_PREFIX)) {
-            String groupId = action.substring(ACTION_DELETE_PREFIX.length()).trim();
+        if (normalizedAction.startsWith(ACTION_DELETE_PREFIX)) {
+            String groupId = normalizedAction.substring(ACTION_DELETE_PREFIX.length()).trim();
             if (!groupId.isBlank() && deleteCallback != null) {
                 LOGGER.log(Level.INFO, "Group manager delete requested for groupId={0}",
                         new Object[] { safeForLog(groupId) });
@@ -161,7 +205,7 @@ public final class TameworkCommandGroupManagerPage
             refreshAndSend();
             return;
         }
-        LOGGER.log(Level.INFO, "Group manager dismissing due to unknown action payload: {0}", safeForLog(action));
+        LOGGER.log(Level.INFO, "Group manager dismissing due to unknown action payload: {0}", safeForLog(normalizedAction));
         handled = true;
         close();
         if (closeCallback != null) {
@@ -282,6 +326,33 @@ public final class TameworkCommandGroupManagerPage
             return data.commandId.trim();
         }
         return "";
+    }
+
+    @Nonnull
+    private Map<String, String> decodeRawEventData(String rawData) {
+        if (rawData == null || rawData.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return MapCodec.STRING_HASH_MAP_CODEC.decodeJson(
+                    new RawJsonReader(rawData.toCharArray()),
+                    ExtraInfo.THREAD_LOCAL.get()
+            );
+        } catch (IOException | RuntimeException ignored) {
+            return Map.of();
+        }
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+        return null;
     }
 
     public static final class GroupManagerEventData {
