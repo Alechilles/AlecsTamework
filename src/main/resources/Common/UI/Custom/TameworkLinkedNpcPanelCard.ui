@@ -104,16 +104,28 @@ Group {
     Background: #4b657f;
     Visible: false;
 
-    DropdownBox #GroupTabDropdown {
+    TextButton #GroupTabButton {
       Anchor: (Top: 0, Left: 0, Width: 6, Height: 72);
+      Style: @TraitTooltipButtonStyle;
+      Text: "";
+      TooltipText: "Set Group";
+      TextTooltipStyle: @LinkedActionTooltipStyle;
+    }
+  }
+
+  Group #GroupPickerContainer {
+    Anchor: (Top: 2, Left: 30, Width: 126, Height: 22);
+    Visible: false;
+
+    DropdownBox #GroupPickerDropdown {
+      Anchor: (Top: 0, Left: 0, Width: 126, Height: 22);
       Style: (
         ...$C.@DefaultDropdownBoxStyle,
-        HorizontalPadding: 0,
+        HorizontalPadding: 6,
         LabelStyle: (
           ...$C.@DefaultDropdownBoxLabelStyle,
           RenderUppercase: false,
-          FontSize: 1,
-          TextColor: #00000000
+          FontSize: 11
         ),
         EntryLabelStyle: (
           ...$C.@DefaultDropdownBoxEntryLabelStyle,
@@ -124,13 +136,12 @@ Group {
           ...$C.@DefaultDropdownBoxEntryLabelStyle,
           RenderUppercase: false,
           RenderBold: true,
-          FontSize: 1,
-          TextColor: #00000000
+          FontSize: 11
         )
       );
       MaxSelection: 1;
       NoItemsText: "Groups";
-      TooltipText: "Group";
+      TooltipText: "Select Group";
       TextTooltipStyle: @LinkedActionTooltipStyle;
     }
   }

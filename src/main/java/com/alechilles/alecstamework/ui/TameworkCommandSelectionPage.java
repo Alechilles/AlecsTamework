@@ -46,6 +46,7 @@ public final class TameworkCommandSelectionPage
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final String LINK_COMMAND_PREFIX = "__link__:";
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
+    private static final String OPEN_GROUP_PICKER_COMMAND_PREFIX = "__opengroup__:";
     private static final String SET_GROUP_COMMAND_PREFIX = "__setgroup__:";
     private static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
@@ -82,6 +83,7 @@ public final class TameworkCommandSelectionPage
                     KEY_CARD_GROUP_VALUE,
                     LINK_COMMAND_PREFIX,
                     UNLINK_COMMAND_PREFIX,
+                    OPEN_GROUP_PICKER_COMMAND_PREFIX,
                     SET_GROUP_COMMAND_PREFIX,
                     TOGGLE_ACTIVE_COMMAND_PREFIX,
                     RESPAWN_COMMAND_PREFIX,
@@ -103,6 +105,7 @@ public final class TameworkCommandSelectionPage
     private LinkedNpcEntry[] linkedNpcEntries;
     private int renderedLinkedNpcCardCount;
     private UUID pendingUnlinkNpcUuid;
+    private UUID openGroupPickerNpcUuid;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
     private final Consumer<UUID> linkCallback;
@@ -168,6 +171,7 @@ public final class TameworkCommandSelectionPage
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.renderedLinkedNpcCardCount = 0;
         this.pendingUnlinkNpcUuid = null;
+        this.openGroupPickerNpcUuid = null;
         this.selectedCommandId = selectedCommandId;
         this.linkCallback = linkCallback;
         this.unlinkCallback = unlinkCallback;
@@ -240,6 +244,7 @@ public final class TameworkCommandSelectionPage
                 panelSetModeCallback.accept(data.panelModeValue);
             }
             pendingUnlinkNpcUuid = null;
+            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
@@ -249,6 +254,7 @@ public final class TameworkCommandSelectionPage
                 panelSetSortCallback.accept(data.panelSortValue);
             }
             pendingUnlinkNpcUuid = null;
+            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
@@ -258,6 +264,7 @@ public final class TameworkCommandSelectionPage
                 panelSetFilterModeCallback.accept(data.panelFilterModeValue);
             }
             pendingUnlinkNpcUuid = null;
+            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
@@ -267,12 +274,14 @@ public final class TameworkCommandSelectionPage
                 panelSetFilterTextCallback.accept(data.panelFilterTextInput);
             }
             pendingUnlinkNpcUuid = null;
+            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
         }
         if (data.commandId == null || data.commandId.isBlank() || CLOSE_COMMAND_ID.equals(data.commandId)) {
             pendingUnlinkNpcUuid = null;
+            openGroupPickerNpcUuid = null;
             closePage();
             return;
         }
@@ -280,6 +289,7 @@ public final class TameworkCommandSelectionPage
             if (panelRadiusDecreaseCallback != null) {
                 panelRadiusDecreaseCallback.run();
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -289,6 +299,7 @@ public final class TameworkCommandSelectionPage
             if (panelRadiusIncreaseCallback != null) {
                 panelRadiusIncreaseCallback.run();
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -300,6 +311,7 @@ public final class TameworkCommandSelectionPage
                     return;
                 }
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 navigationPending = true;
                 navigateAfterUiDrain(() -> {
                     try {
@@ -315,7 +327,21 @@ public final class TameworkCommandSelectionPage
             if (panelClearFiltersCallback != null) {
                 panelClearFiltersCallback.run();
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (data.commandId.startsWith(OPEN_GROUP_PICKER_COMMAND_PREFIX)) {
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, OPEN_GROUP_PICKER_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                pendingUnlinkNpcUuid = null;
+                if (isGroupPickerOpen(npcUuid)) {
+                    openGroupPickerNpcUuid = null;
+                } else {
+                    openGroupPickerNpcUuid = npcUuid;
+                }
                 sendCardRefreshUpdate();
             }
             return;
@@ -341,6 +367,7 @@ public final class TameworkCommandSelectionPage
             }
             panelSetGroupCallback.accept(npcUuid, selectedGroupId);
             pendingUnlinkNpcUuid = null;
+            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
@@ -353,6 +380,7 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 linkCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -366,11 +394,13 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
                     pendingUnlinkNpcUuid = npcUuid;
+                    openGroupPickerNpcUuid = null;
                     sendCardRefreshUpdate();
                     return;
                 }
                 unlinkCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -384,6 +414,7 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 toggleActiveCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -397,6 +428,7 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 respawnCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -410,6 +442,7 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 recallCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -423,6 +456,7 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 setHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -436,6 +470,7 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 returnHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
+                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -443,10 +478,12 @@ public final class TameworkCommandSelectionPage
         }
         if (!containsOption(data.commandId)) {
             pendingUnlinkNpcUuid = null;
+            openGroupPickerNpcUuid = null;
             closePage();
             return;
         }
         pendingUnlinkNpcUuid = null;
+        openGroupPickerNpcUuid = null;
         closePage();
         selectionCallback.accept(data.commandId);
     }
@@ -692,6 +729,7 @@ public final class TameworkCommandSelectionPage
                                    LinkedNpcEntry entry,
                                    boolean appendCard) {
         boolean pendingUnlink = entry.linked() && isPendingUnlink(entry.npcUuid());
+        boolean showGroupPicker = isGroupPickerOpen(entry.npcUuid());
         List<DropdownEntryInfo> cardGroupEntries = resolveCardGroupDropdownEntries(entry);
         String cardGroupValue = resolveCardGroupDropdownValue(entry);
         LinkedNpcPanelCardBinder.bind(
@@ -701,6 +739,7 @@ public final class TameworkCommandSelectionPage
                 entry,
                 appendCard,
                 pendingUnlink,
+                showGroupPicker,
                 cardGroupEntries,
                 cardGroupValue,
                 CARD_BINDING_CONFIG
@@ -713,6 +752,10 @@ public final class TameworkCommandSelectionPage
         if (pendingUnlinkNpcUuid != null
                 && !LinkedNpcPanelSubtitleService.containsEntry(linkedNpcEntries, pendingUnlinkNpcUuid)) {
             pendingUnlinkNpcUuid = null;
+        }
+        if (openGroupPickerNpcUuid != null
+                && !LinkedNpcPanelSubtitleService.containsEntry(linkedNpcEntries, openGroupPickerNpcUuid)) {
+            openGroupPickerNpcUuid = null;
         }
     }
 
@@ -886,6 +929,10 @@ public final class TameworkCommandSelectionPage
 
     private boolean isPendingUnlink(UUID npcUuid) {
         return npcUuid != null && pendingUnlinkNpcUuid != null && pendingUnlinkNpcUuid.equals(npcUuid);
+    }
+
+    private boolean isGroupPickerOpen(UUID npcUuid) {
+        return npcUuid != null && openGroupPickerNpcUuid != null && openGroupPickerNpcUuid.equals(npcUuid);
     }
 
     private record CommandOption(String id, String label) { }

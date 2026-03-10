@@ -20,6 +20,7 @@ final class LinkedNpcPanelCardBinder {
                      LinkedNpcEntry entry,
                      boolean appendCard,
                      boolean pendingUnlink,
+                     boolean showGroupPicker,
                      List<DropdownEntryInfo> cardGroupEntries,
                      String cardGroupValue,
                      CardBindingConfig config) {
@@ -38,7 +39,9 @@ final class LinkedNpcPanelCardBinder {
         String activeToggleInactiveSelector = entrySelector + " #ActiveToggleInactiveButton";
         String inactiveBadgeSelector = entrySelector + " #StatusInactive";
         String groupTabSelector = entrySelector + " #GroupTab";
-        String groupTabDropdownSelector = entrySelector + " #GroupTabDropdown";
+        String groupTabButtonSelector = entrySelector + " #GroupTabButton";
+        String groupPickerContainerSelector = entrySelector + " #GroupPickerContainer";
+        String groupPickerDropdownSelector = entrySelector + " #GroupPickerDropdown";
         String respawnSelector = entrySelector + " #RespawnButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
@@ -73,9 +76,10 @@ final class LinkedNpcPanelCardBinder {
                 entry,
                 pendingUnlink
         );
+        commandBuilder.set(groupPickerContainerSelector + ".Visible", !pendingUnlink && showGroupPicker);
         if (!pendingUnlink) {
-            commandBuilder.set(groupTabDropdownSelector + ".Entries", cardGroupEntries);
-            commandBuilder.set(groupTabDropdownSelector + ".Value", cardGroupValue);
+            commandBuilder.set(groupPickerDropdownSelector + ".Entries", cardGroupEntries);
+            commandBuilder.set(groupPickerDropdownSelector + ".Value", cardGroupValue);
         }
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
@@ -124,10 +128,16 @@ final class LinkedNpcPanelCardBinder {
         }
         if (!pendingUnlink) {
             eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    groupTabButtonSelector,
+                    EventData.of(config.eventCommandId(), config.openGroupPickerCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+            eventBuilder.addEventBinding(
                     CustomUIEventBindingType.ValueChanged,
-                    groupTabDropdownSelector,
+                    groupPickerDropdownSelector,
                     EventData.of(config.eventCommandId(), config.setGroupCommandPrefix() + entry.npcUuid())
-                            .append(config.keyCardGroupValue(), groupTabDropdownSelector + ".Value"),
+                            .append(config.keyCardGroupValue(), groupPickerDropdownSelector + ".Value"),
                     false
             );
         }
@@ -170,6 +180,7 @@ final class LinkedNpcPanelCardBinder {
                              String keyCardGroupValue,
                              String linkCommandPrefix,
                              String unlinkCommandPrefix,
+                             String openGroupPickerCommandPrefix,
                              String setGroupCommandPrefix,
                              String toggleActiveCommandPrefix,
                              String respawnCommandPrefix,
