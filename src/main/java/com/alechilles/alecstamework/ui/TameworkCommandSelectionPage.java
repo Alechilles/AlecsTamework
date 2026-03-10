@@ -775,6 +775,7 @@ public final class TameworkCommandSelectionPage
                     optionSelector + " #OptionColor.Background",
                     normalizeGroupPickerColor(option.colorHex())
             );
+            commandBuilder.set(optionSelector + " #OptionValue.Text", optionValue);
             String optionLabel = resolveGroupPickerOptionLabel(option, optionValue);
             boolean selected = selectedValue != null && selectedValue.equalsIgnoreCase(optionValue);
             commandBuilder.set(
@@ -785,7 +786,7 @@ public final class TameworkCommandSelectionPage
                     CustomUIEventBindingType.Activating,
                     optionSelector + " #OptionButton",
                     EventData.of(EVENT_COMMAND_ID, SET_GROUP_COMMAND_PREFIX + targetEntry.npcUuid())
-                            .append(KEY_CARD_GROUP_VALUE, optionValue),
+                            .append(KEY_CARD_GROUP_VALUE, optionSelector + " #OptionValue.Text"),
                     false
             );
             rendered++;

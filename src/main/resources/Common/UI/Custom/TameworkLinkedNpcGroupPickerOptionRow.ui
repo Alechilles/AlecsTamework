@@ -27,6 +27,16 @@ $C = "Common.ui";
 Group {
   Anchor: (Top: 0, Left: 0, Right: 0, Height: 20);
 
+  Label #OptionValue {
+    Anchor: (Top: 0, Left: 0, Width: 1, Height: 1);
+    Text: "";
+    Style: (
+      FontSize: 1,
+      TextColor: #00000000
+    );
+    Visible: false;
+  }
+
   Group #OptionColor {
     Anchor: (Top: 5, Left: 2, Width: 8, Height: 10);
     Background: #4b657f;
