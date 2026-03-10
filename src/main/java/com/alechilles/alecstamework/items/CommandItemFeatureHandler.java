@@ -191,8 +191,7 @@ public final class CommandItemFeatureHandler {
         );
         this.groupAssignPageService = new CommandGroupAssignPageService(
                 panelActionService,
-                toolInventoryService,
-                feedbackService
+                toolInventoryService
         );
     }
 
@@ -446,6 +445,7 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
+                () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, npcUuid),
@@ -461,12 +461,12 @@ public final class CommandItemFeatureHandler {
                 value -> panelActionService.applySetFilterMode(player, toolId, value),
                 value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
                 () -> panelActionService.applyClearFilters(player, toolId),
-                npcUuid -> groupAssignPageService.openGroupAssignPage(
+                (npcUuid, groupId) -> groupAssignPageService.applyGroupAssignment(
                         player,
                         toolId,
                         config,
                         npcUuid,
-                        () -> reopenSelectionMenu(player, config, toolId)
+                        groupId
                 ),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );

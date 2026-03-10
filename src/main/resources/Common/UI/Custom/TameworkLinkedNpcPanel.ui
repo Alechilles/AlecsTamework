@@ -238,6 +238,87 @@ Group #TameworkLinkedPanelRoot {
         }
       }
     }
+
+    Group #TameworkLinkedPanelGroupAssignOverlay {
+      Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+      Background: #060b13(0.78);
+      Visible: false;
+
+      Group #TameworkLinkedPanelGroupAssignModal {
+        Anchor: (Top: 190, Left: 36, Width: 358, Height: 176);
+        Background: #102038;
+
+        Label #TameworkLinkedPanelGroupAssignTitle {
+          Anchor: (Top: 10, Left: 14, Width: 330, Height: 24);
+          Text: "Assign Group";
+          Style: (
+            FontSize: 18,
+            RenderBold: true,
+            TextColor: #dce8f6,
+            HorizontalAlignment: Start,
+            VerticalAlignment: Center
+          );
+        }
+
+        Label #TameworkLinkedPanelGroupAssignSubtitle {
+          Anchor: (Top: 40, Left: 14, Width: 330, Height: 24);
+          Text: "Choose a group.";
+          Style: (
+            FontSize: 13,
+            TextColor: #bfd0e5,
+            HorizontalAlignment: Start,
+            VerticalAlignment: Center
+          );
+        }
+
+        DropdownBox #TameworkLinkedPanelGroupAssignDropdown {
+          Anchor: (Top: 72, Left: 14, Width: 330, Height: 26);
+          Style: (
+            ...$C.@DefaultDropdownBoxStyle,
+            HorizontalPadding: 8,
+            LabelStyle: (
+              ...$C.@DefaultDropdownBoxLabelStyle,
+              RenderUppercase: false,
+              FontSize: 12
+            ),
+            EntryLabelStyle: (
+              ...$C.@DefaultDropdownBoxEntryLabelStyle,
+              RenderUppercase: false,
+              FontSize: 12
+            ),
+            SelectedEntryLabelStyle: (
+              ...$C.@DefaultDropdownBoxEntryLabelStyle,
+              RenderUppercase: false,
+              RenderBold: true,
+              FontSize: 12
+            )
+          );
+          MaxSelection: 1;
+          NoItemsText: "No groups";
+        }
+
+        Group #TameworkLinkedPanelGroupAssignButtons {
+          Anchor: (Top: 112, Left: 14, Width: 330, Height: 30);
+          LayoutMode: Left;
+
+          Group { Anchor: (FlexWeight: 1); }
+
+          $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignCancelButton {
+            @Sounds = $C.@ButtonSounds;
+            @Anchor = (Width: 92, Height: 24);
+            @Text = "Cancel";
+          }
+
+          Group { Anchor: (Width: 8); }
+
+          $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignApplyButton {
+            @Sounds = $C.@ButtonSounds;
+            @Anchor = (Width: 92, Height: 24);
+            @Text = "Apply";
+          }
+        }
+      }
+    }
   }
 
 }
