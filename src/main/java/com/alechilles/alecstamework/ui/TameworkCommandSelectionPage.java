@@ -19,11 +19,11 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -42,9 +42,11 @@ public final class TameworkCommandSelectionPage
     private static final String KEY_PANEL_SORT_VALUE = "@PanelSortValue";
     private static final String KEY_PANEL_FILTER_MODE_VALUE = "@PanelFilterModeValue";
     private static final String KEY_PANEL_FILTER_TEXT_INPUT = "@PanelFilterTextInput";
+    private static final String KEY_CARD_GROUP_VALUE = "@CardGroupValue";
     private static final String CLOSE_COMMAND_ID = "__close__";
     private static final String LINK_COMMAND_PREFIX = "__link__:";
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
+    private static final String SET_GROUP_COMMAND_PREFIX = "__setgroup__:";
     private static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
@@ -54,6 +56,7 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_RADIUS_INCREASE_COMMAND_ID = "__panel_radius_inc__";
     private static final String PANEL_MANAGE_GROUPS_COMMAND_ID = "__panel_manage_groups__";
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
+    private static final String GROUP_NONE_VALUE = "None";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
     private static final List<DropdownEntryInfo> MODE_DROPDOWN_ENTRIES = List.of(
@@ -72,6 +75,20 @@ public final class TameworkCommandSelectionPage
             new DropdownEntryInfo(LocalizableString.fromString("Species"), "Species"),
             new DropdownEntryInfo(LocalizableString.fromString("Group"), "Group")
     );
+    private static final LinkedNpcPanelCardBinder.CardBindingConfig CARD_BINDING_CONFIG =
+            new LinkedNpcPanelCardBinder.CardBindingConfig(
+                    LINKED_PANEL_CARD_UI_PATH,
+                    EVENT_COMMAND_ID,
+                    KEY_CARD_GROUP_VALUE,
+                    LINK_COMMAND_PREFIX,
+                    UNLINK_COMMAND_PREFIX,
+                    SET_GROUP_COMMAND_PREFIX,
+                    TOGGLE_ACTIVE_COMMAND_PREFIX,
+                    RESPAWN_COMMAND_PREFIX,
+                    RECALL_COMMAND_PREFIX,
+                    SET_HOME_COMMAND_PREFIX,
+                    RETURN_HOME_COMMAND_PREFIX
+            );
 
     private final CommandOption[] options;
     private final boolean requireUnlinkConfirm;
@@ -82,6 +99,7 @@ public final class TameworkCommandSelectionPage
     private final Supplier<String> panelFilterModeValueSupplier;
     private final Supplier<String> panelFilterInputValueSupplier;
     private final Supplier<String> panelFilterSummarySupplier;
+    private final Supplier<List<DropdownEntryInfo>> panelGroupDropdownEntriesSupplier;
     private LinkedNpcEntry[] linkedNpcEntries;
     private int renderedLinkedNpcCardCount;
     private UUID pendingUnlinkNpcUuid;
@@ -102,6 +120,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<String> panelSetFilterModeCallback;
     private final Consumer<String> panelSetFilterTextCallback;
     private final Runnable panelClearFiltersCallback;
+    private final BiConsumer<UUID, String> panelSetGroupCallback;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
     private volatile boolean navigationPending;
@@ -117,6 +136,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Supplier<String> panelFilterModeValueSupplier,
                                         @Nonnull Supplier<String> panelFilterInputValueSupplier,
                                         @Nonnull Supplier<String> panelFilterSummarySupplier,
+                                        @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupDropdownEntriesSupplier,
                                         @Nonnull Consumer<UUID> linkCallback,
                                         @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<UUID> toggleActiveCallback,
@@ -132,6 +152,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<String> panelSetFilterModeCallback,
                                         @Nonnull Consumer<String> panelSetFilterTextCallback,
                                         @Nonnull Runnable panelClearFiltersCallback,
+                                        @Nonnull BiConsumer<UUID, String> panelSetGroupCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
@@ -143,6 +164,7 @@ public final class TameworkCommandSelectionPage
         this.panelFilterModeValueSupplier = panelFilterModeValueSupplier;
         this.panelFilterInputValueSupplier = panelFilterInputValueSupplier;
         this.panelFilterSummarySupplier = panelFilterSummarySupplier;
+        this.panelGroupDropdownEntriesSupplier = panelGroupDropdownEntriesSupplier;
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.renderedLinkedNpcCardCount = 0;
         this.pendingUnlinkNpcUuid = null;
@@ -162,6 +184,7 @@ public final class TameworkCommandSelectionPage
         this.panelSetFilterModeCallback = panelSetFilterModeCallback;
         this.panelSetFilterTextCallback = panelSetFilterTextCallback;
         this.panelClearFiltersCallback = panelClearFiltersCallback;
+        this.panelSetGroupCallback = panelSetGroupCallback;
         this.selectionCallback = selectionCallback;
         this.refreshLoopStarted = false;
         this.dismissed = false;
@@ -295,6 +318,31 @@ public final class TameworkCommandSelectionPage
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
+            return;
+        }
+        if (data.commandId.startsWith(SET_GROUP_COMMAND_PREFIX)) {
+            if (panelSetGroupCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, SET_GROUP_COMMAND_PREFIX);
+            if (npcUuid == null) {
+                return;
+            }
+            String selectedGroupId = normalizeSelectedGroupId(data.cardGroupValue);
+            LinkedNpcEntry entry = findLinkedNpcEntry(npcUuid);
+            if (!isBlank(selectedGroupId) && entry != null && !entry.linked() && linkCallback != null) {
+                linkCallback.accept(npcUuid);
+                refreshLinkedNpcEntries();
+                entry = findLinkedNpcEntry(npcUuid);
+                if (entry == null || !entry.linked()) {
+                    sendCardRefreshUpdate();
+                    return;
+                }
+            }
+            panelSetGroupCallback.accept(npcUuid, selectedGroupId);
+            pendingUnlinkNpcUuid = null;
+            refreshLinkedNpcEntries();
+            sendCardRefreshUpdate();
             return;
         }
         if (data.commandId.startsWith(LINK_COMMAND_PREFIX)) {
@@ -643,132 +691,25 @@ public final class TameworkCommandSelectionPage
                                    int index,
                                    LinkedNpcEntry entry,
                                    boolean appendCard) {
-        String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
-        String nameSelector = entrySelector + " #Name";
-        String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
-        String statusConfirmSelector = entrySelector + " #StatusConfirm";
-        String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
-        String tertiaryStatFrameSelector = entrySelector + " #FutureStatBFrame";
-        String futureActionBarSelector = entrySelector + " #FutureActionBar";
-        String traitsButtonSelector = entrySelector + " #TraitsButton";
-        String talentsButtonSelector = entrySelector + " #TalentsButton";
-        String linkSelector = entrySelector + " #LinkButton";
-        String removeSelector = entrySelector + " #RemoveButton";
-        String activeToggleActiveSelector = entrySelector + " #ActiveToggleActiveButton";
-        String activeToggleInactiveSelector = entrySelector + " #ActiveToggleInactiveButton";
-        String inactiveBadgeSelector = entrySelector + " #StatusInactive";
-        String groupTabSelector = entrySelector + " #GroupTab";
-        String groupTabTextSelector = entrySelector + " #GroupTabText";
-        String respawnSelector = entrySelector + " #RespawnButton";
-        String recallSelector = entrySelector + " #RecallButton";
-        String setHomeSelector = entrySelector + " #SetHomeButton";
-        String returnHomeSelector = entrySelector + " #ReturnHomeButton";
-
-        if (appendCard) {
-            commandBuilder.append("#TameworkLinkedPanelList", LINKED_PANEL_CARD_UI_PATH);
-        }
-        commandBuilder.set(nameSelector + ".Text", entry.displayName());
-        boolean isLinked = entry.linked();
-        boolean pendingUnlink = isLinked && isPendingUnlink(entry.npcUuid());
-        boolean showRespawn = isLinked && entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
-        boolean showRecall = isLinked && !entry.dead() && !entry.captured() && !pendingUnlink;
-        boolean showSetHome = isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
-        boolean showReturnHome = isLinked && !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
-        boolean showLink = !isLinked;
-        boolean showUnlink = isLinked;
-        boolean showActiveToggleActive = isLinked && entry.active() && !pendingUnlink;
-        boolean showActiveToggleInactive = isLinked && !entry.active() && !pendingUnlink;
-        boolean showInactiveBadge = isLinked && !entry.active() && !pendingUnlink;
-        commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-        commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
-        commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
-        commandBuilder.set(linkSelector + ".Visible", showLink);
-        commandBuilder.set(removeSelector + ".Visible", showUnlink);
-        commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
-        commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
-        commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
-        LinkedNpcPanelGroupTabBinder.bind(commandBuilder, groupTabSelector, groupTabTextSelector, entry, pendingUnlink);
-        LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
-        commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
-        commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
-        commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
-        commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
-        commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
-        commandBuilder.set(respawnSelector + ".Visible", showRespawn);
-        commandBuilder.set(recallSelector + ".Visible", showRecall);
-        commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
-        commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
-        LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
-        if (showLink) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    linkSelector,
-                    EventData.of(EVENT_COMMAND_ID, LINK_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
-        if (showUnlink) {
-            commandBuilder.set(removeSelector + ".Text", "");
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    removeSelector,
-                    EventData.of(EVENT_COMMAND_ID, UNLINK_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
-        if (showActiveToggleActive) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    activeToggleActiveSelector,
-                    EventData.of(EVENT_COMMAND_ID, TOGGLE_ACTIVE_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
-        if (showActiveToggleInactive) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    activeToggleInactiveSelector,
-                    EventData.of(EVENT_COMMAND_ID, TOGGLE_ACTIVE_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
-        if (showRespawn) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    respawnSelector,
-                    EventData.of(EVENT_COMMAND_ID, RESPAWN_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
-        if (showRecall) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    recallSelector,
-                    EventData.of(EVENT_COMMAND_ID, RECALL_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
-        if (showSetHome) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    setHomeSelector,
-                    EventData.of(EVENT_COMMAND_ID, SET_HOME_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
-        if (showReturnHome) {
-            eventBuilder.addEventBinding(
-                    CustomUIEventBindingType.Activating,
-                    returnHomeSelector,
-                    EventData.of(EVENT_COMMAND_ID, RETURN_HOME_COMMAND_PREFIX + entry.npcUuid()),
-                    false
-            );
-        }
+        boolean pendingUnlink = entry.linked() && isPendingUnlink(entry.npcUuid());
+        List<DropdownEntryInfo> cardGroupEntries = resolveCardGroupDropdownEntries(entry);
+        String cardGroupValue = resolveCardGroupDropdownValue(entry);
+        LinkedNpcPanelCardBinder.bind(
+                commandBuilder,
+                eventBuilder,
+                index,
+                entry,
+                appendCard,
+                pendingUnlink,
+                cardGroupEntries,
+                cardGroupValue,
+                CARD_BINDING_CONFIG
+        );
     }
 
     private void refreshLinkedNpcEntries() {
         List<LinkedNpcEntry> entries = linkedNpcEntriesSupplier != null ? linkedNpcEntriesSupplier.get() : List.of();
-        linkedNpcEntries = buildLinkedNpcEntries(entries);
+        linkedNpcEntries = LinkedNpcEntrySnapshotMapper.build(entries);
         if (pendingUnlinkNpcUuid != null
                 && !LinkedNpcPanelSubtitleService.containsEntry(linkedNpcEntries, pendingUnlinkNpcUuid)) {
             pendingUnlinkNpcUuid = null;
@@ -847,6 +788,28 @@ public final class TameworkCommandSelectionPage
         return value == null ? "" : value;
     }
 
+    private List<DropdownEntryInfo> resolvePanelGroupDropdownEntries() {
+        List<DropdownEntryInfo> provided = panelGroupDropdownEntriesSupplier != null
+                ? panelGroupDropdownEntriesSupplier.get()
+                : List.of();
+        if (provided == null || provided.isEmpty()) {
+            return List.of(new DropdownEntryInfo(LocalizableString.fromString("None"), GROUP_NONE_VALUE));
+        }
+        return provided;
+    }
+
+    private List<DropdownEntryInfo> resolveCardGroupDropdownEntries(LinkedNpcEntry entry) {
+        return resolvePanelGroupDropdownEntries();
+    }
+
+    private String resolveCardGroupDropdownValue(LinkedNpcEntry entry) {
+        String selectedGroupId = entry != null ? normalizeSelectedGroupId(entry.groupId()) : null;
+        if (isBlank(selectedGroupId)) {
+            return GROUP_NONE_VALUE;
+        }
+        return selectedGroupId;
+    }
+
     private String resolvePanelFilterSummary() {
         if (panelFilterSummarySupplier == null) {
             return "Filters: none";
@@ -884,72 +847,41 @@ public final class TameworkCommandSelectionPage
         return out.toArray(new CommandOption[0]);
     }
 
-    private static LinkedNpcEntry[] buildLinkedNpcEntries(List<LinkedNpcEntry> entries) {
-        if (entries == null || entries.isEmpty()) {
-            return new LinkedNpcEntry[0];
-        }
-        List<LinkedNpcEntry> out = new ArrayList<>(entries.size());
-        for (LinkedNpcEntry entry : entries) {
-            if (entry == null || entry.npcUuid() == null) {
-                continue;
-            }
-            String name = entry.displayName();
-            if (name == null || name.isBlank()) {
-                name = "NPC";
-            }
-            int current = Math.max(0, entry.currentHealth());
-            int max = Math.max(0, entry.maxHealth());
-            int currentHappiness = Math.max(0, entry.currentHappiness());
-            int maxHappiness = Math.max(0, entry.maxHappiness());
-            int currentHunger = Math.max(0, entry.currentHunger());
-            int maxHunger = Math.max(0, entry.maxHunger());
-            int currentThirst = Math.max(0, entry.currentThirst());
-            int maxThirst = Math.max(0, entry.maxThirst());
-            out.add(new LinkedNpcEntry(
-                    entry.npcUuid(),
-                    name,
-                    current,
-                    max,
-                    currentHappiness,
-                    maxHappiness,
-                    entry.happinessModifierBreakdown(),
-                    currentHunger,
-                    maxHunger,
-                    currentThirst,
-                    maxThirst,
-                    entry.loaded(),
-                    entry.hasHome(),
-                    entry.dead(),
-                    entry.captured(),
-                    entry.deadRespawnRemainingMs(),
-                    entry.futureStatA(),
-                    entry.futureStatB(),
-                    entry.traitIndicators(),
-                    entry.isTraitsActionVisible(),
-                    entry.isTraitsActionEnabled(),
-                    entry.isTalentsActionVisible(),
-                    entry.isTalentsActionEnabled(),
-                    entry.linked(),
-                    entry.active(),
-                    entry.speciesId(),
-                    entry.speciesLabel(),
-                    entry.groupId(),
-                    entry.groupName(),
-                    entry.groupColorHex(),
-                    entry.breedingCooldownActive(),
-                    entry.breedingCooldownRemainingMs(),
-                    entry.breedingCooldownRatio(),
-                    entry.breedingCooldownKnown()
-            ));
-        }
-        return out.toArray(new LinkedNpcEntry[0]);
-    }
-
     private static String resolveLabel(CommandEntry entry) {
         if (entry.getDisplayName() != null && !entry.getDisplayName().isBlank()) {
             return entry.getDisplayName();
         }
         return entry.getId();
+    }
+
+    private LinkedNpcEntry findLinkedNpcEntry(UUID npcUuid) {
+        if (npcUuid == null || linkedNpcEntries == null || linkedNpcEntries.length == 0) {
+            return null;
+        }
+        for (LinkedNpcEntry entry : linkedNpcEntries) {
+            if (entry == null || entry.npcUuid() == null) {
+                continue;
+            }
+            if (entry.npcUuid().equals(npcUuid)) {
+                return entry;
+            }
+        }
+        return null;
+    }
+
+    private String normalizeSelectedGroupId(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        String trimmed = rawValue.trim();
+        if (trimmed.isBlank() || GROUP_NONE_VALUE.equalsIgnoreCase(trimmed)) {
+            return null;
+        }
+        return trimmed;
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 
     private boolean isPendingUnlink(UUID npcUuid) {
@@ -994,6 +926,12 @@ public final class TameworkCommandSelectionPage
                 event -> event.panelFilterTextInput
             )
             .add()
+            .append(
+                new KeyedCodec<>(KEY_CARD_GROUP_VALUE, Codec.STRING),
+                (event, value) -> event.cardGroupValue = value,
+                event -> event.cardGroupValue
+            )
+            .add()
             .build();
 
         private String commandId;
@@ -1001,5 +939,6 @@ public final class TameworkCommandSelectionPage
         private String panelSortValue;
         private String panelFilterModeValue;
         private String panelFilterTextInput;
+        private String cardGroupValue;
     }
 }

@@ -100,20 +100,38 @@ Group {
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
   Group #GroupTab {
-    Anchor: (Top: -6, Left: -8, Width: 116, Height: 16);
-    Background: #4b657f;
+    Anchor: (Top: -6, Left: -8, Width: 126, Height: 18);
     Visible: false;
 
-    Label #GroupTabText {
-      Anchor: (Top: 0, Left: 4, Right: 4, Height: 16);
-      Text: "Group";
+    Group #GroupTabColorSwatch {
+      Anchor: (Top: 0, Left: 0, Width: 18, Height: 18);
+      Background: #4b657f;
+    }
+
+    DropdownBox #GroupTabDropdown {
+      Anchor: (Top: 0, Left: 18, Width: 108, Height: 18);
       Style: (
-        FontSize: 9,
-        RenderBold: true,
-        TextColor: #eff4fa,
-        HorizontalAlignment: Start,
-        VerticalAlignment: Center
+        ...$C.@DefaultDropdownBoxStyle,
+        HorizontalPadding: 6,
+        LabelStyle: (
+          ...$C.@DefaultDropdownBoxLabelStyle,
+          RenderUppercase: false,
+          FontSize: 9
+        ),
+        EntryLabelStyle: (
+          ...$C.@DefaultDropdownBoxEntryLabelStyle,
+          RenderUppercase: false,
+          FontSize: 10
+        ),
+        SelectedEntryLabelStyle: (
+          ...$C.@DefaultDropdownBoxEntryLabelStyle,
+          RenderUppercase: false,
+          RenderBold: true,
+          FontSize: 9
+        )
       );
+      MaxSelection: 1;
+      NoItemsText: "No groups";
     }
   }
 

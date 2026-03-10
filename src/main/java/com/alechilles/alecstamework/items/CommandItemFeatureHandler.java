@@ -130,7 +130,8 @@ public final class CommandItemFeatureHandler {
         this.toolInventoryService = new CommandToolInventoryService(
                 panelEntryService,
                 panelEntrySourceService,
-                panelPreferenceService
+                panelPreferenceService,
+                this.groupService
         );
         this.companionPlacementService = new CommandCompanionPlacementService();
         this.recipientService = new CommandRecipientService(
@@ -440,6 +441,7 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterSummaryForTool(player, toolId),
+                () -> toolInventoryService.resolveGroupDropdownEntriesForTool(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, npcUuid),
@@ -455,6 +457,7 @@ public final class CommandItemFeatureHandler {
                 value -> panelActionService.applySetFilterMode(player, toolId, value),
                 value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
                 () -> panelActionService.applyClearFilters(player, toolId),
+                (npcUuid, groupId) -> panelActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);

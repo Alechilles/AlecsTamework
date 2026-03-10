@@ -229,6 +229,29 @@ final class CommandPanelActionService {
         }
     }
 
+    void applySetLinkedNpcGroup(Player player,
+                                String toolId,
+                                UUID npcUuid,
+                                String groupId) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        String normalizedGroupId = normalizeOptionalGroupId(groupId);
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> {
+                    if (normalizedGroupId != null && groupService.findGroup(stack, normalizedGroupId) == null) {
+                        return stack;
+                    }
+                    return linkMutationService.setLinkedNpcGroup(stack, npcUuid, normalizedGroupId);
+                }
+        );
+        if (!updated && player != null && normalizedGroupId != null) {
+            feedbackService.showWarning(player, "Unable to assign that group.");
+        }
+    }
+
     void applyCreateGroup(Player player, String toolId, String name, String colorHex) {
         LOGGER.log(
                 Level.INFO,
@@ -383,5 +406,13 @@ final class CommandPanelActionService {
             return trimmed;
         }
         return trimmed.substring(0, 45) + "...";
+    }
+
+    private String normalizeOptionalGroupId(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 }

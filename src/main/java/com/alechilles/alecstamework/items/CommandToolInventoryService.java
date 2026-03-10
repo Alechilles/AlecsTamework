@@ -8,9 +8,15 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
+import com.hypixel.hytale.server.core.ui.LocalizableString;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.UnaryOperator;
 
@@ -20,18 +26,23 @@ import java.util.function.UnaryOperator;
  * <p>This isolates inventory-scanning and tool-id mutation concerns from command orchestration.
  */
 final class CommandToolInventoryService {
+    private static final String GROUP_NONE_VALUE = "None";
+
     private final CommandLinkedPanelEntryService panelEntryService;
     private final CommandPanelEntrySourceService panelEntrySourceService;
     private final CommandPanelPreferenceService panelPreferenceService;
+    private final CommandGroupService groupService;
 
     CommandToolInventoryService(CommandLinkedPanelEntryService panelEntryService,
                                 CommandPanelEntrySourceService panelEntrySourceService,
-                                CommandPanelPreferenceService panelPreferenceService) {
+                                CommandPanelPreferenceService panelPreferenceService,
+                                CommandGroupService groupService) {
         this.panelEntryService = panelEntryService;
         this.panelEntrySourceService = panelEntrySourceService;
         this.panelPreferenceService = panelPreferenceService != null
                 ? panelPreferenceService
                 : new CommandPanelPreferenceService();
+        this.groupService = groupService != null ? groupService : new CommandGroupService();
     }
 
     ToolResolution ensureToolId(ItemStack itemStack) {
@@ -203,6 +214,34 @@ final class CommandToolInventoryService {
     String resolvePanelFilterInputForTool(Player player, String toolId) {
         ItemStack stack = findToolStack(player, toolId);
         return panelPreferenceService.resolveSelectedFilterInput(stack);
+    }
+
+    List<DropdownEntryInfo> resolveGroupDropdownEntriesForTool(Player player, String toolId) {
+        ArrayList<DropdownEntryInfo> entries = new ArrayList<>();
+        entries.add(new DropdownEntryInfo(LocalizableString.fromString("None"), GROUP_NONE_VALUE));
+        ItemStack stack = findToolStack(player, toolId);
+        if (stack == null || stack.isEmpty()) {
+            return entries;
+        }
+        List<CommandGroupService.GroupRecord> groups = groupService.readGroups(stack);
+        if (groups == null || groups.isEmpty()) {
+            return entries;
+        }
+        Set<String> seenValues = new HashSet<>();
+        seenValues.add(GROUP_NONE_VALUE.toLowerCase(Locale.ROOT));
+        for (CommandGroupService.GroupRecord group : groups) {
+            if (group == null || group.groupId == null || group.groupId.isBlank()) {
+                continue;
+            }
+            String value = group.groupId.trim();
+            String key = value.toLowerCase(Locale.ROOT);
+            if (!seenValues.add(key)) {
+                continue;
+            }
+            String label = (group.name != null && !group.name.isBlank()) ? group.name.trim() : value;
+            entries.add(new DropdownEntryInfo(LocalizableString.fromString(label), value));
+        }
+        return entries;
     }
 
     private ItemStack findToolStack(Player player, String toolId) {
