@@ -118,7 +118,7 @@ Group {
   }
 
   Label #Name {
-    Anchor: (Top: 0, Left: 0, Width: 206, Height: 22);
+    Anchor: (Top: 0, Left: 18, Width: 188, Height: 22);
     Text: "Companion";
     Style: (
       FontSize: 16,
@@ -309,7 +309,7 @@ Group {
   }
 
   TextButton #ActiveToggleActiveButton {
-    Anchor: (Top: 1, Right: 18, Width: 14, Height: 14);
+    Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
     Style: @LinkedActiveStateOnButtonStyle;
     Text: "";
     TooltipText: "Active: receives bulk commands. Click to set inactive.";
@@ -318,7 +318,7 @@ Group {
   }
 
   TextButton #ActiveToggleInactiveButton {
-    Anchor: (Top: 1, Right: 18, Width: 14, Height: 14);
+    Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
     Style: @LinkedActiveStateOffButtonStyle;
     Text: "";
     TooltipText: "Inactive: ignored by bulk commands. Click to set active.";
