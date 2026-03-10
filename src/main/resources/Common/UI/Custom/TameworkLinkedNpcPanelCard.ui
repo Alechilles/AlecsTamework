@@ -300,13 +300,17 @@ Group {
     Visible: false;
   }
 
-  $C.@SmallSecondaryTextButton #LinkButton {
-    @Sounds = $C.@ButtonSounds;
-    @Anchor = (Top: 56, Right: 0, Width: 92, Height: 24);
-    @Text = "Link";
-    @TooltipText = "Link companion";
-    @TextTooltipStyle = @LinkedActionTooltipStyle;
-    @Visible = false;
+  TextButton #LinkButton {
+    Anchor: (Top: 56, Right: 0, Width: 64, Height: 22);
+    Style: (
+      ...$C.@SmallSecondaryTextButtonStyle,
+      Sounds: $C.@ButtonSounds
+    );
+    Padding: (Horizontal: 8);
+    Text: "Link";
+    TooltipText: "Link companion";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
   }
 
   TextButton #ActiveToggleActiveButton {
