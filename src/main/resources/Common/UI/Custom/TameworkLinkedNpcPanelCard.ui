@@ -113,41 +113,6 @@ Group {
     }
   }
 
-  Group #GroupPickerContainer {
-    Anchor: (Top: 82, Left: 18, Width: 178, Height: 96);
-    Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
-    Padding: (Left: 4, Right: 4, Top: 4, Bottom: 4);
-    Visible: false;
-
-    Group #GroupPickerList {
-      Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 20);
-      LayoutMode: Top;
-    }
-
-    TextButton #GroupPickerPrevButton {
-      Anchor: (Bottom: 0, Left: 0, Width: 24, Height: 18);
-      Style: $C.@SmallSecondaryTextButtonStyle;
-      Text: "<";
-    }
-
-    Label #GroupPickerPageLabel {
-      Anchor: (Bottom: 0, Left: 28, Right: 28, Height: 18);
-      Text: "1/1";
-      Style: (
-        FontSize: 10,
-        TextColor: #c3d5ea,
-        HorizontalAlignment: Center,
-        VerticalAlignment: Center
-      );
-    }
-
-    TextButton #GroupPickerNextButton {
-      Anchor: (Bottom: 0, Right: 0, Width: 24, Height: 18);
-      Style: $C.@SmallSecondaryTextButtonStyle;
-      Text: ">";
-    }
-  }
-
   Label #Name {
     Anchor: (Top: 0, Left: 18, Width: 188, Height: 22);
     Text: "Companion";

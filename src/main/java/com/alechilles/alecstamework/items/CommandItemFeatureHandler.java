@@ -97,6 +97,7 @@ public final class CommandItemFeatureHandler {
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandPanelActionService panelActionService;
     private final CommandGroupManagerPageService groupManagerPageService;
+    private final CommandGroupAssignPageService groupAssignPageService;
 
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
@@ -187,6 +188,11 @@ public final class CommandItemFeatureHandler {
         this.groupManagerPageService = new CommandGroupManagerPageService(
                 panelActionService,
                 this.groupService
+        );
+        this.groupAssignPageService = new CommandGroupAssignPageService(
+                panelActionService,
+                toolInventoryService,
+                feedbackService
         );
     }
 
@@ -440,7 +446,6 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
-                () -> toolInventoryService.resolveGroupPickerOptionsForTool(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, npcUuid),
@@ -456,7 +461,13 @@ public final class CommandItemFeatureHandler {
                 value -> panelActionService.applySetFilterMode(player, toolId, value),
                 value -> panelActionService.applySetSelectedFilterText(player, toolId, value),
                 () -> panelActionService.applyClearFilters(player, toolId),
-                (npcUuid, groupId) -> panelActionService.applySetLinkedNpcGroup(player, toolId, npcUuid, groupId),
+                npcUuid -> groupAssignPageService.openGroupAssignPage(
+                        player,
+                        toolId,
+                        config,
+                        npcUuid,
+                        () -> reopenSelectionMenu(player, config, toolId)
+                ),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);

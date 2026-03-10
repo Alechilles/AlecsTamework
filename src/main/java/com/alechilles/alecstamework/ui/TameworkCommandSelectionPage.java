@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -37,7 +36,6 @@ public final class TameworkCommandSelectionPage
     public static final String UI_PATH = "TameworkCommandRadialMenu.ui";
     public static final String LINKED_PANEL_UI_PATH = "TameworkLinkedNpcPanel.ui";
     public static final String LINKED_PANEL_CARD_UI_PATH = "TameworkLinkedNpcPanelCard.ui";
-    public static final String LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH = "TameworkLinkedNpcGroupPickerOptionRow.ui";
     private static final String EVENT_COMMAND_ID = "CommandId";
     private static final String KEY_PANEL_MODE_VALUE = "@PanelModeValue";
     private static final String KEY_PANEL_SORT_VALUE = "@PanelSortValue";
@@ -47,9 +45,6 @@ public final class TameworkCommandSelectionPage
     private static final String LINK_COMMAND_PREFIX = "__link__:";
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
     private static final String OPEN_GROUP_PICKER_COMMAND_PREFIX = "__opengroup__:";
-    private static final String SET_GROUP_COMMAND_PREFIX = "__setgroup__:";
-    private static final String GROUP_PICKER_PAGE_BACK_COMMAND_PREFIX = "__grouppage_back__:";
-    private static final String GROUP_PICKER_PAGE_FORWARD_COMMAND_PREFIX = "__grouppage_forward__:";
     private static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
@@ -59,10 +54,7 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_RADIUS_INCREASE_COMMAND_ID = "__panel_radius_inc__";
     private static final String PANEL_MANAGE_GROUPS_COMMAND_ID = "__panel_manage_groups__";
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
-    private static final String GROUP_NONE_VALUE = "None";
-    private static final String GROUP_NONE_COLOR = "#4B657F";
     private static final int MAX_COMMAND_BUTTONS = 8;
-    private static final int GROUP_PICKER_PAGE_SIZE = 3;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
     private static final List<DropdownEntryInfo> MODE_DROPDOWN_ENTRIES = List.of(
             new DropdownEntryInfo(LocalizableString.fromString("Linked"), "LinkedMode"),
@@ -83,14 +75,10 @@ public final class TameworkCommandSelectionPage
     private static final LinkedNpcPanelCardBinder.CardBindingConfig CARD_BINDING_CONFIG =
             new LinkedNpcPanelCardBinder.CardBindingConfig(
                     LINKED_PANEL_CARD_UI_PATH,
-                    LINKED_PANEL_GROUP_PICKER_OPTION_ROW_UI_PATH,
                     EVENT_COMMAND_ID,
                     LINK_COMMAND_PREFIX,
                     UNLINK_COMMAND_PREFIX,
                     OPEN_GROUP_PICKER_COMMAND_PREFIX,
-                    SET_GROUP_COMMAND_PREFIX,
-                    GROUP_PICKER_PAGE_BACK_COMMAND_PREFIX,
-                    GROUP_PICKER_PAGE_FORWARD_COMMAND_PREFIX,
                     TOGGLE_ACTIVE_COMMAND_PREFIX,
                     RESPAWN_COMMAND_PREFIX,
                     RECALL_COMMAND_PREFIX,
@@ -106,12 +94,9 @@ public final class TameworkCommandSelectionPage
     private final Supplier<String> panelSortValueSupplier;
     private final Supplier<String> panelFilterModeValueSupplier;
     private final Supplier<String> panelFilterInputValueSupplier;
-    private final Supplier<List<LinkedNpcGroupPickerOption>> panelGroupPickerOptionsSupplier;
     private LinkedNpcEntry[] linkedNpcEntries;
     private int renderedLinkedNpcCardCount;
     private UUID pendingUnlinkNpcUuid;
-    private UUID openGroupPickerNpcUuid;
-    private int openGroupPickerPageIndex;
     private final String selectedCommandId;
     private final Consumer<String> selectionCallback;
     private final Consumer<UUID> linkCallback;
@@ -129,7 +114,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<String> panelSetFilterModeCallback;
     private final Consumer<String> panelSetFilterTextCallback;
     private final Runnable panelClearFiltersCallback;
-    private final BiConsumer<UUID, String> panelSetGroupCallback;
+    private final Consumer<UUID> panelOpenGroupAssignCallback;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
     private volatile boolean navigationPending;
@@ -144,7 +129,6 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Supplier<String> panelSortValueSupplier,
                                         @Nonnull Supplier<String> panelFilterModeValueSupplier,
                                         @Nonnull Supplier<String> panelFilterInputValueSupplier,
-                                        @Nonnull Supplier<List<LinkedNpcGroupPickerOption>> panelGroupPickerOptionsSupplier,
                                         @Nonnull Consumer<UUID> linkCallback,
                                         @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<UUID> toggleActiveCallback,
@@ -160,7 +144,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<String> panelSetFilterModeCallback,
                                         @Nonnull Consumer<String> panelSetFilterTextCallback,
                                         @Nonnull Runnable panelClearFiltersCallback,
-                                        @Nonnull BiConsumer<UUID, String> panelSetGroupCallback,
+                                        @Nonnull Consumer<UUID> panelOpenGroupAssignCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
         this.options = buildOptions(config);
@@ -171,12 +155,9 @@ public final class TameworkCommandSelectionPage
         this.panelSortValueSupplier = panelSortValueSupplier;
         this.panelFilterModeValueSupplier = panelFilterModeValueSupplier;
         this.panelFilterInputValueSupplier = panelFilterInputValueSupplier;
-        this.panelGroupPickerOptionsSupplier = panelGroupPickerOptionsSupplier;
         this.linkedNpcEntries = new LinkedNpcEntry[0];
         this.renderedLinkedNpcCardCount = 0;
         this.pendingUnlinkNpcUuid = null;
-        this.openGroupPickerNpcUuid = null;
-        this.openGroupPickerPageIndex = 0;
         this.selectedCommandId = selectedCommandId;
         this.linkCallback = linkCallback;
         this.unlinkCallback = unlinkCallback;
@@ -193,7 +174,7 @@ public final class TameworkCommandSelectionPage
         this.panelSetFilterModeCallback = panelSetFilterModeCallback;
         this.panelSetFilterTextCallback = panelSetFilterTextCallback;
         this.panelClearFiltersCallback = panelClearFiltersCallback;
-        this.panelSetGroupCallback = panelSetGroupCallback;
+        this.panelOpenGroupAssignCallback = panelOpenGroupAssignCallback;
         this.selectionCallback = selectionCallback;
         this.refreshLoopStarted = false;
         this.dismissed = false;
@@ -249,7 +230,6 @@ public final class TameworkCommandSelectionPage
                 panelSetModeCallback.accept(data.panelModeValue);
             }
             pendingUnlinkNpcUuid = null;
-            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
@@ -259,7 +239,6 @@ public final class TameworkCommandSelectionPage
                 panelSetSortCallback.accept(data.panelSortValue);
             }
             pendingUnlinkNpcUuid = null;
-            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
@@ -269,7 +248,6 @@ public final class TameworkCommandSelectionPage
                 panelSetFilterModeCallback.accept(data.panelFilterModeValue);
             }
             pendingUnlinkNpcUuid = null;
-            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
@@ -279,14 +257,12 @@ public final class TameworkCommandSelectionPage
                 panelSetFilterTextCallback.accept(data.panelFilterTextInput);
             }
             pendingUnlinkNpcUuid = null;
-            openGroupPickerNpcUuid = null;
             refreshLinkedNpcEntries();
             sendCardRefreshUpdate();
             return;
         }
         if (data.commandId == null || data.commandId.isBlank() || CLOSE_COMMAND_ID.equals(data.commandId)) {
             pendingUnlinkNpcUuid = null;
-            openGroupPickerNpcUuid = null;
             closePage();
             return;
         }
@@ -294,7 +270,6 @@ public final class TameworkCommandSelectionPage
             if (panelRadiusDecreaseCallback != null) {
                 panelRadiusDecreaseCallback.run();
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -304,7 +279,6 @@ public final class TameworkCommandSelectionPage
             if (panelRadiusIncreaseCallback != null) {
                 panelRadiusIncreaseCallback.run();
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -316,7 +290,6 @@ public final class TameworkCommandSelectionPage
                     return;
                 }
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 navigationPending = true;
                 navigateAfterUiDrain(() -> {
                     try {
@@ -332,82 +305,30 @@ public final class TameworkCommandSelectionPage
             if (panelClearFiltersCallback != null) {
                 panelClearFiltersCallback.run();
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
-                openGroupPickerPageIndex = 0;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
             return;
         }
         if (data.commandId.startsWith(OPEN_GROUP_PICKER_COMMAND_PREFIX)) {
+            if (panelOpenGroupAssignCallback == null) {
+                return;
+            }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, OPEN_GROUP_PICKER_COMMAND_PREFIX);
             if (npcUuid != null) {
-                pendingUnlinkNpcUuid = null;
-                if (isGroupPickerOpen(npcUuid)) {
-                    openGroupPickerNpcUuid = null;
-                    openGroupPickerPageIndex = 0;
-                } else {
-                    openGroupPickerNpcUuid = npcUuid;
-                    openGroupPickerPageIndex = 0;
-                }
-                sendCardRefreshUpdate();
-            }
-            return;
-        }
-        if (data.commandId.startsWith(GROUP_PICKER_PAGE_BACK_COMMAND_PREFIX)) {
-            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, GROUP_PICKER_PAGE_BACK_COMMAND_PREFIX);
-            if (npcUuid != null && isGroupPickerOpen(npcUuid) && openGroupPickerPageIndex > 0) {
-                openGroupPickerPageIndex--;
-                sendCardRefreshUpdate();
-            }
-            return;
-        }
-        if (data.commandId.startsWith(GROUP_PICKER_PAGE_FORWARD_COMMAND_PREFIX)) {
-            UUID npcUuid = CommandUiIdParser.parseNpcUuid(data.commandId, GROUP_PICKER_PAGE_FORWARD_COMMAND_PREFIX);
-            if (npcUuid != null && isGroupPickerOpen(npcUuid)) {
-                int maxPageIndex = LinkedNpcGroupPickerResolver.resolveMaxPageIndex(
-                        LinkedNpcGroupPickerResolver.resolveOptions(
-                                panelGroupPickerOptionsSupplier,
-                                GROUP_NONE_VALUE,
-                                GROUP_NONE_COLOR
-                        ),
-                        GROUP_PICKER_PAGE_SIZE
-                );
-                if (openGroupPickerPageIndex < maxPageIndex) {
-                    openGroupPickerPageIndex++;
-                    sendCardRefreshUpdate();
-                }
-            }
-            return;
-        }
-        if (data.commandId.startsWith(SET_GROUP_COMMAND_PREFIX)) {
-            if (panelSetGroupCallback == null) {
-                return;
-            }
-            LinkedNpcGroupSelectionCommandCodec.Selection selection =
-                    LinkedNpcGroupSelectionCommandCodec.parseCommandId(data.commandId, SET_GROUP_COMMAND_PREFIX);
-            if (selection == null) {
-                return;
-            }
-            UUID npcUuid = selection.npcUuid();
-            String selectedGroupId =
-                    LinkedNpcGroupPickerResolver.normalizeSelectedGroupId(selection.groupValue(), GROUP_NONE_VALUE);
-            LinkedNpcEntry entry = findLinkedNpcEntry(npcUuid);
-            if (selectedGroupId != null && entry != null && !entry.linked() && linkCallback != null) {
-                linkCallback.accept(npcUuid);
-                refreshLinkedNpcEntries();
-                entry = findLinkedNpcEntry(npcUuid);
-                if (entry == null || !entry.linked()) {
-                    sendCardRefreshUpdate();
+                if (navigationPending) {
                     return;
                 }
+                pendingUnlinkNpcUuid = null;
+                navigationPending = true;
+                navigateAfterUiDrain(() -> {
+                    try {
+                        panelOpenGroupAssignCallback.accept(npcUuid);
+                    } finally {
+                        navigationPending = false;
+                    }
+                });
             }
-            panelSetGroupCallback.accept(npcUuid, selectedGroupId);
-            pendingUnlinkNpcUuid = null;
-            openGroupPickerNpcUuid = null;
-            openGroupPickerPageIndex = 0;
-            refreshLinkedNpcEntries();
-            sendCardRefreshUpdate();
             return;
         }
         if (data.commandId.startsWith(LINK_COMMAND_PREFIX)) {
@@ -418,7 +339,6 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 linkCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -432,13 +352,11 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
                     pendingUnlinkNpcUuid = npcUuid;
-                    openGroupPickerNpcUuid = null;
                     sendCardRefreshUpdate();
                     return;
                 }
                 unlinkCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -452,7 +370,6 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 toggleActiveCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -466,7 +383,6 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 respawnCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -480,7 +396,6 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 recallCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -494,7 +409,6 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 setHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -508,7 +422,6 @@ public final class TameworkCommandSelectionPage
             if (npcUuid != null) {
                 returnHomeCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
-                openGroupPickerNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
             }
@@ -516,12 +429,10 @@ public final class TameworkCommandSelectionPage
         }
         if (!containsOption(data.commandId)) {
             pendingUnlinkNpcUuid = null;
-            openGroupPickerNpcUuid = null;
             closePage();
             return;
         }
         pendingUnlinkNpcUuid = null;
-        openGroupPickerNpcUuid = null;
         closePage();
         selectionCallback.accept(data.commandId);
     }
@@ -767,11 +678,6 @@ public final class TameworkCommandSelectionPage
                                    LinkedNpcEntry entry,
                                    boolean appendCard) {
         boolean pendingUnlink = entry.linked() && isPendingUnlink(entry.npcUuid());
-        boolean showGroupPicker = isGroupPickerOpen(entry.npcUuid());
-        List<LinkedNpcGroupPickerOption> groupPickerOptions =
-                LinkedNpcGroupPickerResolver.resolveOptions(panelGroupPickerOptionsSupplier, GROUP_NONE_VALUE, GROUP_NONE_COLOR);
-        String selectedGroupValue = LinkedNpcGroupPickerResolver.resolveSelectedGroupValue(entry, GROUP_NONE_VALUE);
-        int groupPickerPageIndex = showGroupPicker ? clampGroupPickerPageIndex(groupPickerOptions) : 0;
         LinkedNpcPanelCardBinder.bind(
                 commandBuilder,
                 eventBuilder,
@@ -779,10 +685,6 @@ public final class TameworkCommandSelectionPage
                 entry,
                 appendCard,
                 pendingUnlink,
-                showGroupPicker,
-                groupPickerOptions,
-                selectedGroupValue,
-                groupPickerPageIndex,
                 CARD_BINDING_CONFIG
         );
     }
@@ -793,21 +695,6 @@ public final class TameworkCommandSelectionPage
         if (pendingUnlinkNpcUuid != null
                 && !LinkedNpcPanelSubtitleService.containsEntry(linkedNpcEntries, pendingUnlinkNpcUuid)) {
             pendingUnlinkNpcUuid = null;
-        }
-        if (openGroupPickerNpcUuid != null
-                && !LinkedNpcPanelSubtitleService.containsEntry(linkedNpcEntries, openGroupPickerNpcUuid)) {
-            openGroupPickerNpcUuid = null;
-            openGroupPickerPageIndex = 0;
-            return;
-        }
-        if (openGroupPickerNpcUuid != null) {
-            List<LinkedNpcGroupPickerOption> groupPickerOptions =
-                    LinkedNpcGroupPickerResolver.resolveOptions(
-                            panelGroupPickerOptionsSupplier,
-                            GROUP_NONE_VALUE,
-                            GROUP_NONE_COLOR
-                    );
-            openGroupPickerPageIndex = clampGroupPickerPageIndex(groupPickerOptions);
         }
     }
 
@@ -883,16 +770,6 @@ public final class TameworkCommandSelectionPage
         return value == null ? "" : value;
     }
 
-    private int clampGroupPickerPageIndex(List<LinkedNpcGroupPickerOption> groupPickerOptions) {
-        return Math.max(
-                0,
-                Math.min(
-                        openGroupPickerPageIndex,
-                        LinkedNpcGroupPickerResolver.resolveMaxPageIndex(groupPickerOptions, GROUP_PICKER_PAGE_SIZE)
-                )
-        );
-    }
-
     private static CommandOption[] buildOptions(TwCommandItemConfig config) {
         if (config == null || config.getCommandList() == null || config.getCommandList().length == 0) {
             return new CommandOption[0];
@@ -917,27 +794,8 @@ public final class TameworkCommandSelectionPage
         return entry.getId();
     }
 
-    private LinkedNpcEntry findLinkedNpcEntry(UUID npcUuid) {
-        if (npcUuid == null || linkedNpcEntries == null || linkedNpcEntries.length == 0) {
-            return null;
-        }
-        for (LinkedNpcEntry entry : linkedNpcEntries) {
-            if (entry == null || entry.npcUuid() == null) {
-                continue;
-            }
-            if (entry.npcUuid().equals(npcUuid)) {
-                return entry;
-            }
-        }
-        return null;
-    }
-
     private boolean isPendingUnlink(UUID npcUuid) {
         return npcUuid != null && pendingUnlinkNpcUuid != null && pendingUnlinkNpcUuid.equals(npcUuid);
-    }
-
-    private boolean isGroupPickerOpen(UUID npcUuid) {
-        return npcUuid != null && openGroupPickerNpcUuid != null && openGroupPickerNpcUuid.equals(npcUuid);
     }
 
     private record CommandOption(String id, String label) { }

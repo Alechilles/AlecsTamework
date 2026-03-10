@@ -2,7 +2,6 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
-import com.alechilles.alecstamework.ui.LinkedNpcGroupPickerOption;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -28,7 +27,6 @@ import java.util.function.UnaryOperator;
  */
 final class CommandToolInventoryService {
     private static final String GROUP_NONE_VALUE = "None";
-    private static final String GROUP_NONE_COLOR = "#4B657F";
 
     private final CommandLinkedPanelEntryService panelEntryService;
     private final CommandPanelEntrySourceService panelEntrySourceService;
@@ -244,37 +242,6 @@ final class CommandToolInventoryService {
             entries.add(new DropdownEntryInfo(LocalizableString.fromString(label), value));
         }
         return entries;
-    }
-
-    List<LinkedNpcGroupPickerOption> resolveGroupPickerOptionsForTool(Player player, String toolId) {
-        ArrayList<LinkedNpcGroupPickerOption> options = new ArrayList<>();
-        options.add(new LinkedNpcGroupPickerOption(GROUP_NONE_VALUE, "None", GROUP_NONE_COLOR));
-        ItemStack stack = findToolStack(player, toolId);
-        if (stack == null || stack.isEmpty()) {
-            return options;
-        }
-        List<CommandGroupService.GroupRecord> groups = groupService.readGroups(stack);
-        if (groups == null || groups.isEmpty()) {
-            return options;
-        }
-        Set<String> seenValues = new HashSet<>();
-        seenValues.add(GROUP_NONE_VALUE.toLowerCase(Locale.ROOT));
-        for (CommandGroupService.GroupRecord group : groups) {
-            if (group == null || group.groupId == null || group.groupId.isBlank()) {
-                continue;
-            }
-            String value = group.groupId.trim();
-            String key = value.toLowerCase(Locale.ROOT);
-            if (!seenValues.add(key)) {
-                continue;
-            }
-            String label = (group.name != null && !group.name.isBlank()) ? group.name.trim() : value;
-            String color = (group.colorHex != null && !group.colorHex.isBlank())
-                    ? group.colorHex.trim()
-                    : GROUP_NONE_COLOR;
-            options.add(new LinkedNpcGroupPickerOption(value, label, color));
-        }
-        return options;
     }
 
     private ItemStack findToolStack(Player player, String toolId) {

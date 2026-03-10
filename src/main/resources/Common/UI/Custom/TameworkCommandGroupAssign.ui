@@ -1,0 +1,94 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer #TameworkGroupAssignRoot {
+    Anchor: (Width: 430, Height: 216);
+
+    #Title {
+      $C.@Title #TameworkGroupAssignTitle {
+        @Text = "Assign Group";
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+
+      Label #TameworkGroupAssignSubtitle {
+        Anchor: (Height: 24, Bottom: 16);
+        Text: "Choose a group for this NPC.";
+        Style: (
+          FontSize: 14,
+          TextColor: #bfd0e5,
+          HorizontalAlignment: Center,
+          VerticalAlignment: Center
+        );
+      }
+
+      Group {
+        Anchor: (Height: 32, Bottom: 20);
+        LayoutMode: Left;
+
+        Label #TameworkGroupAssignDropdownLabel {
+          Anchor: (Width: 48, Height: 24);
+          Text: "Group:";
+          Style: (
+            FontSize: 12,
+            TextColor: #bfd0e5,
+            HorizontalAlignment: Start,
+            VerticalAlignment: Center
+          );
+        }
+
+        Group { Anchor: (Width: 6); }
+
+        DropdownBox #TameworkGroupAssignDropdown {
+          Anchor: (Width: 316, Height: 24);
+          Style: (
+            ...$C.@DefaultDropdownBoxStyle,
+            HorizontalPadding: 8,
+            LabelStyle: (
+              ...$C.@DefaultDropdownBoxLabelStyle,
+              RenderUppercase: false,
+              FontSize: 11
+            ),
+            EntryLabelStyle: (
+              ...$C.@DefaultDropdownBoxEntryLabelStyle,
+              RenderUppercase: false,
+              FontSize: 11
+            ),
+            SelectedEntryLabelStyle: (
+              ...$C.@DefaultDropdownBoxEntryLabelStyle,
+              RenderUppercase: false,
+              RenderBold: true,
+              FontSize: 11
+            )
+          );
+          MaxSelection: 1;
+          NoItemsText: "No groups";
+        }
+      }
+
+      Group {
+        LayoutMode: Right;
+
+        $C.@SmallSecondaryTextButton #TameworkGroupAssignCancelButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = "Cancel";
+          @Anchor = (MinWidth: 128);
+        }
+
+        Group #TameworkGroupAssignButtonSpacer {
+          Anchor: (Width: 12);
+        }
+
+        $C.@SmallSecondaryTextButton #TameworkGroupAssignApplyButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = "Apply";
+          @Anchor = (Right: 10, MinWidth: 140);
+        }
+      }
+    }
+  }
+}
