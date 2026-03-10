@@ -179,14 +179,14 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkCommandMenuSubtitle.Text", "Click a command to set it.");
         commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
         commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
-        commandBuilder.set("#TameworkLinkedPanelTitle.Text", "Linked Companions");
+        commandBuilder.set("#TameworkLinkedPanelTitle.Text", "Linked NPCs");
         commandBuilder.set(
                 "#TameworkLinkedPanelSubtitle.Text",
                 LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
         );
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", buildModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
-        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusGroup.Visible", shouldShowNearbyRadiusControls());
+        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", shouldShowNearbyRadiusControls());
         commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", buildSortDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
@@ -489,7 +489,7 @@ public final class TameworkCommandSelectionPage
         );
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", buildModeDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
-        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusGroup.Visible", shouldShowNearbyRadiusControls());
+        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", shouldShowNearbyRadiusControls());
         commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", buildSortDropdownEntries());
         commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());

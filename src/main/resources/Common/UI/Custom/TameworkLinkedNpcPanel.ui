@@ -7,7 +7,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
   #Title {
     $C.@Title #TameworkLinkedPanelTitle {
       @Alignment = Start;
-      @Text = "Linked Companions";
+      @Text = "Linked NPCs";
     }
 
     DropdownBox #TameworkLinkedPanelModeDropdown {
@@ -46,8 +46,8 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       LayoutMode: Left;
 
       Label #TameworkLinkedPanelSubtitle {
-        Anchor: (Width: 150, Height: 20);
-        Text: "No linked companions";
+        Anchor: (Width: 182, Height: 20);
+        Text: "No linked NPCs";
         Style: (
           FontSize: 14,
           TextColor: #c4d2e1,
@@ -56,45 +56,49 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         );
       }
 
-      Group { Anchor: (Width: 4); }
+      Group { Anchor: (Width: 6); }
 
-      Group #TameworkLinkedPanelSubtitleRadiusGroup {
-        Anchor: (Width: 126, Height: 24);
-        LayoutMode: Left;
-        Visible: false;
+      Group #TameworkLinkedPanelSubtitleRadiusSlot {
+        Anchor: (Width: 108, Height: 24);
 
-        TextButton #TameworkLinkedPanelRadiusDec {
-          Anchor: (Width: 24, Height: 24);
-          Text: "-";
-        }
+        Group #TameworkLinkedPanelSubtitleRadiusControls {
+          Anchor: (Width: 108, Height: 24);
+          LayoutMode: Left;
+          Visible: false;
 
-        Group { Anchor: (Width: 2); }
+          TextButton #TameworkLinkedPanelRadiusDec {
+            Anchor: (Width: 20, Height: 24);
+            Text: "-";
+          }
 
-        Label #TameworkLinkedPanelRadiusValue {
-          Anchor: (Width: 74, Height: 24);
-          Text: "Radius: 24m";
-          Style: (
-            FontSize: 12,
-            TextColor: #dbe8f6,
-            HorizontalAlignment: Center,
-            VerticalAlignment: Center
-          );
-        }
+          Group { Anchor: (Width: 3); }
 
-        Group { Anchor: (Width: 2); }
+          Label #TameworkLinkedPanelRadiusValue {
+            Anchor: (Width: 62, Height: 24);
+            Text: "Radius: 24m";
+            Style: (
+              FontSize: 12,
+              TextColor: #dbe8f6,
+              HorizontalAlignment: Center,
+              VerticalAlignment: Center
+            );
+          }
 
-        TextButton #TameworkLinkedPanelRadiusInc {
-          Anchor: (Width: 24, Height: 24);
-          Text: "+";
+          Group { Anchor: (Width: 3); }
+
+          TextButton #TameworkLinkedPanelRadiusInc {
+            Anchor: (Width: 20, Height: 24);
+            Text: "+";
+          }
         }
       }
 
-      Group { Anchor: (Width: 4); }
+      Group { Anchor: (Width: 6); }
 
       $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
         @Sounds = $C.@ButtonSounds;
-        @Anchor = (Width: 130, Height: 24);
-        @Text = "Manage Groups";
+        @Anchor = (Width: 74, Height: 24);
+        @Text = "Groups";
       }
     }
 
@@ -106,8 +110,21 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
       Anchor: (Top: 2, Height: 28);
       LayoutMode: Left;
 
+      Label #TameworkLinkedPanelSortLabel {
+        Anchor: (Width: 30, Height: 24);
+        Text: "Sort:";
+        Style: (
+          FontSize: 12,
+          TextColor: #bfd0e5,
+          HorizontalAlignment: Start,
+          VerticalAlignment: Center
+        );
+      }
+
+      Group { Anchor: (Width: 4); }
+
       DropdownBox #TameworkLinkedPanelSortDropdown {
-        Anchor: (Width: 118, Height: 24);
+        Anchor: (Width: 104, Height: 24);
         Style: (
           ...$C.@DefaultDropdownBoxStyle,
           HorizontalPadding: 8,
@@ -132,10 +149,23 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         NoItemsText: "No sort options";
       }
 
-      Group { Anchor: (Width: 6); }
+      Group { Anchor: (Width: 10); }
+
+      Label #TameworkLinkedPanelFilterLabel {
+        Anchor: (Width: 38, Height: 24);
+        Text: "Filter:";
+        Style: (
+          FontSize: 12,
+          TextColor: #bfd0e5,
+          HorizontalAlignment: Start,
+          VerticalAlignment: Center
+        );
+      }
+
+      Group { Anchor: (Width: 4); }
 
       DropdownBox #TameworkLinkedPanelFilterDropdown {
-        Anchor: (Width: 118, Height: 24);
+        Anchor: (Width: 104, Height: 24);
         Style: (
           ...$C.@DefaultDropdownBoxStyle,
           HorizontalPadding: 8,
@@ -160,10 +190,10 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
         NoItemsText: "No filter options";
       }
 
-      Group { Anchor: (Width: 6); }
+      Group { Anchor: (Width: 8); }
 
       Label #TameworkLinkedPanelFilterSummary {
-        Anchor: (Width: 116, Height: 24);
+        Anchor: (Width: 100, Height: 24);
         Text: "Filters: none";
         Style: (
           FontSize: 12,
@@ -212,7 +242,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
 
     Label #TameworkLinkedPanelEmptyState {
       Anchor: (Top: 8, Height: 48);
-      Text: "No linked companions yet. Primary-use on an owned NPC to link it.";
+      Text: "No linked NPCs yet. Primary-use on an owned NPC to link it.";
       Style: (
         FontSize: 14,
         TextColor: #b2c3d6,

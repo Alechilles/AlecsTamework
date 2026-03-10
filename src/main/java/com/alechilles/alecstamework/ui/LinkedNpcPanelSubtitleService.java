@@ -14,12 +14,12 @@ final class LinkedNpcPanelSubtitleService {
         if (pendingUnlinkNpcUuid != null) {
             String pendingName = resolvePendingUnlinkName(entries, pendingUnlinkNpcUuid);
             if (pendingName == null || pendingName.isBlank()) {
-                pendingName = "this companion";
+                pendingName = "this NPC";
             }
             return "Click X again to remove " + pendingName;
         }
         if (total <= 0) {
-            return "No companions";
+            return "No NPCs";
         }
         int linkedCount = 0;
         if (entries != null) {
@@ -30,9 +30,9 @@ final class LinkedNpcPanelSubtitleService {
             }
         }
         if (linkedCount < total) {
-            return total + " companions (" + linkedCount + " linked)";
+            return total + " NPCs (" + linkedCount + " linked)";
         }
-        return linkedCount + " linked companion" + (linkedCount == 1 ? "" : "s");
+        return linkedCount + " linked NPC" + (linkedCount == 1 ? "" : "s");
     }
 
     static boolean containsEntry(LinkedNpcEntry[] entries, UUID npcUuid) {
