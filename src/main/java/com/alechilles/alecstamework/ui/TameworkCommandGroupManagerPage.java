@@ -22,8 +22,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.function.BiConsumer;
@@ -54,7 +52,6 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
     private static final String DEFAULT_SUBTITLE = "Create, edit, recolor, or delete command groups.";
-    private static final long BACK_NAVIGATION_DELAY_MS = 80L;
     private static final Logger LOGGER = Logger.getLogger(TameworkCommandGroupManagerPage.class.getName());
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
@@ -68,6 +65,7 @@ public final class TameworkCommandGroupManagerPage
     private String draftName;
     private String draftColor;
     private String editingGroupId;
+    private boolean navigationPending;
     private boolean handled;
 
     public TameworkCommandGroupManagerPage(@Nonnull PlayerRef playerRef,
@@ -90,6 +88,7 @@ public final class TameworkCommandGroupManagerPage
         this.draftName = "";
         this.draftColor = DEFAULT_GROUP_COLOR;
         this.editingGroupId = null;
+        this.navigationPending = false;
         this.handled = false;
     }
 
@@ -166,6 +165,9 @@ public final class TameworkCommandGroupManagerPage
                                      String colorInput,
                                      String rowNameInput,
                                      String rowColorInput) {
+        if (navigationPending) {
+            return;
+        }
         if (nameInput != null) {
             draftName = nameInput;
         }
@@ -193,11 +195,20 @@ public final class TameworkCommandGroupManagerPage
         }
         if (ACTION_BACK.equals(normalizedAction)) {
             LOGGER.log(Level.INFO, "Group manager back requested.");
-            handled = true;
-            close();
-            if (backCallback != null) {
-                navigateAfterUiDrain(backCallback);
+            if (navigationPending) {
+                return;
             }
+            handled = true;
+            navigationPending = true;
+            navigateAfterUiDrain(() -> {
+                try {
+                    if (backCallback != null) {
+                        backCallback.run();
+                    }
+                } finally {
+                    navigationPending = false;
+                }
+            });
             return;
         }
         if (ACTION_CREATE.equals(normalizedAction)) {
@@ -244,6 +255,7 @@ public final class TameworkCommandGroupManagerPage
 
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        navigationPending = false;
         if (handled) {
             return;
         }
@@ -461,10 +473,7 @@ public final class TameworkCommandGroupManagerPage
     }
 
     private void navigateAfterUiDrain(@Nonnull Runnable action) {
-        CompletableFuture.runAsync(
-                () -> dispatchNavigationAction(action),
-                CompletableFuture.delayedExecutor(BACK_NAVIGATION_DELAY_MS, TimeUnit.MILLISECONDS)
-        );
+        dispatchNavigationAction(action);
     }
 
     private void dispatchNavigationAction(@Nonnull Runnable action) {

@@ -56,7 +56,6 @@ public final class TameworkCommandSelectionPage
     private static final String PANEL_FILTER_CLEAR_COMMAND_ID = "__panel_filter_clear__";
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
-    private static final long MANAGE_GROUPS_NAVIGATION_DELAY_MS = 80L;
     private static final List<DropdownEntryInfo> MODE_DROPDOWN_ENTRIES = List.of(
             new DropdownEntryInfo(LocalizableString.fromString("Linked"), "LinkedMode"),
             new DropdownEntryInfo(LocalizableString.fromString("Nearby"), "NearbyMode")
@@ -105,6 +104,7 @@ public final class TameworkCommandSelectionPage
     private final Runnable panelClearFiltersCallback;
     private volatile boolean refreshLoopStarted;
     private volatile boolean dismissed;
+    private volatile boolean navigationPending;
 
     public TameworkCommandSelectionPage(@Nonnull PlayerRef playerRef,
                                         @Nonnull TwCommandItemConfig config,
@@ -165,6 +165,7 @@ public final class TameworkCommandSelectionPage
         this.selectionCallback = selectionCallback;
         this.refreshLoopStarted = false;
         this.dismissed = false;
+        this.navigationPending = false;
     }
 
     @Override
@@ -208,6 +209,9 @@ public final class TameworkCommandSelectionPage
     public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
                                 @Nonnull Store<EntityStore> store,
                                 @Nonnull CommandSelectionEventData data) {
+        if (navigationPending) {
+            return;
+        }
         if (data.panelModeValue != null) {
             if (panelSetModeCallback != null) {
                 panelSetModeCallback.accept(data.panelModeValue);
@@ -269,9 +273,18 @@ public final class TameworkCommandSelectionPage
         }
         if (PANEL_MANAGE_GROUPS_COMMAND_ID.equals(data.commandId)) {
             if (panelManageGroupsCallback != null) {
+                if (navigationPending) {
+                    return;
+                }
                 pendingUnlinkNpcUuid = null;
-                closePage();
-                navigateAfterUiDrain(panelManageGroupsCallback);
+                navigationPending = true;
+                navigateAfterUiDrain(() -> {
+                    try {
+                        panelManageGroupsCallback.run();
+                    } finally {
+                        navigationPending = false;
+                    }
+                });
             }
             return;
         }
@@ -393,6 +406,7 @@ public final class TameworkCommandSelectionPage
     @Override
     public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         dismissed = true;
+        navigationPending = false;
     }
 
     private void buildCommandButtons(@Nonnull UICommandBuilder commandBuilder,
@@ -525,14 +539,12 @@ public final class TameworkCommandSelectionPage
 
     private void closePage() {
         dismissed = true;
+        navigationPending = false;
         close();
     }
 
     private void navigateAfterUiDrain(@Nonnull Runnable action) {
-        CompletableFuture.runAsync(
-                () -> dispatchNavigationAction(action),
-                CompletableFuture.delayedExecutor(MANAGE_GROUPS_NAVIGATION_DELAY_MS, TimeUnit.MILLISECONDS)
-        );
+        dispatchNavigationAction(action);
     }
 
     private void dispatchNavigationAction(@Nonnull Runnable action) {
