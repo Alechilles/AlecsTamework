@@ -440,7 +440,6 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
-                () -> toolInventoryService.resolvePanelFilterSummaryForTool(player, toolId),
                 () -> toolInventoryService.resolveGroupPickerOptionsForTool(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),

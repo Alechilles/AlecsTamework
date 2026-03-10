@@ -6,6 +6,7 @@ import com.hypixel.hytale.server.core.ui.Value;
 import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -14,7 +15,8 @@ import java.util.Locale;
  */
 final class LinkedNpcPanelCardBinder {
     private static final int CARD_COLLAPSED_HEIGHT = 92;
-    private static final int CARD_EXPANDED_HEIGHT = 166;
+    private static final int CARD_EXPANDED_HEIGHT = 186;
+    private static final int GROUP_PICKER_PAGE_SIZE = 3;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -28,6 +30,7 @@ final class LinkedNpcPanelCardBinder {
                      boolean showGroupPicker,
                      List<LinkedNpcGroupPickerOption> groupPickerOptions,
                      String selectedGroupValue,
+                     int groupPickerPageIndex,
                      CardBindingConfig config) {
         String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
         String nameSelector = entrySelector + " #Name";
@@ -47,6 +50,9 @@ final class LinkedNpcPanelCardBinder {
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String groupPickerContainerSelector = entrySelector + " #GroupPickerContainer";
         String groupPickerListSelector = entrySelector + " #GroupPickerList";
+        String groupPickerPrevButtonSelector = entrySelector + " #GroupPickerPrevButton";
+        String groupPickerNextButtonSelector = entrySelector + " #GroupPickerNextButton";
+        String groupPickerPageLabelSelector = entrySelector + " #GroupPickerPageLabel";
         String respawnSelector = entrySelector + " #RespawnButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
@@ -91,8 +97,12 @@ final class LinkedNpcPanelCardBinder {
                     eventBuilder,
                     entry,
                     groupPickerListSelector,
+                    groupPickerPrevButtonSelector,
+                    groupPickerNextButtonSelector,
+                    groupPickerPageLabelSelector,
                     groupPickerOptions,
                     selectedGroupValue,
+                    groupPickerPageIndex,
                     config
             );
         }
@@ -187,25 +197,58 @@ final class LinkedNpcPanelCardBinder {
                                                UIEventBuilder eventBuilder,
                                                LinkedNpcEntry entry,
                                                String groupPickerListSelector,
+                                               String groupPickerPrevButtonSelector,
+                                               String groupPickerNextButtonSelector,
+                                               String groupPickerPageLabelSelector,
                                                List<LinkedNpcGroupPickerOption> groupPickerOptions,
                                                String selectedGroupValue,
+                                               int requestedPageIndex,
                                                CardBindingConfig config) {
-        if (entry == null || groupPickerListSelector == null || config == null) {
+        if (entry == null
+                || groupPickerListSelector == null
+                || groupPickerPrevButtonSelector == null
+                || groupPickerNextButtonSelector == null
+                || groupPickerPageLabelSelector == null
+                || config == null) {
             return;
         }
         if (groupPickerOptions == null || groupPickerOptions.isEmpty()) {
+            commandBuilder.set(groupPickerPrevButtonSelector + ".Visible", false);
+            commandBuilder.set(groupPickerNextButtonSelector + ".Visible", false);
+            commandBuilder.set(groupPickerPageLabelSelector + ".Visible", false);
             return;
         }
+        List<LinkedNpcGroupPickerOption> validOptions = new ArrayList<>(groupPickerOptions.size());
+        for (LinkedNpcGroupPickerOption option : groupPickerOptions) {
+            if (option == null || normalizeOptionValue(option.value()) == null) {
+                continue;
+            }
+            validOptions.add(option);
+        }
+        if (validOptions.isEmpty()) {
+            commandBuilder.set(groupPickerPrevButtonSelector + ".Visible", false);
+            commandBuilder.set(groupPickerNextButtonSelector + ".Visible", false);
+            commandBuilder.set(groupPickerPageLabelSelector + ".Visible", false);
+            return;
+        }
+        int totalPages = Math.max(1, (validOptions.size() + GROUP_PICKER_PAGE_SIZE - 1) / GROUP_PICKER_PAGE_SIZE);
+        int safePageIndex = Math.max(0, Math.min(requestedPageIndex, totalPages - 1));
+        int startIndex = safePageIndex * GROUP_PICKER_PAGE_SIZE;
+        int endIndex = Math.min(validOptions.size(), startIndex + GROUP_PICKER_PAGE_SIZE);
+        boolean hasPrevPage = safePageIndex > 0;
+        boolean hasNextPage = safePageIndex < totalPages - 1;
+        boolean showPagingControls = totalPages > 1;
+        commandBuilder.set(groupPickerPrevButtonSelector + ".Visible", showPagingControls);
+        commandBuilder.set(groupPickerNextButtonSelector + ".Visible", showPagingControls);
+        commandBuilder.set(groupPickerPageLabelSelector + ".Visible", showPagingControls);
+        commandBuilder.set(groupPickerPrevButtonSelector + ".Enabled", hasPrevPage);
+        commandBuilder.set(groupPickerNextButtonSelector + ".Enabled", hasNextPage);
+        commandBuilder.set(groupPickerPageLabelSelector + ".Text", (safePageIndex + 1) + "/" + totalPages);
         String normalizedSelectedValue = normalizeOptionValue(selectedGroupValue);
         int visibleCount = 0;
-        for (LinkedNpcGroupPickerOption option : groupPickerOptions) {
-            if (option == null) {
-                continue;
-            }
+        for (int optionIndex = startIndex; optionIndex < endIndex; optionIndex++) {
+            LinkedNpcGroupPickerOption option = validOptions.get(optionIndex);
             String optionValue = normalizeOptionValue(option.value());
-            if (optionValue == null) {
-                continue;
-            }
             String optionLabel = resolveOptionLabel(option, optionValue);
             boolean selected = normalizedSelectedValue != null
                     && normalizedSelectedValue.equalsIgnoreCase(optionValue);
@@ -227,6 +270,25 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
             visibleCount++;
+        }
+        if (showPagingControls && hasPrevPage) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    groupPickerPrevButtonSelector,
+                    EventData.of(config.eventCommandId(), config.pageGroupPickerBackCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showPagingControls && hasNextPage) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    groupPickerNextButtonSelector,
+                    EventData.of(
+                            config.eventCommandId(),
+                            config.pageGroupPickerForwardCommandPrefix() + entry.npcUuid()
+                    ),
+                    false
+            );
         }
     }
 
@@ -275,6 +337,8 @@ final class LinkedNpcPanelCardBinder {
                              String unlinkCommandPrefix,
                              String openGroupPickerCommandPrefix,
                              String setGroupCommandPrefix,
+                             String pageGroupPickerBackCommandPrefix,
+                             String pageGroupPickerForwardCommandPrefix,
                              String toggleActiveCommandPrefix,
                              String respawnCommandPrefix,
                              String recallCommandPrefix,
