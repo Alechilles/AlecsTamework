@@ -30,8 +30,7 @@ public final class TameworkCommandGroupManagerPage
         extends InteractiveCustomUIPage<TameworkCommandGroupManagerPage.GroupManagerEventData> {
     public static final String UI_PATH = "TameworkCommandGroupManager.ui";
     public static final String ROW_UI_PATH = "TameworkCommandGroupManagerRow.ui";
-    private static final String KEY_ACTION = "Submit";
-    private static final String KEY_ACTION_LEGACY = "Action";
+    private static final String KEY_ACTION = "Action";
     private static final String KEY_NAME_INPUT = "@GroupNameInput";
     private static final String KEY_COLOR_INPUT = "@GroupColorInput";
     private static final String ACTION_CLOSE = "__close__";
@@ -249,12 +248,6 @@ public final class TameworkCommandGroupManagerPage
         )
                 .<String>append(
                         new KeyedCodec<>(KEY_ACTION, Codec.STRING),
-                        (data, value) -> data.action = value,
-                        data -> data.action
-                )
-                .add()
-                .<String>append(
-                        new KeyedCodec<>(KEY_ACTION_LEGACY, Codec.STRING),
                         (data, value) -> data.action = value,
                         data -> data.action
                 )

@@ -45,7 +45,7 @@ $C.@PageOverlay {
 
         ColorPickerDropdownBox #TameworkGroupColorInput {
           Style: $C.@DefaultColorPickerDropdownBoxStyle;
-          Anchor: (Width: 96, Height: 24);
+          Anchor: (Width: 24, Height: 24);
         }
 
         Group { Anchor: (Width: 6); }
