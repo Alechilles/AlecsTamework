@@ -238,7 +238,7 @@ $C.@DecoratedContainer #TameworkLinkedPanelRoot {
   }
 
   Group #TameworkLinkedPanelGroupPickerOverlay {
-    Anchor: (Top: 108, Left: -158, Width: 152, Height: 146);
+    Anchor: (Top: 108, Left: 6, Width: 152, Height: 146);
     Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
     Padding: (Left: 4, Right: 4, Top: 4, Bottom: 4);
     Visible: false;
