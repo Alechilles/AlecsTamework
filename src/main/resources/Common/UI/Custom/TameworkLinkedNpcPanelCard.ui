@@ -114,7 +114,7 @@ Group {
   }
 
   Group #GroupPickerContainer {
-    Anchor: (Top: 0, Left: 24, Width: 148, Height: 84);
+    Anchor: (Top: 0, Left: -156, Width: 148, Height: 84);
     Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
     Padding: (Left: 4, Right: 4, Top: 4, Bottom: 4);
     Visible: false;
