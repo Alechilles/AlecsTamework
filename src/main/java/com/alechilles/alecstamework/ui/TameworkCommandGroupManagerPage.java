@@ -15,12 +15,15 @@ import com.hypixel.hytale.server.core.ui.builder.EventData;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.function.BiConsumer;
@@ -51,6 +54,7 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
     private static final String DEFAULT_SUBTITLE = "Create, edit, recolor, or delete command groups.";
+    private static final long BACK_NAVIGATION_DELAY_MS = 80L;
     private static final Logger LOGGER = Logger.getLogger(TameworkCommandGroupManagerPage.class.getName());
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
@@ -192,7 +196,7 @@ public final class TameworkCommandGroupManagerPage
             handled = true;
             close();
             if (backCallback != null) {
-                backCallback.run();
+                navigateAfterUiDrain(backCallback);
             }
             return;
         }
@@ -454,6 +458,35 @@ public final class TameworkCommandGroupManagerPage
         }
         String trimmed = value.trim();
         return trimmed.matches("^#[0-9A-Fa-f]{6}$") || trimmed.matches("^[0-9A-Fa-f]{6}$");
+    }
+
+    private void navigateAfterUiDrain(@Nonnull Runnable action) {
+        CompletableFuture.runAsync(
+                () -> dispatchNavigationAction(action),
+                CompletableFuture.delayedExecutor(BACK_NAVIGATION_DELAY_MS, TimeUnit.MILLISECONDS)
+        );
+    }
+
+    private void dispatchNavigationAction(@Nonnull Runnable action) {
+        Ref<EntityStore> ref = playerRef.getReference();
+        if (ref == null || !ref.isValid()) {
+            return;
+        }
+        Store<EntityStore> store = ref.getStore();
+        if (store == null || store.getExternalData() == null) {
+            return;
+        }
+        World world = store.getExternalData().getWorld();
+        if (world == null) {
+            return;
+        }
+        world.execute(() -> {
+            Ref<EntityStore> activeRef = playerRef.getReference();
+            if (activeRef == null || !activeRef.isValid()) {
+                return;
+            }
+            action.run();
+        });
     }
 
     private static String resolveAction(GroupManagerEventData data) {
