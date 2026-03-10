@@ -33,21 +33,21 @@ Group {
     );
   }
 
-  TextButton #RenameButton {
-    Style: $C.@SmallSecondaryTextButtonStyle;
-    Anchor: (Top: 2, Right: 154, Width: 64, Height: 24);
-    Text: "Rename";
+  $C.@SmallSecondaryTextButton #RenameButton {
+    @Sounds = $C.@ButtonSounds;
+    @Anchor = (Top: 2, Right: 154, Width: 64, Height: 24);
+    @Text = "Rename";
   }
 
-  TextButton #ColorButton {
-    Style: $C.@SmallSecondaryTextButtonStyle;
-    Anchor: (Top: 2, Right: 84, Width: 64, Height: 24);
-    Text: "Color";
+  $C.@SmallSecondaryTextButton #ColorButton {
+    @Sounds = $C.@ButtonSounds;
+    @Anchor = (Top: 2, Right: 84, Width: 64, Height: 24);
+    @Text = "Color";
   }
 
-  TextButton #DeleteButton {
-    Style: $C.@SmallSecondaryTextButtonStyle;
-    Anchor: (Top: 2, Right: 0, Width: 78, Height: 24);
-    Text: "Delete";
+  $C.@SmallSecondaryTextButton #DeleteButton {
+    @Sounds = $C.@ButtonSounds;
+    @Anchor = (Top: 2, Right: 0, Width: 78, Height: 24);
+    @Text = "Delete";
   }
 }

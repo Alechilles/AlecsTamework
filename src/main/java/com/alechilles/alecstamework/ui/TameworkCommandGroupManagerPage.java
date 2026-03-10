@@ -16,6 +16,8 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -42,6 +44,7 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
     private static final String EVENT_TRUE = "1";
+    private static final Logger LOGGER = Logger.getLogger(TameworkCommandGroupManagerPage.class.getName());
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
     private final BiConsumer<String, String> createCallback;
@@ -100,7 +103,19 @@ public final class TameworkCommandGroupManagerPage
         boolean closePressed = EVENT_TRUE.equals(data.closeEvent);
         boolean createPressed = EVENT_TRUE.equals(data.createEvent);
         String action = data.action != null ? data.action.trim() : "";
+        LOGGER.log(
+                Level.INFO,
+                "Group manager event: action={0} create={1} close={2} name={3} color={4}",
+                new Object[] {
+                        safeForLog(action),
+                        safeForLog(data.createEvent),
+                        safeForLog(data.closeEvent),
+                        safeForLog(draftName),
+                        safeForLog(draftColor)
+                }
+        );
         if (closePressed || ACTION_CLOSE.equals(action)) {
+            LOGGER.log(Level.INFO, "Group manager close requested.");
             handled = true;
             close();
             if (closeCallback != null) {
@@ -109,6 +124,8 @@ public final class TameworkCommandGroupManagerPage
             return;
         }
         if (createPressed || ACTION_CREATE.equals(action)) {
+            LOGGER.log(Level.INFO, "Group manager create requested for name={0} color={1}",
+                    new Object[] { safeForLog(draftName), safeForLog(draftColor) });
             if (createCallback != null) {
                 createCallback.accept(draftName, draftColor);
             }
@@ -117,11 +134,14 @@ public final class TameworkCommandGroupManagerPage
             return;
         }
         if (action.isBlank()) {
+            LOGGER.log(Level.INFO, "Group manager event ignored because no action payload was provided.");
             return;
         }
         if (action.startsWith(ACTION_RENAME_PREFIX)) {
             String groupId = action.substring(ACTION_RENAME_PREFIX.length()).trim();
             if (!groupId.isBlank() && renameCallback != null) {
+                LOGGER.log(Level.INFO, "Group manager rename requested for groupId={0} newName={1}",
+                        new Object[] { safeForLog(groupId), safeForLog(draftName) });
                 renameCallback.accept(groupId, draftName);
             }
             refreshAndSend();
@@ -130,6 +150,8 @@ public final class TameworkCommandGroupManagerPage
         if (action.startsWith(ACTION_RECOLOR_PREFIX)) {
             String groupId = action.substring(ACTION_RECOLOR_PREFIX.length()).trim();
             if (!groupId.isBlank() && recolorCallback != null) {
+                LOGGER.log(Level.INFO, "Group manager recolor requested for groupId={0} color={1}",
+                        new Object[] { safeForLog(groupId), safeForLog(draftColor) });
                 recolorCallback.accept(groupId, draftColor);
             }
             refreshAndSend();
@@ -138,11 +160,14 @@ public final class TameworkCommandGroupManagerPage
         if (action.startsWith(ACTION_DELETE_PREFIX)) {
             String groupId = action.substring(ACTION_DELETE_PREFIX.length()).trim();
             if (!groupId.isBlank() && deleteCallback != null) {
+                LOGGER.log(Level.INFO, "Group manager delete requested for groupId={0}",
+                        new Object[] { safeForLog(groupId) });
                 deleteCallback.accept(groupId);
             }
             refreshAndSend();
             return;
         }
+        LOGGER.log(Level.INFO, "Group manager dismissing due to unknown action payload: {0}", safeForLog(action));
         handled = true;
         close();
         if (closeCallback != null) {
@@ -310,6 +335,20 @@ public final class TameworkCommandGroupManagerPage
             return DEFAULT_GROUP_COLOR;
         }
         return "#" + normalized.substring(1).toUpperCase(Locale.ROOT);
+    }
+
+    private static String safeForLog(String value) {
+        if (value == null) {
+            return "<null>";
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return "<empty>";
+        }
+        if (trimmed.length() <= 48) {
+            return trimmed;
+        }
+        return trimmed.substring(0, 45) + "...";
     }
 
     /**

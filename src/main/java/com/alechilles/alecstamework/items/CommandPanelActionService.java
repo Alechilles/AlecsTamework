@@ -10,11 +10,14 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Handles linked panel row/header actions that mutate command tool state.
  */
 final class CommandPanelActionService {
+    private static final Logger LOGGER = Logger.getLogger(CommandPanelActionService.class.getName());
     private final CommandLinkMutationService linkMutationService;
     private final CommandToolInventoryService toolInventoryService;
     private final CommandPanelPreferenceService panelPreferenceService;
@@ -227,10 +230,20 @@ final class CommandPanelActionService {
     }
 
     void applyCreateGroup(Player player, String toolId, String name, String colorHex) {
+        LOGGER.log(
+                Level.INFO,
+                "Group create mutation requested: toolId={0} name={1} color={2}",
+                new Object[] { safeForLog(toolId), safeForLog(name), safeForLog(colorHex) }
+        );
         boolean updated = toolInventoryService.mutateToolStack(
                 player,
                 toolId,
                 stack -> groupService.createGroup(stack, name, colorHex)
+        );
+        LOGGER.log(
+                Level.INFO,
+                "Group create mutation result: toolId={0} updated={1}",
+                new Object[] { safeForLog(toolId), updated }
         );
         if (!updated && player != null) {
             feedbackService.showWarning(player, "Unable to create group.");
@@ -242,10 +255,20 @@ final class CommandPanelActionService {
     }
 
     void applyRenameGroup(Player player, String toolId, String groupId, String name) {
+        LOGGER.log(
+                Level.INFO,
+                "Group rename mutation requested: toolId={0} groupId={1} newName={2}",
+                new Object[] { safeForLog(toolId), safeForLog(groupId), safeForLog(name) }
+        );
         boolean updated = toolInventoryService.mutateToolStack(
                 player,
                 toolId,
                 stack -> groupService.renameGroup(stack, groupId, name)
+        );
+        LOGGER.log(
+                Level.INFO,
+                "Group rename mutation result: toolId={0} groupId={1} updated={2}",
+                new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
         );
         if (!updated && player != null) {
             feedbackService.showWarning(player, "Unable to rename group.");
@@ -257,10 +280,20 @@ final class CommandPanelActionService {
     }
 
     void applyRecolorGroup(Player player, String toolId, String groupId, String colorHex) {
+        LOGGER.log(
+                Level.INFO,
+                "Group recolor mutation requested: toolId={0} groupId={1} color={2}",
+                new Object[] { safeForLog(toolId), safeForLog(groupId), safeForLog(colorHex) }
+        );
         boolean updated = toolInventoryService.mutateToolStack(
                 player,
                 toolId,
                 stack -> groupService.recolorGroup(stack, groupId, colorHex)
+        );
+        LOGGER.log(
+                Level.INFO,
+                "Group recolor mutation result: toolId={0} groupId={1} updated={2}",
+                new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
         );
         if (!updated && player != null) {
             feedbackService.showWarning(player, "Unable to update group color.");
@@ -272,6 +305,11 @@ final class CommandPanelActionService {
     }
 
     void applyDeleteGroup(Player player, String toolId, String groupId) {
+        LOGGER.log(
+                Level.INFO,
+                "Group delete mutation requested: toolId={0} groupId={1}",
+                new Object[] { safeForLog(toolId), safeForLog(groupId) }
+        );
         boolean updated = toolInventoryService.mutateToolStack(
                 player,
                 toolId,
@@ -282,6 +320,11 @@ final class CommandPanelActionService {
                     }
                     return clearGroupAssignments(updatedStack, groupId);
                 }
+        );
+        LOGGER.log(
+                Level.INFO,
+                "Group delete mutation result: toolId={0} groupId={1} updated={2}",
+                new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
         );
         if (!updated && player != null) {
             feedbackService.showWarning(player, "Unable to delete group.");
@@ -326,5 +369,19 @@ final class CommandPanelActionService {
             return stack;
         }
         return linkMutationService.writeLinkedNpcRecords(stack, updated);
+    }
+
+    private static String safeForLog(String value) {
+        if (value == null) {
+            return "<null>";
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            return "<empty>";
+        }
+        if (trimmed.length() <= 48) {
+            return trimmed;
+        }
+        return trimmed.substring(0, 45) + "...";
     }
 }

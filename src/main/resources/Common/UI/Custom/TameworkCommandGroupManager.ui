@@ -50,10 +50,10 @@ $C.@PageOverlay {
 
         Group { Anchor: (Width: 6); }
 
-        TextButton #TameworkGroupCreateButton {
-          Style: $C.@SmallSecondaryTextButtonStyle;
-          Anchor: (Width: 90, Height: 24);
-          Text: "Create";
+        $C.@SmallSecondaryTextButton #TameworkGroupCreateButton {
+          @Sounds = $C.@ButtonSounds;
+          @Anchor = (Width: 90, Height: 24);
+          @Text = "Create";
         }
       }
 
@@ -87,10 +87,10 @@ $C.@PageOverlay {
         Anchor: (Top: 8, Height: 24);
         LayoutMode: Right;
 
-        TextButton #TameworkGroupCloseButton {
-          Style: $C.@SmallSecondaryTextButtonStyle;
-          Anchor: (Width: 100, Height: 24);
-          Text: "Close";
+        $C.@SmallSecondaryTextButton #TameworkGroupCloseButton {
+          @Sounds = $C.@ButtonSounds;
+          @Anchor = (Width: 100, Height: 24);
+          @Text = "Close";
         }
       }
     }
