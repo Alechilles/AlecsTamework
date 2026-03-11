@@ -284,7 +284,7 @@ Group {
   }
 
   Label #StatusInactive {
-    Anchor: (Top: 2, Right: 34, Width: 74, Height: 18);
+    Anchor: (Top: 30, Right: 34, Width: 74, Height: 18);
     Text: "INACTIVE";
     Style: (
       FontSize: 10,

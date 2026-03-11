@@ -1,7 +1,8 @@
 # Changelog
 
 ## Unreleased
-- No entries yet.
+### Fixed
+- Linked panel card `INACTIVE` status indicator now uses the same lower status lane as `CONFIRM REMOVE`, avoiding overlap with trait icons.
 
 ## 2.3.0 - Linked NPC Panel Modes, Grouping, and UX Refinements - 2026-03-11
 ### Added
