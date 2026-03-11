@@ -3,7 +3,7 @@
 ## Unreleased
 - No entries yet.
 
-## 2.2.2 - Linked NPC Panel Modes, Grouping, and UX Refinements - 2026-03-11
+## 2.3.0 - Linked NPC Panel Modes, Grouping, and UX Refinements - 2026-03-11
 ### Added
 - Command linked panel now supports explicit per-tool modes (`LinkedMode`, `NearbyMode`) with nearby radius controls.
 - Linked panel now supports per-tool sorting (`Default`, `Name`, `Species`, `Group`) and filtering (`None`, `Name`, `Species`, `Group`) via dropdown controls.

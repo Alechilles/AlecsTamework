@@ -61,12 +61,12 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
   - Allow unlocking new behaviors, stat increases, etc.
   - Will include a talent tree UI
 
-## Quick Start (2.2.x)
+## Quick Start (2.3.x)
 1. Add the dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.2.2"
+  "Alechilles:Alec's Tamework!": "2.3.0"
 },
 "IncludesAssetPack": true
 ```
