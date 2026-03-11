@@ -6,6 +6,7 @@
 
 ### Fixed
 - Linked panel card `INACTIVE` status indicator now uses the same lower status lane as `CONFIRM REMOVE`, avoiding overlap with trait icons.
+- Added shared `Component_ActionList_StandUp` to Tamework assets so mods referencing stand-up wake transitions (for example tamed predator templates copied from cat-pet behavior) validate without requiring Alec's Cats assets.
 
 ## 2.3.0 - Linked NPC Panel Modes, Grouping, and UX Refinements - 2026-03-11
 ### Added

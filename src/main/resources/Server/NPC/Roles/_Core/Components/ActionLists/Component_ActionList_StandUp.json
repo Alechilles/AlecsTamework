@@ -1,0 +1,22 @@
+{
+  "Class": "ActionList",
+  "Content": [
+    {
+      "Type": "PlayAnimation",
+      "Slot": "Status",
+      "Animation": "StandUp"
+    },
+    {
+      "Type": "Timeout",
+      "Delay": [
+        0.83,
+        0.83
+      ]
+    },
+    {
+      "Type": "PlayAnimation",
+      "Slot": "Status"
+    }
+  ],
+  "Type": "Component"
+}
