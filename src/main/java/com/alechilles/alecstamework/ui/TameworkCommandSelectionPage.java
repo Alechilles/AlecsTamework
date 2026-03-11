@@ -212,7 +212,7 @@ public final class TameworkCommandSelectionPage
         commandBuilder.set("#TameworkCommandMenuSubtitle.Text", "Click a command to set it.");
         commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
         commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
-        commandBuilder.set("#TameworkLinkedPanelTitle.Text", "Linked NPCs");
+        commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
         commandBuilder.set(
                 "#TameworkLinkedPanelSubtitle.Text",
                 LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
@@ -565,6 +565,7 @@ public final class TameworkCommandSelectionPage
         }
         UICommandBuilder commandBuilder = new UICommandBuilder();
         UIEventBuilder eventBuilder = new UIEventBuilder();
+        commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
         commandBuilder.set(
                 "#TameworkLinkedPanelSubtitle.Text",
                 LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid)
@@ -882,6 +883,10 @@ public final class TameworkCommandSelectionPage
         }
         String value = panelModeValueSupplier.get();
         return value == null || value.isBlank() ? "LinkedMode" : value;
+    }
+
+    private String resolvePanelTitleText() {
+        return shouldShowNearbyRadiusControls() ? "Nearby NPCs" : "Linked NPCs";
     }
 
     private boolean shouldShowNearbyRadiusControls() {
