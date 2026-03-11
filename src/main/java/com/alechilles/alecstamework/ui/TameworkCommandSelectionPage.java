@@ -246,7 +246,6 @@ public final class TameworkCommandSelectionPage
         }
         if (data.panelGroupAssignValue != null) {
             groupAssignSelectedValue = normalizeGroupAssignValue(data.panelGroupAssignValue);
-            return;
         }
         String commandId = data.commandId == null ? "" : data.commandId.trim();
         if (!commandId.isBlank() && commandId.startsWith(OPEN_GROUP_PICKER_COMMAND_PREFIX)) {
