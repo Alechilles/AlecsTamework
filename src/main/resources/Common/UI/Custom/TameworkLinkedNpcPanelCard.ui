@@ -100,12 +100,12 @@ Group {
   Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
   Group #GroupTab {
-    Anchor: (Top: 8, Left: -10, Width: 6, Height: 72);
+    Anchor: (Top: 14, Left: -9, Width: 5, Height: 64);
     Background: #4b657f;
     Visible: false;
 
     TextButton #GroupTabButton {
-      Anchor: (Top: 0, Left: 0, Width: 6, Height: 72);
+      Anchor: (Top: 0, Left: 0, Width: 5, Height: 64);
       Style: @TraitTooltipButtonStyle;
       Text: "";
       TooltipText: "Set Group";
