@@ -64,6 +64,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     static final ItemsInHandRequirement[] EMPTY_ITEMS_IN_HAND_REQUIREMENTS = new ItemsInHandRequirement[0];
     static final ItemsInInventoryRequirement[] EMPTY_ITEMS_IN_INVENTORY_REQUIREMENTS = new ItemsInInventoryRequirement[0];
     static final ItemsEquippedRequirement[] EMPTY_ITEMS_EQUIPPED_REQUIREMENTS = new ItemsEquippedRequirement[0];
+    static final NpcHealthPercentRequirement[] EMPTY_NPC_HEALTH_PERCENT_REQUIREMENTS = new NpcHealthPercentRequirement[0];
     static final ParamRequirement[] EMPTY_PARAM_REQUIREMENTS = new ParamRequirement[0];
     static final AlarmRequirement[] EMPTY_ALARM_REQUIREMENTS = new AlarmRequirement[0];
     static final StringRequirement[] EMPTY_STRING_REQUIREMENTS = new StringRequirement[0];
@@ -90,6 +91,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final ArrayCodec<ItemsInInventoryRequirement> ITEMS_IN_INVENTORY_REQUIREMENT_ARRAY_CODEC = TwInteractionConfigCodecs.ITEMS_IN_INVENTORY_REQUIREMENT_ARRAY_CODEC;
     public static final BuilderCodec<ItemsEquippedRequirement> ITEMS_EQUIPPED_REQUIREMENT_CODEC = TwInteractionConfigCodecs.ITEMS_EQUIPPED_REQUIREMENT_CODEC;
     public static final ArrayCodec<ItemsEquippedRequirement> ITEMS_EQUIPPED_REQUIREMENT_ARRAY_CODEC = TwInteractionConfigCodecs.ITEMS_EQUIPPED_REQUIREMENT_ARRAY_CODEC;
+    public static final BuilderCodec<NpcHealthPercentRequirement> NPC_HEALTH_PERCENT_REQUIREMENT_CODEC = TwInteractionConfigCodecs.NPC_HEALTH_PERCENT_REQUIREMENT_CODEC;
+    public static final ArrayCodec<NpcHealthPercentRequirement> NPC_HEALTH_PERCENT_REQUIREMENT_ARRAY_CODEC = TwInteractionConfigCodecs.NPC_HEALTH_PERCENT_REQUIREMENT_ARRAY_CODEC;
     public static final BuilderCodec<ParamRequirement> PARAM_REQUIREMENT_CODEC = TwInteractionConfigCodecs.PARAM_REQUIREMENT_CODEC;
     public static final ArrayCodec<ParamRequirement> PARAM_REQUIREMENT_ARRAY_CODEC = TwInteractionConfigCodecs.PARAM_REQUIREMENT_ARRAY_CODEC;
     public static final BuilderCodec<AlarmRequirement> ALARM_REQUIREMENT_CODEC = TwInteractionConfigCodecs.ALARM_REQUIREMENT_CODEC;
@@ -520,6 +523,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         ItemsInHandRequirement[] itemsInHand = EMPTY_ITEMS_IN_HAND_REQUIREMENTS;
         ItemsInInventoryRequirement[] itemsInInventory = EMPTY_ITEMS_IN_INVENTORY_REQUIREMENTS;
         ItemsEquippedRequirement[] itemsEquipped = EMPTY_ITEMS_EQUIPPED_REQUIREMENTS;
+        NpcHealthPercentRequirement[] npcHealthPercent = EMPTY_NPC_HEALTH_PERCENT_REQUIREMENTS;
         ParamRequirement[] parameter = EMPTY_PARAM_REQUIREMENTS;
         AlarmRequirement[] alarmState = EMPTY_ALARM_REQUIREMENTS;
         StringRequirement[] npcState = EMPTY_STRING_REQUIREMENTS;
@@ -578,6 +582,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
             return itemsEquipped == null ? EMPTY_ITEMS_EQUIPPED_REQUIREMENTS : itemsEquipped;
         }
 
+        public NpcHealthPercentRequirement[] getNpcHealthPercent() {
+            return npcHealthPercent == null ? EMPTY_NPC_HEALTH_PERCENT_REQUIREMENTS : npcHealthPercent;
+        }
+
         public ParamRequirement[] getParameter() {
             return parameter == null ? EMPTY_PARAM_REQUIREMENTS : parameter;
         }
@@ -612,6 +620,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
                     && getItemsInHand().length == 0
                     && getItemsInInventory().length == 0
                     && getItemsEquipped().length == 0
+                    && getNpcHealthPercent().length == 0
                     && getParameter().length == 0
                     && getAlarmState().length == 0
                     && getNpcState().length == 0
@@ -699,6 +708,19 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public String[] getValues() {
             return values == null ? ArrayUtil.EMPTY_STRING_ARRAY : values;
+        }
+    }
+
+    public static final class NpcHealthPercentRequirement {
+        ParamOperator operator = ParamOperator.LessThanOrEqual;
+        Double value;
+
+        public ParamOperator getOperator() {
+            return operator == null ? ParamOperator.LessThanOrEqual : operator;
+        }
+
+        public Double getValue() {
+            return value;
         }
     }
 

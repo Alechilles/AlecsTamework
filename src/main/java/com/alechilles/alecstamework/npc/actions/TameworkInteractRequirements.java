@@ -178,6 +178,10 @@ final class TameworkInteractRequirements {
                 requirement -> owner.matchesParamRequirement(requirement, role))) {
             return false;
         }
+        if (!requireAnyMatch(bucket.getNpcHealthPercent(),
+                requirement -> owner.matchesNpcHealthPercent(requirement, npcRef, store))) {
+            return false;
+        }
         if (!requireAnyMatch(bucket.getAlarmState(),
                 requirement -> owner.matchesAlarmState(requirement, npcRef, store, role, ctx))) {
             return false;
@@ -264,6 +268,10 @@ final class TameworkInteractRequirements {
         }
         if (anyMatch(bucket.getParameter(),
                 requirement -> owner.matchesParamRequirement(requirement, role))) {
+            return true;
+        }
+        if (anyMatch(bucket.getNpcHealthPercent(),
+                requirement -> owner.matchesNpcHealthPercent(requirement, npcRef, store))) {
             return true;
         }
         if (anyMatch(bucket.getAlarmState(),

@@ -3,6 +3,9 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionContextRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthPercentRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamOperator;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.InteractionType;
@@ -12,6 +15,9 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Roo
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
+import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
+import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.interactions.ContextualUseNPCInteraction;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -235,6 +241,72 @@ final class InteractionMatchHelpers {
         }
         String state = requirement.getState() != null ? requirement.getState().trim().toLowerCase(Locale.ROOT) : "";
         return alarmHelper.matchesAlarmState(npcRef, store, alarmName, state);
+    }
+
+    // Checks an NPC health-percent requirement against the target NPC.
+    boolean matchesNpcHealthPercent(NpcHealthPercentRequirement requirement,
+                                    Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store) {
+        double healthPercent = resolveNpcHealthPercent(npcRef, store);
+        if (!Double.isFinite(healthPercent)) {
+            return false;
+        }
+        return matchesNpcHealthPercentValue(healthPercent, requirement);
+    }
+
+    // Evaluates a health percent value against a requirement threshold.
+    static boolean matchesNpcHealthPercentValue(double healthPercent, NpcHealthPercentRequirement requirement) {
+        if (!Double.isFinite(healthPercent) || requirement == null) {
+            return false;
+        }
+        Double threshold = requirement.getValue();
+        if (threshold == null || !Double.isFinite(threshold)) {
+            return false;
+        }
+        int compare = Double.compare(healthPercent, threshold);
+        ParamOperator operator = requirement.getOperator();
+        return switch (operator) {
+            case Equals -> compare == 0;
+            case NotEquals -> compare != 0;
+            case GreaterThan -> compare > 0;
+            case GreaterThanOrEqual -> compare >= 0;
+            case LessThan -> compare < 0;
+            case LessThanOrEqual -> compare <= 0;
+        };
+    }
+
+    // Resolves NPC health as a percent [0-100] from the health stat map.
+    private double resolveNpcHealthPercent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return Double.NaN;
+        }
+        ComponentType<EntityStore, EntityStatMap> statType = EntityStatMap.getComponentType();
+        if (statType == null) {
+            return Double.NaN;
+        }
+        EntityStatMap statMap = store.getComponent(npcRef, statType);
+        if (statMap == null) {
+            return Double.NaN;
+        }
+        int healthIndex = EntityStatType.getAssetMap().getIndex("Health");
+        if (healthIndex < 0) {
+            return Double.NaN;
+        }
+        EntityStatValue value = statMap.get(healthIndex);
+        if (value == null) {
+            return Double.NaN;
+        }
+        double max = value.getMax();
+        if (!Double.isFinite(max) || max <= 0.0) {
+            return Double.NaN;
+        }
+        double current = value.get();
+        if (!Double.isFinite(current)) {
+            return Double.NaN;
+        }
+        current = Math.max(0.0, Math.min(current, max));
+        double percent = (current / max) * 100.0;
+        return Math.max(0.0, Math.min(percent, 100.0));
     }
 
     // Resolves a context parameter value from role params.

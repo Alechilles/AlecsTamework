@@ -260,6 +260,7 @@ final class InteractionSelector {
         return hasEntries(bucket.getItemsInHand())
                 || hasEntries(bucket.getItemsInInventory())
                 || hasEntries(bucket.getItemsEquipped())
+                || hasEntries(bucket.getNpcHealthPercent())
                 || hasEntries(bucket.getParameter())
                 || hasEntries(bucket.getAlarmState())
                 || hasEntries(bucket.getNpcState())

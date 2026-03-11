@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquip
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInventoryRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthPercentRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
@@ -317,6 +318,12 @@ public class ActionTameworkInteract extends TameworkActionBase {
 
     boolean matchesParamRequirement(ParamRequirement requirement, Role role) {
         return selection.matchesParamRequirement(requirement, role);
+    }
+
+    boolean matchesNpcHealthPercent(NpcHealthPercentRequirement requirement,
+                                    Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store) {
+        return selection.matchesNpcHealthPercent(requirement, npcRef, store);
     }
 
     boolean matchesNpcState(StringRequirement requirement, Role role) {

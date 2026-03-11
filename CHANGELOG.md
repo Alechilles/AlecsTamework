@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+### Added
+- Interaction `Requires` now supports `NpcHealthPercent` checks with comparison operators (`>`, `>=`, `<`, `<=`, `==`, `!=`) against a `0-100` health-percent threshold.
+
 ### Fixed
 - Linked panel card `INACTIVE` status indicator now uses the same lower status lane as `CONFIRM REMOVE`, avoiding overlap with trait icons.
 

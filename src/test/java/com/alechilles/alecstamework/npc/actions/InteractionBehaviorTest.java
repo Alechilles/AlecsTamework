@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthPercentRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
@@ -162,6 +163,27 @@ class InteractionBehaviorTest {
 
         InteractionContextSnapshot ctx = newContextSnapshotWithHeldItemId("Item_Lettuce");
         assertTrue(resolver.matchesItemsInHand(requirement, null, ctx));
+    }
+
+    @Test
+    void npcHealthPercentRequirementSupportsLessThanOrEqual() throws Exception {
+        NpcHealthPercentRequirement requirement = new NpcHealthPercentRequirement();
+        setField(requirement, "operator", TwInteractionConfig.ParamOperator.LessThanOrEqual);
+        setField(requirement, "value", 40.0);
+
+        assertTrue(InteractionMatchHelpers.matchesNpcHealthPercentValue(35.0, requirement));
+        assertTrue(InteractionMatchHelpers.matchesNpcHealthPercentValue(40.0, requirement));
+        assertFalse(InteractionMatchHelpers.matchesNpcHealthPercentValue(45.0, requirement));
+    }
+
+    @Test
+    void npcHealthPercentRequirementSupportsGreaterThan() throws Exception {
+        NpcHealthPercentRequirement requirement = new NpcHealthPercentRequirement();
+        setField(requirement, "operator", TwInteractionConfig.ParamOperator.GreaterThan);
+        setField(requirement, "value", 60.0);
+
+        assertTrue(InteractionMatchHelpers.matchesNpcHealthPercentValue(75.0, requirement));
+        assertFalse(InteractionMatchHelpers.matchesNpcHealthPercentValue(60.0, requirement));
     }
 
     private static ActionTameworkInteract newInteract() throws Exception {

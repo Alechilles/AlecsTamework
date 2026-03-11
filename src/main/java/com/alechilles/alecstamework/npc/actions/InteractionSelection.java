@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquip
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInventoryRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthPercentRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -148,6 +149,13 @@ final class InteractionSelection {
     // Checks a param requirement against role scopes.
     boolean matchesParamRequirement(ParamRequirement requirement, Role role) {
         return paramMatcher.matchesParamRequirement(requirement, role);
+    }
+
+    // Checks NPC health percent requirements against the interaction target NPC.
+    boolean matchesNpcHealthPercent(NpcHealthPercentRequirement requirement,
+                                    Ref<EntityStore> npcRef,
+                                    Store<EntityStore> store) {
+        return matchHelpers.matchesNpcHealthPercent(requirement, npcRef, store);
     }
 
     // Returns true if the NPC is tamed.

@@ -227,6 +227,13 @@ Fields:
 
 Numeric comparison is used if both the param and value parse as numbers; otherwise string equality is used for `Equals` and `NotEquals`.
 
+### NpcHealthPercent
+Fields:
+- `Operator` (`Equals`, `NotEquals`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`)
+- `Value` (number on a `0`-`100` scale)
+
+The NPC's current health percent is computed from the `Health` stat (`current / max * 100`), clamped to `0..100`.
+
 ### AlarmState
 Fields:
 - `AlarmParam` (role parameter name for the alarm id)

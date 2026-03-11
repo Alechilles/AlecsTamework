@@ -46,6 +46,7 @@ public final class TwInteractionConfigCodecs {
     private static final ItemsInHandRequirement[] EMPTY_ITEMS_IN_HAND_REQUIREMENTS = new ItemsInHandRequirement[0];
     private static final ItemsInInventoryRequirement[] EMPTY_ITEMS_IN_INVENTORY_REQUIREMENTS = new ItemsInInventoryRequirement[0];
     private static final ItemsEquippedRequirement[] EMPTY_ITEMS_EQUIPPED_REQUIREMENTS = new ItemsEquippedRequirement[0];
+    private static final NpcHealthPercentRequirement[] EMPTY_NPC_HEALTH_PERCENT_REQUIREMENTS = new NpcHealthPercentRequirement[0];
     private static final InteractionContextRequirement[] EMPTY_CONTEXT_REQUIREMENTS = new InteractionContextRequirement[0];
     private static final StringRequirement[] EMPTY_STRING_REQUIREMENTS = new StringRequirement[0];
     private static final MovementStateRequirement[] EMPTY_MOVEMENT_STATE_REQUIREMENTS = new MovementStateRequirement[0];
@@ -425,6 +426,33 @@ public final class TwInteractionConfigCodecs {
     public static final ArrayCodec<ItemsEquippedRequirement> ITEMS_EQUIPPED_REQUIREMENT_ARRAY_CODEC =
             new ArrayCodec<>(ITEMS_EQUIPPED_REQUIREMENT_CODEC, ItemsEquippedRequirement[]::new);
 
+    public static final BuilderCodec<NpcHealthPercentRequirement> NPC_HEALTH_PERCENT_REQUIREMENT_CODEC = BuilderCodec.builder(
+            NpcHealthPercentRequirement.class,
+            NpcHealthPercentRequirement::new
+    )
+        .<ParamOperator>append(
+            new KeyedCodec<>("Operator", PARAM_OPERATOR_CODEC),
+            (requirement, value) -> {
+                if (value != null) {
+                    requirement.operator = value;
+                }
+            },
+            requirement -> requirement.operator
+        )
+        .documentation("Comparison operator for NPC health percent.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Value", Codec.DOUBLE),
+            (requirement, value) -> requirement.value = value,
+            requirement -> requirement.value
+        )
+        .documentation("Health percent threshold on a 0-100 scale.")
+        .add()
+        .build();
+
+    public static final ArrayCodec<NpcHealthPercentRequirement> NPC_HEALTH_PERCENT_REQUIREMENT_ARRAY_CODEC =
+            new ArrayCodec<>(NPC_HEALTH_PERCENT_REQUIREMENT_CODEC, NpcHealthPercentRequirement[]::new);
+
     public static final BuilderCodec<ParamRequirement> PARAM_REQUIREMENT_CODEC = BuilderCodec.builder(
             ParamRequirement.class,
             ParamRequirement::new
@@ -656,6 +684,14 @@ public final class TwInteractionConfigCodecs {
             bucket -> bucket.itemsEquipped
         )
         .documentation("Custom checks for equipped items.")
+        .add()
+        .<NpcHealthPercentRequirement[]>append(
+            new KeyedCodec<>("NpcHealthPercent", NPC_HEALTH_PERCENT_REQUIREMENT_ARRAY_CODEC),
+            (bucket, value) -> bucket.npcHealthPercent =
+                    value == null ? EMPTY_NPC_HEALTH_PERCENT_REQUIREMENTS : value,
+            bucket -> bucket.npcHealthPercent
+        )
+        .documentation("Custom checks against NPC health percent (0-100).")
         .add()
         .<ParamRequirement[]>append(
             new KeyedCodec<>("Parameter", PARAM_REQUIREMENT_ARRAY_CODEC),
