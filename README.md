@@ -66,7 +66,7 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.2.1"
+  "Alechilles:Alec's Tamework!": "2.2.2"
 },
 "IncludesAssetPack": true
 ```

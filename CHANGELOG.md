@@ -1,36 +1,30 @@
 # Changelog
 
 ## Unreleased
+- No entries yet.
+
+## 2.2.2 - Linked NPC Panel Modes, Grouping, and UX Refinements - 2026-03-11
 ### Added
-- Command item linked panel now supports explicit panel modes (`LinkedMode` and `NearbyMode`) with per-tool persistence and a configurable nearby-radius control.
-- Linked panel rows now support active/inactive companion state toggles; inactive companions remain visible and are excluded from bulk command dispatch while still supporting per-row recall/return-home actions.
-- Linked panel cards now show a breeding cooldown ring with tooltip state (`ready`, `remaining`, or unavailable) driven from live breeding component snapshots.
-- Linked panel now supports in-panel sorting (`Default`, `Name`, `Species`, `Group`) and per-tool persisted filtering (`Name`, `Species`, `Group`) through dropdown selectors.
-- Added command-group metadata support on command tools, including group registry persistence and linked-record group assignment fields.
-- Added a new `Manage Groups` flow from the linked panel header with a dedicated group manager page for create/rename/recolor/delete operations.
-- Linked companion cards now render a top-left group tab with group name and color when assigned.
+- Command linked panel now supports explicit per-tool modes (`LinkedMode`, `NearbyMode`) with nearby radius controls.
+- Linked panel now supports per-tool sorting (`Default`, `Name`, `Species`, `Group`) and filtering (`None`, `Name`, `Species`, `Group`) via dropdown controls.
+- Linked panel rows now support active/inactive state toggles; inactive NPCs remain visible and can still receive per-row recall/return-home while being excluded from bulk command dispatch.
+- Linked panel cards now show breeding cooldown progress rings with compact real-time countdown tooltip text (`Breeding CD`).
+- Added command-group metadata persistence for tools and linked NPC records, including group id + color/name display metadata.
+- Added `Manage Groups` flow with create/edit/delete operations, row-level inline edit mode, and color-picker-based group colors.
+- Linked NPC cards now include a left-side group indicator tab that reflects assigned group color and opens group assignment.
 
 ### Changed
-- Command panel entry building now resolves group display metadata from persisted tool groups, so group sorting/filtering and card tabs use player-facing group names/colors instead of raw ids.
-- Command group delete operations now clear matching linked-record group assignments in the same mutation flow to avoid orphaned group ids on companions.
-- Linked companions panel mode selection now renders as a header dropdown in the top-right title area (instead of an inline control-row button), while keeping per-tool mode persistence.
-- Linked companions panel `Manage Groups` action now renders as a styled secondary button in the subtitle/header row (moved out of the radius control row).
-- Linked companions panel now places `Clear` on the filter-input row, and conditionally shows both filter input and clear controls only when a filter mode is selected (not `None`).
-- Linked companions panel radius controls now render on the subtitle/header row between companion count and `Manage Groups`, and only appear while the panel mode is `NearbyMode`.
-- Linked panel controls now include explicit `Sort:` and `Filter:` labels, tighter/centered header-row radius controls with wider radius text space, fixed header-row radius sloting, right-aligned `Groups` button placement, reduced separator/dropdown vertical gap, and updated panel terminology from `Companions` to `NPCs`.
-- Linked panel controls are now condensed further: smaller sort/filter dropdowns with tighter label spacing, removed `Filters: #` summary text, inline compact filter text input on the same controls row, and removed the clear button in favor of resetting filter mode to `None`.
+- Linked panel control layout was consolidated and tightened for small-panel readability: mode dropdown in header, nearby radius controls on the subtitle row, and compact sort/filter controls.
+- Linked panel title now reflects mode (`Linked NPCs` vs `Nearby NPCs`).
+- Group assignment now uses an inline overlay on the main selection panel (no panel-close/page-swap flow), preserving panel context and reducing transition flash.
+- Group assignment applies auto-link-then-assign behavior when assigning a non-`None` group to an unlinked owned NPC.
 
 ### Fixed
-- Species filtering now uses consistent role-id resolution across linked and nearby entries, including fallback extraction from legacy cached name keys when role metadata is missing, so linked companions no longer disappear incorrectly under Species filter.
-- Group manager actions now post explicit submit payloads with current draft inputs (create/rename/recolor/delete/close), fixing cases where create and close buttons did not respond.
-- Group manager color input now uses a native color picker dropdown control instead of freeform hex text entry.
-- Group manager color picker bindings now target `ColorPickerDropdownBox.Color` (not `.Value`), fixing panel-open failures caused by invalid selector property access.
-- Group manager now uses a single `Action` event key path for button submit payloads, fixing create no-op cases caused by ambiguous dual action-key decoding.
-- Group manager color picker swatch is now square (24x24) for a compact header-row layout.
-- Group manager create/close button handling now includes dedicated submit flags in event payloads (in addition to `Action`) to harden against dropped action-field payloads on button activation.
-- Group manager create/close/row action buttons now use explicit small-secondary button styling for consistent visual affordance.
-- Group manager dedicated submit flags now use non-gathered event keys (`GroupCreateEvent` / `GroupCloseEvent` without `@`) to avoid CustomUI binding gather errors on create/close click.
-- Command selection page now marks itself dismissed before close transitions (including `Groups` open), preventing late refresh-loop updates from targeting linked-panel selectors on the next page.
+- Species filtering now uses consistent role-id resolution across linked and nearby entries, including legacy fallback handling.
+- Resolved multiple CustomUI binding/selector issues in group manager and group-assignment flows (create/close no-op cases, color picker property binding mismatches, and action payload gathering issues).
+- Resolved command panel transition/input-lock issues when navigating between main panel and group manager.
+- Resolved inline group assignment `Apply` handling so apply events carrying both value + action are processed reliably.
+- Group tab indicator alignment and sizing were corrected for card row centering and visibility.
 
 ## 2.2.1 - Companion Policy, Interaction QoL, and Config Scope Updates - 2026-03-08
 ### Added
