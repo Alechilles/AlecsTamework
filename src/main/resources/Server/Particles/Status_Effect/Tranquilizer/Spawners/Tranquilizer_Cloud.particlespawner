@@ -30,8 +30,8 @@
     "Max": 12
   },
   "TotalParticles": {
-    "Min": 360,
-    "Max": 360
+    "Min": 216,
+    "Max": 216
   },
   "InitialVelocity": {
     "Speed": {
