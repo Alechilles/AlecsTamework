@@ -2,7 +2,6 @@
   "ApplicationEffects": {
     "EntityBottomTint": "#000000",
     "EntityTopTint": "#800080",
-    "EntityAnimationId": "Hurt",
     "WorldSoundEventId": "SFX_Effect_Poison_World",
     "LocalSoundEventId": "SFX_Effect_Poison_Local",
     "Particles": [
