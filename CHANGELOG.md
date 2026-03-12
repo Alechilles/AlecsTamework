@@ -13,6 +13,7 @@
 - Added `TranquilizerEffectExpirySyncSystem` to force an explicit `COMPLETE` effect-remove network update for `Tw_Status_Tranquilized` during the expiry window (including already-zero remaining duration), preventing lingering tranquilizer particles on clients after natural expiry.
 - Tranquilizer status particles now use dedicated finite-budget spawners (`Tranquilizer_Cloud` + bounded `Tranquilizer_Bubble`) so cloud/bubble visuals self-terminate instead of running indefinitely if an engine-side detach/update is missed.
 - Tuned tranquilizer fallback particle budgets so cloud/bubble self-termination aligns much closer to the intended 30s tranquilizer duration when detach updates are missed.
+- Further tuned tranquilizer fallback particle budgets from live timing checks (cloud/bubble) to tighten self-termination toward the target 30s window.
 - Tame/role-swap interaction flows now explicitly clear `Tw_Status_Tranquilized` before role change, preventing tranquilizer cloud/bubble particles from persisting after taming (including multi-hit tranquilizer cases).
 - `Tw_Status_Tranquilized` no longer applies the poison-style `Hurt` status animation pulse, so tranquilized NPCs keep normal sleep/idle posture unless struck by actual hit impact.
 
