@@ -4,6 +4,8 @@
   },
   "Parent": "Weapon_Arrow_Crude",
   "Quality": "Uncommon",
+  "Texture": "Items/Weapons/Arrow/Tranquilizer_Texture.png",
+  "Icon": "Icons/ItemsGenerated/Weapon_Arrow_Tranquilizer.png",
   "Recipe": {
     "KnowledgeRequired": false,
     "Input": [
