@@ -6,7 +6,7 @@
   "Parent": "Potion_Empty",
   "Quality": "Uncommon",
   "ItemLevel": 25,
-  "Icon": "Icons/ItemsGenerated/Potion_Poison.png",
+  "Icon": "Icons/ItemsGenerated/Potion_Tranquilizer.png",
   "BlockType": {
     "CustomModelTexture": [
       {

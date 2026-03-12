@@ -3,6 +3,7 @@
     "Name": "server.items.Weapon_Shortbow_Tranquilizer.name"
   },
   "Parent": "Weapon_Shortbow_Cobalt",
+  "Texture": "Items/Weapons/Bow/Cobalt_Texture_Tranquilizer.png",
   "Recipe": {
     "KnowledgeRequired": false,
     "Input": [
