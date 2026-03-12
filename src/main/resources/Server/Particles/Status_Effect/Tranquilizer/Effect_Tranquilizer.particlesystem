@@ -36,6 +36,7 @@
       }
     }
   ],
+  "LifeSpan": 1.2,
   "CullDistance": 100.0,
   "IsImportant": true
 }
