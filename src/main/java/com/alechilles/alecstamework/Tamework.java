@@ -78,7 +78,6 @@ import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
-import com.alechilles.alecstamework.npc.systems.TranquilizerEffectExpirySyncSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -274,7 +273,6 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
-        getEntityStoreRegistry().registerSystem(new TranquilizerEffectExpirySyncSystem());
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
                 getDataDirectory().resolve("CommandLinkedNpcCaptures.dat")
