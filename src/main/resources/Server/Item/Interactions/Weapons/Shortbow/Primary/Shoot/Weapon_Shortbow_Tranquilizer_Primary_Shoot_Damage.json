@@ -1,0 +1,14 @@
+{
+  "Parent": "Weapon_Shortbow_Primary_Shoot_Damage",
+  "DamageCalculator": {
+    "Class": "Charged",
+    "BaseDamage": {
+      "Physical": 0
+    }
+  },
+  "Next": {
+    "Type": "ApplyEffect",
+    "EffectId": "Tw_Status_Tranquilized",
+    "Entity": "Target"
+  }
+}

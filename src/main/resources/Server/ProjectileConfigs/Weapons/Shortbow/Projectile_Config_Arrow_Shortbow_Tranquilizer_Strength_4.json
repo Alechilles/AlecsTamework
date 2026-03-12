@@ -1,0 +1,13 @@
+{
+  "Parent": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Base",
+  "LaunchForce": 85,
+  "Physics": {
+    "Type": "Standard",
+    "Gravity": 25,
+    "TerminalVelocityAir": 50,
+    "TerminalVelocityWater": 15,
+    "RotationMode": "VelocityDamped",
+    "Bounciness": 0.0,
+    "SticksVertically": true
+  }
+}

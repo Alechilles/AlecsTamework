@@ -1,0 +1,157 @@
+{
+  "Type": "Charging",
+  "AllowIndefiniteHold": true,
+  "DisplayProgress": false,
+  "Effects": {
+    "ItemAnimationId": "ShootCharging",
+    "ClearAnimationOnFinish": true,
+    "ClearSoundEventOnFinish": true,
+    "WorldSoundEventId": "SFX_Bow_T2_Draw",
+    "LocalSoundEventId": "SFX_Bow_T2_Draw_Local",
+    "Particles": [
+      {
+        "PositionOffset": {
+          "X": 0.075,
+          "Y": -0.4,
+          "Z": 0.075
+        },
+        "RotationOffset": {
+          "Pitch": 0,
+          "Roll": 0,
+          "Yaw": 90
+        },
+        "Scale": 0.5,
+        "TargetNodeName": "Handle",
+        "SystemId": "Bow_Charging"
+      }
+    ]
+  },
+  "HorizontalSpeedMultiplier": 0.67,
+  "Next": {
+    "0.1": {
+      "Type": "ModifyInventory",
+      "ItemToRemove": {
+        "Id": "Weapon_Arrow_Tranquilizer",
+        "Quantity": 1
+      },
+      "Next": {
+        "Type": "Replace",
+        "Var": "Primary_Shoot_Strength_0",
+        "DefaultValue": {
+          "Interactions": [
+            "Weapon_Shortbow_Primary_Shoot_Strength_0"
+          ]
+        }
+      },
+      "Failed": {
+        "Type": "Replace",
+        "Var": "No_Ammo_Effects",
+        "DefaultValue": {
+          "Interactions": [
+            "Common_Bow_No_Ammo"
+          ]
+        }
+      }
+    },
+    "0.3": {
+      "Type": "ModifyInventory",
+      "ItemToRemove": {
+        "Id": "Weapon_Arrow_Tranquilizer",
+        "Quantity": 1
+      },
+      "Next": {
+        "Type": "Replace",
+        "Var": "Primary_Shoot_Strength_1",
+        "DefaultValue": {
+          "Interactions": [
+            "Weapon_Shortbow_Primary_Shoot_Strength_1"
+          ]
+        }
+      },
+      "Failed": {
+        "Type": "Replace",
+        "Var": "No_Ammo_Effects",
+        "DefaultValue": {
+          "Interactions": [
+            "Common_Bow_No_Ammo"
+          ]
+        }
+      }
+    },
+    "0.6": {
+      "Type": "ModifyInventory",
+      "ItemToRemove": {
+        "Id": "Weapon_Arrow_Tranquilizer",
+        "Quantity": 1
+      },
+      "Next": {
+        "Type": "Replace",
+        "Var": "Primary_Shoot_Strength_2",
+        "DefaultValue": {
+          "Interactions": [
+            "Weapon_Shortbow_Primary_Shoot_Strength_2"
+          ]
+        }
+      },
+      "Failed": {
+        "Type": "Replace",
+        "Var": "No_Ammo_Effects",
+        "DefaultValue": {
+          "Interactions": [
+            "Common_Bow_No_Ammo"
+          ]
+        }
+      }
+    },
+    "0.9": {
+      "Type": "ModifyInventory",
+      "ItemToRemove": {
+        "Id": "Weapon_Arrow_Tranquilizer",
+        "Quantity": 1
+      },
+      "Next": {
+        "Type": "Replace",
+        "Var": "Primary_Shoot_Strength_3",
+        "DefaultValue": {
+          "Interactions": [
+            "Weapon_Shortbow_Primary_Shoot_Strength_3"
+          ]
+        }
+      },
+      "Failed": {
+        "Type": "Replace",
+        "Var": "No_Ammo_Effects",
+        "DefaultValue": {
+          "Interactions": [
+            "Common_Bow_No_Ammo"
+          ]
+        }
+      }
+    },
+    "1.2": {
+      "Type": "ModifyInventory",
+      "ItemToRemove": {
+        "Id": "Weapon_Arrow_Tranquilizer",
+        "Quantity": 1
+      },
+      "Next": {
+        "Type": "Replace",
+        "Var": "Primary_Shoot_Strength_4",
+        "DefaultValue": {
+          "Interactions": [
+            "Weapon_Shortbow_Primary_Shoot_Strength_4"
+          ]
+        }
+      },
+      "Failed": {
+        "Type": "Replace",
+        "Var": "No_Ammo_Effects",
+        "DefaultValue": {
+          "Interactions": [
+            "Common_Bow_No_Ammo"
+          ]
+        }
+      }
+    }
+  }
+}

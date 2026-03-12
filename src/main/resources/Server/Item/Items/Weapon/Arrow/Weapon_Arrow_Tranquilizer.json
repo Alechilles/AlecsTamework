@@ -1,0 +1,7 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Weapon_Arrow_Tranquilizer.name"
+  },
+  "Parent": "Weapon_Arrow_Crude",
+  "Quality": "Uncommon"
+}

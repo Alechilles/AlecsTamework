@@ -1,0 +1,19 @@
+{
+  "Parent": "Projectile_Config_Arrow_Shortbow",
+  "Model": "Arrow_Crude",
+  "Interactions": {
+    "ProjectileHit": {
+      "Interactions": [
+        "Weapon_Shortbow_Tranquilizer_Primary_Shoot_Damage",
+        "Common_Projectile_Impact_Effects",
+        "Common_Projectile_Despawn"
+      ]
+    },
+    "ProjectileMiss": {
+      "Interactions": [
+        "Common_Projectile_Miss",
+        "Common_Projectile_Despawn"
+      ]
+    }
+  }
+}

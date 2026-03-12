@@ -1,0 +1,55 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Weapon_Shortbow_Tranquilizer.name"
+  },
+  "Parent": "Weapon_Shortbow_Cobalt",
+  "InteractionVars": {
+    "Primary_Shoot_Charge": {
+      "Interactions": [
+        {
+          "Parent": "Weapon_Shortbow_Tranquilizer_Primary_Shoot_Charge"
+        }
+      ]
+    },
+    "Primary_Shoot_Strength_0": {
+      "Interactions": [
+        {
+          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_0",
+          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_0"
+        }
+      ]
+    },
+    "Primary_Shoot_Strength_1": {
+      "Interactions": [
+        {
+          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_1",
+          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_1"
+        }
+      ]
+    },
+    "Primary_Shoot_Strength_2": {
+      "Interactions": [
+        {
+          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_2",
+          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_2"
+        }
+      ]
+    },
+    "Primary_Shoot_Strength_3": {
+      "Interactions": [
+        {
+          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_3",
+          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_3"
+        }
+      ]
+    },
+    "Primary_Shoot_Strength_4": {
+      "Interactions": [
+        {
+          "Parent": "Weapon_Shortbow_Primary_Shoot_Strength_4",
+          "Config": "Projectile_Config_Arrow_Shortbow_Tranquilizer_Strength_4"
+        }
+      ]
+    }
+  }
+}
