@@ -10,7 +10,7 @@
 ### Fixed
 - Linked panel card `INACTIVE` status indicator now uses the same lower status lane as `CONFIRM REMOVE`, avoiding overlap with trait icons.
 - Added shared `Component_Tamework_ActionList_StandUp` to Tamework assets so mods referencing stand-up wake transitions (for example tamed predator templates copied from cat-pet behavior) validate without requiring Alec's Cats assets.
-- Added `TranquilizerEffectExpirySyncSystem` to force an explicit effect-remove network update for `Tw_Status_Tranquilized` just before natural expiry, preventing lingering tranquilizer particles on clients.
+- Added `TranquilizerEffectExpirySyncSystem` to force an explicit `COMPLETE` effect-remove network update for `Tw_Status_Tranquilized` during the expiry window (including already-zero remaining duration), preventing lingering tranquilizer particles on clients after natural expiry.
 - Tame/role-swap interaction flows now explicitly clear `Tw_Status_Tranquilized` before role change, preventing tranquilizer cloud/bubble particles from persisting after taming (including multi-hit tranquilizer cases).
 - `Tw_Status_Tranquilized` no longer applies the poison-style `Hurt` status animation pulse, so tranquilized NPCs keep normal sleep/idle posture unless struck by actual hit impact.
 

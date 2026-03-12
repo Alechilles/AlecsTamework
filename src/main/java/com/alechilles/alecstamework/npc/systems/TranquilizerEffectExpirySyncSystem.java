@@ -29,7 +29,8 @@ import javax.annotation.Nullable;
  *
  * <p>Vanilla effect ticking can remove duration-expired effects from the active map without queuing a dedicated
  * remove-change packet. For tranquilizer, that leaves client-side particles visible until a full entity refresh.
- * This system proactively issues {@link RemovalBehavior#DURATION} just before expiry so clients receive a clear event.
+ * This system proactively issues {@link RemovalBehavior#COMPLETE} during the final duration window so clients
+ * receive a clear event before vanilla tick cleanup can drop the effect entry without a remove update.
  */
 public final class TranquilizerEffectExpirySyncSystem extends EntityTickingSystem<EntityStore> {
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
@@ -67,9 +68,6 @@ public final class TranquilizerEffectExpirySyncSystem extends EntityTickingSyste
             @Nonnull Store<EntityStore> store,
             @Nonnull CommandBuffer<EntityStore> commandBuffer
     ) {
-        if (!(dt > 0.0f)) {
-            return;
-        }
         int effectIndex = resolveTranquilizerEffectIndex();
         if (effectIndex == Integer.MIN_VALUE) {
             return;
@@ -87,17 +85,15 @@ public final class TranquilizerEffectExpirySyncSystem extends EntityTickingSyste
             return;
         }
         float remainingSeconds = tranquilized.getRemainingDuration();
-        if (!(remainingSeconds > 0.0f)) {
-            return;
-        }
-        if (remainingSeconds > dt + EXPIRY_EPSILON_SECONDS) {
+        float expiryWindow = (dt > 0.0f ? dt : 0.0f) + EXPIRY_EPSILON_SECONDS;
+        if (remainingSeconds > expiryWindow) {
             return;
         }
         Ref<EntityStore> ref = archetypeChunk.getReferenceTo(index);
         if (ref == null || !ref.isValid()) {
             return;
         }
-        effectController.removeEffect(ref, effectIndex, RemovalBehavior.DURATION, commandBuffer);
+        effectController.removeEffect(ref, effectIndex, RemovalBehavior.COMPLETE, commandBuffer);
     }
 
     private int resolveTranquilizerEffectIndex() {
