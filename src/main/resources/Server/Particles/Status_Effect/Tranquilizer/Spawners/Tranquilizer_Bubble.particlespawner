@@ -20,18 +20,22 @@
   "ParticleRotateWithSpawner": false,
   "TrailSpawnerPositionMultiplier": 1,
   "TrailSpawnerRotationMultiplier": 1,
-  "MaxConcurrentParticles": 10,
+  "MaxConcurrentParticles": 20,
   "WaveDelay": {
-    "Min": 0.16666666666666666,
-    "Max": 0.3333333333333333
+    "Min": 0,
+    "Max": 0
   },
   "ParticleLifeSpan": {
-    "Min": 0.3333333333333333,
-    "Max": 0.5
+    "Min": 0.45,
+    "Max": 0.45
   },
   "SpawnRate": {
-    "Min": 10,
-    "Max": 12
+    "Min": 14,
+    "Max": 14
+  },
+  "TotalParticles": {
+    "Min": -1,
+    "Max": -1
   },
   "InitialVelocity": {
     "Speed": {

@@ -17,10 +17,11 @@
         }
       },
       "WaveDelay": {
-        "Min": 0.16666666666666666,
-        "Max": 1
+        "Min": 0,
+        "Max": 0
       },
-      "MaxConcurrent": 1,
+      "MaxConcurrent": 2,
+      "StartDelay": 0,
       "PositionOffset": {
         "X": 0,
         "Y": 1,
@@ -29,6 +30,12 @@
     },
     {
       "SpawnerId": "Tranquilizer_Cloud",
+      "WaveDelay": {
+        "Min": 0,
+        "Max": 0
+      },
+      "MaxConcurrent": 2,
+      "StartDelay": 0,
       "PositionOffset": {
         "X": 0,
         "Y": 1,
@@ -36,7 +43,7 @@
       }
     }
   ],
-  "LifeSpan": 1.2,
+  "LifeSpan": 1.8,
   "CullDistance": 100.0,
   "IsImportant": true
 }
