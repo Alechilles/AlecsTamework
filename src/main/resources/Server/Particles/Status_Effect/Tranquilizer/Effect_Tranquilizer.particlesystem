@@ -28,7 +28,7 @@
       }
     },
     {
-      "SpawnerId": "Poison_Cloud",
+      "SpawnerId": "Tranquilizer_Cloud",
       "PositionOffset": {
         "X": 0,
         "Y": 1,
