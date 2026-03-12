@@ -17,6 +17,7 @@
 - Reworked tranquilizer particles to short pulse-style emissions: `Effect_Tranquilizer` now uses a short system lifespan and burst-like cloud/bubble spawner settings so repeated status-driven emits handle the ongoing look while each individual particle instance self-terminates quickly.
 - Tame/role-swap interaction flows now explicitly clear `Tw_Status_Tranquilized` before role change, preventing tranquilizer cloud/bubble particles from persisting after taming (including multi-hit tranquilizer cases).
 - `Tw_Status_Tranquilized` no longer applies the poison-style `Hurt` status animation pulse, so tranquilized NPCs keep normal sleep/idle posture unless struck by actual hit impact.
+- Mounted NPCs now hide active custom nameplates while ridden and restore the previous/custom name after dismount, preventing overhead names from overlapping rider camera/body views.
 
 ## 2.3.0 - Linked NPC Panel Modes, Grouping, and UX Refinements - 2026-03-11
 ### Added

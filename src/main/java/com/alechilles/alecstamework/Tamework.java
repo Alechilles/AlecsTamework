@@ -53,6 +53,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -77,10 +78,12 @@ import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
@@ -137,6 +140,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
     private ComponentType<EntityStore, TameworkNpcNameComponent> npcNameComponentType;
+    private ComponentType<EntityStore, TameworkMountedNameplateComponent> mountedNameplateComponentType;
     private ComponentType<EntityStore, TameworkCommandLinksComponent> commandLinksComponentType;
     private ComponentType<EntityStore, TameworkHappinessComponent> happinessComponentType;
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
@@ -205,6 +209,12 @@ public class Tamework extends JavaPlugin {
                 TameworkNpcNameComponent.CODEC
         );
 
+        mountedNameplateComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkMountedNameplateComponent.class,
+                "TameworkMountedNameplate",
+                TameworkMountedNameplateComponent.CODEC
+        );
+
         commandLinksComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkCommandLinksComponent.class,
                 "TameworkCommandLinks",
@@ -249,6 +259,14 @@ public class Tamework extends JavaPlugin {
 
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
+        );
+        getEntityStoreRegistry().registerSystem(
+                new NpcMountedNameplateVisibilitySystem(
+                        NPCEntity.getComponentType(),
+                        NPCMountComponent.getComponentType(),
+                        mountedNameplateComponentType,
+                        npcNameComponentType
+                )
         );
         getEntityStoreRegistry().registerSystem(
                 new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType())
@@ -831,6 +849,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkNpcNameComponent> getNpcNameComponentType() {
         return npcNameComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkMountedNameplateComponent> getMountedNameplateComponentType() {
+        return mountedNameplateComponentType;
     }
 
     public ComponentType<EntityStore, TameworkCommandLinksComponent> getCommandLinksComponentType() {
