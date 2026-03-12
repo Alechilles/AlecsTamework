@@ -3,6 +3,49 @@
     "Name": "server.items.Weapon_Shortbow_Tranquilizer.name"
   },
   "Parent": "Weapon_Shortbow_Cobalt",
+  "Recipe": {
+    "KnowledgeRequired": false,
+    "Input": [
+      {
+        "ItemId": "Weapon_Shortbow_Cobalt",
+        "Quantity": 1
+      },
+      {
+        "ItemId": "Ingredient_Bar_Cobalt",
+        "Quantity": 4
+      },
+      {
+        "ItemId": "Ingredient_Leather_Heavy",
+        "Quantity": 2
+      },
+      {
+        "ItemId": "Ingredient_Fabric_Scrap_Shadoweave",
+        "Quantity": 2
+      },
+      {
+        "ItemId": "Potion_Tranquilizer",
+        "Quantity": 2
+      }
+    ],
+    "BenchRequirement": [
+      {
+        "Type": "Crafting",
+        "Categories": [
+          "Weapon_Bow"
+        ],
+        "Id": "Weapon_Bench",
+        "RequiredTierLevel": 2
+      },
+      {
+        "Type": "DiagramCrafting",
+        "Categories": [
+          "Weapons.Bow"
+        ],
+        "Id": "Armory"
+      }
+    ],
+    "TimeSeconds": 4
+  },
   "InteractionVars": {
     "Primary_Shoot_Charge": {
       "Interactions": [

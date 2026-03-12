@@ -1,0 +1,54 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Potion_Tranquilizer.name",
+    "Description": "server.items.Potion_Tranquilizer.description"
+  },
+  "Parent": "Potion_Empty",
+  "Quality": "Uncommon",
+  "ItemLevel": 25,
+  "Icon": "Icons/ItemsGenerated/Potion_Poison.png",
+  "BlockType": {
+    "CustomModelTexture": [
+      {
+        "Texture": "Items/Consumables/Potions/Potion_Textures/Purple.png",
+        "Weight": 1
+      }
+    ],
+    "BlockParticleSetId": "GlassPoison",
+    "ParticleColor": "#a06ae0"
+  },
+  "Recipe": {
+    "KnowledgeRequired": false,
+    "Input": [
+      {
+        "ItemId": "Potion_Empty",
+        "Quantity": 1
+      },
+      {
+        "ItemId": "Ingredient_Sac_Venom",
+        "Quantity": 2
+      },
+      {
+        "ItemId": "Ingredient_Life_Essence",
+        "Quantity": 4
+      },
+      {
+        "ItemId": "Plant_Crop_Mushroom_Glowing_Purple",
+        "Quantity": 2
+      }
+    ],
+    "BenchRequirement": [
+      {
+        "Id": "Alchemybench",
+        "Type": "Crafting",
+        "Categories": [
+          "Alchemy_Potions"
+        ],
+        "RequiredTierLevel": 2
+      }
+    ],
+    "OutputQuantity": 1,
+    "TimeSeconds": 2
+  },
+  "MaxStack": 10
+}

@@ -3,5 +3,34 @@
     "Name": "server.items.Weapon_Arrow_Tranquilizer.name"
   },
   "Parent": "Weapon_Arrow_Crude",
-  "Quality": "Uncommon"
+  "Quality": "Uncommon",
+  "Recipe": {
+    "KnowledgeRequired": false,
+    "Input": [
+      {
+        "ItemId": "Weapon_Arrow_Crude",
+        "Quantity": 6
+      },
+      {
+        "ItemId": "Potion_Tranquilizer",
+        "Quantity": 1
+      },
+      {
+        "ItemId": "Ingredient_Fibre",
+        "Quantity": 2
+      }
+    ],
+    "OutputQuantity": 6,
+    "BenchRequirement": [
+      {
+        "Type": "Crafting",
+        "Categories": [
+          "Weapon_Bow"
+        ],
+        "Id": "Weapon_Bench",
+        "RequiredTierLevel": 2
+      }
+    ],
+    "TimeSeconds": 1
+  }
 }

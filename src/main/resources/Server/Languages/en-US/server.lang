@@ -19,5 +19,9 @@ interactionHints.modeCycle=Press [{key}] to change modes
 interactionHints.custom=Press [{key}] to interact
 interactionHints.harvest=Press [{key}] to harvest
 interactionHints.harvestContext=Use item to harvest
+
+# === Tamework Tranquilizer ===
 server.items.Weapon_Shortbow_Tranquilizer.name=Tranquilizer Shortbow
 server.items.Weapon_Arrow_Tranquilizer.name=Tranquilizer Arrow
+server.items.Potion_Tranquilizer.name=Tranquilizer Potion
+server.items.Potion_Tranquilizer.description=Used to craft tranquilizer arrows and equipment.
