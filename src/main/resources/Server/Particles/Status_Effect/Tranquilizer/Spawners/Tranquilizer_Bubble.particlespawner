@@ -52,7 +52,7 @@
     }
   },
   "Particle": {
-    "Texture": "Particles/Textures/Shapes/Effect_Poison_Bubble.png",
+    "Texture": "Particles/Textures/Shapes/Effect_Tranquilizer_Bubble.png",
     "FrameSize": {
       "Width": 32,
       "Height": 32
