@@ -1,0 +1,41 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "Tranquilizer_Bubble",
+      "EmitOffset": {
+        "X": {
+          "Min": 0,
+          "Max": 0
+        },
+        "Y": {
+          "Min": 0,
+          "Max": 0
+        },
+        "Z": {
+          "Min": 0,
+          "Max": 0
+        }
+      },
+      "WaveDelay": {
+        "Min": 0.16666666666666666,
+        "Max": 1
+      },
+      "MaxConcurrent": 1,
+      "PositionOffset": {
+        "X": 0,
+        "Y": 1,
+        "Z": 0
+      }
+    },
+    {
+      "SpawnerId": "Poison_Cloud",
+      "PositionOffset": {
+        "X": 0,
+        "Y": 1,
+        "Z": 0
+      }
+    }
+  ],
+  "CullDistance": 100.0,
+  "IsImportant": true
+}
