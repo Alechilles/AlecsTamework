@@ -1,0 +1,127 @@
+{
+  "EmitOffset": {
+    "X": {
+      "Min": 0,
+      "Max": 0
+    },
+    "Y": {
+      "Min": 0,
+      "Max": 0
+    }
+  },
+  "ParticleRotationInfluence": "Billboard",
+  "LightInfluence": 0.8,
+  "MaxConcurrentParticles": 1,
+  "ParticleLifeSpan": {
+    "Min": 2,
+    "Max": 2
+  },
+  "SpawnRate": {
+    "Min": 1,
+    "Max": 1
+  },
+  "ParticleRotateWithSpawner": false,
+  "Particle": {
+    "Texture": "Particles/Tamework/Thoughts/EggThought.png",
+    "ScaleRatioConstraint": "OneToOne",
+    "UVOption": "None",
+    "Animation": {
+      "0": {
+        "Opacity": 1,
+        "Scale": {
+          "X": {
+            "Min": 0,
+            "Max": 0.0
+          }
+        }
+      },
+      "5": {
+        "Scale": {
+          "X": {
+            "Min": 0.7,
+            "Max": 0.7
+          }
+        }
+      },
+      "10": {
+        "Scale": {
+          "X": {
+            "Min": 1,
+            "Max": 1
+          }
+        }
+      },
+      "13": {
+        "Scale": {
+          "X": {
+            "Min": 1.1,
+            "Max": 1.1
+          }
+        }
+      },
+      "16": {
+        "Scale": {
+          "X": {
+            "Min": 0.95,
+            "Max": 0.95
+          }
+        }
+      },
+      "18": {
+        "Scale": {
+          "X": {
+            "Min": 1,
+            "Max": 1
+          }
+        }
+      },
+      "90": {
+        "Scale": {
+          "X": {
+            "Min": 1,
+            "Max": 1
+          }
+        }
+      },
+      "94": {
+        "Scale": {
+          "X": {
+            "Min": 1.1,
+            "Max": 1.1
+          }
+        }
+      },
+      "100": {
+        "Scale": {
+          "X": {
+            "Min": 0.01,
+            "Max": 0.01
+          }
+        }
+      }
+    },
+    "InitialAnimationFrame": {
+      "Scale": {
+        "X": {
+          "Min": 0.2,
+          "Max": 0.2
+        }
+      },
+      "Opacity": 1,
+      "Rotation": {
+        "Z": {
+          "Min": -20,
+          "Max": 20
+        }
+      },
+      "Color": "#ffffff"
+    },
+    "SoftParticles": "Disable"
+  },
+  "RenderMode": "BlendLinear",
+  "SpawnBurst": true,
+  "TrailSpawnerPositionMultiplier": 0,
+  "TrailSpawnerRotationMultiplier": 1,
+  "LinearFiltering": false,
+  "CameraOffset": -0.48
+}
