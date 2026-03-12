@@ -6,12 +6,16 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetOwnerEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetStateEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StatDelta;
+import com.hypixel.hytale.assetstore.map.IndexedLookupTableAssetMap;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
+import com.hypixel.hytale.server.core.asset.type.entityeffect.config.RemovalBehavior;
+import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
@@ -26,6 +30,9 @@ import java.util.UUID;
 /** Applies interaction effects that change NPC ownership, stats, or states. */
 final class InteractionStateEffects {
     private static final String HEALTH_STAT_ID = "Health";
+    private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
+    private static final int EFFECT_INDEX_UNRESOLVED = Integer.MIN_VALUE;
+    private static int tranquilizerEffectIndex = EFFECT_INDEX_UNRESOLVED;
     /**
      * Cross-template swaps (for example wild -> tamed livestock) can fail when preserving
      * state/substate names from the source role. Interaction-driven role changes should
@@ -35,6 +42,7 @@ final class InteractionStateEffects {
 
     // Marks the NPC as tamed and assigns owner based on the interacting player.
     boolean applyStartTaming(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
+        clearTranquilizerEffect(npcRef, store);
         ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
         if (tamedType != null) {
             store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
@@ -197,6 +205,7 @@ final class InteractionStateEffects {
         if (roleIndex < 0) {
             return false;
         }
+        clearTranquilizerEffect(npcRef, store);
         RoleChangeSystem.requestRoleChange(
                 npcRef,
                 role,
@@ -249,5 +258,41 @@ final class InteractionStateEffects {
         }
         statMap.addStatValue(statIndex, (float) delta);
         return true;
+    }
+
+    // Clears the tranquilizer status effect before tame/role-swap transitions so remove updates are emitted reliably.
+    private boolean clearTranquilizerEffect(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        int effectIndex = resolveTranquilizerEffectIndex();
+        if (effectIndex == EFFECT_INDEX_UNRESOLVED) {
+            return false;
+        }
+        ComponentType<EntityStore, EffectControllerComponent> effectType = EffectControllerComponent.getComponentType();
+        if (effectType == null) {
+            return false;
+        }
+        EffectControllerComponent effectController = store.getComponent(npcRef, effectType);
+        if (effectController == null || !effectController.getActiveEffects().containsKey(effectIndex)) {
+            return false;
+        }
+        effectController.removeEffect(npcRef, effectIndex, RemovalBehavior.COMPLETE, store);
+        return true;
+    }
+
+    private int resolveTranquilizerEffectIndex() {
+        if (tranquilizerEffectIndex != EFFECT_INDEX_UNRESOLVED) {
+            return tranquilizerEffectIndex;
+        }
+        IndexedLookupTableAssetMap<String, EntityEffect> effectMap = EntityEffect.getAssetMap();
+        if (effectMap == null) {
+            return EFFECT_INDEX_UNRESOLVED;
+        }
+        int resolved = effectMap.getIndex(TRANQUILIZER_EFFECT_ID);
+        if (resolved != EFFECT_INDEX_UNRESOLVED) {
+            tranquilizerEffectIndex = resolved;
+        }
+        return resolved;
     }
 }
