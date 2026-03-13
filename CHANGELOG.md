@@ -6,7 +6,7 @@
 - New NPC sensor builder `TameworkEffectActive` for role instructions/sensors, including optional `MinRemainingSeconds` checks for effect-duration thresholds.
 - New tranquilizer combat assets: `Tw_Status_Tranquilized` status effect, `Weapon_Arrow_Tranquilizer` ammo, and a cobalt-based `Weapon_Shortbow_Tranquilizer` with tranquilizer projectile variants.
 - New dedicated tranquilizer status particle system `Effect_Tranquilizer` (no poison-face overlay) with a custom purple bubble texture (`Effect_Tranquilizer_Bubble.png`) for `Tw_Status_Tranquilized`.
-
+- Added `TwGlobalConfig.AssetSets` opt-in gates (`TranquilizerShortbow`, `TranquilizerArrow`, `TranquilizerPotion`) plus recipe-visibility reconciliation that removes gated tranquilizer recipes from crafting registries (and restores them when enabled).
 ### Fixed
 - Linked panel card `INACTIVE` status indicator now uses the same lower status lane as `CONFIRM REMOVE`, avoiding overlap with trait icons.
 - Added shared `Component_Tamework_ActionList_StandUp` to Tamework assets so mods referencing stand-up wake transitions (for example tamed predator templates copied from cat-pet behavior) validate without requiring Alec's Cats assets.

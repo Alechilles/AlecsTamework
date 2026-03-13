@@ -1,6 +1,6 @@
 {
   "Parent": "Projectile_Config_Arrow_Shortbow",
-  "Model": "Arrow_Crude",
+  "Model": "Arrow_Tranquilizer",
   "Interactions": {
     "ProjectileHit": {
       "Interactions": [
@@ -17,3 +17,4 @@
     }
   }
 }
+

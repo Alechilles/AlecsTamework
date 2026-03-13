@@ -1,0 +1,26 @@
+{
+  "$Comment": "Particle delays are tuned to appear at max charge (1.2s). StartDelay accounts for ~0.45s built-in particle spawn delay. If max charge time changes, adjust: NewDelay = NewMaxCharge - 0.45",
+  "Spawners": [
+    {
+      "SpawnerId": "Bow_Charging_Tranquilizer_Circles",
+      "StartDelay": 0.75,
+      "SpawnRate": {
+        "Min": 2.0,
+        "Max": 2.0
+      },
+      "MaxConcurrent": 4,
+      "TotalSpawners": 100
+    },
+    {
+      "SpawnerId": "Bow_Charging_Tranquilizer_Sparks",
+      "StartDelay": 0.95,
+      "MaxConcurrent": 4,
+      "SpawnRate": {
+        "Min": 2.0,
+        "Max": 2.0
+      },
+      "TotalSpawners": 100
+    }
+  ],
+  "BoundingRadius": 10
+}

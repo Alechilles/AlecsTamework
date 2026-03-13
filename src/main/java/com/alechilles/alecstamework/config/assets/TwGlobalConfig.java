@@ -229,6 +229,29 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .add()
             .build();
 
+    private static final BuilderCodec<AssetSetsSection> ASSET_SETS_SECTION_CODEC = BuilderCodec.builder(
+                    AssetSetsSection.class, AssetSetsSection::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("TranquilizerShortbow", Codec.BOOLEAN),
+                    (section, value) -> section.tranquilizerShortbow = value,
+                    section -> section.tranquilizerShortbow
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("TranquilizerArrow", Codec.BOOLEAN),
+                    (section, value) -> section.tranquilizerArrow = value,
+                    section -> section.tranquilizerArrow
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("TranquilizerPotion", Codec.BOOLEAN),
+                    (section, value) -> section.tranquilizerPotion = value,
+                    section -> section.tranquilizerPotion
+            )
+            .add()
+            .build();
+
     public static final AssetBuilderCodec<String, TwGlobalConfig> CODEC =
             AssetBuilderCodec.builder(
                     TwGlobalConfig.class,
@@ -267,6 +290,13 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     TwGlobalConfig::toCommandSection
             )
             .documentation("Organized section for command runtime and respawn tuning settings.")
+            .add()
+            .<AssetSetsSection>append(
+                    new KeyedCodec<>("AssetSets", ASSET_SETS_SECTION_CODEC),
+                    TwGlobalConfig::applyAssetSetsSection,
+                    TwGlobalConfig::toAssetSetsSection
+            )
+            .documentation("Opt-in asset-set gates that can be enabled by any loaded TwGlobalConfig asset.")
             .add()
             .build();
 
@@ -309,6 +339,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private double commandPlacementMinRelativeY = -2.0;
     private double commandPlacementMaxRelativeY = 4.0;
     private boolean commandLinkedPanelRequireUnlinkConfirm = true;
+    private boolean tranquilizerShortbowAssetSetEnabled;
+    private boolean tranquilizerArrowAssetSetEnabled;
+    private boolean tranquilizerPotionAssetSetEnabled;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -356,6 +389,40 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     // Builds a default global config without relying on asset store state.
     public static TwGlobalConfig defaultConfig() {
         return new TwGlobalConfig();
+    }
+
+    // Resolves feature gates by OR-ing enabled values across all enabled global configs.
+    @Nonnull
+    public static AssetSetToggles resolveEnabledAssetSets() {
+        DefaultAssetMap<String, TwGlobalConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return AssetSetToggles.disabled();
+        }
+        boolean tranquilizerShortbowEnabled = false;
+        boolean tranquilizerArrowEnabled = false;
+        boolean tranquilizerPotionEnabled = false;
+        for (TwGlobalConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate == null || !candidate.isEnabled()) {
+                continue;
+            }
+            if (candidate.isTranquilizerShortbowAssetSetEnabled()) {
+                tranquilizerShortbowEnabled = true;
+            }
+            if (candidate.isTranquilizerArrowAssetSetEnabled()) {
+                tranquilizerArrowEnabled = true;
+            }
+            if (candidate.isTranquilizerPotionAssetSetEnabled()) {
+                tranquilizerPotionEnabled = true;
+            }
+            if (tranquilizerShortbowEnabled && tranquilizerArrowEnabled && tranquilizerPotionEnabled) {
+                break;
+            }
+        }
+        return new AssetSetToggles(
+                tranquilizerShortbowEnabled,
+                tranquilizerArrowEnabled,
+                tranquilizerPotionEnabled
+        );
     }
 
     private static TwGlobalConfig selectBest(DefaultAssetMap<String, TwGlobalConfig> assetMap) {
@@ -436,6 +503,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         inheritOwnershipProtectionSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritInteractionDefaultsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritCommandSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritAssetSetsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
     }
 
     public boolean isEnabled() {
@@ -556,6 +624,18 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     public boolean isCommandLinkedPanelRequireUnlinkConfirm() {
         return commandLinkedPanelRequireUnlinkConfirm;
+    }
+
+    public boolean isTranquilizerShortbowAssetSetEnabled() {
+        return tranquilizerShortbowAssetSetEnabled;
+    }
+
+    public boolean isTranquilizerArrowAssetSetEnabled() {
+        return tranquilizerArrowAssetSetEnabled;
+    }
+
+    public boolean isTranquilizerPotionAssetSetEnabled() {
+        return tranquilizerPotionAssetSetEnabled;
     }
 
     private void applyGeneralSection(@Nullable GeneralSection section) {
@@ -724,6 +804,29 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.placementMinRelativeY = commandPlacementMinRelativeY;
         section.placementMaxRelativeY = commandPlacementMaxRelativeY;
         section.linkedPanelRequireUnlinkConfirm = commandLinkedPanelRequireUnlinkConfirm;
+        return section;
+    }
+
+    private void applyAssetSetsSection(@Nullable AssetSetsSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.tranquilizerShortbow != null) {
+            tranquilizerShortbowAssetSetEnabled = section.tranquilizerShortbow;
+        }
+        if (section.tranquilizerArrow != null) {
+            tranquilizerArrowAssetSetEnabled = section.tranquilizerArrow;
+        }
+        if (section.tranquilizerPotion != null) {
+            tranquilizerPotionAssetSetEnabled = section.tranquilizerPotion;
+        }
+    }
+
+    private AssetSetsSection toAssetSetsSection() {
+        AssetSetsSection section = new AssetSetsSection();
+        section.tranquilizerShortbow = tranquilizerShortbowAssetSetEnabled;
+        section.tranquilizerArrow = tranquilizerArrowAssetSetEnabled;
+        section.tranquilizerPotion = tranquilizerPotionAssetSetEnabled;
         return section;
     }
 
@@ -922,6 +1025,32 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
     }
 
+    private void inheritAssetSetsSection(@Nonnull TwGlobalConfig parent,
+                                         @Nonnull Set<String> explicitTopLevelKeys,
+                                         @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("AssetSets")) {
+            tranquilizerShortbowAssetSetEnabled = parent.tranquilizerShortbowAssetSetEnabled;
+            tranquilizerArrowAssetSetEnabled = parent.tranquilizerArrowAssetSetEnabled;
+            tranquilizerPotionAssetSetEnabled = parent.tranquilizerPotionAssetSetEnabled;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("AssetSets");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("TranquilizerShortbow")) {
+            tranquilizerShortbowAssetSetEnabled = parent.tranquilizerShortbowAssetSetEnabled;
+        }
+        if (!nestedExplicit.contains("TranquilizerArrow")) {
+            tranquilizerArrowAssetSetEnabled = parent.tranquilizerArrowAssetSetEnabled;
+        }
+        if (!nestedExplicit.contains("TranquilizerPotion")) {
+            tranquilizerPotionAssetSetEnabled = parent.tranquilizerPotionAssetSetEnabled;
+        }
+    }
+
     private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
         return nestedExplicit.contains("DeadRespawnCooldownMs")
                 || nestedExplicit.contains("DeadRespawnCooldownMins");
@@ -979,5 +1108,43 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Double placementMinRelativeY;
         private Double placementMaxRelativeY;
         private Boolean linkedPanelRequireUnlinkConfirm;
+    }
+
+    private static final class AssetSetsSection {
+        private Boolean tranquilizerShortbow;
+        private Boolean tranquilizerArrow;
+        private Boolean tranquilizerPotion;
+    }
+
+    public static final class AssetSetToggles {
+        private static final AssetSetToggles DISABLED = new AssetSetToggles(false, false, false);
+
+        private final boolean tranquilizerShortbowEnabled;
+        private final boolean tranquilizerArrowEnabled;
+        private final boolean tranquilizerPotionEnabled;
+
+        public AssetSetToggles(boolean tranquilizerShortbowEnabled,
+                               boolean tranquilizerArrowEnabled,
+                               boolean tranquilizerPotionEnabled) {
+            this.tranquilizerShortbowEnabled = tranquilizerShortbowEnabled;
+            this.tranquilizerArrowEnabled = tranquilizerArrowEnabled;
+            this.tranquilizerPotionEnabled = tranquilizerPotionEnabled;
+        }
+
+        public static AssetSetToggles disabled() {
+            return DISABLED;
+        }
+
+        public boolean isTranquilizerShortbowEnabled() {
+            return tranquilizerShortbowEnabled;
+        }
+
+        public boolean isTranquilizerArrowEnabled() {
+            return tranquilizerArrowEnabled;
+        }
+
+        public boolean isTranquilizerPotionEnabled() {
+            return tranquilizerPotionEnabled;
+        }
     }
 }

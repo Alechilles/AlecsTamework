@@ -18,9 +18,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class DefendComponentAssetTest {
 
     @Test
-    void defendInstructionReferencesHostileToMasterTargetSensor() {
+    void defendInstructionReferencesAttackedMasterTargetSensor() {
         String defend = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Defend.json");
-        assertTrue(defend.contains("\"Reference\": \"Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget\""));
+        assertTrue(defend.contains("\"Reference\": \"Component_Tamework_Sensor_Defend_Attacked_MasterTarget\""));
+        assertFalse(defend.contains("\"Reference\": \"Component_Sensor_Standard_Detection\""));
+    }
+
+    @Test
+    void aggressiveInstructionRetainsLegacyHostileDetectionSensors() {
+        String aggressive = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Aggressive.json");
+        assertTrue(aggressive.contains("\"Reference\": \"Component_Sensor_Standard_Detection\""));
+        assertTrue(aggressive.contains("\"Reference\": \"Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget\""));
     }
 
     @Test
@@ -77,6 +85,14 @@ class DefendComponentAssetTest {
     void hostileToMasterTargetSensorUsesCustomAttitudeFilter() {
         String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget.json");
         assertTrue(sensor.contains("\"Type\": \"TameworkAttitudeFromTargetSlot\""));
+        assertTrue(sensor.contains("\"SourceTargetSlot\": {"));
+        assertTrue(sensor.contains("\"Value\": \"MasterTarget\""));
+    }
+
+    @Test
+    void attackedMasterTargetSensorUsesRecentAttackFilter() {
+        String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Attacked_MasterTarget.json");
+        assertTrue(sensor.contains("\"Type\": \"TameworkAttackedTargetSlotRecently\""));
         assertTrue(sensor.contains("\"SourceTargetSlot\": {"));
         assertTrue(sensor.contains("\"Value\": \"MasterTarget\""));
     }

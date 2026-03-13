@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
@@ -33,6 +34,7 @@ import com.alechilles.alecstamework.items.CoopFeatureHandler;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
+import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
@@ -59,6 +61,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
@@ -86,6 +89,7 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
+import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
@@ -120,6 +124,7 @@ public class Tamework extends JavaPlugin {
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
     private CoopFeatureHandler coopFeatureHandler;
+    private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
@@ -164,6 +169,7 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
+        tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
@@ -183,6 +189,8 @@ public class Tamework extends JavaPlugin {
         registerNeedsAssets();
         registerBreedingAssets();
         registerTraitAssets();
+        getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
 
         // Register components that persist owner and tamed state on NPCs.
         ownerComponentType = getEntityStoreRegistry().registerComponent(
@@ -310,6 +318,7 @@ public class Tamework extends JavaPlugin {
         }
 
         // Register damage filter system (configurable owner protection).
+        getEntityStoreRegistry().registerSystem(new DamageTargetMemorySystem());
         getEntityStoreRegistry().registerSystem(
                 new OwnerDamageFilterSystem(getLogger())
         );
@@ -362,6 +371,7 @@ public class Tamework extends JavaPlugin {
             getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
             getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
         }
+        reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(
                 "Tamework item configs loaded: spawners="
                         + loadedSpawner
@@ -670,12 +680,31 @@ public class Tamework extends JavaPlugin {
             LoadedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
+        reconcileTranquilizerRecipeVisibility();
     }
 
     private void onGlobalAssetsRemoved(
             RemovedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
+        reconcileTranquilizerRecipeVisibility();
+    }
+
+    private void onCraftingRecipeAssetsLoaded(
+            LoadedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> event) {
+        reconcileTranquilizerRecipeVisibility();
+    }
+
+    private void onCraftingRecipeAssetsRemoved(
+            RemovedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> event) {
+        reconcileTranquilizerRecipeVisibility();
+    }
+
+    private void reconcileTranquilizerRecipeVisibility() {
+        if (tranquilizerRecipeVisibilityService == null) {
+            return;
+        }
+        tranquilizerRecipeVisibilityService.reconcile();
     }
 
     private void onCompanionAssetsLoaded(
@@ -1042,6 +1071,10 @@ public class Tamework extends JavaPlugin {
             filterFactory.add(
                     BuilderEntityFilterTameworkAttitudeFromTargetSlot.BUILDER_ID,
                     BuilderEntityFilterTameworkAttitudeFromTargetSlot::new
+            );
+            filterFactory.add(
+                    BuilderEntityFilterTameworkAttackedTargetSlotRecently.BUILDER_ID,
+                    BuilderEntityFilterTameworkAttackedTargetSlotRecently::new
             );
         }
 

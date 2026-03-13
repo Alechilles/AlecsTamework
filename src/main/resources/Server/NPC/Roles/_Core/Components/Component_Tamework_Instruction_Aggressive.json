@@ -203,7 +203,7 @@
         ]
       },
       {
-        "$Comment": "Engage only candidates that recently attacked MasterTarget while defending.",
+        "$Comment": "Engage nearby mobs while defending.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
@@ -220,26 +220,56 @@
               }
             },
             {
-              "Reference": "Component_Tamework_Sensor_Defend_Attacked_MasterTarget",
-              "Modify": {
-                "ViewRange": {
-                  "Compute": "AlertedRange"
+              "Type": "Or",
+              "Sensors": [
+                {
+                  "Reference": "Component_Sensor_Standard_Detection",
+                  "Modify": {
+                    "ViewRange": {
+                      "Compute": "AlertedRange"
+                    },
+                    "ViewSector": {
+                      "Compute": "ViewSector"
+                    },
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "AbsoluteDetectionRange": {
+                      "Compute": "AbsoluteDetectionRange"
+                    },
+                    "Attitudes": [
+                      "Hostile"
+                    ],
+                    "ExcludeGroups": [
+                      "Self"
+                    ]
+                  }
                 },
-                "ViewSector": {
-                  "Compute": "ViewSector"
-                },
-                "HearingRange": {
-                  "Compute": "HearingRange"
-                },
-                "AbsoluteDetectionRange": {
-                  "Compute": "AbsoluteDetectionRange"
-                },
-                "SourceTargetSlot": "MasterTarget",
-                "RecentAttackMaxAgeSeconds": 30,
-                "ExcludeGroups": [
-                  "Self"
-                ]
-              }
+                {
+                  "Reference": "Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget",
+                  "Modify": {
+                    "ViewRange": {
+                      "Compute": "AlertedRange"
+                    },
+                    "ViewSector": {
+                      "Compute": "ViewSector"
+                    },
+                    "HearingRange": {
+                      "Compute": "HearingRange"
+                    },
+                    "AbsoluteDetectionRange": {
+                      "Compute": "AbsoluteDetectionRange"
+                    },
+                    "Attitudes": [
+                      "Hostile"
+                    ],
+                    "SourceTargetSlot": "MasterTarget",
+                    "ExcludeGroups": [
+                      "Self"
+                    ]
+                  }
+                }
+              ]
             }
           ]
         },

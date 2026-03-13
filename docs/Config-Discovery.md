@@ -25,6 +25,8 @@ These asset types are registered with the asset registry and are available to an
   contains the role id.
 - `Priority` defaults to `0`. Higher values win. If multiple configs share the same priority, selection order follows asset map iteration.
 - TwGlobalConfig resolves to the highest priority enabled asset. If multiple configs share the same priority, the lowest asset id (case-insensitive) is selected.
+- `TwGlobalConfig.AssetSets` feature gates are resolved independently from active-config priority:
+  each gate is enabled when at least one enabled global config sets that gate to `true`.
 
 ## Global config asset
 TwGlobalConfig replaces the old settings file and is organized into top-level sections:
@@ -50,6 +52,10 @@ TwGlobalConfig replaces the old settings file and is organized into top-level se
   - `PlacementMinRelativeY`
   - `PlacementMaxRelativeY`
   - `LinkedPanelRequireUnlinkConfirm`
+- `AssetSets`:
+  - `TranquilizerShortbow`
+  - `TranquilizerArrow`
+  - `TranquilizerPotion`
 
 String parameter-name fields in `InteractionDefaults` are required; missing or blank values emit a warning on startup.
 Command tuning fields are optional and fall back to built-in defaults when omitted or invalid.

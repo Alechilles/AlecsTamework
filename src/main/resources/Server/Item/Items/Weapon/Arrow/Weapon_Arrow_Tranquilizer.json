@@ -3,7 +3,7 @@
     "Name": "server.items.Weapon_Arrow_Tranquilizer.name"
   },
   "Parent": "Weapon_Arrow_Crude",
-  "Quality": "Uncommon",
+  "Quality": "Rare",
   "Texture": "Items/Weapons/Arrow/Tranquilizer_Texture.png",
   "Icon": "Icons/ItemsGenerated/Weapon_Arrow_Tranquilizer.png",
   "Recipe": {
@@ -34,5 +34,36 @@
       }
     ],
     "TimeSeconds": 1
-  }
+  },
+  "FirstPersonParticles": [
+    {
+      "SystemId": "Effect_Tranquilizer",
+      "TargetEntityPart": "Self",
+      "TargetNodeName": "Arrow-Head",
+      "Scale": 0.15,
+      "PositionOffset": {
+        "X": 0.15,
+        "Y": 0,
+        "Z": 0
+      },
+      "RotationOffset": {
+        "Roll": 90
+      },
+      "DetachedFromModel": false
+    }
+  ],
+  "Particles": [
+    {
+      "SystemId": "Effect_Tranquilizer",
+      "TargetNodeName": "Arrow-Head",
+      "Scale": 0.15,
+      "RotationOffset": {
+        "Roll": 180
+      },
+      "PositionOffset": {
+        "X": 0,
+        "Y": 0.15
+      }
+    }
+  ]
 }

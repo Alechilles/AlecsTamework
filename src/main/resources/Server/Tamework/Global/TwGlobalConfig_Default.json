@@ -17,5 +17,10 @@
     "RelocationMaxWaitMs": 120000,
     "RelocationMaxRetryAttempts": 60,
     "LinkedPanelRequireUnlinkConfirm": true
+  },
+  "AssetSets": {
+    "TranquilizerShortbow": false,
+    "TranquilizerArrow": false,
+    "TranquilizerPotion": false
   }
 }

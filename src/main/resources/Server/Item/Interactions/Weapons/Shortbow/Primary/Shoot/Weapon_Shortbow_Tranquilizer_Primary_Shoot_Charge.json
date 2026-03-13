@@ -8,11 +8,22 @@
     "ClearSoundEventOnFinish": true,
     "WorldSoundEventId": "SFX_Bow_T2_Draw",
     "LocalSoundEventId": "SFX_Bow_T2_Draw_Local",
-    "Particles": [
+    "FirstPersonParticles": [
+      {
+        "SystemId": "Effect_Tranquilizer",
+        "TargetEntityPart": "PrimaryItem",
+        "TargetNodeName": "ARROW-HEAD",
+        "Scale": 0.15,
+        "RotationOffset": {
+          "Pitch": 0,
+          "Roll": 90,
+          "Yaw": 0
+        }
+      },
       {
         "PositionOffset": {
-          "X": 0.075,
-          "Y": -0.4,
+          "X": 0,
+          "Y": -0.5,
           "Z": 0.075
         },
         "RotationOffset": {
@@ -22,7 +33,39 @@
         },
         "Scale": 0.5,
         "TargetNodeName": "Handle",
-        "SystemId": "Bow_Charging"
+        "SystemId": "Bow_Charging_Tranquilizer"
+      }
+    ],
+    "Particles": [
+      {
+        "PositionOffset": {
+          "X": 0,
+          "Y": -0.5,
+          "Z": 0.075
+        },
+        "RotationOffset": {
+          "Pitch": 0,
+          "Roll": 0,
+          "Yaw": 90
+        },
+        "Scale": 0.5,
+        "TargetNodeName": "Handle",
+        "SystemId": "Bow_Charging_Tranquilizer"
+      },
+      {
+        "SystemId": "Effect_Tranquilizer",
+        "TargetEntityPart": "PrimaryItem",
+        "TargetNodeName": "ARROW-HEAD",
+        "Scale": 0.15,
+        "RotationOffset": {
+          "Pitch": 0,
+          "Roll": 180,
+          "Yaw": 0
+        },
+        "PositionOffset": {
+          "Y": 0.12,
+          "X": 0
+        }
       }
     ]
   },
