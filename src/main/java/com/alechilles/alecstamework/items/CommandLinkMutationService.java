@@ -71,6 +71,7 @@ final class CommandLinkMutationService {
         }
         current.setOwnerId(playerId);
         boolean linked;
+        boolean active = false;
         TameworkCommandLinksComponent updated;
         if (current.containsToolId(toolId)) {
             updated = current.withToolIdRemoved(toolId);
@@ -78,6 +79,7 @@ final class CommandLinkMutationService {
         } else {
             updated = current.withToolIdAdded(toolId);
             linked = true;
+            active = shouldActivateOnLink(config, workingItem);
         }
         store.putComponent(targetRef, TameworkCommandLinksComponent.getComponentType(), updated);
         ItemStack updatedItem = workingItem;
@@ -94,14 +96,15 @@ final class CommandLinkMutationService {
                         homePosition,
                         npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
                         npcNameResolver.resolveNpcNameKey(npc),
-                        resolveCachedRoleId(npc)
+                        resolveCachedRoleId(npc),
+                        active
                 );
             } else {
                 updatedItem = linkedNpcRecordStore.remove(updatedItem, npcUuid);
             }
         }
         String name = npcNameResolver.resolveNpcDisplayName(targetRef, store, npc);
-        return new LinkToggleResult(true, linked, name, updatedItem);
+        return new LinkToggleResult(true, linked, active, name, updatedItem);
     }
 
     boolean unlinkLoadedNpcFromTool(Player player, UUID npcUuid, String toolId) {
@@ -199,7 +202,9 @@ final class CommandLinkMutationService {
         return linkedNpcRecordStore.remove(stack, npcUuid);
     }
 
-    ActiveToggleResult toggleLinkedNpcActive(ItemStack stack, UUID npcUuid) {
+    ActiveToggleResult toggleLinkedNpcActive(ItemStack stack,
+                                             UUID npcUuid,
+                                             TwCommandItemConfig config) {
         if (stack == null || stack.isEmpty() || npcUuid == null) {
             return ActiveToggleResult.notToggled(stack);
         }
@@ -209,6 +214,9 @@ final class CommandLinkMutationService {
             return ActiveToggleResult.notToggled(stack);
         }
         boolean nextActive = !record.active;
+        if (nextActive && !canActivateLinkedNpc(stack, npcUuid, config)) {
+            return ActiveToggleResult.maxActiveReached(stack);
+        }
         ItemStack updated = linkedNpcRecordStore.setActive(stack, npcUuid, nextActive);
         if (updated == stack) {
             return ActiveToggleResult.notToggled(stack);
@@ -228,19 +236,65 @@ final class CommandLinkMutationService {
         return linkedNpcRecordStore.write(stack, records);
     }
 
+    private boolean shouldActivateOnLink(TwCommandItemConfig config, ItemStack stack) {
+        int maxActive = config != null ? Math.max(0, config.getMaxActive()) : 0;
+        if (maxActive <= 0) {
+            return true;
+        }
+        return countActiveLinkedRecords(stack, null) < maxActive;
+    }
+
+    private boolean canActivateLinkedNpc(ItemStack stack,
+                                         UUID targetNpcUuid,
+                                         TwCommandItemConfig config) {
+        int maxActive = config != null ? Math.max(0, config.getMaxActive()) : 0;
+        if (maxActive <= 0) {
+            return true;
+        }
+        return countActiveLinkedRecords(stack, targetNpcUuid) < maxActive;
+    }
+
+    private int countActiveLinkedRecords(ItemStack stack, UUID excludedNpcUuid) {
+        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        if (records.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null || !record.active) {
+                continue;
+            }
+            if (excludedNpcUuid != null && excludedNpcUuid.equals(record.npcUuid)) {
+                continue;
+            }
+            count++;
+        }
+        return count;
+    }
+
     static final class ActiveToggleResult {
         final ItemStack updatedItem;
         final boolean toggled;
         final boolean active;
+        final boolean blockedByMaxActive;
 
-        private ActiveToggleResult(ItemStack updatedItem, boolean toggled, boolean active) {
+        private ActiveToggleResult(ItemStack updatedItem, boolean toggled, boolean active, boolean blockedByMaxActive) {
             this.updatedItem = updatedItem;
             this.toggled = toggled;
             this.active = active;
+            this.blockedByMaxActive = blockedByMaxActive;
+        }
+
+        private ActiveToggleResult(ItemStack updatedItem, boolean toggled, boolean active) {
+            this(updatedItem, toggled, active, false);
         }
 
         static ActiveToggleResult notToggled(ItemStack stack) {
             return new ActiveToggleResult(stack, false, false);
+        }
+
+        static ActiveToggleResult maxActiveReached(ItemStack stack) {
+            return new ActiveToggleResult(stack, false, false, true);
         }
     }
 }

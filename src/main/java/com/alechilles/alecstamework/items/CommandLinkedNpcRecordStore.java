@@ -105,6 +105,17 @@ final class CommandLinkedNpcRecordStore {
                      String cachedDisplayName,
                      String cachedNameKey,
                      String cachedRoleId) {
+        return upsert(stack, npcUuid, position, homePosition, cachedDisplayName, cachedNameKey, cachedRoleId, null);
+    }
+
+    ItemStack upsert(ItemStack stack,
+                     UUID npcUuid,
+                     Vector3d position,
+                     Vector3d homePosition,
+                     String cachedDisplayName,
+                     String cachedNameKey,
+                     String cachedRoleId,
+                     Boolean activeOverride) {
         if (stack == null || stack.isEmpty() || npcUuid == null) {
             return stack;
         }
@@ -124,6 +135,7 @@ final class CommandLinkedNpcRecordStore {
             String mergedDisplayName = firstNonBlank(cachedDisplayName, record.cachedDisplayName);
             String mergedNameKey = firstNonBlank(cachedNameKey, record.cachedNameKey);
             String mergedRoleId = firstNonBlank(cachedRoleId, record.cachedRoleId);
+            boolean mergedActive = activeOverride != null ? activeOverride : record.active;
             records.set(i, new LinkedNpcRecord(
                     npcUuid,
                     mergedLastKnown,
@@ -131,7 +143,7 @@ final class CommandLinkedNpcRecordStore {
                     mergedDisplayName,
                     mergedNameKey,
                     mergedRoleId,
-                    record.active,
+                    mergedActive,
                     record.groupId
             ));
             updated = true;
@@ -145,7 +157,7 @@ final class CommandLinkedNpcRecordStore {
                     firstNonBlank(cachedDisplayName, null),
                     firstNonBlank(cachedNameKey, null),
                     firstNonBlank(cachedRoleId, null),
-                    true,
+                    activeOverride == null || activeOverride,
                     null
             ));
         }

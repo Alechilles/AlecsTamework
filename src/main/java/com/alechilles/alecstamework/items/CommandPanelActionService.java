@@ -76,11 +76,16 @@ final class CommandPanelActionService {
             feedbackService.showWarning(player, "That companion is already linked.");
             return;
         }
-        feedbackService.showSuccess(player, "Linked " + result.npcName + ".");
+        if (result.active) {
+            feedbackService.showSuccess(player, "Linked " + result.npcName + ".");
+            return;
+        }
+        feedbackService.showSuccess(player, "Linked " + result.npcName + " as inactive.");
     }
 
     void applyToggleActive(Player player,
                            String toolId,
+                           TwCommandItemConfig config,
                            UUID npcUuid) {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
@@ -89,12 +94,16 @@ final class CommandPanelActionService {
                 new CommandLinkMutationService.ActiveToggleResult[1];
         toolInventoryService.mutateToolStack(player, toolId, stack -> {
             CommandLinkMutationService.ActiveToggleResult result =
-                    linkMutationService.toggleLinkedNpcActive(stack, npcUuid);
+                    linkMutationService.toggleLinkedNpcActive(stack, npcUuid, config);
             resultHolder[0] = result;
             return result.updatedItem;
         });
         CommandLinkMutationService.ActiveToggleResult result = resultHolder[0];
         if (result == null || !result.toggled) {
+            if (result != null && result.blockedByMaxActive) {
+                feedbackService.showWarning(player, "Max active companions reached for this tool.");
+                return;
+            }
             feedbackService.showWarning(player, "That NPC is not linked to this tool.");
             return;
         }

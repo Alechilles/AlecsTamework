@@ -8,17 +8,19 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 final class LinkToggleResult {
     final boolean toggled;
     final boolean linked;
+    final boolean active;
     final String npcName;
     final ItemStack updatedItem;
 
-    LinkToggleResult(boolean toggled, boolean linked, String npcName, ItemStack updatedItem) {
+    LinkToggleResult(boolean toggled, boolean linked, boolean active, String npcName, ItemStack updatedItem) {
         this.toggled = toggled;
         this.linked = linked;
+        this.active = active;
         this.npcName = npcName;
         this.updatedItem = updatedItem;
     }
 
     static LinkToggleResult notToggled() {
-        return new LinkToggleResult(false, false, null, null);
+        return new LinkToggleResult(false, false, false, null, null);
     }
 }

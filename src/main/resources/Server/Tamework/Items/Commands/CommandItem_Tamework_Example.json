@@ -10,6 +10,7 @@
   "RequireTamed": true,
   "RequireOwner": true,
   "MaxTargets": 25,
+  "MaxActive": 0,
   "CooldownSeconds": 2,
   "RequireLineOfSight": false,
   "AllowedRoles": {

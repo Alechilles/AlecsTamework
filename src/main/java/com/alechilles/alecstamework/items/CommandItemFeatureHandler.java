@@ -265,7 +265,11 @@ public final class CommandItemFeatureHandler {
                 if (updateHeldItem) {
                     updateHeldItem(player, working);
                 }
-                feedbackService.showSuccess(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
+                if (link.linked && !link.active) {
+                    feedbackService.showSuccess(player, "Linked " + link.npcName + " as inactive.");
+                } else {
+                    feedbackService.showSuccess(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
+                }
                 return true;
             }
         }
@@ -448,7 +452,7 @@ public final class CommandItemFeatureHandler {
                 () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId),
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
-                npcUuid -> panelActionService.applyToggleActive(player, toolId, npcUuid),
+                npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),

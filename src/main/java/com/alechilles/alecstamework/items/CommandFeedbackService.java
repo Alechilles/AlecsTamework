@@ -121,27 +121,28 @@ final class CommandFeedbackService {
         if (soundEventIndex <= 0) {
             return;
         }
-        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
-        if (transform != null) {
-            Vector3d position = transform.getPosition();
-            SoundUtil.playSoundEvent3d(
-                    soundEventIndex,
-                    SoundCategory.SFX,
-                    position.x,
-                    position.y,
-                    position.z,
-                    DEFAULT_COMMAND_FEEDBACK_VOLUME,
-                    DEFAULT_COMMAND_FEEDBACK_PITCH,
-                    store
-            );
-            return;
-        }
+        // Always play local feedback for the activating player.
         SoundUtil.playSoundEvent2d(
                 playerRef,
                 soundEventIndex,
                 SoundCategory.SFX,
                 DEFAULT_COMMAND_FEEDBACK_VOLUME,
                 DEFAULT_COMMAND_FEEDBACK_PITCH,
+                store
+        );
+        TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
+        if (transform == null) {
+            return;
+        }
+        Vector3d position = transform.getPosition();
+        // Emit positional sound for nearby players, excluding the source player.
+        SoundUtil.playSoundEvent3d(
+                playerRef,
+                soundEventIndex,
+                position.x,
+                position.y,
+                position.z,
+                true,
                 store
         );
     }

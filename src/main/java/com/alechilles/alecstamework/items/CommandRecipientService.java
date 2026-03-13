@@ -6,7 +6,6 @@ import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -54,8 +53,11 @@ final class CommandRecipientService {
         }
         double radiusSq = effectiveRadius >= 0 ? effectiveRadius * effectiveRadius : -1;
         int maxTargets = Math.max(1, context.config.getMaxTargets());
+        int maxActive = Math.max(0, context.config.getMaxActive());
         UUID playerUuid = context.player.getUuid();
-        Map<UUID, LinkedNpcRecord> linkedRecordByUuid = readLinkedRecordByUuid(context.workingItem);
+        List<LinkedNpcRecord> linkedRecords = linkedNpcRecordStore.read(context.workingItem);
+        Map<UUID, LinkedNpcRecord> linkedRecordByUuid = mapLinkedRecordsByUuid(linkedRecords);
+        Set<UUID> cappedActiveLinkedNpcUuids = resolveCappedActiveLinkedNpcUuids(linkedRecords, maxActive);
 
         context.store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
             for (int i = 0; i < chunk.size(); i++) {
@@ -92,6 +94,9 @@ final class CommandRecipientService {
                 }
                 UUID npcUuid = npc.getUuid();
                 if (isInactiveLinkedRecord(linkedRecordByUuid, npcUuid)) {
+                    continue;
+                }
+                if (isCappedOutLinkedRecord(linkedRecordByUuid, cappedActiveLinkedNpcUuids, maxActive, npcUuid)) {
                     continue;
                 }
                 TransformComponent npcTransform = chunk.getComponent(i, TransformComponent.getComponentType());
@@ -144,6 +149,16 @@ final class CommandRecipientService {
         if (remaining <= 0) {
             return List.of();
         }
+        int maxActive = Math.max(0, context.config.getMaxActive());
+        int remainingActiveSlots = Integer.MAX_VALUE;
+        if (maxActive > 0) {
+            Map<UUID, LinkedNpcRecord> linkedRecordByUuid = mapLinkedRecordsByUuid(linkedRecords);
+            int loadedActiveCount = countLoadedActiveLinkedRecipients(loadedRecipients, linkedRecordByUuid);
+            remainingActiveSlots = maxActive - loadedActiveCount;
+            if (remainingActiveSlots <= 0) {
+                return List.of();
+            }
+        }
         ArrayList<LinkedNpcRecord> unloaded = new ArrayList<>();
         World world = context.player != null ? context.player.getWorld() : null;
         if (world == null) {
@@ -164,6 +179,12 @@ final class CommandRecipientService {
                 }
             }
             unloaded.add(record);
+            if (maxActive > 0) {
+                remainingActiveSlots--;
+                if (remainingActiveSlots <= 0) {
+                    break;
+                }
+            }
             if (unloaded.size() >= remaining) {
                 break;
             }
@@ -171,8 +192,7 @@ final class CommandRecipientService {
         return unloaded;
     }
 
-    private Map<UUID, LinkedNpcRecord> readLinkedRecordByUuid(ItemStack stack) {
-        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+    private Map<UUID, LinkedNpcRecord> mapLinkedRecordsByUuid(List<LinkedNpcRecord> records) {
         if (records.isEmpty()) {
             return Map.of();
         }
@@ -192,5 +212,54 @@ final class CommandRecipientService {
         }
         LinkedNpcRecord record = linkedRecordByUuid.get(npcUuid);
         return record != null && !record.active;
+    }
+
+    private boolean isCappedOutLinkedRecord(Map<UUID, LinkedNpcRecord> linkedRecordByUuid,
+                                            Set<UUID> cappedActiveLinkedNpcUuids,
+                                            int maxActive,
+                                            UUID npcUuid) {
+        if (maxActive <= 0 || linkedRecordByUuid.isEmpty() || npcUuid == null) {
+            return false;
+        }
+        LinkedNpcRecord record = linkedRecordByUuid.get(npcUuid);
+        if (record == null || !record.active) {
+            return false;
+        }
+        return !cappedActiveLinkedNpcUuids.contains(npcUuid);
+    }
+
+    private Set<UUID> resolveCappedActiveLinkedNpcUuids(List<LinkedNpcRecord> records, int maxActive) {
+        if (maxActive <= 0 || records.isEmpty()) {
+            return Set.of();
+        }
+        HashSet<UUID> allowed = new HashSet<>();
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null || !record.active) {
+                continue;
+            }
+            allowed.add(record.npcUuid);
+            if (allowed.size() >= maxActive) {
+                break;
+            }
+        }
+        return allowed;
+    }
+
+    private int countLoadedActiveLinkedRecipients(List<Candidate> loadedRecipients,
+                                                  Map<UUID, LinkedNpcRecord> linkedRecordByUuid) {
+        if (loadedRecipients == null || loadedRecipients.isEmpty() || linkedRecordByUuid.isEmpty()) {
+            return 0;
+        }
+        int count = 0;
+        for (Candidate recipient : loadedRecipients) {
+            if (recipient == null || recipient.npc == null || recipient.npc.getUuid() == null) {
+                continue;
+            }
+            LinkedNpcRecord record = linkedRecordByUuid.get(recipient.npc.getUuid());
+            if (record != null && record.active) {
+                count++;
+            }
+        }
+        return count;
     }
 }

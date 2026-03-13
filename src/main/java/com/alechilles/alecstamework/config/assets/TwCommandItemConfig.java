@@ -567,6 +567,12 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         )
         .add()
         .<Integer>append(
+            new KeyedCodec<>("MaxActive", Codec.INTEGER),
+            (asset, value) -> asset.maxActive = value == null ? 0 : Math.max(0, value),
+            asset -> asset.maxActive
+        )
+        .add()
+        .<Integer>append(
             new KeyedCodec<>("CooldownSeconds", Codec.INTEGER),
             (asset, value) -> asset.cooldownSeconds = value == null ? 2 : Math.max(0, value),
             asset -> asset.cooldownSeconds
@@ -607,6 +613,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private boolean requireTamed = true;
     private boolean requireOwner = true;
     private int maxTargets = 25;
+    private int maxActive;
     private int cooldownSeconds = 2;
     private boolean requireLineOfSight;
     private AllowedRoles allowedRoles = new AllowAllRoles();
@@ -680,6 +687,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!explicitTopLevelKeys.contains("RequireTamed")) requireTamed = parent.requireTamed;
         if (!explicitTopLevelKeys.contains("RequireOwner")) requireOwner = parent.requireOwner;
         if (!explicitTopLevelKeys.contains("MaxTargets")) maxTargets = parent.maxTargets;
+        if (!explicitTopLevelKeys.contains("MaxActive")) maxActive = parent.maxActive;
         if (!explicitTopLevelKeys.contains("CooldownSeconds")) cooldownSeconds = parent.cooldownSeconds;
         if (!explicitTopLevelKeys.contains("RequireLineOfSight")) requireLineOfSight = parent.requireLineOfSight;
         if (!explicitTopLevelKeys.contains("AllowedRoles")) allowedRoles = parent.allowedRoles;
@@ -720,6 +728,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public int getMaxTargets() {
         return maxTargets;
+    }
+
+    public int getMaxActive() {
+        return maxActive;
     }
 
     public int getCooldownSeconds() {

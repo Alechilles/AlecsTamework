@@ -69,11 +69,14 @@ Additional filters:
 - `AllowedRoles` (`AllowAll`, `Allowlist`, `Denylist`)
 - `Radius`
 - `MaxTargets`
+- `MaxActive` (optional active-link cap; `0` means no active limit)
 - `RequireLineOfSight`
 
 Linking state is stored in:
 - NPC component: `TameworkCommandLinksComponent` (owner/tool links plus optional per-NPC home position)
 - Tool metadata: linked NPC UUIDs plus last-known positions (and mirrored home data for unloaded relocation)
+
+`MaxActive` applies to linked NPC records marked active. This allows tools to keep larger linked rosters while limiting how many companions receive command dispatch at once.
 
 ## Command List and Steps
 Each command entry in `CommandList` defines:
