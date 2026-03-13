@@ -53,6 +53,12 @@ A modular taming framework for Hytale that focuses on fast setup and giving modd
 - **Examples and Documentation** - Plenty of examples and thorough documentation to help you integrate Tamework.
   - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
+## Metrics (HStats)
+- Tamework now reports anonymous server-level usage metrics through [HStats](https://hstats.dev/).
+- When installed, tracked Alec asset-pack mods that depend on Tamework (Cats, Animal Husbandry, Nametags) are also reported via Tamework.
+- Reported data includes aggregate server/player counts plus runtime environment metadata (OS, Java version, CPU core count).
+- Server owners can opt out at any time by editing `hstats-server-uuid.txt` in the server working directory and setting `enabled=false`.
+
 ## Roadmap
 - **NPC XP/leveling system**
   - Gain XP passively when with owner or when doing certain configurable actions

@@ -8,6 +8,8 @@
 - New dedicated tranquilizer status particle system `Effect_Tranquilizer` (no poison-face overlay) with a custom purple bubble texture (`Effect_Tranquilizer_Bubble.png`) for `Tw_Status_Tranquilized`.
 - Added `TwGlobalConfig.AssetSets` opt-in gates (`TranquilizerShortbow`, `TranquilizerArrow`, `TranquilizerPotion`) plus recipe-visibility reconciliation that removes gated tranquilizer recipes from crafting registries (and restores them when enabled).
 - Command item configs now support optional `MaxActive` limits, allowing more linked NPCs than active command recipients (`0` keeps the previous unlimited-active behavior).
+- Added HStats integration for anonymous Tamework usage metrics reporting, including server-owner opt-out support through `hstats-server-uuid.txt`.
+- Added Tamework-side HStats forwarding for tracked Alec dependency asset packs (Cats, Animal Husbandry, Nametags) when installed and declaring a Tamework dependency.
 ### Fixed
 - Linked panel card `INACTIVE` status indicator now uses the same lower status lane as `CONFIRM REMOVE`, avoiding overlap with trait icons.
 - Added shared `Component_Tamework_ActionList_StandUp` to Tamework assets so mods referencing stand-up wake transitions (for example tamed predator templates copied from cat-pet behavior) validate without requiring Alec's Cats assets.

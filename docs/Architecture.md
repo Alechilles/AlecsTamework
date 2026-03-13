@@ -20,6 +20,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Linked companions panel runtime (TameworkCommandSelectionPage + UI helper services + per-row action routing)
 - Ownership and taming (components, owner interaction blocking, damage filters)
 - Localization and messages (translation discovery + owner denial messages)
+- Metrics telemetry (TameworkHStatsIntegration + HStats bridge + dependency mod forwarding)
 - Asset-pack ordering and legacy-pack replacement at early `LoadAssetEvent`
 
 ## Key behaviors
@@ -55,6 +56,8 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Command relocation queue + on-load system: `src/main/java/com/alechilles/alecstamework/items/CommandNpcRelocationService.java` and `src/main/java/com/alechilles/alecstamework/npc/systems/CommandNpcRelocationOnLoadSystem.java`
 - Command UI page + helpers: `src/main/java/com/alechilles/alecstamework/ui/TameworkCommandSelectionPage.java` and `src/main/java/com/alechilles/alecstamework/ui/*Service.java`
 - Global config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwGlobalConfig.java`
+- Metrics bootstrap: `src/main/java/com/alechilles/alecstamework/metrics/TameworkHStatsIntegration.java`
+- Dependency metrics reporter: `src/main/java/com/alechilles/alecstamework/metrics/TameworkDependencyMetricsReporter.java`
 - Example assets: `src/main/resources/Server/Tamework`
 
 ## Versioned docs

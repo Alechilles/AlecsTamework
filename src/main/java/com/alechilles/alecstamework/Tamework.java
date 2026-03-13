@@ -35,22 +35,12 @@ import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
-import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
-import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureOwner;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureStranger;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkCaptureWild;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyInteract;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDenyCaptureUntamed;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkDebugMessage;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkHarvestDrop;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteract;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkInteractPrompt;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkNeedsResourceConsume;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
-import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
+import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
+import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
@@ -61,16 +51,6 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
-import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
-import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsOwner;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkIsTamed;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkLifeStage;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedBelow;
-import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
@@ -98,14 +78,8 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
-import com.hypixel.hytale.server.core.plugin.event.PluginSetupEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import com.hypixel.hytale.server.npc.asset.builder.BuilderFactory;
-import com.hypixel.hytale.server.npc.corecomponents.IEntityFilter;
-import com.hypixel.hytale.server.npc.instructions.Action;
-import com.hypixel.hytale.server.npc.instructions.Sensor;
 
 /**
  * Main entry point for the Alec's Tamework! plugin.
@@ -128,7 +102,8 @@ public class Tamework extends JavaPlugin {
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
-    private boolean npcActionsRegistered;
+    private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
+    private TameworkHStatsIntegration hStatsIntegration;
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -170,6 +145,8 @@ public class Tamework extends JavaPlugin {
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
+        npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
+        hStatsIntegration = new TameworkHStatsIntegration(this);
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
@@ -385,12 +362,17 @@ public class Tamework extends JavaPlugin {
         );
 
         // Register custom NPC action/sensor builders once NPCPlugin is available.
-        registerNpcActionsIfReady();
+        if (npcBuilderRegistrar != null) {
+            npcBuilderRegistrar.registerNpcActionsIfReady();
+        }
     }
 
     @Override
     protected void start() {
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
+        if (hStatsIntegration != null) {
+            hStatsIntegration.initialize();
+        }
         if (assetPackCoordinator != null) {
             assetPackCoordinator.ensureAssetEditorPackVisible();
         }
@@ -993,106 +975,6 @@ public class Tamework extends JavaPlugin {
         );
     }
 
-    // NPC action/sensor builders must be registered after NPCPlugin is ready.
-    private void registerNpcActionsIfReady() {
-        if (npcActionsRegistered) {
-            return;
-        }
-        NPCPlugin npcPlugin = NPCPlugin.get();
-        if (npcPlugin != null) {
-            getLogger().at(Level.INFO).log("Tamework NPC builder registration: NPCPlugin detected on setup.");
-            registerNpcActions(npcPlugin);
-            return;
-        }
-        getLogger().at(Level.INFO).log("Tamework NPC builder registration: NPCPlugin not ready, waiting for PluginSetupEvent.");
-        if (getEventRegistry() != null) {
-            getEventRegistry().registerGlobal(
-                    PluginSetupEvent.class,
-                    this::onPluginSetup
-            );
-        }
-    }
-
-    // Called when plugins are set up; used to detect NPCPlugin availability.
-    private void onPluginSetup(PluginSetupEvent event) {
-        if (npcActionsRegistered) {
-            return;
-        }
-        if (event.getPlugin() instanceof NPCPlugin) {
-            getLogger().at(Level.INFO).log("Tamework NPC builder registration: PluginSetupEvent received NPCPlugin.");
-            registerNpcActions((NPCPlugin) event.getPlugin());
-        }
-    }
-
-    // Register custom action/sensor builders and trigger NPC validation.
-    private void registerNpcActions(NPCPlugin npcPlugin) {
-        if (npcActionsRegistered || npcPlugin == null) {
-            return;
-        }
-        BuilderFactory<Action> actionFactory = npcPlugin.getBuilderManager().getFactory(Action.class);
-        if (actionFactory == null) {
-            getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Action factory missing.");
-        } else {
-            getLogger().at(Level.INFO).log("Tamework NPC builder registration: Action factory ready.");
-            actionFactory.add(BuilderActionTameworkCaptureOwner.BUILDER_ID, BuilderActionTameworkCaptureOwner::new);
-            actionFactory.add(BuilderActionTameworkCaptureStranger.BUILDER_ID, BuilderActionTameworkCaptureStranger::new);
-            actionFactory.add(BuilderActionTameworkCaptureWild.BUILDER_ID, BuilderActionTameworkCaptureWild::new);
-            actionFactory.add(BuilderActionTameworkDebugMessage.BUILDER_ID, BuilderActionTameworkDebugMessage::new);
-            actionFactory.add(BuilderActionTameworkDenyInteract.BUILDER_ID, BuilderActionTameworkDenyInteract::new);
-            actionFactory.add(BuilderActionTameworkDenyCaptureUntamed.BUILDER_ID, BuilderActionTameworkDenyCaptureUntamed::new);
-            actionFactory.add(BuilderActionTameworkHarvestDrop.BUILDER_ID, BuilderActionTameworkHarvestDrop::new);
-            actionFactory.add(BuilderActionTameworkInteract.BUILDER_ID, BuilderActionTameworkInteract::new);
-            actionFactory.add(BuilderActionTameworkInteractPrompt.BUILDER_ID, BuilderActionTameworkInteractPrompt::new);
-            actionFactory.add(BuilderActionTameworkNeedsResourceConsume.BUILDER_ID, BuilderActionTameworkNeedsResourceConsume::new);
-            actionFactory.add(BuilderActionTameworkSetTamed.BUILDER_ID, BuilderActionTameworkSetTamed::new);
-            actionFactory.add(BuilderActionTameworkSetOwner.BUILDER_ID, BuilderActionTameworkSetOwner::new);
-        }
-
-        BuilderFactory<Sensor> sensorFactory = npcPlugin.getBuilderManager().getFactory(Sensor.class);
-        if (sensorFactory == null) {
-            getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Sensor factory missing.");
-        } else {
-            getLogger().at(Level.INFO).log("Tamework NPC builder registration: Sensor factory ready.");
-            sensorFactory.add(BuilderSensorTameworkIsOwner.BUILDER_ID, BuilderSensorTameworkIsOwner::new);
-            sensorFactory.add(BuilderSensorTameworkHasOwner.BUILDER_ID, BuilderSensorTameworkHasOwner::new);
-            sensorFactory.add(BuilderSensorTameworkIsTamed.BUILDER_ID, BuilderSensorTameworkIsTamed::new);
-            sensorFactory.add(BuilderSensorTameworkLifeStage.BUILDER_ID, BuilderSensorTameworkLifeStage::new);
-            sensorFactory.add(BuilderSensorTameworkHook.BUILDER_ID, BuilderSensorTameworkHook::new);
-            sensorFactory.add(BuilderSensorTameworkEffectActive.BUILDER_ID, BuilderSensorTameworkEffectActive::new);
-            sensorFactory.add(BuilderSensorTameworkNeedBelow.BUILDER_ID, BuilderSensorTameworkNeedBelow::new);
-            sensorFactory.add(BuilderSensorTameworkNeedsResourceTarget.BUILDER_ID, BuilderSensorTameworkNeedsResourceTarget::new);
-        }
-
-        BuilderFactory<IEntityFilter> filterFactory = npcPlugin.getBuilderManager().getFactory(IEntityFilter.class);
-        if (filterFactory == null) {
-            getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Entity filter factory missing.");
-        } else {
-            getLogger().at(Level.INFO).log("Tamework NPC builder registration: Entity filter factory ready.");
-            filterFactory.add(
-                    BuilderEntityFilterTameworkAttitudeFromTargetSlot.BUILDER_ID,
-                    BuilderEntityFilterTameworkAttitudeFromTargetSlot::new
-            );
-            filterFactory.add(
-                    BuilderEntityFilterTameworkAttackedTargetSlotRecently.BUILDER_ID,
-                    BuilderEntityFilterTameworkAttackedTargetSlotRecently::new
-            );
-        }
-
-        npcActionsRegistered = true;
-        getLogger().at(Level.INFO).log("Registered Tamework NPC capture actions.");
-        try {
-            if (npcPlugin.getBuilderManager() == null) {
-                getLogger().at(Level.WARNING).log("NPC builder manager unavailable; skipping validation trigger.");
-                return;
-            }
-            npcPlugin.getBuilderManager().getAllBuilders()
-                    .forEach((index, info) -> npcPlugin.forceValidation(index));
-            getLogger().at(Level.INFO).log("Triggered NPC validation after registering Tamework builders.");
-        } catch (Exception ex) {
-            getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to revalidate NPC assets after registering Tamework builders.");
-        }
-    }
 }
 
 
