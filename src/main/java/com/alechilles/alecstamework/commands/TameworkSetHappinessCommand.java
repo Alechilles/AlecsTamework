@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -100,7 +101,8 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
                 breeding.setConfigId(breedingConfig.getId());
             }
             if (breedingConfig != null) {
-                ready = clamped >= breedingConfig.getHappiness().getThreshold();
+                String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
+                ready = clamped >= breedingConfig.resolveHappiness(roleId).getThreshold();
                 breeding.setReady(ready);
             }
             store.putComponent(candidate.ref, breedingType, breeding);

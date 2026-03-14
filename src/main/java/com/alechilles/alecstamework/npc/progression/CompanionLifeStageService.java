@@ -161,7 +161,8 @@ public final class CompanionLifeStageService {
         if (roleId != null && !roleId.isBlank()) {
             TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
             if (config != null && config.isEnabled()) {
-                TwBreedingConfig.OffspringLifecycleSettings lifecycleSettings = config.getOffspringLifecycle();
+                TwBreedingConfig.OffspringLifecycleSettings lifecycleSettings =
+                        config.resolveOffspringLifecycle(roleId);
                 if (lifecycleSettings != null && lifecycleSettings.isEnabled()) {
                     family = config.resolveLifecycleFamilyForRole(roleId);
                     String inferredStage = inferStageFromFamilyRole(roleId, family);
@@ -666,7 +667,7 @@ public final class CompanionLifeStageService {
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         TwBreedingConfig config = roleId != null ? TwBreedingConfig.resolveForRole(roleId) : null;
         return config != null
-                ? config.getTiming().getTimerBasis()
+                ? config.resolveTiming(roleId).getTimerBasis()
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
     }
 
@@ -698,7 +699,7 @@ public final class CompanionLifeStageService {
             if (config == null || !config.isEnabled()) {
                 return false;
             }
-            TwBreedingConfig.OffspringLifecycleSettings lifecycle = config.getOffspringLifecycle();
+            TwBreedingConfig.OffspringLifecycleSettings lifecycle = config.resolveOffspringLifecycle(currentRoleId);
             if (lifecycle == null || !lifecycle.isEnabled()) {
                 return false;
             }
@@ -784,7 +785,7 @@ public final class CompanionLifeStageService {
                                                          @Nullable String spawnedRoleId,
                                                          @Nullable Store<EntityStore> store) {
         TwBreedingConfig.OffspringLifecycleSettings lifecycle = breedingConfig != null
-                ? breedingConfig.getOffspringLifecycle()
+                ? breedingConfig.resolveOffspringLifecycle(spawnedRoleId)
                 : null;
         TwBreedingConfig.RoleFamily family = preResolvedFamily;
         if (family == null && breedingConfig != null && spawnedRoleId != null && !spawnedRoleId.isBlank()) {
@@ -818,7 +819,7 @@ public final class CompanionLifeStageService {
             adultSwitchScale = adultFinalScale;
         }
 
-        long totalGrowthMs = resolveGrowthDurationMs(breedingConfig, lifecycle, family, store);
+        long totalGrowthMs = resolveGrowthDurationMs(breedingConfig, lifecycle, family, spawnedRoleId, store);
         double babyDelta = Math.abs(adolescentSwitchScale - babyStartScale);
         double adolescentDelta = hasAdolescentStage ? Math.abs(adultSwitchScale - adolescentStartScale) : 0.0;
         double adultDelta = Math.abs(adultFinalScale - adultStartScale);
@@ -855,6 +856,7 @@ public final class CompanionLifeStageService {
     private static long resolveGrowthDurationMs(@Nullable TwBreedingConfig breedingConfig,
                                                 @Nullable TwBreedingConfig.OffspringLifecycleSettings lifecycle,
                                                 @Nullable TwBreedingConfig.RoleFamily family,
+                                                @Nullable String roleId,
                                                 @Nullable Store<EntityStore> store) {
         long configuredSeconds = DEFAULT_GROWTH_DURATION_SECONDS;
         if (lifecycle != null && lifecycle.isEnabled()) {
@@ -864,7 +866,7 @@ public final class CompanionLifeStageService {
             }
         }
         TwBreedingConfig.TimerBasis timerBasis = breedingConfig != null
-                ? breedingConfig.getTiming().getTimerBasis()
+                ? breedingConfig.resolveTiming(roleId).getTimerBasis()
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
         long converted = BreedingTimeService.toGameDurationMs(configuredSeconds, timerBasis, store);
         if (converted > 0L) {

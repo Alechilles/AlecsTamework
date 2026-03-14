@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
@@ -257,7 +258,7 @@ final class CommandRespawnService {
         boolean ready = false;
         String configId = snapshot.breedingConfigId();
         if (configId != null && !configId.isBlank()) {
-            ready = resolveBreedingReadiness(configId, happiness);
+            ready = resolveBreedingReadiness(configId, happiness, spawnedRef, store);
         }
         long lastHappinessUpdateMs = resolveRestoredHappinessTimestamp(spawnedRef, store);
         TameworkBreedingComponent component = new TameworkBreedingComponent(
@@ -336,7 +337,10 @@ final class CommandRespawnService {
         );
     }
 
-    private boolean resolveBreedingReadiness(String configId, double happiness) {
+    private boolean resolveBreedingReadiness(String configId,
+                                             double happiness,
+                                             @Nullable Ref<EntityStore> npcRef,
+                                             @Nullable Store<EntityStore> store) {
         if (configId == null || configId.isBlank()) {
             return false;
         }
@@ -344,7 +348,8 @@ final class CommandRespawnService {
         if (config == null) {
             return false;
         }
-        return happiness >= config.getHappiness().getThreshold();
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        return happiness >= config.resolveHappiness(roleId).getThreshold();
     }
 
     @Nullable

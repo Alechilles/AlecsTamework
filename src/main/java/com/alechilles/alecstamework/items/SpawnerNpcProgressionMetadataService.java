@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
@@ -222,7 +223,8 @@ final class SpawnerNpcProgressionMetadataService {
         if (resolvedConfigId != null && !resolvedConfigId.isBlank()) {
             TwBreedingConfig config = TwBreedingConfig.resolveById(resolvedConfigId);
             if (config != null) {
-                ready = value >= config.getHappiness().getThreshold();
+                String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+                ready = value >= config.resolveHappiness(roleId).getThreshold();
             }
         }
         TameworkBreedingComponent component = new TameworkBreedingComponent(

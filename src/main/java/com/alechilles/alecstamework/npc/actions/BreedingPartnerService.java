@@ -44,8 +44,8 @@ final class BreedingPartnerService {
         UUID sourceOwnerId = resolveOwnerId(sourceRef, store);
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
 
-        TwBreedingConfig.PairingSettings pairing = config != null ? config.getPairing() : null;
-        TwBreedingConfig.EligibilitySettings eligibility = config != null ? config.getEligibility() : null;
+        TwBreedingConfig.PairingSettings pairing = config != null ? config.resolvePairing(sourceRoleId) : null;
+        TwBreedingConfig.EligibilitySettings eligibility = config != null ? config.resolveEligibility(sourceRoleId) : null;
         double radius = sanitizeRadius(pairing != null ? pairing.getBreedRadius() : 10.0);
         double radiusSq = radius * radius;
         boolean requireSameRole = pairing == null || pairing.isRequireSameRoleId();

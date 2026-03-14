@@ -10,7 +10,9 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
+import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -24,7 +26,11 @@ import javax.annotation.Nullable;
  */
 public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwBreedingConfig>>,
         TwParentFallbackAsset<TwBreedingConfig> {
+    private static final int SECONDS_PER_MINUTE = 60;
     private static final RoleFamily[] EMPTY_ROLE_FAMILIES = new RoleFamily[0];
+    private static final RoleMaxNearbySameTypeOverride[] EMPTY_ROLE_MAX_NEARBY_OVERRIDES =
+            new RoleMaxNearbySameTypeOverride[0];
+    private static final Map<String, RoleOverrideSettings> EMPTY_ROLE_OVERRIDES = Collections.emptyMap();
 
     private static final BuilderCodec<HappinessSettings> HAPPINESS_CODEC = BuilderCodec.builder(
             HappinessSettings.class,
@@ -68,6 +74,28 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
+    private static final BuilderCodec<RoleMaxNearbySameTypeOverride> ROLE_MAX_NEARBY_OVERRIDE_CODEC =
+            BuilderCodec.builder(
+                RoleMaxNearbySameTypeOverride.class,
+                RoleMaxNearbySameTypeOverride::new
+            )
+                .<String>append(
+                    new KeyedCodec<>("RoleId", Codec.STRING),
+                    (override, value) -> override.roleId = value,
+                    override -> override.roleId
+                )
+                .add()
+                .<Integer>append(
+                    new KeyedCodec<>("MaxNearbySameType", Codec.INTEGER),
+                    (override, value) -> override.maxNearbySameType = value,
+                    override -> override.maxNearbySameType
+                )
+                .add()
+                .build();
+
+    private static final ArrayCodec<RoleMaxNearbySameTypeOverride> ROLE_MAX_NEARBY_OVERRIDE_ARRAY_CODEC =
+            new ArrayCodec<>(ROLE_MAX_NEARBY_OVERRIDE_CODEC, RoleMaxNearbySameTypeOverride[]::new);
+
     private static final BuilderCodec<PairingSettings> PAIRING_CODEC = BuilderCodec.builder(
             PairingSettings.class,
             PairingSettings::new
@@ -102,6 +130,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             settings -> settings.requireSameRoleId
         )
         .add()
+        .<RoleMaxNearbySameTypeOverride[]>append(
+            new KeyedCodec<>("RoleMaxNearbySameType", ROLE_MAX_NEARBY_OVERRIDE_ARRAY_CODEC),
+            (settings, value) -> settings.roleMaxNearbySameType = value == null
+                    ? EMPTY_ROLE_MAX_NEARBY_OVERRIDES
+                    : value,
+            settings -> settings.roleMaxNearbySameType
+        )
+        .add()
         .build();
 
     private static final BuilderCodec<CooldownSettings> COOLDOWN_CODEC = BuilderCodec.builder(
@@ -112,6 +148,16 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             new KeyedCodec<>("BaseCooldownSeconds", Codec.INTEGER),
             (settings, value) -> settings.baseCooldownSeconds = value,
             settings -> settings.baseCooldownSeconds
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("BaseCooldownMinutes", Codec.INTEGER),
+            (settings, value) -> {
+                if (value != null) {
+                    settings.baseCooldownSeconds = minutesToSeconds(value, settings.baseCooldownSeconds);
+                }
+            },
+            settings -> null
         )
         .add()
         .<Integer>append(
@@ -253,6 +299,16 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             family -> family.timeToFullGrownSeconds
         )
         .add()
+        .<Integer>append(
+            new KeyedCodec<>("TimeToFullGrownMinutes", Codec.INTEGER),
+            (family, value) -> {
+                if (value != null) {
+                    family.timeToFullGrownSeconds = minutesToSeconds(value, family.timeToFullGrownSeconds);
+                }
+            },
+            family -> null
+        )
+        .add()
         .<Double>append(
             new KeyedCodec<>("BabyStartScale", Codec.DOUBLE),
             (family, value) -> family.babyStartScale = value,
@@ -301,11 +357,45 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .<Integer>append(
             new KeyedCodec<>("DefaultTimeToFullGrownSeconds", Codec.INTEGER),
             (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
+            settings -> null
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("DefaultTimeToFullGrownMinutes", Codec.INTEGER),
+            (settings, value) -> {
+                if (value != null) {
+                    settings.defaultTimeToFullGrownSeconds =
+                            minutesToSeconds(value, settings.defaultTimeToFullGrownSeconds);
+                }
+            },
+            settings -> null
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("TimeToFullGrownSeconds", Codec.INTEGER),
+            (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
             settings -> settings.defaultTimeToFullGrownSeconds
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("TimeToFullGrownMinutes", Codec.INTEGER),
+            (settings, value) -> {
+                if (value != null) {
+                    settings.defaultTimeToFullGrownSeconds =
+                            minutesToSeconds(value, settings.defaultTimeToFullGrownSeconds);
+                }
+            },
+            settings -> null
         )
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultBabyStartScale", Codec.DOUBLE),
+            (settings, value) -> settings.defaultBabyStartScale = value,
+            settings -> null
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("BabyStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultBabyStartScale = value,
             settings -> settings.defaultBabyStartScale
         )
@@ -313,11 +403,23 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .<Double>append(
             new KeyedCodec<>("DefaultAdolescentStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdolescentStartScale = value,
+            settings -> null
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdolescentStartScale", Codec.DOUBLE),
+            (settings, value) -> settings.defaultAdolescentStartScale = value,
             settings -> settings.defaultAdolescentStartScale
         )
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultAdultStartScale", Codec.DOUBLE),
+            (settings, value) -> settings.defaultAdultStartScale = value,
+            settings -> null
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdultStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdultStartScale = value,
             settings -> settings.defaultAdultStartScale
         )
@@ -325,11 +427,23 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .<Double>append(
             new KeyedCodec<>("DefaultAdolescentSwitchScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdolescentSwitchScale = value,
+            settings -> null
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdolescentSwitchScale", Codec.DOUBLE),
+            (settings, value) -> settings.defaultAdolescentSwitchScale = value,
             settings -> settings.defaultAdolescentSwitchScale
         )
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultAdultSwitchScale", Codec.DOUBLE),
+            (settings, value) -> settings.defaultAdultSwitchScale = value,
+            settings -> null
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("AdultSwitchScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdultSwitchScale = value,
             settings -> settings.defaultAdultSwitchScale
         )
@@ -341,6 +455,398 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         )
         .add()
         .build();
+
+    private static final BuilderCodec<HappinessSettingsOverride> HAPPINESS_OVERRIDE_CODEC = BuilderCodec.builder(
+            HappinessSettingsOverride.class,
+            HappinessSettingsOverride::new
+    )
+        .<Double>append(
+            new KeyedCodec<>("Threshold", Codec.DOUBLE),
+            (settings, value) -> settings.threshold = value,
+            settings -> settings.threshold
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<EligibilitySettingsOverride> ELIGIBILITY_OVERRIDE_CODEC = BuilderCodec.builder(
+            EligibilitySettingsOverride.class,
+            EligibilitySettingsOverride::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
+            (settings, value) -> settings.requireTamed = value,
+            settings -> settings.requireTamed
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireAdult", Codec.BOOLEAN),
+            (settings, value) -> settings.requireAdult = value,
+            settings -> settings.requireAdult
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireNotInCombat", Codec.BOOLEAN),
+            (settings, value) -> settings.requireNotInCombat = value,
+            settings -> settings.requireNotInCombat
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireNotSleeping", Codec.BOOLEAN),
+            (settings, value) -> settings.requireNotSleeping = value,
+            settings -> settings.requireNotSleeping
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<PairingSettingsOverride> PAIRING_OVERRIDE_CODEC = BuilderCodec.builder(
+            PairingSettingsOverride.class,
+            PairingSettingsOverride::new
+    )
+        .<Double>append(
+            new KeyedCodec<>("BreedRadius", Codec.DOUBLE),
+            (settings, value) -> settings.breedRadius = value,
+            settings -> settings.breedRadius
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireWanderMode", Codec.BOOLEAN),
+            (settings, value) -> settings.requireWanderMode = value,
+            settings -> settings.requireWanderMode
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireSameOwner", Codec.BOOLEAN),
+            (settings, value) -> settings.requireSameOwner = value,
+            settings -> settings.requireSameOwner
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("MaxNearbySameType", Codec.INTEGER),
+            (settings, value) -> settings.maxNearbySameType = value,
+            settings -> settings.maxNearbySameType
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireSameRoleId", Codec.BOOLEAN),
+            (settings, value) -> settings.requireSameRoleId = value,
+            settings -> settings.requireSameRoleId
+        )
+        .add()
+        .<RoleMaxNearbySameTypeOverride[]>append(
+            new KeyedCodec<>("RoleMaxNearbySameType", ROLE_MAX_NEARBY_OVERRIDE_ARRAY_CODEC),
+            (settings, value) -> settings.roleMaxNearbySameType = value,
+            settings -> settings.roleMaxNearbySameType
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<CooldownSettingsOverride> COOLDOWN_OVERRIDE_CODEC = BuilderCodec.builder(
+            CooldownSettingsOverride.class,
+            CooldownSettingsOverride::new
+    )
+        .<Integer>append(
+            new KeyedCodec<>("BaseCooldownSeconds", Codec.INTEGER),
+            (settings, value) -> settings.baseCooldownSeconds = value,
+            settings -> settings.baseCooldownSeconds
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("BaseCooldownMinutes", Codec.INTEGER),
+            (settings, value) -> {
+                if (value != null) {
+                    settings.baseCooldownSeconds = minutesToSeconds(value, settings.baseCooldownSeconds);
+                }
+            },
+            settings -> null
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("MinDelaySeconds", Codec.INTEGER),
+            (settings, value) -> settings.minDelaySeconds = value,
+            settings -> settings.minDelaySeconds
+        )
+        .add()
+        .<Integer>append(
+            new KeyedCodec<>("MaxDelaySeconds", Codec.INTEGER),
+            (settings, value) -> settings.maxDelaySeconds = value,
+            settings -> settings.maxDelaySeconds
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<PassiveBreedingSettingsOverride> PASSIVE_BREEDING_OVERRIDE_CODEC =
+            BuilderCodec.builder(
+                PassiveBreedingSettingsOverride.class,
+                PassiveBreedingSettingsOverride::new
+            )
+                .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.enabled = value,
+                    settings -> settings.enabled
+                )
+                .add()
+                .<Integer>append(
+                    new KeyedCodec<>("SweepIntervalSeconds", Codec.INTEGER),
+                    (settings, value) -> settings.sweepIntervalSeconds = value,
+                    settings -> settings.sweepIntervalSeconds
+                )
+                .add()
+                .<String>append(
+                    new KeyedCodec<>("Basis", Codec.STRING),
+                    (settings, value) -> settings.timerBasis = value == null
+                            ? null
+                            : TimerBasis.fromConfigValue(value),
+                    settings -> settings.timerBasis == null
+                            ? null
+                            : settings.timerBasis.toConfigValue()
+                )
+                .add()
+                .build();
+
+    private static final BuilderCodec<TimingSettingsOverride> TIMING_OVERRIDE_CODEC = BuilderCodec.builder(
+            TimingSettingsOverride.class,
+            TimingSettingsOverride::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Basis", Codec.STRING),
+            (settings, value) -> settings.timerBasis = value == null
+                    ? null
+                    : TimerBasis.fromConfigValue(value),
+            settings -> settings.timerBasis == null ? null : settings.timerBasis.toConfigValue()
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<AttachmentInheritanceSettingsOverride> ATTACHMENT_INHERITANCE_OVERRIDE_CODEC =
+            BuilderCodec.builder(
+                AttachmentInheritanceSettingsOverride.class,
+                AttachmentInheritanceSettingsOverride::new
+            )
+                .<Double>append(
+                    new KeyedCodec<>("ParentWeight", Codec.DOUBLE),
+                    (settings, value) -> settings.parentWeight = value,
+                    settings -> settings.parentWeight
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
+                    (settings, value) -> settings.randomWeight = value,
+                    settings -> settings.randomWeight
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("MutationChance", Codec.DOUBLE),
+                    (settings, value) -> settings.mutationChance = value,
+                    settings -> settings.mutationChance
+                )
+                .add()
+                .build();
+
+    private static final BuilderCodec<InheritanceSettingsOverride> INHERITANCE_OVERRIDE_CODEC = BuilderCodec.builder(
+            InheritanceSettingsOverride.class,
+            InheritanceSettingsOverride::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("InheritOwner", Codec.BOOLEAN),
+            (settings, value) -> settings.inheritOwner = value,
+            settings -> settings.inheritOwner
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("InheritTamed", Codec.BOOLEAN),
+            (settings, value) -> settings.inheritTamed = value,
+            settings -> settings.inheritTamed
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("InheritAttachments", Codec.BOOLEAN),
+            (settings, value) -> settings.inheritAttachments = value,
+            settings -> settings.inheritAttachments
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("InheritTraits", Codec.BOOLEAN),
+            (settings, value) -> settings.inheritTraits = value,
+            settings -> settings.inheritTraits
+        )
+        .add()
+        .<AttachmentInheritanceSettingsOverride>append(
+            new KeyedCodec<>("AttachmentInheritance", ATTACHMENT_INHERITANCE_OVERRIDE_CODEC),
+            (settings, value) -> settings.attachmentInheritance = value,
+            settings -> settings.attachmentInheritance
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<OffspringLifecycleSettingsOverride> OFFSPRING_LIFECYCLE_OVERRIDE_CODEC =
+            BuilderCodec.builder(
+                OffspringLifecycleSettingsOverride.class,
+                OffspringLifecycleSettingsOverride::new
+            )
+                .<Boolean>append(
+                    new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.enabled = value,
+                    settings -> settings.enabled
+                )
+                .add()
+                .<Integer>append(
+                    new KeyedCodec<>("DefaultTimeToFullGrownSeconds", Codec.INTEGER),
+                    (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
+                    settings -> null
+                )
+                .add()
+                .<Integer>append(
+                    new KeyedCodec<>("DefaultTimeToFullGrownMinutes", Codec.INTEGER),
+                    (settings, value) -> {
+                        if (value != null) {
+                            settings.defaultTimeToFullGrownSeconds =
+                                    minutesToSeconds(value, settings.defaultTimeToFullGrownSeconds);
+                        }
+                    },
+                    settings -> null
+                )
+                .add()
+                .<Integer>append(
+                    new KeyedCodec<>("TimeToFullGrownSeconds", Codec.INTEGER),
+                    (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
+                    settings -> settings.defaultTimeToFullGrownSeconds
+                )
+                .add()
+                .<Integer>append(
+                    new KeyedCodec<>("TimeToFullGrownMinutes", Codec.INTEGER),
+                    (settings, value) -> {
+                        if (value != null) {
+                            settings.defaultTimeToFullGrownSeconds =
+                                    minutesToSeconds(value, settings.defaultTimeToFullGrownSeconds);
+                        }
+                    },
+                    settings -> null
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("DefaultBabyStartScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultBabyStartScale = value,
+                    settings -> null
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("BabyStartScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultBabyStartScale = value,
+                    settings -> settings.defaultBabyStartScale
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("DefaultAdolescentStartScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdolescentStartScale = value,
+                    settings -> null
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("AdolescentStartScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdolescentStartScale = value,
+                    settings -> settings.defaultAdolescentStartScale
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("DefaultAdultStartScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdultStartScale = value,
+                    settings -> null
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("AdultStartScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdultStartScale = value,
+                    settings -> settings.defaultAdultStartScale
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("DefaultAdolescentSwitchScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdolescentSwitchScale = value,
+                    settings -> null
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("AdolescentSwitchScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdolescentSwitchScale = value,
+                    settings -> settings.defaultAdolescentSwitchScale
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("DefaultAdultSwitchScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdultSwitchScale = value,
+                    settings -> null
+                )
+                .add()
+                .<Double>append(
+                    new KeyedCodec<>("AdultSwitchScale", Codec.DOUBLE),
+                    (settings, value) -> settings.defaultAdultSwitchScale = value,
+                    settings -> settings.defaultAdultSwitchScale
+                )
+                .add()
+                .<RoleFamily[]>append(
+                    new KeyedCodec<>("Families", ROLE_FAMILY_ARRAY_CODEC),
+                    (settings, value) -> settings.families = value,
+                    settings -> settings.families
+                )
+                .add()
+                .build();
+
+    private static final BuilderCodec<RoleOverrideSettings> ROLE_OVERRIDE_CODEC = BuilderCodec.builder(
+            RoleOverrideSettings.class,
+            RoleOverrideSettings::new
+    )
+        .<HappinessSettingsOverride>append(
+            new KeyedCodec<>("Happiness", HAPPINESS_OVERRIDE_CODEC),
+            (settings, value) -> settings.happiness = value,
+            settings -> settings.happiness
+        )
+        .add()
+        .<EligibilitySettingsOverride>append(
+            new KeyedCodec<>("Eligibility", ELIGIBILITY_OVERRIDE_CODEC),
+            (settings, value) -> settings.eligibility = value,
+            settings -> settings.eligibility
+        )
+        .add()
+        .<PairingSettingsOverride>append(
+            new KeyedCodec<>("Pairing", PAIRING_OVERRIDE_CODEC),
+            (settings, value) -> settings.pairing = value,
+            settings -> settings.pairing
+        )
+        .add()
+        .<CooldownSettingsOverride>append(
+            new KeyedCodec<>("Cooldowns", COOLDOWN_OVERRIDE_CODEC),
+            (settings, value) -> settings.cooldowns = value,
+            settings -> settings.cooldowns
+        )
+        .add()
+        .<PassiveBreedingSettingsOverride>append(
+            new KeyedCodec<>("PassiveBreeding", PASSIVE_BREEDING_OVERRIDE_CODEC),
+            (settings, value) -> settings.passiveBreeding = value,
+            settings -> settings.passiveBreeding
+        )
+        .add()
+        .<TimingSettingsOverride>append(
+            new KeyedCodec<>("Timing", TIMING_OVERRIDE_CODEC),
+            (settings, value) -> settings.timing = value,
+            settings -> settings.timing
+        )
+        .add()
+        .<InheritanceSettingsOverride>append(
+            new KeyedCodec<>("Inheritance", INHERITANCE_OVERRIDE_CODEC),
+            (settings, value) -> settings.inheritance = value,
+            settings -> settings.inheritance
+        )
+        .add()
+        .<OffspringLifecycleSettingsOverride>append(
+            new KeyedCodec<>("OffspringLifecycle", OFFSPRING_LIFECYCLE_OVERRIDE_CODEC),
+            (settings, value) -> settings.offspringLifecycle = value,
+            settings -> settings.offspringLifecycle
+        )
+        .add()
+        .build();
+
+    private static final MapCodec<RoleOverrideSettings, Map<String, RoleOverrideSettings>> ROLE_OVERRIDES_BY_ROLE_CODEC =
+            new MapCodec<>(ROLE_OVERRIDE_CODEC, HashMap::new);
 
     public static final AssetBuilderCodec<String, TwBreedingConfig> CODEC = AssetBuilderCodec.builder(
             TwBreedingConfig.class,
@@ -420,6 +926,12 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             asset -> asset.offspringLifecycle
         )
         .add()
+        .<Map<String, RoleOverrideSettings>>append(
+            new KeyedCodec<>("RoleOverrides", ROLE_OVERRIDES_BY_ROLE_CODEC),
+            (asset, value) -> asset.roleOverrides = value == null ? EMPTY_ROLE_OVERRIDES : value,
+            asset -> asset.roleOverrides
+        )
+        .add()
         .build();
 
     private static AssetStore<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> ASSET_STORE;
@@ -442,6 +954,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     private TimingSettings timing = new TimingSettings();
     private InheritanceSettings inheritance = new InheritanceSettings();
     private OffspringLifecycleSettings offspringLifecycle = new OffspringLifecycleSettings();
+    private Map<String, RoleOverrideSettings> roleOverrides = EMPTY_ROLE_OVERRIDES;
 
     public static AssetStore<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -530,6 +1043,30 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     registerRoleCacheEntry(cache, candidate, roleId);
                 }
             }
+            for (Map.Entry<String, RoleOverrideSettings> overrideEntry : candidate.getRoleOverrides().entrySet()) {
+                if (overrideEntry == null || overrideEntry.getKey() == null || overrideEntry.getKey().isBlank()) {
+                    continue;
+                }
+                registerRoleCacheEntry(cache, candidate, overrideEntry.getKey());
+                RoleOverrideSettings override = overrideEntry.getValue();
+                OffspringLifecycleSettingsOverride lifecycleOverride = override != null
+                        ? override.offspringLifecycle
+                        : null;
+                RoleFamily[] overrideFamilies = lifecycleOverride != null
+                        ? lifecycleOverride.families
+                        : null;
+                if (overrideFamilies == null) {
+                    continue;
+                }
+                for (RoleFamily family : overrideFamilies) {
+                    if (family == null) {
+                        continue;
+                    }
+                    registerRoleCacheEntry(cache, candidate, family.getAdultRoleId());
+                    registerRoleCacheEntry(cache, candidate, family.getBabyRoleId());
+                    registerRoleCacheEntry(cache, candidate, family.getAdolescentRoleId());
+                }
+            }
             OffspringLifecycleSettings lifecycle = candidate.getOffspringLifecycle();
             for (RoleFamily family : lifecycle.getFamilies()) {
                 if (family == null) {
@@ -580,6 +1117,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         if (!explicitTopLevelKeys.contains("Timing")) timing = parent.timing;
         if (!explicitTopLevelKeys.contains("Inheritance")) inheritance = parent.inheritance;
         if (!explicitTopLevelKeys.contains("OffspringLifecycle")) offspringLifecycle = parent.offspringLifecycle;
+        if (!explicitTopLevelKeys.contains("RoleOverrides")) roleOverrides = parent.roleOverrides;
     }
 
     private static void registerRoleCacheEntry(@Nonnull Map<String, TwBreedingConfig> cache,
@@ -649,32 +1187,120 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return happiness == null ? new HappinessSettings() : happiness;
     }
 
+    public HappinessSettings resolveHappiness(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.happiness == null) {
+            return getHappiness();
+        }
+        HappinessSettings resolved = copyHappiness(getHappiness());
+        override.happiness.applyTo(resolved);
+        return resolved;
+    }
+
     public EligibilitySettings getEligibility() {
         return eligibility == null ? new EligibilitySettings() : eligibility;
+    }
+
+    public EligibilitySettings resolveEligibility(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.eligibility == null) {
+            return getEligibility();
+        }
+        EligibilitySettings resolved = copyEligibility(getEligibility());
+        override.eligibility.applyTo(resolved);
+        return resolved;
     }
 
     public PairingSettings getPairing() {
         return pairing == null ? new PairingSettings() : pairing;
     }
 
+    public PairingSettings resolvePairing(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.pairing == null) {
+            return getPairing();
+        }
+        PairingSettings resolved = copyPairing(getPairing());
+        override.pairing.applyTo(resolved);
+        return resolved;
+    }
+
+    public int resolveMaxNearbySameType(@Nullable String roleId) {
+        return resolvePairing(roleId).resolveMaxNearbySameType(roleId);
+    }
+
     public CooldownSettings getCooldowns() {
         return cooldowns == null ? new CooldownSettings() : cooldowns;
+    }
+
+    public CooldownSettings resolveCooldowns(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.cooldowns == null) {
+            return getCooldowns();
+        }
+        CooldownSettings resolved = copyCooldowns(getCooldowns());
+        override.cooldowns.applyTo(resolved);
+        return resolved;
     }
 
     public PassiveBreedingSettings getPassiveBreeding() {
         return passiveBreeding == null ? new PassiveBreedingSettings() : passiveBreeding;
     }
 
+    public PassiveBreedingSettings resolvePassiveBreeding(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.passiveBreeding == null) {
+            return getPassiveBreeding();
+        }
+        PassiveBreedingSettings resolved = copyPassiveBreeding(getPassiveBreeding());
+        override.passiveBreeding.applyTo(resolved);
+        return resolved;
+    }
+
     public TimingSettings getTiming() {
         return timing == null ? new TimingSettings() : timing;
+    }
+
+    public TimingSettings resolveTiming(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.timing == null) {
+            return getTiming();
+        }
+        TimingSettings resolved = copyTiming(getTiming());
+        override.timing.applyTo(resolved);
+        return resolved;
     }
 
     public InheritanceSettings getInheritance() {
         return inheritance == null ? new InheritanceSettings() : inheritance;
     }
 
+    public InheritanceSettings resolveInheritance(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.inheritance == null) {
+            return getInheritance();
+        }
+        InheritanceSettings resolved = copyInheritance(getInheritance());
+        override.inheritance.applyTo(resolved);
+        return resolved;
+    }
+
     public OffspringLifecycleSettings getOffspringLifecycle() {
         return offspringLifecycle == null ? new OffspringLifecycleSettings() : offspringLifecycle;
+    }
+
+    public OffspringLifecycleSettings resolveOffspringLifecycle(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.offspringLifecycle == null) {
+            return getOffspringLifecycle();
+        }
+        OffspringLifecycleSettings resolved = copyOffspringLifecycle(getOffspringLifecycle());
+        override.offspringLifecycle.applyTo(resolved);
+        return resolved;
+    }
+
+    public Map<String, RoleOverrideSettings> getRoleOverrides() {
+        return roleOverrides == null ? EMPTY_ROLE_OVERRIDES : roleOverrides;
     }
 
     @Nullable
@@ -682,7 +1308,344 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         if (roleId == null || roleId.isBlank()) {
             return null;
         }
-        return getOffspringLifecycle().resolveFamilyForRole(roleId);
+        return resolveOffspringLifecycle(roleId).resolveFamilyForRole(roleId);
+    }
+
+    @Nullable
+    private RoleOverrideSettings resolveRoleOverride(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        String normalized = normalizeRoleCacheKey(roleId);
+        for (Map.Entry<String, RoleOverrideSettings> entry : getRoleOverrides().entrySet()) {
+            if (entry == null || entry.getKey() == null || entry.getKey().isBlank()) {
+                continue;
+            }
+            if (!normalizeRoleCacheKey(entry.getKey()).equals(normalized)) {
+                continue;
+            }
+            return entry.getValue();
+        }
+        return null;
+    }
+
+    private static HappinessSettings copyHappiness(@Nullable HappinessSettings source) {
+        HappinessSettings base = source == null ? new HappinessSettings() : source;
+        HappinessSettings copy = new HappinessSettings();
+        copy.threshold = base.threshold;
+        return copy;
+    }
+
+    private static EligibilitySettings copyEligibility(@Nullable EligibilitySettings source) {
+        EligibilitySettings base = source == null ? new EligibilitySettings() : source;
+        EligibilitySettings copy = new EligibilitySettings();
+        copy.requireTamed = base.requireTamed;
+        copy.requireAdult = base.requireAdult;
+        copy.requireNotInCombat = base.requireNotInCombat;
+        copy.requireNotSleeping = base.requireNotSleeping;
+        return copy;
+    }
+
+    private static PairingSettings copyPairing(@Nullable PairingSettings source) {
+        PairingSettings base = source == null ? new PairingSettings() : source;
+        PairingSettings copy = new PairingSettings();
+        copy.breedRadius = base.breedRadius;
+        copy.requireWanderMode = base.requireWanderMode;
+        copy.requireSameOwner = base.requireSameOwner;
+        copy.maxNearbySameType = base.maxNearbySameType;
+        copy.requireSameRoleId = base.requireSameRoleId;
+        copy.roleMaxNearbySameType = base.roleMaxNearbySameType == null
+                ? EMPTY_ROLE_MAX_NEARBY_OVERRIDES
+                : base.roleMaxNearbySameType.clone();
+        return copy;
+    }
+
+    private static CooldownSettings copyCooldowns(@Nullable CooldownSettings source) {
+        CooldownSettings base = source == null ? new CooldownSettings() : source;
+        CooldownSettings copy = new CooldownSettings();
+        copy.baseCooldownSeconds = base.baseCooldownSeconds;
+        copy.minDelaySeconds = base.minDelaySeconds;
+        copy.maxDelaySeconds = base.maxDelaySeconds;
+        return copy;
+    }
+
+    private static PassiveBreedingSettings copyPassiveBreeding(@Nullable PassiveBreedingSettings source) {
+        PassiveBreedingSettings base = source == null ? new PassiveBreedingSettings() : source;
+        PassiveBreedingSettings copy = new PassiveBreedingSettings();
+        copy.enabled = base.enabled;
+        copy.sweepIntervalSeconds = base.sweepIntervalSeconds;
+        copy.timerBasis = base.timerBasis;
+        return copy;
+    }
+
+    private static TimingSettings copyTiming(@Nullable TimingSettings source) {
+        TimingSettings base = source == null ? new TimingSettings() : source;
+        TimingSettings copy = new TimingSettings();
+        copy.timerBasis = base.timerBasis;
+        return copy;
+    }
+
+    private static InheritanceSettings copyInheritance(@Nullable InheritanceSettings source) {
+        InheritanceSettings base = source == null ? new InheritanceSettings() : source;
+        InheritanceSettings copy = new InheritanceSettings();
+        copy.inheritOwner = base.inheritOwner;
+        copy.inheritTamed = base.inheritTamed;
+        copy.inheritAttachments = base.inheritAttachments;
+        copy.inheritTraits = base.inheritTraits;
+        copy.attachmentInheritance = copyAttachmentInheritance(base.attachmentInheritance);
+        return copy;
+    }
+
+    private static AttachmentInheritanceSettings copyAttachmentInheritance(
+            @Nullable AttachmentInheritanceSettings source) {
+        AttachmentInheritanceSettings base = source == null
+                ? new AttachmentInheritanceSettings()
+                : source;
+        AttachmentInheritanceSettings copy = new AttachmentInheritanceSettings();
+        copy.parentWeight = base.parentWeight;
+        copy.randomWeight = base.randomWeight;
+        copy.mutationChance = base.mutationChance;
+        return copy;
+    }
+
+    private static int minutesToSeconds(int minutes, @Nullable Integer fallbackSeconds) {
+        int safeFallback = fallbackSeconds == null ? 0 : Math.max(0, fallbackSeconds);
+        if (minutes < 0) {
+            return safeFallback;
+        }
+        long seconds = (long) minutes * SECONDS_PER_MINUTE;
+        if (seconds > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) seconds;
+    }
+
+    private static OffspringLifecycleSettings copyOffspringLifecycle(@Nullable OffspringLifecycleSettings source) {
+        OffspringLifecycleSettings base = source == null ? new OffspringLifecycleSettings() : source;
+        OffspringLifecycleSettings copy = new OffspringLifecycleSettings();
+        copy.enabled = base.enabled;
+        copy.defaultTimeToFullGrownSeconds = base.defaultTimeToFullGrownSeconds;
+        copy.defaultBabyStartScale = base.defaultBabyStartScale;
+        copy.defaultAdolescentStartScale = base.defaultAdolescentStartScale;
+        copy.defaultAdultStartScale = base.defaultAdultStartScale;
+        copy.defaultAdolescentSwitchScale = base.defaultAdolescentSwitchScale;
+        copy.defaultAdultSwitchScale = base.defaultAdultSwitchScale;
+        copy.families = base.families == null ? EMPTY_ROLE_FAMILIES : base.families.clone();
+        return copy;
+    }
+
+    /** Optional per-role overrides for breeding sections. */
+    public static final class RoleOverrideSettings {
+        private HappinessSettingsOverride happiness;
+        private EligibilitySettingsOverride eligibility;
+        private PairingSettingsOverride pairing;
+        private CooldownSettingsOverride cooldowns;
+        private PassiveBreedingSettingsOverride passiveBreeding;
+        private TimingSettingsOverride timing;
+        private InheritanceSettingsOverride inheritance;
+        private OffspringLifecycleSettingsOverride offspringLifecycle;
+    }
+
+    /** Partial happiness override patch for a single role. */
+    public static final class HappinessSettingsOverride {
+        private Double threshold;
+
+        private void applyTo(@Nonnull HappinessSettings target) {
+            if (threshold != null) {
+                target.threshold = threshold;
+            }
+        }
+    }
+
+    /** Partial eligibility override patch for a single role. */
+    public static final class EligibilitySettingsOverride {
+        private Boolean requireTamed;
+        private Boolean requireAdult;
+        private Boolean requireNotInCombat;
+        private Boolean requireNotSleeping;
+
+        private void applyTo(@Nonnull EligibilitySettings target) {
+            if (requireTamed != null) {
+                target.requireTamed = requireTamed;
+            }
+            if (requireAdult != null) {
+                target.requireAdult = requireAdult;
+            }
+            if (requireNotInCombat != null) {
+                target.requireNotInCombat = requireNotInCombat;
+            }
+            if (requireNotSleeping != null) {
+                target.requireNotSleeping = requireNotSleeping;
+            }
+        }
+    }
+
+    /** Partial pairing override patch for a single role. */
+    public static final class PairingSettingsOverride {
+        private Double breedRadius;
+        private Boolean requireWanderMode;
+        private Boolean requireSameOwner;
+        private Integer maxNearbySameType;
+        private Boolean requireSameRoleId;
+        private RoleMaxNearbySameTypeOverride[] roleMaxNearbySameType;
+
+        private void applyTo(@Nonnull PairingSettings target) {
+            if (breedRadius != null) {
+                target.breedRadius = breedRadius;
+            }
+            if (requireWanderMode != null) {
+                target.requireWanderMode = requireWanderMode;
+            }
+            if (requireSameOwner != null) {
+                target.requireSameOwner = requireSameOwner;
+            }
+            if (maxNearbySameType != null) {
+                target.maxNearbySameType = maxNearbySameType;
+            }
+            if (requireSameRoleId != null) {
+                target.requireSameRoleId = requireSameRoleId;
+            }
+            if (roleMaxNearbySameType != null) {
+                target.roleMaxNearbySameType = roleMaxNearbySameType;
+            }
+        }
+    }
+
+    /** Partial cooldown override patch for a single role. */
+    public static final class CooldownSettingsOverride {
+        private Integer baseCooldownSeconds;
+        private Integer minDelaySeconds;
+        private Integer maxDelaySeconds;
+
+        private void applyTo(@Nonnull CooldownSettings target) {
+            if (baseCooldownSeconds != null) {
+                target.baseCooldownSeconds = baseCooldownSeconds;
+            }
+            if (minDelaySeconds != null) {
+                target.minDelaySeconds = minDelaySeconds;
+            }
+            if (maxDelaySeconds != null) {
+                target.maxDelaySeconds = maxDelaySeconds;
+            }
+        }
+    }
+
+    /** Partial passive-breeding override patch for a single role. */
+    public static final class PassiveBreedingSettingsOverride {
+        private Boolean enabled;
+        private Integer sweepIntervalSeconds;
+        private TimerBasis timerBasis;
+
+        private void applyTo(@Nonnull PassiveBreedingSettings target) {
+            if (enabled != null) {
+                target.enabled = enabled;
+            }
+            if (sweepIntervalSeconds != null) {
+                target.sweepIntervalSeconds = sweepIntervalSeconds;
+            }
+            if (timerBasis != null) {
+                target.timerBasis = timerBasis;
+            }
+        }
+    }
+
+    /** Partial timing override patch for a single role. */
+    public static final class TimingSettingsOverride {
+        private TimerBasis timerBasis;
+
+        private void applyTo(@Nonnull TimingSettings target) {
+            if (timerBasis != null) {
+                target.timerBasis = timerBasis;
+            }
+        }
+    }
+
+    /** Partial attachment-inheritance override patch for a single role. */
+    public static final class AttachmentInheritanceSettingsOverride {
+        private Double parentWeight;
+        private Double randomWeight;
+        private Double mutationChance;
+
+        private void applyTo(@Nonnull AttachmentInheritanceSettings target) {
+            if (parentWeight != null) {
+                target.parentWeight = parentWeight;
+            }
+            if (randomWeight != null) {
+                target.randomWeight = randomWeight;
+            }
+            if (mutationChance != null) {
+                target.mutationChance = mutationChance;
+            }
+        }
+    }
+
+    /** Partial inheritance override patch for a single role. */
+    public static final class InheritanceSettingsOverride {
+        private Boolean inheritOwner;
+        private Boolean inheritTamed;
+        private Boolean inheritAttachments;
+        private Boolean inheritTraits;
+        private AttachmentInheritanceSettingsOverride attachmentInheritance;
+
+        private void applyTo(@Nonnull InheritanceSettings target) {
+            if (inheritOwner != null) {
+                target.inheritOwner = inheritOwner;
+            }
+            if (inheritTamed != null) {
+                target.inheritTamed = inheritTamed;
+            }
+            if (inheritAttachments != null) {
+                target.inheritAttachments = inheritAttachments;
+            }
+            if (inheritTraits != null) {
+                target.inheritTraits = inheritTraits;
+            }
+            if (attachmentInheritance != null) {
+                if (target.attachmentInheritance == null) {
+                    target.attachmentInheritance = new AttachmentInheritanceSettings();
+                }
+                attachmentInheritance.applyTo(target.attachmentInheritance);
+            }
+        }
+    }
+
+    /** Partial lifecycle override patch for a single role. */
+    public static final class OffspringLifecycleSettingsOverride {
+        private Boolean enabled;
+        private Integer defaultTimeToFullGrownSeconds;
+        private Double defaultBabyStartScale;
+        private Double defaultAdolescentStartScale;
+        private Double defaultAdultStartScale;
+        private Double defaultAdolescentSwitchScale;
+        private Double defaultAdultSwitchScale;
+        private RoleFamily[] families;
+
+        private void applyTo(@Nonnull OffspringLifecycleSettings target) {
+            if (enabled != null) {
+                target.enabled = enabled;
+            }
+            if (defaultTimeToFullGrownSeconds != null) {
+                target.defaultTimeToFullGrownSeconds = defaultTimeToFullGrownSeconds;
+            }
+            if (defaultBabyStartScale != null) {
+                target.defaultBabyStartScale = defaultBabyStartScale;
+            }
+            if (defaultAdolescentStartScale != null) {
+                target.defaultAdolescentStartScale = defaultAdolescentStartScale;
+            }
+            if (defaultAdultStartScale != null) {
+                target.defaultAdultStartScale = defaultAdultStartScale;
+            }
+            if (defaultAdolescentSwitchScale != null) {
+                target.defaultAdolescentSwitchScale = defaultAdolescentSwitchScale;
+            }
+            if (defaultAdultSwitchScale != null) {
+                target.defaultAdultSwitchScale = defaultAdultSwitchScale;
+            }
+            if (families != null) {
+                target.families = families;
+            }
+        }
     }
 
     /** Tunable values for breeding-specific happiness gating. */
@@ -725,6 +1688,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private boolean requireSameOwner;
         private int maxNearbySameType;
         private boolean requireSameRoleId = true;
+        private RoleMaxNearbySameTypeOverride[] roleMaxNearbySameType = EMPTY_ROLE_MAX_NEARBY_OVERRIDES;
 
         public double getBreedRadius() {
             return breedRadius;
@@ -739,11 +1703,54 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
 
         public int getMaxNearbySameType() {
-            return maxNearbySameType;
+            return Math.max(0, maxNearbySameType);
         }
 
         public boolean isRequireSameRoleId() {
             return requireSameRoleId;
+        }
+
+        public RoleMaxNearbySameTypeOverride[] getRoleMaxNearbySameType() {
+            return roleMaxNearbySameType == null ? EMPTY_ROLE_MAX_NEARBY_OVERRIDES : roleMaxNearbySameType;
+        }
+
+        public int resolveMaxNearbySameType(@Nullable String roleId) {
+            int fallback = getMaxNearbySameType();
+            if (roleId == null || roleId.isBlank()) {
+                return fallback;
+            }
+            for (RoleMaxNearbySameTypeOverride override : getRoleMaxNearbySameType()) {
+                if (override == null || !override.matchesRole(roleId)) {
+                    continue;
+                }
+                return override.getMaxNearbySameType(fallback);
+            }
+            return fallback;
+        }
+    }
+
+    /** Optional per-role Pairing MaxNearbySameType overrides. */
+    public static final class RoleMaxNearbySameTypeOverride {
+        private String roleId;
+        private Integer maxNearbySameType;
+
+        @Nullable
+        public String getRoleId() {
+            return roleId;
+        }
+
+        public int getMaxNearbySameType(int fallback) {
+            if (maxNearbySameType == null) {
+                return Math.max(0, fallback);
+            }
+            return Math.max(0, maxNearbySameType);
+        }
+
+        public boolean matchesRole(@Nullable String targetRoleId) {
+            if (roleId == null || roleId.isBlank() || targetRoleId == null || targetRoleId.isBlank()) {
+                return false;
+            }
+            return normalizeRoleCacheKey(roleId).equals(normalizeRoleCacheKey(targetRoleId));
         }
     }
 

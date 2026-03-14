@@ -172,7 +172,8 @@ public final class CompanionProgressionBootstrapService {
         long lastUpdateMs = happiness != null && happiness.getLastUpdateMs() > 0L
                 ? happiness.getLastUpdateMs()
                 : now;
-        boolean ready = happinessValue >= config.getHappiness().getThreshold();
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        boolean ready = happinessValue >= config.resolveHappiness(roleId).getThreshold();
         TameworkBreedingComponent existing = store.getComponent(npcRef, breedingType);
         if (existing != null) {
             boolean changed = false;
@@ -198,6 +199,7 @@ public final class CompanionProgressionBootstrapService {
                     existing.getCooldownUntilMs(),
                     now,
                     config,
+                    roleId,
                     store
             );
             if (migratedCooldownUntilMs != existing.getCooldownUntilMs()) {
@@ -346,6 +348,7 @@ public final class CompanionProgressionBootstrapService {
     private static long migrateLegacyCooldownUntilMs(long cooldownUntilMs,
                                                      long nowGameMs,
                                                      TwBreedingConfig breedingConfig,
+                                                     @Nullable String roleId,
                                                      Store<EntityStore> store) {
         if (cooldownUntilMs <= 0L || nowGameMs >= 0L || cooldownUntilMs < 0L) {
             return cooldownUntilMs;
@@ -356,7 +359,7 @@ public final class CompanionProgressionBootstrapService {
             return 0L;
         }
         TwBreedingConfig.TimerBasis timerBasis = breedingConfig != null
-                ? breedingConfig.getTiming().getTimerBasis()
+                ? breedingConfig.resolveTiming(roleId).getTimerBasis()
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
         long remainingGameMs = BreedingTimeService.toGameDurationMs(
                 remainingRealMs / 1000.0,

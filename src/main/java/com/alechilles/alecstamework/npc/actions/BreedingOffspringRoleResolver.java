@@ -17,7 +17,8 @@ final class BreedingOffspringRoleResolver {
         }
 
         if (breedingConfig != null) {
-            TwBreedingConfig.OffspringLifecycleSettings lifecycle = breedingConfig.getOffspringLifecycle();
+            TwBreedingConfig.OffspringLifecycleSettings lifecycle =
+                    breedingConfig.resolveOffspringLifecycle(parentRoleId);
             if (lifecycle != null && lifecycle.isEnabled()) {
                 TwBreedingConfig.RoleFamily family = breedingConfig.resolveLifecycleFamilyForRole(parentRoleId);
                 if (family != null) {

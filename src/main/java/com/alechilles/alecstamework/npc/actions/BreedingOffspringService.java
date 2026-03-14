@@ -339,7 +339,13 @@ final class BreedingOffspringService {
     private CooldownResolution resolveCooldown(@Nullable TwBreedingConfig config,
                                                Ref<EntityStore> npcRef,
                                                Store<EntityStore> store) {
-        TwBreedingConfig.CooldownSettings settings = config != null ? config.getCooldowns() : null;
+        String roleId = null;
+        if (npcRef != null && npcRef.isValid() && store != null) {
+            roleId = resolveRoleId(store.getComponent(npcRef, NPCEntity.getComponentType()));
+        }
+        TwBreedingConfig.CooldownSettings settings = config != null
+                ? config.resolveCooldowns(roleId)
+                : null;
         int baseSeconds = settings != null ? Math.max(0, settings.getBaseCooldownSeconds()) : 600;
         int minDelay = settings != null ? Math.max(0, settings.getMinDelaySeconds()) : 15;
         int maxDelay = settings != null ? Math.max(0, settings.getMaxDelaySeconds()) : 45;
@@ -363,7 +369,7 @@ final class BreedingOffspringService {
         }
         double adjustedSeconds = baseSecondsWithDelay * multiplier;
         TwBreedingConfig.TimerBasis timerBasis = config != null
-                ? config.getTiming().getTimerBasis()
+                ? config.resolveTiming(roleId).getTimerBasis()
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
         long durationMs = BreedingTimeService.toGameDurationMs(adjustedSeconds, timerBasis, store);
         double currentRate = BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store);

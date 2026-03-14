@@ -109,7 +109,7 @@ public final class PassiveBreedingSweepService {
             }
 
             TwBreedingConfig config = BreedingConfigResolver.resolveConfig(ref, store, breeding);
-            if (config == null || !config.isEnabled() || !config.getPassiveBreeding().isEnabled()) {
+            if (config == null || !config.isEnabled() || !config.resolvePassiveBreeding(roleId).isEnabled()) {
                 continue;
             }
             sweepCandidates.add(new SweepCandidate(ref, npc, roleId, new Vector3d(transform.getPosition()), config));
@@ -127,14 +127,17 @@ public final class PassiveBreedingSweepService {
                                                     @Nonnull TameworkBreedingComponent breeding,
                                                     @Nonnull Store<EntityStore> store) {
         double happiness = CompanionHappinessService.resolveCurrentValue(candidate.ref(), store, breeding.getHappiness());
-        double threshold = BreedingEligibilityService.resolveThreshold(null, candidate.config().getHappiness().getThreshold());
+        double threshold = BreedingEligibilityService.resolveThreshold(
+                null,
+                candidate.config().resolveHappiness(candidate.roleId()).getThreshold()
+        );
         double effectiveHappiness = BreedingEligibilityService.resolveEffectiveHappiness(happiness, 1.0, null);
         return BreedingEligibilityService.isEligible(effectiveHappiness, threshold);
     }
 
     private static boolean passesEligibilityGates(@Nonnull SweepCandidate candidate,
                                                   @Nonnull Store<EntityStore> store) {
-        TwBreedingConfig.EligibilitySettings eligibility = candidate.config().getEligibility();
+        TwBreedingConfig.EligibilitySettings eligibility = candidate.config().resolveEligibility(candidate.roleId());
         if (eligibility == null) {
             return true;
         }
@@ -155,11 +158,11 @@ public final class PassiveBreedingSweepService {
     private boolean isOvercrowded(@Nonnull SweepCandidate candidate,
                                   @Nonnull Store<EntityStore> store,
                                   @Nonnull List<BirthReservation> birthReservations) {
-        TwBreedingConfig.PairingSettings pairing = candidate.config().getPairing();
+        TwBreedingConfig.PairingSettings pairing = candidate.config().resolvePairing(candidate.roleId());
         if (pairing == null) {
             return false;
         }
-        int maxNearbySameType = Math.max(0, pairing.getMaxNearbySameType());
+        int maxNearbySameType = pairing.resolveMaxNearbySameType(candidate.roleId());
         if (maxNearbySameType <= 0) {
             return false;
         }

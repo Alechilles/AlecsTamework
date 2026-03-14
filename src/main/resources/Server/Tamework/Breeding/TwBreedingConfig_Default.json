@@ -26,7 +26,7 @@
     "RequireSameRoleId": true
   },
   "Cooldowns": {
-    "BaseCooldownSeconds": 1440,
+    "BaseCooldownMinutes": 24,
     "MinDelaySeconds": 0,
     "MaxDelaySeconds": 300
   },
@@ -51,18 +51,36 @@
   },
   "OffspringLifecycle": {
     "Enabled": true,
-    "DefaultTimeToFullGrownSeconds": 420,
-    "DefaultBabyStartScale": 0.55,
-    "DefaultAdolescentStartScale": 0.8,
-    "DefaultAdultStartScale": 0.8,
-    "DefaultAdolescentSwitchScale": 1.0,
-    "DefaultAdultSwitchScale": 1.0,
-    "Families": [
-      {
-        "AdultRoleId": "Mob_Tamework_Example",
-        "BabyRoleId": "Mob_Tamework_Example_Baby",
-        "TimeToFullGrownSeconds": 2880
+    "TimeToFullGrownMinutes": 7,
+    "BabyStartScale": 0.55,
+    "AdolescentStartScale": 0.8,
+    "AdultStartScale": 0.8,
+    "AdolescentSwitchScale": 1.0,
+    "AdultSwitchScale": 1.0
+  },
+  "RoleOverrides": {
+    "Mob_Tamework_Example": {
+      "OffspringLifecycle": {
+        "Families": [
+          {
+            "AdultRoleId": "Mob_Tamework_Example",
+            "BabyRoleId": "Mob_Tamework_Example_Baby",
+            "TimeToFullGrownMinutes": 48
+          }
+        ]
       }
-    ]
+    },
+    "Mob_Tamework_Example_Baby": {
+      "OffspringLifecycle": {
+        "Families": [
+          {
+            "AdultRoleId": "Mob_Tamework_Example",
+            "BabyRoleId": "Mob_Tamework_Example_Baby",
+            "TimeToFullGrownMinutes": 48
+          }
+        ]
+      }
+    }
   }
 }
+

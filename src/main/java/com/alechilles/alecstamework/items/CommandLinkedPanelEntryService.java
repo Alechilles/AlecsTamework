@@ -711,12 +711,16 @@ final class CommandLinkedPanelEntryService {
             }
             config = TwBreedingConfig.resolveForRole(roleId);
         }
-        if (config == null || config.getCooldowns() == null || config.getTiming() == null) {
+        String roleId = resolvedRoleId;
+        if (roleId == null || roleId.isBlank()) {
+            roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        }
+        if (config == null || config.resolveCooldowns(roleId) == null || config.resolveTiming(roleId) == null) {
             return 0.0;
         }
         long baseDurationMs = BreedingTimeService.toGameDurationMs(
-                config.getCooldowns().getBaseCooldownSeconds(),
-                config.getTiming().getTimerBasis(),
+                config.resolveCooldowns(roleId).getBaseCooldownSeconds(),
+                config.resolveTiming(roleId).getTimerBasis(),
                 store
         );
         if (baseDurationMs <= 0L) {

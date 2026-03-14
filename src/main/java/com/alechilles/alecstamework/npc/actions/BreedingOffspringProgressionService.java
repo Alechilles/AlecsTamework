@@ -69,6 +69,7 @@ final class BreedingOffspringProgressionService {
                 parentBOwner,
                 parentATamed,
                 parentBTamed,
+                childRoleId,
                 breedingConfigId,
                 store
         );
@@ -81,6 +82,7 @@ final class BreedingOffspringProgressionService {
                 parentARef,
                 parentBRef,
                 breedingConfig,
+                childRoleId,
                 breedingConfigId,
                 store
         );
@@ -143,13 +145,14 @@ final class BreedingOffspringProgressionService {
                                            @Nullable Ref<EntityStore> parentARef,
                                            @Nullable Ref<EntityStore> parentBRef,
                                            @Nullable TwBreedingConfig breedingConfig,
+                                           @Nullable String childRoleId,
                                            @Nullable String breedingConfigId,
                                            @Nullable Store<EntityStore> store) {
         if (childRef == null || !childRef.isValid() || store == null) {
             return;
         }
         TwBreedingConfig.InheritanceSettings inheritance = breedingConfig != null
-                ? breedingConfig.getInheritance()
+                ? breedingConfig.resolveInheritance(childRoleId)
                 : null;
         CompanionAttachmentInheritanceService.AttachmentInheritanceProfile profile =
                 CompanionAttachmentInheritanceService.AttachmentInheritanceProfile.fromConfig(inheritance);
@@ -197,6 +200,7 @@ final class BreedingOffspringProgressionService {
                                                       OwnerSnapshot parentBOwner,
                                                       boolean parentATamed,
                                                       boolean parentBTamed,
+                                                      @Nullable String childRoleId,
                                                       @Nullable String breedingConfigId,
                                                       Store<EntityStore> store) {
         if (childRef == null || !childRef.isValid() || store == null) {
@@ -204,7 +208,7 @@ final class BreedingOffspringProgressionService {
         }
         TwBreedingConfig config = resolveBreedingConfig(breedingConfigId);
         TwBreedingConfig.InheritanceSettings inheritance = config != null
-                ? config.getInheritance()
+                ? config.resolveInheritance(childRoleId)
                 : null;
         boolean inheritOwner = inheritance == null || inheritance.isInheritOwner();
         boolean inheritTamed = inheritance == null || inheritance.isInheritTamed();
@@ -247,7 +251,7 @@ final class BreedingOffspringProgressionService {
 
         long seed = resolveOffspringSeed(childNpc, parentARef, parentBRef, store);
         TwBreedingConfig breedingConfig = resolveBreedingConfig(breedingConfigId);
-        boolean inheritTraits = breedingConfig != null && breedingConfig.getInheritance().isInheritTraits();
+        boolean inheritTraits = breedingConfig != null && breedingConfig.resolveInheritance(childRoleId).isInheritTraits();
         double previousSizeMultiplier = TraitModifierService.resolveMultiplier(
                 existingTraits,
                 traitConfig,

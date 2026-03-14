@@ -53,8 +53,9 @@ final class InteractionBreedingEffects {
         if (breeding.isCooldownActive(now)) {
             return false;
         }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         TwBreedingConfig config = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
-        if (!passesEligibilityGates(config, role, npcRef, store)) {
+        if (!passesEligibilityGates(config, role, npcRef, store, roleId)) {
             return false;
         }
         if ((breeding.getConfigId() == null || breeding.getConfigId().isBlank())
@@ -67,7 +68,7 @@ final class InteractionBreedingEffects {
         if (Math.abs(breeding.getHappiness() - happiness) > 0.000001) {
             breeding.setHappiness(happiness);
         }
-        double threshold = resolveThreshold(interaction, config);
+        double threshold = resolveThreshold(interaction, config, roleId);
         double effectiveHappiness = BreedingEligibilityService.resolveEffectiveHappiness(
                 happiness,
                 1.0,
@@ -100,17 +101,17 @@ final class InteractionBreedingEffects {
     private boolean passesEligibilityGates(@Nullable TwBreedingConfig config,
                                            @Nullable Role role,
                                            Ref<EntityStore> npcRef,
-                                           Store<EntityStore> store) {
+                                           Store<EntityStore> store,
+                                           @Nullable String roleId) {
         if (config == null) {
             return true;
         }
-        TwBreedingConfig.EligibilitySettings eligibility = config.getEligibility();
+        TwBreedingConfig.EligibilitySettings eligibility = config.resolveEligibility(roleId);
         if (eligibility.isRequireTamed() && !TamedStateResolver.isTamed(npcRef, store)) {
             owner.logDebug("TameworkInteract: breeding blocked. NPC is not tamed.");
             return false;
         }
         if (eligibility.isRequireAdult()) {
-            String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
             if (!CompanionLifeStageService.isAdult(npcRef, store, roleId)) {
                 owner.logDebug("TameworkInteract: breeding blocked. NPC is not adult. role=" + roleId);
                 return false;
@@ -141,9 +142,11 @@ final class InteractionBreedingEffects {
         return stateSupport.getStateHelper().getStateName(currentState);
     }
 
-    private double resolveThreshold(BreedInteraction interaction, @Nullable TwBreedingConfig config) {
-        double fallback = config != null && config.getHappiness() != null
-                ? config.getHappiness().getThreshold()
+    private double resolveThreshold(BreedInteraction interaction,
+                                    @Nullable TwBreedingConfig config,
+                                    @Nullable String roleId) {
+        double fallback = config != null && config.resolveHappiness(roleId) != null
+                ? config.resolveHappiness(roleId).getThreshold()
                 : 0.0;
         return BreedingEligibilityService.resolveThreshold(
                 interaction != null ? interaction.getMinHappiness() : null,
