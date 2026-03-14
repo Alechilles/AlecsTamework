@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+
+## 2.3.1 - Tranquilizer + Command UX + Metrics - 2026-03-14
 ### Added
 - Interaction `Requires` now supports `NpcHealthPercent` checks with comparison operators (`>`, `>=`, `<`, `<=`, `==`, `!=`) against a `0-100` health-percent threshold.
 - New NPC sensor builder `TameworkEffectActive` for role instructions/sensors, including optional `MinRemainingSeconds` checks for effect-duration thresholds.
