@@ -750,6 +750,21 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         return commandList;
     }
 
+    /**
+     * Builds the built-in Return Home command used by panel actions when an item config does not
+     * define an explicit return-home command entry.
+     */
+    public static CommandEntry createBuiltInReturnHomeCommand() {
+        MoveToPositionStep step = new MoveToPositionStep();
+        step.source = MoveSource.StoredHome;
+
+        CommandEntry entry = new CommandEntry();
+        entry.id = "ReturnHome";
+        entry.displayName = "Return Home";
+        entry.steps = new CommandStep[] { step };
+        return entry;
+    }
+
     @Nullable
     public CommandEntry findCommandById(@Nullable String commandId) {
         if (commandId == null || commandId.isBlank()) {

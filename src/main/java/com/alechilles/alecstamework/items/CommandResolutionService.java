@@ -104,7 +104,10 @@ final class CommandResolutionService {
             }
         }
         CommandEntry fallback = resolveCommand(config, null, itemStack);
-        return isReturnHomeCommand(fallback) ? fallback : null;
+        if (isReturnHomeCommand(fallback)) {
+            return fallback;
+        }
+        return TwCommandItemConfig.createBuiltInReturnHomeCommand();
     }
 
     Ref<EntityStore> resolveCommandTarget(Ref<EntityStore> playerRef,
