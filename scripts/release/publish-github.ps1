@@ -154,7 +154,7 @@ $uploadHeaders = @{
 $artifactBytes = [System.IO.File]::ReadAllBytes($resolvedArtifactPath)
 $uploadedAsset = Invoke-RestMethod `
     -Method Post `
-    -Uri "$uploadUrl?name=$encodedArtifactName&label=$encodedArtifactName" `
+    -Uri "${uploadUrl}?name=$encodedArtifactName&label=$encodedArtifactName" `
     -Headers $uploadHeaders `
     -ContentType "application/java-archive" `
     -Body $artifactBytes
