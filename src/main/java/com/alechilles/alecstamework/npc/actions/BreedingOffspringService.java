@@ -837,7 +837,7 @@ final class BreedingOffspringService {
         if (instance == null || instance.getLogger() == null || message == null || message.isBlank()) {
             return;
         }
-        instance.getLogger().at(Level.INFO).log(message);
+        instance.getLogger().at(Level.FINE).log(message);
     }
 
     private record PairingTargets(Vector3d parentATarget, Vector3d parentBTarget) {
