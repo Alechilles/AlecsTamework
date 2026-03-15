@@ -85,6 +85,7 @@ final class SpawnerSpawnPositionService {
         if (transform == null) {
             return null;
         }
+        Vector3d playerPosition = new Vector3d(transform.getPosition());
         Vector3f rotation = new Vector3f(transform.getRotation());
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
         if (headRotation != null) {
@@ -123,22 +124,40 @@ final class SpawnerSpawnPositionService {
                 spawnY = blockY + 1.0 + SPAWN_SURFACE_OFFSET_Y;
             }
             Vector3d spawnPos = new Vector3d(clampedX, spawnY, clampedZ);
+            Vector3d clampedSpawnPos = clampToMaxDistance(playerPosition, spawnPos, maxDistance);
+            if (clampedSpawnPos != spawnPos) {
+                logSpawnDebug(
+                        "hit-distance-clamped",
+                        targetLocation,
+                        adjusted,
+                        clampedSpawnPos,
+                        forward,
+                        rayDistance,
+                        maxDistance,
+                        blockX,
+                        blockY,
+                        blockZ
+                );
+                return clampedSpawnPos;
+            }
             logSpawnDebug("hit", targetLocation, adjusted, spawnPos, forward, rayDistance, maxDistance, blockX, blockY, blockZ);
             return spawnPos;
         }
 
-        Vector3d spawnPos = new Vector3d(transform.getPosition());
+        Vector3d spawnPos = new Vector3d(playerPosition);
         spawnPos.x += forward.x * spawnDistance;
         spawnPos.y += forward.y * spawnDistance + SPAWN_OFFSET_Y;
         spawnPos.z += forward.z * spawnDistance;
-        double minY = transform.getPosition().y + SPAWN_SURFACE_OFFSET_Y;
+        double minY = playerPosition.y + SPAWN_SURFACE_OFFSET_Y;
         if (spawnPos.y < minY) {
             spawnPos.y = minY;
-            logSpawnDebug("fallback-clamped", null, null, spawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
-            return spawnPos;
+            Vector3d clampedSpawnPos = clampToMaxDistance(playerPosition, spawnPos, maxDistance);
+            logSpawnDebug("fallback-clamped", null, null, clampedSpawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
+            return clampedSpawnPos;
         }
-        logSpawnDebug("fallback", null, null, spawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
-        return spawnPos;
+        Vector3d clampedSpawnPos = clampToMaxDistance(playerPosition, spawnPos, maxDistance);
+        logSpawnDebug("fallback", null, null, clampedSpawnPos, forward, spawnDistance, maxDistance, -1, -1, -1);
+        return clampedSpawnPos;
     }
 
     Vector3f resolveSpawnRotation(@Nullable Store<EntityStore> store,
@@ -228,5 +247,30 @@ final class SpawnerSpawnPositionService {
             return "(null)";
         }
         return String.format(Locale.US, "(%.3f, %.3f, %.3f)", vector.x, vector.y, vector.z);
+    }
+
+    @Nullable
+    static Vector3d clampToMaxDistance(@Nullable Vector3d origin, @Nullable Vector3d target, double maxDistance) {
+        if (origin == null || target == null || maxDistance <= 0.0) {
+            return target;
+        }
+        double dx = target.x - origin.x;
+        double dy = target.y - origin.y;
+        double dz = target.z - origin.z;
+        double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
+        double maxDistanceSquared = maxDistance * maxDistance;
+        if (distanceSquared <= maxDistanceSquared) {
+            return target;
+        }
+        double distance = Math.sqrt(distanceSquared);
+        if (distance <= 0.000001) {
+            return target;
+        }
+        double scale = maxDistance / distance;
+        return new Vector3d(
+                origin.x + (dx * scale),
+                origin.y + (dy * scale),
+                origin.z + (dz * scale)
+        );
     }
 }
