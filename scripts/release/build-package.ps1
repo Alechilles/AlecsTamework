@@ -5,6 +5,7 @@ param(
     [string]$OutputDir = "artifacts",
     [string]$ArtifactPathOutputFile = "",
     [string]$HytaleInstallPath = "",
+    [string]$PrebuiltArtifactPath = "",
     [bool]$SkipTests = $false
 )
 
@@ -38,41 +39,56 @@ $artifactPath = Join-Path $OutputDir $artifactName
 
 switch ($config.packaging) {
     "jar" {
-        $mvnArgs = @("-B", "clean", "test", "package")
-        if ($SkipTests) {
-            $mvnArgs = @("-B", "clean", "package", "-DskipTests")
-        }
-
-        if (-not [string]::IsNullOrWhiteSpace($HytaleInstallPath)) {
-            if (-not (Test-Path -Path $HytaleInstallPath)) {
-                throw "Provided hytale install path was not found: '$HytaleInstallPath'."
+        if (-not [string]::IsNullOrWhiteSpace($PrebuiltArtifactPath)) {
+            if (-not (Test-Path -Path $PrebuiltArtifactPath)) {
+                throw "Prebuilt artifact '$PrebuiltArtifactPath' was not found."
             }
 
-            $resolvedInstallPath = (Resolve-Path -Path $HytaleInstallPath).Path
-            $serverJarPath = Join-Path $resolvedInstallPath "Server\HytaleServer.jar"
-            if (-not (Test-Path -Path $serverJarPath)) {
-                throw "Expected HytaleServer.jar at '$serverJarPath'."
+            $resolvedPrebuiltArtifact = (Resolve-Path -Path $PrebuiltArtifactPath).Path
+            $prebuiltArtifact = Get-Item -Path $resolvedPrebuiltArtifact
+            if ($prebuiltArtifact.Length -le 0) {
+                throw "Prebuilt artifact is empty: '$resolvedPrebuiltArtifact'."
             }
 
-            $mvnArgs += "-Dhytale.install.path=$resolvedInstallPath"
-            Write-Host "Using hytale.install.path override: $resolvedInstallPath"
+            Write-Host "Using prebuilt artifact: $resolvedPrebuiltArtifact"
+            Copy-Item -Path $resolvedPrebuiltArtifact -Destination $artifactPath -Force
+        } else {
+            $mvnArgs = @("-B", "clean", "test", "package")
+            if ($SkipTests) {
+                $mvnArgs = @("-B", "clean", "package", "-DskipTests")
+            }
+
+            if (-not [string]::IsNullOrWhiteSpace($HytaleInstallPath)) {
+                if (-not (Test-Path -Path $HytaleInstallPath)) {
+                    throw "Provided hytale install path was not found: '$HytaleInstallPath'."
+                }
+
+                $resolvedInstallPath = (Resolve-Path -Path $HytaleInstallPath).Path
+                $serverJarPath = Join-Path $resolvedInstallPath "Server\HytaleServer.jar"
+                if (-not (Test-Path -Path $serverJarPath)) {
+                    throw "Expected HytaleServer.jar at '$serverJarPath'."
+                }
+
+                $mvnArgs += "-Dhytale.install.path=$resolvedInstallPath"
+                Write-Host "Using hytale.install.path override: $resolvedInstallPath"
+            }
+
+            & .\mvnw.cmd @mvnArgs
+            if ($LASTEXITCODE -ne 0) {
+                throw "Maven build failed with exit code $LASTEXITCODE."
+            }
+
+            $builtJar = Get-ChildItem -Path "target" -Filter "*.jar" |
+                Where-Object { $_.Name -notlike "original-*" } |
+                Sort-Object -Property LastWriteTime -Descending |
+                Select-Object -First 1
+
+            if ($null -eq $builtJar) {
+                throw "No built jar was found in target/."
+            }
+
+            Copy-Item -Path $builtJar.FullName -Destination $artifactPath -Force
         }
-
-        & .\mvnw.cmd @mvnArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "Maven build failed with exit code $LASTEXITCODE."
-        }
-
-        $builtJar = Get-ChildItem -Path "target" -Filter "*.jar" |
-            Where-Object { $_.Name -notlike "original-*" } |
-            Sort-Object -Property LastWriteTime -Descending |
-            Select-Object -First 1
-
-        if ($null -eq $builtJar) {
-            throw "No built jar was found in target/."
-        }
-
-        Copy-Item -Path $builtJar.FullName -Destination $artifactPath -Force
     }
     "zip" {
         $stagingDir = Join-Path $OutputDir "staging"
