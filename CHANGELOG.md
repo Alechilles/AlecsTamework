@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 2.4.1 - Mounted Companion Hotfix - 2026-03-15
+### Fixed
+- Mounted companion name hide/restore now preserves existing `Nameplate` archetype membership during mount role swaps, preventing world-thread crashes when mounting or dismounting Tamework companions with custom names.
+- Unnamed mounted companions now skip the temporary name-hide path entirely, preventing mount-time crashes that only reproduced when no name was present before mounting.
+- Breeding lifecycle diagnostics such as cooldown application and spawn-success traces are no longer emitted at default `INFO` level during normal gameplay.
+
 ## 2.4.0 - Tranquilizer + Command UX + Metrics - 2026-03-14
 ### Added
 - Interaction `Requires` now supports `NpcHealthPercent` checks with comparison operators (`>`, `>=`, `<`, `<=`, `==`, `!=`) against a `0-100` health-percent threshold.
