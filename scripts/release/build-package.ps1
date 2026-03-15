@@ -51,7 +51,9 @@ switch ($config.packaging) {
             }
 
             Write-Host "Using prebuilt artifact: $resolvedPrebuiltArtifact"
-            Copy-Item -Path $resolvedPrebuiltArtifact -Destination $artifactPath -Force
+            if ($resolvedPrebuiltArtifact -ne $artifactPath) {
+                Copy-Item -Path $resolvedPrebuiltArtifact -Destination $artifactPath -Force
+            }
         } else {
             $mvnArgs = @("-B", "clean", "test", "package")
             if ($SkipTests) {
