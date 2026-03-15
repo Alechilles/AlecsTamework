@@ -36,6 +36,7 @@ $normalizedVersion = Get-NormalizedVersion -RawVersion $Version
 New-Item -ItemType Directory -Path $OutputDir -Force | Out-Null
 $artifactName = Get-ArtifactName -Config $config -NormalizedVersion $normalizedVersion
 $artifactPath = Join-Path $OutputDir $artifactName
+$resolvedArtifactDestination = [System.IO.Path]::GetFullPath($artifactPath)
 
 switch ($config.packaging) {
     "jar" {
@@ -51,8 +52,8 @@ switch ($config.packaging) {
             }
 
             Write-Host "Using prebuilt artifact: $resolvedPrebuiltArtifact"
-            if ($resolvedPrebuiltArtifact -ne $artifactPath) {
-                Copy-Item -Path $resolvedPrebuiltArtifact -Destination $artifactPath -Force
+            if ($resolvedPrebuiltArtifact -ne $resolvedArtifactDestination) {
+                Copy-Item -Path $resolvedPrebuiltArtifact -Destination $resolvedArtifactDestination -Force
             }
         } else {
             $mvnArgs = @("-B", "clean", "test", "package")
