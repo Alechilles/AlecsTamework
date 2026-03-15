@@ -126,6 +126,7 @@ Effects:
 - Attempts to mount the NPC using `NPCMountComponent`.
 - Uses role params `MountAnchorX/Y/Z` and optional `MountMovementConfig`.
 - While mounted, NPC nameplates are hidden to avoid first-person/third-person camera overlap and restored on dismount.
+- NPCs that do not already have a visible/custom name are left unchanged during mount transitions.
 
 ### ModeCycle
 Fields:
