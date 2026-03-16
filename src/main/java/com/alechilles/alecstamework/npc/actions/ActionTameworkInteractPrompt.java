@@ -84,7 +84,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
         PromptState previous = lastPrompts.get(playerId);
         boolean changed = !prompt.equals(previous);
-        boolean interactable = !prompt.isHidden();
+        boolean interactable = prompt.interactable;
         maybeLogPromptDebug(resolved, config, npcRef, role, store, ctx, prompt);
         if (changed) {
             // Force a refresh when the prompt changes so the hint updates on the client.
@@ -105,19 +105,22 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     // Determines the prompt state (visibility + hint key) for the selected entry.
     private PromptState resolvePromptState(ActionTameworkInteract.ResolvedInteraction resolved) {
         if (resolved == null || resolved.blockedByCooldown || resolved.entry == null) {
-            return PromptState.hidden();
+            return PromptState.hidden(false);
         }
         InteractionEntry entry = resolved.entry;
         Boolean showOverride = entry.getShowPrompt();
         boolean showPrompt = showOverride == null || showOverride;
         if (!showPrompt) {
-            return PromptState.hidden();
+            return PromptState.hidden(true);
         }
         String hint = entry.getPromptHint();
         if (hint == null || hint.isBlank()) {
             hint = resolveDefaultHint(entry);
         }
-        return new PromptState(hint, true);
+        if (hint == null || hint.isBlank()) {
+            return PromptState.hidden(true);
+        }
+        return new PromptState(hint, true, true);
     }
 
     // Selects a default hint key by interaction type.
@@ -153,10 +156,12 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private static final class PromptState {
         final String hint;
         final boolean showPrompt;
+        final boolean interactable;
 
-        private PromptState(String hint, boolean showPrompt) {
+        private PromptState(String hint, boolean showPrompt, boolean interactable) {
             this.hint = hint;
             this.showPrompt = showPrompt;
+            this.interactable = interactable;
         }
 
         boolean isHidden() {
@@ -175,6 +180,9 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             if (this.showPrompt != that.showPrompt) {
                 return false;
             }
+            if (this.interactable != that.interactable) {
+                return false;
+            }
             if (this.hint == null) {
                 return that.hint == null;
             }
@@ -184,12 +192,13 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         @Override
         public int hashCode() {
             int result = Boolean.hashCode(showPrompt);
+            result = 31 * result + Boolean.hashCode(interactable);
             result = 31 * result + (hint == null ? 0 : hint.hashCode());
             return result;
         }
 
-        static PromptState hidden() {
-            return new PromptState(null, false);
+        static PromptState hidden(boolean interactable) {
+            return new PromptState(null, false, interactable);
         }
     }
 
@@ -221,10 +230,8 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 ? resolved.entry.getClass().getSimpleName()
                 : "<none>";
         boolean showPrompt = !prompt.isHidden();
-        boolean alarmReady = isHarvestAlarmReady(npcRef, store);
-        boolean alarmActive = isHarvestAlarmActive(npcRef, store);
-        boolean alarmPassed = isHarvestAlarmPassed(npcRef, store);
-        boolean alarmUnset = isHarvestAlarmUnset(npcRef, store);
+        boolean interactable = prompt.interactable;
+        InteractionAlarmHelper.AlarmSnapshot alarm = getHarvestAlarmSnapshot(npcRef, store);
         boolean requireAlarm = false;
         boolean requireContext = false;
         if (resolved != null && resolved.entry instanceof HarvestInteraction) {
@@ -234,17 +241,25 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
 
         instance.getLogger().at(Level.INFO).log(
-                "TameworkPrompt debug: role=%s config=%s entry=%s show=%s alarmName=%s " +
-                        "ready=%s active=%s passed=%s unset=%s requireAlarm=%s requireContext=%s",
+                "TameworkPrompt debug: role=%s config=%s entry=%s interactable=%s show=%s alarmName=%s " +
+                        "validName=%s npcResolved=%s storeResolved=%s exists=%s nowAvailable=%s " +
+                        "set=%s unset=%s active=%s passed=%s ready=%s requireAlarm=%s requireContext=%s",
                 roleName,
                 configId,
                 entryType,
+                interactable,
                 showPrompt,
                 getHarvestAlarmName(),
-                alarmReady,
-                alarmActive,
-                alarmPassed,
-                alarmUnset,
+                alarm.validName,
+                alarm.npcResolved,
+                alarm.storeResolved,
+                alarm.exists,
+                alarm.nowAvailable,
+                alarm.set,
+                alarm.unset,
+                alarm.active,
+                alarm.passed,
+                alarm.ready,
                 requireAlarm,
                 requireContext
         );

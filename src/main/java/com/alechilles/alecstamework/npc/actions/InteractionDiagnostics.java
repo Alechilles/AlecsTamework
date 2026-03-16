@@ -38,7 +38,8 @@ final class InteractionDiagnostics {
     void logDebug(String message) {
         Tamework instance = Tamework.getInstance();
         if (instance != null && instance.getLogger() != null) {
-            instance.getLogger().at(Level.FINE).log(message);
+            Level level = instance.isDebugPromptEnabled() ? Level.INFO : Level.FINE;
+            instance.getLogger().at(level).log(message);
         }
     }
 

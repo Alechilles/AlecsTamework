@@ -35,6 +35,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
     private final Boolean isHarvestableOverride;
     private final boolean hasHarvestContextOverride;
     private final String harvestContextOverride;
+    private final String triggerSource;
     private final String configParamName;
     private final String lovedItemsParamName;
     private final String isHarvestableParamName;
@@ -56,6 +57,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
         this.isHarvestableOverride = builder.hasIsHarvestableOverride() ? builder.getIsHarvestable(support) : null;
         this.hasHarvestContextOverride = builder.hasHarvestInteractionContextOverride();
         this.harvestContextOverride = hasHarvestContextOverride ? builder.getHarvestInteractionContext(support) : null;
+        this.triggerSource = builder.hasTriggerSourceOverride() ? builder.getTriggerSource(support) : null;
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         this.configParamName = globalConfig.getInteractionConfigParam();
         this.lovedItemsParamName = globalConfig.getLovedItemsParam();
@@ -136,7 +138,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
                            InfoProvider infoProvider,
                            double dt,
                            Store<EntityStore> store) {
-        selection.logDebug("TameworkInteract: execute called.");
+        selection.logDebug("TameworkInteract: execute called. source=" + describeTriggerSource());
         if (npcRef == null || !npcRef.isValid()) {
             return false;
         }
@@ -157,7 +159,8 @@ public class ActionTameworkInteract extends TameworkActionBase {
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, configParamName);
         selection.logDebug(String.format(
-                "TameworkInteract: role=%s configOverride=%s roleParam=%s heldItem=%s",
+                "TameworkInteract: source=%s role=%s configOverride=%s roleParam=%s heldItem=%s",
+                describeTriggerSource(),
                 roleName,
                 configIdOverride,
                 roleOverride,
@@ -428,8 +431,16 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "unset");
     }
 
+    InteractionAlarmHelper.AlarmSnapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        return alarmHelper.snapshot(npcRef, store, harvestAlarmName);
+    }
+
     String getHarvestAlarmName() {
         return harvestAlarmName;
+    }
+
+    String describeTriggerSource() {
+        return triggerSource != null && !triggerSource.isBlank() ? triggerSource : "<unspecified>";
     }
 
     private void maybeNotifyOwnerDenied(Ref<EntityStore> npcRef,

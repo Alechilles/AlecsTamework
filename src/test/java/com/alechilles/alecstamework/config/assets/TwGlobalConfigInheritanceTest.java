@@ -90,6 +90,19 @@ class TwGlobalConfigInheritanceTest {
         assertEquals(90000, child.getCommandDeadRespawnCooldownMs());
     }
 
+    @Test
+    void defaultInteractionDefaultsAreAvailableWithoutInteractionSection() {
+        TwGlobalConfig config = new TwGlobalConfig();
+
+        assertEquals("InteractionConfigId", config.getInteractionConfigParam());
+        assertEquals("LovedItems", config.getLovedItemsParam());
+        assertEquals("IsHarvestable", config.getIsHarvestableParam());
+        assertEquals("IsMountable", config.getIsMountableParam());
+        assertEquals("HarvestInteractionContext", config.getHarvestContextParam());
+        assertEquals("Harvest_Ready", config.getHarvestAlarmName());
+        assertEquals("TameworkInteract_Cooldown", config.getInteractionCooldownAlarmPrefix());
+    }
+
     private void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);

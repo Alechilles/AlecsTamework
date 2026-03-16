@@ -18,12 +18,14 @@ public class BuilderActionTameworkInteract extends TameworkActionBuilderBase {
     private final BooleanHolder isMountable = new BooleanHolder();
     private final BooleanHolder isHarvestable = new BooleanHolder();
     private final StringHolder harvestInteractionContext = new StringHolder();
+    private final StringHolder triggerSource = new StringHolder();
 
     private boolean hasConfigId;
     private boolean hasLovedItems;
     private boolean hasIsMountable;
     private boolean hasIsHarvestable;
     private boolean hasHarvestContext;
+    private boolean hasTriggerSource;
 
     @Override
     public BuilderActionTameworkInteract readConfig(JsonElement element) {
@@ -80,6 +82,16 @@ public class BuilderActionTameworkInteract extends TameworkActionBuilderBase {
                 "Optional harvest interaction context override.",
                 "If set, this value is used instead of role parameters."
         );
+        hasTriggerSource = getString(
+                element,
+                "TriggerSource",
+                triggerSource,
+                null,
+                null,
+                BuilderDescriptorState.Stable,
+                "Optional debug label describing which asset branch invoked the interaction.",
+                "Used for runtime diagnostics when multiple sensors route into TameworkInteract."
+        );
         return this;
     }
 
@@ -126,6 +138,14 @@ public class BuilderActionTameworkInteract extends TameworkActionBuilderBase {
 
     public String getHarvestInteractionContext(BuilderSupport support) {
         return harvestInteractionContext.get(support.getExecutionContext());
+    }
+
+    public boolean hasTriggerSourceOverride() {
+        return hasTriggerSource;
+    }
+
+    public String getTriggerSource(BuilderSupport support) {
+        return triggerSource.get(support.getExecutionContext());
     }
 
     public ActionTameworkInteract build(BuilderSupport support) {

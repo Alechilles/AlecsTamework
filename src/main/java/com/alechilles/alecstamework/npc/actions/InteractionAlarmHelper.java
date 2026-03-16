@@ -19,23 +19,9 @@ final class InteractionAlarmHelper {
         this.owner = owner;
     }
 
-    // Returns true when the alarm is unset or has passed.
+    // Returns true when the alarm exists and is unset or has passed.
     boolean isAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
-        if (alarmName == null || alarmName.isBlank()) {
-            return false;
-        }
-        Alarm alarm = resolveAlarm(npcRef, store, alarmName);
-        if (alarm == null) {
-            return false;
-        }
-        if (!alarm.isSet()) {
-            return true;
-        }
-        Instant now = resolveGameTime(store);
-        if (now == null) {
-            return false;
-        }
-        return alarm.hasPassed(now);
+        return snapshot(npcRef, store, alarmName).ready;
     }
 
     // Checks whether the alarm matches the required state string.
@@ -43,25 +29,44 @@ final class InteractionAlarmHelper {
                               Store<EntityStore> store,
                               String alarmName,
                               String state) {
-        if (alarmName == null || alarmName.isBlank()) {
-            return false;
-        }
         String normalized = state != null ? state.trim().toLowerCase(Locale.ROOT) : "";
-        Alarm alarm = resolveAlarm(npcRef, store, alarmName);
-        if (alarm == null) {
-            return "unset".equals(normalized);
-        }
-        Instant now = resolveGameTime(store);
+        AlarmSnapshot snapshot = snapshot(npcRef, store, alarmName);
         switch (normalized) {
             case "unset":
-                return !alarm.isSet();
+                return snapshot.unset;
             case "passed":
-                return alarm.isSet() && now != null && alarm.hasPassed(now);
+                return snapshot.passed;
             case "active":
-                return alarm.isSet() && (now == null || !alarm.hasPassed(now));
+                return snapshot.active;
             default:
                 return false;
         }
+    }
+
+    // Captures the raw alarm state used by prompt diagnostics.
+    AlarmSnapshot snapshot(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
+        if (alarmName == null || alarmName.isBlank()) {
+            return AlarmSnapshot.invalidName();
+        }
+        NPCEntity npc = owner.resolveNpcEntity(npcRef, store);
+        if (npc == null) {
+            return AlarmSnapshot.missingNpc(alarmName);
+        }
+        AlarmStore alarmStore = npc.getAlarmStore();
+        if (alarmStore == null) {
+            return AlarmSnapshot.missingStore(alarmName);
+        }
+        Alarm alarm = alarmStore.get(npc, alarmName);
+        if (alarm == null) {
+            return AlarmSnapshot.missingAlarm(alarmName);
+        }
+        Instant now = resolveGameTime(store);
+        boolean set = alarm.isSet();
+        boolean passed = set && now != null && alarm.hasPassed(now);
+        boolean unset = !set;
+        boolean active = set && (now == null || !passed);
+        boolean ready = unset || passed;
+        return AlarmSnapshot.present(alarmName, now != null, set, unset, active, passed, ready);
     }
 
     // Resolves the alarm instance for an NPC and alarm name.
@@ -87,5 +92,67 @@ final class InteractionAlarmHelper {
             return null;
         }
         return time.getGameTime();
+    }
+
+    // Lightweight immutable view of alarm lookup/state for diagnostics.
+    static final class AlarmSnapshot {
+        final boolean validName;
+        final boolean npcResolved;
+        final boolean storeResolved;
+        final boolean exists;
+        final boolean nowAvailable;
+        final boolean set;
+        final boolean unset;
+        final boolean active;
+        final boolean passed;
+        final boolean ready;
+
+        private AlarmSnapshot(boolean validName,
+                              boolean npcResolved,
+                              boolean storeResolved,
+                              boolean exists,
+                              boolean nowAvailable,
+                              boolean set,
+                              boolean unset,
+                              boolean active,
+                              boolean passed,
+                              boolean ready) {
+            this.validName = validName;
+            this.npcResolved = npcResolved;
+            this.storeResolved = storeResolved;
+            this.exists = exists;
+            this.nowAvailable = nowAvailable;
+            this.set = set;
+            this.unset = unset;
+            this.active = active;
+            this.passed = passed;
+            this.ready = ready;
+        }
+
+        static AlarmSnapshot invalidName() {
+            return new AlarmSnapshot(false, false, false, false, false, false, false, false, false, false);
+        }
+
+        static AlarmSnapshot missingNpc(String alarmName) {
+            return new AlarmSnapshot(true, false, false, false, false, false, true, false, false, false);
+        }
+
+        static AlarmSnapshot missingStore(String alarmName) {
+            return new AlarmSnapshot(true, true, false, false, false, false, true, false, false, false);
+        }
+
+        static AlarmSnapshot missingAlarm(String alarmName) {
+            return new AlarmSnapshot(true, true, true, false, false, false, true, false, false, false);
+        }
+
+        static AlarmSnapshot present(String alarmName,
+                                     boolean nowAvailable,
+                                     boolean set,
+                                     boolean unset,
+                                     boolean active,
+                                     boolean passed,
+                                     boolean ready) {
+            return new AlarmSnapshot(true, true, true, true, nowAvailable, set, unset, active, passed, ready);
+        }
     }
 }
