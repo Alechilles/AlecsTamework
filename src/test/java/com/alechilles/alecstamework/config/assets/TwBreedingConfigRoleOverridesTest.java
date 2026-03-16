@@ -127,6 +127,30 @@ class TwBreedingConfigRoleOverridesTest {
         assertEquals(7200, config.resolveOffspringLifecycle("Tamed_Fox").resolveTimeToFullGrownSeconds(null));
     }
 
+    @Test
+    void resolveLifecycleFallsBackToMatchingAdultFamilyOverrideForBabyRole() throws Exception {
+        TwBreedingConfig config = new TwBreedingConfig();
+        TwBreedingConfig.OffspringLifecycleSettings base = new TwBreedingConfig.OffspringLifecycleSettings();
+        setField(base, "defaultTimeToFullGrownSeconds", 7200);
+        setField(config, "offspringLifecycle", base);
+
+        TwBreedingConfig.RoleOverrideSettings roleOverride = new TwBreedingConfig.RoleOverrideSettings();
+        TwBreedingConfig.OffspringLifecycleSettingsOverride lifecycleOverride =
+                new TwBreedingConfig.OffspringLifecycleSettingsOverride();
+        TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
+        setField(lifecycleOverride, "defaultTimeToFullGrownSeconds", 3000);
+        setField(family, "adultRoleId", "Tamed_Cow");
+        setField(family, "babyRoleId", "Tamed_Cow_Calf");
+        setField(family, "timeToFullGrownSeconds", 1800);
+        setField(lifecycleOverride, "families", new TwBreedingConfig.RoleFamily[] { family });
+        setField(roleOverride, "offspringLifecycle", lifecycleOverride);
+        setRoleOverride(config, "Tamed_Cow", roleOverride);
+
+        TwBreedingConfig.RoleFamily resolvedFamily = config.resolveLifecycleFamilyForRole("Tamed_Cow_Calf");
+        assertEquals("Tamed_Cow", resolvedFamily.getAdultRoleId());
+        assertEquals(1800, config.resolveOffspringLifecycle("Tamed_Cow_Calf").resolveTimeToFullGrownSeconds(resolvedFamily));
+    }
+
     private static void setRoleOverride(TwBreedingConfig config,
                                         String roleId,
                                         TwBreedingConfig.RoleOverrideSettings override) throws Exception {

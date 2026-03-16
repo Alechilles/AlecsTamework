@@ -69,17 +69,6 @@
           }
         ]
       }
-    },
-    "Mob_Tamework_Example_Baby": {
-      "OffspringLifecycle": {
-        "Families": [
-          {
-            "AdultRoleId": "Mob_Tamework_Example",
-            "BabyRoleId": "Mob_Tamework_Example_Baby",
-            "TimeToFullGrownMinutes": 48
-          }
-        ]
-      }
     }
   }
 }

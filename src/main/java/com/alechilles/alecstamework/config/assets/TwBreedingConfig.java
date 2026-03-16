@@ -1290,7 +1290,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     }
 
     public OffspringLifecycleSettings resolveOffspringLifecycle(@Nullable String roleId) {
-        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        RoleOverrideSettings override = resolveOffspringLifecycleOverride(roleId);
         if (override == null || override.offspringLifecycle == null) {
             return getOffspringLifecycle();
         }
@@ -1325,6 +1325,28 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 continue;
             }
             return entry.getValue();
+        }
+        return null;
+    }
+
+    @Nullable
+    private RoleOverrideSettings resolveOffspringLifecycleOverride(@Nullable String roleId) {
+        RoleOverrideSettings exact = resolveRoleOverride(roleId);
+        if (exact != null && exact.offspringLifecycle != null) {
+            return exact;
+        }
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        for (RoleOverrideSettings override : getRoleOverrides().values()) {
+            if (override == null || override.offspringLifecycle == null || override.offspringLifecycle.families == null) {
+                continue;
+            }
+            for (RoleFamily family : override.offspringLifecycle.families) {
+                if (family != null && family.matchesRole(roleId)) {
+                    return override;
+                }
+            }
         }
         return null;
     }
