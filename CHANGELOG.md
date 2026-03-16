@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 2.4.2 - Interaction + Lifecycle Reliability - 2026-03-16
+### Fixed
+- Tamework contextual-use targets remain interactable even when their generic `F` prompt is intentionally hidden.
+- `/tw debugprompt` now logs raw harvest-alarm resolution details (`exists`, `set`, `unset`, `active`, `passed`, `ready`, and lookup validity) so prompt diagnostics no longer blur together "missing", "unset", and "not ready" states.
+- Partial `TwGlobalConfig` assets that only override unrelated sections (for example `AssetSets`) now retain Tamework's built-in interaction defaults, preventing `HarvestAlarmName` and other core interaction param names from becoming `null` at runtime.
+- Offspring lifecycle growth without an adolescent role now treats the adult transition as the next stage for baby scaling and duration splits, so baby companions grow toward `AdultSwitchScale` before swapping to the adult role/stage instead of using adolescent fallback scales.
+- Offspring lifecycle role overrides now fall back through matching family entries, so adult-keyed lifecycle overrides apply to the configured baby role too and duplicate baby-key override blocks are no longer required.
+- Offspring lifecycle adult scale baselines now resolve from the configured adult role's appearance/model asset instead of the spawned baby model, so bred adults inherit the correct adult body size before `SizeMultiplier` traits are applied.
+
 ## 2.4.1 - Mounted Companion Hotfix - 2026-03-15
 ### Fixed
 - Mounted companion name hide/restore now preserves existing `Nameplate` archetype membership during mount role swaps, preventing world-thread crashes when mounting or dismounting Tamework companions with custom names.
