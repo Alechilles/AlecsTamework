@@ -21,6 +21,7 @@ class DefendComponentAssetTest {
     void defendInstructionReferencesAttackedMasterTargetSensor() {
         String defend = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Defend.json");
         assertTrue(defend.contains("\"Reference\": \"Component_Tamework_Sensor_Defend_Attacked_MasterTarget\""));
+        assertTrue(defend.contains("\"IncludeSelfAsSource\": true"));
         assertFalse(defend.contains("\"Reference\": \"Component_Sensor_Standard_Detection\""));
     }
 
@@ -95,6 +96,9 @@ class DefendComponentAssetTest {
         assertTrue(sensor.contains("\"Type\": \"TameworkAttackedTargetSlotRecently\""));
         assertTrue(sensor.contains("\"SourceTargetSlot\": {"));
         assertTrue(sensor.contains("\"Value\": \"MasterTarget\""));
+        assertTrue(sensor.contains("\"IncludeSelfAsSource\": {"));
+        assertTrue(sensor.contains("\"Value\": false"));
+        assertTrue(sensor.contains("\"Compute\": \"IncludeSelfAsSource\""));
     }
 
     private String readResource(String path) {

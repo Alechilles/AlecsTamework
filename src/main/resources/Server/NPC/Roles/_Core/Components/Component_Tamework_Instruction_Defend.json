@@ -203,7 +203,7 @@
         ]
       },
       {
-        "$Comment": "Engage only candidates that recently attacked MasterTarget while defending.",
+        "$Comment": "Engage candidates that recently attacked MasterTarget or this NPC while defending.",
         "Continue": true,
         "Sensor": {
           "Type": "And",
@@ -236,6 +236,7 @@
                 },
                 "SourceTargetSlot": "MasterTarget",
                 "RecentAttackMaxAgeSeconds": 30,
+                "IncludeSelfAsSource": true,
                 "ExcludeGroups": [
                   "Self"
                 ]

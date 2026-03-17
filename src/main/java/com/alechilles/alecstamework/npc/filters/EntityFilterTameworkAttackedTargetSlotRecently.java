@@ -20,6 +20,7 @@ public final class EntityFilterTameworkAttackedTargetSlotRecently extends Entity
     private final int sourceTargetSlot;
     private final double maxAgeSeconds;
     private final boolean useSelfWhenSourceMissing;
+    private final boolean includeSelfAsSource;
     private final DamageTargetMemoryService damageMemoryService = DamageTargetMemoryService.getInstance();
 
     public EntityFilterTameworkAttackedTargetSlotRecently(
@@ -28,6 +29,7 @@ public final class EntityFilterTameworkAttackedTargetSlotRecently extends Entity
         this.sourceTargetSlot = builder.getSourceTargetSlot(support);
         this.maxAgeSeconds = builder.getMaxAgeSeconds(support);
         this.useSelfWhenSourceMissing = builder.useSelfWhenSourceMissing(support);
+        this.includeSelfAsSource = builder.includeSelfAsSource(support);
     }
 
     @Override
@@ -39,12 +41,13 @@ public final class EntityFilterTameworkAttackedTargetSlotRecently extends Entity
             return false;
         }
         Ref<EntityStore> sourceRef = resolveSourceRef(ref, role);
-        if (sourceRef == null || !sourceRef.isValid()) {
-            return false;
-        }
         long maxAgeMs = maxAgeSeconds < 0.0 ? -1L : Math.round(maxAgeSeconds * 1000.0);
         long nowMs = resolveCurrentTimeMs(store);
-        return damageMemoryService.hasRecentHit(targetRef, sourceRef, maxAgeMs, nowMs);
+        if (sourceRef != null && sourceRef.isValid()
+                && damageMemoryService.hasRecentHit(targetRef, sourceRef, maxAgeMs, nowMs)) {
+            return true;
+        }
+        return includeSelfAsSource && damageMemoryService.hasRecentHit(targetRef, ref, maxAgeMs, nowMs);
     }
 
     @Override

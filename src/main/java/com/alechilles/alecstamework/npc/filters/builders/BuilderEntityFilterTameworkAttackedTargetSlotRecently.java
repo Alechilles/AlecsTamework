@@ -24,6 +24,7 @@ public final class BuilderEntityFilterTameworkAttackedTargetSlotRecently extends
     private final StringHolder sourceTargetSlot = new StringHolder();
     private final DoubleHolder maxAgeSeconds = new DoubleHolder();
     private final BooleanHolder useSelfWhenSourceMissing = new BooleanHolder();
+    private final BooleanHolder includeSelfAsSource = new BooleanHolder();
 
     @Nonnull
     @Override
@@ -81,6 +82,15 @@ public final class BuilderEntityFilterTameworkAttackedTargetSlotRecently extends
                 "Fallback to the NPC itself when SourceTargetSlot is unset.",
                 null
         );
+        this.getBoolean(
+                data,
+                "IncludeSelfAsSource",
+                this.includeSelfAsSource,
+                false,
+                BuilderDescriptorState.Stable,
+                "Also match when the candidate recently attacked this NPC.",
+                null
+        );
         this.requireContext(InstructionType.Any, ComponentContext.NotSelfEntitySensor);
         return this;
     }
@@ -95,5 +105,9 @@ public final class BuilderEntityFilterTameworkAttackedTargetSlotRecently extends
 
     public boolean useSelfWhenSourceMissing(@Nonnull BuilderSupport support) {
         return this.useSelfWhenSourceMissing.get(support.getExecutionContext());
+    }
+
+    public boolean includeSelfAsSource(@Nonnull BuilderSupport support) {
+        return this.includeSelfAsSource.get(support.getExecutionContext());
     }
 }

@@ -3,6 +3,8 @@
 ## Unreleased
 ### Added
 - Added shared `Want_Food_Charcoal` particle assets (`Want_Food_Charcoal`, `ThoughtCloud_Charcoal`, and `CharcoalThought.png`) so mods can reuse a blank-thought + base charcoal icon food hint.
+### Fixed
+- Defend instruction threat detection now treats mobs that recently attacked the companion itself as valid retaliatory targets (in addition to mobs that attacked `MasterTarget`), so companions no longer ignore direct incoming hits while defending.
 
 ## 2.4.2 - Interaction + Lifecycle Reliability - 2026-03-16
 ### Fixed

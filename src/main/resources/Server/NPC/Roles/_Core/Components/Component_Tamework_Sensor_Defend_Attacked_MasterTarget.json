@@ -30,6 +30,10 @@
       "Value": 30,
       "Description": "How recent the attack on SourceTargetSlot must be to match."
     },
+    "IncludeSelfAsSource": {
+      "Value": false,
+      "Description": "When true, also match candidates that recently attacked this NPC."
+    },
     "ExcludeGroups": {
       "Value": [],
       "TypeHint": "String",
@@ -65,6 +69,9 @@
             },
             "MaxAgeSeconds": {
               "Compute": "RecentAttackMaxAgeSeconds"
+            },
+            "IncludeSelfAsSource": {
+              "Compute": "IncludeSelfAsSource"
             }
           },
           {
@@ -103,6 +110,9 @@
             },
             "MaxAgeSeconds": {
               "Compute": "RecentAttackMaxAgeSeconds"
+            },
+            "IncludeSelfAsSource": {
+              "Compute": "IncludeSelfAsSource"
             }
           },
           {
@@ -150,6 +160,9 @@
             },
             "MaxAgeSeconds": {
               "Compute": "RecentAttackMaxAgeSeconds"
+            },
+            "IncludeSelfAsSource": {
+              "Compute": "IncludeSelfAsSource"
             }
           },
           {
