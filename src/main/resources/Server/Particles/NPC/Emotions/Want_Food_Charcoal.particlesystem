@@ -1,0 +1,48 @@
+{
+  "Spawners": [
+    {
+      "SpawnerId": "ThoughtCloud_Small",
+      "PositionOffset": {
+        "Y": -0.2
+      }
+    },
+    {
+      "SpawnerId": "ThoughtCloud_Medium",
+      "PositionOffset": {
+        "Y": -0.05
+      },
+      "StartDelay": 0.1
+    },
+    {
+      "SpawnerId": "ThoughtCloud_Charcoal",
+      "PositionOffset": {
+        "Y": 0.3
+      },
+      "StartDelay": 0.2,
+      "FixedRotation": false
+    },
+    {
+      "SpawnerId": "ThoughtCloud_Move",
+      "PositionOffset": {
+        "Y": 0.3
+      },
+      "StartDelay": 0.2,
+      "RotationOffset": {
+        "Pitch": 90,
+        "Yaw": 180
+      }
+    },
+    {
+      "SpawnerId": "ThoughtCloud_Move",
+      "PositionOffset": {
+        "Y": 0.3
+      },
+      "RotationOffset": {
+        "Pitch": 90
+      },
+      "StartDelay": 0.2
+    }
+  ],
+  "LifeSpan": 2,
+  "IsImportant": false
+}

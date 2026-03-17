@@ -1,6 +1,8 @@
 # Changelog
 
 ## Unreleased
+### Added
+- Added shared `Want_Food_Charcoal` particle assets (`Want_Food_Charcoal`, `ThoughtCloud_Charcoal`, and `CharcoalThought.png`) so mods can reuse a blank-thought + base charcoal icon food hint.
 
 ## 2.4.2 - Interaction + Lifecycle Reliability - 2026-03-16
 ### Fixed
