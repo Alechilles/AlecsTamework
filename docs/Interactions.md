@@ -1,35 +1,33 @@
 # Optimized Interactions (TwInteractionConfig)
 
 ## Overview
-Tamework replaces large NPC interaction instruction trees with a single action call. The flow is driven by `TwInteractionConfig` assets and executed by the `Action_Tamework_Interact` NPC action.
+Tamework replaces large NPC interaction instruction trees with a single action call. The flow is driven by `TwInteractionConfig` assets and executed by `TameworkInteract`.
 
 ## Asset location
 `<ModRoot>/Server/Tamework/Interactions/*.json`
 
 ## Config resolution
-- If the action passes `ConfigId`, that asset id is used.
-- Otherwise the role parameter named by `TwGlobalConfig.InteractionConfigParam` (default `InteractionConfigId`) is used if present.
-- Otherwise the enabled config with the highest `Priority` whose `RoleIds` contains the NPC role id is selected.
+- If action field `ConfigId` is provided, that config id is used.
+- Otherwise the role param named by `TwGlobalConfig.InteractionDefaults.InteractionConfigParam` (default `InteractionConfigId`) is used when present.
+- Otherwise the enabled config with the highest `Priority` whose `RoleIds` includes the NPC role is selected.
 
-`Priority` defaults to `0`; higher values win. If multiple configs share the same priority, selection order follows asset map iteration.
+`Priority` defaults to `0`. Higher values win. For equal priorities, current asset-map iteration order applies.
 
 ## Global defaults
-Default parameter names and alarm names used by the interaction system live in `TwGlobalConfig`
-(`Server/Tamework/Global/*.json`). If you change those names, update your role params and/or
-action overrides to match.
+Parameter/alarm names used by the interaction system are defined under `TwGlobalConfig.InteractionDefaults`.
+If you rename these keys, update role params and/or action overrides accordingly.
 
 ## Interaction order
-`Interactions` is evaluated in order. The first enabled entry whose requirements pass is executed.
+`Interactions` is evaluated in authored order. The first enabled entry whose requirements pass is executed.
 
 ## Prompts (optional)
-If you include the `TameworkInteractPrompt` action in your role instructions, Tamework will show a
-prompt for the first matching interaction entry.
+If the role runs `TameworkInteractPrompt`, Tamework shows the first matching entry's prompt.
 
-Each entry can override prompt behavior with:
-- `PromptHint` (translation key string, e.g. `server.interactionHints.feed`)
-- `ShowPrompt` (boolean; hide prompts for entries that should never show UI)
+Per-entry prompt controls:
+- `PromptHint` (translation key)
+- `ShowPrompt` (hide prompt for specific entries)
 
-Default prompt keys (used when `PromptHint` is empty):
+Default prompt keys:
 - `server.interactionHints.generic`
 - `server.interactionHints.tame`
 - `server.interactionHints.feed`
@@ -40,128 +38,90 @@ Default prompt keys (used when `PromptHint` is empty):
 - `server.interactionHints.breed`
 - `server.interactionHints.custom`
 
-Define the keys in `Server/Languages/en-US/server.lang` **without** the `server.` prefix.
+Define these in `Server/Languages/en-US/server.lang` without the `server.` prefix.
 
 ## Cooldowns
-Cooldowns are enforced in real-time seconds (not game time).
-`CooldownSeconds` on an entry overrides `Cooldowns.InteractionSeconds` on the config.
-Cooldowns are stored as NPC alarms named
-`<InteractionCooldownAlarmPrefix>_<ConfigId>_<index>` where the prefix comes from `TwGlobalConfig`
-(default `TameworkInteract_Cooldown`).
-You can inspect them with `/tw getalarm`.
-Contextual interactions (e.g., harvest + interaction context) will block fall-through if their cooldown
-or harvest alarm is not ready.
+- Cooldowns are real-time seconds.
+- Entry `CooldownSeconds` overrides config `Cooldowns.InteractionSeconds`.
+- Alarm id format: `<InteractionCooldownAlarmPrefix>_<ConfigId>_<index>`.
+- Prefix comes from `TwGlobalConfig.InteractionDefaults.InteractionCooldownAlarmPrefix`.
+
+Use `/tw getalarm` to inspect cooldown/harvest alarms.
 
 ## Preset interactions
-Preset entries provide simple defaults plus optional `Requires` + `Effects` add‑ons.
+Preset entries provide default behavior plus optional `Requires` + `Effects` add-ons.
 
 ### Tame
-Fields:
-- `UseLovedItems` (default true)
-- `ItemsInHand` (item id or array)
-- `ItemsParam` (role parameter name that returns string, string[], or JSON array string)
-- `Role` (optional NPC role id to swap to after taming)
-- `RoleParam` (role parameter name that resolves a role id; overrides `Role`)
+Common fields:
+- `UseLovedItems`
+- `ItemsInHand`
+- `ItemsParam`
+- `Role`
+- `RoleParam` (overrides `Role` when resolved)
 
-Requirements:
-- NPC must be untamed.
-- Held item must match the resolved item list.
-
-Effects:
-- Sets tamed true and owner to the interacting player.
-- Consumes the held item.
-- If `Role`/`RoleParam` is provided, swaps the NPC role after taming.
+Behavior:
+- Requires untamed NPC and matching held item.
+- Sets tamed + owner, consumes held item, optional role swap.
 
 ### Feed
-Fields:
-- `UseLovedItems` (default true)
-- `ItemsInHand` (array of string/object entries)
-- `Heal` (global fallback)
-- `ItemsParam` (role parameter name)
+Common fields:
+- `UseLovedItems`
+- `ItemsInHand`
+- `Heal`
+- `ItemsParam`
 
-`ItemsInHand` entries are an array of:
-- `"ItemId"` (string)
-- `{ "Item": "ItemId", "Heal": 8 }`
-
-`ItemsParam` supports:
-- role param string array of item ids
-- or a JSON array string containing item ids and/or `{ "Item": "...", "Heal": 4 }` objects
-
-Requirements:
-- NPC must be tamed.
-- Held item must match the resolved item list.
-
-Effects:
-- Heals the NPC by the per‑item override or the global `Heal`.
-- Shows floating combat text for healing (if a player is present).
-- Consumes the held item.
-- Applies shared happiness gain using resolved `TwHappinessConfig.Sources.GainOnFeed` when happiness progression exists.
-  If no happiness config is resolved, default shared happiness rules are used.
-  This flows through `CompanionHappinessService` and mirrors into breeding progression when present.
-  Trait effect key `HappinessGainMultiplier` scales this gain when traits are present.
+Behavior:
+- Requires tamed NPC and matching held item.
+- Heals/consumes item.
+- Applies shared happiness gain (`TwHappinessConfig` or defaults) with trait scaling via `HappinessGainMultiplier`.
+- Applies manual needs refill rules from `TwNeedsConfig.ManualRefill` when configured.
 
 ### Harvest
-Fields:
-- `RequireTamed` (default true)
-- `RequireHarvestable` (default true)
-- `RequireHarvestAlarmReady` (default true)
-- `RequireHarvestInteractionContext` (default true)
+Common fields:
+- `RequireTamed`
+- `RequireHarvestable`
+- `RequireHarvestAlarmReady`
+- `RequireHarvestInteractionContext`
 
-Requirements:
-- Uses role parameters named by `TwGlobalConfig.IsHarvestableParam` and
-  `TwGlobalConfig.HarvestContextParam` (defaults `IsHarvestable`, `HarvestInteractionContext`).
-- Uses the `TwGlobalConfig.HarvestAlarmName` alarm on the NPC (default `Harvest_Ready`).
-
-Effects:
-- Sets NPC state `$Harvest` (role should handle alarm/drops in that state).
+Behavior:
+- Uses role params named by `TwGlobalConfig.InteractionDefaults` for harvestability/context.
+- Uses alarm `TwGlobalConfig.InteractionDefaults.HarvestAlarmName` (default `Harvest_Ready`).
+- Runs `$Harvest` state when valid.
 
 ### Mount
-Fields:
-- `RequireTamed` (default true)
-- `RequireOwner` (default true)
-- `RequireMountable` (default true)
-- `RequireCrouching` (default true)
+Common fields:
+- `RequireTamed`
+- `RequireOwner`
+- `RequireMountable`
+- `RequireCrouching`
 
-Effects:
-- Attempts to mount the NPC using `NPCMountComponent`.
-- Uses role params `MountAnchorX/Y/Z` and optional `MountMovementConfig`.
-- While mounted, NPC nameplates are hidden to avoid first-person/third-person camera overlap and restored on dismount.
-- NPCs that do not already have a visible/custom name are left unchanged during mount transitions.
+Behavior:
+- Attempts mount via `NPCMountComponent`.
+- Uses mount anchor params.
+- Hides active custom nameplates while mounted and restores on dismount.
 
 ### ModeCycle
-Fields:
-- `RequireTamed` (default true)
-- `RequireOwner` (default true)
-- `ShowFloatingText` (default false)
-- `ShowUiMessage` (default false)
-- `Cycle` (array of `ModeStep` entries)
+Common fields:
+- `RequireTamed`
+- `RequireOwner`
+- `ShowFloatingText`
+- `ShowUiMessage`
+- `Cycle`
 
-`ModeStep` fields:
-- `State`
-- `SubState`
-- `Message` (used for `ShowFloatingText` / `ShowUiMessage`)
-
-If `Cycle` is empty, default cycle is `Hold -> Idle -> Defend`.
+Default cycle when empty: `Hold -> Idle -> Defend`.
 
 ### Breed
-Fields:
-- `RequireTamed` (default true)
-- `MinHappiness` (optional threshold override)
-- `FertilityBonus` (optional additive bonus applied during interaction eligibility checks)
+Common fields:
+- `RequireTamed`
+- `MinHappiness`
+- `FertilityBonus`
 
-Effects:
-- Ensures happiness and breeding progression state exists on the NPC.
-- Uses role/config breeding resolution and enforces config-level state gates:
-  `Eligibility.RequireTamed`, `Eligibility.RequireAdult`, `Eligibility.RequireNotSleeping`, and `Eligibility.RequireNotInCombat`.
-- Marks breeding readiness when effective fertility meets threshold:
-  `effective = (sharedHappiness * FertilityMultiplier) + FertilityBonus`.
-  Trait effect key `FertilityMultiplier` defaults to `1.0` when traits are missing.
-- Attempts nearby partner matching when both NPCs are breeding-ready, then:
-  parent cooldown alarm is set, parents move toward each other, hearts play, and offspring spawns shortly after.
-- Offspring role selection prefers a baby-role variant when one exists (`*_Baby` patterns) and falls back to the parent role.
-- Offspring progression state now initializes life stage (`Baby -> Adolescent -> Adult`) and supports growth scaling for fallback baby roles.
-- Breeding cooldown and offspring growth durations are configured in seconds but stored/compared as game-time timestamps.
-  `TwBreedingConfig.Timing.Basis` controls conversion behavior (`WORLD_TIME_SCALED` default, or `REAL_TIME` for current time-scale tracking).
+Behavior:
+- Ensures progression state exists.
+- Enforces `TwBreedingConfig.Eligibility` gates (`RequireTamed`, `RequireAdult`, `RequireNotSleeping`, `RequireNotInCombat`).
+- Uses effective fertility: `(sharedHappiness * FertilityMultiplier) + FertilityBonus`.
+- When ready pair found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
+- Offspring flow supports baby-role preference, life-stage initialization, trait/attachment inheritance, and growth timing.
 
 ## Custom interactions
 `Type: "Custom"` exposes full `Requires` + `Effects` control.
@@ -176,137 +136,102 @@ Example:
 ```
 
 ## Requirements
-`Requires` contains two buckets:
-- `All`: all requirements must pass.
-- `Any`: at least one requirement must pass.
+`Requires` has two buckets:
+- `All`: every listed requirement set must pass.
+- `Any`: at least one listed requirement set must pass.
 
-Within each requirement array, any entry can satisfy that requirement type. Empty arrays are ignored.
+Within each requirement type array, any one entry can satisfy that type.
 
-### Basic toggles
-- `LovedItems` (uses `TwGlobalConfig.LovedItemsParam`, default `LovedItems`)
-- `IsHarvestable` (uses `TwGlobalConfig.IsHarvestableParam`, default `IsHarvestable`)
-- `IsMountable` (uses `TwGlobalConfig.IsMountableParam`, default `IsMountable`)
+### Basic booleans
+- `LovedItems`
+- `IsHarvestable`
+- `IsMountable`
 - `IsTamed`
 - `IsNotTamed`
+- `PlayerHandEmpty`
 - `PlayerCrouching`
 - `PlayerIsOwner`
 - `HarvestAlarmReady`
-- `HarvestInteractionContext` (blank context is allowed; uses `TwGlobalConfig.HarvestContextParam`)
+- `HarvestInteractionContext`
 
-### ItemsInHand
+### `ItemsInHand`
 Fields:
-- `Items` (item id array)
-- `ItemsParam` (role parameter name)
-- `Quantity` (minimum stack size)
+- `Items`
+- `ItemsParam`
+- `Quantity`
+- `Operator` (`AnyOf`, `NoneOf`)
 
-### ItemsInInventory
+### `ItemsInInventory`
 Fields:
-- `Items` (item id array)
-- `ItemsParam` (role parameter name)
-- `Quantity` (minimum total quantity)
+- `Items`
+- `ItemsParam`
+- `Quantity`
 
-`ItemsParam` for item requirements accepts a role param that returns:
-- a string array of item ids
-- or a JSON array string of item ids and/or objects with `Item`/`item` fields
-
-### ItemsEquipped
+### `ItemsEquipped`
 Fields:
-- `Items` (optional item id array)
-- `ItemsParam` (role parameter name)
-- `Slots` (slot enum array)
+- `Items`
+- `ItemsParam`
+- `Slots` (`Head`, `Chest`, `Hands`, `Legs`, `Armor`, `Equipped`, `Utility`, `Accessory`, `Accessories`)
 
-Slot values:
-`Head`, `Chest`, `Hands`, `Legs`, `Armor`, `Equipped`, `Utility`, `Accessory`, `Accessories`
-
-If `Items` is empty but `Slots` are provided, any item in those slots passes.
-
-### Parameter
+### `Parameter`
 Fields:
-- `Name` (role parameter name)
+- `Name`
 - `Operator` (`Equals`, `NotEquals`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`)
-- `Match` (`Any` or `All`)
-- `Value` (string or array)
+- `Match` (`Any`, `All`)
+- `Value`
 
-Numeric comparison is used if both the param and value parse as numbers; otherwise string equality is used for `Equals` and `NotEquals`.
-
-### NpcHealthPercent
+### `NpcHealthPercent`
 Fields:
-- `Operator` (`Equals`, `NotEquals`, `GreaterThan`, `GreaterThanOrEqual`, `LessThan`, `LessThanOrEqual`)
-- `Value` (number on a `0`-`100` scale)
+- `Operator`
+- `Value` (`0-100` scale)
 
-The NPC's current health percent is computed from the `Health` stat (`current / max * 100`), clamped to `0..100`.
-
-### AlarmState
+### `AlarmState`
 Fields:
-- `AlarmParam` (role parameter name for the alarm id)
-- `Name` (alarm id)
+- `AlarmParam`
+- `Name`
 - `State` (`Unset`, `Active`, `Passed`)
 
-If an alarm does not exist, it is treated as `Unset`.
-
-### NpcState
+### `NpcState`
 Fields:
 - `State`
 - `SubState`
 
-`State` may include `Primary.SubState`. If `State` is blank and `SubState` is provided, any state with that substate name matches.
-
-### PlayerMovementState
+### `PlayerMovementState`
 Field:
-- `State` with values `Crouching`, `Walking`, `Running`, `Sprinting`, `Idle`, `Mounting`, `Sleeping`
+- `State` (`Crouching`, `Walking`, `Running`, `Sprinting`, `Idle`, `Mounting`, `Sleeping`)
 
-### InteractionContext
+### `InteractionContext`
 Fields:
 - `Context`
-- `ContextParam` (role parameter name)
-
-If `ContextParam` resolves to a value, it is used. Otherwise `Context` is used. The context must exist and match a contextual interaction on the NPC.
+- `ContextParam`
 
 ## Effects
-Effects are defined under `Effects` in any interaction type.
+Common effect families:
+- State/ownership: `SetTamed`, `SetOwner`, `SetState`, `SetRole`, `ModifyStats`
+- Item operations: `RemoveItemsHand`, `AddItemsHand`, `RemoveItemsInventory`, `AddItemInventory`
+- Presentation: `ShowFloatingText`, `ShowUiMessage`, `PlaySound`, `SpawnParticles`
+- Utility: `DropItem`, `Mount`, `TriggerNpcHook`
 
-Available effects:
-- `SetTamed` `{ "Value": true | false }`
-- `SetOwner` `{ "Source": "Player" | "None" | "Custom", "Uuid": "...", "Name": "..." }`
-- `ModifyStats` `{ "Stats": [ { "StatId": "...", "Amount": 5 } ] }`
-- `SetState` `{ "State": "...", "SubState": "..." }`
-- `SetRole` `{ "Role": "...", "RoleParam": "RoleIdParam" }` (RoleParam overrides Role when resolved; role swaps run before other effects)
-- `RemoveItemsHand` `{ "Quantity": 1 }`
-- `AddItemsHand` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
-- `RemoveItemsInventory` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
-- `AddItemInventory` `{ "Items": [ { "Item": "...", "Quantity": 1 } ] }`
-- `Mount` `true`
-- `PlaySound` `{ "SoundEvent": "...", "Volume": 1, "Pitch": 1, "Offset": [0,0,0], "PlayerOnly": false }`
-- `SpawnParticles` `{ "ParticleSystem": "...", "Offset": [0,0,0], "Color": "#RRGGBB", "PlayerOnly": false }`
-- `DropItem` `{ "Item": "...", "DropList": "...", "QuantityMin": 1, "QuantityMax": 1, "ThrowSpeed": 0 }`
-- `TriggerNpcHook` `{ "HookId": "...", "PlayerOnly": true, "Consume": true }`
-- `ShowFloatingText` `{ "Message": "+10 HP" }`
-- `ShowUiMessage` `{ "Message": "Mode: Defend" }`
+`SpawnParticles` supports node/attachment targeting:
+- `AttachTarget` (`Position`, `Entity`, `Node`)
+- `AttachNode`
+- `OffsetParam`
+- `PlayerOnly`
 
-Item list resolution for inventory effects:
-- `RemoveItemsHand`, `AddItemsHand`, `RemoveItemsInventory`, and `AddItemInventory` accept `ItemsParam`.
-- `ItemsParam` supports string arrays of item ids, or a JSON array string of item ids and/or objects
-  with `Item`/`Quantity` fields (quantity defaults to 1).
-
-## Action usage in NPC roles
-Example interaction instruction snippet:
-
+## Action usage in roles
 ```json
 "Actions": [
   {
     "Type": "LockOnInteractionTarget",
     "TargetSlot": { "Compute": "MasterTargetSlot" }
   },
-  {
-    "Type": "TameworkInteract",
-    "ConfigId": { "Compute": "InteractionConfigId" },
-    "LovedItems": { "Compute": "LovedItems" },
-    "IsMountable": { "Compute": "IsMountable" },
-    "IsHarvestable": { "Compute": "IsHarvestable" },
-    "HarvestInteractionContext": { "Compute": "HarvestInteractionContext" }
-  }
+  { "Type": "TameworkInteract" }
 ]
 ```
 
-`TameworkInteract` uses role parameters by default (names defined in `TwGlobalConfig`), and the
-action fields above override those values when provided.
+Optional action overrides:
+- `ConfigId`
+- `LovedItems`
+- `IsMountable`
+- `IsHarvestable`
+- `HarvestInteractionContext`

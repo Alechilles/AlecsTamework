@@ -1,66 +1,75 @@
 # Debugging and Testing
 
 ## Recommended workflow
-- Test on a local server first.
-- Check server logs for builder or asset errors.
-- Validate spawner and interaction configs are loading.
+- Test changes on a local server first.
+- Watch server logs for asset decode, builder, and runtime warnings.
+- Validate config resolution for the exact role/item/coop id under test.
 
-## Common log messages
-- "Builder ... does not exist" -> missing action or sensor registration or asset load order.
-- "Unknown JSON attribute ..." -> builder does not recognize the field name.
-- "TameworkInteract: no config resolved or config disabled" -> role id mismatch or config disabled.
-- "TameworkInteract: no interactions matched" -> requirements did not pass. The log includes a summary of key flags.
-- "Mount preset effect not yet implemented" -> feature stub.
+## Common log patterns
+- `Builder ... does not exist` -> missing builder registration or load-order issue.
+- `Unknown JSON attribute ...` -> field name mismatch for that builder/asset codec.
+- `TameworkInteract: no config resolved or config disabled` -> config resolution mismatch (`ConfigId`, role param, or `RoleIds`).
+- `TameworkInteract: no interactions matched` -> requirements failed; inspect requirement summary and alarm/context state.
+- `TwGlobalConfig ... missing required fields` -> one or more required interaction default param names are blank.
 
 ## Interaction troubleshooting
-- Verify `TwInteractionConfig` is enabled and `RoleIds` include the NPC role id.
-- If multiple configs match the same role, use `ConfigId` on the action to force the selection.
-- Ensure role parameters exist if you rely on them (names are defined by `TwGlobalConfig`, defaults are `LovedItems`, `IsMountable`, `IsHarvestable`, `HarvestInteractionContext`).
-- If harvest always works, make sure your role sets the `TwGlobalConfig.HarvestAlarmName` alarm when `$Harvest` runs (default `Harvest_Ready`).
-- If harvest never works, check `HarvestInteractionContext` (or your custom `HarvestContextParam`) and the harvest alarm state.
-- Cooldowns are enforced in real-time seconds and stored as alarms. Use `/tw getalarm` to inspect them if interactions seem locked out.
-  The alarm prefix is `TwGlobalConfig.InteractionCooldownAlarmPrefix`.
-- If prompts look wrong or stale, ensure `TameworkInteractPrompt` is running and use `/tw debugprompt` to inspect prompt selection.
-- Prompt hint keys are `server.interactionHints.*` and must be defined in `Server/Languages/en-US/server.lang` without the `server.` prefix.
-- Breed readiness currently depends on shared happiness (mirrored into breeding state). Feeding increases happiness using `TwHappinessConfig.Sources.GainOnFeed` when present (or shared defaults when no happiness config resolves), with optional trait multiplier `HappinessGainMultiplier`.
-- Breed interaction checks now use effective fertility for threshold gating: `(Happiness * FertilityMultiplier) + FertilityBonus`.
-- Breed interaction now checks config state gates (`RequireNotSleeping`, `RequireNotInCombat`) and adult gating (`RequireAdult` via life-stage state), and logs blocked-state diagnostics when debug is enabled.
-- Successful breeding now schedules a visible sequence: parent approach movement, hearts particle, then delayed offspring spawn.
-- Breeding cooldown/life-stage timing values are tracked in game-time milliseconds; conversion from config seconds is controlled by `TwBreedingConfig.Timing.Basis`.
+- Verify matching enabled `TwInteractionConfig` with expected `RoleIds` and `Priority`.
+- If multiple configs apply, set explicit `ConfigId` on `TameworkInteract` for deterministic selection.
+- Confirm role params referenced by `TwGlobalConfig.InteractionDefaults` exist and have expected values.
+- Use `/tw getalarm` for harvest/cooldown alarm state.
+- If prompt behavior is stale/wrong, ensure `TameworkInteractPrompt` is running and use `/tw debugprompt`.
+- If custom item checks fail unexpectedly, verify `ItemsInHand.Operator` (`AnyOf` vs `NoneOf`) and quantity requirements.
+- For `NpcHealthPercent` requirements, confirm health scaling assumptions (`0-100`).
 
-## Hook troubleshooting
-- `TriggerNpcHook` writes a `TameworkHookComponent` to the NPC.
-- `TameworkHook` sensors can consume the hook automatically if `Consume` is true.
-- In NPC instructions, use `Sensor` (singular). `Sensors` is not supported and will default to always-match behavior.
-- Use `/tw debughook [on|off]` to enable hook debug logs (or toggle without args).
-- Use debug logs or temporary particles to verify the hook was emitted and consumed.
+## Progression troubleshooting
+- Validate resolved configs for happiness/needs/breeding/traits on the same NPC.
+- Use:
+  - `/tw gethappiness`
+  - `/tw getneeds`
+  - `/tw gettraits`
+  - `/tw getlifestage`
+- For breeding issues, confirm:
+  - effective fertility threshold
+  - life-stage/adult gates
+  - sleep/combat gates
+  - cooldown state/alarm timing
+
+## Needs/resource seek troubleshooting
+- Confirm seek sensor/action components are in the role/template:
+  - `Component_Tamework_Instruction_Needs_Seek_Resource_Sensor`
+  - `Component_Tamework_Instruction_Needs_Seek_Resource`
+  - `TameworkNeedsResourceConsume`
+- If seek loops repeat, review reachable targets and failed-seek cooldown behavior.
+
+## Hook and effect troubleshooting
+- `TriggerNpcHook` writes `TameworkHookComponent`; `TameworkHook` consumes it.
+- In instruction nodes, use `Sensor` (singular), not `Sensors`.
+- Use `/tw debughook [on|off]` to inspect hook emit/consume flow.
+- `TameworkEffectActive` can validate effect-driven branches; verify `EffectId` and optional `MinRemainingSeconds`.
 
 ## Command-item troubleshooting
-- Confirm your item is present in a `TwCommandItemConfig.ItemIds` list.
-- If secondary-use radial selection does not open, verify the item has a `TameworkCommand` interaction with `CommandId: OpenSelectionMenu`.
-- If move/home commands select but do not move, ensure your role/template includes `Component_Tamework_Instruction_Command_Move`.
-- If unloaded linked NPCs are not relocating, verify the tool still contains linked NPC metadata and check command feedback for queued counts.
-- If recall/return-home behavior feels wrong at distance, review `TwGlobalConfig` command relocation tuning fields.
-- If command linking fails unexpectedly, verify owner/tamed requirements and `AllowedRoles` filters in `TwCommandItemConfig`.
+- Confirm held item resolves to a `TwCommandItemConfig` and includes expected command list.
+- If radial UI does not open, ensure secondary interaction uses `CommandId: OpenSelectionMenu`.
+- If move/home commands do not move NPCs, verify `Component_Tamework_Instruction_Command_Move` is present.
+- For panel confusion, verify mode (`LinkedMode`/`NearbyMode`), filter mode/value, and active/inactive row state.
+- For unloaded relocation, use linked panel status + `/tw findnpc <uuid>` and check relocation timing config.
 
-## Visual debugging tips
-- Enable NPC debug options such as `DisplayState` and `DisplayTarget` to see live behavior state and targeting.
-- Add temporary particles or sounds inside instructions to confirm sensor triggers.
+## Spawner/naming troubleshooting
+- Spawner failures: check role filters, tame/owner policy, range/cooldown, and captured metadata.
+- Naming failures: confirm naming config binding and policy (`RequireTamed`, `RequireOwner`, rename/replace limits).
 
-## Useful checks
-- Spawn both Tamework example mobs to validate actions and sensors.
-- Confirm capture and spawn preserves attachments.
-- Validate owner and tamed gating with `/tw getowner` and `/tw gettamed`.
-- Check shared happiness + breeding eligibility context with `/tw gethappiness`.
-- Check life-stage gates and growth timing with `/tw getlifestage`.
-- Force/tune happiness gates during testing with `/tw sethappiness <value>`.
-- Inspect rolled traits and effect-key values with `/tw gettraits`.
-- Check alarm state + remaining cooldown with `/tw getalarm [AlarmName]`.
-- Toggle spawner raycast logs with `/tw debugspawner` when testing spawner items.
-- After editing spawner, naming, or command item configs, run `/tw reloadconfig`.
-## Global config warnings
-- If `TwGlobalConfig` is missing required fields, the server logs a warning listing which fields are blank.
+## Debug toggles
+- `/tw debughook [on|off]`
+- `/tw debugprompt [on|off]`
+- `/tw debugspawner [on|off]`
+- `/tw debuglag [on|off]`
 
-## Hytalor patches
-- Hytalor writes patched output to `.../Server/mods/HytalorOverrides/`.
-- If a change seems ignored, compare the override file to your patch source to verify the patch applied.
+## Useful quick checks
+- `/tw getowner`, `/tw setowner`
+- `/tw gettamed`, `/tw settamed`
+- `/tw getalarm [AlarmName] [NpcUuid]`
+- `/tw getflockdebug`
+- `/tw reloadconfig` (item-feature assets only)
+
+## Timestamp note
+World-time based timestamps can be negative and still valid. Treat `0` as unset sentinel; use ordering comparisons, not `> 0` assumptions.

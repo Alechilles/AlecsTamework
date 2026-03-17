@@ -1,66 +1,76 @@
 # Config Discovery
 
-This document explains how Tamework discovers asset based configuration and settings.
+This document explains where Tamework config assets live and how each family resolves.
 
 ## Asset locations
-- TwSpawnerConfig assets live under:
-  `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
-- TwNameItemConfig assets live under:
-  `<ModRoot>/Server/Tamework/Items/Naming/*.json`
-- TwCommandItemConfig assets live under:
-  `<ModRoot>/Server/Tamework/Items/Commands/*.json`
-- TwInteractionConfig assets live under:
-  `<ModRoot>/Server/Tamework/Interactions/*.json`
-- TwGlobalConfig assets live under:
-  `<ModRoot>/Server/Tamework/Global/*.json`
+- `TwGlobalConfig`: `<ModRoot>/Server/Tamework/Global/*.json`
+- `TwCompanionConfig`: `<ModRoot>/Server/Tamework/Companion/*.json`
+- `TwInteractionConfig`: `<ModRoot>/Server/Tamework/Interactions/*.json`
+- `TwSpawnerConfig`: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
+- `TwNameItemConfig`: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
+- `TwCommandItemConfig`: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
+- `TwHappinessConfig`: `<ModRoot>/Server/Tamework/Happiness/*.json`
+- `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
+- `TwBreedingConfig`: `<ModRoot>/Server/Tamework/Breeding/*.json`
+- `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
+- `TwCoopConfig`: `<ModRoot>/Server/Tamework/Farming/Coops/*.json`
 
-These asset types are registered with the asset registry and are available to any mod that ships assets at those paths.
+## Resolution patterns
+### Single active global config
+`TwGlobalConfig` resolves to highest enabled `Priority` (tie: case-insensitive lowest asset id).
 
-## Resolution and overrides
-- Asset ids are derived from the filename (standard asset behavior).
-- If multiple mods provide the same asset id, the later loaded asset wins.
-- `Action_Tamework_Interact` resolves configs in this order:
-  `ConfigId` override (if provided on the action), then the role param named by `TwGlobalConfig.InteractionConfigParam`
-  (default `InteractionConfigId`) if present, then the enabled config with the highest `Priority` whose `RoleIds`
-  contains the role id.
-- `Priority` defaults to `0`. Higher values win. If multiple configs share the same priority, selection order follows asset map iteration.
-- TwGlobalConfig resolves to the highest priority enabled asset. If multiple configs share the same priority, the lowest asset id (case-insensitive) is selected.
-- `TwGlobalConfig.AssetSets` feature gates are resolved independently from active-config priority:
-  each gate is enabled when at least one enabled global config sets that gate to `true`.
+### Role-scoped families
+Resolved by role id + `Priority`:
+- `TwCompanionConfig`
+- `TwInteractionConfig`
+- `TwHappinessConfig`
+- `TwNeedsConfig`
+- `TwBreedingConfig`
+- `TwTraitConfig`
 
-## Global config asset
-TwGlobalConfig replaces the old settings file and is organized into top-level sections:
-- `General` (`Enabled`, `Priority`)
-- `OwnershipProtection` (`BlockOwnerDamage`, `BlockAllPlayerDamageIfOwned`, `InvulnerableIfOwned`)
-- `InteractionDefaults` (`InteractionConfigParam`, `LovedItemsParam`, `IsHarvestableParam`, `IsMountableParam`, `HarvestContextParam`, `HarvestAlarmName`, `InteractionCooldownAlarmPrefix`)
-- `Command`:
-  - `ReturnHomeTeleportDistance`
-  - `ReturnHomePathDistanceBeforeTeleport`
-  - `ReturnHomeTeleportDelayMs`
-  - `RecallSafeSpawnDistance`
-  - `RecallForceRelocateDistance`
-  - `RelocationRetryIntervalMs`
-  - `RelocationMaxWaitMs`
-  - `RelocationMaxRetryAttempts`
-  - `DeadRespawnEnabled`
-  - `DeadRespawnCooldownMs`
-  - `DeadRespawnFollowRetryDelayMs`
-  - `DeadRespawnDistanceClose`
-  - `DeadRespawnDistanceNear`
-  - `DeadRespawnDistanceMid`
-  - `DeadRespawnDistanceFar`
-  - `PlacementMinRelativeY`
-  - `PlacementMaxRelativeY`
-  - `LinkedPanelRequireUnlinkConfirm`
-- `AssetSets`:
-  - `TranquilizerShortbow`
-  - `TranquilizerArrow`
-  - `TranquilizerPotion`
+### Item-scoped families
+Resolved by bound item ids:
+- `TwSpawnerConfig` (`EmptyItemId`)
+- `TwNameItemConfig` (`ItemId` / `ItemIds`)
+- `TwCommandItemConfig` (`ItemIds`)
 
-String parameter-name fields in `InteractionDefaults` are required; missing or blank values emit a warning on startup.
-Command tuning fields are optional and fall back to built-in defaults when omitted or invalid.
+### Coop-scoped family
+- `TwCoopConfig` by `CoopId`
+
+## Priority and ties
+- Higher `Priority` wins.
+- For equal priority, most families use deterministic id-based tie-breaks.
+- `TwInteractionConfig` selection remains priority-first with current asset-map iteration behavior for equal-priority ties.
+
+## Parent fallback inheritance
+All Tamework asset families above support parent fallback inheritance.
+
+Behavior summary:
+- Parent is resolved by parent key/id.
+- Child keeps explicitly authored fields.
+- Missing fields inherit from parent.
+- Sectioned configs (for example `TwGlobalConfig`, `TwCompanionConfig`) inherit nested fields section-by-section.
+
+## Global vs companion policy scope
+- `TwGlobalConfig` contains global defaults and shared infrastructure knobs.
+- `TwCompanionConfig` is the preferred role-scoped location for ownership protection and command behavior policy.
+- Effective role settings fall back to global values when no role-scoped companion policy resolves.
+
+## Asset-set gates
+`TwGlobalConfig.AssetSets` gates optional bundled asset sets:
+- `TranquilizerShortbow`
+- `TranquilizerArrow`
+- `TranquilizerPotion`
+
+Gate evaluation is OR-based across enabled global configs:
+- a gate is enabled if any enabled global config sets it true.
+
+Recipe visibility reconciliation removes disabled gated tranquilizer recipes from crafting registries and restores them when enabled.
 
 ## Reloading
-- `/tw reloadconfig` reloads spawner + naming + command item configs from disk
-  (`TwSpawnerConfig`, `TwNameItemConfig`, `TwCommandItemConfig`).
-- TwInteractionConfig assets are managed by the asset registry and do not require a manual reload command.
+`/tw reloadconfig` reloads item-feature registries only:
+- `TwSpawnerConfig`
+- `TwNameItemConfig`
+- `TwCommandItemConfig`
+
+Other families are asset-registry driven and update through normal loaded/removed asset events.

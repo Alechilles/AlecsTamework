@@ -1,41 +1,28 @@
 # Command Items (TwCommandItemConfig)
 
-### Note: Command items are a beta feature. Changes to core systems are likely. Expect breaking changes if you implement this in your mod currently.
-
 ## Overview
-Command items let players link companion NPCs to a tool and issue commands at runtime.
-The system is asset-driven and built around:
-- `TwCommandItemConfig` assets
+Command items let players link companion NPCs to a tool and dispatch commands at runtime.
+The system is asset-driven around:
+- `TwCommandItemConfig`
 - `TameworkCommand` item interaction
 - `CommandItemFeatureHandler` orchestration
-- Optional NPC instruction bridge `Component_Tamework_Instruction_Command_Move`
-
-Core behaviors:
-- Link/unlink NPCs per tool item.
-- Select a command (cycle or radial menu).
-- Execute command steps on matching recipients.
-- Queue relocation-style commands for unloaded linked NPCs and apply when chunks/entities are available.
 
 ## Runtime Architecture (Contributor View)
-Command runtime is intentionally split so one class does not own all logic:
+Command runtime is split to keep the orchestrator thin:
 - Orchestrator: `CommandItemFeatureHandler`
-- Selection/resolution: `CommandResolutionService`, `CommandRecipientService`
+- Resolution/selection: `CommandResolutionService`, `CommandRecipientService`
 - Link persistence/mutation: `CommandLinkedNpcRecordStore`, `CommandLinkMutationService`
 - Step execution + move/home behavior: `CommandStepExecutionService`, `CommandMenuMoveService`
 - Off-screen relocation + revive: `CommandRelocationDispatchService`, `CommandNpcRelocationService`, `CommandRespawnService`, `CommandLinkedNpcDeathService`
-- Panel view-model assembly: `CommandLinkedPanelEntryService`
+- Panel entry assembly/filter/sort: `CommandLinkedPanelEntryService`, `CommandPanelEntrySourceService`, `CommandPanelPreferenceService`
+- Group metadata + group manager actions: `CommandGroupService`, `CommandGroupManagerPageService`
 - Player feedback: `CommandFeedbackService`
 
-This split is important for maintainability and testability; add new logic to the matching service domain instead of growing the orchestrator.
-
-## Asset and Item Wiring
-- Command config assets:
-  `<ModRoot>/Server/Tamework/Items/Commands/*.json`
-- Item interaction:
-  `TameworkCommand`
+## Asset and item wiring
+- Assets: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
+- Item interaction: `TameworkCommand`
 
 Typical item wiring:
-
 ```json
 "Interactions": {
   "Primary": {
@@ -51,118 +38,110 @@ Typical item wiring:
 }
 ```
 
-Notes:
-- Primary use usually executes the selected command (and can toggle linking when targeting an NPC).
-- Secondary use can open the radial selection menu (`OpenSelectionMenu`).
-- `CommandId: CycleSelection` is also supported for non-UI cycling.
+Overrides:
+- `OpenSelectionMenu`
+- `CycleSelection`
 
-## Recipient Selection
-`TwCommandItemConfig` controls recipient membership with `MembershipMode`:
-- `LinkedOnly`
-- `OwnerScope`
-- `MasterTarget`
-- `LinkedOrMasterTarget`
-
-Additional filters:
+## Recipient selection and linking
+`TwCommandItemConfig` recipient controls:
+- `MembershipMode`: `LinkedOnly`, `OwnerScope`, `MasterTarget`, `LinkedOrMasterTarget`
 - `RequireOwner`
 - `RequireTamed`
 - `AllowedRoles` (`AllowAll`, `Allowlist`, `Denylist`)
 - `Radius`
 - `MaxTargets`
-- `MaxActive` (optional active-link cap; `0` means no active limit)
+- `MaxActive` (`0` = unlimited active links)
 - `RequireLineOfSight`
+- `LinkEnabled`
+- `LinkUseTogglesMembership`
 
-Linking state is stored in:
-- NPC component: `TameworkCommandLinksComponent` (owner/tool links plus optional per-NPC home position)
-- Tool metadata: linked NPC UUIDs plus last-known positions (and mirrored home data for unloaded relocation)
+Link metadata includes:
+- NPC uuid
+- last-known position
+- optional home position
+- cached display/name key/role
+- active/inactive flag
+- optional `groupId`
 
-`MaxActive` applies to linked NPC records marked active. This allows tools to keep larger linked rosters while limiting how many companions receive command dispatch at once.
+Inactive linked rows stay visible in the panel, can still use per-row actions, and are excluded from bulk dispatch.
 
-## Command List and Steps
-Each command entry in `CommandList` defines:
+## Command list and steps
+Each `CommandList` entry supports:
 - `Id`
 - `DisplayName`
 - `Default`
 - `Feedback`
-- `ModeMapping` (optional fallback when no steps are defined)
+- `ModeMapping`
 - `Steps`
 
-Supported step types:
+Step types:
 - `SetState`
-- `SetTarget` (`CrosshairTarget`, `LastAttackTarget`, `OwnerPlayer`, `StoredTarget`)
+- `SetTarget`
 - `ClearTarget`
 - `ClearCombat`
-- `MoveToPosition` (`RaycastHit`, `OwnerPosition`, `StoredHome`)
-- `StoreHome` (`RaycastHit`, `OwnerPosition`)
+- `MoveToPosition`
+- `StoreHome`
 - `TriggerHook`
 
-Per-step control:
-- `FailurePolicy`: `Continue`, `AbortCommandForNpc`, `AbortAll`
-- `Optional`: true/false
+Per-step controls:
+- `FailurePolicy` (`Continue`, `AbortCommandForNpc`, `AbortAll`)
+- `Optional`
 
-## Radial Selection UI
-Selection page:
-- UI file: `Common/UI/Custom/TameworkCommandRadialMenu.ui`
-- Page class: `TameworkCommandSelectionPage`
+## Command radial + linked panel UX
+Selection UI:
+- `Common/UI/Custom/TameworkCommandRadialMenu.ui`
+- `TameworkCommandSelectionPage`
 
-Behavior:
-- Secondary use with `OpenSelectionMenu` opens the wheel.
-- Clicking a slice sets the selected command id in tool metadata.
-- The page supports up to 8 visible command buttons.
+Linked panel supports:
+- Mode toggle: `LinkedMode` / `NearbyMode`
+- Nearby radius controls in nearby mode
+- Sort: `Default`, `Name`, `Species`, `Group`
+- Filter: `None`, `Name`, `Species`, `Group`
+- Filter text input for active filter mode
+- Active/inactive row toggles
+- Group assignment overlay per row
+- Group manager flow (create/rename/recolor/delete)
+- Per-row actions: `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready)
+- Breeding cooldown ring/status and progression vitals/trait indicators
 
-Linked companions side panel (shown with the radial menu):
-- Displays linked NPCs in a dynamic scroll list (not fixed rows).
-- Shows loaded/unloaded/dead row status and health snapshots when available.
-- Supports per-row `Recall`, `Set Home`, `Return Home`, and `Unlink` actions.
-- Shows `Revive` on dead companions when dead respawn is enabled and cooldown is ready.
-- Refreshes row status/health/cooldowns in-place once per second while open.
-- Includes an empty-state prompt when no companions are linked.
-- Optional unlink safety confirmation can require a second click.
-
-## Move/Home/Recall and Off-Screen Relocation
-Command relocation supports both loaded and unloaded NPCs.
-
+## Move/home/recall and off-screen relocation
 Loaded flow:
-- `SetHome` stores home per linked NPC (not per command tool), so each NPC can return to a different location.
-- `ReturnHome` can use hybrid behavior:
-  - path a short visible segment
-  - deferred teleport to stored home
-- `Recall` can force-relocate very distant loaded NPCs near the player before normal follow resumes.
+- `SetHome` stores per-NPC home data.
+- `ReturnHome` can use path + deferred teleport behavior.
+- `Recall` can force-relocate distant companions near the player before follow resumes.
 
 Unloaded flow:
-- Relocation-style commands queue a pending relocation by NPC UUID.
+- Relocation commands enqueue pending relocations by NPC uuid.
 - Source/destination chunks are requested asynchronously.
-- Retries run on a bounded interval/time window.
-- Pending relocations are also retried on NPC add/remove events.
-- Unloaded identities shown in the linked panel use fallback priority: `Display Name > Name Key > Role ID`.
+- Retries run on bounded interval/time windows.
+- On-load relocation retries run via `CommandNpcRelocationOnLoadSystem`.
 
-Global tuning values come from `TwGlobalConfig.Command`:
+Dead companions:
+- Death snapshots persist across relog/restart.
+- `Revive` respects role-scoped effective cooldown/enable policy (`TwCompanionConfig`, with global fallback).
+
+## Global tuning
+`TwGlobalConfig.Command` remains the shared relocation infrastructure location:
+- `RelocationRetryIntervalMs`
+- `RelocationMaxWaitMs`
+- `RelocationMaxRetryAttempts`
+- `LinkedPanelRequireUnlinkConfirm`
+
+Role-scoped behavior tuning belongs in `TwCompanionConfig.Command`:
 - `ReturnHomeTeleportDistance`
 - `ReturnHomePathDistanceBeforeTeleport`
 - `ReturnHomeTeleportDelayMs`
 - `RecallSafeSpawnDistance`
 - `RecallForceRelocateDistance`
-- `RelocationRetryIntervalMs`
-- `RelocationMaxWaitMs`
-- `RelocationMaxRetryAttempts`
 - `DeadRespawnEnabled`
-- `DeadRespawnCooldownMs`
+- `DeadRespawnCooldownMs` / `DeadRespawnCooldownMins`
 - `DeadRespawnFollowRetryDelayMs`
-- `DeadRespawnDistanceClose`
-- `DeadRespawnDistanceNear`
-- `DeadRespawnDistanceMid`
-- `DeadRespawnDistanceFar`
+- `DeadRespawnDistanceClose/Near/Mid/Far`
 - `PlacementMinRelativeY`
 - `PlacementMaxRelativeY`
-- `LinkedPanelRequireUnlinkConfirm`
 
-## Hook Bridge for Movement
-`MoveToPosition` emits hooks with ids like:
-- `Tamework.Command.MoveToPosition.RaycastHit`
-- `Tamework.Command.MoveToPosition.StoredHome`
-
-`Component_Tamework_Instruction_Command_Move` can consume these hooks and run actual seek behavior.
-`TameworkHook` now exposes target-position params (`HookHasTargetPosition`, `HookTargetX`, `HookTargetY`, `HookTargetZ`) so instruction logic can read movement destinations directly.
+## Feedback notes
+Command feedback sounds are delivered as local 2D sound for the using player and in-world 3D sound for nearby others.
 
 ## Reloading
-`/tw reloadconfig` reloads command item assets along with spawner and naming item assets.
+`/tw reloadconfig` reloads command item assets along with spawner and naming assets.

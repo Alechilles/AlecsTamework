@@ -3,62 +3,45 @@
 This document is a high-level map of how Alec's Tamework is organized and where to make changes safely.
 
 ## Core concepts
-- Tamework is a framework mod that supplies reusable NPC actions, sensors, components, and asset driven configuration that other mods can reference.
-- Two layers: an asset layer (NPC templates, items, particles, interaction configs) and a plugin layer (components, actions, sensors, runtime behavior).
-- Asset driven configuration is preferred so other mods can override behavior without patching Java.
-- Runtime systems are organized as orchestrators plus focused services (selection, validation, persistence, relocation, UI view-models, feedback).
+- Tamework is a framework mod supplying reusable NPC actions/sensors/components plus asset-driven runtime systems.
+- Two layers: asset layer (NPC templates/items/particles/config assets) and plugin layer (components, actions, sensors, services, systems).
+- Runtime is intentionally decomposed into orchestrators + focused services (selection, validation, persistence, relocation, UI view-models, feedback).
 
 ## Major subsystems
-- NPC actions and sensors
-- Optimized interactions pipeline (TwInteractionConfig + Action_Tamework_Interact)
-- Hook and instruction bridge (TriggerNpcHook effect + TameworkHook sensor)
-- Companion progression (TwHappinessConfig/TwBreedingConfig/TwTraitConfig + bootstrap + persistence bridges)
-- Spawner items (TwSpawnerConfig + TameworkSpawn + SpawnerFeatureHandler orchestrating spawner services)
-- Naming items (TwNameItemConfig + TameworkNameNpc + NamingFeatureHandler orchestrating naming services)
-- Command items (TwCommandItemConfig + TameworkCommand + CommandItemFeatureHandler orchestrating command services)
-- Command relocation pipeline (CommandNpcRelocationService + CommandNpcRelocationOnLoadSystem)
-- Linked companions panel runtime (TameworkCommandSelectionPage + UI helper services + per-row action routing)
-- Ownership and taming (components, owner interaction blocking, damage filters)
-- Localization and messages (translation discovery + owner denial messages)
-- Metrics telemetry (TameworkHStatsIntegration + HStats bridge + dependency mod forwarding)
-- Asset-pack ordering and legacy-pack replacement at early `LoadAssetEvent`
+- NPC action/sensor/filter builder registration (`TameworkNpcBuilderRegistrar`)
+- Optimized interaction pipeline (`TwInteractionConfig` + `TameworkInteract`)
+- Hook bridge (`TriggerNpcHook` + `TameworkHook`)
+- Companion progression (`TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, `TwTraitConfig`, lifecycle/attachment sync)
+- Role-scoped companion policy (`TwCompanionConfig`) with global fallback
+- Spawner item runtime (`TwSpawnerConfig` + `TameworkSpawn` + spawner services)
+- Naming item runtime (`TwNameItemConfig` + `TameworkNameNpc` + naming services)
+- Command item runtime (`TwCommandItemConfig` + `TameworkCommand` + command services)
+- Command relocation/death snapshot pipeline (`CommandNpcRelocationService`, `CommandLinkedNpcDeathService`, on-load relocation system)
+- Linked companions panel + command radial UI (mode/sort/filter/group management + per-row actions)
+- Coop policy overlays (`TwCoopConfig`)
+- Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
+- Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
 
 ## Key behaviors
-- Action_Tamework_Interact resolves a TwInteractionConfig and executes the first matching interaction entry.
-- The interaction pipeline is split into resolution, selection, and execution helpers to isolate matching, cooldowns, and effects.
-- TwInteractionConfig supports preset interactions (Tame, Feed, Harvest, Mount, ModeCycle, Breed) plus fully custom requirements and effects.
-- Shared happiness progression is stored in `TameworkHappinessComponent` and resolved from `TwHappinessConfig`; breeding reads/mirrors this value for compatibility while partner/offspring logic evolves.
-- Life-stage progression is tracked in `TameworkLifeStageComponent` and used by breeding adult gates, offspring initialization, and progression persistence.
-- Offspring appearance inheritance persists deterministic attachment selections in `TameworkAttachmentsComponent`; runtime sync reapplies those selections after role/model transitions so baby/adult visual variants remain consistent.
-- The hook system allows interaction effects to emit a hook signal that can be consumed by NPC instruction sensors.
-- TwSpawnerConfig assets are converted into per-item feature configs and executed through dedicated spawner services (policy, metadata, identity/state, effects, placement, inventory).
-- TwNameItemConfig assets are resolved per item and executed through naming services (NPC info/ownership checks plus effect application).
-- TwCommandItemConfig assets are indexed by item id and executed through command services (resolution, recipients, link mutation, step execution, relocation dispatch, respawn, feedback, panel entry building).
-- Linked companions panel provides per-NPC actions (`Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive`) with incremental row refresh while open.
-- Recall/return-home/revive use shared safe placement + relocation queueing for unloaded linked NPCs with chunk preload retries.
-- Dead linked NPC snapshots persist so dead/revive state survives relog and restart.
-- Owner protection can block owner damage, all player damage, or make owned NPCs invulnerable via settings.
+- `TameworkInteract` resolves one config and executes the first enabled matching entry.
+- Interaction flow is split across resolver/selector/effect helpers for maintainability.
+- `TwInteractionConfig` supports preset interactions (`Tame`, `Feed`, `Harvest`, `Mount`, `ModeCycle`, `Breed`) and custom requirement/effect combinations.
+- Shared progression state persists via happiness/needs/breeding/traits/life-stage/attachments components and is restored across capture/spawn + death/respawn flows.
+- Command tools persist linked NPC metadata, active/inactive status, panel preferences, and group metadata directly on the item.
+- Linked panel supports both linked and nearby modes, plus sort/filter/group assignment and group manager flows.
+- Ownership/damage behavior resolves effective policy through `TwCompanionConfig` with `TwGlobalConfig` fallback.
 
 ## Where to look
-- Plugin entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`
+- Entrypoint: `src/main/java/com/alechilles/alecstamework/Tamework.java`
+- Builder registration: `src/main/java/com/alechilles/alecstamework/npc/TameworkNpcBuilderRegistrar.java`
 - Actions: `src/main/java/com/alechilles/alecstamework/npc/actions`
 - Sensors: `src/main/java/com/alechilles/alecstamework/npc/sensors`
 - Components: `src/main/java/com/alechilles/alecstamework/npc/components`
-- Interaction config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwInteractionConfig.java`
-- Happiness config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwHappinessConfig.java`
-- Spawner config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwSpawnerConfig.java`
-- Naming config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwNameItemConfig.java`
-- Command config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwCommandItemConfig.java`
-- Progression bootstrap and services: `src/main/java/com/alechilles/alecstamework/npc/progression/CompanionProgressionBootstrapService.java` and `src/main/java/com/alechilles/alecstamework/npc/progression/CompanionHappinessService.java`
-- Spawner orchestration + services: `src/main/java/com/alechilles/alecstamework/items/SpawnerFeatureHandler.java` and `src/main/java/com/alechilles/alecstamework/items/Spawner*Service.java`
-- Naming orchestration + services: `src/main/java/com/alechilles/alecstamework/items/NamingFeatureHandler.java` and `src/main/java/com/alechilles/alecstamework/items/Naming*Service.java`
-- Command orchestration + services: `src/main/java/com/alechilles/alecstamework/items/CommandItemFeatureHandler.java` and `src/main/java/com/alechilles/alecstamework/items/Command*Service.java`
-- Command relocation queue + on-load system: `src/main/java/com/alechilles/alecstamework/items/CommandNpcRelocationService.java` and `src/main/java/com/alechilles/alecstamework/npc/systems/CommandNpcRelocationOnLoadSystem.java`
-- Command UI page + helpers: `src/main/java/com/alechilles/alecstamework/ui/TameworkCommandSelectionPage.java` and `src/main/java/com/alechilles/alecstamework/ui/*Service.java`
-- Global config asset: `src/main/java/com/alechilles/alecstamework/config/assets/TwGlobalConfig.java`
-- Metrics bootstrap: `src/main/java/com/alechilles/alecstamework/metrics/TameworkHStatsIntegration.java`
-- Dependency metrics reporter: `src/main/java/com/alechilles/alecstamework/metrics/TameworkDependencyMetricsReporter.java`
-- Example assets: `src/main/resources/Server/Tamework`
+- Config assets: `src/main/java/com/alechilles/alecstamework/config/assets`
+- Command runtime: `src/main/java/com/alechilles/alecstamework/items/Command*`
+- Command UI: `src/main/java/com/alechilles/alecstamework/ui`
+- Metrics: `src/main/java/com/alechilles/alecstamework/metrics`
+- Bundled assets/examples: `src/main/resources/Server/Tamework`
 
 ## Versioned docs
-Public end user docs live in the separate wiki repo. Internal docs live here under `/docs`.
+Public end-user docs live in the wiki repo. Internal contributor docs live under `/docs`.
