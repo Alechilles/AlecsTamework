@@ -62,7 +62,13 @@
 - `/tw debughook [on|off]`
 - `/tw debugprompt [on|off]`
 - `/tw debugspawner [on|off]`
+- `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debuglag [on|off]`
+
+`/tw debugdespawn` notes:
+- Default (no role filter) tracks all tamed companions.
+- You can target a role by name (for example `Rat` or `Tamed_Rat`).
+- Use `all` or `clear` to remove a role filter without disabling the toggle.
 
 ## Useful quick checks
 - `/tw getowner`, `/tw setowner`
