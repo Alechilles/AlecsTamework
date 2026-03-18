@@ -290,7 +290,7 @@ final class InteractionStateEffects {
             return;
         }
         String roleName = npc.getRoleName();
-        if (!isRatRole(roleName) && !isRatRole(targetRoleId)) {
+        if (!plugin.matchesDebugDespawnRole(roleName) && !plugin.matchesDebugDespawnRole(targetRoleId)) {
             return;
         }
         plugin.getLogger().at(Level.INFO).log(
@@ -300,14 +300,6 @@ final class InteractionStateEffects {
                         + " targetRole=" + (targetRoleId == null || targetRoleId.isBlank() ? "<none>" : targetRoleId)
                         + " spawnConfig=" + npc.getSpawnConfiguration()
         );
-    }
-
-    private static boolean isRatRole(String roleName) {
-        if (roleName == null || roleName.isBlank()) {
-            return false;
-        }
-        String normalized = roleName.trim().toLowerCase();
-        return "rat".equals(normalized) || normalized.endsWith("_rat");
     }
 
     // Applies a healing delta to the NPC stats.

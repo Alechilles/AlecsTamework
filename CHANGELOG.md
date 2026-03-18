@@ -4,12 +4,12 @@
 ### Added
 - Added shared `Want_Food_Charcoal` particle assets (`Want_Food_Charcoal`, `ThoughtCloud_Charcoal`, and `CharcoalThought.png`) so mods can reuse a blank-thought + base charcoal icon food hint.
 - Linked panel NPC cards now include a breeding enable/disable toggle (default `off`), and passive/interaction breeding flows now require this per-NPC toggle to be enabled.
-- Added `/tw debugdespawn [on|off]` to toggle focused rat companion despawn diagnostics logs (add/remove lifecycle reason, role, tamed state, owner, and spawn-configuration context).
+- Added `/tw debugdespawn` overloads to support optional role filters for despawn diagnostics (for example `on Tamed_Rat`, `Rat`, and `clear`).
 ### Fixed
 - Defend instruction threat detection now treats mobs that recently attacked the companion itself as valid retaliatory targets (in addition to mobs that attacked `MasterTarget`), so companions no longer ignore direct incoming hits while defending.
-- Added immediate tame-flow diagnostics breadcrumbs for rat role changes when despawn diagnostics are enabled, improving root-cause tracing for intermittent post-tame removals.
+- Added immediate tame-flow diagnostics breadcrumbs for role changes when despawn diagnostics are enabled, improving root-cause tracing for intermittent post-tame removals.
 - Tame transitions now detach NPCs from spawn-marker/spawn-beacon ownership and clear spawn-tracking state when they become tamed, preventing cave-spawned companions (especially rats) from being reclaimed and removed after role swap.
-- Rat despawn diagnostics now include spawn-marker/spawn-beacon reference presence and linked marker/beacon UUID context on add/remove events.
+- Despawn diagnostics now track all tamed companions (instead of rat-only) and include spawn-marker/spawn-beacon reference presence plus linked marker/beacon UUID context on add/remove events.
 
 ## 2.4.2 - Interaction + Lifecycle Reliability - 2026-03-16
 ### Fixed

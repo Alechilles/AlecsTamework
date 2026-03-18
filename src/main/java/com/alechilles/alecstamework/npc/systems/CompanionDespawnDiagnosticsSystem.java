@@ -25,7 +25,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Emits focused diagnostics for rat NPC lifecycle removals while debug logging is enabled.
+ * Emits focused diagnostics for tamed NPC lifecycle removals while debug logging is enabled.
  */
 public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntityStore> {
     private final ComponentType<EntityStore, NPCEntity> npcType;
@@ -56,7 +56,8 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         String refKey = key(reference);
-        if (!isDebugEnabled()) {
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || !plugin.isDebugDespawnEnabled()) {
             trackedByReference.remove(refKey);
             return;
         }
@@ -68,11 +69,12 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
             return;
         }
         String roleName = npc.getRoleName();
-        if (!isRatRole(roleName)) {
+        TameworkTamedComponent tamed = tamedType == null ? null : store.getComponent(reference, tamedType);
+        boolean isTamed = tamed != null && tamed.isTamed();
+        if (!shouldTrack(plugin, roleName, isTamed)) {
             trackedByReference.remove(refKey);
             return;
         }
-        TameworkTamedComponent tamed = tamedType == null ? null : store.getComponent(reference, tamedType);
         TameworkOwnerComponent owner = ownerType == null ? null : store.getComponent(reference, ownerType);
         SpawnMarkerReference markerReference = spawnMarkerReferenceType == null
                 ? null
@@ -87,7 +89,7 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
                 npc.getUuid(),
                 roleName,
                 npc.getSpawnConfiguration(),
-                tamed != null && tamed.isTamed(),
+                isTamed,
                 owner != null ? owner.getOwnerId() : null,
                 owner != null ? owner.getOwnerName() : null,
                 String.valueOf(reason),
@@ -124,14 +126,12 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
                                @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         String refKey = key(reference);
         TrackedNpcSnapshot tracked = trackedByReference.remove(refKey);
-        if (!isDebugEnabled()) {
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || !plugin.isDebugDespawnEnabled()) {
             return;
         }
         NPCEntity npc = npcType == null ? null : store.getComponent(reference, npcType);
         String roleName = resolveRoleName(npc, tracked);
-        if (!isRatRole(roleName)) {
-            return;
-        }
         TameworkTamedComponent tamed = tamedType == null ? null : store.getComponent(reference, tamedType);
         TameworkOwnerComponent owner = ownerType == null ? null : store.getComponent(reference, ownerType);
         SpawnMarkerReference markerReference = spawnMarkerReferenceType == null
@@ -141,6 +141,9 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
                 ? null
                 : store.getComponent(reference, spawnBeaconReferenceType);
         boolean isTamed = tamed != null ? tamed.isTamed() : tracked != null && tracked.tamed;
+        if (!shouldTrack(plugin, roleName, isTamed)) {
+            return;
+        }
         UUID ownerId = owner != null ? owner.getOwnerId() : tracked != null ? tracked.ownerId : null;
         String ownerName = owner != null ? owner.getOwnerName() : tracked != null ? tracked.ownerName : null;
         boolean hasMarkerReference = markerReference != null || tracked != null && tracked.hadMarkerReference;
@@ -158,7 +161,7 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
         log(
                 Level.WARNING,
                 String.format(
-                        "Despawn diagnostics: rat removed ref=%s uuid=%s role=%s tamed=%s spawnConfig=%s removeReason=%s aliveMs=%s addReason=%s trackedRole=%s trackedSpawnConfig=%s ownerId=%s ownerName=%s markerRef=%s markerEntityUuid=%s beaconRef=%s beaconEntityUuid=%s",
+                        "Despawn diagnostics: companion removed ref=%s uuid=%s role=%s tamed=%s spawnConfig=%s removeReason=%s aliveMs=%s addReason=%s trackedRole=%s trackedSpawnConfig=%s ownerId=%s ownerName=%s markerRef=%s markerEntityUuid=%s beaconRef=%s beaconEntityUuid=%s",
                         refKey,
                         uuidText(npc != null ? npc.getUuid() : tracked != null ? tracked.uuid : null),
                         safe(roleName),
@@ -187,12 +190,8 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
         return Query.and(npcType);
     }
 
-    private static boolean isRatRole(@Nullable String roleName) {
-        if (roleName == null || roleName.isBlank()) {
-            return false;
-        }
-        String normalized = roleName.trim().toLowerCase();
-        return "rat".equals(normalized) || normalized.endsWith("_rat");
+    private static boolean shouldTrack(@Nonnull Tamework plugin, @Nullable String roleName, boolean isTamed) {
+        return isTamed && plugin.matchesDebugDespawnRole(roleName);
     }
 
     @Nullable
@@ -226,11 +225,6 @@ public final class CompanionDespawnDiagnosticsSystem extends RefSystem<EntitySto
         }
         UUIDComponent uuidComponent = store.getComponent(entityRef, uuidType);
         return uuidComponent == null ? null : uuidComponent.getUuid();
-    }
-
-    private static boolean isDebugEnabled() {
-        Tamework instance = Tamework.getInstance();
-        return instance != null && instance.isDebugDespawnEnabled();
     }
 
     private static void log(Level level, String message) {

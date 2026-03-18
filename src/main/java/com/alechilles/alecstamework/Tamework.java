@@ -136,6 +136,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
     private volatile boolean debugDespawnLogs;
+    private volatile String debugDespawnRoleFilter;
     private volatile boolean debugLagLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
@@ -967,6 +968,44 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugDespawnEnabled() {
         debugDespawnLogs = !debugDespawnLogs;
         return debugDespawnLogs;
+    }
+
+    public String getDebugDespawnRoleFilter() {
+        return debugDespawnRoleFilter;
+    }
+
+    public void clearDebugDespawnRoleFilter() {
+        debugDespawnRoleFilter = null;
+    }
+
+    public String setDebugDespawnRoleFilter(String roleName) {
+        debugDespawnRoleFilter = normalizeDebugDespawnRole(roleName);
+        return debugDespawnRoleFilter;
+    }
+
+    public boolean matchesDebugDespawnRole(String roleName) {
+        String filter = debugDespawnRoleFilter;
+        if (filter == null || filter.isBlank()) {
+            return true;
+        }
+        if (roleName == null || roleName.isBlank()) {
+            return false;
+        }
+        String normalizedRole = normalizeDebugDespawnRole(roleName);
+        if (normalizedRole == null) {
+            return false;
+        }
+        return normalizedRole.equals(filter)
+                || normalizedRole.endsWith("_" + filter)
+                || normalizedRole.startsWith(filter + "_");
+    }
+
+    private static String normalizeDebugDespawnRole(String roleName) {
+        if (roleName == null) {
+            return null;
+        }
+        String normalized = roleName.trim().toLowerCase();
+        return normalized.isBlank() ? null : normalized;
     }
 
     public boolean setDebugLagEnabled(boolean enabled) {
