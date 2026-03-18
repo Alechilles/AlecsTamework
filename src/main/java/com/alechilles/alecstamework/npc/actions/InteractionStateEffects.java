@@ -23,6 +23,8 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
+import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
@@ -58,6 +60,7 @@ final class InteractionStateEffects {
             String ownerName = ref != null ? ref.getUsername() : null;
             store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
         }
+        detachFromSpawnReferences(npcRef, store);
         applyDisableSpawnDrivenDespawn(npcRef, store);
         logDespawnDebug("start_taming", npcRef, store, null);
         CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
@@ -89,6 +92,7 @@ final class InteractionStateEffects {
         }
         store.putComponent(npcRef, tamedType, new TameworkTamedComponent(value));
         if (value) {
+            detachFromSpawnReferences(npcRef, store);
             applyDisableSpawnDrivenDespawn(npcRef, store);
             CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
         }
@@ -240,6 +244,33 @@ final class InteractionStateEffects {
         }
         npc.setSpawnConfiguration(DISABLE_DESPAWN_SPAWN_CONFIGURATION);
         return true;
+    }
+
+    // Detaches tameable NPCs from spawn marker/beacon ownership so marker-lost cleanup cannot reclaim companions.
+    private boolean detachFromSpawnReferences(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        boolean detached = false;
+        ComponentType<EntityStore, SpawnMarkerReference> markerReferenceType = SpawnMarkerReference.getComponentType();
+        if (markerReferenceType != null && store.getComponent(npcRef, markerReferenceType) != null) {
+            store.tryRemoveComponent(npcRef, markerReferenceType);
+            detached = true;
+        }
+        ComponentType<EntityStore, SpawnBeaconReference> beaconReferenceType = SpawnBeaconReference.getComponentType();
+        if (beaconReferenceType != null && store.getComponent(npcRef, beaconReferenceType) != null) {
+            store.tryRemoveComponent(npcRef, beaconReferenceType);
+            detached = true;
+        }
+        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
+        if (npcType == null) {
+            return detached;
+        }
+        NPCEntity npc = store.getComponent(npcRef, npcType);
+        if (npc == null) {
+            return detached;
+        }
+        return npc.updateSpawnTrackingState(false) || detached;
     }
 
     private static void logDespawnDebug(String stage,

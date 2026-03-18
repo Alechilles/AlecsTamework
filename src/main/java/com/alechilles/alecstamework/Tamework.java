@@ -71,6 +71,7 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
+import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
@@ -80,6 +81,8 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Int
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
+import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 
 /**
@@ -280,7 +283,10 @@ public class Tamework extends JavaPlugin {
                 new CompanionDespawnDiagnosticsSystem(
                         NPCEntity.getComponentType(),
                         tamedComponentType,
-                        ownerComponentType
+                        ownerComponentType,
+                        SpawnMarkerReference.getComponentType(),
+                        SpawnBeaconReference.getComponentType(),
+                        UUIDComponent.getComponentType()
                 )
         );
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());

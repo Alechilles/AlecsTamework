@@ -8,6 +8,8 @@
 ### Fixed
 - Defend instruction threat detection now treats mobs that recently attacked the companion itself as valid retaliatory targets (in addition to mobs that attacked `MasterTarget`), so companions no longer ignore direct incoming hits while defending.
 - Added immediate tame-flow diagnostics breadcrumbs for rat role changes when despawn diagnostics are enabled, improving root-cause tracing for intermittent post-tame removals.
+- Tame transitions now detach NPCs from spawn-marker/spawn-beacon ownership and clear spawn-tracking state when they become tamed, preventing cave-spawned companions (especially rats) from being reclaimed and removed after role swap.
+- Rat despawn diagnostics now include spawn-marker/spawn-beacon reference presence and linked marker/beacon UUID context on add/remove events.
 
 ## 2.4.2 - Interaction + Lifecycle Reliability - 2026-03-16
 ### Fixed
