@@ -55,6 +55,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnL
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionDespawnDiagnosticsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnProtectionSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
@@ -131,6 +132,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
+    private volatile boolean debugDespawnLogs;
     private volatile boolean debugLagLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
@@ -274,6 +276,13 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
         getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
+        getEntityStoreRegistry().registerSystem(
+                new CompanionDespawnDiagnosticsSystem(
+                        NPCEntity.getComponentType(),
+                        tamedComponentType,
+                        ownerComponentType
+                )
+        );
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
@@ -938,6 +947,20 @@ public class Tamework extends JavaPlugin {
 
     public boolean isDebugLagEnabled() {
         return debugLagLogs;
+    }
+
+    public boolean isDebugDespawnEnabled() {
+        return debugDespawnLogs;
+    }
+
+    public boolean setDebugDespawnEnabled(boolean enabled) {
+        debugDespawnLogs = enabled;
+        return debugDespawnLogs;
+    }
+
+    public boolean toggleDebugDespawnEnabled() {
+        debugDespawnLogs = !debugDespawnLogs;
+        return debugDespawnLogs;
     }
 
     public boolean setDebugLagEnabled(boolean enabled) {

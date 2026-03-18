@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModifyStatsEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.OwnerSource;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetOwnerEffect;
@@ -27,6 +28,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.UUID;
+import java.util.logging.Level;
 
 /** Applies interaction effects that change NPC ownership, stats, or states. */
 final class InteractionStateEffects {
@@ -57,6 +59,7 @@ final class InteractionStateEffects {
             store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
         }
         applyDisableSpawnDrivenDespawn(npcRef, store);
+        logDespawnDebug("start_taming", npcRef, store, null);
         CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
         return true;
     }
@@ -218,6 +221,7 @@ final class InteractionStateEffects {
                 store
         );
         applyDisableSpawnDrivenDespawn(npcRef, store);
+        logDespawnDebug("set_role", npcRef, store, roleId);
         return true;
     }
 
@@ -236,6 +240,43 @@ final class InteractionStateEffects {
         }
         npc.setSpawnConfiguration(DISABLE_DESPAWN_SPAWN_CONFIGURATION);
         return true;
+    }
+
+    private static void logDespawnDebug(String stage,
+                                        Ref<EntityStore> npcRef,
+                                        Store<EntityStore> store,
+                                        String targetRoleId) {
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || !plugin.isDebugDespawnEnabled() || plugin.getLogger() == null) {
+            return;
+        }
+        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
+        if (npcType == null || npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(npcRef, npcType);
+        if (npc == null) {
+            return;
+        }
+        String roleName = npc.getRoleName();
+        if (!isRatRole(roleName) && !isRatRole(targetRoleId)) {
+            return;
+        }
+        plugin.getLogger().at(Level.INFO).log(
+                "Despawn diagnostics: tame flow stage=" + stage
+                        + " uuid=" + (npc.getUuid() == null ? "<none>" : npc.getUuid())
+                        + " role=" + (roleName == null || roleName.isBlank() ? "<none>" : roleName)
+                        + " targetRole=" + (targetRoleId == null || targetRoleId.isBlank() ? "<none>" : targetRoleId)
+                        + " spawnConfig=" + npc.getSpawnConfiguration()
+        );
+    }
+
+    private static boolean isRatRole(String roleName) {
+        if (roleName == null || roleName.isBlank()) {
+            return false;
+        }
+        String normalized = roleName.trim().toLowerCase();
+        return "rat".equals(normalized) || normalized.endsWith("_rat");
     }
 
     // Applies a healing delta to the NPC stats.
