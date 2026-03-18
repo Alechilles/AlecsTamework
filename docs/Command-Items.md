@@ -99,6 +99,7 @@ Linked panel supports:
 - Filter: `None`, `Name`, `Species`, `Group`
 - Filter text input for active filter mode
 - Active/inactive row toggles
+- Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row
 - Group manager flow (create/rename/recolor/delete)
 - Per-row actions: `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready)

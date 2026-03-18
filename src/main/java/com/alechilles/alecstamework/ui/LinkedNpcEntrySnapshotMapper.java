@@ -62,6 +62,7 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.groupId(),
                     entry.groupName(),
                     entry.groupColorHex(),
+                    entry.breedingEnabled(),
                     entry.breedingCooldownActive(),
                     entry.breedingCooldownRemainingMs(),
                     entry.breedingCooldownRatio(),

@@ -36,6 +36,8 @@ final class LinkedNpcPanelCardBinder {
         String removeSelector = entrySelector + " #RemoveButton";
         String activeToggleActiveSelector = entrySelector + " #ActiveToggleActiveButton";
         String activeToggleInactiveSelector = entrySelector + " #ActiveToggleInactiveButton";
+        String breedingToggleEnabledSelector = entrySelector + " #BreedingToggleEnabledButton";
+        String breedingToggleDisabledSelector = entrySelector + " #BreedingToggleDisabledButton";
         String inactiveBadgeSelector = entrySelector + " #StatusInactive";
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
@@ -57,6 +59,10 @@ final class LinkedNpcPanelCardBinder {
         boolean showUnlink = isLinked;
         boolean showActiveToggleActive = isLinked && entry.active() && !pendingUnlink;
         boolean showActiveToggleInactive = isLinked && !entry.active() && !pendingUnlink;
+        boolean showBreedingToggleEnabled =
+                isLinked && entry.loaded() && entry.breedingCooldownKnown() && entry.breedingEnabled() && !pendingUnlink;
+        boolean showBreedingToggleDisabled =
+                isLinked && entry.loaded() && entry.breedingCooldownKnown() && !entry.breedingEnabled() && !pendingUnlink;
         boolean showInactiveBadge = isLinked && !entry.active() && !pendingUnlink;
 
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
@@ -66,6 +72,8 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(removeSelector + ".Visible", showUnlink);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
         commandBuilder.set(activeToggleInactiveSelector + ".Visible", showActiveToggleInactive);
+        commandBuilder.set(breedingToggleEnabledSelector + ".Visible", showBreedingToggleEnabled);
+        commandBuilder.set(breedingToggleDisabledSelector + ".Visible", showBreedingToggleDisabled);
         commandBuilder.set(inactiveBadgeSelector + ".Visible", showInactiveBadge);
         LinkedNpcPanelGroupTabBinder.bind(
                 commandBuilder,
@@ -116,6 +124,22 @@ final class LinkedNpcPanelCardBinder {
                     CustomUIEventBindingType.Activating,
                     activeToggleInactiveSelector,
                     EventData.of(config.eventCommandId(), config.toggleActiveCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showBreedingToggleEnabled) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    breedingToggleEnabledSelector,
+                    EventData.of(config.eventCommandId(), config.toggleBreedingCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showBreedingToggleDisabled) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    breedingToggleDisabledSelector,
+                    EventData.of(config.eventCommandId(), config.toggleBreedingCommandPrefix() + entry.npcUuid()),
                     false
             );
         }
@@ -176,6 +200,7 @@ final class LinkedNpcPanelCardBinder {
                              String unlinkCommandPrefix,
                              String openGroupPickerCommandPrefix,
                              String toggleActiveCommandPrefix,
+                             String toggleBreedingCommandPrefix,
                              String respawnCommandPrefix,
                              String recallCommandPrefix,
                              String setHomeCommandPrefix,

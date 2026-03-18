@@ -112,6 +112,7 @@ public final class CommandLinkedNpcDeathService {
                 : null;
         String breedingConfigId = breedingComponent != null ? breedingComponent.getConfigId() : null;
         Double breedingHappiness = breedingComponent != null ? breedingComponent.getHappiness() : null;
+        boolean breedingEnabled = breedingComponent != null && breedingComponent.isEnabled();
         long breedingCooldownUntilMs = breedingComponent != null ? breedingComponent.getCooldownUntilMs() : 0L;
         UUID breedingLastPartnerUuid = breedingComponent != null ? breedingComponent.getLastPartnerUuid() : null;
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
@@ -219,7 +220,8 @@ public final class CommandLinkedNpcDeathService {
                         lifeStageAdultScale,
                         lifeStageGrowthScalingEnabled,
                         attachmentsConfigId,
-                        attachmentsValues
+                        attachmentsValues,
+                        breedingEnabled
                 )
         );
         persistSnapshots();
@@ -347,7 +349,8 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + snapshot.lifeStageAdultScale()
                 + FIELD_SEPARATOR + snapshot.lifeStageGrowthScalingEnabled()
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsConfigId())
-                + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsValues());
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsValues())
+                + FIELD_SEPARATOR + snapshot.breedingEnabled();
     }
 
     @Nullable
@@ -415,6 +418,7 @@ public final class CommandLinkedNpcDeathService {
                 : (parts.length > 33 && Boolean.parseBoolean(parts[33]));
         String attachmentsConfigId = parts.length > 34 ? decodeNullableString(parts[34]) : null;
         String attachmentsValues = parts.length > 35 ? decodeNullableString(parts[35]) : null;
+        boolean breedingEnabled = parts.length > 36 && Boolean.parseBoolean(parts[36]);
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -451,7 +455,8 @@ public final class CommandLinkedNpcDeathService {
                 lifeStageAdultScale,
                 lifeStageGrowthScalingEnabled,
                 attachmentsConfigId,
-                attachmentsValues
+                attachmentsValues,
+                breedingEnabled
         );
     }
 
@@ -799,7 +804,8 @@ public final class CommandLinkedNpcDeathService {
                                          double lifeStageAdultScale,
                                          boolean lifeStageGrowthScalingEnabled,
                                          @Nullable String attachmentsConfigId,
-                                         @Nullable String attachmentsValues) {
+                                         @Nullable String attachmentsValues,
+                                         boolean breedingEnabled) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

@@ -177,6 +177,7 @@ public final class CompanionProgressionBootstrapService {
         TameworkBreedingComponent existing = store.getComponent(npcRef, breedingType);
         if (existing != null) {
             boolean changed = false;
+            boolean readyWhenEnabled = existing.isEnabled() && ready;
             String resolvedConfigId = config.getId();
             if (resolvedConfigId != null
                     && !resolvedConfigId.isBlank()
@@ -206,8 +207,8 @@ public final class CompanionProgressionBootstrapService {
                 existing.setCooldownUntilMs(migratedCooldownUntilMs);
                 changed = true;
             }
-            if (existing.isReady() != ready) {
-                existing.setReady(ready);
+            if (existing.isReady() != readyWhenEnabled) {
+                existing.setReady(readyWhenEnabled);
                 changed = true;
             }
             if (changed) {
@@ -219,7 +220,8 @@ public final class CompanionProgressionBootstrapService {
                 config.getId(),
                 happinessValue,
                 lastUpdateMs,
-                ready,
+                false,
+                false,
                 0L,
                 null
         );

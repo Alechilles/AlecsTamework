@@ -30,6 +30,7 @@ public final class LinkedNpcEntry {
     private final String groupId;
     private final String groupName;
     private final String groupColorHex;
+    private final boolean breedingEnabled;
     private final boolean breedingCooldownActive;
     private final long breedingCooldownRemainingMs;
     private final double breedingCooldownRatio;
@@ -90,6 +91,7 @@ public final class LinkedNpcEntry {
                 null,
                 null,
                 null,
+                false,
                 false,
                 0L,
                 0.0,
@@ -152,6 +154,7 @@ public final class LinkedNpcEntry {
                 null,
                 null,
                 false,
+                false,
                 0L,
                 0.0,
                 false
@@ -188,6 +191,7 @@ public final class LinkedNpcEntry {
                           String groupId,
                           String groupName,
                           String groupColorHex,
+                          boolean breedingEnabled,
                           boolean breedingCooldownActive,
                           long breedingCooldownRemainingMs,
                           double breedingCooldownRatio,
@@ -215,6 +219,7 @@ public final class LinkedNpcEntry {
         this.groupId = groupId;
         this.groupName = groupName;
         this.groupColorHex = groupColorHex;
+        this.breedingEnabled = breedingEnabled;
         this.breedingCooldownActive = breedingCooldownActive;
         this.breedingCooldownRemainingMs = Math.max(0L, breedingCooldownRemainingMs);
         this.breedingCooldownRatio = sanitizeRatio(breedingCooldownRatio);
@@ -322,6 +327,10 @@ public final class LinkedNpcEntry {
 
     public String groupColorHex() {
         return groupColorHex;
+    }
+
+    public boolean breedingEnabled() {
+        return breedingEnabled;
     }
 
     public boolean breedingCooldownActive() {

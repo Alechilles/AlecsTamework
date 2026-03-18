@@ -453,6 +453,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid),
+                npcUuid -> panelActionService.applyToggleBreeding(player, toolId, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),

@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -108,6 +111,29 @@ final class CommandPanelActionService {
             return;
         }
         feedbackService.showSuccess(player, result.active ? "Companion activated." : "Companion set inactive.");
+    }
+
+    void applyToggleBreeding(Player player,
+                             String toolId,
+                             UUID npcUuid) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        CommandLinkMutationService.BreedingToggleResult[] resultHolder =
+                new CommandLinkMutationService.BreedingToggleResult[1];
+        toolInventoryService.mutateToolStack(player, toolId, stack -> {
+            CommandLinkMutationService.BreedingToggleResult result =
+                    linkMutationService.toggleLinkedNpcBreeding(stack, npcUuid);
+            resultHolder[0] = result;
+            return result.updatedItem;
+        });
+        CommandLinkMutationService.BreedingToggleResult result = resultHolder[0];
+        if (result == null || !result.toggled) {
+            feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+            return;
+        }
+        applyLoadedNpcBreedingToggle(player, npcUuid, result.breedingEnabled);
+        feedbackService.showSuccess(player, result.breedingEnabled ? "Breeding enabled." : "Breeding disabled.");
     }
 
     void applyTogglePanelMode(Player player,
@@ -390,6 +416,7 @@ final class CommandPanelActionService {
                         record.cachedNameKey,
                         record.cachedRoleId,
                         record.active,
+                        record.breedingEnabled,
                         null
                 ));
                 changed = true;
@@ -423,5 +450,46 @@ final class CommandPanelActionService {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private void applyLoadedNpcBreedingToggle(Player player,
+                                              UUID npcUuid,
+                                              boolean enabled) {
+        if (player == null || npcUuid == null) {
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            return;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        if (npcRef == null || !npcRef.isValid()) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        if (breedingType == null) {
+            return;
+        }
+        CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
+        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
+        if (breeding == null) {
+            return;
+        }
+        boolean changed = false;
+        if (breeding.isEnabled() != enabled) {
+            breeding.setEnabled(enabled);
+            changed = true;
+        }
+        if (!enabled && breeding.isReady()) {
+            breeding.setReady(false);
+            changed = true;
+        }
+        if (changed) {
+            store.putComponent(npcRef, breedingType, breeding);
+        }
     }
 }

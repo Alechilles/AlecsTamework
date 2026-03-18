@@ -49,6 +49,14 @@ final class InteractionBreedingEffects {
             owner.logDebug("TameworkInteract: no breeding component found for NPC.");
             return false;
         }
+        if (!breeding.isEnabled()) {
+            owner.logDebug("TameworkInteract: breeding blocked. NPC breeding toggle is disabled.");
+            if (breeding.isReady()) {
+                breeding.setReady(false);
+                store.putComponent(npcRef, breedingType, breeding);
+            }
+            return false;
+        }
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         if (breeding.isCooldownActive(now)) {
             return false;

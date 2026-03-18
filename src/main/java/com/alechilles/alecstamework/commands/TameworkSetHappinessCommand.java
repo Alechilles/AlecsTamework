@@ -102,7 +102,7 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
             }
             if (breedingConfig != null) {
                 String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
-                ready = clamped >= breedingConfig.resolveHappiness(roleId).getThreshold();
+                ready = breeding.isEnabled() && clamped >= breedingConfig.resolveHappiness(roleId).getThreshold();
                 breeding.setReady(ready);
             }
             store.putComponent(candidate.ref, breedingType, breeding);

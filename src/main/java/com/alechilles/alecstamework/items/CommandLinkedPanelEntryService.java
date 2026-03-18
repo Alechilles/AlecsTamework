@@ -113,6 +113,7 @@ final class CommandLinkedPanelEntryService {
             int maxHunger = 0;
             int thirst = 0;
             int maxThirst = 0;
+            boolean breedingEnabled = record.breedingEnabled;
             boolean breedingCooldownActive = false;
             long breedingCooldownRemainingMs = 0L;
             double breedingCooldownRatio = 0.0;
@@ -158,6 +159,7 @@ final class CommandLinkedPanelEntryService {
                         }
                         BreedingCooldownSnapshot breedingSnapshot = readBreedingCooldownSnapshot(npcRef, store, speciesId);
                         if (breedingSnapshot != null) {
+                            breedingEnabled = breedingSnapshot.enabled;
                             breedingCooldownKnown = breedingSnapshot.known;
                             breedingCooldownActive = breedingSnapshot.active;
                             breedingCooldownRemainingMs = breedingSnapshot.remainingMs;
@@ -239,6 +241,7 @@ final class CommandLinkedPanelEntryService {
                     groupId,
                     groupName,
                     groupColor,
+                    breedingEnabled,
                     breedingCooldownActive,
                     breedingCooldownRemainingMs,
                     breedingCooldownRatio,
@@ -680,7 +683,7 @@ final class CommandLinkedPanelEntryService {
         }
         TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
         if (breeding == null) {
-            return new BreedingCooldownSnapshot(false, false, 0L, 0.0);
+            return new BreedingCooldownSnapshot(false, false, false, 0L, 0.0);
         }
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         long until = breeding.getCooldownUntilMs();
@@ -692,7 +695,7 @@ final class CommandLinkedPanelEntryService {
         double ratio = active
                 ? resolveBreedingCooldownRatio(breeding, npcRef, store, resolvedRoleId, remainingGameMs)
                 : 1.0;
-        return new BreedingCooldownSnapshot(true, active, remainingRealMs, ratio);
+        return new BreedingCooldownSnapshot(true, breeding.isEnabled(), active, remainingRealMs, ratio);
     }
 
     private double resolveBreedingCooldownRatio(TameworkBreedingComponent breeding,
@@ -768,12 +771,18 @@ final class CommandLinkedPanelEntryService {
 
     private static final class BreedingCooldownSnapshot {
         private final boolean known;
+        private final boolean enabled;
         private final boolean active;
         private final long remainingMs;
         private final double ratio;
 
-        private BreedingCooldownSnapshot(boolean known, boolean active, long remainingMs, double ratio) {
+        private BreedingCooldownSnapshot(boolean known,
+                                        boolean enabled,
+                                        boolean active,
+                                        long remainingMs,
+                                        double ratio) {
             this.known = known;
+            this.enabled = enabled;
             this.active = active;
             this.remainingMs = Math.max(0L, remainingMs);
             this.ratio = Math.max(0.0, Math.min(1.0, ratio));

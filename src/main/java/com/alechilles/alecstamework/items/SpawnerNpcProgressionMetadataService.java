@@ -52,6 +52,7 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_CONFIG_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_HAPPINESS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_ENABLED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_LAST_PARTNER_UUID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_CONFIG_ID);
@@ -108,6 +109,7 @@ final class SpawnerNpcProgressionMetadataService {
         if (component == null) {
             ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.BREEDING_CONFIG_ID);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_HAPPINESS);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_ENABLED);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_LAST_PARTNER_UUID);
             return updated;
@@ -122,6 +124,11 @@ final class SpawnerNpcProgressionMetadataService {
                 TameworkMetadataKeys.BREEDING_HAPPINESS,
                 Codec.DOUBLE,
                 resolveCurrentHappiness(npcRef, store, component.getHappiness())
+        );
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.BREEDING_ENABLED,
+                Codec.BOOLEAN,
+                component.isEnabled()
         );
         updated = updated.withMetadata(
                 TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL,
@@ -189,10 +196,12 @@ final class SpawnerNpcProgressionMetadataService {
         }
         String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_CONFIG_ID, Codec.STRING);
         Double legacyHappiness = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_HAPPINESS, Codec.DOUBLE);
+        Boolean enabled = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_ENABLED, Codec.BOOLEAN);
         Long cooldown = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL, Codec.LONG);
         UUID partner = stack.getFromMetadataOrNull(TameworkMetadataKeys.BREEDING_LAST_PARTNER_UUID, Codec.UUID_STRING);
         boolean hasData = (configId != null && !configId.isBlank())
                 || legacyHappiness != null
+                || enabled != null
                 || cooldown != null
                 || partner != null;
         if (!hasData) {
@@ -216,11 +225,14 @@ final class SpawnerNpcProgressionMetadataService {
                 : existing != null
                 ? existing.getCooldownUntilMs()
                 : 0L;
+        boolean breedingEnabled = enabled != null
+                ? enabled
+                : existing != null && existing.isEnabled();
         UUID lastPartner = partner != null
                 ? partner
                 : existing != null ? existing.getLastPartnerUuid() : null;
         boolean ready = false;
-        if (resolvedConfigId != null && !resolvedConfigId.isBlank()) {
+        if (breedingEnabled && resolvedConfigId != null && !resolvedConfigId.isBlank()) {
             TwBreedingConfig config = TwBreedingConfig.resolveById(resolvedConfigId);
             if (config != null) {
                 String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
@@ -232,6 +244,7 @@ final class SpawnerNpcProgressionMetadataService {
                 value,
                 lastHappinessUpdateMs > 0L ? lastHappinessUpdateMs : System.currentTimeMillis(),
                 ready,
+                breedingEnabled,
                 cooldownUntil,
                 lastPartner
         );

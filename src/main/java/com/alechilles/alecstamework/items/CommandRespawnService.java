@@ -163,6 +163,11 @@ final class CommandRespawnService {
                 npcNameResolver.resolveNpcNameKey(spawnedNpc),
                 npcNameResolver.resolveNpcRoleId(spawnedNpc)
         );
+        updated = linkMutationService.setLinkedNpcBreedingEnabled(
+                updated,
+                spawnedNpc.getUuid(),
+                deadSnapshot.breedingEnabled()
+        );
         if (deathService != null) {
             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
         }
@@ -244,6 +249,7 @@ final class CommandRespawnService {
         }
         boolean hasBreedingData = (snapshot.breedingConfigId() != null && !snapshot.breedingConfigId().isBlank())
                 || snapshot.breedingHappiness() != null
+                || snapshot.breedingEnabled()
                 || snapshot.breedingCooldownUntilMs() > 0L
                 || snapshot.breedingLastPartnerUuid() != null;
         if (!hasBreedingData) {
@@ -257,7 +263,7 @@ final class CommandRespawnService {
                 : 0.0;
         boolean ready = false;
         String configId = snapshot.breedingConfigId();
-        if (configId != null && !configId.isBlank()) {
+        if (snapshot.breedingEnabled() && configId != null && !configId.isBlank()) {
             ready = resolveBreedingReadiness(configId, happiness, spawnedRef, store);
         }
         long lastHappinessUpdateMs = resolveRestoredHappinessTimestamp(spawnedRef, store);
@@ -266,6 +272,7 @@ final class CommandRespawnService {
                 happiness,
                 lastHappinessUpdateMs > 0L ? lastHappinessUpdateMs : System.currentTimeMillis(),
                 ready,
+                snapshot.breedingEnabled(),
                 snapshot.breedingCooldownUntilMs(),
                 snapshot.breedingLastPartnerUuid()
         );

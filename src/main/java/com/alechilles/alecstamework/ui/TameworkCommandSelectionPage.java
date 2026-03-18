@@ -48,6 +48,7 @@ public final class TameworkCommandSelectionPage
     private static final String UNLINK_COMMAND_PREFIX = "__unlink__:";
     private static final String OPEN_GROUP_PICKER_COMMAND_PREFIX = "__opengroup__:";
     private static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";
+    private static final String TOGGLE_BREEDING_COMMAND_PREFIX = "__breeding__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
@@ -85,6 +86,7 @@ public final class TameworkCommandSelectionPage
                     UNLINK_COMMAND_PREFIX,
                     OPEN_GROUP_PICKER_COMMAND_PREFIX,
                     TOGGLE_ACTIVE_COMMAND_PREFIX,
+                    TOGGLE_BREEDING_COMMAND_PREFIX,
                     RESPAWN_COMMAND_PREFIX,
                     RECALL_COMMAND_PREFIX,
                     SET_HOME_COMMAND_PREFIX,
@@ -108,6 +110,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> linkCallback;
     private final Consumer<UUID> unlinkCallback;
     private final Consumer<UUID> toggleActiveCallback;
+    private final Consumer<UUID> toggleBreedingCallback;
     private final Consumer<UUID> respawnCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
@@ -144,6 +147,7 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<UUID> linkCallback,
                                         @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<UUID> toggleActiveCallback,
+                                        @Nonnull Consumer<UUID> toggleBreedingCallback,
                                         @Nonnull Consumer<UUID> respawnCallback,
                                         @Nonnull Consumer<UUID> recallCallback,
                                         @Nonnull Consumer<UUID> setHomeCallback,
@@ -175,6 +179,7 @@ public final class TameworkCommandSelectionPage
         this.linkCallback = linkCallback;
         this.unlinkCallback = unlinkCallback;
         this.toggleActiveCallback = toggleActiveCallback;
+        this.toggleBreedingCallback = toggleBreedingCallback;
         this.respawnCallback = respawnCallback;
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
@@ -401,6 +406,19 @@ public final class TameworkCommandSelectionPage
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, TOGGLE_ACTIVE_COMMAND_PREFIX);
             if (npcUuid != null) {
                 toggleActiveCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (commandId.startsWith(TOGGLE_BREEDING_COMMAND_PREFIX)) {
+            if (toggleBreedingCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, TOGGLE_BREEDING_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                toggleBreedingCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();

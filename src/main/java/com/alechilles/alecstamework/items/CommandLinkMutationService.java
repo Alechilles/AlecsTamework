@@ -224,8 +224,30 @@ final class CommandLinkMutationService {
         return new ActiveToggleResult(updated, true, nextActive);
     }
 
+    BreedingToggleResult toggleLinkedNpcBreeding(ItemStack stack,
+                                                  UUID npcUuid) {
+        if (stack == null || stack.isEmpty() || npcUuid == null) {
+            return BreedingToggleResult.notToggled(stack);
+        }
+        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        LinkedNpcRecord record = linkedNpcRecordStore.find(records, npcUuid);
+        if (record == null) {
+            return BreedingToggleResult.notToggled(stack);
+        }
+        boolean nextEnabled = !record.breedingEnabled;
+        ItemStack updated = linkedNpcRecordStore.setBreedingEnabled(stack, npcUuid, nextEnabled);
+        if (updated == stack) {
+            return BreedingToggleResult.notToggled(stack);
+        }
+        return new BreedingToggleResult(updated, true, nextEnabled);
+    }
+
     ItemStack setLinkedNpcGroup(ItemStack stack, UUID npcUuid, String groupId) {
         return linkedNpcRecordStore.setGroup(stack, npcUuid, groupId);
+    }
+
+    ItemStack setLinkedNpcBreedingEnabled(ItemStack stack, UUID npcUuid, boolean breedingEnabled) {
+        return linkedNpcRecordStore.setBreedingEnabled(stack, npcUuid, breedingEnabled);
     }
 
     List<LinkedNpcRecord> readLinkedNpcRecords(ItemStack stack) {
@@ -295,6 +317,22 @@ final class CommandLinkMutationService {
 
         static ActiveToggleResult maxActiveReached(ItemStack stack) {
             return new ActiveToggleResult(stack, false, false, true);
+        }
+    }
+
+    static final class BreedingToggleResult {
+        final ItemStack updatedItem;
+        final boolean toggled;
+        final boolean breedingEnabled;
+
+        private BreedingToggleResult(ItemStack updatedItem, boolean toggled, boolean breedingEnabled) {
+            this.updatedItem = updatedItem;
+            this.toggled = toggled;
+            this.breedingEnabled = breedingEnabled;
+        }
+
+        static BreedingToggleResult notToggled(ItemStack stack) {
+            return new BreedingToggleResult(stack, false, false);
         }
     }
 }

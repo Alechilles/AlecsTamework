@@ -43,6 +43,12 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
         )
         .add()
         .append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            TameworkBreedingComponent::setEnabled,
+            TameworkBreedingComponent::isEnabled
+        )
+        .add()
+        .append(
             new KeyedCodec<>("CooldownUntilMs", Codec.LONG),
             TameworkBreedingComponent::setCooldownUntilMs,
             TameworkBreedingComponent::getCooldownUntilMs
@@ -60,6 +66,7 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
     private double happiness;
     private long lastHappinessUpdateMs;
     private boolean ready;
+    private boolean enabled;
     private long cooldownUntilMs;
     private UUID lastPartnerUuid;
 
@@ -72,10 +79,21 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
                                      boolean ready,
                                      long cooldownUntilMs,
                                      UUID lastPartnerUuid) {
+        this(configId, happiness, lastHappinessUpdateMs, ready, false, cooldownUntilMs, lastPartnerUuid);
+    }
+
+    public TameworkBreedingComponent(String configId,
+                                     double happiness,
+                                     long lastHappinessUpdateMs,
+                                     boolean ready,
+                                     boolean enabled,
+                                     long cooldownUntilMs,
+                                     UUID lastPartnerUuid) {
         this.configId = configId;
         this.happiness = happiness;
         this.lastHappinessUpdateMs = lastHappinessUpdateMs;
         this.ready = ready;
+        this.enabled = enabled;
         this.cooldownUntilMs = cooldownUntilMs;
         this.lastPartnerUuid = lastPartnerUuid;
     }
@@ -117,6 +135,14 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
         this.ready = ready;
     }
 
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
     public long getCooldownUntilMs() {
         return cooldownUntilMs;
     }
@@ -144,6 +170,7 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
                 happiness,
                 lastHappinessUpdateMs,
                 ready,
+                enabled,
                 cooldownUntilMs,
                 lastPartnerUuid
         );

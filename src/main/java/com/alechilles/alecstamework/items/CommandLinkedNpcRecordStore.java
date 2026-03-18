@@ -26,6 +26,7 @@ final class CommandLinkedNpcRecordStore {
     private static final String TOKEN_NAME_KEY = "nk=";
     private static final String TOKEN_ROLE_ID = "rid=";
     private static final String TOKEN_ACTIVE = "ac=";
+    private static final String TOKEN_BREEDING_ENABLED = "be=";
     private static final String TOKEN_GROUP_ID = "gid=";
 
     List<LinkedNpcRecord> read(ItemStack stack) {
@@ -91,6 +92,9 @@ final class CommandLinkedNpcRecordStore {
             if (!record.active) {
                 builder.append('|').append(TOKEN_ACTIVE).append('0');
             }
+            if (record.breedingEnabled) {
+                builder.append('|').append(TOKEN_BREEDING_ENABLED).append('1');
+            }
             if (record.groupId != null && !record.groupId.isBlank()) {
                 builder.append('|').append(TOKEN_GROUP_ID).append(encodeRecordText(record.groupId));
             }
@@ -144,6 +148,7 @@ final class CommandLinkedNpcRecordStore {
                     mergedNameKey,
                     mergedRoleId,
                     mergedActive,
+                    record.breedingEnabled,
                     record.groupId
             ));
             updated = true;
@@ -158,6 +163,7 @@ final class CommandLinkedNpcRecordStore {
                     firstNonBlank(cachedNameKey, null),
                     firstNonBlank(cachedRoleId, null),
                     activeOverride == null || activeOverride,
+                    false,
                     null
             ));
         }
@@ -190,6 +196,42 @@ final class CommandLinkedNpcRecordStore {
                     record.cachedNameKey,
                     record.cachedRoleId,
                     active,
+                    record.breedingEnabled,
+                    record.groupId
+            ));
+            changed = true;
+            break;
+        }
+        return changed ? write(stack, records) : stack;
+    }
+
+    ItemStack setBreedingEnabled(ItemStack stack, UUID npcUuid, boolean breedingEnabled) {
+        if (stack == null || stack.isEmpty() || npcUuid == null) {
+            return stack;
+        }
+        List<LinkedNpcRecord> records = new ArrayList<>(read(stack));
+        boolean changed = false;
+        String key = npcUuid.toString().toLowerCase(Locale.ROOT);
+        for (int i = 0; i < records.size(); i++) {
+            LinkedNpcRecord record = records.get(i);
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (!key.equals(record.npcUuid.toString().toLowerCase(Locale.ROOT))) {
+                continue;
+            }
+            if (record.breedingEnabled == breedingEnabled) {
+                break;
+            }
+            records.set(i, new LinkedNpcRecord(
+                    record.npcUuid,
+                    record.lastKnownPosition,
+                    record.homePosition,
+                    record.cachedDisplayName,
+                    record.cachedNameKey,
+                    record.cachedRoleId,
+                    record.active,
+                    breedingEnabled,
                     record.groupId
             ));
             changed = true;
@@ -225,6 +267,7 @@ final class CommandLinkedNpcRecordStore {
                     record.cachedNameKey,
                     record.cachedRoleId,
                     record.active,
+                    record.breedingEnabled,
                     normalizedGroupId
             ));
             changed = true;
@@ -291,6 +334,7 @@ final class CommandLinkedNpcRecordStore {
         String cachedNameKey = null;
         String cachedRoleId = null;
         boolean active = true;
+        boolean breedingEnabled = false;
         String groupId = null;
         int index = 1;
         if (parts.length >= 4) {
@@ -340,6 +384,11 @@ final class CommandLinkedNpcRecordStore {
                 active = !"0".equals(flag) && !"false".equalsIgnoreCase(flag);
                 continue;
             }
+            if (token.startsWith(TOKEN_BREEDING_ENABLED)) {
+                String flag = token.substring(TOKEN_BREEDING_ENABLED.length()).trim();
+                breedingEnabled = "1".equals(flag) || "true".equalsIgnoreCase(flag);
+                continue;
+            }
             if (token.startsWith(TOKEN_GROUP_ID)) {
                 groupId = decodeRecordText(token.substring(TOKEN_GROUP_ID.length()));
             }
@@ -352,6 +401,7 @@ final class CommandLinkedNpcRecordStore {
                 cachedNameKey,
                 cachedRoleId,
                 active,
+                breedingEnabled,
                 groupId
         );
     }

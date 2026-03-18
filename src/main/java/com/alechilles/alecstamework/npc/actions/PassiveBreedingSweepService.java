@@ -73,7 +73,7 @@ public final class PassiveBreedingSweepService {
                 breeding.setReady(shouldBeReady);
                 store.putComponent(candidate.ref(), breedingType, breeding);
             }
-            if (!shouldBeReady || breeding.isCooldownActive(nowMs)) {
+            if (!breeding.isEnabled() || !shouldBeReady || breeding.isCooldownActive(nowMs)) {
                 continue;
             }
             if (isOvercrowded(candidate, store, birthReservations)) {
@@ -119,7 +119,8 @@ public final class PassiveBreedingSweepService {
     private static boolean resolveShouldBeReady(@Nonnull SweepCandidate candidate,
                                                 @Nonnull TameworkBreedingComponent breeding,
                                                 @Nonnull Store<EntityStore> store) {
-        return passesHappinessThreshold(candidate, breeding, store)
+        return breeding.isEnabled()
+                && passesHappinessThreshold(candidate, breeding, store)
                 && passesEligibilityGates(candidate, store);
     }
 

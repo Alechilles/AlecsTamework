@@ -71,6 +71,22 @@ $C = "Common.ui";
   Sounds: $C.@ButtonSounds
 );
 
+@LinkedBreedingStateOnButtonStyle = TextButtonStyle(
+  Default: (Background: (Color: #6f5fb0), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (Color: #8674cd), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (Color: #5a4f90), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Sounds: $C.@ButtonSounds
+);
+
+@LinkedBreedingStateOffButtonStyle = TextButtonStyle(
+  Default: (Background: (Color: #5f6775), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (Color: #728196), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (Color: #4f5662), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Sounds: $C.@ButtonSounds
+);
+
 @LinkedActionTooltipStyle = TextTooltipStyle(
   Background: #0f1e30(0.96),
   MaxWidth: 220,
@@ -323,6 +339,24 @@ Group {
     Style: @LinkedActiveStateOffButtonStyle;
     Text: "";
     TooltipText: "Inactive: ignored by bulk commands. Click to set active.";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
+  }
+
+  TextButton #BreedingToggleEnabledButton {
+    Anchor: (Top: 22, Left: 0, Width: 14, Height: 14);
+    Style: @LinkedBreedingStateOnButtonStyle;
+    Text: "";
+    TooltipText: "Breeding: enabled. Click to disable.";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
+  }
+
+  TextButton #BreedingToggleDisabledButton {
+    Anchor: (Top: 22, Left: 0, Width: 14, Height: 14);
+    Style: @LinkedBreedingStateOffButtonStyle;
+    Text: "";
+    TooltipText: "Breeding: disabled. Click to enable.";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }

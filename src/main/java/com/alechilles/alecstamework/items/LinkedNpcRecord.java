@@ -17,6 +17,7 @@ final class LinkedNpcRecord {
     final String cachedNameKey;
     final String cachedRoleId;
     final boolean active;
+    final boolean breedingEnabled;
     final String groupId;
 
     LinkedNpcRecord(UUID npcUuid,
@@ -33,6 +34,7 @@ final class LinkedNpcRecord {
                 cachedNameKey,
                 cachedRoleId,
                 true,
+                false,
                 null
         );
     }
@@ -44,6 +46,7 @@ final class LinkedNpcRecord {
                     String cachedNameKey,
                     String cachedRoleId,
                     boolean active,
+                    boolean breedingEnabled,
                     String groupId) {
         this.npcUuid = npcUuid;
         this.lastKnownPosition = lastKnownPosition != null ? new Vector3d(lastKnownPosition) : null;
@@ -52,6 +55,7 @@ final class LinkedNpcRecord {
         this.cachedNameKey = (cachedNameKey != null && !cachedNameKey.isBlank()) ? cachedNameKey : null;
         this.cachedRoleId = (cachedRoleId != null && !cachedRoleId.isBlank()) ? cachedRoleId : null;
         this.active = active;
+        this.breedingEnabled = breedingEnabled;
         this.groupId = (groupId != null && !groupId.isBlank()) ? groupId : null;
     }
 }

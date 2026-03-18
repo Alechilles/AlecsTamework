@@ -35,6 +35,9 @@ final class BreedingPartnerService {
         if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
             return null;
         }
+        if (!sourceBreeding.isEnabled()) {
+            return null;
+        }
         NPCEntity sourceNpc = store.getComponent(sourceRef, NPCEntity.getComponentType());
         TransformComponent sourceTransform = store.getComponent(sourceRef, TransformComponent.getComponentType());
         if (sourceNpc == null || sourceTransform == null) {
@@ -84,7 +87,10 @@ final class BreedingPartnerService {
                 TameworkBreedingComponent candidateBreeding = breedingType != null
                         ? chunk.getComponent(i, breedingType)
                         : null;
-                if (candidateBreeding == null || !candidateBreeding.isReady() || candidateBreeding.isCooldownActive(now)) {
+                if (candidateBreeding == null
+                        || !candidateBreeding.isEnabled()
+                        || !candidateBreeding.isReady()
+                        || candidateBreeding.isCooldownActive(now)) {
                     continue;
                 }
                 if (requireTamed && !TamedStateResolver.isTamed(candidateRef, store)) {
