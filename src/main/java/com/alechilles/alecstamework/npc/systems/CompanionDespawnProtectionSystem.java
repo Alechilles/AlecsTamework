@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
  * their spawn configuration to {@code Integer.MIN_VALUE} whenever they are tamed or have a persisted custom name.
  */
 public final class CompanionDespawnProtectionSystem extends TickingSystem<EntityStore> {
-    private static final long SWEEP_INTERVAL_MS = 5_000L;
+    private static final long SWEEP_INTERVAL_MS = 1_000L;
     private static final int DISABLE_DESPAWN_SPAWN_CONFIGURATION = Integer.MIN_VALUE;
 
     private long nextSweepAtMs;

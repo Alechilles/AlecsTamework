@@ -22,6 +22,7 @@ import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
@@ -32,6 +33,7 @@ final class InteractionStateEffects {
     private static final String HEALTH_STAT_ID = "Health";
     private static final String TRANQUILIZER_EFFECT_ID = "Tw_Status_Tranquilized";
     private static final int EFFECT_INDEX_UNRESOLVED = Integer.MIN_VALUE;
+    private static final int DISABLE_DESPAWN_SPAWN_CONFIGURATION = Integer.MIN_VALUE;
     private static int tranquilizerEffectIndex = EFFECT_INDEX_UNRESOLVED;
     /**
      * Cross-template swaps (for example wild -> tamed livestock) can fail when preserving
@@ -54,6 +56,7 @@ final class InteractionStateEffects {
             String ownerName = ref != null ? ref.getUsername() : null;
             store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
         }
+        applyDisableSpawnDrivenDespawn(npcRef, store);
         CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
         return true;
     }
@@ -83,6 +86,7 @@ final class InteractionStateEffects {
         }
         store.putComponent(npcRef, tamedType, new TameworkTamedComponent(value));
         if (value) {
+            applyDisableSpawnDrivenDespawn(npcRef, store);
             CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
         }
         return true;
@@ -213,6 +217,24 @@ final class InteractionStateEffects {
                 PRESERVE_STATE_ON_INTERACTION_ROLE_CHANGE,
                 store
         );
+        applyDisableSpawnDrivenDespawn(npcRef, store);
+        return true;
+    }
+
+    // Immediately opts this NPC out of spawn-configuration-driven despawn checks.
+    boolean applyDisableSpawnDrivenDespawn(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
+        if (npcType == null) {
+            return false;
+        }
+        NPCEntity npc = store.getComponent(npcRef, npcType);
+        if (npc == null || npc.getSpawnConfiguration() == DISABLE_DESPAWN_SPAWN_CONFIGURATION) {
+            return false;
+        }
+        npc.setSpawnConfiguration(DISABLE_DESPAWN_SPAWN_CONFIGURATION);
         return true;
     }
 
