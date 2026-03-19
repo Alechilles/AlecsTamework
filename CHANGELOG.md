@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.4.3 - Defense + Despawn Diagnostics - 2026-03-19
 ### Added
 - Added shared `Want_Food_Charcoal` particle assets (`Want_Food_Charcoal`, `ThoughtCloud_Charcoal`, and `CharcoalThought.png`) so mods can reuse a blank-thought + base charcoal icon food hint.
 - Linked panel NPC cards now include a breeding enable/disable toggle (default `off`), and passive/interaction breeding flows now require this per-NPC toggle to be enabled.
