@@ -207,6 +207,23 @@ public final class CompanionProgressionBootstrapService {
                 existing.setCooldownUntilMs(migratedCooldownUntilMs);
                 changed = true;
             }
+            long cooldownDurationMs = existing.getCooldownDurationMs();
+            long cooldownStartedAtMs = existing.getCooldownStartedAtMs();
+            if (migratedCooldownUntilMs > now && cooldownDurationMs <= 0L) {
+                cooldownDurationMs = Math.max(0L, migratedCooldownUntilMs - now);
+                cooldownStartedAtMs = cooldownDurationMs > 0L ? now : 0L;
+            } else if (migratedCooldownUntilMs <= now && (cooldownDurationMs > 0L || cooldownStartedAtMs > 0L)) {
+                cooldownDurationMs = 0L;
+                cooldownStartedAtMs = 0L;
+            }
+            if (existing.getCooldownDurationMs() != cooldownDurationMs) {
+                existing.setCooldownDurationMs(cooldownDurationMs);
+                changed = true;
+            }
+            if (existing.getCooldownStartedAtMs() != cooldownStartedAtMs) {
+                existing.setCooldownStartedAtMs(cooldownStartedAtMs);
+                changed = true;
+            }
             if (existing.isReady() != readyWhenEnabled) {
                 existing.setReady(readyWhenEnabled);
                 changed = true;

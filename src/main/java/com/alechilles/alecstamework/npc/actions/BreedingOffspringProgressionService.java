@@ -294,9 +294,12 @@ final class BreedingOffspringProgressionService {
             return;
         }
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
-        long cooldownUntilMs = now + Math.max(0L, childCooldownMs);
+        long cooldownDurationMs = Math.max(0L, childCooldownMs);
+        long cooldownUntilMs = now + cooldownDurationMs;
         breeding.setReady(false);
         breeding.setCooldownUntilMs(cooldownUntilMs);
+        breeding.setCooldownStartedAtMs(cooldownDurationMs > 0L ? now : 0L);
+        breeding.setCooldownDurationMs(cooldownDurationMs);
         breeding.setLastPartnerUuid(null);
         store.putComponent(childRef, breedingType, breeding);
         applyCooldownAlarm(childRef, childNpc, cooldownUntilMs, store);

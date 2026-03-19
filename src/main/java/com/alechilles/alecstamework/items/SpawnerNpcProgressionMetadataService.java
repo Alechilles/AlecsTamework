@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.codec.Codec;
@@ -225,6 +226,13 @@ final class SpawnerNpcProgressionMetadataService {
                 : existing != null
                 ? existing.getCooldownUntilMs()
                 : 0L;
+        long cooldownStartedAtMs = existing != null ? existing.getCooldownStartedAtMs() : 0L;
+        long cooldownDurationMs = existing != null ? existing.getCooldownDurationMs() : 0L;
+        if (cooldownUntil > 0L && cooldownDurationMs <= 0L) {
+            long now = BreedingTimeService.resolveCurrentTimeMs(store);
+            cooldownDurationMs = Math.max(0L, cooldownUntil - now);
+            cooldownStartedAtMs = cooldownDurationMs > 0L ? now : 0L;
+        }
         boolean breedingEnabled = enabled != null
                 ? enabled
                 : existing != null && existing.isEnabled();
@@ -246,7 +254,9 @@ final class SpawnerNpcProgressionMetadataService {
                 ready,
                 breedingEnabled,
                 cooldownUntil,
-                lastPartner
+                lastPartner,
+                cooldownStartedAtMs,
+                cooldownDurationMs
         );
         store.putComponent(npcRef, type, component);
     }

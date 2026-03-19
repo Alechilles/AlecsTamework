@@ -75,6 +75,8 @@ public final class TameworkSetBreedingReadyCommand extends AbstractPlayerCommand
         if (nextReady) {
             breeding.setReady(true);
             breeding.setCooldownUntilMs(0L);
+            breeding.setCooldownStartedAtMs(0L);
+            breeding.setCooldownDurationMs(0L);
             breeding.setLastPartnerUuid(null);
         } else {
             breeding.setReady(false);

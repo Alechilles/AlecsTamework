@@ -55,6 +55,18 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
         )
         .add()
         .append(
+            new KeyedCodec<>("CooldownStartedAtMs", Codec.LONG),
+            TameworkBreedingComponent::setCooldownStartedAtMs,
+            TameworkBreedingComponent::getCooldownStartedAtMs
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("CooldownDurationMs", Codec.LONG),
+            TameworkBreedingComponent::setCooldownDurationMs,
+            TameworkBreedingComponent::getCooldownDurationMs
+        )
+        .add()
+        .append(
             new KeyedCodec<>("LastPartnerUuid", new UUIDBinaryCodec()),
             TameworkBreedingComponent::setLastPartnerUuid,
             TameworkBreedingComponent::getLastPartnerUuid
@@ -68,6 +80,8 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
     private boolean ready;
     private boolean enabled;
     private long cooldownUntilMs;
+    private long cooldownStartedAtMs;
+    private long cooldownDurationMs;
     private UUID lastPartnerUuid;
 
     public TameworkBreedingComponent() {
@@ -79,7 +93,7 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
                                      boolean ready,
                                      long cooldownUntilMs,
                                      UUID lastPartnerUuid) {
-        this(configId, happiness, lastHappinessUpdateMs, ready, false, cooldownUntilMs, lastPartnerUuid);
+        this(configId, happiness, lastHappinessUpdateMs, ready, false, cooldownUntilMs, lastPartnerUuid, 0L, 0L);
     }
 
     public TameworkBreedingComponent(String configId,
@@ -89,12 +103,26 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
                                      boolean enabled,
                                      long cooldownUntilMs,
                                      UUID lastPartnerUuid) {
+        this(configId, happiness, lastHappinessUpdateMs, ready, enabled, cooldownUntilMs, lastPartnerUuid, 0L, 0L);
+    }
+
+    public TameworkBreedingComponent(String configId,
+                                     double happiness,
+                                     long lastHappinessUpdateMs,
+                                     boolean ready,
+                                     boolean enabled,
+                                     long cooldownUntilMs,
+                                     UUID lastPartnerUuid,
+                                     long cooldownStartedAtMs,
+                                     long cooldownDurationMs) {
         this.configId = configId;
         this.happiness = happiness;
         this.lastHappinessUpdateMs = lastHappinessUpdateMs;
         this.ready = ready;
         this.enabled = enabled;
         this.cooldownUntilMs = cooldownUntilMs;
+        this.cooldownStartedAtMs = Math.max(0L, cooldownStartedAtMs);
+        this.cooldownDurationMs = Math.max(0L, cooldownDurationMs);
         this.lastPartnerUuid = lastPartnerUuid;
     }
 
@@ -151,6 +179,22 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
         this.cooldownUntilMs = cooldownUntilMs;
     }
 
+    public long getCooldownStartedAtMs() {
+        return cooldownStartedAtMs;
+    }
+
+    public void setCooldownStartedAtMs(long cooldownStartedAtMs) {
+        this.cooldownStartedAtMs = Math.max(0L, cooldownStartedAtMs);
+    }
+
+    public long getCooldownDurationMs() {
+        return cooldownDurationMs;
+    }
+
+    public void setCooldownDurationMs(long cooldownDurationMs) {
+        this.cooldownDurationMs = Math.max(0L, cooldownDurationMs);
+    }
+
     public UUID getLastPartnerUuid() {
         return lastPartnerUuid;
     }
@@ -172,7 +216,9 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
                 ready,
                 enabled,
                 cooldownUntilMs,
-                lastPartnerUuid
+                lastPartnerUuid,
+                cooldownStartedAtMs,
+                cooldownDurationMs
         );
     }
 }

@@ -153,9 +153,12 @@ final class BreedingOffspringService {
         if (npcRef == null || !npcRef.isValid() || breeding == null || store == null) {
             return;
         }
-        long until = now + Math.max(0L, cooldownMs);
+        long durationMs = Math.max(0L, cooldownMs);
+        long until = now + durationMs;
         breeding.setReady(false);
         breeding.setCooldownUntilMs(until);
+        breeding.setCooldownStartedAtMs(durationMs > 0L ? now : 0L);
+        breeding.setCooldownDurationMs(durationMs);
         breeding.setLastPartnerUuid(partnerUuid);
         breeding.setLastHappinessUpdateMs(now);
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();

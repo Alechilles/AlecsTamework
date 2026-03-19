@@ -14,6 +14,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentServ
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
+import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -267,14 +268,24 @@ final class CommandRespawnService {
             ready = resolveBreedingReadiness(configId, happiness, spawnedRef, store);
         }
         long lastHappinessUpdateMs = resolveRestoredHappinessTimestamp(spawnedRef, store);
+        long cooldownUntilMs = snapshot.breedingCooldownUntilMs();
+        long cooldownDurationMs = 0L;
+        long cooldownStartedAtMs = 0L;
+        if (cooldownUntilMs > 0L) {
+            long now = BreedingTimeService.resolveCurrentTimeMs(store);
+            cooldownDurationMs = Math.max(0L, cooldownUntilMs - now);
+            cooldownStartedAtMs = cooldownDurationMs > 0L ? now : 0L;
+        }
         TameworkBreedingComponent component = new TameworkBreedingComponent(
                 configId,
                 happiness,
                 lastHappinessUpdateMs > 0L ? lastHappinessUpdateMs : System.currentTimeMillis(),
                 ready,
                 snapshot.breedingEnabled(),
-                snapshot.breedingCooldownUntilMs(),
-                snapshot.breedingLastPartnerUuid()
+                cooldownUntilMs,
+                snapshot.breedingLastPartnerUuid(),
+                cooldownStartedAtMs,
+                cooldownDurationMs
         );
         store.putComponent(spawnedRef, breedingType, component);
     }
