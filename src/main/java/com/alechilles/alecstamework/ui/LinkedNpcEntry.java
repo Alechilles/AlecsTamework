@@ -23,6 +23,7 @@ public final class LinkedNpcEntry {
     private final boolean active;
     private final boolean dead;
     private final boolean captured;
+    private final boolean lost;
     private final boolean hasHome;
     private final long deadRespawnRemainingMs;
     private final String speciesId;
@@ -58,6 +59,7 @@ public final class LinkedNpcEntry {
                           boolean hasHome,
                           boolean dead,
                           boolean captured,
+                          boolean lost,
                           long deadRespawnRemainingMs,
                           LinkedNpcTraitIndicator[] traitIndicators) {
         this(
@@ -76,6 +78,7 @@ public final class LinkedNpcEntry {
                 hasHome,
                 dead,
                 captured,
+                lost,
                 deadRespawnRemainingMs,
                 null,
                 null,
@@ -114,6 +117,7 @@ public final class LinkedNpcEntry {
                           boolean hasHome,
                           boolean dead,
                           boolean captured,
+                          boolean lost,
                           long deadRespawnRemainingMs,
                           FutureStat futureStatA,
                           FutureStat futureStatB,
@@ -138,6 +142,7 @@ public final class LinkedNpcEntry {
                 hasHome,
                 dead,
                 captured,
+                lost,
                 deadRespawnRemainingMs,
                 futureStatA,
                 futureStatB,
@@ -176,6 +181,7 @@ public final class LinkedNpcEntry {
                           boolean hasHome,
                           boolean dead,
                           boolean captured,
+                          boolean lost,
                           long deadRespawnRemainingMs,
                           FutureStat futureStatA,
                           FutureStat futureStatB,
@@ -213,6 +219,7 @@ public final class LinkedNpcEntry {
         this.hasHome = hasHome;
         this.dead = dead;
         this.captured = captured;
+        this.lost = lost;
         this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
         this.speciesId = speciesId;
         this.speciesLabel = speciesLabel;
@@ -299,6 +306,10 @@ public final class LinkedNpcEntry {
 
     public boolean captured() {
         return captured;
+    }
+
+    public boolean lost() {
+        return lost;
     }
 
     public boolean hasHome() {

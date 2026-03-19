@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -18,11 +19,14 @@ import javax.annotation.Nonnull;
 public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStore> {
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
+    private final CommandLinkedNpcLostService lostService;
 
     public CommandNpcRelocationOnLoadSystem(CommandNpcRelocationService relocationService,
-                                            CommandLinkedNpcDeathService deathService) {
+                                            CommandLinkedNpcDeathService deathService,
+                                            CommandLinkedNpcLostService lostService) {
         this.relocationService = relocationService;
         this.deathService = deathService;
+        this.lostService = lostService;
     }
 
     @Override
@@ -34,11 +38,17 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
             if (deathService != null) {
                 deathService.onNpcAdded(reference, store);
             }
+            if (lostService != null) {
+                lostService.onNpcAdded(reference, store);
+            }
             return;
         }
         relocationService.onNpcAdded(reference, store);
         if (deathService != null) {
             deathService.onNpcAdded(reference, store);
+        }
+        if (lostService != null) {
+            lostService.onNpcAdded(reference, store);
         }
     }
 

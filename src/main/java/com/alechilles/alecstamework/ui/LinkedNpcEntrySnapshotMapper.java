@@ -47,6 +47,7 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.hasHome(),
                     entry.dead(),
                     entry.captured(),
+                    entry.lost(),
                     entry.deadRespawnRemainingMs(),
                     entry.futureStatA(),
                     entry.futureStatB(),

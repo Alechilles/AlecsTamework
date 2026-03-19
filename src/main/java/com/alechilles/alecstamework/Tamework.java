@@ -29,6 +29,7 @@ import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CoopFeatureHandler;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
@@ -107,6 +108,7 @@ public class Tamework extends JavaPlugin {
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
+    private CommandLinkedNpcLostService commandLinkedNpcLostService;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private boolean globalAssetsRegistered;
@@ -300,8 +302,17 @@ public class Tamework extends JavaPlugin {
         commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
                 getDataDirectory().resolve("CommandLinkedNpcDeaths.dat")
         );
+        commandLinkedNpcLostService = new CommandLinkedNpcLostService(
+                getDataDirectory().resolve("CommandLinkedNpcLost.dat"),
+                getLogger()
+        );
+        commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
         getEntityStoreRegistry().registerSystem(
-                new CommandNpcRelocationOnLoadSystem(commandNpcRelocationService, commandLinkedNpcDeathService)
+                new CommandNpcRelocationOnLoadSystem(
+                        commandNpcRelocationService,
+                        commandLinkedNpcDeathService,
+                        commandLinkedNpcLostService
+                )
         );
         getChunkStoreRegistry().registerSystem(new FeedTroughFoodStateSyncSystem());
 
@@ -338,7 +349,8 @@ public class Tamework extends JavaPlugin {
                 commandItemRegistry,
                 commandNpcRelocationService,
                 commandLinkedNpcDeathService,
-                commandLinkedNpcCaptureService
+                commandLinkedNpcCaptureService,
+                commandLinkedNpcLostService
         );
         // Core handler for coop intake policy overlays.
         coopFeatureHandler = new CoopFeatureHandler(getLogger());

@@ -78,6 +78,7 @@ public final class CommandItemFeatureHandler {
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
+    private final CommandLinkedNpcLostService lostService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandGroupService groupService;
     private final CommandFeedbackService feedbackService;
@@ -93,6 +94,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkMutationService linkMutationService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandRespawnService respawnService;
+    private final CommandLostRecoveryService lostRecoveryService;
     private final CommandMenuMoveService menuMoveService;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandPanelActionService panelActionService;
@@ -102,11 +104,13 @@ public final class CommandItemFeatureHandler {
     public CommandItemFeatureHandler(CommandItemRegistry registry,
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcDeathService deathService,
-                                     CommandLinkedNpcCaptureService captureService) {
+                                     CommandLinkedNpcCaptureService captureService,
+                                     CommandLinkedNpcLostService lostService) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
+        this.lostService = lostService;
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
         this.groupService = new CommandGroupService();
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
@@ -116,6 +120,7 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 deathService,
                 captureService,
+                lostService,
                 npcNameResolver,
                 linkPolicyService,
                 this.groupService
@@ -165,10 +170,20 @@ public final class CommandItemFeatureHandler {
                 deathService,
                 stepExecutionService
         );
+        this.lostRecoveryService = new CommandLostRecoveryService(
+                companionPlacementService,
+                new CommandNpcExistenceService(),
+                linkPolicyService,
+                linkMutationService,
+                npcNameResolver,
+                stepExecutionService,
+                lostService
+        );
         this.menuMoveService = new CommandMenuMoveService(
                 resolutionService,
                 linkMutationService,
                 deathService,
+                lostService,
                 relocationDispatchService,
                 stepExecutionService,
                 feedbackService,
@@ -582,8 +597,8 @@ public final class CommandItemFeatureHandler {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
-        if (deathService == null) {
-            feedbackService.showWarning(player, "Dead companion tracking is unavailable.");
+        if (deathService == null && lostService == null) {
+            feedbackService.showWarning(player, "Companion recovery tracking is unavailable.");
             return;
         }
         Inventory inventory = player.getInventory();
@@ -619,56 +634,93 @@ public final class CommandItemFeatureHandler {
                 return;
             }
             CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
-                    deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid());
-            if (deadSnapshot == null) {
-                feedbackService.showWarning(player, "That companion is not marked as dead.");
+                    deathService != null ? deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) : null;
+            if (deadSnapshot != null) {
+                String roleId = deadSnapshot.roleId();
+                if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+                    roleId = record.cachedRoleId;
+                }
+                TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+                if (!companionSettings.isDeadRespawnEnabled()) {
+                    feedbackService.showWarning(player, "Dead companion respawn is disabled.");
+                    return;
+                }
+                long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
+                if (remainingMs > 0L) {
+                    feedbackService.showWarning(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
+                    return;
+                }
+                double safeSpawnDistance = resolvePositiveDouble(
+                        companionSettings.getRecallSafeSpawnDistance(),
+                        RECALL_SAFE_SPAWN_DISTANCE
+                );
+                long followRetryDelayMs = resolvePositiveLong(
+                        companionSettings.getDeadRespawnFollowRetryDelayMs(),
+                        RESPAWN_FOLLOW_RETRY_DELAY_MS
+                );
+                ItemStack updatedStack = respawnService.respawnDeadLinkedNpc(
+                        player,
+                        playerRef,
+                        store,
+                        toolId,
+                        stack,
+                        record,
+                        deadSnapshot,
+                        safeSpawnDistance,
+                        followRetryDelayMs
+                );
+                if (updatedStack == null) {
+                    feedbackService.showWarning(player, "Failed to respawn that companion.");
+                    return;
+                }
+                hotbar.setItemStackForSlot(slot, updatedStack);
+                inventory.markChanged();
+                player.sendInventory();
+                String name = deadSnapshot.displayName();
+                if (name == null || name.isBlank()) {
+                    name = "companion";
+                }
+                feedbackService.showSuccess(player, "Respawned " + name + ".");
                 return;
             }
-            String roleId = deadSnapshot.roleId();
-            if ((roleId == null || roleId.isBlank()) && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
-                roleId = record.cachedRoleId;
+            if (lostService == null || !lostService.isLost(npcUuid)) {
+                feedbackService.showWarning(player, "That companion is not marked as dead or lost.");
+                return;
             }
+            String roleId = record.cachedRoleId;
             TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-            if (!companionSettings.isDeadRespawnEnabled()) {
-                feedbackService.showWarning(player, "Dead companion respawn is disabled.");
-                return;
-            }
-            long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
-            if (remainingMs > 0L) {
-                feedbackService.showWarning(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
-                return;
-            }
             double safeSpawnDistance = resolvePositiveDouble(
                     companionSettings.getRecallSafeSpawnDistance(),
                     RECALL_SAFE_SPAWN_DISTANCE
             );
-            long followRetryDelayMs = resolvePositiveLong(
-                    companionSettings.getDeadRespawnFollowRetryDelayMs(),
-                    RESPAWN_FOLLOW_RETRY_DELAY_MS
-            );
-            ItemStack updatedStack = respawnService.respawnDeadLinkedNpc(
+            CommandLostRecoveryService.Result recoveryResult = lostRecoveryService.recoverLostLinkedNpc(
                     player,
                     playerRef,
                     store,
                     toolId,
                     stack,
                     record,
-                    deadSnapshot,
-                    safeSpawnDistance,
-                    followRetryDelayMs
+                    safeSpawnDistance
             );
-            if (updatedStack == null) {
-                feedbackService.showWarning(player, "Failed to respawn that companion.");
+            if (!recoveryResult.isSuccess()) {
+                String errorMessage = recoveryResult.errorMessage();
+                if (errorMessage == null || errorMessage.isBlank()) {
+                    errorMessage = "Failed to recover that companion.";
+                }
+                feedbackService.showWarning(player, errorMessage);
                 return;
             }
-            hotbar.setItemStackForSlot(slot, updatedStack);
+            hotbar.setItemStackForSlot(slot, recoveryResult.updatedStack());
             inventory.markChanged();
             player.sendInventory();
-            String name = deadSnapshot.displayName();
-            if (name == null || name.isBlank()) {
-                name = "companion";
+            String recoveredName = recoveryResult.recoveredName();
+            if (recoveredName == null || recoveredName.isBlank()) {
+                recoveredName = record.cachedDisplayName;
             }
-            feedbackService.showSuccess(player, "Respawned " + name + ".");
+            if (recoveredName == null || recoveredName.isBlank()) {
+                recoveredName = "companion";
+            }
+            feedbackService.showSuccess(player, "Recovered " + recoveredName + ".");
             return;
         }
         feedbackService.showWarning(player, "Unable to find that command item.");

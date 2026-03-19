@@ -41,6 +41,8 @@ public final class CommandNpcRelocationService {
     private final HytaleLogger logger;
     private final ConcurrentHashMap<UUID, PendingRelocation> pendingByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Vector3d> lastKnownByNpc = new ConcurrentHashMap<>();
+    @Nullable
+    private volatile CommandRelocationDropListener relocationDropListener;
 
     public CommandNpcRelocationService() {
         this(null);
@@ -48,6 +50,10 @@ public final class CommandNpcRelocationService {
 
     public CommandNpcRelocationService(@Nullable HytaleLogger logger) {
         this.logger = logger;
+    }
+
+    public void setRelocationDropListener(@Nullable CommandRelocationDropListener relocationDropListener) {
+        this.relocationDropListener = relocationDropListener;
     }
 
     public void queueRelocation(World world,
@@ -220,6 +226,19 @@ public final class CommandNpcRelocationService {
         if (now - pending.queuedAtMs > resolveMaxRelocationWaitMs()
                 || pending.retryAttempts > resolveMaxRetryAttempts()) {
             pendingByNpc.remove(npcUuid, pending);
+            CommandRelocationDropListener dropListener = relocationDropListener;
+            if (dropListener != null) {
+                dropListener.onRelocationDropped(
+                        pending.npcUuid,
+                        pending.ownerUuid,
+                        pending.sourceHintPosition,
+                        pending.alternateSourceHintPosition,
+                        pending.destination,
+                        pending.queuedAtMs,
+                        now,
+                        pending.retryAttempts
+                );
+            }
             logRetryDrop(pending, now);
             return;
         }

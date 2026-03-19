@@ -51,10 +51,14 @@ final class LinkedNpcPanelCardBinder {
         }
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
         boolean isLinked = entry.linked();
-        boolean showRespawn = isLinked && entry.dead() && entry.deadRespawnRemainingMs() == 0L && !pendingUnlink;
-        boolean showRecall = isLinked && !entry.dead() && !entry.captured() && !pendingUnlink;
-        boolean showSetHome = isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !pendingUnlink;
-        boolean showReturnHome = isLinked && !entry.dead() && !entry.captured() && entry.hasHome() && !pendingUnlink;
+        boolean showRespawn = isLinked
+                && (entry.dead() || entry.lost())
+                && entry.deadRespawnRemainingMs() == 0L
+                && !pendingUnlink;
+        boolean showRecall = isLinked && !entry.dead() && !entry.captured() && !entry.lost() && !pendingUnlink;
+        boolean showSetHome = isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !entry.lost() && !pendingUnlink;
+        boolean showReturnHome =
+                isLinked && !entry.dead() && !entry.captured() && !entry.lost() && entry.hasHome() && !pendingUnlink;
         boolean showLink = !isLinked;
         boolean showUnlink = isLinked;
         boolean showActiveToggleActive = isLinked && entry.active() && !pendingUnlink;

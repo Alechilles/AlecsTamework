@@ -30,6 +30,7 @@ final class CommandMenuMoveService {
     private final CommandResolutionService resolutionService;
     private final CommandLinkMutationService linkMutationService;
     private final CommandLinkedNpcDeathService deathService;
+    private final CommandLinkedNpcLostService lostService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandFeedbackService feedbackService;
@@ -42,6 +43,7 @@ final class CommandMenuMoveService {
     CommandMenuMoveService(CommandResolutionService resolutionService,
                            CommandLinkMutationService linkMutationService,
                            CommandLinkedNpcDeathService deathService,
+                           CommandLinkedNpcLostService lostService,
                            CommandRelocationDispatchService relocationDispatchService,
                            CommandStepExecutionService stepExecutionService,
                            CommandFeedbackService feedbackService,
@@ -53,6 +55,7 @@ final class CommandMenuMoveService {
         this.resolutionService = resolutionService;
         this.linkMutationService = linkMutationService;
         this.deathService = deathService;
+        this.lostService = lostService;
         this.relocationDispatchService = relocationDispatchService;
         this.stepExecutionService = stepExecutionService;
         this.feedbackService = feedbackService;
@@ -108,6 +111,10 @@ final class CommandMenuMoveService {
             if (deathService != null
                     && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
                 feedbackService.showWarning(player, "That companion is dead. Use Respawn when it is ready.");
+                return;
+            }
+            if (lostService != null && lostService.isLost(npcUuid)) {
+                feedbackService.showWarning(player, "That companion is lost. Use Respawn to recover it.");
                 return;
             }
             TwCommandItemConfig config = resolutionService.resolveConfig(stack.getItemId(), null);

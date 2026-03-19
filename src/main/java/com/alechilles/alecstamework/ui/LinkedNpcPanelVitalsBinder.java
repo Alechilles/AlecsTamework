@@ -49,6 +49,13 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
+        if (entry.lost()) {
+            String lostText = "Lost";
+            commandBuilder.set(healthTextSelector + ".Text", lostText);
+            commandBuilder.set(healthTextShadowSelector + ".Text", lostText);
+            commandBuilder.set(healthFillSelector + ".Visible", false);
+            return;
+        }
         if (!entry.loaded()) {
             String statusText = entry.captured() ? "Captured" : "Unloaded";
             commandBuilder.set(healthTextSelector + ".Text", statusText);
@@ -101,6 +108,9 @@ final class LinkedNpcPanelVitalsBinder {
         if (entry.dead()) {
             return new NeedVisual(0.0, LinkedNpcPanelStatusTextService.resolveDeadHappinessText(entry), false);
         }
+        if (entry.lost()) {
+            return new NeedVisual(0.0, "Happiness: unavailable (lost).", false);
+        }
         if (!entry.loaded()) {
             return new NeedVisual(
                     0.0,
@@ -123,6 +133,9 @@ final class LinkedNpcPanelVitalsBinder {
         if (entry.dead()) {
             return new NeedVisual(0.0, "Hunger: unavailable (dead)", false);
         }
+        if (entry.lost()) {
+            return new NeedVisual(0.0, "Hunger: unavailable (lost)", false);
+        }
         if (!entry.loaded()) {
             if (entry.captured()) {
                 return new NeedVisual(0.0, "Hunger: unavailable (captured)", false);
@@ -143,6 +156,9 @@ final class LinkedNpcPanelVitalsBinder {
         }
         if (entry.dead()) {
             return new NeedVisual(0.0, "Thirst: unavailable (dead)", false);
+        }
+        if (entry.lost()) {
+            return new NeedVisual(0.0, "Thirst: unavailable (lost)", false);
         }
         if (!entry.loaded()) {
             if (entry.captured()) {

@@ -28,6 +28,9 @@ final class LinkedNpcPanelStatusTextService {
         if (entry.dead()) {
             return "DEAD";
         }
+        if (entry.lost()) {
+            return "LOST";
+        }
         if (entry.captured()) {
             return "CAPTURED";
         }
@@ -35,6 +38,9 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String resolveUnavailableHealthText(LinkedNpcEntry entry) {
+        if (entry != null && entry.lost()) {
+            return "Lost companion. Use Respawn to recover.";
+        }
         if (entry != null && entry.captured()) {
             return "Captured in item.";
         }
@@ -49,6 +55,9 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String resolveUnavailableHappinessText(LinkedNpcEntry entry) {
+        if (entry != null && entry.lost()) {
+            return "Happiness: unavailable (lost).";
+        }
         if (entry != null && entry.captured()) {
             return "Happiness: unavailable (captured).";
         }

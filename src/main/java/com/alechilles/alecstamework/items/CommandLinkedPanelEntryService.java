@@ -46,6 +46,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
+    private final CommandLinkedNpcLostService lostService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandGroupService groupService;
@@ -53,12 +54,14 @@ final class CommandLinkedPanelEntryService {
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
                                    CommandLinkedNpcCaptureService captureService,
+                                   CommandLinkedNpcLostService lostService,
                                    CommandNpcNameResolver npcNameResolver,
                                    CommandLinkPolicyService linkPolicyService,
                                    CommandGroupService groupService) {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
         this.deathService = deathService;
         this.captureService = captureService;
+        this.lostService = lostService;
         this.npcNameResolver = npcNameResolver;
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.groupService = groupService != null ? groupService : new CommandGroupService();
@@ -87,6 +90,7 @@ final class CommandLinkedPanelEntryService {
             boolean loaded = false;
             boolean dead = false;
             boolean captured = false;
+            boolean lost = false;
             long deadRespawnRemainingMs = 0L;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
@@ -210,6 +214,13 @@ final class CommandLinkedPanelEntryService {
                     }
                 }
             }
+            if (!loaded && !dead && !captured && lostService != null) {
+                CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot =
+                        lostService.getLostSnapshot(record.npcUuid);
+                if (lostSnapshot != null) {
+                    lost = true;
+                }
+            }
             entries.add(new LinkedNpcEntry(
                     record.npcUuid,
                     displayName,
@@ -226,6 +237,7 @@ final class CommandLinkedPanelEntryService {
                     hasHome,
                     dead,
                     captured,
+                    lost,
                     deadRespawnRemainingMs,
                     null,
                     null,
@@ -703,6 +715,22 @@ final class CommandLinkedPanelEntryService {
                                                 Store<EntityStore> store,
                                                 String resolvedRoleId,
                                                 long remainingMs) {
+        long knownDurationMs = 0L;
+        if (breeding != null) {
+            knownDurationMs = Math.max(0L, breeding.getCooldownDurationMs());
+            if (knownDurationMs <= 0L) {
+                long startedAtMs = breeding.getCooldownStartedAtMs();
+                long untilMs = breeding.getCooldownUntilMs();
+                if (startedAtMs > 0L && untilMs > startedAtMs) {
+                    knownDurationMs = untilMs - startedAtMs;
+                }
+            }
+        }
+        if (knownDurationMs > 0L) {
+            double progress = 1.0 - ((double) remainingMs / (double) knownDurationMs);
+            return clamp(progress, 0.0, 1.0);
+        }
+
         TwBreedingConfig config = null;
         if (breeding != null && breeding.getConfigId() != null && !breeding.getConfigId().isBlank()) {
             config = TwBreedingConfig.resolveById(breeding.getConfigId());
