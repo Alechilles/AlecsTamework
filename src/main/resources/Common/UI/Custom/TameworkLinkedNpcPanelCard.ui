@@ -56,34 +56,34 @@ $C = "Common.ui";
 );
 
 @LinkedActiveStateOnButtonStyle = TextButtonStyle(
-  Default: (Background: (Color: #4caf6f), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (Color: #67cb89), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (Color: #3f8f5c), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
   Sounds: $C.@ButtonSounds
 );
 
 @LinkedActiveStateOffButtonStyle = TextButtonStyle(
-  Default: (Background: (Color: #c08956), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (Color: #d39a63), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (Color: #9f7248), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
   Sounds: $C.@ButtonSounds
 );
 
 @LinkedBreedingStateOnButtonStyle = TextButtonStyle(
-  Default: (Background: (Color: #6f5fb0), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (Color: #8674cd), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (Color: #5a4f90), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
   Sounds: $C.@ButtonSounds
 );
 
 @LinkedBreedingStateOffButtonStyle = TextButtonStyle(
-  Default: (Background: (Color: #5f6775), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (Color: #728196), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (Color: #4f5662), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (Color: #4e6077), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
+  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
   Sounds: $C.@ButtonSounds
 );
 
@@ -344,7 +344,7 @@ Group {
   }
 
   TextButton #BreedingToggleEnabledButton {
-    Anchor: (Top: 22, Left: 0, Width: 14, Height: 14);
+    Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
     Style: @LinkedBreedingStateOnButtonStyle;
     Text: "";
     TooltipText: "Breeding: enabled. Click to disable.";
@@ -353,7 +353,7 @@ Group {
   }
 
   TextButton #BreedingToggleDisabledButton {
-    Anchor: (Top: 22, Left: 0, Width: 14, Height: 14);
+    Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
     Style: @LinkedBreedingStateOffButtonStyle;
     Text: "";
     TooltipText: "Breeding: disabled. Click to enable.";

@@ -31,6 +31,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CoopFeatureHandler;
+import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
@@ -302,6 +303,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CommandNpcRelocationOnLoadSystem(commandNpcRelocationService, commandLinkedNpcDeathService)
         );
+        getChunkStoreRegistry().registerSystem(new FeedTroughFoodStateSyncSystem());
 
         // Damage event is needed for owner damage filtering; avoid double-registration.
         try {
