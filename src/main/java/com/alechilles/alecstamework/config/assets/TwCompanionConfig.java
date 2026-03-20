@@ -10,6 +10,7 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -39,6 +40,10 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
     private static final double DEFAULT_DEAD_RESPAWN_DISTANCE_FAR = 16.0;
     private static final double DEFAULT_PLACEMENT_MIN_RELATIVE_Y = -2.0;
     private static final double DEFAULT_PLACEMENT_MAX_RELATIVE_Y = 4.0;
+    private static final boolean DEFAULT_CROSS_WORLD_RECALL_ENABLED = true;
+    private static final boolean DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE = true;
+    private static final String[] DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER =
+            new String[] { "Follow", "Defend", "Aggressive" };
 
     private static final BuilderCodec<OwnershipProtectionSettings> OWNERSHIP_PROTECTION_CODEC = BuilderCodec.builder(
             OwnershipProtectionSettings.class,
@@ -60,6 +65,37 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
                     (settings, value) -> settings.invulnerableIfOwned = value,
                     settings -> settings.invulnerableIfOwned
+            )
+            .add()
+            .build();
+
+    private static final BuilderCodec<TravelSettings> TRAVEL_CODEC = BuilderCodec.builder(
+            TravelSettings.class,
+            TravelSettings::new
+    )
+            .<Boolean>append(
+                    new KeyedCodec<>("CrossWorldRecallEnabled", Codec.BOOLEAN),
+                    (settings, value) -> settings.crossWorldRecallEnabled = value != null && value,
+                    settings -> settings.crossWorldRecallEnabled
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("OnTransferFailure", Codec.STRING),
+                    (settings, value) -> settings.onTransferFailure =
+                            TransferFailurePolicy.parse(value, settings.onTransferFailure),
+                    settings -> settings.onTransferFailure.name()
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("FollowMasterOnWorldChange", Codec.BOOLEAN),
+                    (settings, value) -> settings.followMasterOnWorldChange = value != null && value,
+                    settings -> settings.followMasterOnWorldChange
+            )
+            .add()
+            .<String[]>append(
+                    new KeyedCodec<>("FollowMasterOnWorldChangeStateFilter", Codec.STRING_ARRAY),
+                    (settings, value) -> settings.followMasterOnWorldChangeStateFilter = normalizeStateFilter(value),
+                    settings -> settings.followMasterOnWorldChangeStateFilter
             )
             .add()
             .build();
@@ -160,6 +196,12 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     new KeyedCodec<>("PlacementMaxRelativeY", Codec.DOUBLE),
                     (settings, value) -> settings.placementMaxRelativeY = value,
                     settings -> settings.placementMaxRelativeY
+            )
+            .add()
+            .<TravelSettings>append(
+                    new KeyedCodec<>("Travel", TRAVEL_CODEC),
+                    (settings, value) -> settings.travel = value == null ? new TravelSettings() : value,
+                    settings -> settings.travel
             )
             .add()
             .build();
@@ -570,6 +612,9 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         if (!nestedExplicit.contains("PlacementMaxRelativeY")) {
             currentCommand.placementMaxRelativeY = parentCommand.placementMaxRelativeY;
         }
+        if (!nestedExplicit.contains("Travel")) {
+            currentCommand.travel = parentCommand.travel.copy();
+        }
     }
 
     private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
@@ -586,6 +631,86 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return Integer.MAX_VALUE;
         }
         return (int) Math.round(millis);
+    }
+
+    private static String[] normalizeStateFilter(@Nullable String[] rawStates) {
+        if (rawStates == null || rawStates.length == 0) {
+            return ArrayUtil.EMPTY_STRING_ARRAY;
+        }
+        ArrayList<String> normalized = new ArrayList<>(rawStates.length);
+        for (String value : rawStates) {
+            String normalizedValue = normalizeStateKey(value);
+            if (normalizedValue != null) {
+                normalized.add(normalizedValue);
+            }
+        }
+        return normalized.isEmpty() ? ArrayUtil.EMPTY_STRING_ARRAY : normalized.toArray(String[]::new);
+    }
+
+    @Nullable
+    private static String normalizeStateKey(@Nullable String state) {
+        if (state == null || state.isBlank()) {
+            return null;
+        }
+        String normalized = state.trim();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        return normalized.toLowerCase(Locale.ROOT);
+    }
+
+    private static boolean isStateAllowedByFilters(@Nullable String state, @Nullable String[] filters) {
+        if (filters == null || filters.length == 0) {
+            return true;
+        }
+        String normalizedState = normalizeStateKey(state);
+        if (normalizedState == null) {
+            return false;
+        }
+        for (String filter : filters) {
+            if (matchesStateFilter(normalizedState, filter)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean matchesStateFilter(@Nonnull String normalizedState, @Nullable String filter) {
+        String normalizedFilter = normalizeStateKey(filter);
+        if (normalizedFilter == null) {
+            return false;
+        }
+        if (normalizedState.equals(normalizedFilter) || normalizedState.startsWith(normalizedFilter)) {
+            return true;
+        }
+        String[] segments = normalizedState.split("[^a-z0-9]+");
+        for (String segment : segments) {
+            if (segment == null || segment.isBlank()) {
+                continue;
+            }
+            if (segment.equals(normalizedFilter) || segment.startsWith(normalizedFilter)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public enum TransferFailurePolicy {
+        QueueForRecall,
+        MarkLost,
+        Ignore;
+
+        @Nonnull
+        static TransferFailurePolicy parse(@Nullable String raw, @Nullable TransferFailurePolicy fallback) {
+            if (raw != null && !raw.isBlank()) {
+                for (TransferFailurePolicy candidate : values()) {
+                    if (candidate.name().equalsIgnoreCase(raw.trim())) {
+                        return candidate;
+                    }
+                }
+            }
+            return fallback != null ? fallback : QueueForRecall;
+        }
     }
 
     public static final class OwnershipProtectionSettings {
@@ -614,6 +739,49 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
     }
 
+    public static final class TravelSettings {
+        private boolean crossWorldRecallEnabled = DEFAULT_CROSS_WORLD_RECALL_ENABLED;
+        private TransferFailurePolicy onTransferFailure = TransferFailurePolicy.QueueForRecall;
+        private boolean followMasterOnWorldChange = DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE;
+        private String[] followMasterOnWorldChangeStateFilter =
+                normalizeStateFilter(DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER);
+
+        public boolean isCrossWorldRecallEnabled() {
+            return crossWorldRecallEnabled;
+        }
+
+        @Nonnull
+        public TransferFailurePolicy getOnTransferFailure() {
+            return onTransferFailure != null ? onTransferFailure : TransferFailurePolicy.QueueForRecall;
+        }
+
+        public boolean isFollowMasterOnWorldChange() {
+            return followMasterOnWorldChange;
+        }
+
+        public String[] getFollowMasterOnWorldChangeStateFilter() {
+            return followMasterOnWorldChangeStateFilter != null
+                    ? followMasterOnWorldChangeStateFilter.clone()
+                    : ArrayUtil.EMPTY_STRING_ARRAY;
+        }
+
+        public boolean isStateAllowedForWorldChange(@Nullable String state) {
+            if (!followMasterOnWorldChange) {
+                return false;
+            }
+            return isStateAllowedByFilters(state, followMasterOnWorldChangeStateFilter);
+        }
+
+        private TravelSettings copy() {
+            TravelSettings copy = new TravelSettings();
+            copy.crossWorldRecallEnabled = crossWorldRecallEnabled;
+            copy.onTransferFailure = getOnTransferFailure();
+            copy.followMasterOnWorldChange = followMasterOnWorldChange;
+            copy.followMasterOnWorldChangeStateFilter = getFollowMasterOnWorldChangeStateFilter();
+            return copy;
+        }
+    }
+
     public static final class CommandSettings {
         private double returnHomeTeleportDistance = DEFAULT_RETURN_HOME_TELEPORT_DISTANCE;
         private double returnHomePathDistanceBeforeTeleport = DEFAULT_RETURN_HOME_PATH_DISTANCE_BEFORE_TELEPORT;
@@ -629,6 +797,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private double deadRespawnDistanceFar = DEFAULT_DEAD_RESPAWN_DISTANCE_FAR;
         private double placementMinRelativeY = DEFAULT_PLACEMENT_MIN_RELATIVE_Y;
         private double placementMaxRelativeY = DEFAULT_PLACEMENT_MAX_RELATIVE_Y;
+        private TravelSettings travel = new TravelSettings();
 
         public double getReturnHomeTeleportDistance() {
             return returnHomeTeleportDistance;
@@ -686,6 +855,10 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             return placementMaxRelativeY;
         }
 
+        public TravelSettings getTravel() {
+            return travel != null ? travel : new TravelSettings();
+        }
+
         private CommandSettings copy() {
             CommandSettings copy = new CommandSettings();
             copy.returnHomeTeleportDistance = returnHomeTeleportDistance;
@@ -702,6 +875,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             copy.deadRespawnDistanceFar = deadRespawnDistanceFar;
             copy.placementMinRelativeY = placementMinRelativeY;
             copy.placementMaxRelativeY = placementMaxRelativeY;
+            copy.travel = getTravel().copy();
             return copy;
         }
     }
@@ -730,6 +904,10 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         private final double deadRespawnDistanceFar;
         private final double placementMinRelativeY;
         private final double placementMaxRelativeY;
+        private final boolean crossWorldRecallEnabled;
+        private final TransferFailurePolicy onTransferFailure;
+        private final boolean followMasterOnWorldChange;
+        private final String[] followMasterOnWorldChangeStateFilter;
 
         private EffectiveSettings(boolean blockOwnerDamage,
                                   boolean blockAllPlayerDamageIfOwned,
@@ -747,7 +925,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                                   double deadRespawnDistanceMid,
                                   double deadRespawnDistanceFar,
                                   double placementMinRelativeY,
-                                  double placementMaxRelativeY) {
+                                  double placementMaxRelativeY,
+                                  boolean crossWorldRecallEnabled,
+                                  TransferFailurePolicy onTransferFailure,
+                                  boolean followMasterOnWorldChange,
+                                  @Nullable String[] followMasterOnWorldChangeStateFilter) {
             this.blockOwnerDamage = blockOwnerDamage;
             this.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
             this.invulnerableIfOwned = invulnerableIfOwned;
@@ -765,12 +947,20 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
             this.deadRespawnDistanceFar = deadRespawnDistanceFar;
             this.placementMinRelativeY = placementMinRelativeY;
             this.placementMaxRelativeY = placementMaxRelativeY;
+            this.crossWorldRecallEnabled = crossWorldRecallEnabled;
+            this.onTransferFailure = onTransferFailure != null ? onTransferFailure : TransferFailurePolicy.QueueForRecall;
+            this.followMasterOnWorldChange = followMasterOnWorldChange;
+            this.followMasterOnWorldChangeStateFilter =
+                    followMasterOnWorldChangeStateFilter != null
+                            ? normalizeStateFilter(followMasterOnWorldChangeStateFilter)
+                            : ArrayUtil.EMPTY_STRING_ARRAY;
         }
 
         public static EffectiveSettings from(@Nullable TwCompanionConfig scoped, @Nullable TwGlobalConfig global) {
             if (scoped != null && scoped.isEnabled()) {
                 OwnershipProtectionSettings ownership = scoped.getOwnershipProtection();
                 CommandSettings command = scoped.getCommand();
+                TravelSettings travel = command.getTravel();
                 return new EffectiveSettings(
                         ownership.isBlockOwnerDamage(),
                         ownership.isBlockAllPlayerDamageIfOwned(),
@@ -788,7 +978,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                         command.getDeadRespawnDistanceMid(),
                         command.getDeadRespawnDistanceFar(),
                         command.getPlacementMinRelativeY(),
-                        command.getPlacementMaxRelativeY()
+                        command.getPlacementMaxRelativeY(),
+                        travel.isCrossWorldRecallEnabled(),
+                        travel.getOnTransferFailure(),
+                        travel.isFollowMasterOnWorldChange(),
+                        travel.getFollowMasterOnWorldChangeStateFilter()
                 );
             }
             return fromGlobal(global);
@@ -818,7 +1012,11 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     global != null ? global.getCommandDeadRespawnDistanceMid() : DEFAULT_DEAD_RESPAWN_DISTANCE_MID,
                     global != null ? global.getCommandDeadRespawnDistanceFar() : DEFAULT_DEAD_RESPAWN_DISTANCE_FAR,
                     global != null ? global.getCommandPlacementMinRelativeY() : DEFAULT_PLACEMENT_MIN_RELATIVE_Y,
-                    global != null ? global.getCommandPlacementMaxRelativeY() : DEFAULT_PLACEMENT_MAX_RELATIVE_Y
+                    global != null ? global.getCommandPlacementMaxRelativeY() : DEFAULT_PLACEMENT_MAX_RELATIVE_Y,
+                    DEFAULT_CROSS_WORLD_RECALL_ENABLED,
+                    TransferFailurePolicy.QueueForRecall,
+                    DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE,
+                    DEFAULT_FOLLOW_MASTER_ON_WORLD_CHANGE_STATE_FILTER
             );
         }
 
@@ -888,6 +1086,30 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
 
         public double getPlacementMaxRelativeY() {
             return placementMaxRelativeY;
+        }
+
+        public boolean isCrossWorldRecallEnabled() {
+            return crossWorldRecallEnabled;
+        }
+
+        @Nonnull
+        public TransferFailurePolicy getOnTransferFailure() {
+            return onTransferFailure;
+        }
+
+        public boolean isFollowMasterOnWorldChange() {
+            return followMasterOnWorldChange;
+        }
+
+        public String[] getFollowMasterOnWorldChangeStateFilter() {
+            return followMasterOnWorldChangeStateFilter.clone();
+        }
+
+        public boolean isWorldChangeStateAllowed(@Nullable String state) {
+            if (!followMasterOnWorldChange) {
+                return false;
+            }
+            return isStateAllowedByFilters(state, followMasterOnWorldChangeStateFilter);
         }
     }
 }

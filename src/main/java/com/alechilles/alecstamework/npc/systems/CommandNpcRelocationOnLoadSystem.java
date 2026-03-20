@@ -58,7 +58,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                                @Nonnull Store<EntityStore> store,
                                @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         if (relocationService != null) {
-            relocationService.onNpcRemoved(reference, store);
+            relocationService.onNpcRemoved(reference, reason, store);
         }
         if (deathService != null) {
             deathService.onNpcRemoved(reference, reason, store);

@@ -134,6 +134,10 @@ Role-scoped behavior tuning belongs in `TwCompanionConfig.Command`:
 - `ReturnHomeTeleportDelayMs`
 - `RecallSafeSpawnDistance`
 - `RecallForceRelocateDistance`
+- `Travel.CrossWorldRecallEnabled`
+- `Travel.OnTransferFailure` (`QueueForRecall`, `MarkLost`, `Ignore`)
+- `Travel.FollowMasterOnWorldChange`
+- `Travel.FollowMasterOnWorldChangeStateFilter`
 - `DeadRespawnEnabled`
 - `DeadRespawnCooldownMs` / `DeadRespawnCooldownMins`
 - `DeadRespawnFollowRetryDelayMs`

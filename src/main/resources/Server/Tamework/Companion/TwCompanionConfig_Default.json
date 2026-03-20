@@ -15,6 +15,16 @@
     "ReturnHomeTeleportDelayMs": 2500,
     "RecallSafeSpawnDistance": 20.0,
     "RecallForceRelocateDistance": 80.0,
+    "Travel": {
+      "CrossWorldRecallEnabled": true,
+      "OnTransferFailure": "QueueForRecall",
+      "FollowMasterOnWorldChange": true,
+      "FollowMasterOnWorldChangeStateFilter": [
+        "Follow",
+        "Defend",
+        "Aggressive"
+      ]
+    },
     "DeadRespawnEnabled": true,
     "DeadRespawnCooldownMins": 10,
     "DeadRespawnFollowRetryDelayMs": 1250,

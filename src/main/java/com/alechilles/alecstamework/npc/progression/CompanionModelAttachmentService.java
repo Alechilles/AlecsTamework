@@ -152,7 +152,16 @@ public final class CompanionModelAttachmentService {
         }
         Map<String, Set<String>> options = resolveAttachmentOptionIds(modelAsset);
         Map<String, String> filteredSelections = filterAttachmentSelections(attachmentSelections, options);
-        Model updated = Model.createScaledModel(modelAsset, model.getScale(), filteredSelections);
+        Model updated = CompanionModelScaleService.createScaledModel(
+                npcRef,
+                store,
+                modelAsset,
+                model.getScale(),
+                filteredSelections
+        );
+        if (updated == null) {
+            return false;
+        }
         store.putComponent(npcRef, ModelComponent.getComponentType(), new ModelComponent(updated));
         if (npc != null && npc.getRole() != null) {
             npc.getRole().updateMotionControllers(npcRef, updated, updated.getBoundingBox(), store);

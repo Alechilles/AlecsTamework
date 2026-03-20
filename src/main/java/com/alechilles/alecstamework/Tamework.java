@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
+import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -31,6 +32,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
+import com.alechilles.alecstamework.items.CommandTeleportArrivalRelocationSystem;
 import com.alechilles.alecstamework.items.CoopFeatureHandler;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
@@ -77,6 +79,7 @@ import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
+import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -163,6 +166,12 @@ public class Tamework extends JavaPlugin {
         Interaction.CODEC.register("TameworkNameNpc", TameworkNameNpcInteraction.class, TameworkNameNpcInteraction.CODEC);
         // Register the custom item interaction used by command items.
         Interaction.CODEC.register("TameworkCommand", TameworkCommandInteraction.class, TameworkCommandInteraction.CODEC);
+        // Register the custom block interaction used to empty water trough states.
+        Interaction.CODEC.register(
+                "TameworkClearFeedTroughWater",
+                TameworkClearFeedTroughWaterInteraction.class,
+                TameworkClearFeedTroughWaterInteraction.CODEC
+        );
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();
         registerCompanionAssets();
@@ -352,6 +361,9 @@ public class Tamework extends JavaPlugin {
                 commandLinkedNpcCaptureService,
                 commandLinkedNpcLostService
         );
+        getEntityStoreRegistry().registerSystem(
+                new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
+        );
         // Core handler for coop intake policy overlays.
         coopFeatureHandler = new CoopFeatureHandler(getLogger());
 
@@ -377,6 +389,12 @@ public class Tamework extends JavaPlugin {
         if (namingFeatureHandler != null) {
             getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
             getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
+        }
+        if (commandItemFeatureHandler != null) {
+            getEventRegistry().registerGlobal(
+                    AddPlayerToWorldEvent.class,
+                    commandItemFeatureHandler::onAddPlayerToWorld
+            );
         }
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(

@@ -415,6 +415,7 @@ final class CommandPanelActionService {
                         record.cachedDisplayName,
                         record.cachedNameKey,
                         record.cachedRoleId,
+                        record.cachedCommandState,
                         record.active,
                         record.breedingEnabled,
                         null

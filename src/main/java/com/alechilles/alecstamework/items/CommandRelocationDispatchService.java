@@ -69,7 +69,9 @@ final class CommandRelocationDispatchService {
                         postRelocationState.subState,
                         0L,
                         record.lastKnownPosition,
-                        record.homePosition
+                        record.homePosition,
+                        false,
+                        TwCompanionConfig.TransferFailurePolicy.QueueForRecall
                 );
                 queued++;
                 continue;
@@ -102,7 +104,9 @@ final class CommandRelocationDispatchService {
                     postRelocationState.subState,
                     0L,
                     sourceHint,
-                    record.homePosition
+                    record.homePosition,
+                    settings.isCrossWorldRecallEnabled(),
+                    settings.getOnTransferFailure()
             );
             queued++;
         }

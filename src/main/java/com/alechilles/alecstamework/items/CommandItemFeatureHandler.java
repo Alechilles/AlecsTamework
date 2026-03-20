@@ -37,10 +37,14 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entity.damage.DamageCause;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -52,6 +56,7 @@ import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -73,6 +78,9 @@ public final class CommandItemFeatureHandler {
     private static final String CYCLE_SELECTION_COMMAND_ID = "CycleSelection";
     private static final String OPEN_SELECTION_MENU_COMMAND_ID = "OpenSelectionMenu";
     private static final long RESPAWN_FOLLOW_RETRY_DELAY_MS = 1250L;
+    private static final float RELEASE_DESPAWN_DELAY_SECONDS = 4.0F;
+    private static final float CULL_DAMAGE_AMOUNT = 2.1474836E9F;
+    private static final String[] RELEASE_STATE_CANDIDATES = new String[] { "Flee", "Wander", "Idle" };
 
     private final CommandItemRegistry registry;
     private final CommandNpcRelocationService relocationService;
@@ -92,6 +100,7 @@ public final class CommandItemFeatureHandler {
     private final CommandRecipientService recipientService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandLinkMutationService linkMutationService;
+    private final CommandNpcExistenceService npcExistenceService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandRespawnService respawnService;
     private final CommandLostRecoveryService lostRecoveryService;
@@ -155,6 +164,7 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 npcNameResolver
         );
+        this.npcExistenceService = new CommandNpcExistenceService();
         this.relocationDispatchService = new CommandRelocationDispatchService(
                 relocationService,
                 deathService,
@@ -172,7 +182,7 @@ public final class CommandItemFeatureHandler {
         );
         this.lostRecoveryService = new CommandLostRecoveryService(
                 companionPlacementService,
-                new CommandNpcExistenceService(),
+                npcExistenceService,
                 linkPolicyService,
                 linkMutationService,
                 npcNameResolver,
@@ -207,6 +217,168 @@ public final class CommandItemFeatureHandler {
         this.groupAssignPageService = new CommandGroupAssignPageService(
                 panelActionService,
                 toolInventoryService
+        );
+    }
+
+    public void onAddPlayerToWorld(AddPlayerToWorldEvent event) {
+        if (event == null || event.getWorld() == null || event.getHolder() == null || relocationService == null) {
+            return;
+        }
+        Player player = event.getHolder().getComponent(Player.getComponentType());
+        if (player == null) {
+            return;
+        }
+        World world = event.getWorld();
+        CompletableFuture.runAsync(
+                () -> world.execute(() -> queueWorldChangeTravelRelocations(player, world)),
+                CompletableFuture.delayedExecutor(250L, TimeUnit.MILLISECONDS)
+        );
+    }
+
+    public void queueWorldChangeTravelRelocationsForPlayerUuid(World destinationWorld, UUID playerUuid) {
+        if (destinationWorld == null || playerUuid == null || relocationService == null) {
+            return;
+        }
+        Store<EntityStore> destinationStore =
+                destinationWorld.getEntityStore() != null ? destinationWorld.getEntityStore().getStore() : null;
+        if (destinationStore == null) {
+            return;
+        }
+        Ref<EntityStore> playerRef = destinationWorld.getEntityRef(playerUuid);
+        if (playerRef == null || !playerRef.isValid()) {
+            return;
+        }
+        Player player = destinationStore.getComponent(playerRef, Player.getComponentType());
+        if (player == null) {
+            return;
+        }
+        queueWorldChangeTravelRelocations(player, destinationWorld);
+    }
+
+    private void queueWorldChangeTravelRelocations(Player player, World destinationWorld) {
+        if (player == null || destinationWorld == null || relocationService == null) {
+            return;
+        }
+        if (player.getWorld() != destinationWorld) {
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return;
+        }
+        Store<EntityStore> destinationStore =
+                destinationWorld.getEntityStore() != null ? destinationWorld.getEntityStore().getStore() : null;
+        Ref<EntityStore> playerRef = player.getReference();
+        if (destinationStore == null || playerRef == null || !playerRef.isValid()) {
+            return;
+        }
+        UUID ownerUuid = player.getUuid();
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        Set<UUID> queuedNpcUuids = new HashSet<>();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            TwCommandItemConfig config = resolutionService.resolveConfig(stack.getItemId(), null);
+            if (config == null || !config.isEnabled()) {
+                continue;
+            }
+            String toolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (toolId == null || toolId.isBlank()) {
+                continue;
+            }
+            List<LinkedNpcRecord> linkedRecords = linkMutationService.readLinkedNpcRecords(stack);
+            if (linkedRecords.isEmpty()) {
+                continue;
+            }
+            for (LinkedNpcRecord record : linkedRecords) {
+                if (record == null || record.npcUuid == null || !record.active || queuedNpcUuids.contains(record.npcUuid)) {
+                    continue;
+                }
+                if (deathService != null
+                        && deathService.getDeadSnapshotForTool(record.npcUuid, toolId, ownerUuid) != null) {
+                    continue;
+                }
+                if (lostService != null && lostService.isLost(record.npcUuid)) {
+                    continue;
+                }
+                String roleId = resolveTravelRoleId(record);
+                TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+                if (!settings.isFollowMasterOnWorldChange()) {
+                    continue;
+                }
+                if (!isEligibleForWorldChangeTravel(record, settings)) {
+                    continue;
+                }
+                RelocationState travelState = resolveTravelRelocationState(record);
+                Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : record.homePosition;
+                double safeSpawnDistance = resolvePositiveDouble(
+                        settings.getRecallSafeSpawnDistance(),
+                        RECALL_SAFE_SPAWN_DISTANCE
+                );
+                Vector3d safeDestination = companionPlacementService.computeSafeRecallPosition(
+                        playerRef,
+                        destinationStore,
+                        safeSpawnDistance,
+                        roleId,
+                        sourceHint
+                );
+                if (safeDestination == null) {
+                    continue;
+                }
+                relocationService.queueRelocation(
+                        destinationWorld,
+                        record.npcUuid,
+                        safeDestination,
+                        ownerUuid,
+                        true,
+                        true,
+                        travelState.state,
+                        travelState.subState,
+                        0L,
+                        sourceHint,
+                        record.homePosition,
+                        true,
+                        settings.getOnTransferFailure(),
+                        null
+                );
+                queuedNpcUuids.add(record.npcUuid);
+            }
+        }
+    }
+
+    private boolean isEligibleForWorldChangeTravel(LinkedNpcRecord record,
+                                                   TwCompanionConfig.EffectiveSettings settings) {
+        if (record == null || settings == null) {
+            return false;
+        }
+        String[] requiredStates = settings.getFollowMasterOnWorldChangeStateFilter();
+        if (requiredStates == null || requiredStates.length == 0) {
+            return true;
+        }
+        if (record.cachedCommandState == null || record.cachedCommandState.isBlank()) {
+            // Preserve backward compatibility for older linked-record metadata that does not cache state yet.
+            return true;
+        }
+        return settings.isWorldChangeStateAllowed(record.cachedCommandState);
+    }
+
+    private RelocationState resolveTravelRelocationState(LinkedNpcRecord record) {
+        if (record == null || record.cachedCommandState == null || record.cachedCommandState.isBlank()) {
+            return new RelocationState(null, null);
+        }
+        String cachedState = record.cachedCommandState.trim();
+        int separator = cachedState.indexOf('.');
+        if (separator < 0) {
+            return new RelocationState(cachedState, null);
+        }
+        String state = cachedState.substring(0, separator).trim();
+        String subState = separator + 1 < cachedState.length() ? cachedState.substring(separator + 1).trim() : null;
+        return new RelocationState(
+                state == null || state.isBlank() ? null : state,
+                subState == null || subState.isBlank() ? null : subState
         );
     }
 
@@ -469,6 +641,8 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid),
                 npcUuid -> panelActionService.applyToggleBreeding(player, toolId, npcUuid),
+                npcUuid -> applyMenuRelease(player, toolId, config, npcUuid),
+                npcUuid -> applyMenuCull(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
@@ -589,6 +763,161 @@ public final class CommandItemFeatureHandler {
             return;
         }
         feedbackService.showWarning(player, "Unable to find that command item.");
+    }
+
+    private void applyMenuRelease(Player player,
+                                  String toolId,
+                                  TwCommandItemConfig config,
+                                  UUID npcUuid) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            feedbackService.showWarning(player, "Unable to release right now.");
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            feedbackService.showWarning(player, "Unable to release right now.");
+            return;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        if (npcRef == null || !npcRef.isValid()) {
+            feedbackService.showWarning(player, "That mob must be loaded to release.");
+            return;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            feedbackService.showWarning(player, "That mob must be loaded to release.");
+            return;
+        }
+        if (!canApplyNearbyReleaseCull(player, config, npcRef, store)) {
+            feedbackService.showWarning(player, "You can only release owned nearby companions.");
+            return;
+        }
+        clearNpcTamedOwnershipAndLinks(npcRef, store);
+        trySetReleaseState(npcRef, npc, store);
+        npc.setToDespawn();
+        npc.setDespawnTime(RELEASE_DESPAWN_DELAY_SECONDS);
+        String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
+        if (displayName == null || displayName.isBlank()) {
+            displayName = "mob";
+        }
+        feedbackService.showSuccess(player, "Released " + displayName + ". It will despawn shortly.");
+    }
+
+    private void applyMenuCull(Player player,
+                               String toolId,
+                               TwCommandItemConfig config,
+                               UUID npcUuid) {
+        if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null) {
+            feedbackService.showWarning(player, "Unable to cull right now.");
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            feedbackService.showWarning(player, "Unable to cull right now.");
+            return;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        if (npcRef == null || !npcRef.isValid()) {
+            feedbackService.showWarning(player, "That mob must be loaded to cull.");
+            return;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            feedbackService.showWarning(player, "That mob must be loaded to cull.");
+            return;
+        }
+        if (!canApplyNearbyReleaseCull(player, config, npcRef, store)) {
+            feedbackService.showWarning(player, "You can only cull owned nearby companions.");
+            return;
+        }
+        DamageCause cause = DamageCause.COMMAND != null ? DamageCause.COMMAND : DamageCause.PHYSICAL;
+        if (cause == null) {
+            feedbackService.showWarning(player, "Unable to cull right now.");
+            return;
+        }
+        DeathComponent.tryAddComponent(store, npcRef, new Damage(Damage.NULL_SOURCE, cause, CULL_DAMAGE_AMOUNT));
+        String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
+        if (displayName == null || displayName.isBlank()) {
+            displayName = "mob";
+        }
+        feedbackService.showSuccess(player, "Culled " + displayName + ".");
+    }
+
+    private boolean canApplyNearbyReleaseCull(Player player,
+                                              TwCommandItemConfig config,
+                                              Ref<EntityStore> npcRef,
+                                              Store<EntityStore> store) {
+        if (player == null || npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        UUID ownerUuid = player.getUuid();
+        if (ownerUuid == null) {
+            return false;
+        }
+        boolean requireTamed = config != null && config.isRequireTamed();
+        return linkPolicyService.passesOwnerAndTamed(true, requireTamed, npcRef, ownerUuid, store);
+    }
+
+    private void clearNpcTamedOwnershipAndLinks(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        if (ownerType != null) {
+            TameworkOwnerComponent owner = store.getComponent(npcRef, ownerType);
+            if (owner != null && (owner.getOwnerId() != null || owner.getOwnerName() != null)) {
+                owner.setOwnerId(null);
+                owner.setOwnerName(null);
+                store.putComponent(npcRef, ownerType, owner);
+            }
+        }
+
+        ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
+        if (tamedType != null) {
+            TameworkTamedComponent tamed = store.getComponent(npcRef, tamedType);
+            if (tamed != null && tamed.isTamed()) {
+                tamed.setTamed(false);
+                store.putComponent(npcRef, tamedType, tamed);
+            }
+        }
+
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        if (linksType != null) {
+            TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
+            if (links != null) {
+                links.setOwnerId(null);
+                links.setToolIds(new String[0]);
+                links.setHomePosition(null);
+                store.putComponent(npcRef, linksType, links);
+            }
+        }
+    }
+
+    private void trySetReleaseState(Ref<EntityStore> npcRef,
+                                    NPCEntity npc,
+                                    Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || npc == null || store == null) {
+            return;
+        }
+        for (String state : RELEASE_STATE_CANDIDATES) {
+            if (state == null || state.isBlank()) {
+                continue;
+            }
+            if (stepExecutionService.applyState(npcRef, npc, store, state, null)) {
+                return;
+            }
+            if (!state.startsWith("$") && stepExecutionService.applyState(npcRef, npc, store, "$" + state, null)) {
+                return;
+            }
+        }
     }
 
     private void applyMenuRespawn(Player player,
@@ -829,6 +1158,13 @@ public final class CommandItemFeatureHandler {
                                       UUID npcUuid,
                                       boolean returnHome) {
         menuMoveService.applyMenuMoveCommand(player, toolId, npcUuid, returnHome, this::resolveCommandLabel);
+    }
+
+    private String resolveTravelRoleId(LinkedNpcRecord record) {
+        if (record != null && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+            return record.cachedRoleId;
+        }
+        return null;
     }
 
     private String formatDuration(long remainingMs) {

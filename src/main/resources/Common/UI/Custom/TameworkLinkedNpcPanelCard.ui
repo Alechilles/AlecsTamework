@@ -287,7 +287,7 @@ Group {
   }
 
   Label #StatusConfirm {
-    Anchor: (Top: 30, Right: 34, Width: 96, Height: 18);
+    Anchor: (Top: 30, Right: 18, Width: 118, Height: 18);
     Text: "CONFIRM REMOVE";
     Style: (
       FontSize: 10,
@@ -321,6 +321,32 @@ Group {
     Padding: (Horizontal: 8);
     Text: "Link";
     TooltipText: "Link companion";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
+  }
+
+  TextButton #ReleaseButton {
+    Anchor: (Top: 56, Right: 66, Width: 72, Height: 22);
+    Style: (
+      ...$C.@SmallSecondaryTextButtonStyle,
+      Sounds: $C.@ButtonSounds
+    );
+    Padding: (Horizontal: 4);
+    Text: "Release";
+    TooltipText: "Animal will be released to the wild and disappear permanently.";
+    TextTooltipStyle: @LinkedActionTooltipStyle;
+    Visible: false;
+  }
+
+  TextButton #CullButton {
+    Anchor: (Top: 56, Right: 0, Width: 62, Height: 22);
+    Style: (
+      ...$C.@SmallSecondaryTextButtonStyle,
+      Sounds: $C.@ButtonSounds
+    );
+    Padding: (Horizontal: 4);
+    Text: "Cull";
+    TooltipText: "Animal will be slaughtered and cannot be revived.";
     TextTooltipStyle: @LinkedActionTooltipStyle;
     Visible: false;
   }

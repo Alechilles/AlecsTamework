@@ -49,6 +49,8 @@ public final class TameworkCommandSelectionPage
     private static final String OPEN_GROUP_PICKER_COMMAND_PREFIX = "__opengroup__:";
     private static final String TOGGLE_ACTIVE_COMMAND_PREFIX = "__active__:";
     private static final String TOGGLE_BREEDING_COMMAND_PREFIX = "__breeding__:";
+    private static final String RELEASE_COMMAND_PREFIX = "__release__:";
+    private static final String CULL_COMMAND_PREFIX = "__cull__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
@@ -87,6 +89,8 @@ public final class TameworkCommandSelectionPage
                     OPEN_GROUP_PICKER_COMMAND_PREFIX,
                     TOGGLE_ACTIVE_COMMAND_PREFIX,
                     TOGGLE_BREEDING_COMMAND_PREFIX,
+                    RELEASE_COMMAND_PREFIX,
+                    CULL_COMMAND_PREFIX,
                     RESPAWN_COMMAND_PREFIX,
                     RECALL_COMMAND_PREFIX,
                     SET_HOME_COMMAND_PREFIX,
@@ -111,6 +115,8 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> unlinkCallback;
     private final Consumer<UUID> toggleActiveCallback;
     private final Consumer<UUID> toggleBreedingCallback;
+    private final Consumer<UUID> releaseCallback;
+    private final Consumer<UUID> cullCallback;
     private final Consumer<UUID> respawnCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
@@ -148,6 +154,8 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<UUID> toggleActiveCallback,
                                         @Nonnull Consumer<UUID> toggleBreedingCallback,
+                                        @Nonnull Consumer<UUID> releaseCallback,
+                                        @Nonnull Consumer<UUID> cullCallback,
                                         @Nonnull Consumer<UUID> respawnCallback,
                                         @Nonnull Consumer<UUID> recallCallback,
                                         @Nonnull Consumer<UUID> setHomeCallback,
@@ -180,6 +188,8 @@ public final class TameworkCommandSelectionPage
         this.unlinkCallback = unlinkCallback;
         this.toggleActiveCallback = toggleActiveCallback;
         this.toggleBreedingCallback = toggleBreedingCallback;
+        this.releaseCallback = releaseCallback;
+        this.cullCallback = cullCallback;
         this.respawnCallback = respawnCallback;
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
@@ -387,12 +397,45 @@ public final class TameworkCommandSelectionPage
             }
             UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, UNLINK_COMMAND_PREFIX);
             if (npcUuid != null) {
+                LinkedNpcEntry entry = resolveLinkedNpcEntry(npcUuid);
+                boolean linkedEntry = entry != null && entry.linked();
+                if (!linkedEntry) {
+                    pendingUnlinkNpcUuid = npcUuid;
+                    sendCardRefreshUpdate();
+                    return;
+                }
                 if (requireUnlinkConfirm && !isPendingUnlink(npcUuid)) {
                     pendingUnlinkNpcUuid = npcUuid;
                     sendCardRefreshUpdate();
                     return;
                 }
                 unlinkCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (commandId.startsWith(RELEASE_COMMAND_PREFIX)) {
+            if (releaseCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, RELEASE_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                releaseCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
+                refreshLinkedNpcEntries();
+                sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (commandId.startsWith(CULL_COMMAND_PREFIX)) {
+            if (cullCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, CULL_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                cullCallback.accept(npcUuid);
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
@@ -748,7 +791,7 @@ public final class TameworkCommandSelectionPage
                                    int index,
                                    LinkedNpcEntry entry,
                                    boolean appendCard) {
-        boolean pendingUnlink = entry.linked() && isPendingUnlink(entry.npcUuid());
+        boolean pendingUnlink = isPendingUnlink(entry.npcUuid());
         LinkedNpcPanelCardBinder.bind(
                 commandBuilder,
                 eventBuilder,

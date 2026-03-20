@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemInventoryEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
@@ -28,6 +29,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.logging.Level;
 
 /** Tamework interact effects. */
 final class TameworkInteractEffects {
@@ -108,7 +110,11 @@ final class TameworkInteractEffects {
         }
         SpawnParticlesEffect spawnParticles = effects.getSpawnParticles();
         if (spawnParticles != null) {
-            applied |= presentationEffects.applySpawnParticles(spawnParticles, npcRef, role, store, player, ctx);
+            try {
+                applied |= presentationEffects.applySpawnParticles(spawnParticles, npcRef, role, store, player, ctx);
+            } catch (RuntimeException | LinkageError ex) {
+                logNonFatalEffectFailure("spawnParticles", ex);
+            }
         }
         DropItemEffect dropItem = effects.getDropItem();
         if (dropItem != null) {
@@ -220,6 +226,22 @@ final class TameworkInteractEffects {
                                Role role,
                                Store<EntityStore> store) {
         return breedingEffects.applyStartBreeding(interaction, npcRef, role, store);
+    }
+
+    // Logs and suppresses non-fatal custom effect failures to avoid world-thread crashes.
+    private void logNonFatalEffectFailure(String effectName, Throwable error) {
+        String message = "TameworkInteract: " + effectName
+                + " effect failed; skipping effect to keep interaction flow alive.";
+        Tamework instance = Tamework.getInstance();
+        if (instance != null && instance.getLogger() != null) {
+            if (error == null) {
+                instance.getLogger().at(Level.WARNING).log(message);
+            } else {
+                instance.getLogger().at(Level.WARNING).withCause(error).log(message);
+            }
+            return;
+        }
+        owner.logUnsupported(message);
     }
 
 }

@@ -45,6 +45,8 @@ final class LinkedNpcPanelCardBinder {
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
         String returnHomeSelector = entrySelector + " #ReturnHomeButton";
+        String releaseSelector = entrySelector + " #ReleaseButton";
+        String cullSelector = entrySelector + " #CullButton";
 
         if (appendCard) {
             commandBuilder.append("#TameworkLinkedPanelList", config.linkedPanelCardUiPath());
@@ -59,8 +61,11 @@ final class LinkedNpcPanelCardBinder {
         boolean showSetHome = isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !entry.lost() && !pendingUnlink;
         boolean showReturnHome =
                 isLinked && !entry.dead() && !entry.captured() && !entry.lost() && entry.hasHome() && !pendingUnlink;
-        boolean showLink = !isLinked;
-        boolean showUnlink = isLinked;
+        boolean canOpenReleaseActions = !isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !entry.lost();
+        boolean showLink = !isLinked && !pendingUnlink;
+        boolean showUnlink = isLinked || canOpenReleaseActions;
+        boolean showRelease = pendingUnlink && canOpenReleaseActions;
+        boolean showCull = pendingUnlink && canOpenReleaseActions;
         boolean showActiveToggleActive = isLinked && entry.active() && !pendingUnlink;
         boolean showActiveToggleInactive = isLinked && !entry.active() && !pendingUnlink;
         boolean showBreedingToggleEnabled =
@@ -72,6 +77,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
         commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
+        commandBuilder.set(statusConfirmSelector + ".Text", isLinked ? "CONFIRM REMOVE" : "RELEASE OR CULL");
         commandBuilder.set(linkSelector + ".Visible", showLink);
         commandBuilder.set(removeSelector + ".Visible", showUnlink);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
@@ -96,6 +102,8 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
         commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
+        commandBuilder.set(releaseSelector + ".Visible", showRelease);
+        commandBuilder.set(cullSelector + ".Visible", showCull);
         LinkedNpcTraitIndicatorBinder.bind(commandBuilder, entrySelector, entry.traitIndicators());
 
         if (showLink) {
@@ -187,6 +195,22 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
+        if (showRelease) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    releaseSelector,
+                    EventData.of(config.eventCommandId(), config.releaseCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showCull) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    cullSelector,
+                    EventData.of(config.eventCommandId(), config.cullCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
     }
 
     private static Anchor buildCardAnchor() {
@@ -205,6 +229,8 @@ final class LinkedNpcPanelCardBinder {
                              String openGroupPickerCommandPrefix,
                              String toggleActiveCommandPrefix,
                              String toggleBreedingCommandPrefix,
+                             String releaseCommandPrefix,
+                             String cullCommandPrefix,
                              String respawnCommandPrefix,
                              String recallCommandPrefix,
                              String setHomeCommandPrefix,

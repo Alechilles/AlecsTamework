@@ -25,6 +25,7 @@ final class CommandLinkedNpcRecordStore {
     private static final String TOKEN_DISPLAY_NAME = "dn=";
     private static final String TOKEN_NAME_KEY = "nk=";
     private static final String TOKEN_ROLE_ID = "rid=";
+    private static final String TOKEN_COMMAND_STATE = "cs=";
     private static final String TOKEN_ACTIVE = "ac=";
     private static final String TOKEN_BREEDING_ENABLED = "be=";
     private static final String TOKEN_GROUP_ID = "gid=";
@@ -89,6 +90,9 @@ final class CommandLinkedNpcRecordStore {
             if (record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
                 builder.append('|').append(TOKEN_ROLE_ID).append(encodeRecordText(record.cachedRoleId));
             }
+            if (record.cachedCommandState != null && !record.cachedCommandState.isBlank()) {
+                builder.append('|').append(TOKEN_COMMAND_STATE).append(encodeRecordText(record.cachedCommandState));
+            }
             if (!record.active) {
                 builder.append('|').append(TOKEN_ACTIVE).append('0');
             }
@@ -109,7 +113,17 @@ final class CommandLinkedNpcRecordStore {
                      String cachedDisplayName,
                      String cachedNameKey,
                      String cachedRoleId) {
-        return upsert(stack, npcUuid, position, homePosition, cachedDisplayName, cachedNameKey, cachedRoleId, null);
+        return upsert(
+                stack,
+                npcUuid,
+                position,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                null,
+                null
+        );
     }
 
     ItemStack upsert(ItemStack stack,
@@ -120,6 +134,28 @@ final class CommandLinkedNpcRecordStore {
                      String cachedNameKey,
                      String cachedRoleId,
                      Boolean activeOverride) {
+        return upsert(
+                stack,
+                npcUuid,
+                position,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                activeOverride,
+                null
+        );
+    }
+
+    ItemStack upsert(ItemStack stack,
+                     UUID npcUuid,
+                     Vector3d position,
+                     Vector3d homePosition,
+                     String cachedDisplayName,
+                     String cachedNameKey,
+                     String cachedRoleId,
+                     Boolean activeOverride,
+                     String cachedCommandState) {
         if (stack == null || stack.isEmpty() || npcUuid == null) {
             return stack;
         }
@@ -139,6 +175,7 @@ final class CommandLinkedNpcRecordStore {
             String mergedDisplayName = firstNonBlank(cachedDisplayName, record.cachedDisplayName);
             String mergedNameKey = firstNonBlank(cachedNameKey, record.cachedNameKey);
             String mergedRoleId = firstNonBlank(cachedRoleId, record.cachedRoleId);
+            String mergedCommandState = firstNonBlank(cachedCommandState, record.cachedCommandState);
             boolean mergedActive = activeOverride != null ? activeOverride : record.active;
             records.set(i, new LinkedNpcRecord(
                     npcUuid,
@@ -147,6 +184,7 @@ final class CommandLinkedNpcRecordStore {
                     mergedDisplayName,
                     mergedNameKey,
                     mergedRoleId,
+                    mergedCommandState,
                     mergedActive,
                     record.breedingEnabled,
                     record.groupId
@@ -162,6 +200,7 @@ final class CommandLinkedNpcRecordStore {
                     firstNonBlank(cachedDisplayName, null),
                     firstNonBlank(cachedNameKey, null),
                     firstNonBlank(cachedRoleId, null),
+                    firstNonBlank(cachedCommandState, null),
                     activeOverride == null || activeOverride,
                     false,
                     null
@@ -195,6 +234,7 @@ final class CommandLinkedNpcRecordStore {
                     record.cachedDisplayName,
                     record.cachedNameKey,
                     record.cachedRoleId,
+                    record.cachedCommandState,
                     active,
                     record.breedingEnabled,
                     record.groupId
@@ -230,6 +270,7 @@ final class CommandLinkedNpcRecordStore {
                     record.cachedDisplayName,
                     record.cachedNameKey,
                     record.cachedRoleId,
+                    record.cachedCommandState,
                     record.active,
                     breedingEnabled,
                     record.groupId
@@ -266,6 +307,7 @@ final class CommandLinkedNpcRecordStore {
                     record.cachedDisplayName,
                     record.cachedNameKey,
                     record.cachedRoleId,
+                    record.cachedCommandState,
                     record.active,
                     record.breedingEnabled,
                     normalizedGroupId
@@ -333,6 +375,7 @@ final class CommandLinkedNpcRecordStore {
         String cachedDisplayName = null;
         String cachedNameKey = null;
         String cachedRoleId = null;
+        String cachedCommandState = null;
         boolean active = true;
         boolean breedingEnabled = false;
         String groupId = null;
@@ -379,6 +422,10 @@ final class CommandLinkedNpcRecordStore {
                 cachedRoleId = decodeRecordText(token.substring(TOKEN_ROLE_ID.length()));
                 continue;
             }
+            if (token.startsWith(TOKEN_COMMAND_STATE)) {
+                cachedCommandState = decodeRecordText(token.substring(TOKEN_COMMAND_STATE.length()));
+                continue;
+            }
             if (token.startsWith(TOKEN_ACTIVE)) {
                 String flag = token.substring(TOKEN_ACTIVE.length()).trim();
                 active = !"0".equals(flag) && !"false".equalsIgnoreCase(flag);
@@ -400,6 +447,7 @@ final class CommandLinkedNpcRecordStore {
                 cachedDisplayName,
                 cachedNameKey,
                 cachedRoleId,
+                cachedCommandState,
                 active,
                 breedingEnabled,
                 groupId

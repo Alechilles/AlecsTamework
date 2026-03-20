@@ -16,6 +16,7 @@ final class LinkedNpcRecord {
     final String cachedDisplayName;
     final String cachedNameKey;
     final String cachedRoleId;
+    final String cachedCommandState;
     final boolean active;
     final boolean breedingEnabled;
     final String groupId;
@@ -33,6 +34,7 @@ final class LinkedNpcRecord {
                 cachedDisplayName,
                 cachedNameKey,
                 cachedRoleId,
+                null,
                 true,
                 false,
                 null
@@ -45,6 +47,7 @@ final class LinkedNpcRecord {
                     String cachedDisplayName,
                     String cachedNameKey,
                     String cachedRoleId,
+                    String cachedCommandState,
                     boolean active,
                     boolean breedingEnabled,
                     String groupId) {
@@ -54,6 +57,7 @@ final class LinkedNpcRecord {
         this.cachedDisplayName = (cachedDisplayName != null && !cachedDisplayName.isBlank()) ? cachedDisplayName : null;
         this.cachedNameKey = (cachedNameKey != null && !cachedNameKey.isBlank()) ? cachedNameKey : null;
         this.cachedRoleId = (cachedRoleId != null && !cachedRoleId.isBlank()) ? cachedRoleId : null;
+        this.cachedCommandState = (cachedCommandState != null && !cachedCommandState.isBlank()) ? cachedCommandState : null;
         this.active = active;
         this.breedingEnabled = breedingEnabled;
         this.groupId = (groupId != null && !groupId.isBlank()) ? groupId : null;

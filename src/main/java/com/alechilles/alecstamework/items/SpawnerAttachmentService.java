@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.codec.Codec;
@@ -68,7 +69,16 @@ final class SpawnerAttachmentService {
         }
 
         Map<String, String> applied = new HashMap<>(attachments);
-        Model updatedModel = Model.createScaledModel(modelAsset, model.getScale(), applied);
+        Model updatedModel = CompanionModelScaleService.createScaledModel(
+                npcRef,
+                store,
+                modelAsset,
+                model.getScale(),
+                applied
+        );
+        if (updatedModel == null) {
+            return;
+        }
         store.putComponent(npcRef, ModelComponent.getComponentType(), new ModelComponent(updatedModel));
         if (npc != null && npc.getRole() != null) {
             npc.getRole().updateMotionControllers(npcRef, updatedModel, updatedModel.getBoundingBox(), store);
