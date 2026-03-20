@@ -8,10 +8,11 @@
 - Linked companion panel/menu flows now recognize `LOST` companions, block recall/return-home while lost, and allow `Respawn` to perform strict recovery (replacement spawn + anti-dup stale-original suppression mapping).
 - Added role-scoped command travel settings under `TwCompanionConfig.Command.Travel`: `CrossWorldRecallEnabled`, `OnTransferFailure`, `FollowMasterOnWorldChange`, and `FollowMasterOnWorldChangeStateFilter`.
 - Added automatic companion travel relocation hooks for player world-entry and same-world teleport arrival events.
-### Fixed
-- Cross-world relocation now restores follow-capable command state on arrival from linked-record cached command state metadata.
-- World-change travel state filtering now evaluates cached command state instead of volatile runtime role state after teleport unloads.
-- Relocation finalization now retries when owner `MasterTarget` is temporarily unavailable, preventing transferred companions from arriving without follow binding.
+- Linked companion panel now supports nearby-only `Release` and `Cull` actions behind the existing confirm flow, with ownership/tamed gating for safety.
+- Added feed trough asset support (`Tw_Feed_Trough`) with staged food/water block variants, localized open/empty interaction prompts, and generated icon/model assets.
+- Added water-trough charge handling through `TameworkClearFeedTroughWater` and `FeedTroughWaterStateService`, including progressive water-state depletion and clear-to-base behavior.
+- Added bucket integration mappings so container/deco buckets can refill feed trough water variants to full state.
+- Companion needs hydration can now consume nearby feed trough water charges when available.
 
 ## 2.4.3 - Defense + Despawn Diagnostics - 2026-03-19
 ### Added
