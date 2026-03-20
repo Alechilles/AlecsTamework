@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
@@ -169,6 +170,13 @@ public final class CompanionNeedsEnvironmentService {
     boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
                         @Nullable Store<EntityStore> store,
                         @Nonnull TwNeedsConfig config) {
+        return isNearWater(npcRef, store, config, null);
+    }
+
+    boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
+                        @Nullable Store<EntityStore> store,
+                        @Nonnull TwNeedsConfig config,
+                        @Nullable Vector3d scanCenterOverride) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -188,9 +196,16 @@ public final class CompanionNeedsEnvironmentService {
         if (chunkStoreStore == null) {
             return false;
         }
-        int blockX = (int) Math.floor(transform.getPosition().x);
-        int blockY = (int) Math.floor(transform.getPosition().y);
-        int blockZ = (int) Math.floor(transform.getPosition().z);
+        Vector3d scanCenter = scanCenterOverride;
+        if (scanCenter == null
+                || !Double.isFinite(scanCenter.x)
+                || !Double.isFinite(scanCenter.y)
+                || !Double.isFinite(scanCenter.z)) {
+            scanCenter = transform.getPosition();
+        }
+        int blockX = (int) Math.floor(scanCenter.x);
+        int blockY = (int) Math.floor(scanCenter.y);
+        int blockZ = (int) Math.floor(scanCenter.z);
         int searchRadius = Math.max(1, (int) Math.ceil(radius));
         double radiusSq = radius * radius;
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
@@ -206,7 +221,7 @@ public final class CompanionNeedsEnvironmentService {
                     if (worldChunk == null) {
                         continue;
                     }
-                    if (worldChunk.getFluidId(x, y, z) != 0) {
+                    if (isConsumableWaterSourceAt(worldChunk, x, y, z)) {
                         return true;
                     }
                 }
@@ -283,7 +298,7 @@ public final class CompanionNeedsEnvironmentService {
                         continue;
                     }
                     WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk == null || worldChunk.getFluidId(x, y, z) == 0) {
+                    if (worldChunk == null || !isConsumableWaterSourceAt(worldChunk, x, y, z)) {
                         continue;
                     }
                     Vector3d standPosition = findNearestStandPositionAdjacentToBlock(
@@ -308,6 +323,91 @@ public final class CompanionNeedsEnvironmentService {
             }
         }
         return bestTarget;
+    }
+
+    boolean consumeNearbyWaterTroughCharge(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store,
+                                           @Nonnull TwNeedsConfig config) {
+        return consumeNearbyWaterTroughCharge(npcRef, store, config, null);
+    }
+
+    boolean consumeNearbyWaterTroughCharge(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store,
+                                           @Nonnull TwNeedsConfig config,
+                                           @Nullable Vector3d scanCenterOverride) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        World world = resolveWorld(store);
+        if (transform == null || world == null || world.getChunkStore() == null) {
+            return false;
+        }
+        TwNeedsConfig.PassiveRefillSettings passiveRefill = config.getPassiveRefill();
+        double radius = passiveRefill.getWaterConsumeRadius();
+        int verticalScanRadius = passiveRefill.getWaterVerticalScanRadius();
+        if (!Double.isFinite(radius) || radius <= 0.0) {
+            return false;
+        }
+        ChunkStore chunkStore = world.getChunkStore();
+        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
+        if (chunkStoreStore == null) {
+            return false;
+        }
+        Vector3d scanCenter = scanCenterOverride;
+        if (scanCenter == null
+                || !Double.isFinite(scanCenter.x)
+                || !Double.isFinite(scanCenter.y)
+                || !Double.isFinite(scanCenter.z)) {
+            scanCenter = transform.getPosition();
+        }
+        int blockX = (int) Math.floor(scanCenter.x);
+        int blockY = (int) Math.floor(scanCenter.y);
+        int blockZ = (int) Math.floor(scanCenter.z);
+        int searchRadius = Math.max(1, (int) Math.ceil(radius));
+        double radiusSq = radius * radius;
+        int bestX = 0;
+        int bestY = 0;
+        int bestZ = 0;
+        boolean found = false;
+        double bestDistanceSq = Double.POSITIVE_INFINITY;
+        Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        for (int y = blockY - verticalScanRadius; y <= blockY + verticalScanRadius; y++) {
+            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
+                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
+                    double dx = x - blockX;
+                    double dz = z - blockZ;
+                    if ((dx * dx) + (dz * dz) > radiusSq) {
+                        continue;
+                    }
+                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
+                    if (!isConsumableWaterTroughAt(worldChunk, x, y, z)) {
+                        continue;
+                    }
+                    double distanceSq = distanceSquaredToBlockCenter(scanCenter, x, y, z);
+                    if (!Double.isFinite(distanceSq) || distanceSq >= bestDistanceSq) {
+                        continue;
+                    }
+                    bestDistanceSq = distanceSq;
+                    bestX = x;
+                    bestY = y;
+                    bestZ = z;
+                    found = true;
+                }
+            }
+        }
+        if (!found) {
+            return false;
+        }
+        WorldChunk targetChunk = resolveWorldChunk(chunkStore, chunkStoreStore, bestX, bestZ, chunkCache);
+        if (targetChunk == null) {
+            return false;
+        }
+        BlockState blockState = targetChunk.getState(bestX, bestY, bestZ);
+        if (!(blockState instanceof ItemContainerState itemContainerState)) {
+            return false;
+        }
+        return FeedTroughWaterStateService.consumeSingleCharge(itemContainerState);
     }
 
     @Nullable
@@ -757,6 +857,34 @@ public final class CompanionNeedsEnvironmentService {
             return false;
         }
         return isSolidBlock(groundBlockId, groundFluid);
+    }
+
+    private static boolean isConsumableWaterSourceAt(@Nullable WorldChunk worldChunk,
+                                                     int blockX,
+                                                     int blockY,
+                                                     int blockZ) {
+        if (worldChunk == null) {
+            return false;
+        }
+        if (worldChunk.getFluidId(blockX, blockY, blockZ) != 0) {
+            return true;
+        }
+        return isConsumableWaterTroughAt(worldChunk, blockX, blockY, blockZ);
+    }
+
+    private static boolean isConsumableWaterTroughAt(@Nullable WorldChunk worldChunk,
+                                                     int blockX,
+                                                     int blockY,
+                                                     int blockZ) {
+        if (worldChunk == null) {
+            return false;
+        }
+        BlockState state = worldChunk.getState(blockX, blockY, blockZ);
+        if (!(state instanceof ItemContainerState containerState)) {
+            return false;
+        }
+        BlockType blockType = worldChunk.getBlockType(blockX, blockY, blockZ);
+        return FeedTroughWaterStateService.hasConsumableWater(containerState, blockType);
     }
 
     private static boolean isSolidBlock(int blockId, int fluidId) {

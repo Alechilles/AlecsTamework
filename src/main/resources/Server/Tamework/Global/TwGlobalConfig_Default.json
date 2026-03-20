@@ -21,6 +21,7 @@
   "AssetSets": {
     "TranquilizerShortbow": false,
     "TranquilizerArrow": false,
-    "TranquilizerPotion": false
+    "TranquilizerPotion": false,
+    "FeedTrough": false
   }
 }

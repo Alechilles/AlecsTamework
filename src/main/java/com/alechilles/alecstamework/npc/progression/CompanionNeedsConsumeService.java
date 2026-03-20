@@ -209,8 +209,24 @@ public final class CompanionNeedsConsumeService {
             if (!passiveRefill.isNearbyWaterDrinkEnabled()) {
                 NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "water_refill_disabled");
             } else {
-                boolean nearWater = mode == NeedsResourceConsumeMode.WATER
-                        || ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config);
+                boolean consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
+                        npcRef,
+                        store,
+                        config,
+                        consumeOriginOverride
+                );
+                if (!consumedTroughCharge && consumeOriginOverride != null) {
+                    consumedTroughCharge = ENVIRONMENT_SERVICE.consumeNearbyWaterTroughCharge(
+                            npcRef,
+                            store,
+                            config
+                    );
+                }
+                boolean nearWater = consumedTroughCharge
+                        || ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config, consumeOriginOverride);
+                if (!nearWater && consumeOriginOverride != null) {
+                    nearWater = ENVIRONMENT_SERVICE.isNearWater(npcRef, store, config);
+                }
                 if (nearWater) {
                     thirstGain = passiveRefill.getThirstGainPerSweepNearWater();
                 } else {

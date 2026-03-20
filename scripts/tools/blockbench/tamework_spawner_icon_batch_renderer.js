@@ -273,10 +273,17 @@
   }
 
   function showError(error) {
-    const message = error && error.message ? error.message : String(error);
-    Blockbench.showMessageBox({
-      title: "Spawner Icon Batch Renderer",
-      message
+    return new Promise((resolve) => {
+      const message = error && error.message ? error.message : String(error);
+      Blockbench.showMessageBox(
+        {
+          title: "Spawner Icon Batch Renderer",
+          message
+        },
+        () => {
+          resolve();
+        }
+      );
     });
   }
 
@@ -1464,16 +1471,9 @@
     return parsed;
   }
 
-  async function runWizardFlow() {
-    requireDesktopApp();
+  async function runWizardSubmission(formResult) {
     const path = getPathModule();
     const appRoot = path.resolve(".");
-
-    const formResult = await showWizardConfigDialog(getWizardDefaults());
-    if (!formResult) {
-      return;
-    }
-    rememberWizardValues(formResult);
 
     const modelPath = resolveUserPath(formResult.modelPath, appRoot);
     if (!modelPath) {
@@ -1603,6 +1603,24 @@
     });
   }
 
+  async function runWizardFlow() {
+    requireDesktopApp();
+    while (true) {
+      const formResult = await showWizardConfigDialog(getWizardDefaults());
+      if (!formResult) {
+        return;
+      }
+      rememberWizardValues(formResult);
+      try {
+        await runWizardSubmission(formResult);
+        return;
+      } catch (error) {
+        await showError(error);
+        console.error(`[${PLUGIN_ID}] Wizard submission failed`, error);
+      }
+    }
+  }
+
   function askYesNo(title, message, yesLabel, noLabel) {
     return new Promise((resolve) => {
       Blockbench.showMessageBox(
@@ -1680,7 +1698,7 @@
       }
       await runBatch(file.path);
     } catch (error) {
-      showError(error);
+      await showError(error);
       console.error(`[${PLUGIN_ID}]`, error);
     } finally {
       isRunning = false;
@@ -1696,7 +1714,7 @@
     try {
       await runWizardFlow();
     } catch (error) {
-      showError(error);
+      await showError(error);
       console.error(`[${PLUGIN_ID}]`, error);
     } finally {
       isRunning = false;

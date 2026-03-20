@@ -19,6 +19,8 @@ interactionHints.modeCycle=Press [{key}] to change modes
 interactionHints.custom=Press [{key}] to interact
 interactionHints.harvest=Press [{key}] to harvest
 interactionHints.harvestContext=Use item to harvest
+interactionHints.emptyTrough=Press [{key}] to empty Trough
+interactionHints.openTrough=Press [{key}] to open Trough
 
 # === Tamework Tranquilizer ===
 items.Weapon_Shortbow_Tranquilizer.name=Tranquilizer Shortbow

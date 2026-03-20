@@ -1,0 +1,1345 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Bench_Trough.name",
+    "Description": "server.items.Bench_Trough.description"
+  },
+  "Categories": [
+    "Furniture.Benches"
+  ],
+  "Recipe": {
+    "TimeSeconds": 1,
+    "KnowledgeRequired": false,
+    "Input": [
+      {
+        "Quantity": 10,
+        "ResourceTypeId": "Wood_All"
+      }
+    ],
+    "BenchRequirement": [
+      {
+        "Id": "Farmingbench",
+        "Type": "Crafting",
+        "Categories": [
+          "Farming"
+        ]
+      }
+    ]
+  },
+  "BlockType": {
+    "Material": "Solid",
+    "DrawType": "Model",
+    "Opacity": "Transparent",
+    "CustomModel": "Blocks/FeedTroughEmpty.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "Blocks/FeedTrough_Texture.png",
+        "Weight": 1
+      }
+    ],
+    "HitboxType": "Bench_Trough",
+    "VariantRotation": "NESW",
+    "Gathering": {
+      "Breaking": {
+        "GatherType": "Benches",
+        "ItemId": "Tw_Feed_Trough"
+      }
+    },
+    "BlockParticleSetId": "Wood",
+    "Support": {
+      "Down": [
+        {
+          "FaceType": "Full"
+        }
+      ]
+    },
+    "ParticleColor": "#815c39",
+    "BlockSoundSetId": "Wood",
+    "Interactions": {
+      "Primary": "Break_Container",
+      "Use": "Open_Container"
+    },
+    "InteractionHint": "server.interactionHints.openTrough",
+    "Flags": {
+      "IsUsable": true
+    },
+    "Supporting": {
+      "Up": [
+        {
+          "FaceType": "Full"
+        }
+      ]
+    },
+    "State": {
+      "Id": "container",
+      "Capacity": 5
+    }
+  },
+  "PlayerAnimationsId": "Block",
+  "IconProperties": {
+    "Scale": 0.43,
+    "Rotation": [
+      22.5,
+      45,
+      22.5
+    ],
+    "Translation": [
+      13.2,
+      -10.8
+    ]
+  },
+  "Icon": "Icons/ItemsGenerated/Tw_Feed_Trough.png",
+  "Tags": {
+    "Type": [
+      "Bench"
+    ]
+  },
+  "MaxStack": 10,
+  "ItemSoundSetId": "ISS_Blocks_Wood",
+  "State": {
+    "Water": {
+      "BlockType": {
+        "Material": "Solid",
+        "DrawType": "Model",
+        "Opacity": "Transparent",
+        "CustomModel": "Blocks/FeedTroughFull.blockymodel",
+        "CustomModelTexture": [
+          {
+            "Texture": "Blocks/FeedTroughWater90_Texture.png",
+            "Weight": 1
+          }
+        ],
+        "HitboxType": "Bench_Trough",
+        "VariantRotation": "NESW",
+        "Gathering": {
+          "Breaking": {
+            "GatherType": "Benches",
+            "ItemId": "Tw_Feed_Trough"
+          }
+        },
+        "BlockParticleSetId": "Wood",
+        "Support": {
+          "Down": [
+            {
+              "FaceType": "Full"
+            }
+          ]
+        },
+        "ParticleColor": "#815c39",
+        "BlockSoundSetId": "Wood",
+        "Interactions": {
+          "Primary": "Break_Container",
+          "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+        },
+        "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+          "IsUsable": false
+        },
+        "Supporting": {
+          "Up": [
+            {
+              "FaceType": "Full"
+            }
+          ]
+        },
+        "State": {
+          "Id": "container",
+          "Capacity": 1
+        }
+      },
+      "State": {
+        "Full": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTroughFull.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater90_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "90": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough90.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater90_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "80": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough80.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater75_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "70": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough70.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater75_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "60": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough60.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater50_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "50": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough50.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater50_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "40": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough40.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater50_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "30": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough30.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "20": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough20.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        },
+        "10": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough10.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughWater_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": {
+              "Interactions": [
+                {
+                  "Type": "TameworkClearFeedTroughWater",
+                  "RunTime": 0.0,
+                  "RequireEmptyHand": false
+                }
+              ]
+            }
+            },
+            "InteractionHint": "server.interactionHints.emptyTrough",
+            "Flags": {
+              "IsUsable": false
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 1
+            }
+          }
+        }
+      },
+      "Variant": true,
+      "Container": {
+        "GlobalFilter": "DenyAll",
+        "Capacity": 0
+      }
+    },
+    "Food": {
+      "BlockType": {
+        "Material": "Solid",
+        "DrawType": "Model",
+        "Opacity": "Transparent",
+        "CustomModel": "Blocks/FeedTroughFull.blockymodel",
+        "CustomModelTexture": [
+          {
+            "Texture": "Blocks/FeedTroughFeed_Texture.png",
+            "Weight": 1
+          }
+        ],
+        "HitboxType": "Bench_Trough",
+        "VariantRotation": "NESW",
+        "Gathering": {
+          "Breaking": {
+            "GatherType": "Benches",
+            "ItemId": "Tw_Feed_Trough"
+          }
+        },
+        "BlockParticleSetId": "Wood",
+        "Support": {
+          "Down": [
+            {
+              "FaceType": "Full"
+            }
+          ]
+        },
+        "ParticleColor": "#815c39",
+        "BlockSoundSetId": "Wood",
+        "Interactions": {
+          "Primary": "Break_Container",
+          "Use": "Open_Container"
+        },
+        "InteractionHint": "server.interactionHints.openTrough",
+        "Flags": {
+          "IsUsable": true
+        },
+        "Supporting": {
+          "Up": [
+            {
+              "FaceType": "Full"
+            }
+          ]
+        },
+        "State": {
+          "Id": "container",
+          "Capacity": 5
+        }
+      },
+      "State": {
+        "Full": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTroughFull.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "90": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough90.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "80": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough80.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "70": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough70.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "60": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough60.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "50": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough50.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "40": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough40.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "30": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough30.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "20": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough20.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        },
+        "10": {
+          "BlockType": {
+            "Material": "Solid",
+            "DrawType": "Model",
+            "Opacity": "Transparent",
+            "CustomModel": "Blocks/FeedTrough10.blockymodel",
+            "CustomModelTexture": [
+              {
+                "Texture": "Blocks/FeedTroughFeed_Texture.png",
+                "Weight": 1
+              }
+            ],
+            "HitboxType": "Bench_Trough",
+            "VariantRotation": "NESW",
+            "Gathering": {
+              "Breaking": {
+                "GatherType": "Benches",
+                "ItemId": "Tw_Feed_Trough"
+              }
+            },
+            "BlockParticleSetId": "Wood",
+            "Support": {
+              "Down": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "ParticleColor": "#815c39",
+            "BlockSoundSetId": "Wood",
+            "Interactions": {
+              "Primary": "Break_Container",
+              "Use": "Open_Container"
+            },
+            "InteractionHint": "server.interactionHints.openTrough",
+            "Flags": {
+              "IsUsable": true
+            },
+            "Supporting": {
+              "Up": [
+                {
+                  "FaceType": "Full"
+                }
+              ]
+            },
+            "State": {
+              "Id": "container",
+              "Capacity": 5
+            }
+          }
+        }
+      },
+      "Variant": true,
+      "Container": {
+        "Capacity": 5
+      }
+    }
+
+  },
+  "Variant": false,
+  "Container": {
+    "Capacity": 5
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -250,6 +250,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     section -> section.tranquilizerPotion
             )
             .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("FeedTrough", Codec.BOOLEAN),
+                    (section, value) -> section.feedTrough = value,
+                    section -> section.feedTrough
+            )
+            .add()
             .build();
 
     public static final AssetBuilderCodec<String, TwGlobalConfig> CODEC =
@@ -342,6 +348,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private boolean tranquilizerShortbowAssetSetEnabled;
     private boolean tranquilizerArrowAssetSetEnabled;
     private boolean tranquilizerPotionAssetSetEnabled;
+    private boolean feedTroughAssetSetEnabled;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -401,6 +408,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         boolean tranquilizerShortbowEnabled = false;
         boolean tranquilizerArrowEnabled = false;
         boolean tranquilizerPotionEnabled = false;
+        boolean feedTroughEnabled = false;
         for (TwGlobalConfig candidate : assetMap.getAssetMap().values()) {
             if (candidate == null || !candidate.isEnabled()) {
                 continue;
@@ -414,14 +422,21 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             if (candidate.isTranquilizerPotionAssetSetEnabled()) {
                 tranquilizerPotionEnabled = true;
             }
-            if (tranquilizerShortbowEnabled && tranquilizerArrowEnabled && tranquilizerPotionEnabled) {
+            if (candidate.isFeedTroughAssetSetEnabled()) {
+                feedTroughEnabled = true;
+            }
+            if (tranquilizerShortbowEnabled
+                    && tranquilizerArrowEnabled
+                    && tranquilizerPotionEnabled
+                    && feedTroughEnabled) {
                 break;
             }
         }
         return new AssetSetToggles(
                 tranquilizerShortbowEnabled,
                 tranquilizerArrowEnabled,
-                tranquilizerPotionEnabled
+                tranquilizerPotionEnabled,
+                feedTroughEnabled
         );
     }
 
@@ -638,6 +653,10 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return tranquilizerPotionAssetSetEnabled;
     }
 
+    public boolean isFeedTroughAssetSetEnabled() {
+        return feedTroughAssetSetEnabled;
+    }
+
     private void applyGeneralSection(@Nullable GeneralSection section) {
         if (section == null) {
             return;
@@ -820,6 +839,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.tranquilizerPotion != null) {
             tranquilizerPotionAssetSetEnabled = section.tranquilizerPotion;
         }
+        if (section.feedTrough != null) {
+            feedTroughAssetSetEnabled = section.feedTrough;
+        }
     }
 
     private AssetSetsSection toAssetSetsSection() {
@@ -827,6 +849,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.tranquilizerShortbow = tranquilizerShortbowAssetSetEnabled;
         section.tranquilizerArrow = tranquilizerArrowAssetSetEnabled;
         section.tranquilizerPotion = tranquilizerPotionAssetSetEnabled;
+        section.feedTrough = feedTroughAssetSetEnabled;
         return section;
     }
 
@@ -1032,6 +1055,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             tranquilizerShortbowAssetSetEnabled = parent.tranquilizerShortbowAssetSetEnabled;
             tranquilizerArrowAssetSetEnabled = parent.tranquilizerArrowAssetSetEnabled;
             tranquilizerPotionAssetSetEnabled = parent.tranquilizerPotionAssetSetEnabled;
+            feedTroughAssetSetEnabled = parent.feedTroughAssetSetEnabled;
             return;
         }
         Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
@@ -1048,6 +1072,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("TranquilizerPotion")) {
             tranquilizerPotionAssetSetEnabled = parent.tranquilizerPotionAssetSetEnabled;
+        }
+        if (!nestedExplicit.contains("FeedTrough")) {
+            feedTroughAssetSetEnabled = parent.feedTroughAssetSetEnabled;
         }
     }
 
@@ -1114,21 +1141,25 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Boolean tranquilizerShortbow;
         private Boolean tranquilizerArrow;
         private Boolean tranquilizerPotion;
+        private Boolean feedTrough;
     }
 
     public static final class AssetSetToggles {
-        private static final AssetSetToggles DISABLED = new AssetSetToggles(false, false, false);
+        private static final AssetSetToggles DISABLED = new AssetSetToggles(false, false, false, false);
 
         private final boolean tranquilizerShortbowEnabled;
         private final boolean tranquilizerArrowEnabled;
         private final boolean tranquilizerPotionEnabled;
+        private final boolean feedTroughEnabled;
 
         public AssetSetToggles(boolean tranquilizerShortbowEnabled,
                                boolean tranquilizerArrowEnabled,
-                               boolean tranquilizerPotionEnabled) {
+                               boolean tranquilizerPotionEnabled,
+                               boolean feedTroughEnabled) {
             this.tranquilizerShortbowEnabled = tranquilizerShortbowEnabled;
             this.tranquilizerArrowEnabled = tranquilizerArrowEnabled;
             this.tranquilizerPotionEnabled = tranquilizerPotionEnabled;
+            this.feedTroughEnabled = feedTroughEnabled;
         }
 
         public static AssetSetToggles disabled() {
@@ -1145,6 +1176,10 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
         public boolean isTranquilizerPotionEnabled() {
             return tranquilizerPotionEnabled;
+        }
+
+        public boolean isFeedTroughEnabled() {
+            return feedTroughEnabled;
         }
     }
 }

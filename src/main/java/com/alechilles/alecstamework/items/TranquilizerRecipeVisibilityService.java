@@ -14,13 +14,14 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Keeps tranquilizer recipes hidden unless their corresponding TwGlobalConfig asset-set gate is enabled.
+ * Keeps gated recipes hidden unless their corresponding TwGlobalConfig asset-set toggle is enabled.
  */
 public final class TranquilizerRecipeVisibilityService {
     private static final String ASSET_SOURCE_ID = "Hytale:Hytale";
     private static final String ITEM_TRANQUILIZER_SHORTBOW = "Weapon_Shortbow_Tranquilizer";
     private static final String ITEM_TRANQUILIZER_ARROW = "Weapon_Arrow_Tranquilizer";
     private static final String ITEM_TRANQUILIZER_POTION = "Potion_Tranquilizer";
+    private static final String ITEM_FEED_TROUGH = "Tw_Feed_Trough";
 
     private boolean reconciling;
 
@@ -74,6 +75,13 @@ public final class TranquilizerRecipeVisibilityService {
             addMissingGeneratedRecipesIfEnabled(
                     ITEM_TRANQUILIZER_POTION,
                     toggles.isTranquilizerPotionEnabled(),
+                    itemMap,
+                    recipeMap,
+                    recipesToRestore
+            );
+            addMissingGeneratedRecipesIfEnabled(
+                    ITEM_FEED_TROUGH,
+                    toggles.isFeedTroughEnabled(),
                     itemMap,
                     recipeMap,
                     recipesToRestore
@@ -134,6 +142,9 @@ public final class TranquilizerRecipeVisibilityService {
         }
         if (ITEM_TRANQUILIZER_POTION.equals(itemId)) {
             return toggles.isTranquilizerPotionEnabled();
+        }
+        if (ITEM_FEED_TROUGH.equals(itemId)) {
+            return toggles.isFeedTroughEnabled();
         }
         return true;
     }
