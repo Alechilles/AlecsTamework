@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.List;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Handles linked-NPC mutations and command-item linked-record persistence.
@@ -23,13 +24,23 @@ final class CommandLinkMutationService {
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandNpcNameResolver npcNameResolver;
+    @Nullable
+    private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
 
     CommandLinkMutationService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                CommandLinkPolicyService linkPolicyService,
                                CommandNpcNameResolver npcNameResolver) {
+        this(linkedNpcRecordStore, linkPolicyService, npcNameResolver, null);
+    }
+
+    CommandLinkMutationService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
+                               CommandLinkPolicyService linkPolicyService,
+                               CommandNpcNameResolver npcNameResolver,
+                               @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
         this.linkedNpcRecordStore = linkedNpcRecordStore != null ? linkedNpcRecordStore : new CommandLinkedNpcRecordStore();
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
         this.npcNameResolver = npcNameResolver != null ? npcNameResolver : new CommandNpcNameResolver();
+        this.stateSnapshotService = stateSnapshotService;
     }
 
     LinkToggleResult tryToggleLink(Player player,
@@ -82,6 +93,9 @@ final class CommandLinkMutationService {
             active = shouldActivateOnLink(config, workingItem);
         }
         store.putComponent(targetRef, TameworkCommandLinksComponent.getComponentType(), updated);
+        if (stateSnapshotService != null) {
+            stateSnapshotService.refreshFromEntity(targetRef, store);
+        }
         ItemStack updatedItem = workingItem;
         UUID npcUuid = npc.getUuid();
         if (npcUuid != null && updatedItem != null && !updatedItem.isEmpty()) {
@@ -189,6 +203,9 @@ final class CommandLinkMutationService {
                     null,
                     resolveCachedCommandState(candidate.npc)
             );
+            if (stateSnapshotService != null) {
+                stateSnapshotService.refreshFromEntity(candidate.ref, store);
+            }
         }
         return updated;
     }

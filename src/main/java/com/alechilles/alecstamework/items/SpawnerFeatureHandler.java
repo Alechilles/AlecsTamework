@@ -446,6 +446,7 @@ public final class SpawnerFeatureHandler {
                 .spawnerIconDefault(baseConfig.getSpawnerIconDefault())
                 .spawnerIconOverrides(baseConfig.getSpawnerIconOverrides())
                 .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
+                .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
                 .build();
     }
 
@@ -536,6 +537,7 @@ public final class SpawnerFeatureHandler {
         }
         updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
         updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
+        updated = captureMetadataService.applyTooltipDisplayNameMetadata(updated, captureInfo);
         if (worldStore != null) {
             updated = progressionMetadataService.applyNpcProgressionMetadata(updated, targetRef, worldStore);
         }

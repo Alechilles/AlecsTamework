@@ -38,6 +38,7 @@ public final class TameworkMetadataKeys {
     public static final String NPC_NAME_OWNER_UUID = "Tamework.NpcNameOwnerUuid";
     public static final String NPC_NAME_UPDATED_MS = "Tamework.NpcNameUpdatedMs";
     public static final String NPC_NAME_SOURCE = "Tamework.NpcNameSource";
+    public static final String CAPTURE_TOOLTIP_DISPLAY_NAME = "Tamework.CaptureTooltipDisplayName";
     public static final String CAPTURE_COOLDOWN_UNTIL = "Tamework.CaptureCooldownUntil";
     public static final String SPAWN_COOLDOWN_UNTIL = "Tamework.SpawnCooldownUntil";
     public static final String NAME_COOLDOWN_UNTIL = "Tamework.NameCooldownUntil";

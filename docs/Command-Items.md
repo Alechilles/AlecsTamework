@@ -102,7 +102,8 @@ Linked panel supports:
 - Breeding enable/disable row toggles (default: disabled)
 - Group assignment overlay per row
 - Group manager flow (create/rename/recolor/delete)
-- Per-row actions: `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready)
+- Status lanes for loaded/unloaded/dead/lost companions
+- Per-row actions: `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
 - Breeding cooldown ring/status and progression vitals/trait indicators
 
 ## Move/home/recall and off-screen relocation
@@ -116,6 +117,11 @@ Unloaded flow:
 - Source/destination chunks are requested asynchronously.
 - Retries run on bounded interval/time windows.
 - On-load relocation retries run via `CommandNpcRelocationOnLoadSystem`.
+
+Lost flow:
+- If relocation retry windows are exhausted, a linked companion can transition to `LOST`.
+- `Recall`/`Return Home` are blocked while `LOST`.
+- `Revive`/`Respawn` can perform strict recovery (replacement spawn + stale-original suppression mapping).
 
 Dead companions:
 - Death snapshots persist across relog/restart.

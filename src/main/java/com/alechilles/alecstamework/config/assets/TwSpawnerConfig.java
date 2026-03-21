@@ -86,6 +86,30 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         }
     };
 
+    private static final Codec<ItemFeatureConfig.SpawnerTooltipMode> TOOLTIP_MODE_CODEC = new Codec<>() {
+        @Override
+        public ItemFeatureConfig.SpawnerTooltipMode decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
+            if (Codec.isNullBsonValue(bsonValue)) {
+                return ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
+            }
+            String raw = Codec.STRING.decode(bsonValue, extraInfo);
+            return ItemFeatureConfig.SpawnerTooltipMode.fromString(raw);
+        }
+
+        @Override
+        public BsonValue encode(ItemFeatureConfig.SpawnerTooltipMode value, ExtraInfo extraInfo) {
+            ItemFeatureConfig.SpawnerTooltipMode mode =
+                    value != null ? value : ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
+            return Codec.STRING.encode(mode == ItemFeatureConfig.SpawnerTooltipMode.REPLACE ? "Replace" : "Additive", extraInfo);
+        }
+
+        @Nonnull
+        @Override
+        public Schema toSchema(@Nonnull SchemaContext context) {
+            return Codec.STRING.toSchema(context);
+        }
+    };
+
     private static final BuilderCodec<AllowedRoles> ALLOWED_ROLES_BASE_CODEC = BuilderCodec.abstractBuilder(
             AllowedRoles.class
         )
@@ -340,6 +364,14 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         )
         .documentation("Icon overrides keyed by role ID.")
         .add()
+        .<ItemFeatureConfig.SpawnerTooltipMode>append(
+            new KeyedCodec<>("TooltipMode", TOOLTIP_MODE_CODEC),
+            (asset, value) -> asset.tooltipMode =
+                    value == null ? ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE : value,
+            asset -> asset.tooltipMode
+        )
+        .documentation("Tooltip composition mode for DynamicTooltipsLib integrations (Additive or Replace).")
+        .add()
         .build();
 
     private static AssetStore<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> ASSET_STORE;
@@ -354,6 +386,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
     private String iconDefault;
     private SpawnerIconOverride[] iconOverrides = EMPTY_OVERRIDES;
     private Map<String, SpawnerIconOverride[]> iconOverridesByRole = Collections.emptyMap();
+    private ItemFeatureConfig.SpawnerTooltipMode tooltipMode = ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
     private CaptureSettings capture = new CaptureSettings();
     private SpawnSettings spawn = new SpawnSettings();
 
@@ -420,6 +453,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         if (!explicitTopLevelKeys.contains("Spawn")) spawn = parent.spawn;
         if (!explicitTopLevelKeys.contains("IconOverrides")) iconOverrides = parent.iconOverrides;
         if (!explicitTopLevelKeys.contains("IconOverridesByRole")) iconOverridesByRole = parent.iconOverridesByRole;
+        if (!explicitTopLevelKeys.contains("TooltipMode")) tooltipMode = parent.tooltipMode;
     }
 
     public String getEmptyItemId() {
@@ -464,6 +498,7 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             .spawnerIconDefault(iconDefault)
             .spawnerIconOverrides(toOverrides(iconOverrides))
             .spawnerIconOverridesByRole(toOverridesByRole(iconOverridesByRole))
+            .spawnerTooltipMode(tooltipMode)
             .build();
     }
 

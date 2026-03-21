@@ -1,15 +1,33 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -26,22 +44,33 @@ public final class CommandLinkedNpcLostService {
     private static final String VECTOR_SEPARATOR = ",";
 
     private final ConcurrentHashMap<UUID, LostLinkedNpcSnapshot> snapshotsByNpc = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> recoverySnapshotsByNpc =
+            new ConcurrentHashMap<>();
     private final Path persistencePath;
     private final Object persistenceLock = new Object();
     @Nullable
     private final HytaleLogger logger;
+    @Nullable
+    private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
 
     public CommandLinkedNpcLostService() {
-        this(null, null);
+        this(null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath) {
-        this(persistencePath, null);
+        this(persistencePath, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath, @Nullable HytaleLogger logger) {
+        this(persistencePath, logger, null);
+    }
+
+    public CommandLinkedNpcLostService(@Nullable Path persistencePath,
+                                       @Nullable HytaleLogger logger,
+                                       @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
         this.persistencePath = persistencePath != null ? persistencePath.toAbsolutePath().normalize() : null;
         this.logger = logger;
+        this.stateSnapshotService = stateSnapshotService;
         loadPersistedSnapshots();
     }
 
@@ -109,6 +138,13 @@ public final class CommandLinkedNpcLostService {
         if (npcUuid == null) {
             return;
         }
+        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot recoverySnapshot =
+                buildRecoverySnapshot(reference, store, npc);
+        if (recoverySnapshot != null) {
+            recoverySnapshotsByNpc.put(npcUuid, recoverySnapshot);
+        } else {
+            recoverySnapshotsByNpc.remove(npcUuid);
+        }
         LostLinkedNpcSnapshot snapshot = snapshotsByNpc.get(npcUuid);
         if (snapshot == null) {
             return;
@@ -131,6 +167,28 @@ public final class CommandLinkedNpcLostService {
         }
     }
 
+    public void onNpcRemoved(Ref<EntityStore> reference,
+                             RemoveReason reason,
+                             Store<EntityStore> store) {
+        if (reference == null || store == null) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        UUID npcUuid = npc != null ? npc.getUuid() : null;
+        if (npcUuid == null) {
+            return;
+        }
+        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot recoverySnapshot =
+                buildRecoverySnapshot(reference, store, npc);
+        if (recoverySnapshot != null) {
+            recoverySnapshotsByNpc.put(npcUuid, recoverySnapshot);
+            return;
+        }
+        if (reason == RemoveReason.REMOVE) {
+            recoverySnapshotsByNpc.remove(npcUuid);
+        }
+    }
+
     @Nullable
     public LostLinkedNpcSnapshot getLostSnapshot(UUID npcUuid) {
         if (npcUuid == null) {
@@ -145,6 +203,20 @@ public final class CommandLinkedNpcLostService {
 
     public boolean isLost(UUID npcUuid) {
         return getLostSnapshot(npcUuid) != null;
+    }
+
+    @Nullable
+    public CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot getRecoverySnapshot(UUID npcUuid) {
+        if (npcUuid == null) {
+            return null;
+        }
+        if (stateSnapshotService != null) {
+            CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot shared = stateSnapshotService.getSnapshot(npcUuid);
+            if (shared != null) {
+                return shared;
+            }
+        }
+        return recoverySnapshotsByNpc.get(npcUuid);
     }
 
     @Nullable
@@ -207,6 +279,10 @@ public final class CommandLinkedNpcLostService {
                         now
                 )
         );
+        if (stateSnapshotService != null) {
+            stateSnapshotService.clearSnapshot(originalNpcUuid);
+        }
+        recoverySnapshotsByNpc.remove(originalNpcUuid);
         persistSnapshots();
     }
 
@@ -388,6 +464,221 @@ public final class CommandLinkedNpcLostService {
             return second;
         }
         return third;
+    }
+
+    @Nullable
+    private CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot buildRecoverySnapshot(Ref<EntityStore> npcRef,
+                                                                                     Store<EntityStore> store,
+                                                                                     NPCEntity npc) {
+        if (npcRef == null || !npcRef.isValid() || store == null || npc == null || npc.getUuid() == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        TameworkCommandLinksComponent links = linksType != null ? store.getComponent(npcRef, linksType) : null;
+        if (links == null || links.getToolIds() == null || links.getToolIds().length == 0) {
+            return null;
+        }
+        String[] toolIds = sanitizeToolIds(links.getToolIds());
+        if (toolIds.length == 0) {
+            return null;
+        }
+
+        UUID ownerId = links.getOwnerId();
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        TameworkOwnerComponent ownerComponent = ownerType != null ? store.getComponent(npcRef, ownerType) : null;
+        if (ownerComponent != null && ownerComponent.getOwnerId() != null) {
+            ownerId = ownerComponent.getOwnerId();
+        }
+        String ownerName = ownerComponent != null ? ownerComponent.getOwnerName() : null;
+        boolean tamed = TamedStateResolver.isTamed(npcRef, store);
+
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        TameworkBreedingComponent breedingComponent = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
+        String breedingConfigId = breedingComponent != null ? breedingComponent.getConfigId() : null;
+        Double breedingHappiness = breedingComponent != null ? breedingComponent.getHappiness() : null;
+        boolean breedingEnabled = breedingComponent != null && breedingComponent.isEnabled();
+        long breedingCooldownUntilMs = breedingComponent != null ? breedingComponent.getCooldownUntilMs() : 0L;
+        UUID breedingLastPartnerUuid = breedingComponent != null ? breedingComponent.getLastPartnerUuid() : null;
+
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        TameworkHappinessComponent happinessComponent = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
+        String happinessConfigId = happinessComponent != null ? happinessComponent.getConfigId() : null;
+        Double happinessValue = null;
+        if (happinessComponent != null) {
+            happinessValue = happinessComponent.getValue();
+        } else if (breedingHappiness != null) {
+            happinessValue = breedingHappiness;
+        }
+        long happinessLastUpdateMs = happinessComponent != null
+                ? happinessComponent.getLastUpdateMs()
+                : breedingComponent != null
+                ? breedingComponent.getLastHappinessUpdateMs()
+                : 0L;
+
+        ComponentType<EntityStore, TameworkTraitsComponent> traitsType = TameworkTraitsComponent.getComponentType();
+        TameworkTraitsComponent traitsComponent = traitsType != null ? store.getComponent(npcRef, traitsType) : null;
+        String traitsConfigId = traitsComponent != null ? traitsComponent.getConfigId() : null;
+        long traitsRollSeed = traitsComponent != null ? traitsComponent.getRollSeed() : 0L;
+        String traitsValues = traitsComponent != null ? TraitValueCodec.encode(traitsComponent.getTraitValues()) : null;
+        if (traitsValues != null && traitsValues.isBlank()) {
+            traitsValues = null;
+        }
+
+        ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageType = TameworkLifeStageComponent.getComponentType();
+        TameworkLifeStageComponent lifeStageComponent = lifeStageType != null
+                ? store.getComponent(npcRef, lifeStageType)
+                : null;
+        String lifeStage = lifeStageComponent != null ? lifeStageComponent.getStage() : null;
+        long lifeStageBornAtMs = lifeStageComponent != null ? lifeStageComponent.getBornAtMs() : 0L;
+        long lifeStageAdolescentAtMs = lifeStageComponent != null ? lifeStageComponent.getAdolescentAtMs() : 0L;
+        long lifeStageAdultAtMs = lifeStageComponent != null ? lifeStageComponent.getAdultAtMs() : 0L;
+        long lifeStageFullyGrownAtMs = lifeStageComponent != null ? lifeStageComponent.getFullyGrownAtMs() : 0L;
+        double lifeStageBabyScale = lifeStageComponent != null ? lifeStageComponent.getBabyScale() : 0.55;
+        double lifeStageAdolescentScale = lifeStageComponent != null ? lifeStageComponent.getAdolescentScale() : 0.80;
+        double lifeStageAdolescentSwitchScale = lifeStageComponent != null
+                ? lifeStageComponent.getAdolescentSwitchScale()
+                : 0.80;
+        double lifeStageAdultStartScale = lifeStageComponent != null ? lifeStageComponent.getAdultStartScale() : 0.80;
+        double lifeStageAdultSwitchScale = lifeStageComponent != null ? lifeStageComponent.getAdultSwitchScale() : 1.00;
+        double lifeStageAdultScale = lifeStageComponent != null ? lifeStageComponent.getAdultScale() : 1.00;
+        boolean lifeStageGrowthScalingEnabled = lifeStageComponent != null
+                && lifeStageComponent.isGrowthScalingEnabled();
+
+        ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsType =
+                TameworkAttachmentsComponent.getComponentType();
+        TameworkAttachmentsComponent attachmentsComponent = attachmentsType != null
+                ? store.getComponent(npcRef, attachmentsType)
+                : null;
+        String attachmentsConfigId = attachmentsComponent != null ? attachmentsComponent.getConfigId() : null;
+        Map<String, String> attachmentSelections = attachmentsComponent != null
+                && attachmentsComponent.getAttachmentIds() != null
+                && !attachmentsComponent.getAttachmentIds().isEmpty()
+                ? attachmentsComponent.getAttachmentIds()
+                : CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
+        String attachmentsValues = CommandLinkedNpcDeathService.encodeAttachmentSelections(attachmentSelections);
+
+        TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
+        Vector3d homePosition = links.hasHome() ? links.getHomePosition() : null;
+        String roleId = resolveRoleId(npc);
+        String customName = resolveCustomName(npcRef, store);
+        String displayName = resolveDisplayName(npcRef, store, npc, roleId, customName);
+        long snapshotAtMs = System.currentTimeMillis();
+
+        return new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
+                npc.getUuid(),
+                ownerId,
+                ownerName,
+                toolIds,
+                roleId,
+                tamed,
+                customName,
+                displayName,
+                lastKnownPosition,
+                homePosition,
+                snapshotAtMs,
+                snapshotAtMs,
+                breedingConfigId,
+                breedingHappiness,
+                breedingCooldownUntilMs,
+                breedingLastPartnerUuid,
+                traitsConfigId,
+                traitsRollSeed,
+                traitsValues,
+                happinessConfigId,
+                happinessValue,
+                happinessLastUpdateMs,
+                lifeStage,
+                lifeStageBornAtMs,
+                lifeStageAdolescentAtMs,
+                lifeStageAdultAtMs,
+                lifeStageFullyGrownAtMs,
+                lifeStageBabyScale,
+                lifeStageAdolescentScale,
+                lifeStageAdolescentSwitchScale,
+                lifeStageAdultStartScale,
+                lifeStageAdultSwitchScale,
+                lifeStageAdultScale,
+                lifeStageGrowthScalingEnabled,
+                attachmentsConfigId,
+                attachmentsValues,
+                breedingEnabled
+        );
+    }
+
+    @Nullable
+    private String resolveRoleId(NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        String roleName = npc.getRoleName();
+        if (roleName != null && !roleName.isBlank()) {
+            return roleName;
+        }
+        int roleIndex = npc.getRoleIndex();
+        NPCPlugin plugin = NPCPlugin.get();
+        if (roleIndex >= 0 && plugin != null) {
+            String name = plugin.getName(roleIndex);
+            if (name != null && !name.isBlank()) {
+                return name;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private String resolveCustomName(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+        if (nameType == null) {
+            return null;
+        }
+        TameworkNpcNameComponent component = store.getComponent(npcRef, nameType);
+        if (component == null || component.getName() == null || component.getName().isBlank()) {
+            return null;
+        }
+        return component.getName();
+    }
+
+    private String resolveDisplayName(Ref<EntityStore> npcRef,
+                                      Store<EntityStore> store,
+                                      NPCEntity npc,
+                                      @Nullable String roleId,
+                                      @Nullable String customName) {
+        if (customName != null && !customName.isBlank()) {
+            return customName;
+        }
+        if (npcRef != null && npcRef.isValid() && store != null) {
+            DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
+            if (displayName != null && displayName.getDisplayName() != null) {
+                String ansi = displayName.getDisplayName().getAnsiMessage();
+                if (ansi != null && !ansi.isBlank()) {
+                    return ansi;
+                }
+            }
+        }
+        if (npc != null) {
+            String legacy = npc.getLegacyDisplayName();
+            if (legacy != null && !legacy.isBlank()) {
+                return legacy;
+            }
+        }
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
+        }
+        return "Lost companion";
+    }
+
+    private String[] sanitizeToolIds(@Nullable String[] toolIds) {
+        if (toolIds == null || toolIds.length == 0) {
+            return new String[0];
+        }
+        return Arrays.stream(toolIds)
+                .filter(value -> value != null && !value.isBlank())
+                .distinct()
+                .toArray(String[]::new);
     }
 
     /**

@@ -51,15 +51,23 @@ public final class CommandLinkedNpcDeathService {
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
     private final Path persistencePath;
     private final Object persistenceLock = new Object();
+    @Nullable
+    private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
 
     public CommandLinkedNpcDeathService() {
-        this(null);
+        this(null, null);
     }
 
     public CommandLinkedNpcDeathService(@Nullable Path persistencePath) {
+        this(persistencePath, null);
+    }
+
+    public CommandLinkedNpcDeathService(@Nullable Path persistencePath,
+                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
         this.persistencePath = persistencePath != null
                 ? persistencePath.toAbsolutePath().normalize()
                 : null;
+        this.stateSnapshotService = stateSnapshotService;
         loadPersistedSnapshots();
     }
 
@@ -97,6 +105,59 @@ public final class CommandLinkedNpcDeathService {
                 persistSnapshots();
             }
             return;
+        }
+        if (stateSnapshotService != null) {
+            stateSnapshotService.refreshFromEntity(reference, store);
+            DeadLinkedNpcSnapshot cached = stateSnapshotService.getSnapshot(npcUuid);
+            if (cached != null) {
+                String roleId = firstNonBlank(cached.roleId(), resolveRoleId(npc), null);
+                long diedAtMs = System.currentTimeMillis();
+                long respawnAvailableAtMs = diedAtMs + resolveRespawnCooldownMs(roleId);
+                deadByNpc.put(
+                        npcUuid,
+                        new DeadLinkedNpcSnapshot(
+                                npcUuid,
+                                cached.ownerId() != null ? cached.ownerId() : links.getOwnerId(),
+                                cached.ownerName(),
+                                sanitizeToolIds(links.getToolIds()),
+                                roleId,
+                                cached.tamed(),
+                                cached.customName(),
+                                firstNonBlank(cached.displayName(), roleId, "Dead companion"),
+                                copyVector(cached.lastKnownPosition()),
+                                links.hasHome() ? links.getHomePosition() : copyVector(cached.homePosition()),
+                                diedAtMs,
+                                respawnAvailableAtMs,
+                                cached.breedingConfigId(),
+                                cached.breedingHappiness(),
+                                cached.breedingCooldownUntilMs(),
+                                cached.breedingLastPartnerUuid(),
+                                cached.traitsConfigId(),
+                                cached.traitsRollSeed(),
+                                cached.traitsValues(),
+                                cached.happinessConfigId(),
+                                cached.happinessValue(),
+                                cached.happinessLastUpdateMs(),
+                                cached.lifeStage(),
+                                cached.lifeStageBornAtMs(),
+                                cached.lifeStageAdolescentAtMs(),
+                                cached.lifeStageAdultAtMs(),
+                                cached.lifeStageFullyGrownAtMs(),
+                                cached.lifeStageBabyScale(),
+                                cached.lifeStageAdolescentScale(),
+                                cached.lifeStageAdolescentSwitchScale(),
+                                cached.lifeStageAdultStartScale(),
+                                cached.lifeStageAdultSwitchScale(),
+                                cached.lifeStageAdultScale(),
+                                cached.lifeStageGrowthScalingEnabled(),
+                                cached.attachmentsConfigId(),
+                                cached.attachmentsValues(),
+                                cached.breedingEnabled()
+                        )
+                );
+                persistSnapshots();
+                return;
+            }
         }
 
         UUID ownerId = links.getOwnerId();
@@ -253,6 +314,9 @@ public final class CommandLinkedNpcDeathService {
     public void clearDeadSnapshot(UUID npcUuid) {
         if (npcUuid == null) {
             return;
+        }
+        if (stateSnapshotService != null) {
+            stateSnapshotService.clearSnapshot(npcUuid);
         }
         if (deadByNpc.remove(npcUuid) != null) {
             persistSnapshots();
@@ -764,6 +828,27 @@ public final class CommandLinkedNpcDeathService {
                 .filter(value -> value != null && !value.isBlank())
                 .distinct()
                 .toArray(String[]::new);
+    }
+
+    @Nullable
+    private Vector3d copyVector(@Nullable Vector3d vector) {
+        return vector != null ? new Vector3d(vector) : null;
+    }
+
+    @Nullable
+    private String firstNonBlank(@Nullable String first,
+                                 @Nullable String second,
+                                 @Nullable String third) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        if (third != null && !third.isBlank()) {
+            return third;
+        }
+        return null;
     }
 
     /**

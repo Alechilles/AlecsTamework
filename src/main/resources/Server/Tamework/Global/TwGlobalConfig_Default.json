@@ -5,7 +5,7 @@
   },
   "InteractionDefaults": {
     "InteractionConfigParam": "InteractionConfigId",
-    "LovedItemsParam": "LovedItems",
+    "LovedItemsParam": "AttractiveItemSet",
     "IsHarvestableParam": "IsHarvestable",
     "IsMountableParam": "IsMountable",
     "HarvestContextParam": "HarvestInteractionContext",

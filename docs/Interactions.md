@@ -75,6 +75,7 @@ Behavior:
 - Heals/consumes item.
 - Applies shared happiness gain (`TwHappinessConfig` or defaults) with trait scaling via `HappinessGainMultiplier`.
 - Applies manual needs refill rules from `TwNeedsConfig.ManualRefill` when configured.
+- Companion hydration can also consume feed trough water charges through needs/runtime systems; trough water states can be refilled via compatible bucket interactions.
 
 ### Harvest
 Common fields:

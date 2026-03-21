@@ -27,10 +27,13 @@ import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
+import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
+import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandTeleportArrivalRelocationSystem;
 import com.alechilles.alecstamework.items.CoopFeatureHandler;
@@ -112,8 +115,10 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
     private CommandLinkedNpcLostService commandLinkedNpcLostService;
+    private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
+    private SpawnerTooltipBridge spawnerTooltipBridge;
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
@@ -305,22 +310,26 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
+        commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService();
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
                 getDataDirectory().resolve("CommandLinkedNpcCaptures.dat")
         );
         commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
-                getDataDirectory().resolve("CommandLinkedNpcDeaths.dat")
+                getDataDirectory().resolve("CommandLinkedNpcDeaths.dat"),
+                commandLinkedNpcStateSnapshotService
         );
         commandLinkedNpcLostService = new CommandLinkedNpcLostService(
                 getDataDirectory().resolve("CommandLinkedNpcLost.dat"),
-                getLogger()
+                getLogger(),
+                commandLinkedNpcStateSnapshotService
         );
         commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
         getEntityStoreRegistry().registerSystem(
                 new CommandNpcRelocationOnLoadSystem(
                         commandNpcRelocationService,
                         commandLinkedNpcDeathService,
-                        commandLinkedNpcLostService
+                        commandLinkedNpcLostService,
+                        commandLinkedNpcStateSnapshotService
                 )
         );
         getChunkStoreRegistry().registerSystem(new FeedTroughFoodStateSyncSystem());
@@ -348,6 +357,11 @@ public class Tamework extends JavaPlugin {
         translationRegistry = new TranslationRegistry();
         int langLoaded = ModLanguageDiscovery.loadAll(translationRegistry, getLogger(), getDataDirectory());
         getLogger().at(Level.INFO).log("Tamework language entries loaded: " + langLoaded);
+        spawnerTooltipBridge = SpawnerTooltipBridgeLoader.initialize(
+                getLogger(),
+                itemFeatureRegistry,
+                translationRegistry
+        );
 
         // Core handler for capture/spawn flows.
         spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, commandLinkedNpcCaptureService);
@@ -359,7 +373,8 @@ public class Tamework extends JavaPlugin {
                 commandNpcRelocationService,
                 commandLinkedNpcDeathService,
                 commandLinkedNpcCaptureService,
-                commandLinkedNpcLostService
+                commandLinkedNpcLostService,
+                commandLinkedNpcStateSnapshotService
         );
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
@@ -428,6 +443,9 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (spawnerTooltipBridge != null) {
+            spawnerTooltipBridge.shutdown();
+        }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
 
@@ -491,6 +509,9 @@ public class Tamework extends JavaPlugin {
                         + loadedCommands
                         + (commandItemRegistry != null ? " (total: " + commandItemRegistry.snapshot().size() + ")" : "")
         );
+        if (spawnerTooltipBridge != null) {
+            spawnerTooltipBridge.refreshFromItemConfigReload();
+        }
         return loadedSpawner + loadedNaming + loadedCommands;
     }
 

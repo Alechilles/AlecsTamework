@@ -9,6 +9,10 @@
   let wizardAction = null;
   let isRunning = false;
   let wizardLastValues = null;
+  const compositedTextureCache = new Map();
+  const textureVisibilityCache = new Map();
+  const runDebugRows = [];
+  const JOB_TIMEOUT_MS = 45000;
 
   function requireDesktopApp() {
     if (typeof isApp !== "undefined" && !isApp) {
@@ -28,6 +32,13 @@
       return requireNativeModule("fs");
     }
     return require("fs");
+  }
+
+  function getBufferCtor() {
+    if (typeof Buffer !== "undefined") {
+      return Buffer;
+    }
+    return require("buffer").Buffer;
   }
 
   function asNumber(value, fallback) {
@@ -117,6 +128,82 @@
     return normalizePath(assetPath, commonRoot);
   }
 
+  function inferGameRootFromPath(anyPath) {
+    const raw = String(anyPath || "");
+    if (!raw) {
+      return null;
+    }
+    const path = getPathModule();
+    const sep = path.sep;
+    const lower = raw.toLowerCase();
+    const markers = [
+      `${sep}server${sep}mods${sep}`,
+      `${sep}server${sep}`,
+      `${sep}assets${sep}`,
+      `${sep}common${sep}`
+    ];
+    for (const marker of markers) {
+      const index = lower.indexOf(marker);
+      if (index !== -1) {
+        return raw.slice(0, index);
+      }
+    }
+    return null;
+  }
+
+  function buildAssetSearchRoots(modRoot, sourcePaths) {
+    const path = getPathModule();
+    const roots = [];
+    const seen = new Set();
+    const addRoot = (candidate) => {
+      if (!candidate || typeof candidate !== "string") {
+        return;
+      }
+      const normalized = path.normalize(candidate);
+      const key = normalized.toLowerCase();
+      if (seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      roots.push(normalized);
+    };
+
+    addRoot(path.join(modRoot, "Common"));
+    addRoot(path.join(modRoot, "Assets", "Common"));
+
+    (sourcePaths || []).forEach((entry) => {
+      const gameRoot = inferGameRootFromPath(entry);
+      if (!gameRoot) {
+        return;
+      }
+      addRoot(path.join(gameRoot, "Common"));
+      addRoot(path.join(gameRoot, "Assets", "Common"));
+    });
+
+    return roots;
+  }
+
+  function resolveAssetFileFromRoots(assetRoots, assetPath) {
+    if (!assetPath || typeof assetPath !== "string") {
+      return null;
+    }
+    const roots = Array.isArray(assetRoots) && assetRoots.length ? assetRoots : [];
+    let fallbackPath = null;
+    for (const root of roots) {
+      const candidate = normalizePath(assetPath, root);
+      if (!candidate) {
+        continue;
+      }
+      if (!fallbackPath) {
+        fallbackPath = candidate;
+      }
+      if (fileExists(candidate)) {
+        return candidate;
+      }
+    }
+    return fallbackPath;
+  }
+
   function inferModelName(modelPath) {
     const path = getPathModule();
     return path.basename(modelPath, path.extname(modelPath));
@@ -126,6 +213,69 @@
     const fs = getFsModule();
     ensureDirectory(path);
     fs.writeFileSync(path, JSON.stringify(payload, null, 2) + "\n", "utf8");
+  }
+
+  function getActiveProjectTexture() {
+    if (typeof Texture === "undefined" || !Array.isArray(Texture.all) || !Texture.all.length) {
+      return null;
+    }
+    return Texture.all.find((entry) => entry && entry.use_as_default) || Texture.all[0] || null;
+  }
+
+  function ensurePngFromDataUrl(dataUrl, jobsDir, label) {
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith("data:image/")) {
+      return null;
+    }
+    const comma = dataUrl.indexOf(",");
+    if (comma < 0) {
+      return null;
+    }
+    const base64 = dataUrl.slice(comma + 1);
+    if (!base64) {
+      return null;
+    }
+    const outDir = getPathModule().join(jobsDir, ".tmp", "bb_icon_texture_cache");
+    const hash = hashString(`${label || "texture"}:${base64.slice(0, 256)}:${base64.length}`);
+    const outPath = getPathModule().join(outDir, `${label || "texture"}_${hash}.png`);
+    if (fileExists(outPath)) {
+      return outPath;
+    }
+    ensureDirectory(outPath);
+    getFsModule().writeFileSync(outPath, getBufferCtor().from(base64, "base64"));
+    return outPath;
+  }
+
+  function resolveProjectTexturePath(jobsDir, label) {
+    const texture = getActiveProjectTexture();
+    if (!texture) {
+      return null;
+    }
+    if (texture.path && fileExists(texture.path)) {
+      return texture.path;
+    }
+    if (texture.source) {
+      const fromSource = ensurePngFromDataUrl(texture.source, jobsDir, label || "project_default");
+      if (fromSource) {
+        return fromSource;
+      }
+    }
+    if (texture.img && typeof texture.img.src === "string") {
+      const fromImg = ensurePngFromDataUrl(texture.img.src, jobsDir, label || "project_default");
+      if (fromImg) {
+        return fromImg;
+      }
+    }
+    if (texture.canvas && typeof texture.canvas.toDataURL === "function") {
+      const fromCanvas = ensurePngFromDataUrl(
+        texture.canvas.toDataURL("image/png"),
+        jobsDir,
+        label || "project_default"
+      );
+      if (fromCanvas) {
+        return fromCanvas;
+      }
+    }
+    return null;
   }
 
   function replaceFileExt(path, ext) {
@@ -168,9 +318,52 @@
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
   }
 
+  function normalizeForCompare(filePath) {
+    if (!filePath || typeof filePath !== "string") {
+      return "";
+    }
+    return getPathModule().normalize(filePath).toLowerCase();
+  }
+
+  function samePath(a, b) {
+    const na = normalizeForCompare(a);
+    const nb = normalizeForCompare(b);
+    return !!na && !!nb && na === nb;
+  }
+
   function waitFrame() {
     return new Promise((resolve) => {
       setTimeout(resolve, 0);
+    });
+  }
+
+  function withTimeout(promise, timeoutMs, label) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) {
+          return;
+        }
+        done = true;
+        reject(new Error(`Timed out after ${timeoutMs}ms while rendering ${label}.`));
+      }, timeoutMs);
+      Promise.resolve(promise)
+        .then((value) => {
+          if (done) {
+            return;
+          }
+          done = true;
+          clearTimeout(timer);
+          resolve(value);
+        })
+        .catch((error) => {
+          if (done) {
+            return;
+          }
+          done = true;
+          clearTimeout(timer);
+          reject(error);
+        });
     });
   }
 
@@ -273,18 +466,8 @@
   }
 
   function showError(error) {
-    return new Promise((resolve) => {
-      const message = error && error.message ? error.message : String(error);
-      Blockbench.showMessageBox(
-        {
-          title: "Spawner Icon Batch Renderer",
-          message
-        },
-        () => {
-          resolve();
-        }
-      );
-    });
+    const message = error && error.message ? error.message : String(error);
+    return showTextDialog("Spawner Icon Batch Renderer", message, 980);
   }
 
   function parseJobsPayload(payload) {
@@ -401,6 +584,10 @@
     const modelPath = config.modelPath;
     const modRoot = config.modRoot;
     const commonRoot = config.commonRoot;
+    const assetRoots =
+      Array.isArray(config.assetRoots) && config.assetRoots.length
+        ? config.assetRoots.slice()
+        : [commonRoot];
     const roles = config.roles;
     const setDefs = extractSetDefinitions(modelJson, config.includeEmptySets);
     const optionVisuals = extractOptionVisuals(modelJson);
@@ -474,8 +661,8 @@
             model: visual ? visual.model : null,
             texture: visual ? visual.texture : null,
             weight: visual ? visual.weight : null,
-            modelFile: resolveCommonAssetFile(commonRoot, visual ? visual.model : null),
-            textureFile: resolveCommonAssetFile(commonRoot, visual ? visual.texture : null)
+            modelFile: resolveAssetFileFromRoots(assetRoots, visual ? visual.model : null),
+            textureFile: resolveAssetFileFromRoots(assetRoots, visual ? visual.texture : null)
           });
         });
 
@@ -488,8 +675,8 @@
           setValues,
           baseModel,
           baseTexture,
-          baseModelFile: resolveCommonAssetFile(commonRoot, baseModel),
-          baseTextureFile: resolveCommonAssetFile(commonRoot, baseTexture),
+          baseModelFile: resolveAssetFileFromRoots(assetRoots, baseModel),
+          baseTextureFile: resolveAssetFileFromRoots(assetRoots, baseTexture),
           selectedOptionAssets,
           outputIcon: iconRel,
           outputIconFile: iconFile
@@ -538,8 +725,8 @@
         model: {
           baseModel,
           baseTexture,
-          baseModelFile: resolveCommonAssetFile(commonRoot, baseModel),
-          baseTextureFile: resolveCommonAssetFile(commonRoot, baseTexture)
+          baseModelFile: resolveAssetFileFromRoots(assetRoots, baseModel),
+          baseTextureFile: resolveAssetFileFromRoots(assetRoots, baseTexture)
         },
         jobCount: jobs.length,
         jobs
@@ -609,43 +796,84 @@
     }
   }
 
+  function isLikelyAttachmentModelPath(modelPath) {
+    if (!modelPath) {
+      return false;
+    }
+    const path = getPathModule();
+    const normalized = String(modelPath).toLowerCase().replace(/\//g, "\\");
+    const attachmentMarker = `\\attachments\\`;
+    if (normalized.includes(attachmentMarker)) {
+      return true;
+    }
+    const baseName = path.basename(modelPath).toLowerCase();
+    return baseName.includes("attachment");
+  }
+
+  function hasBaseOverrideHint(asset, modelPath) {
+    const path = getPathModule();
+    const baseName = modelPath ? path.basename(modelPath).toLowerCase() : "";
+    const setName = asset && typeof asset.set === "string" ? asset.set.toLowerCase() : "";
+    const optionName = asset && typeof asset.option === "string" ? asset.option.toLowerCase() : "";
+    const combined = `${setName} ${optionName} ${baseName}`;
+    return (
+      combined.includes("base") ||
+      combined.includes("basecolor") ||
+      combined.includes("base_color")
+    );
+  }
+
   function selectEffectiveBase(job, baseModelPath, baseTexturePath, jobsDir) {
     const assets = Array.isArray(job.selectedOptionAssets) ? job.selectedOptionAssets : [];
-    if (assets.length !== 1) {
-      return {
-        modelPath: baseModelPath,
-        texturePath: baseTexturePath,
-        consumedAssetIndex: -1
+    const normalizedBase = normalizeForCompare(baseModelPath);
+    let fallbackCandidate = null;
+    for (let i = 0; i < assets.length; i += 1) {
+      const asset = assets[i];
+      const modelPath = normalizePath(asset && asset.modelFile, jobsDir);
+      if (!modelPath) {
+        continue;
+      }
+      if (normalizeForCompare(modelPath) === normalizedBase) {
+        continue;
+      }
+      const baseHint = hasBaseOverrideHint(asset, modelPath);
+      if (isLikelyAttachmentModelPath(modelPath) && !baseHint) {
+        continue;
+      }
+      const texturePath = normalizePath(asset && asset.textureFile, jobsDir) || baseTexturePath;
+      const candidate = {
+        modelPath,
+        texturePath,
+        consumedAssetIndex: i
       };
+      if (baseHint) {
+        return candidate;
+      }
+      if (!fallbackCandidate) {
+        fallbackCandidate = candidate;
+      }
     }
-    const asset = assets[0];
-    const modelPath = normalizePath(asset && asset.modelFile, jobsDir);
-    const texturePath = normalizePath(asset && asset.textureFile, jobsDir) || baseTexturePath;
-    if (!modelPath || modelPath === baseModelPath) {
-      return {
-        modelPath: baseModelPath,
-        texturePath: baseTexturePath,
-        consumedAssetIndex: -1
-      };
-    }
-    const baseName = getPathModule().basename(modelPath).toLowerCase();
-    if (baseName.includes("attachment")) {
-      return {
-        modelPath: baseModelPath,
-        texturePath: baseTexturePath,
-        consumedAssetIndex: -1
-      };
+    if (fallbackCandidate) {
+      return fallbackCandidate;
     }
     return {
-      modelPath,
-      texturePath,
-      consumedAssetIndex: 0
+      modelPath: baseModelPath,
+      texturePath: baseTexturePath,
+      consumedAssetIndex: -1
     };
   }
 
-  async function applyAttachments(codec, job, jobsDir, baseModelPath, consumedAssetIndex) {
+  async function applyAttachments(
+    codec,
+    job,
+    jobsDir,
+    baseModelPath,
+    baseTexturePath,
+    consumedAssetIndex
+  ) {
     const assets = Array.isArray(job.selectedOptionAssets) ? job.selectedOptionAssets : [];
-    let baseTextureOverride = null;
+    const sameModelTextureLayers = [];
+    const skippedTransparentLayers = [];
     for (const asset of assets) {
       if (!asset || typeof asset !== "object") {
         continue;
@@ -658,9 +886,12 @@
         continue;
       }
       const texturePath = normalizePath(asset.textureFile, jobsDir);
-      if (modelPath === baseModelPath) {
-        if (texturePath) {
-          baseTextureOverride = texturePath;
+      if (samePath(modelPath, baseModelPath)) {
+        if (texturePath && fileExists(texturePath)) {
+          sameModelTextureLayers.push({
+            asset,
+            texturePath
+          });
         }
         continue;
       }
@@ -680,7 +911,114 @@
       buildAttachmentCollection(attachmentName, parseResult, modelPath, texturePath);
       await waitFrame();
     }
-    return baseTextureOverride;
+
+    const visibleSameModelTextureLayers = [];
+    for (const layer of sameModelTextureLayers) {
+      if (!layer || !layer.texturePath) {
+        continue;
+      }
+      const hasPixels = await textureHasVisiblePixels(layer.texturePath);
+      if (!hasPixels) {
+        skippedTransparentLayers.push({
+          set: layer.asset ? layer.asset.set : null,
+          option: layer.asset ? layer.asset.option : null,
+          texturePath: layer.texturePath
+        });
+        continue;
+      }
+      visibleSameModelTextureLayers.push(layer);
+    }
+
+    const jobDebug = {
+      id: typeof job.id === "string" ? job.id : job.comboSlug || "job",
+      baseModelPath: baseModelPath || null,
+      baseTexturePath: baseTexturePath || null,
+      selectedOptionAssets: assets.map((asset) => ({
+        set: asset && asset.set ? asset.set : null,
+        option: asset && asset.option ? asset.option : null,
+        modelFile: asset && asset.modelFile ? normalizePath(asset.modelFile, jobsDir) : null,
+        textureFile: asset && asset.textureFile ? normalizePath(asset.textureFile, jobsDir) : null
+      }))
+    };
+
+    const layeredBaseTextures = [];
+    const preferredBaseLayer = visibleSameModelTextureLayers.find((entry) => {
+      if (!entry || !entry.texturePath) {
+        return false;
+      }
+      const fileName = getPathModule().basename(entry.texturePath).toLowerCase();
+      return hasBaseOverrideHint(entry.asset, baseModelPath) && !fileName.includes("empty");
+    });
+
+    const existingBaseTexturePath =
+      baseTexturePath && fileExists(baseTexturePath) ? baseTexturePath : null;
+    const inferredProjectTexturePath = resolveProjectTexturePath(jobsDir, "project_default");
+    const foundationTexturePath = preferredBaseLayer
+      ? preferredBaseLayer.texturePath
+      : existingBaseTexturePath || inferredProjectTexturePath;
+
+    if (foundationTexturePath) {
+      layeredBaseTextures.push({
+        texturePath: foundationTexturePath,
+        mode: "source-over"
+      });
+    }
+    for (const layer of visibleSameModelTextureLayers) {
+      if (!layer || !layer.texturePath) {
+        continue;
+      }
+      if (preferredBaseLayer && samePath(layer.texturePath, preferredBaseLayer.texturePath)) {
+        continue;
+      }
+      layeredBaseTextures.push({
+        texturePath: layer.texturePath,
+        mode: "source-over"
+      });
+    }
+    if (!layeredBaseTextures.length) {
+      return null;
+    }
+    const deduped = [];
+    const seen = new Set();
+    for (const layer of layeredBaseTextures) {
+      const texturePath = layer && typeof layer.texturePath === "string" ? layer.texturePath : "";
+      const mode = layer && typeof layer.mode === "string" ? layer.mode : "source-over";
+      const key = `${normalizeForCompare(texturePath)}@${mode}`;
+      if (!key || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      deduped.push({
+        texturePath,
+        mode
+      });
+    }
+    const composedTexturePath = await composeTexturesToPath(deduped, jobsDir);
+    jobDebug.sameModelTextureLayers = sameModelTextureLayers.map((entry) => ({
+      set: entry && entry.asset ? entry.asset.set : null,
+      option: entry && entry.asset ? entry.asset.option : null,
+      texturePath: entry ? entry.texturePath : null
+    }));
+    jobDebug.visibleSameModelTextureLayers = visibleSameModelTextureLayers.map((entry) => ({
+      set: entry && entry.asset ? entry.asset.set : null,
+      option: entry && entry.asset ? entry.asset.option : null,
+      texturePath: entry ? entry.texturePath : null
+    }));
+    jobDebug.skippedTransparentLayers = skippedTransparentLayers;
+    jobDebug.preferredBaseLayer = preferredBaseLayer
+      ? {
+          set: preferredBaseLayer.asset ? preferredBaseLayer.asset.set : null,
+          option: preferredBaseLayer.asset ? preferredBaseLayer.asset.option : null,
+          texturePath: preferredBaseLayer.texturePath
+        }
+      : null;
+    jobDebug.foundationTexturePath = foundationTexturePath || null;
+    jobDebug.existingBaseTexturePath = existingBaseTexturePath;
+    jobDebug.inferredProjectTexturePath = inferredProjectTexturePath;
+    jobDebug.compositeLayers = deduped.slice();
+    jobDebug.compositedTexturePath = composedTexturePath || null;
+    runDebugRows.push(jobDebug);
+    return composedTexturePath;
   }
 
   function choosePreview() {
@@ -705,6 +1043,8 @@
       (job && job.camera && job.camera.scale) || cameraDefaults.scale,
       1.0
     );
+    let desiredDistance = null;
+    let focusSize = null;
 
     if (
       typeof DefaultCameraPresets !== "undefined" &&
@@ -751,7 +1091,7 @@
         typeof Canvas !== "undefined" && typeof Canvas.getModelSize === "function"
           ? Canvas.getModelSize()
           : [2, 2, 2];
-      const focusSize = Math.max(
+      focusSize = Math.max(
         asNumber(modelSize && modelSize[0], 0),
         asNumber(modelSize && modelSize[1], 0) * 2,
         asNumber(modelSize && modelSize[2], 0),
@@ -762,8 +1102,22 @@
           ? preview.camera.position.length()
           : 1;
       const safeDistance = Math.max(currentDistance, 0.001);
-      const desiredDistance = (focusSize * 1.2) / Math.max(scale, 0.001);
+      desiredDistance = (focusSize * 1.2) / Math.max(scale, 0.001);
       preview.camera.position.multiplyScalar(desiredDistance / safeDistance);
+    }
+
+    // Tighten depth range to reduce precision artifacts (z-fighting) in Blockbench preview.
+    if (
+      preview.camera &&
+      typeof preview.camera === "object" &&
+      Number.isFinite(desiredDistance) &&
+      Number.isFinite(focusSize)
+    ) {
+      const modelRadius = Math.max(0.5, focusSize * 0.9);
+      const near = Math.max(0.02, desiredDistance - modelRadius * 1.6);
+      const far = Math.max(near + 4, desiredDistance + modelRadius * 2.2);
+      preview.camera.near = near;
+      preview.camera.far = far;
     }
 
     if (preview.controls && typeof preview.controls.update === "function") {
@@ -805,6 +1159,132 @@
       image.onerror = () => reject(new Error("Failed to decode screenshot image."));
       image.src = dataUrl;
     });
+  }
+
+  function filePathToDataUrl(filePath) {
+    const fs = getFsModule();
+    const ext = getPathModule().extname(filePath).toLowerCase();
+    const mime = ext === ".png" ? "image/png" : "application/octet-stream";
+    const bytes = fs.readFileSync(filePath);
+    return `data:${mime};base64,${getBufferCtor().from(bytes).toString("base64")}`;
+  }
+
+  async function textureHasVisiblePixels(texturePath) {
+    const key = normalizeForCompare(texturePath);
+    if (!key) {
+      return false;
+    }
+    if (textureVisibilityCache.has(key)) {
+      return textureVisibilityCache.get(key);
+    }
+    if (!fileExists(texturePath)) {
+      textureVisibilityCache.set(key, false);
+      return false;
+    }
+    try {
+      const dataUrl = filePathToDataUrl(texturePath);
+      const image = await loadImage(dataUrl);
+      const width = Math.max(1, image.width || 1);
+      const height = Math.max(1, image.height || 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, width, height);
+      ctx.drawImage(image, 0, 0, width, height);
+      const pixelData = ctx.getImageData(0, 0, width, height).data;
+      for (let i = 3; i < pixelData.length; i += 4) {
+        if (pixelData[i] !== 0) {
+          textureVisibilityCache.set(key, true);
+          return true;
+        }
+      }
+      textureVisibilityCache.set(key, false);
+      return false;
+    } catch (_error) {
+      // Keep unknown textures instead of accidentally stripping valid layers.
+      textureVisibilityCache.set(key, true);
+      return true;
+    }
+  }
+
+  function hashString(input) {
+    const raw = String(input || "");
+    let hash = 2166136261;
+    for (let i = 0; i < raw.length; i += 1) {
+      hash ^= raw.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16);
+  }
+
+  async function composeTexturesToPath(textureLayers, jobsDir) {
+    const normalized = [];
+    for (const entry of textureLayers || []) {
+      let texturePath = null;
+      let mode = "source-over";
+      if (typeof entry === "string") {
+        texturePath = entry;
+      } else if (entry && typeof entry === "object") {
+        texturePath = typeof entry.texturePath === "string" ? entry.texturePath : null;
+        mode = typeof entry.mode === "string" && entry.mode.trim().length ? entry.mode.trim() : "source-over";
+      }
+      if (!texturePath) {
+        continue;
+      }
+      const trimmed = texturePath.trim();
+      if (!trimmed || !fileExists(trimmed)) {
+        continue;
+      }
+      normalized.push({
+        texturePath: trimmed,
+        mode
+      });
+    }
+    if (!normalized.length) {
+      return null;
+    }
+    if (normalized.length === 1 && normalized[0].mode === "source-over") {
+      return normalized[0].texturePath;
+    }
+    const cacheKey = normalized
+      .map((entry) => `${normalizeForCompare(entry.texturePath)}@${entry.mode}`)
+      .join("|");
+    if (compositedTextureCache.has(cacheKey)) {
+      return compositedTextureCache.get(cacheKey);
+    }
+    const images = [];
+    for (const layer of normalized) {
+      const dataUrl = filePathToDataUrl(layer.texturePath);
+      const image = await loadImage(dataUrl);
+      images.push({
+        image,
+        mode: layer.mode
+      });
+    }
+    const width = Math.max(1, images[0].image.width || 1);
+    const height = Math.max(1, images[0].image.height || 1);
+    const canvas = document.createElement("canvas");
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, width, height);
+    for (const layer of images) {
+      ctx.globalCompositeOperation = layer.mode || "source-over";
+      ctx.drawImage(layer.image, 0, 0, width, height);
+    }
+    ctx.globalCompositeOperation = "source-over";
+    const dataUrl = canvas.toDataURL("image/png");
+    const base64 = dataUrl.split(",")[1];
+    if (!base64) {
+      throw new Error("Failed to compose layered texture.");
+    }
+    const outDir = getPathModule().join(jobsDir, ".tmp", "bb_icon_texture_cache");
+    const outPath = getPathModule().join(outDir, `${hashString(cacheKey)}.png`);
+    ensureDirectory(outPath);
+    getFsModule().writeFileSync(outPath, getBufferCtor().from(base64, "base64"));
+    compositedTextureCache.set(cacheKey, outPath);
+    return outPath;
   }
 
   async function applyScreenTranslation(dataUrl, iconSize, translation) {
@@ -909,6 +1389,7 @@
       job,
       jobsDir,
       effectiveBase.modelPath,
+      effectiveBase.texturePath,
       effectiveBase.consumedAssetIndex
     );
     if (baseTextureOverride) {
@@ -940,14 +1421,42 @@
     const total = payload.jobs.length;
     const defaults = payload.defaults && typeof payload.defaults === "object" ? payload.defaults : {};
     const failures = [];
+    runDebugRows.length = 0;
+    textureVisibilityCache.clear();
+    compositedTextureCache.clear();
     const startedAt = Date.now();
+    const debugFilePath = getPathModule().join(jobsDir, ".tmp", "spawner_icon_debug_last_run.json");
+
+    const writeRunDebug = (extra) => {
+      writeJson(debugFilePath, Object.assign(
+        {
+          schema: "tamework.spawner-icon-debug.v1",
+          generatedAtUtc: new Date().toISOString(),
+          status: "running",
+          jobsDir,
+          totalJobs: total,
+          completedJobs: runDebugRows.length,
+          failureCount: failures.length,
+          failures,
+          jobs: runDebugRows
+        },
+        extra || {}
+      ));
+    };
+
+    writeRunDebug({ status: "running", currentJobIndex: 0, currentJobId: null });
 
     for (let i = 0; i < total; i += 1) {
       const job = payload.jobs[i];
       const label = typeof job.id === "string" ? job.id : `job-${i + 1}`;
       Blockbench.setProgress((i + 1) / total);
+      writeRunDebug({ status: "running", currentJobIndex: i + 1, currentJobId: label });
       try {
-        await renderSingleJob(codec, defaults, job, jobsDir);
+        await withTimeout(
+          renderSingleJob(codec, defaults, job, jobsDir),
+          JOB_TIMEOUT_MS,
+          label
+        );
       } catch (error) {
         failures.push({
           index: i + 1,
@@ -956,27 +1465,51 @@
         });
         console.error(`[${PLUGIN_ID}] Failed ${label}`, error);
       }
+      writeRunDebug({ status: "running", currentJobIndex: i + 1, currentJobId: label });
     }
 
     Blockbench.setProgress();
     const elapsedSec = ((Date.now() - startedAt) / 1000).toFixed(1);
     const successCount = total - failures.length;
+    writeRunDebug({
+      status: "completed",
+      elapsedSec,
+      successCount,
+      failureCount: failures.length,
+      currentJobIndex: total,
+      currentJobId: null
+    });
     return {
       total,
       successCount,
       failures,
-      elapsedSec
+      elapsedSec,
+      debugFilePath
     };
   }
 
   function buildRunSummaryText(summary) {
     let message = `Completed ${summary.successCount}/${summary.total} render jobs in ${summary.elapsedSec}s.`;
     if (summary.failures.length) {
+      const abbreviate = (raw) => {
+        const singleLine = String(raw || "").replace(/\s+/g, " ").trim();
+        if (singleLine.length <= 180) {
+          return singleLine;
+        }
+        return `${singleLine.slice(0, 177)}...`;
+      };
+      const sampleLimit = 4;
       const sample = summary.failures
-        .slice(0, 8)
-        .map((entry) => `#${entry.index} ${entry.id}: ${entry.message}`)
+        .slice(0, sampleLimit)
+        .map((entry) => `#${entry.index} ${entry.id}: ${abbreviate(entry.message)}`)
         .join("\n");
       message += `\n\nFailures: ${summary.failures.length}\n${sample}`;
+      if (summary.failures.length > sampleLimit) {
+        message += `\n...and ${summary.failures.length - sampleLimit} more`;
+      }
+    }
+    if (summary.debugFilePath) {
+      message += `\n\nDebug log:\n${summary.debugFilePath}`;
     }
     return message;
   }
@@ -986,10 +1519,7 @@
     const jobsDir = path.dirname(jobsFilePath);
     const payload = parseJobsPayload(readJsonFromDisk(jobsFilePath));
     const summary = await runBatchPayload(payload, jobsDir);
-    Blockbench.showMessageBox({
-      title: "Spawner Icon Batch Renderer",
-      message: buildRunSummaryText(summary)
-    });
+    await showTextDialog("Spawner Icon Batch Renderer", buildRunSummaryText(summary), 980);
     return summary;
   }
 
@@ -1181,7 +1711,82 @@
         grid-template-columns: 1fr 1fr 1fr;
         gap: 10px;
       }
+      .tw-message-wrap {
+        max-height: 70vh;
+        overflow: auto;
+        background: #1b212c;
+        border: 1px solid #3a4458;
+        border-radius: 8px;
+        padding: 12px;
+      }
+      .tw-message-text {
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        line-height: 1.45;
+        font-size: 13px;
+        color: #e8eefc;
+      }
     `;
+  }
+
+  function showTextDialog(title, message, width) {
+    return new Promise((resolve) => {
+      const text = typeof message === "string" ? message : String(message || "");
+      if (typeof Dialog === "undefined") {
+        Blockbench.showMessageBox(
+          {
+            title,
+            message: text
+          },
+          () => resolve()
+        );
+        return;
+      }
+      ensureWizardDialogStyle();
+      const dialogId = `tw_spawner_msg_${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
+      let dialog = null;
+      const finish = () => {
+        try {
+          if (dialog) {
+            dialog.hide();
+          }
+        } catch (_error) {}
+        try {
+          if (dialog && typeof dialog.delete === "function") {
+            dialog.delete();
+          }
+        } catch (_error) {}
+        resolve();
+      };
+      dialog = new Dialog({
+        id: dialogId,
+        title: title || "Message",
+        width: Math.max(720, Math.floor(asNumber(width, 960))),
+        buttons: ["OK"],
+        confirmIndex: 0,
+        cancelIndex: 0,
+        component: {
+          data() {
+            return {
+              text
+            };
+          },
+          template: `
+            <div class="tw-message-wrap">
+              <div class="tw-message-text">{{ text }}</div>
+            </div>
+          `
+        },
+        onConfirm() {
+          finish();
+        },
+        onCancel() {
+          finish();
+        }
+      });
+      dialog.show();
+    });
   }
 
   function deriveWizardPathsFromModel(modelPath) {
@@ -1505,6 +2110,7 @@
         throw new Error(`Spawner JSON is invalid: ${spawnerPath}`);
       }
     }
+    const assetRoots = buildAssetSearchRoots(modRoot, [modelPath, spawnerPath].filter(Boolean));
 
     const discoveredRoles = spawnerJson ? discoverRolesFromSpawner(spawnerJson) : [];
     const typedRoles = parseCsv(formResult.rolesCsv);
@@ -1518,10 +2124,7 @@
     }
 
     const setDefs = extractSetDefinitions(modelJson, []);
-    const primarySet = setDefs.length === 1 ? setDefs[0] : null;
-    const defaultFilenameTemplate = primarySet
-      ? `${modelName}_{role}_{${safeKey(primarySet.name)}}.png`
-      : `${modelName}_{role}_{combo_slug}.png`;
+    const defaultFilenameTemplate = `${modelName}_{combo_slug}.png`;
 
     const iconRelDir = normalizeRelDir(
       formResult.iconRelDir,
@@ -1550,6 +2153,7 @@
       modRoot,
       commonRoot,
       roles,
+      assetRoots,
       includeEmptySets,
       emptyValueToken,
       iconRelDir,
@@ -1559,6 +2163,22 @@
       cameraRotation,
       cameraTranslation
     });
+    const resolvedBaseModelFile = generated.jobsPayload
+      && generated.jobsPayload.model
+      ? generated.jobsPayload.model.baseModelFile
+      : null;
+    if (!resolvedBaseModelFile || !fileExists(resolvedBaseModelFile)) {
+      const declaredModel = generated.jobsPayload && generated.jobsPayload.model
+        ? generated.jobsPayload.model.baseModel
+        : null;
+      const rootsList = assetRoots.length ? assetRoots.map((root) => `- ${root}`).join("\n") : "- (none)";
+      throw new Error(
+        "Base model file not found.\n"
+        + `ModelAsset.Model: ${declaredModel || "(missing)"}\n`
+        + "Searched roots:\n"
+        + rootsList
+      );
+    }
 
     let jobsOutPath = null;
     let manifestOutPath = null;
@@ -1597,10 +2217,7 @@
       if (manifestOutPath) message += `\n- Manifest: ${manifestOutPath}`;
       if (spawnerOutPath) message += `\n- Spawner: ${spawnerOutPath}`;
     }
-    Blockbench.showMessageBox({
-      title: "Spawner Icon Wizard",
-      message
-    });
+    await showTextDialog("Spawner Icon Wizard", message, 980);
   }
 
   async function runWizardFlow() {

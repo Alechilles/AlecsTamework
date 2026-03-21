@@ -1,0 +1,115 @@
+{
+  "Type": "Component",
+  "Class": "Instruction",
+  "$TODO": "This should in future validate that either the WakeupSensor or DayTimePeriod are passed.",
+  "Parameters": {
+    "_ImportStates": [ "OnDamageWithTarget", "OnDamageNoTarget", "OnProximity", "OnWakeUp" ],
+    "CanHear": {
+      "Value": true,
+      "Description": "Whether the NPC can hear"
+    },
+    "HearingRange": {
+      "Value": 8,
+      "Description": "Hearing range"
+    },
+    "AlertedRange": {
+      "Value": 30,
+      "Description": "A range within which the player can be seen/sensed when the NPC is alerted to their presence"
+    },
+    "ReactToNPCs": {
+      "Value": true,
+      "Description": "Whether or not to react to other NPCs"
+    },
+    "Attitudes": {
+      "Value": [ "Hostile", "Revered", "Friendly", "Neutral" ],
+      "Description": "A prioritised list of attitudes to respond to"
+    },
+    "WakeupSensor": {
+      "Value": "Component_Sensor_Day",
+      "Description": "The sensor component to use to determine when to wake up. Will be ignored if left default and DayTimePeriod is set."
+    },
+    "DayTimePeriod": {
+      "Value": [ 6.01, 17.99 ],
+      "TypeHint": "Number",
+      "Description": "The hour range considered to be daytime for this NPC."
+    },
+    "SleepAnimation": {
+      "Value": "Sleep",
+      "Description": "Sleep-loop animation while sleeping. Set empty to skip animation playback."
+    }
+  },
+  "Content": {
+    "Instructions": [
+      {
+        "Reference": "Component_Instruction_Damage_Check",
+        "Modify": {
+          "_ExportStates": [ "OnDamageWithTarget", "OnDamageNoTarget" ],
+          "AlertedRange": { "Compute": "AlertedRange" }
+        }
+      },
+      {
+        "Sensor": {
+          "Type": "Damage",
+          "Combat": false,
+          "Environment": true,
+          "Drowning": true,
+          "Other": true
+        },
+        "Actions": [
+          {
+            "Type": "ParentState",
+            "State": "OnDamageNoTarget"
+          }
+        ]
+      },
+      {
+        "Enabled": { "Compute": "!isEmpty(SleepAnimation)" },
+        "Reference": "Component_Instruction_Play_Animation",
+        "Modify": {
+          "Animation": { "Compute": "SleepAnimation" }
+        }
+      },
+      {
+        "Sensor": {
+          "Reference": "Component_Sensor_Sound_By_Attitude",
+          "Modify": {
+            "Enabled": { "Compute": "CanHear" },
+            "HearingRange": { "Compute": "HearingRange" },
+            "GetNPCs": { "Compute": "ReactToNPCs" },
+            "Attitudes": { "Compute": "Attitudes" }
+          }
+        },
+        "Actions": [
+          {
+            "Type": "ParentState",
+            "State": "OnProximity"
+          }
+        ]
+      },
+      {
+        "Sensor": {
+          "Reference": { "Compute": "WakeupSensor" },
+          "Interfaces": [ "Hytale.Component.Sensor.Time", "Hytale.Component.Sensor.WakeUp" ],
+          "Modify": {
+            "_InterfaceParameters": {
+              "Hytale.Component.Sensor.Time": {
+                "Period": { "Compute": "DayTimePeriod" }
+              }
+            }
+          }
+        },
+        "ActionsBlocking": true,
+        "Actions": [
+          {
+            "Type": "Timeout",
+            "Delay": [ 0, 5 ]
+          },
+          {
+            "Type": "ParentState",
+            "State": "OnWakeUp"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -43,6 +43,10 @@
       "Value": [],
       "TypeHint": "String",
       "Description": "NPCGroup array for flock behavior (used for Flock_Attack wakeups)."
+    },
+    "SleepAnimation": {
+      "Value": "Sleep",
+      "Description": "Sleep-loop animation while sleeping. Set empty to skip animation playback."
     }
   },
   "Content": {
@@ -128,7 +132,7 @@
             }
           },
           {
-            "Reference": "Component_Instruction_Wild_Sleep_State",
+            "Reference": "Component_Tamework_Instruction_Wild_Sleep_State",
             "Modify": {
               "_ExportStates": [
                 "OnDamageWithTarget",
@@ -136,6 +140,9 @@
                 "OnProximity",
                 "OnWakeUp"
               ],
+              "SleepAnimation": {
+                "Compute": "SleepAnimation"
+              },
               "HearingRange": {
                 "Compute": "HearingRange"
               },
@@ -155,7 +162,7 @@
         },
         "Instructions": [
           {
-            "Reference": "Component_Instruction_Wild_Sleep_State",
+            "Reference": "Component_Tamework_Instruction_Wild_Sleep_State",
             "Modify": {
               "_ExportStates": [
                 "OnDamageWithTarget",
@@ -163,6 +170,9 @@
                 "OnProximity",
                 "OnWakeUp"
               ],
+              "SleepAnimation": {
+                "Compute": "SleepAnimation"
+              },
               "HearingRange": {
                 "Compute": "HearingRange"
               },

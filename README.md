@@ -25,6 +25,7 @@ This mod does not add anything to the game on it's own. If you are a player look
   - Includes random attachments such as varying textures, models, etc.
   - Includes persisted progression state such as ownership/tamed, happiness, needs, breeding readiness/cooldowns, traits, life stage, and attachment selections.
   - Ownership can optionally be cleared on capture and re-set on spawn to enable player trading of captured NPCs.
+  - Optional DynamicTooltipsLib bridge adds captured-spawner tooltip lines (`Name`, `Role`) with per-item `TooltipMode` (`Additive` or `Replace`).
 - **Naming Items** - Name tamed NPCs with an in-game input UI using `TwNameItemConfig` + `TameworkNameNpc`.
   - Works with any custom item; not a fixed nametag item
   - Per-item rules for roles, ownership, allowed characters, rename rules, and more
@@ -36,8 +37,11 @@ This mod does not add anything to the game on it's own. If you are a player look
   - Unlink safety is configurable via `TwGlobalConfig.Command.LinkedPanelRequireUnlinkConfirm`.
   - Supports command steps like state changes, target assignment, move-to-ping, set/return-home, and hook triggers.
   - Includes off-screen command queueing + chunk preload retries for recall/return-home relocation with safer placement for recall/revive.
+  - Supports strict lost-companion recovery (`LOST` state + stale-original suppression mapping) and nearby-only `Release`/`Cull` actions in linked panel flows.
   - Companion command behavior (recall/return-home/respawn distances and timing) can be scoped per role with `TwCompanionConfig`.
+  - Companion travel relocation policy can be scoped per role with `TwCompanionConfig.Command.Travel` (`CrossWorldRecallEnabled`, `OnTransferFailure`, `FollowMasterOnWorldChange`, `FollowMasterOnWorldChangeStateFilter`).
   - Command relocation infrastructure tuning remains global in `TwGlobalConfig.Command` (`RelocationRetryIntervalMs`, `RelocationMaxWaitMs`, `RelocationMaxRetryAttempts`).
+  - `/tw debugdespawn [on|off] [RoleName|all|clear]` supports role-filtered despawn diagnostics for tamed companions.
 - **Happiness and Needs System** - Shared progression state for companion wellbeing and behavior pressure.
   - Role-priority config resolution for happiness (`TwHappinessConfig`) and needs (`TwNeedsConfig`).
   - Hunger/thirst decay, passive refill, resource-seek support, and needs-driven happiness penalties.
@@ -64,14 +68,22 @@ This mod does not add anything to the game on it's own. If you are a player look
   - Allow unlocking new behaviors, stat increases, etc.
   - Will include a talent tree UI
 
-## Quick Start (2.3.x)
+## Quick Start (2.4.x)
 1. Add the dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.3.0"
+"Alechilles:Alec's Tamework!": "2.4.5"
 },
 "IncludesAssetPack": true
+```
+
+Optional for custom spawner tooltip lines:
+
+```json
+"OptionalDependencies": {
+  "org.herolias:DynamicTooltipsLib": "1.5.x"
+}
 ```
 
 **Asset pack note:** Tamework ships as a jar with embedded `Common/` + `Server/` assets. At load time, Tamework also enforces early asset-pack ordering and removes legacy standalone `Alec's Tamework! (Assets)` packs/archives when detected.

@@ -87,6 +87,7 @@ public final class CommandItemFeatureHandler {
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
     private final CommandLinkedNpcLostService lostService;
+    private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandGroupService groupService;
     private final CommandFeedbackService feedbackService;
@@ -114,12 +115,14 @@ public final class CommandItemFeatureHandler {
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcDeathService deathService,
                                      CommandLinkedNpcCaptureService captureService,
-                                     CommandLinkedNpcLostService lostService) {
+                                     CommandLinkedNpcLostService lostService,
+                                     CommandLinkedNpcStateSnapshotService stateSnapshotService) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
         this.lostService = lostService;
+        this.stateSnapshotService = stateSnapshotService;
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
         this.groupService = new CommandGroupService();
         this.feedbackService = new CommandFeedbackService(new TameworkUiMessageService());
@@ -162,7 +165,8 @@ public final class CommandItemFeatureHandler {
         this.linkMutationService = new CommandLinkMutationService(
                 linkedNpcRecordStore,
                 linkPolicyService,
-                npcNameResolver
+                npcNameResolver,
+                stateSnapshotService
         );
         this.npcExistenceService = new CommandNpcExistenceService();
         this.relocationDispatchService = new CommandRelocationDispatchService(
@@ -186,6 +190,7 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 linkMutationService,
                 npcNameResolver,
+                respawnService,
                 stepExecutionService,
                 lostService
         );

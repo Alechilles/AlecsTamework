@@ -76,6 +76,10 @@
       "Value": true,
       "Description": "Whether this NPC always sleeps through the whole night."
     },
+    "SleepEnabled": {
+      "Value": true,
+      "Description": "Whether hold ambient behavior can transition into sleep."
+    },
     "DayTimeNapWeight": {
       "Value": 2,
       "Description": "Weight used to determine if the NPC should have a short nap during the day. Set to 0 to disable."
@@ -206,12 +210,15 @@
           "NightFlavorAnimationLength": {
             "Compute": "NightFlavorAnimationLength"
           },
-          "AlwaysSleepAtNight": {
-            "Compute": "AlwaysSleepAtNight"
-          },
-          "DayTimeNapWeight": {
-            "Compute": "DayTimeNapWeight"
-          },
+           "AlwaysSleepAtNight": {
+              "Compute": "AlwaysSleepAtNight"
+            },
+            "SleepEnabled": {
+              "Compute": "SleepEnabled"
+            },
+            "DayTimeNapWeight": {
+              "Compute": "DayTimeNapWeight"
+            },
           "CanHear": {
             "Compute": "CanHear"
           },

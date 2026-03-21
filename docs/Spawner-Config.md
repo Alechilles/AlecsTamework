@@ -20,6 +20,9 @@ When extending spawner behavior, add logic to these service domains instead of c
 - `EmptyItemId` (required). The empty spawner item id to bind this config to.
 - `FilledItemId` (optional). The filled variant item id, if used.
 - `IconDefault` (optional). Default icon override used for filled items.
+- `TooltipMode` (optional, default `Additive`). Controls DynamicTooltipsLib composition for captured-spawner tooltip lines.
+  - `Additive`: appends Tamework lines (`Name`, `Role`) to the base tooltip.
+  - `Replace`: writes Tamework lines as override description text.
 
 ## AllowedRoles
 Controls which NPC roles can be captured or spawned.
@@ -165,3 +168,4 @@ Notes:
 
 ## Reloading
 Use `/tw reloadconfig` to reload spawner, naming, and command item configs into the item feature registries.
+When DynamicTooltipsLib is present, Tamework also invalidates and refreshes tooltip caches on reload.

@@ -15,7 +15,9 @@
     "Main": "com.alechilles.alecstamework.Tamework",
     "ServerVersion": "2026.02.19-1a311a592",
     "Dependencies": {},
-    "OptionalDependencies": {},
+    "OptionalDependencies": {
+        "org.herolias:DynamicTooltipsLib": "1.5.x"
+    },
     "LoadBefore": {},
     "DisabledByDefault": false,
     "IncludesAssetPack": true,

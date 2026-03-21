@@ -120,6 +120,10 @@
       "Value": false,
       "Description": "Whether this NPC should always sleep at night when settled and conditions allow."
     },
+    "SleepEnabled": {
+      "Value": true,
+      "Description": "Whether settle ambient behavior can transition into sleep."
+    },
     "DayTimeNapWeight": {
       "Value": 1,
       "Description": "Weight used to determine if this NPC should nap during daytime settle windows. Set to 0 to disable."
@@ -402,12 +406,15 @@
               "NightFlavorAnimationLength": {
                 "Compute": "NightFlavorAnimationLength"
               },
-              "AlwaysSleepAtNight": {
-                "Compute": "AlwaysSleepAtNight"
-              },
-              "DayTimeNapWeight": {
-                "Compute": "DayTimeNapWeight"
-              },
+               "AlwaysSleepAtNight": {
+                  "Compute": "AlwaysSleepAtNight"
+                },
+                "SleepEnabled": {
+                  "Compute": "SleepEnabled"
+                },
+                "DayTimeNapWeight": {
+                  "Compute": "DayTimeNapWeight"
+                },
               "CanHear": {
                 "Compute": "CanHear"
               },

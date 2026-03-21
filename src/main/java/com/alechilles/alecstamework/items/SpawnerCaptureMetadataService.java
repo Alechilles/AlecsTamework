@@ -313,6 +313,21 @@ final class SpawnerCaptureMetadataService {
     }
 
     @Nullable
+    ItemStack applyTooltipDisplayNameMetadata(@Nullable ItemStack updated, @Nullable CaptureInfo captureInfo) {
+        if (updated == null || captureInfo == null) {
+            return updated;
+        }
+        String displayName = captureInfo.tooltipDisplayName;
+        if (displayName == null || displayName.isBlank()) {
+            displayName = captureInfo.npcNameKey;
+        }
+        if (displayName == null || displayName.isBlank()) {
+            return clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME);
+        }
+        return updated.withMetadata(TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME, Codec.STRING, displayName);
+    }
+
+    @Nullable
     ItemStack clearNameMetadata(@Nullable ItemStack updated) {
         ItemStack cleared = clearMetadataKey(updated, TameworkMetadataKeys.NPC_NAME);
         cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_OWNER_UUID);

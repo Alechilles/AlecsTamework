@@ -76,6 +76,10 @@
       "Value": true,
       "Description": "Whether this NPC should always sleep at night when conditions allow."
     },
+    "SleepEnabled": {
+      "Value": true,
+      "Description": "Whether this ambient behavior is allowed to transition into sleep states."
+    },
     "DayTimeNapWeight": {
       "Value": 2,
       "Description": "Weight used to determine if the NPC should have a short nap during the day. Set to 0 to disable."
@@ -123,7 +127,7 @@
       {
         "$Comment": "Sleep at night whenever conditions allow.",
         "Enabled": {
-          "Compute": "AlwaysSleepAtNight"
+          "Compute": "SleepEnabled && AlwaysSleepAtNight"
         },
         "Sensor": {
           "Type": "And",
@@ -362,7 +366,7 @@
           {
             "$Comment": "Take a daytime nap.",
             "Enabled": {
-              "Compute": "DayTimeNapWeight > 0"
+              "Compute": "SleepEnabled && DayTimeNapWeight > 0"
             },
             "Weight": {
               "Compute": "DayTimeNapWeight"
@@ -445,7 +449,7 @@
       {
         "$Comment": "Execute nighttime ambient behaviors for NPCs that do not always sleep at night.",
         "Enabled": {
-          "Compute": "!AlwaysSleepAtNight"
+          "Compute": "!AlwaysSleepAtNight || !SleepEnabled"
         },
         "Type": "Random",
         "ExecuteFor": {
@@ -602,6 +606,9 @@
           },
           {
             "$Comment": "Low chance of sleeping at night for non-night-sleepers.",
+            "Enabled": {
+              "Compute": "SleepEnabled"
+            },
             "Weight": 1,
             "Sensor": {
               "Type": "And",

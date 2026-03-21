@@ -1,324 +1,231 @@
 $C = "Common.ui";
 
 Group #TameworkLinkedPanelRoot {
-  Anchor: (Top: 290, Left: 0, Width: 562, Height: 640);
-  Visible: false;
+    Anchor: (Top: 290, Left: 0, Width: 562, Height: 640);
+    Visible: false;
 
-  $C.@DecoratedContainer #TameworkLinkedPanelContainer {
-    Anchor: (Top: 0, Left: 132, Width: 430, Height: 640);
+    $C.@DecoratedContainer #TameworkLinkedPanelContainer {
+        Anchor: (Top: 0, Left: 132, Width: 430, Height: 640);
 
-    #Title {
-      $C.@Title #TameworkLinkedPanelTitle {
-        @Alignment = Start;
-        @Text = "Linked NPCs";
-      }
+        #Title {
+            $C.@Title #TameworkLinkedPanelTitle {
+                @Alignment = Start;
+                @Text = "Linked NPCs";
+            }
 
-      DropdownBox #TameworkLinkedPanelModeDropdown {
-        Anchor: (Top: 2, Right: 8, Width: 132, Height: 24);
-        Style: (
-          ...$C.@DefaultDropdownBoxStyle,
-          HorizontalPadding: 8,
-          LabelStyle: (
-            ...$C.@DefaultDropdownBoxLabelStyle,
-            RenderUppercase: false,
-            FontSize: 11
-          ),
-          EntryLabelStyle: (
-            ...$C.@DefaultDropdownBoxEntryLabelStyle,
-            RenderUppercase: false,
-            FontSize: 11
-          ),
-          SelectedEntryLabelStyle: (
-            ...$C.@DefaultDropdownBoxEntryLabelStyle,
-            RenderUppercase: false,
-            RenderBold: true,
-            FontSize: 11
-          )
-        );
-        MaxSelection: 1;
-        NoItemsText: "No modes";
-      }
-    }
-
-    #Content {
-      LayoutMode: Top;
-      Padding: (Left: 10, Right: 6, Top: 6, Bottom: 10);
-
-    Group #TameworkLinkedPanelSubtitleRow {
-      Anchor: (Height: 24);
-
-      Label #TameworkLinkedPanelSubtitle {
-        Anchor: (Left: 2, Width: 138, Height: 20);
-        Text: "No linked NPCs";
-        Style: (
-          FontSize: 14,
-          TextColor: #c4d2e1,
-          HorizontalAlignment: Start,
-          VerticalAlignment: Center
-        );
-      }
-
-      Group #TameworkLinkedPanelSubtitleRadiusSlot {
-        Anchor: (Left: 147, Width: 124, Height: 24);
-        LayoutMode: Left;
-
-        Group { Anchor: (Width: 12); }
-
-        Group #TameworkLinkedPanelSubtitleRadiusControls {
-          Anchor: (Width: 100, Height: 24);
-          LayoutMode: Left;
-          Visible: false;
-
-          TextButton #TameworkLinkedPanelRadiusDec {
-            Anchor: (Width: 14, Height: 24);
-            Text: "-";
-          }
-
-          Group { Anchor: (Width: 1); }
-
-          Label #TameworkLinkedPanelRadiusValue {
-            Anchor: (Width: 68, Height: 24);
-            Text: "Radius: 24m";
-            Style: (
-              FontSize: 12,
-              TextColor: #dbe8f6,
-              HorizontalAlignment: Center,
-              VerticalAlignment: Center
-            );
-          }
-
-          Group { Anchor: (Width: 4); }
-
-          TextButton #TameworkLinkedPanelRadiusInc {
-            Anchor: (Width: 14, Height: 24);
-            Text: "+";
-          }
+            DropdownBox #TameworkLinkedPanelModeDropdown {
+                Anchor: (Top: 2, Right: 8, Width: 132, Height: 24);
+                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 11));
+                MaxSelection: 1;
+                NoItemsText: "No modes";
+            }
         }
 
-        Group { Anchor: (Width: 12); }
-      }
+        #Content {
+            LayoutMode: Top;
+            Padding: (Left: 10, Right: 6, Top: 6, Bottom: 10);
 
-      $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
-        @Sounds = $C.@ButtonSounds;
-        @Anchor = (Right: 2, Width: 88, Height: 24);
-        @Text = "Groups";
-      }
-    }
+            Group #TameworkLinkedPanelSubtitleRow {
+                Anchor: (Height: 24);
 
-    $C.@PanelSeparatorFancy {
-      @Anchor = (Top: 2, Bottom: 4);
-    }
+                Label #TameworkLinkedPanelSubtitle {
+                    Anchor: (Left: 2, Width: 138, Height: 20);
+                    Text: "No linked NPCs";
+                    Style: (FontSize: 14, TextColor: #c4d2e1, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
 
-    Group #TameworkLinkedPanelControlsSecondary {
-      Anchor: (Top: 0, Height: 28);
-      LayoutMode: Left;
+                Group #TameworkLinkedPanelSubtitleRadiusSlot {
+                    Anchor: (Left: 147, Width: 124, Height: 24);
+                    LayoutMode: Left;
 
-      Label #TameworkLinkedPanelSortLabel {
-        Anchor: (Width: 26, Height: 24);
-        Text: "Sort:";
-        Style: (
-          FontSize: 12,
-          TextColor: #bfd0e5,
-          HorizontalAlignment: Start,
-          VerticalAlignment: Center
-        );
-      }
+                    Group {
+                        Anchor: (Width: 12);
+                    }
 
-      Group { Anchor: (Width: 2); }
+                    Group #TameworkLinkedPanelSubtitleRadiusControls {
+                        Anchor: (Width: 100, Height: 24);
+                        LayoutMode: Left;
+                        Visible: false;
 
-      DropdownBox #TameworkLinkedPanelSortDropdown {
-        Anchor: (Width: 92, Height: 24);
-        Style: (
-          ...$C.@DefaultDropdownBoxStyle,
-          HorizontalPadding: 8,
-          LabelStyle: (
-            ...$C.@DefaultDropdownBoxLabelStyle,
-            RenderUppercase: false,
-            FontSize: 11
-          ),
-          EntryLabelStyle: (
-            ...$C.@DefaultDropdownBoxEntryLabelStyle,
-            RenderUppercase: false,
-            FontSize: 11
-          ),
-          SelectedEntryLabelStyle: (
-            ...$C.@DefaultDropdownBoxEntryLabelStyle,
-            RenderUppercase: false,
-            RenderBold: true,
-            FontSize: 11
-          )
-        );
-        MaxSelection: 1;
-        NoItemsText: "No sort options";
-      }
+                        TextButton #TameworkLinkedPanelRadiusDec {
+                            Anchor: (Width: 14, Height: 24);
+                            Text: "-";
+                        }
 
-      Group { Anchor: (Width: 6); }
+                        Group {
+                            Anchor: (Width: 1);
+                        }
 
-      Label #TameworkLinkedPanelFilterLabel {
-        Anchor: (Width: 34, Height: 24);
-        Text: "Filter:";
-        Style: (
-          FontSize: 12,
-          TextColor: #bfd0e5,
-          HorizontalAlignment: Start,
-          VerticalAlignment: Center
-        );
-      }
+                        Label #TameworkLinkedPanelRadiusValue {
+                            Anchor: (Width: 68, Height: 24);
+                            Text: "Radius: 24m";
+                            Style: (FontSize: 12, TextColor: #dbe8f6, HorizontalAlignment: Center, VerticalAlignment: Center);
+                        }
 
-      Group { Anchor: (Width: 2); }
+                        Group {
+                            Anchor: (Width: 4);
+                        }
 
-      DropdownBox #TameworkLinkedPanelFilterDropdown {
-        Anchor: (Width: 92, Height: 24);
-        Style: (
-          ...$C.@DefaultDropdownBoxStyle,
-          HorizontalPadding: 8,
-          LabelStyle: (
-            ...$C.@DefaultDropdownBoxLabelStyle,
-            RenderUppercase: false,
-            FontSize: 11
-          ),
-          EntryLabelStyle: (
-            ...$C.@DefaultDropdownBoxEntryLabelStyle,
-            RenderUppercase: false,
-            FontSize: 11
-          ),
-          SelectedEntryLabelStyle: (
-            ...$C.@DefaultDropdownBoxEntryLabelStyle,
-            RenderUppercase: false,
-            RenderBold: true,
-            FontSize: 11
-          )
-        );
-        MaxSelection: 1;
-        NoItemsText: "No filter options";
-      }
+                        TextButton #TameworkLinkedPanelRadiusInc {
+                            Anchor: (Width: 14, Height: 24);
+                            Text: "+";
+                        }
+                    }
 
-      Group { Anchor: (Width: 6); }
+                    Group {
+                        Anchor: (Width: 12);
+                    }
+                }
 
-      Group #TameworkLinkedPanelInlineFilterTextControls {
-        Anchor: (Width: 138, Height: 24);
-        LayoutMode: Left;
-        Visible: false;
+                $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
+                    @Sounds = $C.@ButtonSounds;
+                    @Anchor = (Right: 2, Width: 88, Height: 24);
+                    @Text = "Groups";
+                }
+            }
 
-        TextField #TameworkLinkedPanelFilterInput {
-          Style: $C.@DefaultInputFieldStyle;
-          PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
-          Background: $C.@InputBoxBackground;
-          Anchor: (Width: 138, Height: 24);
-          Padding: (Horizontal: 8);
-          PlaceholderText: "Filter Text";
-          MaxLength: 40;
-        }
-      }
-    }
+            $C.@PanelSeparatorFancy {
+                @Anchor = (Top: 2, Bottom: 4);
+            }
 
-    Label #TameworkLinkedPanelEmptyState {
-      Anchor: (Top: 8, Height: 48);
-      Text: "No linked NPCs yet. Primary-use on an owned NPC to link it.";
-      Style: (
-        FontSize: 14,
-        TextColor: #b2c3d6,
-        HorizontalAlignment: Start,
-        VerticalAlignment: Start
-      );
-      Visible: false;
-    }
+            Group #TameworkLinkedPanelControlsSecondary {
+                Anchor: (Top: 0, Height: 28);
+                LayoutMode: Left;
 
-      Group #TameworkLinkedPanelListViewport {
-        Anchor: (Top: 1);
-        FlexWeight: 1;
-        LayoutMode: TopScrolling;
-        KeepScrollPosition: true;
-        ScrollbarStyle: $C.@DefaultScrollbarStyle;
-        Padding: (Left: 7, Right: 2, Top: 1, Bottom: 7);
+                Label #TameworkLinkedPanelSortLabel {
+                    Anchor: (Width: 26, Height: 24);
+                    Text: "Sort:";
+                    Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
 
-        Group #TameworkLinkedPanelList {
-          LayoutMode: Top;
-          Anchor: (Bottom: 6);
-        }
-      }
-    }
+                Group {
+                    Anchor: (Width: 2);
+                }
 
-    Group #TameworkLinkedPanelGroupAssignOverlay {
-      Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
-      Background: #060b13(0.78);
-      Visible: false;
+                DropdownBox #TameworkLinkedPanelSortDropdown {
+                    Anchor: (Width: 92, Height: 24);
+                    Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 11));
+                    MaxSelection: 1;
+                    NoItemsText: "No sort options";
+                }
 
-      Group #TameworkLinkedPanelGroupAssignModal {
-        Anchor: (Top: 190, Left: 36, Width: 358, Height: 176);
-        Background: #102038;
+                Group {
+                    Anchor: (Width: 6);
+                }
 
-        Label #TameworkLinkedPanelGroupAssignTitle {
-          Anchor: (Top: 10, Left: 14, Width: 330, Height: 24);
-          Text: "Assign Group";
-          Style: (
-            FontSize: 18,
-            RenderBold: true,
-            TextColor: #dce8f6,
-            HorizontalAlignment: Start,
-            VerticalAlignment: Center
-          );
+                Label #TameworkLinkedPanelFilterLabel {
+                    Anchor: (Width: 34, Height: 24);
+                    Text: "Filter:";
+                    Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Group {
+                    Anchor: (Width: 2);
+                }
+
+                DropdownBox #TameworkLinkedPanelFilterDropdown {
+                    Anchor: (Width: 92, Height: 24);
+                    Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 11));
+                    MaxSelection: 1;
+                    NoItemsText: "No filter options";
+                }
+
+                Group {
+                    Anchor: (Width: 6);
+                }
+
+                Group #TameworkLinkedPanelInlineFilterTextControls {
+                    Anchor: (Width: 138, Height: 24);
+                    LayoutMode: Left;
+                    Visible: false;
+
+                    TextField #TameworkLinkedPanelFilterInput {
+                        Style: $C.@DefaultInputFieldStyle;
+                        PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                        Background: $C.@InputBoxBackground;
+                        Anchor: (Width: 138, Height: 24);
+                        Padding: (Horizontal: 8);
+                        PlaceholderText: "Filter Text";
+                        MaxLength: 40;
+                    }
+                }
+            }
+
+            Label #TameworkLinkedPanelEmptyState {
+                Anchor: (Top: 8, Height: 48);
+                Text: "No linked NPCs yet. Primary-use on an owned NPC to link it.";
+                Style: (FontSize: 14, TextColor: #b2c3d6, HorizontalAlignment: Start, VerticalAlignment: Start);
+                Visible: false;
+            }
+
+            Group #TameworkLinkedPanelListViewport {
+                Anchor: (Top: 1);
+                FlexWeight: 1;
+                KeepScrollPosition: true;
+                ScrollbarStyle: $C.@DefaultScrollbarStyle;
+                Padding: (Left: 7, Right: 2, Top: 1, Bottom: 7);
+                LayoutMode: TopScrolling;
+
+                Group #TameworkLinkedPanelList {
+                    LayoutMode: Top;
+                    Anchor: (Bottom: 6);
+                }
+            }
         }
 
-        Label #TameworkLinkedPanelGroupAssignSubtitle {
-          Anchor: (Top: 40, Left: 14, Width: 330, Height: 24);
-          Text: "Choose a group.";
-          Style: (
-            FontSize: 13,
-            TextColor: #bfd0e5,
-            HorizontalAlignment: Start,
-            VerticalAlignment: Center
-          );
+        Group #TameworkLinkedPanelGroupAssignOverlay {
+            Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+            Background: #060b13(0.78);
+            Visible: false;
+
+            Group #TameworkLinkedPanelGroupAssignModal {
+                Anchor: (Top: 190, Left: 36, Width: 358, Height: 176);
+                Background: #102038;
+
+                Label #TameworkLinkedPanelGroupAssignTitle {
+                    Anchor: (Top: 10, Left: 14, Width: 330, Height: 24);
+                    Text: "Assign Group";
+                    Style: (FontSize: 18, RenderBold: true, TextColor: #dce8f6, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                Label #TameworkLinkedPanelGroupAssignSubtitle {
+                    Anchor: (Top: 40, Left: 14, Width: 330, Height: 24);
+                    Text: "Choose a group.";
+                    Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+                }
+
+                DropdownBox #TameworkLinkedPanelGroupAssignDropdown {
+                    Anchor: (Top: 72, Left: 14, Width: 330, Height: 26);
+                    Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 12), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 12), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 12));
+                    MaxSelection: 1;
+                    NoItemsText: "No groups";
+                }
+
+                Group #TameworkLinkedPanelGroupAssignButtons {
+                    Anchor: (Top: 112, Left: 14, Width: 330, Height: 30);
+                    LayoutMode: Left;
+
+                    Group {
+                        Anchor: (Width: 138);
+                    }
+
+                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignCancelButton {
+                        @Sounds = $C.@ButtonSounds;
+                        @Anchor = (Width: 92, Height: 24);
+                        @Text = "Cancel";
+                    }
+
+                    Group {
+                        Anchor: (Width: 8);
+                    }
+
+                    $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignApplyButton {
+                        @Sounds = $C.@ButtonSounds;
+                        @Anchor = (Width: 92, Height: 24);
+                        @Text = "Apply";
+                    }
+                }
+            }
         }
-
-        DropdownBox #TameworkLinkedPanelGroupAssignDropdown {
-          Anchor: (Top: 72, Left: 14, Width: 330, Height: 26);
-          Style: (
-            ...$C.@DefaultDropdownBoxStyle,
-            HorizontalPadding: 8,
-            LabelStyle: (
-              ...$C.@DefaultDropdownBoxLabelStyle,
-              RenderUppercase: false,
-              FontSize: 12
-            ),
-            EntryLabelStyle: (
-              ...$C.@DefaultDropdownBoxEntryLabelStyle,
-              RenderUppercase: false,
-              FontSize: 12
-            ),
-            SelectedEntryLabelStyle: (
-              ...$C.@DefaultDropdownBoxEntryLabelStyle,
-              RenderUppercase: false,
-              RenderBold: true,
-              FontSize: 12
-            )
-          );
-          MaxSelection: 1;
-          NoItemsText: "No groups";
-        }
-
-        Group #TameworkLinkedPanelGroupAssignButtons {
-          Anchor: (Top: 112, Left: 14, Width: 330, Height: 30);
-          LayoutMode: Left;
-
-          Group { Anchor: (Width: 138); }
-
-          $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignCancelButton {
-            @Sounds = $C.@ButtonSounds;
-            @Anchor = (Width: 92, Height: 24);
-            @Text = "Cancel";
-          }
-
-          Group { Anchor: (Width: 8); }
-
-          $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignApplyButton {
-            @Sounds = $C.@ButtonSounds;
-            @Anchor = (Width: 92, Height: 24);
-            @Text = "Apply";
-          }
-        }
-      }
     }
-  }
-
 }

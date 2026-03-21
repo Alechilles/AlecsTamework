@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+## 2.4.5 - Companion Metadata Recovery + Tooltip Bridge - 2026-03-20
+### Added
+- Added optional DynamicTooltipsLib integration for spawner items, including captured tooltip metadata (`Name`, `Role`) and per-spawner `TooltipMode` (`Additive`/`Replace`) via `TwSpawnerConfig`.
+- Added shared linked-companion state snapshot caching used across link, refresh, death, and lost-companion flows to preserve full recovery metadata.
+
+### Changed
+- `/tw reloadconfig` now invalidates and refreshes DynamicTooltipsLib tooltip caches when that optional dependency is loaded.
+
+### Fixed
+- Lost companion recovery now restores captured metadata (display name, appearance/skin variants, progression traits/state, and command-state context) instead of spawning defaultized replacements.
+- Strict lost recovery now prefers shared state snapshots and death-snapshot respawn reconstruction, with stale-original suppression retained for late original reloads.
+
 ## 2.4.4 - Companion Travel + Lost Recovery Reliability - 2026-03-19
 ### Added
 - Added strict linked-companion lost-state tracking (`CommandLinkedNpcLost.dat`) wired to relocation retry exhaustion, with persisted original-to-replacement mappings that suppress stale originals if they reappear later.

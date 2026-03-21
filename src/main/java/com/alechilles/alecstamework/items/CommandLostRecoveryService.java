@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -15,7 +16,11 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nullable;
 
@@ -24,12 +29,14 @@ import javax.annotation.Nullable;
  */
 final class CommandLostRecoveryService {
     private static final String MASTER_TARGET_SLOT = "MasterTarget";
+    private static final long LOST_RECOVERY_FOLLOW_RETRY_DELAY_MS = 1250L;
 
     private final CommandCompanionPlacementService companionPlacementService;
     private final CommandNpcExistenceService existenceService;
     private final CommandLinkPolicyService linkPolicyService;
     private final CommandLinkMutationService linkMutationService;
     private final CommandNpcNameResolver npcNameResolver;
+    private final CommandRespawnService respawnService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandLinkedNpcLostService lostService;
 
@@ -38,6 +45,7 @@ final class CommandLostRecoveryService {
                                CommandLinkPolicyService linkPolicyService,
                                CommandLinkMutationService linkMutationService,
                                CommandNpcNameResolver npcNameResolver,
+                               CommandRespawnService respawnService,
                                CommandStepExecutionService stepExecutionService,
                                CommandLinkedNpcLostService lostService) {
         this.companionPlacementService = companionPlacementService;
@@ -45,6 +53,7 @@ final class CommandLostRecoveryService {
         this.linkPolicyService = linkPolicyService;
         this.linkMutationService = linkMutationService;
         this.npcNameResolver = npcNameResolver;
+        this.respawnService = respawnService;
         this.stepExecutionService = stepExecutionService;
         this.lostService = lostService;
     }
@@ -69,7 +78,41 @@ final class CommandLostRecoveryService {
             return Result.fail("That companion is still alive in world '" + liveNpc.worldName() + "'.");
         }
 
-        String roleId = resolveRoleId(record);
+        CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot recoverySnapshot = lostService.getRecoverySnapshot(record.npcUuid);
+        CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot = lostService.getLostSnapshot(record.npcUuid);
+        Vector3d sourceHint = record.lastKnownPosition != null
+                ? record.lastKnownPosition
+                : lostSnapshot != null && lostSnapshot.lastKnownPosition() != null
+                ? lostSnapshot.lastKnownPosition()
+                : record.homePosition != null
+                ? record.homePosition
+                : lostSnapshot != null
+                ? lostSnapshot.homePosition()
+                : null;
+        Vector3d homePosition = record.homePosition != null
+                ? record.homePosition
+                : recoverySnapshot != null && recoverySnapshot.homePosition() != null
+                ? recoverySnapshot.homePosition()
+                : lostSnapshot != null
+                ? lostSnapshot.homePosition()
+                : null;
+        Result snapshotRecovery = tryRecoverFromSnapshot(
+                player,
+                playerRef,
+                store,
+                toolId,
+                stack,
+                record,
+                recoverySnapshot,
+                sourceHint,
+                homePosition,
+                safeSpawnDistance
+        );
+        if (snapshotRecovery != null && snapshotRecovery.isSuccess()) {
+            return snapshotRecovery;
+        }
+
+        String roleId = resolveRoleId(record, recoverySnapshot);
         if (roleId == null || roleId.isBlank()) {
             return Result.fail("Unable to recover: missing role metadata.");
         }
@@ -82,16 +125,6 @@ final class CommandLostRecoveryService {
             return Result.fail("Unable to recover: unknown role '" + roleId + "'.");
         }
 
-        CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot = lostService.getLostSnapshot(record.npcUuid);
-        Vector3d sourceHint = record.lastKnownPosition != null
-                ? record.lastKnownPosition
-                : lostSnapshot != null && lostSnapshot.lastKnownPosition() != null
-                ? lostSnapshot.lastKnownPosition()
-                : record.homePosition != null
-                ? record.homePosition
-                : lostSnapshot != null
-                ? lostSnapshot.homePosition()
-                : null;
         Vector3d destination = companionPlacementService.computeSafeRespawnPosition(
                 playerRef,
                 store,
@@ -111,12 +144,12 @@ final class CommandLostRecoveryService {
 
         Ref<EntityStore> spawnedRef = spawned.first();
         NPCEntity spawnedNpc = spawned.second();
-        UUID ownerId = player.getUuid();
-        Vector3d homePosition = record.homePosition != null
-                ? record.homePosition
-                : lostSnapshot != null
-                ? lostSnapshot.homePosition()
-                : null;
+        UUID ownerId = recoverySnapshot != null && recoverySnapshot.ownerId() != null
+                ? recoverySnapshot.ownerId()
+                : player.getUuid();
+        String ownerName = recoverySnapshot != null && recoverySnapshot.ownerName() != null
+                ? recoverySnapshot.ownerName()
+                : player.getDisplayName();
         String[] toolIds = linkPolicyService.mergeToolIds(null, toolId);
 
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
@@ -125,11 +158,28 @@ final class CommandLostRecoveryService {
         }
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
         if (ownerType != null) {
-            store.putComponent(spawnedRef, ownerType, new TameworkOwnerComponent(ownerId, player.getDisplayName()));
+            store.putComponent(spawnedRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
         }
         ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
         if (tamedType != null) {
-            store.putComponent(spawnedRef, tamedType, new TameworkTamedComponent(true));
+            boolean tamed = recoverySnapshot == null || recoverySnapshot.tamed();
+            store.putComponent(spawnedRef, tamedType, new TameworkTamedComponent(tamed));
+        }
+        if (recoverySnapshot != null && recoverySnapshot.customName() != null && !recoverySnapshot.customName().isBlank()) {
+            ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
+            if (nameType != null) {
+                store.putComponent(
+                        spawnedRef,
+                        nameType,
+                        new TameworkNpcNameComponent(
+                                recoverySnapshot.customName(),
+                                ownerId,
+                                System.currentTimeMillis(),
+                                TameworkNpcNameComponent.NameSource.System
+                        )
+                );
+            }
+            EntitySupport.setDisplayName(spawnedRef, recoverySnapshot.customName(), store);
         }
 
         applyFollowBootstrap(spawnedRef, spawnedNpc, playerRef, store);
@@ -158,7 +208,92 @@ final class CommandLostRecoveryService {
     }
 
     @Nullable
-    private String resolveRoleId(LinkedNpcRecord record) {
+    private Result tryRecoverFromSnapshot(Player player,
+                                          Ref<EntityStore> playerRef,
+                                          Store<EntityStore> store,
+                                          String toolId,
+                                          ItemStack stack,
+                                          LinkedNpcRecord record,
+                                          @Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot recoverySnapshot,
+                                          @Nullable Vector3d sourceHint,
+                                          @Nullable Vector3d homePosition,
+                                          double safeSpawnDistance) {
+        if (player == null || playerRef == null || !playerRef.isValid() || store == null
+                || toolId == null || toolId.isBlank()
+                || stack == null || stack.isEmpty() || record == null || record.npcUuid == null
+                || recoverySnapshot == null
+                || respawnService == null
+                || recoverySnapshot.roleId() == null
+                || recoverySnapshot.roleId().isBlank()) {
+            return null;
+        }
+        List<LinkedNpcRecord> beforeRecords = linkMutationService.readLinkedNpcRecords(stack);
+        ItemStack updatedStack = respawnService.respawnDeadLinkedNpc(
+                player,
+                playerRef,
+                store,
+                toolId,
+                stack,
+                record,
+                recoverySnapshot,
+                safeSpawnDistance,
+                LOST_RECOVERY_FOLLOW_RETRY_DELAY_MS
+        );
+        if (updatedStack == null || updatedStack.isEmpty()) {
+            return null;
+        }
+        List<LinkedNpcRecord> afterRecords = linkMutationService.readLinkedNpcRecords(updatedStack);
+        UUID replacementNpcUuid = resolveReplacementUuid(beforeRecords, afterRecords, record.npcUuid);
+        if (replacementNpcUuid != null) {
+            lostService.markRecovered(record.npcUuid, replacementNpcUuid, sourceHint, homePosition);
+        } else {
+            lostService.clearLostSnapshot(record.npcUuid);
+        }
+        existenceService.despawnIfPresent(record.npcUuid);
+        String recoveredName = firstNonBlank(
+                recoverySnapshot.customName(),
+                recoverySnapshot.displayName(),
+                record.cachedDisplayName
+        );
+        return Result.success(updatedStack, recoveredName);
+    }
+
+    @Nullable
+    private UUID resolveReplacementUuid(@Nullable List<LinkedNpcRecord> beforeRecords,
+                                        @Nullable List<LinkedNpcRecord> afterRecords,
+                                        @Nullable UUID originalNpcUuid) {
+        if (afterRecords == null || afterRecords.isEmpty()) {
+            return null;
+        }
+        Set<UUID> beforeIds = new HashSet<>();
+        if (beforeRecords != null) {
+            for (LinkedNpcRecord record : beforeRecords) {
+                if (record == null || record.npcUuid == null) {
+                    continue;
+                }
+                beforeIds.add(record.npcUuid);
+            }
+        }
+        for (LinkedNpcRecord record : afterRecords) {
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (originalNpcUuid != null && originalNpcUuid.equals(record.npcUuid)) {
+                continue;
+            }
+            if (!beforeIds.contains(record.npcUuid)) {
+                return record.npcUuid;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private String resolveRoleId(LinkedNpcRecord record,
+                                 @Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot recoverySnapshot) {
+        if (recoverySnapshot != null && recoverySnapshot.roleId() != null && !recoverySnapshot.roleId().isBlank()) {
+            return recoverySnapshot.roleId();
+        }
         if (record == null) {
             return null;
         }
@@ -185,6 +320,22 @@ final class CommandLostRecoveryService {
                     return remainder;
                 }
             }
+        }
+        return null;
+    }
+
+    @Nullable
+    private String firstNonBlank(@Nullable String first,
+                                 @Nullable String second,
+                                 @Nullable String third) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        if (third != null && !third.isBlank()) {
+            return third;
         }
         return null;
     }

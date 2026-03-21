@@ -30,6 +30,24 @@ public final class ItemFeatureConfig {
         }
     }
 
+    public enum SpawnerTooltipMode {
+        ADDITIVE,
+        REPLACE;
+
+        public static SpawnerTooltipMode fromString(String value) {
+            if (value == null) {
+                return ADDITIVE;
+            }
+            switch (value.trim().toLowerCase()) {
+                case "replace":
+                    return REPLACE;
+                case "additive":
+                default:
+                    return ADDITIVE;
+            }
+        }
+    }
+
     private final boolean spawnerEnabled;
     private final boolean whistleEnabled;
     private final boolean captureClearsOwner;
@@ -55,6 +73,7 @@ public final class ItemFeatureConfig {
     private final String spawnerIconDefault;
     private final List<SpawnerIconOverride> spawnerIconOverrides;
     private final Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole;
+    private final SpawnerTooltipMode spawnerTooltipMode;
 
     private ItemFeatureConfig(Builder builder) {
         this.spawnerEnabled = builder.spawnerEnabled;
@@ -82,6 +101,7 @@ public final class ItemFeatureConfig {
         this.spawnerIconDefault = builder.spawnerIconDefault;
         this.spawnerIconOverrides = builder.spawnerIconOverrides;
         this.spawnerIconOverridesByRole = builder.spawnerIconOverridesByRole;
+        this.spawnerTooltipMode = builder.spawnerTooltipMode;
     }
 
     public static Builder builder() {
@@ -195,6 +215,10 @@ public final class ItemFeatureConfig {
         return spawnerIconOverridesByRole;
     }
 
+    public SpawnerTooltipMode getSpawnerTooltipMode() {
+        return spawnerTooltipMode;
+    }
+
     public static final class SpawnerIconOverride {
         // Attachment keys must match the NPC attachment map for a given capture.
 
@@ -241,6 +265,7 @@ public final class ItemFeatureConfig {
         private String spawnerIconDefault;
         private List<SpawnerIconOverride> spawnerIconOverrides = Collections.emptyList();
         private Map<String, List<SpawnerIconOverride>> spawnerIconOverridesByRole = Collections.emptyMap();
+        private SpawnerTooltipMode spawnerTooltipMode = SpawnerTooltipMode.ADDITIVE;
 
         private Builder() {
         }
@@ -410,6 +435,11 @@ public final class ItemFeatureConfig {
             return this;
         }
 
+        public Builder spawnerTooltipMode(SpawnerTooltipMode spawnerTooltipMode) {
+            this.spawnerTooltipMode = spawnerTooltipMode != null ? spawnerTooltipMode : SpawnerTooltipMode.ADDITIVE;
+            return this;
+        }
+
         public ItemFeatureConfig build() {
             return new ItemFeatureConfig(this);
         }
@@ -448,7 +478,8 @@ public final class ItemFeatureConfig {
                 && Objects.equals(spawnerFilledItemId, other.spawnerFilledItemId)
                 && Objects.equals(spawnerIconDefault, other.spawnerIconDefault)
                 && Objects.equals(spawnerIconOverrides, other.spawnerIconOverrides)
-                && Objects.equals(spawnerIconOverridesByRole, other.spawnerIconOverridesByRole);
+                && Objects.equals(spawnerIconOverridesByRole, other.spawnerIconOverridesByRole)
+                && spawnerTooltipMode == other.spawnerTooltipMode;
     }
 
     @Override
@@ -478,7 +509,8 @@ public final class ItemFeatureConfig {
                 spawnerFilledItemId,
                 spawnerIconDefault,
                 spawnerIconOverrides,
-                spawnerIconOverridesByRole
+                spawnerIconOverridesByRole,
+                spawnerTooltipMode
         );
     }
 }
