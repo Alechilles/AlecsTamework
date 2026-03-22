@@ -227,6 +227,72 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .build();
 
+    private static final BuilderCodec<TickPolicySettings> TICK_POLICY_CODEC = BuilderCodec.builder(
+            TickPolicySettings.class,
+            TickPolicySettings::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Mode", Codec.STRING),
+            (settings, value) -> settings.mode = TickPolicyMode.fromConfigValue(value),
+            settings -> settings.getMode().toConfigValue()
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("OwnerOfflineGraceHours", Codec.DOUBLE),
+            (settings, value) -> settings.ownerOfflineGraceHours = value,
+            settings -> settings.ownerOfflineGraceHours
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("OwnerOfflineDecayMultiplier", Codec.DOUBLE),
+            (settings, value) -> settings.ownerOfflineDecayMultiplier = value,
+            settings -> settings.ownerOfflineDecayMultiplier
+        )
+        .add()
+        .build();
+
+    private static final BuilderCodec<DamageSettings> DAMAGE_CODEC = BuilderCodec.builder(
+            DamageSettings.class,
+            DamageSettings::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            (settings, value) -> settings.enabled = value != null && value,
+            settings -> settings.enabled
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Model", Codec.STRING),
+            (settings, value) -> settings.model = DamageModel.fromConfigValue(value),
+            settings -> settings.getModel().toConfigValue()
+        )
+        .add()
+        .<String>append(
+            new KeyedCodec<>("DualNeedRule", Codec.STRING),
+            (settings, value) -> settings.dualNeedRule = DualNeedRule.fromConfigValue(value),
+            settings -> settings.getDualNeedRule().toConfigValue()
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("StarvationDamagePerMinute", Codec.DOUBLE),
+            (settings, value) -> settings.starvationDamagePerMinute = value,
+            settings -> settings.starvationDamagePerMinute
+        )
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("DehydrationDamagePerMinute", Codec.DOUBLE),
+            (settings, value) -> settings.dehydrationDamagePerMinute = value,
+            settings -> settings.dehydrationDamagePerMinute
+        )
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("Lethal", Codec.BOOLEAN),
+            (settings, value) -> settings.lethal = value == null || value,
+            settings -> settings.lethal
+        )
+        .add()
+        .build();
+
     public static final AssetBuilderCodec<String, TwNeedsConfig> CODEC = AssetBuilderCodec.builder(
             TwNeedsConfig.class,
             TwNeedsConfig::new,
@@ -254,42 +320,72 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             asset -> asset.roleIds
         )
+        .documentation("NPC role IDs this config applies to. Inheritance: omitted value inherits from parent; explicit "
+                + "array replaces parent value (no merge).")
         .add()
         .<ValueSettings>append(
             new KeyedCodec<>("Values", VALUE_CODEC),
             (asset, value) -> asset.values = value == null ? new ValueSettings() : value,
             asset -> asset.values
         )
+        .documentation("Needs value bounds/defaults. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<DecaySettings>append(
             new KeyedCodec<>("Decay", DECAY_CODEC),
             (asset, value) -> asset.decay = value == null ? new DecaySettings() : value,
             asset -> asset.decay
         )
+        .documentation("Per-minute needs decay settings. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<HappinessImpactSettings>append(
             new KeyedCodec<>("HappinessImpact", HAPPINESS_IMPACT_CODEC),
             (asset, value) -> asset.happinessImpact = value == null ? new HappinessImpactSettings() : value,
             asset -> asset.happinessImpact
         )
+        .documentation("Need-to-happiness impact settings. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<PassiveRefillSettings>append(
             new KeyedCodec<>("PassiveRefill", PASSIVE_REFILL_CODEC),
             (asset, value) -> asset.passiveRefill = value == null ? new PassiveRefillSettings() : value,
             asset -> asset.passiveRefill
         )
+        .documentation("Passive refill settings. Inheritance: omitted section inherits from parent; when present, only "
+                + "explicitly defined nested fields override parent.")
         .add()
         .<ManualRefillSettings>append(
             new KeyedCodec<>("ManualRefill", MANUAL_REFILL_CODEC),
             (asset, value) -> asset.manualRefill = value == null ? new ManualRefillSettings() : value,
             asset -> asset.manualRefill
         )
+        .documentation("Manual refill settings. Inheritance: omitted section inherits from parent; when present, only "
+                + "explicitly defined nested fields override parent.")
         .add()
         .<TimingSettings>append(
             new KeyedCodec<>("Timing", TIMING_CODEC),
             (asset, value) -> asset.timing = value == null ? new TimingSettings() : value,
             asset -> asset.timing
         )
+        .documentation("Needs timer basis settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
+        .add()
+        .<TickPolicySettings>append(
+            new KeyedCodec<>("TickPolicy", TICK_POLICY_CODEC),
+            (asset, value) -> asset.tickPolicy = value == null ? new TickPolicySettings() : value,
+            asset -> asset.tickPolicy
+        )
+        .documentation("Needs ticking policy settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
+        .add()
+        .<DamageSettings>append(
+            new KeyedCodec<>("Damage", DAMAGE_CODEC),
+            (asset, value) -> asset.damage = value == null ? new DamageSettings() : value,
+            asset -> asset.damage
+        )
+        .documentation("Needs damage settings. Inheritance: omitted section inherits from parent; when present, only "
+                + "explicitly defined nested fields override parent.")
         .add()
         .build();
 
@@ -311,6 +407,8 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
     private PassiveRefillSettings passiveRefill = new PassiveRefillSettings();
     private ManualRefillSettings manualRefill = new ManualRefillSettings();
     private TimingSettings timing = new TimingSettings();
+    private TickPolicySettings tickPolicy = new TickPolicySettings();
+    private DamageSettings damage = new DamageSettings();
 
     public static AssetStore<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -457,15 +555,259 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwNeedsConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwNeedsConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
-        if (!explicitTopLevelKeys.contains("Values")) values = parent.values;
-        if (!explicitTopLevelKeys.contains("Decay")) decay = parent.decay;
-        if (!explicitTopLevelKeys.contains("HappinessImpact")) happinessImpact = parent.happinessImpact;
-        if (!explicitTopLevelKeys.contains("PassiveRefill")) passiveRefill = parent.passiveRefill;
-        if (!explicitTopLevelKeys.contains("ManualRefill")) manualRefill = parent.manualRefill;
-        if (!explicitTopLevelKeys.contains("Timing")) timing = parent.timing;
+        if (!explicitTopLevelKeys.contains("Values")) {
+            values = parent.values;
+        } else {
+            inheritValuesSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Values"));
+        }
+        if (!explicitTopLevelKeys.contains("Decay")) {
+            decay = parent.decay;
+        } else {
+            inheritDecaySection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Decay"));
+        }
+        if (!explicitTopLevelKeys.contains("HappinessImpact")) {
+            happinessImpact = parent.happinessImpact;
+        } else {
+            inheritHappinessImpactSection(
+                    parent,
+                    nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "HappinessImpact")
+            );
+        }
+        if (!explicitTopLevelKeys.contains("PassiveRefill")) {
+            passiveRefill = parent.passiveRefill;
+        } else {
+            inheritPassiveRefillSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "PassiveRefill"));
+        }
+        if (!explicitTopLevelKeys.contains("ManualRefill")) {
+            manualRefill = parent.manualRefill;
+        } else {
+            inheritManualRefillSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "ManualRefill"));
+        }
+        if (!explicitTopLevelKeys.contains("Timing")) {
+            timing = parent.timing;
+        } else {
+            inheritTimingSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Timing"));
+        }
+        if (!explicitTopLevelKeys.contains("TickPolicy")) {
+            tickPolicy = parent.tickPolicy;
+        } else {
+            inheritTickPolicySection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "TickPolicy"));
+        }
+        if (!explicitTopLevelKeys.contains("Damage")) {
+            damage = parent.damage;
+        } else {
+            inheritDamageSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Damage"));
+        }
+    }
+
+    private void inheritValuesSection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (values == null) {
+            values = parent.values;
+            return;
+        }
+        if (parent.values == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("HungerDefault")) values.hungerDefault = parent.values.hungerDefault;
+        if (!nestedExplicitKeys.contains("HungerMin")) values.hungerMin = parent.values.hungerMin;
+        if (!nestedExplicitKeys.contains("HungerMax")) values.hungerMax = parent.values.hungerMax;
+        if (!nestedExplicitKeys.contains("ThirstDefault")) values.thirstDefault = parent.values.thirstDefault;
+        if (!nestedExplicitKeys.contains("ThirstMin")) values.thirstMin = parent.values.thirstMin;
+        if (!nestedExplicitKeys.contains("ThirstMax")) values.thirstMax = parent.values.thirstMax;
+    }
+
+    private void inheritDecaySection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (decay == null) {
+            decay = parent.decay;
+            return;
+        }
+        if (parent.decay == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("HungerPerMinute")) {
+            decay.hungerPerMinute = parent.decay.hungerPerMinute;
+        }
+        if (!nestedExplicitKeys.contains("ThirstPerMinute")) {
+            decay.thirstPerMinute = parent.decay.thirstPerMinute;
+        }
+    }
+
+    private void inheritHappinessImpactSection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (happinessImpact == null) {
+            happinessImpact = parent.happinessImpact;
+            return;
+        }
+        if (parent.happinessImpact == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("HungerPenaltyAtMin")) {
+            happinessImpact.hungerPenaltyAtMin = parent.happinessImpact.hungerPenaltyAtMin;
+        }
+        if (!nestedExplicitKeys.contains("ThirstPenaltyAtMin")) {
+            happinessImpact.thirstPenaltyAtMin = parent.happinessImpact.thirstPenaltyAtMin;
+        }
+        if (!nestedExplicitKeys.contains("PenaltyCurvePower")) {
+            happinessImpact.penaltyCurvePower = parent.happinessImpact.penaltyCurvePower;
+        }
+    }
+
+    private void inheritPassiveRefillSection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (passiveRefill == null) {
+            passiveRefill = parent.passiveRefill;
+            return;
+        }
+        if (parent.passiveRefill == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("SweepIntervalSeconds")) {
+            passiveRefill.sweepIntervalSeconds = parent.passiveRefill.sweepIntervalSeconds;
+        }
+        if (!nestedExplicitKeys.contains("NearbyContainerFeedEnabled")) {
+            passiveRefill.nearbyContainerFeedEnabled = parent.passiveRefill.nearbyContainerFeedEnabled;
+        }
+        if (!nestedExplicitKeys.contains("ContainerSearchRadius")) {
+            passiveRefill.containerSearchRadius = parent.passiveRefill.containerSearchRadius;
+        }
+        if (!nestedExplicitKeys.contains("ContainerVerticalScanRadius")) {
+            passiveRefill.containerVerticalScanRadius = parent.passiveRefill.containerVerticalScanRadius;
+        }
+        if (!nestedExplicitKeys.contains("ContainerConsumeRadius")) {
+            passiveRefill.containerConsumeRadius = parent.passiveRefill.containerConsumeRadius;
+        }
+        if (!nestedExplicitKeys.contains("ContainerFoodItemIds")) {
+            passiveRefill.containerFoodItemIds = parent.passiveRefill.containerFoodItemIds;
+        }
+        if (!nestedExplicitKeys.contains("HungerGainPerConsumedItem")) {
+            passiveRefill.hungerGainPerConsumedItem = parent.passiveRefill.hungerGainPerConsumedItem;
+        }
+        if (!nestedExplicitKeys.contains("MaxContainerItemsConsumedPerSweep")) {
+            passiveRefill.maxContainerItemsConsumedPerSweep = parent.passiveRefill.maxContainerItemsConsumedPerSweep;
+        }
+        if (!nestedExplicitKeys.contains("NearbyWaterDrinkEnabled")) {
+            passiveRefill.nearbyWaterDrinkEnabled = parent.passiveRefill.nearbyWaterDrinkEnabled;
+        }
+        if (!nestedExplicitKeys.contains("WaterSearchRadius")) {
+            passiveRefill.waterSearchRadius = parent.passiveRefill.waterSearchRadius;
+        }
+        if (!nestedExplicitKeys.contains("WaterVerticalScanRadius")) {
+            passiveRefill.waterVerticalScanRadius = parent.passiveRefill.waterVerticalScanRadius;
+        }
+        if (!nestedExplicitKeys.contains("WaterConsumeRadius")) {
+            passiveRefill.waterConsumeRadius = parent.passiveRefill.waterConsumeRadius;
+        }
+        if (!nestedExplicitKeys.contains("ThirstGainPerSweepNearWater")) {
+            passiveRefill.thirstGainPerSweepNearWater = parent.passiveRefill.thirstGainPerSweepNearWater;
+        }
+    }
+
+    private void inheritManualRefillSection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (manualRefill == null) {
+            manualRefill = parent.manualRefill;
+            return;
+        }
+        if (parent.manualRefill == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("HungerGainOnFeedInteraction")) {
+            manualRefill.hungerGainOnFeedInteraction = parent.manualRefill.hungerGainOnFeedInteraction;
+        }
+        if (!nestedExplicitKeys.contains("ThirstGainOnWaterBucket")) {
+            manualRefill.thirstGainOnWaterBucket = parent.manualRefill.thirstGainOnWaterBucket;
+        }
+        if (!nestedExplicitKeys.contains("WaterBucketItemIds")) {
+            manualRefill.waterBucketItemIds = parent.manualRefill.waterBucketItemIds;
+        }
+    }
+
+    private void inheritTimingSection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (timing == null) {
+            timing = parent.timing;
+            return;
+        }
+        if (parent.timing == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Basis")) timing.timerBasis = parent.timing.timerBasis;
+    }
+
+    private void inheritTickPolicySection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (tickPolicy == null) {
+            tickPolicy = parent.tickPolicy;
+            return;
+        }
+        if (parent.tickPolicy == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Mode")) tickPolicy.mode = parent.tickPolicy.mode;
+        if (!nestedExplicitKeys.contains("OwnerOfflineGraceHours")) {
+            tickPolicy.ownerOfflineGraceHours = parent.tickPolicy.ownerOfflineGraceHours;
+        }
+        if (!nestedExplicitKeys.contains("OwnerOfflineDecayMultiplier")) {
+            tickPolicy.ownerOfflineDecayMultiplier = parent.tickPolicy.ownerOfflineDecayMultiplier;
+        }
+    }
+
+    private void inheritDamageSection(@Nonnull TwNeedsConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (damage == null) {
+            damage = parent.damage;
+            return;
+        }
+        if (parent.damage == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Enabled")) damage.enabled = parent.damage.enabled;
+        if (!nestedExplicitKeys.contains("Model")) damage.model = parent.damage.model;
+        if (!nestedExplicitKeys.contains("DualNeedRule")) damage.dualNeedRule = parent.damage.dualNeedRule;
+        if (!nestedExplicitKeys.contains("StarvationDamagePerMinute")) {
+            damage.starvationDamagePerMinute = parent.damage.starvationDamagePerMinute;
+        }
+        if (!nestedExplicitKeys.contains("DehydrationDamagePerMinute")) {
+            damage.dehydrationDamagePerMinute = parent.damage.dehydrationDamagePerMinute;
+        }
+        if (!nestedExplicitKeys.contains("Lethal")) damage.lethal = parent.damage.lethal;
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     protected TwNeedsConfig() {
@@ -509,6 +851,14 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public TimingSettings getTiming() {
         return timing == null ? new TimingSettings() : timing;
+    }
+
+    public TickPolicySettings getTickPolicy() {
+        return tickPolicy == null ? new TickPolicySettings() : tickPolicy;
+    }
+
+    public DamageSettings getDamage() {
+        return damage == null ? new DamageSettings() : damage;
     }
 
     /** Bounds and default values for hunger and thirst state. */
@@ -678,6 +1028,59 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 
+    /** Owner-presence policy controlling how elapsed time contributes to needs progression. */
+    public static final class TickPolicySettings {
+        private TickPolicyMode mode = TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY;
+        private double ownerOfflineGraceHours = 72.0;
+        private double ownerOfflineDecayMultiplier = 1.0;
+
+        public TickPolicyMode getMode() {
+            return mode == null ? TickPolicyMode.OWNER_ONLINE_GRACE_THEN_DECAY : mode;
+        }
+
+        public double getOwnerOfflineGraceHours() {
+            return sanitizeNonNegative(ownerOfflineGraceHours, 72.0);
+        }
+
+        public double getOwnerOfflineDecayMultiplier() {
+            return sanitizeNonNegative(ownerOfflineDecayMultiplier, 1.0);
+        }
+    }
+
+    /** Time-based hunger/thirst damage settings. */
+    public static final class DamageSettings {
+        private boolean enabled;
+        private DamageModel model = DamageModel.MIN_ONLY_FLAT;
+        private DualNeedRule dualNeedRule = DualNeedRule.USE_HIGHER_ONLY;
+        private double starvationDamagePerMinute = 2.0;
+        private double dehydrationDamagePerMinute = 3.0;
+        private boolean lethal = true;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public DamageModel getModel() {
+            return model == null ? DamageModel.MIN_ONLY_FLAT : model;
+        }
+
+        public DualNeedRule getDualNeedRule() {
+            return dualNeedRule == null ? DualNeedRule.USE_HIGHER_ONLY : dualNeedRule;
+        }
+
+        public double getStarvationDamagePerMinute() {
+            return sanitizeNonNegative(starvationDamagePerMinute, 2.0);
+        }
+
+        public double getDehydrationDamagePerMinute() {
+            return sanitizeNonNegative(dehydrationDamagePerMinute, 3.0);
+        }
+
+        public boolean isLethal() {
+            return lethal;
+        }
+    }
+
     /** Duration basis for needs decay/refill timing. */
     public enum TimerBasis {
         REAL_TIME,
@@ -694,6 +1097,74 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
                 }
             }
             return REAL_TIME;
+        }
+
+        public String toConfigValue() {
+            return name();
+        }
+    }
+
+    /** Policy mode for owner-presence needs progression gating. */
+    public enum TickPolicyMode {
+        ANY_LOADED_PLAYER,
+        OWNER_ONLINE_GRACE_THEN_DECAY;
+
+        public static TickPolicyMode fromConfigValue(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return OWNER_ONLINE_GRACE_THEN_DECAY;
+            }
+            String normalized = value.trim().toUpperCase(Locale.ROOT);
+            for (TickPolicyMode mode : values()) {
+                if (mode.name().equals(normalized)) {
+                    return mode;
+                }
+            }
+            return OWNER_ONLINE_GRACE_THEN_DECAY;
+        }
+
+        public String toConfigValue() {
+            return name();
+        }
+    }
+
+    /** Damage application model when needs are depleted. */
+    public enum DamageModel {
+        MIN_ONLY_FLAT;
+
+        public static DamageModel fromConfigValue(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return MIN_ONLY_FLAT;
+            }
+            String normalized = value.trim().toUpperCase(Locale.ROOT);
+            for (DamageModel model : values()) {
+                if (model.name().equals(normalized)) {
+                    return model;
+                }
+            }
+            return MIN_ONLY_FLAT;
+        }
+
+        public String toConfigValue() {
+            return name();
+        }
+    }
+
+    /** Rule used when hunger and thirst both qualify for damage at the same tick. */
+    public enum DualNeedRule {
+        USE_HIGHER_ONLY,
+        SUM_BOTH;
+
+        public static DualNeedRule fromConfigValue(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return USE_HIGHER_ONLY;
+            }
+            String normalized = value.trim().toUpperCase(Locale.ROOT);
+            for (DualNeedRule rule : values()) {
+                if (rule.name().equals(normalized)) {
+                    return rule;
+                }
+            }
+            return USE_HIGHER_ONLY;
         }
 
         public String toConfigValue() {

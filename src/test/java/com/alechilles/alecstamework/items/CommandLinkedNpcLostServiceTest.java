@@ -97,6 +97,47 @@ class CommandLinkedNpcLostServiceTest {
         assertEquals(replacementNpcUuid, reloaded.getReplacementUuid(originalNpcUuid));
     }
 
+    @Test
+    void doesNotMarkCapturedCompanionAsLost() {
+        Path persistencePath = tempDir.resolve("CommandLinkedNpcLost.dat");
+        CommandLinkedNpcCaptureService captureService = new CommandLinkedNpcCaptureService();
+        CommandLinkedNpcLostService service = new CommandLinkedNpcLostService(
+                persistencePath,
+                null,
+                null,
+                captureService
+        );
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+
+        captureService.recordCapturedSnapshot(
+                new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
+                        npcUuid,
+                        ownerUuid,
+                        new String[] {"tool-alpha"},
+                        "server.npcRole.test",
+                        "Captured Companion",
+                        new Vector3d(2.0, 3.0, 4.0),
+                        new Vector3d(5.0, 6.0, 7.0),
+                        System.currentTimeMillis()
+                )
+        );
+
+        service.recordLostFromRelocationDrop(
+                npcUuid,
+                ownerUuid,
+                new Vector3d(10.0, 20.0, 30.0),
+                new Vector3d(40.0, 50.0, 60.0),
+                null,
+                100L,
+                200L,
+                2
+        );
+
+        assertFalse(service.isLost(npcUuid));
+        assertNull(service.getLostSnapshot(npcUuid));
+    }
+
     private void assertVector(Vector3d value, double x, double y, double z) {
         assertNotNull(value);
         assertEquals(x, value.x, 0.0001);

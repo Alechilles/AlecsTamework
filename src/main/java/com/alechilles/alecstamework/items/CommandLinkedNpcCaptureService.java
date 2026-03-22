@@ -51,10 +51,33 @@ public final class CommandLinkedNpcCaptureService {
         if (!snapshot.containsToolId(toolId)) {
             return null;
         }
-        if (snapshot.ownerId() != null && ownerUuid != null && !snapshot.ownerId().equals(ownerUuid)) {
+        if (!isOwnerCompatible(snapshot, ownerUuid)) {
             return null;
         }
         return snapshot;
+    }
+
+    @Nullable
+    public CapturedLinkedNpcSnapshot getCapturedSnapshotForOwner(UUID npcUuid, @Nullable UUID ownerUuid) {
+        CapturedLinkedNpcSnapshot snapshot = getCapturedSnapshot(npcUuid);
+        if (snapshot == null) {
+            return null;
+        }
+        if (!isOwnerCompatible(snapshot, ownerUuid)) {
+            return null;
+        }
+        return snapshot;
+    }
+
+    @Nullable
+    public CapturedLinkedNpcSnapshot getCapturedSnapshotForToolOrOwner(UUID npcUuid,
+                                                                        String toolId,
+                                                                        @Nullable UUID ownerUuid) {
+        CapturedLinkedNpcSnapshot byTool = getCapturedSnapshotForTool(npcUuid, toolId, ownerUuid);
+        if (byTool != null) {
+            return byTool;
+        }
+        return getCapturedSnapshotForOwner(npcUuid, ownerUuid);
     }
 
     public void recordCapturedSnapshot(@Nullable CapturedLinkedNpcSnapshot snapshot) {
@@ -275,6 +298,13 @@ public final class CommandLinkedNpcCaptureService {
                 .filter(value -> value != null && !value.isBlank())
                 .distinct()
                 .toArray(String[]::new);
+    }
+
+    private boolean isOwnerCompatible(CapturedLinkedNpcSnapshot snapshot, @Nullable UUID ownerUuid) {
+        if (snapshot == null) {
+            return false;
+        }
+        return snapshot.ownerId() == null || ownerUuid == null || snapshot.ownerId().equals(ownerUuid);
     }
 
     private String encodeVector(@Nullable Vector3d vector) {

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -43,6 +44,9 @@ public final class TraitDamageModifierSystem extends DamageEventSystem {
         if (!(amount > 0.0f)) {
             return;
         }
+        if (shouldBypassTraitModifiers(damage)) {
+            return;
+        }
         if (chunk == null || store == null) {
             return;
         }
@@ -73,6 +77,18 @@ public final class TraitDamageModifierSystem extends DamageEventSystem {
             return;
         }
         damage.setAmount((float) nextAmount);
+    }
+
+    static boolean shouldBypassTraitModifiers(Damage damage) {
+        if (damage == null) {
+            return false;
+        }
+        Damage.Source source = damage.getSource();
+        if (!(source instanceof Damage.EnvironmentSource environmentSource)) {
+            return false;
+        }
+        String type = environmentSource.getType();
+        return type != null && type.equalsIgnoreCase(CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE);
     }
 
     private double resolveSourceDamageMultiplier(Damage damage, Store<EntityStore> store) {

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.actions.PassiveBreedingSweepService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
@@ -8,6 +9,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.Map;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -37,7 +39,11 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
             return;
         }
         nextSweepAtMs = schedulerNowMs + resolveIntervalMs(runtimeSettings, store);
-        sweepService.runSweep(store, BreedingTimeService.resolveCurrentTimeMs(store));
+        try {
+            sweepService.runSweep(store, BreedingTimeService.resolveCurrentTimeMs(store));
+        } catch (Throwable throwable) {
+            log(Level.SEVERE, "Passive breeding sweep failed and was skipped this interval: " + throwable);
+        }
     }
 
     @Nonnull
@@ -94,5 +100,13 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     }
 
     private record SweepRuntimeSettings(int intervalSeconds, TwBreedingConfig.TimerBasis basis) {
+    }
+
+    private static void log(@Nonnull Level level, @Nullable String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || instance.getLogger() == null || message == null || message.isBlank()) {
+            return;
+        }
+        instance.getLogger().at(level).log(message);
     }
 }

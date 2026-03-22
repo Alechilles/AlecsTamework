@@ -1,696 +1,819 @@
 $C = "Common.ui";
 
-@RemoveIconButtonLabelStyle = LabelStyle(
-  FontSize: 1,
-  TextColor: #00000000
-);
-
-@RemoveIconButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Default.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Hover.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Pressed.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Disabled.png"), LabelStyle: @RemoveIconButtonLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedActionIconLabelStyle = LabelStyle(
-  FontSize: 1,
-  TextColor: #00000000
-);
-
-@LinkedActionRecallButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedActionSetHomeButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedActionReturnHomeButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedActionRespawnButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Default.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedActiveStateButtonLabelStyle = LabelStyle(
-  FontSize: 1,
-  TextColor: #00000000
-);
-
-@LinkedActiveStateOnButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedActiveStateOffButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedBreedingStateOnButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedBreedingStateOffButtonStyle = TextButtonStyle(
-  Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle),
-  Sounds: $C.@ButtonSounds
-);
-
-@LinkedActionTooltipStyle = TextTooltipStyle(
-  Background: #0f1e30(0.96),
-  MaxWidth: 220,
-  LabelStyle: (
-    Wrap: true,
-    FontSize: 14,
-    TextColor: #eef4fb
-  ),
-  Padding: 12
-);
-
-@TraitTooltipLabelStyle = LabelStyle(
-  FontSize: 1,
-  TextColor: #00000000
-);
-
-@TraitTooltipButtonStyle = TextButtonStyle(
-  Default: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle),
-  Hovered: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle),
-  Pressed: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle),
-  Disabled: (Background: (Color: #00000000), LabelStyle: @TraitTooltipLabelStyle)
-);
+@RemoveIconButtonLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
+@RemoveIconButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Default.png"), LabelStyle: @RemoveIconButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Hover.png"), LabelStyle: @RemoveIconButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Pressed.png"), LabelStyle: @RemoveIconButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelRemoveButton_Disabled.png"), LabelStyle: @RemoveIconButtonLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActionIconLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
+@LinkedActionRecallButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Recall_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActionSetHomeButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActionReturnHomeButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActionRespawnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActiveStateButtonLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
+@LinkedActiveStateOnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActiveStateOffButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedBreedingStateOnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedBreedingStateOffButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleBreeding_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActionTooltipStyle = TextTooltipStyle(Background: #0f1e30(0.96), MaxWidth: 220, LabelStyle: (Wrap: true, FontSize: 14, TextColor: #eef4fb), Padding: 12);
+@TraitTooltipLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
+@TraitTooltipButtonStyle = TextButtonStyle(Default: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Hovered: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Pressed: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle), Disabled: (Background: (Color: #000000(0.0)), LabelStyle: @TraitTooltipLabelStyle));
 
 Group {
-  Anchor: (Top: 3, Left: 0, Right: 0, Height: 92);
-  Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
-  Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
+    Anchor: (Top: 3, Left: 0, Right: 0, Height: 92);
+    Background: (TexturePath: "Common/ContainerPanelPatch.png", Border: 4);
+    Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
 
-  Group #GroupTab {
-    Anchor: (Top: 14, Left: -10, Width: 6, Height: 48);
-    Background: #4b657f;
-    Visible: false;
-
-    TextButton #GroupTabButton {
-      Anchor: (Top: 0, Left: 0, Width: 6, Height: 48);
-      Style: @TraitTooltipButtonStyle;
-      Text: "";
-      TooltipText: "Set Group";
-      TextTooltipStyle: @LinkedActionTooltipStyle;
-    }
-  }
-
-  Label #Name {
-    Anchor: (Top: 0, Left: 18, Width: 188, Height: 22);
-    Text: "Companion";
-    Style: (
-      FontSize: 16,
-      RenderBold: true,
-      TextColor: #eff4fa,
-      HorizontalAlignment: Start,
-      VerticalAlignment: Center
-    );
-  }
-
-  Label #StatusUnloaded {
-    Anchor: (Top: 2, Right: 34, Width: 76, Height: 18);
-    Text: "UNLOADED";
-    Style: (
-      FontSize: 10,
-      RenderBold: true,
-      TextColor: #ffe5b4,
-      HorizontalAlignment: Center,
-      VerticalAlignment: Center
-    );
-    Visible: false;
-  }
-
-  Group #TraitStrip {
-    Anchor: (Top: 1, Right: 34, Width: 80, Height: 24);
-    LayoutMode: Left;
-
-    Group #TraitSlot0 {
-      Anchor: (Width: 24, Height: 24);
-      Visible: false;
-
-      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
-
-      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
-      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #6fc576; }
-      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
-      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
-
-      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-      Group #TraitIconImage {
-        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
-        Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+    Group #GroupTab {
+        Anchor: (Top: 14, Left: -10, Width: 6, Height: 48);
+        Background: #4b657f;
         Visible: false;
-      }
-      Label #TraitIcon {
-        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-        Text: "?";
-        Style: (
-          FontSize: 10,
-          RenderBold: true,
-          TextColor: #deebff,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
 
-      TextButton #TraitTooltip {
-        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
-        Text: "";
-        TooltipText: "Trait";
-        TextTooltipStyle: @LinkedActionTooltipStyle;
-      }
+        TextButton #GroupTabButton {
+            Anchor: (Top: 0, Left: 0, Width: 6, Height: 48);
+            Style: @TraitTooltipButtonStyle;
+            Text: "";
+            TooltipText: "Set Group";
+            TextTooltipStyle: @LinkedActionTooltipStyle;
+        }
     }
 
-    Group { Anchor: (Width: 4); }
+    Label #Name {
+        Anchor: (Top: 0, Left: 18, Width: 188, Height: 22);
+        Text: "Companion";
+        Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
+    }
 
-    Group #TraitSlot1 {
-      Anchor: (Width: 24, Height: 24);
-      Visible: false;
-
-      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
-
-      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
-      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #6fc576; }
-      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
-      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
-
-      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-      Group #TraitIconImage {
-        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
-        Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+    Label #StatusUnloaded {
+        Anchor: (Top: 2, Right: 34, Width: 76, Height: 18);
+        Text: "UNLOADED";
+        Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
-      }
-      Label #TraitIcon {
-        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-        Text: "?";
-        Style: (
-          FontSize: 10,
-          RenderBold: true,
-          TextColor: #deebff,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
-
-      TextButton #TraitTooltip {
-        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
-        Text: "";
-        TooltipText: "Trait";
-        TextTooltipStyle: @LinkedActionTooltipStyle;
-      }
     }
 
-    Group { Anchor: (Width: 4); }
+    Group #TraitStrip {
+        Anchor: (Top: 1, Right: 34, Width: 80, Height: 24);
+        LayoutMode: Left;
 
-    Group #TraitSlot2 {
-      Anchor: (Width: 24, Height: 24);
-      Visible: false;
+        Group #TraitSlot0 {
+            Anchor: (Width: 24, Height: 24);
+            Visible: false;
 
-      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
+            Group #RingTrackTop {
+                Anchor: (Top: 1, Left: 3, Width: 18, Height: 2);
+                Background: #23354a;
+            }
 
-      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
-      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #6fc576; }
-      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #6fc576; }
-      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #6fc576; }
+            Group #RingTrackRight {
+                Anchor: (Top: 3, Left: 21, Width: 2, Height: 18);
+                Background: #23354a;
+            }
 
-      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-      Group #TraitIconImage {
-        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
-        Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 3, Width: 18, Height: 2);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 3, Left: 1, Width: 2, Height: 18);
+                Background: #23354a;
+            }
+
+            Group #RingFillTop {
+                Anchor: (Top: 1, Left: 3, Width: 0, Height: 2);
+                Background: #6fc576;
+            }
+
+            Group #RingFillRight {
+                Anchor: (Top: 3, Left: 21, Width: 2, Height: 0);
+                Background: #6fc576;
+            }
+
+            Group #RingFillBottom {
+                Anchor: (Top: 21, Left: 3, Width: 0, Height: 2);
+                Background: #6fc576;
+            }
+
+            Group #RingFillLeft {
+                Anchor: (Top: 3, Left: 1, Width: 2, Height: 0);
+                Background: #6fc576;
+            }
+
+            Group {
+                Anchor: (Top: 5, Left: 5, Width: 14, Height: 14);
+                Background: #081220;
+            }
+
+            Group #TraitIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+                Visible: false;
+            }
+
+            Label #TraitIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "?";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #TraitTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Trait";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+
+        Group {
+            Anchor: (Width: 4);
+        }
+
+        Group #TraitSlot1 {
+            Anchor: (Width: 24, Height: 24);
+            Visible: false;
+
+            Group #RingTrackTop {
+                Anchor: (Top: 1, Left: 3, Width: 18, Height: 2);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 3, Left: 21, Width: 2, Height: 18);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 3, Width: 18, Height: 2);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 3, Left: 1, Width: 2, Height: 18);
+                Background: #23354a;
+            }
+
+            Group #RingFillTop {
+                Anchor: (Top: 1, Left: 3, Width: 0, Height: 2);
+                Background: #6fc576;
+            }
+
+            Group #RingFillRight {
+                Anchor: (Top: 3, Left: 21, Width: 2, Height: 0);
+                Background: #6fc576;
+            }
+
+            Group #RingFillBottom {
+                Anchor: (Top: 21, Left: 3, Width: 0, Height: 2);
+                Background: #6fc576;
+            }
+
+            Group #RingFillLeft {
+                Anchor: (Top: 3, Left: 1, Width: 2, Height: 0);
+                Background: #6fc576;
+            }
+
+            Group {
+                Anchor: (Top: 5, Left: 5, Width: 14, Height: 14);
+                Background: #081220;
+            }
+
+            Group #TraitIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+                Visible: false;
+            }
+
+            Label #TraitIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "?";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #TraitTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Trait";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+
+        Group {
+            Anchor: (Width: 4);
+        }
+
+        Group #TraitSlot2 {
+            Anchor: (Width: 24, Height: 24);
+            Visible: false;
+
+            Group #RingTrackTop {
+                Anchor: (Top: 1, Left: 3, Width: 18, Height: 2);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 3, Left: 21, Width: 2, Height: 18);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 3, Width: 18, Height: 2);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 3, Left: 1, Width: 2, Height: 18);
+                Background: #23354a;
+            }
+
+            Group #RingFillTop {
+                Anchor: (Top: 1, Left: 3, Width: 0, Height: 2);
+                Background: #6fc576;
+            }
+
+            Group #RingFillRight {
+                Anchor: (Top: 3, Left: 21, Width: 2, Height: 0);
+                Background: #6fc576;
+            }
+
+            Group #RingFillBottom {
+                Anchor: (Top: 21, Left: 3, Width: 0, Height: 2);
+                Background: #6fc576;
+            }
+
+            Group #RingFillLeft {
+                Anchor: (Top: 3, Left: 1, Width: 2, Height: 0);
+                Background: #6fc576;
+            }
+
+            Group {
+                Anchor: (Top: 5, Left: 5, Width: 14, Height: 14);
+                Background: #081220;
+            }
+
+            Group #TraitIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+                Visible: false;
+            }
+
+            Label #TraitIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "?";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #TraitTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Trait";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+    }
+
+    Label #StatusConfirm {
+        Anchor: (Top: 30, Right: 18, Width: 118, Height: 18);
+        Text: "CONFIRM REMOVE";
+        Style: (FontSize: 10, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
-      }
-      Label #TraitIcon {
-        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-        Text: "?";
-        Style: (
-          FontSize: 10,
-          RenderBold: true,
-          TextColor: #deebff,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
-
-      TextButton #TraitTooltip {
-        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
-        Text: "";
-        TooltipText: "Trait";
-        TextTooltipStyle: @LinkedActionTooltipStyle;
-      }
-    }
-  }
-
-  Label #StatusConfirm {
-    Anchor: (Top: 30, Right: 18, Width: 118, Height: 18);
-    Text: "CONFIRM REMOVE";
-    Style: (
-      FontSize: 10,
-      RenderBold: true,
-      TextColor: #ffd3d3,
-      HorizontalAlignment: Center,
-      VerticalAlignment: Center
-    );
-    Visible: false;
-  }
-
-  Label #StatusInactive {
-    Anchor: (Top: 30, Right: 34, Width: 74, Height: 18);
-    Text: "INACTIVE";
-    Style: (
-      FontSize: 10,
-      RenderBold: true,
-      TextColor: #ffbd9a,
-      HorizontalAlignment: Center,
-      VerticalAlignment: Center
-    );
-    Visible: false;
-  }
-
-  TextButton #LinkButton {
-    Anchor: (Top: 56, Right: 0, Width: 64, Height: 22);
-    Style: (
-      ...$C.@SmallSecondaryTextButtonStyle,
-      Sounds: $C.@ButtonSounds
-    );
-    Padding: (Horizontal: 8);
-    Text: "Link";
-    TooltipText: "Link companion";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #ReleaseButton {
-    Anchor: (Top: 56, Right: 66, Width: 72, Height: 22);
-    Style: (
-      ...$C.@SmallSecondaryTextButtonStyle,
-      Sounds: $C.@ButtonSounds
-    );
-    Padding: (Horizontal: 4);
-    Text: "Release";
-    TooltipText: "Animal will be released to the wild and disappear permanently.";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #CullButton {
-    Anchor: (Top: 56, Right: 0, Width: 62, Height: 22);
-    Style: (
-      ...$C.@SmallSecondaryTextButtonStyle,
-      Sounds: $C.@ButtonSounds
-    );
-    Padding: (Horizontal: 4);
-    Text: "Cull";
-    TooltipText: "Animal will be slaughtered and cannot be revived.";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #ActiveToggleActiveButton {
-    Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
-    Style: @LinkedActiveStateOnButtonStyle;
-    Text: "";
-    TooltipText: "Active: receives bulk commands. Click to set inactive.";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #ActiveToggleInactiveButton {
-    Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
-    Style: @LinkedActiveStateOffButtonStyle;
-    Text: "";
-    TooltipText: "Inactive: ignored by bulk commands. Click to set active.";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #BreedingToggleEnabledButton {
-    Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
-    Style: @LinkedBreedingStateOnButtonStyle;
-    Text: "";
-    TooltipText: "Breeding: enabled. Click to disable.";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #BreedingToggleDisabledButton {
-    Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
-    Style: @LinkedBreedingStateOffButtonStyle;
-    Text: "";
-    TooltipText: "Breeding: disabled. Click to enable.";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #RespawnButton {
-    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
-    Style: @LinkedActionRespawnButtonStyle;
-    Text: "";
-    TooltipText: "Revive";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #RecallButton {
-    Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
-    Style: @LinkedActionRecallButtonStyle;
-    Text: "";
-    TooltipText: "Recall";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #SetHomeButton {
-    Anchor: (Top: 56, Right: 0, Width: 24, Height: 24);
-    Style: @LinkedActionSetHomeButtonStyle;
-    Text: "";
-    TooltipText: "Set Home";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #ReturnHomeButton {
-    Anchor: (Top: 56, Right: 28, Width: 24, Height: 24);
-    Style: @LinkedActionReturnHomeButtonStyle;
-    Text: "";
-    TooltipText: "Return Home";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-    Visible: false;
-  }
-
-  TextButton #RemoveButton {
-    Anchor: (Top: 1, Right: 0, Width: 14, Height: 14);
-    Style: @RemoveIconButtonStyle;
-    Text: "";
-    TooltipText: "Unlink";
-    TextTooltipStyle: @LinkedActionTooltipStyle;
-  }
-
-  Group #HealthFrame {
-    Anchor: (Top: 30, Left: 0, Width: 206, Height: 14);
-    Background: #0a121b(0.95);
-
-    Group #HealthFill {
-      Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
-      Background: #6fc576;
     }
 
-    Label #HealthTextShadow {
-      Anchor: (Top: 2, Left: 1, Width: 206, Height: 12);
-      Text: "?/?";
-      Style: (
-        FontSize: 9,
-        RenderBold: true,
-        TextColor: #081220(0.90),
-        HorizontalAlignment: Center,
-        VerticalAlignment: Center
-      );
-    }
-
-    Label #HealthText {
-      Anchor: (Top: 1, Left: 0, Width: 206, Height: 12);
-      Text: "?/?";
-      Style: (
-        FontSize: 9,
-        RenderBold: true,
-        TextColor: #eef4fa,
-        HorizontalAlignment: Center,
-        VerticalAlignment: Center
-      );
-    }
-  }
-
-  Group #NeedRingRow {
-    Anchor: (Top: 52, Left: 0, Width: 114, Height: 24);
-    LayoutMode: Left;
-
-    Group #NeedHappiness {
-      Anchor: (Width: 24, Height: 24);
-
-      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
-
-      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #f2c97c; }
-      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #f2c97c; }
-      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #f2c97c; }
-      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #f2c97c; }
-
-      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-      Group #NeedIconImage {
-        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
-        Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Happiness.png");
+    Label #StatusInactive {
+        Anchor: (Top: 30, Right: 34, Width: 74, Height: 18);
+        Text: "INACTIVE";
+        Style: (FontSize: 10, RenderBold: true, TextColor: #ffbd9a, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
-      }
-      Label #NeedIcon {
-        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-        Text: "M";
-        Style: (
-          FontSize: 10,
-          RenderBold: true,
-          TextColor: #deebff,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
-
-      TextButton #NeedTooltip {
-        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
-        Text: "";
-        TooltipText: "Happiness";
-        TextTooltipStyle: @LinkedActionTooltipStyle;
-      }
     }
 
-    Group { Anchor: (Width: 6); }
-
-    Group #NeedHunger {
-      Anchor: (Width: 24, Height: 24);
-
-      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
-
-      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #d9a066; }
-      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #d9a066; }
-      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #d9a066; }
-      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #d9a066; }
-
-      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-      Group #NeedIconImage {
-        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
-        Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Hunger.png");
+    TextButton #LinkButton {
+        Anchor: (Top: 56, Right: 0, Width: 64, Height: 22);
+        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Padding: (Horizontal: 8);
+        Text: "Link";
+        TooltipText: "Link companion";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
-      }
-      Label #NeedIcon {
-        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-        Text: "F";
-        Style: (
-          FontSize: 10,
-          RenderBold: true,
-          TextColor: #deebff,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
-
-      TextButton #NeedTooltip {
-        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
-        Text: "";
-        TooltipText: "Hunger";
-        TextTooltipStyle: @LinkedActionTooltipStyle;
-      }
     }
 
-    Group { Anchor: (Width: 6); }
-
-    Group #NeedThirst {
-      Anchor: (Width: 24, Height: 24);
-
-      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
-
-      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #76b7ea; }
-      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #76b7ea; }
-      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #76b7ea; }
-      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #76b7ea; }
-
-      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-      Group #NeedIconImage {
-        Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
-        Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Thirst.png");
+    TextButton #ReleaseButton {
+        Anchor: (Top: 56, Right: 66, Width: 72, Height: 22);
+        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Padding: (Horizontal: 4);
+        Text: "Release";
+        TooltipText: "Animal will be released to the wild and disappear permanently.";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
-      }
-      Label #NeedIcon {
-        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-        Text: "W";
-        Style: (
-          FontSize: 10,
-          RenderBold: true,
-          TextColor: #deebff,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
+    }
 
-      TextButton #NeedTooltip {
-        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
-        Text: "";
-        TooltipText: "Thirst";
+    TextButton #CullButton {
+        Anchor: (Top: 56, Right: 0, Width: 62, Height: 22);
+        Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
+        Padding: (Horizontal: 4);
+        Text: "Cull";
+        TooltipText: "Animal will be slaughtered and cannot be revived.";
         TextTooltipStyle: @LinkedActionTooltipStyle;
-      }
+        Visible: false;
     }
 
-    Group { Anchor: (Width: 6); }
-
-    Group #BreedingCooldown {
-      Anchor: (Width: 24, Height: 24);
-      Visible: false;
-
-      Group #RingTrackTop { Anchor: (Top: 1, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 18); Background: #23354a; }
-      Group #RingTrackBottom { Anchor: (Top: 21, Left: 3, Width: 18, Height: 2); Background: #23354a; }
-      Group #RingTrackLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 18); Background: #23354a; }
-
-      Group #RingFillTop { Anchor: (Top: 1, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
-      Group #RingFillRight { Anchor: (Top: 3, Left: 21, Width: 2, Height: 0); Background: #e8a574; }
-      Group #RingFillBottom { Anchor: (Top: 21, Left: 3, Width: 0, Height: 2); Background: #e8a574; }
-      Group #RingFillLeft { Anchor: (Top: 3, Left: 1, Width: 2, Height: 0); Background: #e8a574; }
-
-      Group { Anchor: (Top: 5, Left: 5, Width: 14, Height: 14); Background: #081220; }
-      Label #BreedingCooldownIcon {
-        Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-        Text: "B";
-        Style: (
-          FontSize: 10,
-          RenderBold: true,
-          TextColor: #deebff,
-          HorizontalAlignment: Center,
-          VerticalAlignment: Center
-        );
-      }
-
-      TextButton #BreedingCooldownTooltip {
-        Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
-        Style: @TraitTooltipButtonStyle;
+    TextButton #ActiveToggleActiveButton {
+        Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
+        Style: @LinkedActiveStateOnButtonStyle;
         Text: "";
-        TooltipText: "Breeding cooldown";
+        TooltipText: "Active: receives bulk commands. Click to set inactive.";
         TextTooltipStyle: @LinkedActionTooltipStyle;
-      }
-    }
-  }
-
-  Group #FutureStatAFrame {
-    Anchor: (Top: 124, Left: 0, Width: 360, Height: 10);
-    Background: #0a121b(0.95);
-    Visible: false;
-
-    Group #FutureStatAFill {
-      Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
-      Background: #7cc6f2;
+        Visible: false;
     }
 
-    Label #FutureStatAText {
-      Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-      Text: "Stat A: ?/?";
-      Style: (
-        FontSize: 10,
-        TextColor: #9fc2dd,
-        HorizontalAlignment: Start,
-        VerticalAlignment: Center
-      );
-    }
-  }
-
-  Group #FutureStatBFrame {
-    Anchor: (Top: 138, Left: 0, Width: 360, Height: 10);
-    Background: #0a121b(0.95);
-    Visible: false;
-
-    Group #FutureStatBFill {
-      Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
-      Background: #f2c97c;
+    TextButton #ActiveToggleInactiveButton {
+        Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
+        Style: @LinkedActiveStateOffButtonStyle;
+        Text: "";
+        TooltipText: "Inactive: ignored by bulk commands. Click to set active.";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
     }
 
-    Label #FutureStatBText {
-      Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-      Text: "Stat B: ?/?";
-      Style: (
-        FontSize: 10,
-        TextColor: #9fc2dd,
-        HorizontalAlignment: Start,
-        VerticalAlignment: Center
-      );
-    }
-  }
-
-  Group #FutureActionBar {
-    Anchor: (Top: 152, Left: 0, Width: 360, Height: 24);
-    LayoutMode: Left;
-    Visible: false;
-
-    TextButton #TraitsButton {
-      Anchor: (Left: 0, Width: 108, Height: 22);
-      Text: "Traits";
-      Visible: false;
+    TextButton #BreedingToggleEnabledButton {
+        Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
+        Style: @LinkedBreedingStateOnButtonStyle;
+        Text: "";
+        TooltipText: "Breeding: enabled. Click to disable.";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
     }
 
-    TextButton #TalentsButton {
-      Anchor: (Left: 6, Width: 108, Height: 22);
-      Text: "Talents";
-      Visible: false;
+    TextButton #BreedingToggleDisabledButton {
+        Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
+        Style: @LinkedBreedingStateOffButtonStyle;
+        Text: "";
+        TooltipText: "Breeding: disabled. Click to enable.";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
     }
-  }
+
+    TextButton #RespawnButton {
+        Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
+        Style: @LinkedActionRespawnButtonStyle;
+        Text: "";
+        TooltipText: "Revive";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #RecallButton {
+        Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
+        Style: @LinkedActionRecallButtonStyle;
+        Text: "";
+        TooltipText: "Recall";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #SetHomeButton {
+        Anchor: (Top: 56, Right: 0, Width: 24, Height: 24);
+        Style: @LinkedActionSetHomeButtonStyle;
+        Text: "";
+        TooltipText: "Set Home";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #ReturnHomeButton {
+        Anchor: (Top: 56, Right: 28, Width: 24, Height: 24);
+        Style: @LinkedActionReturnHomeButtonStyle;
+        Text: "";
+        TooltipText: "Return Home";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #RemoveButton {
+        Anchor: (Top: 1, Right: 0, Width: 14, Height: 14);
+        Style: @RemoveIconButtonStyle;
+        Text: "";
+        TooltipText: "Unlink";
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+    }
+
+    Group #HealthFrame {
+        Anchor: (Top: 30, Left: 0, Width: 206, Height: 14);
+        Background: #0a121b(0.95);
+
+        Group #HealthFill {
+            Anchor: (Left: 1, Top: 1, Width: 204, Height: 12);
+            Background: #6fc576;
+        }
+
+        Label #HealthTextShadow {
+            Anchor: (Top: 2, Left: 1, Width: 206, Height: 12);
+            Text: "?/?";
+            Style: (FontSize: 9, RenderBold: true, TextColor: #081220(0.9), HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+
+        Label #HealthText {
+            Anchor: (Top: 1, Left: 0, Width: 206, Height: 12);
+            Text: "?/?";
+            Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fa, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+    }
+
+    Group #NeedRingRow {
+        Anchor: (Top: 52, Left: 0, Width: 114, Height: 24);
+        LayoutMode: Left;
+
+        Group #NeedHappiness {
+            Anchor: (Width: 24, Height: 24);
+
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #f6d56b;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+            }
+
+            Group {
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+                Background: #081220;
+            }
+
+            Group #NeedIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Happiness.png");
+                Visible: false;
+            }
+
+            Label #NeedIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "M";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #NeedTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Happiness";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+
+        Group {
+            Anchor: (Width: 6);
+        }
+
+        Group #NeedHunger {
+            Anchor: (Width: 24, Height: 24);
+
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #f08e45;
+            }
+
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #f08e45;
+            }
+
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #f08e45;
+            }
+
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #f08e45;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #f08e45;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+            }
+
+            Group {
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+                Background: #081220;
+            }
+
+            Group #NeedIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Hunger.png");
+                Visible: false;
+            }
+
+            Label #NeedIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "F";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #NeedTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Hunger";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+
+        Group {
+            Anchor: (Width: 6);
+        }
+
+        Group #NeedThirst {
+            Anchor: (Width: 24, Height: 24);
+
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #5bc2ff;
+            }
+
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #5bc2ff;
+            }
+
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #5bc2ff;
+            }
+
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #5bc2ff;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #5bc2ff;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+            }
+
+            Group {
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+                Background: #081220;
+            }
+
+            Group #NeedIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Need_Thirst.png");
+                Visible: false;
+            }
+
+            Label #NeedIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "W";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #NeedTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Thirst";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+
+        Group {
+            Anchor: (Width: 6);
+        }
+
+        Group #BreedingCooldown {
+            Anchor: (Width: 24, Height: 24);
+            Visible: false;
+
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #f6d56b;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #f6d56b;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+            }
+
+            Group {
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+                Background: #081220;
+            }
+
+            Label #BreedingCooldownIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "B";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #BreedingCooldownTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Breeding cooldown";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+    }
+
+    Group #FutureStatAFrame {
+        Anchor: (Top: 124, Left: 0, Width: 360, Height: 10);
+        Background: #0a121b(0.95);
+        Visible: false;
+
+        Group #FutureStatAFill {
+            Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
+            Background: #7cc6f2;
+        }
+
+        Label #FutureStatAText {
+            Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
+            Text: "Stat A: ?/?";
+            Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+    }
+
+    Group #FutureStatBFrame {
+        Anchor: (Top: 138, Left: 0, Width: 360, Height: 10);
+        Background: #0a121b(0.95);
+        Visible: false;
+
+        Group #FutureStatBFill {
+            Anchor: (Left: 1, Top: 1, Width: 358, Height: 8);
+            Background: #f2c97c;
+        }
+
+        Label #FutureStatBText {
+            Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
+            Text: "Stat B: ?/?";
+            Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+    }
+
+    Group #FutureActionBar {
+        Anchor: (Top: 152, Left: 0, Width: 360, Height: 24);
+        LayoutMode: Left;
+        Visible: false;
+
+        TextButton #TraitsButton {
+            Anchor: (Left: 0, Width: 108, Height: 22);
+            Text: "Traits";
+            Visible: false;
+        }
+
+        TextButton #TalentsButton {
+            Anchor: (Left: 6, Width: 108, Height: 22);
+            Text: "Talents";
+            Visible: false;
+        }
+    }
 }

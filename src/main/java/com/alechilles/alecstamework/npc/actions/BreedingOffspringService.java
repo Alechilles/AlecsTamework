@@ -25,6 +25,7 @@ import com.hypixel.hytale.server.npc.storage.AlarmStore;
 import com.hypixel.hytale.server.npc.util.Alarm;
 import it.unimi.dsi.fastutil.Pair;
 import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ThreadLocalRandom;
@@ -55,6 +56,7 @@ final class BreedingOffspringService {
     private final BreedingFertilityOffspringService fertilityOffspringService;
     private final BreedingOffspringProgressionService progressionService;
     private final BreedingParticleOffsetResolver particleOffsetResolver;
+    private final BreedingClaimLimitPolicyService claimLimitPolicyService;
 
     BreedingOffspringService(BreedingPartnerService partnerService) {
         this.partnerService = partnerService;
@@ -62,12 +64,21 @@ final class BreedingOffspringService {
         this.fertilityOffspringService = new BreedingFertilityOffspringService();
         this.progressionService = new BreedingOffspringProgressionService();
         this.particleOffsetResolver = new BreedingParticleOffsetResolver();
+        this.claimLimitPolicyService = new BreedingClaimLimitPolicyService();
     }
 
     boolean tryCompletePairing(Ref<EntityStore> sourceRef,
                                Store<EntityStore> store,
                                TameworkBreedingComponent sourceBreeding,
                                @Nullable TwBreedingConfig config) {
+        return tryCompletePairing(sourceRef, store, sourceBreeding, config, null);
+    }
+
+    boolean tryCompletePairing(Ref<EntityStore> sourceRef,
+                               Store<EntityStore> store,
+                               TameworkBreedingComponent sourceBreeding,
+                               @Nullable TwBreedingConfig config,
+                               @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations) {
         if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
             return false;
         }
@@ -89,6 +100,42 @@ final class BreedingOffspringService {
         TameworkBreedingComponent livePartnerBreeding = getBreedingComponent(partner.ref, store);
         if (livePartnerBreeding == null || !livePartnerBreeding.isReady()) {
             return false;
+        }
+        Vector3d spawnAnchor = resolveSpawnAnchor(sourceRef, partner.ref, store);
+        String sourceRoleId = resolveRoleId(sourceNpc);
+        BreedingClaimLimitPolicyService.Decision claimDecision = claimLimitPolicyService.evaluate(
+                store,
+                spawnAnchor,
+                config,
+                0
+        );
+        if (!claimDecision.allowed()) {
+            logInfo(String.format(
+                    "Breeding pairing blocked by claim limits: reason=%s parentA=%s parentB=%s.",
+                    claimDecision.reason(),
+                    sourceNpc.getUuid(),
+                    partnerNpc.getUuid()
+            ));
+            return false;
+        }
+        int remainingClaimHeadroom = claimDecision.remainingHeadroom();
+        if (pendingClaimReservations != null
+                && claimDecision.capEnforced()
+                && claimDecision.claimReservationKey() != null) {
+            int pendingReserved = pendingClaimReservations.getOrDefault(claimDecision.claimReservationKey(), 0);
+            remainingClaimHeadroom -= Math.max(0, pendingReserved);
+            if (remainingClaimHeadroom <= 0) {
+                logInfo(String.format(
+                        "Breeding pairing blocked by pending claim reservations: party=%s pending=%d cap=%d current=%d parentA=%s parentB=%s.",
+                        claimDecision.claimReservationKey().partyId(),
+                        pendingReserved,
+                        claimDecision.effectiveCap(),
+                        claimDecision.currentCount(),
+                        sourceNpc.getUuid(),
+                        partnerNpc.getUuid()
+                ));
+                return false;
+            }
         }
 
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
@@ -119,11 +166,11 @@ final class BreedingOffspringService {
         OffspringSpawnContext context = new OffspringSpawnContext(
                 sourceNpc.getUuid(),
                 partnerNpc.getUuid(),
-                resolveRoleId(sourceNpc),
+                sourceRoleId,
                 resolveRoleId(partnerNpc),
                 sourceNpc.getRoleIndex(),
                 partnerNpc.getRoleIndex(),
-                resolveSpawnAnchor(sourceRef, partner.ref, store),
+                spawnAnchor,
                 resolveOwnerSnapshot(sourceRef, store),
                 resolveOwnerSnapshot(partner.ref, store),
                 resolveTamedState(sourceRef, store),
@@ -131,6 +178,21 @@ final class BreedingOffspringService {
                 resolveConfigId(config, sourceBreeding, livePartnerBreeding)
         );
         schedulePairingEffects(context, store);
+        if (pendingClaimReservations != null
+                && claimDecision.capEnforced()
+                && claimDecision.claimReservationKey() != null) {
+            int reservationAmount = Math.min(
+                    BreedingFertilityOffspringService.maxOffspringPerBreed(),
+                    Math.max(0, remainingClaimHeadroom)
+            );
+            if (reservationAmount > 0) {
+                pendingClaimReservations.merge(
+                        claimDecision.claimReservationKey(),
+                        reservationAmount,
+                        Integer::sum
+                );
+            }
+        }
         return true;
     }
 
@@ -584,9 +646,53 @@ final class BreedingOffspringService {
             ));
             return;
         }
+        BreedingClaimLimitPolicyService.Decision claimDecision = claimLimitPolicyService.evaluate(
+                store,
+                spawnPosition,
+                childBreedingConfig,
+                0
+        );
+        if (!claimDecision.allowed()) {
+            logInfo(String.format(
+                    "Breeding spawn skipped by claim limits: reason=%s parentA=%s parentB=%s role=%s.",
+                    claimDecision.reason(),
+                    context.parentAUuid(),
+                    context.parentBUuid(),
+                    spawnRole.roleId()
+            ));
+            return;
+        }
+        int targetSpawnCount = fertilityRoll.offspringCount();
+        if (claimDecision.capEnforced()) {
+            targetSpawnCount = Math.min(targetSpawnCount, claimDecision.remainingHeadroom());
+            if (targetSpawnCount <= 0) {
+                logInfo(String.format(
+                        "Breeding spawn skipped: claim cap reached parentA=%s parentB=%s role=%s cap=%d current=%d pending=%d.",
+                        context.parentAUuid(),
+                        context.parentBUuid(),
+                        spawnRole.roleId(),
+                        claimDecision.effectiveCap(),
+                        claimDecision.currentCount(),
+                        claimDecision.pendingReservations()
+                ));
+                return;
+            }
+            if (targetSpawnCount < fertilityRoll.offspringCount()) {
+                logInfo(String.format(
+                        "Breeding offspring clamped by claim cap: requested=%d allowed=%d parentA=%s parentB=%s role=%s cap=%d current=%d.",
+                        fertilityRoll.offspringCount(),
+                        targetSpawnCount,
+                        context.parentAUuid(),
+                        context.parentBUuid(),
+                        spawnRole.roleId(),
+                        claimDecision.effectiveCap(),
+                        claimDecision.currentCount()
+                ));
+            }
+        }
         Vector3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
         int spawnedCount = 0;
-        for (int i = 0; i < fertilityRoll.offspringCount(); i++) {
+        for (int i = 0; i < targetSpawnCount; i++) {
             Vector3d spawnAttemptPosition = i == 0
                     ? spawnPosition
                     : new Vector3d(

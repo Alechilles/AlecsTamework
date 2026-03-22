@@ -7,13 +7,13 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
  */
 final class LinkedNpcPanelVitalsBinder {
     private static final int VITAL_FILL_MAX_WIDTH = 204;
-    private static final double NEED_RING_SEGMENT_MULTIPLIER = 4.0;
-    private static final int NEED_RING_SEGMENT_PIXELS = 18;
-    private static final String HAPPINESS_FILL_COLOR = "#f2c97c";
-    private static final String HUNGER_FILL_COLOR = "#d9a066";
-    private static final String THIRST_FILL_COLOR = "#76b7ea";
-    private static final String BREEDING_ACTIVE_FILL_COLOR = "#e8a574";
-    private static final String UNAVAILABLE_FILL_COLOR = "#4e6077";
+    private static final double NEED_RING_BAR1_LENGTH = 12.0;
+    private static final double NEED_RING_BAR2_LENGTH = 24.0;
+    private static final double NEED_RING_BAR3_LENGTH = 24.0;
+    private static final double NEED_RING_BAR4_LENGTH = 24.0;
+    private static final double NEED_RING_BAR5_LENGTH = 12.0;
+    private static final double NEED_RING_PERIMETER_PIXELS =
+            NEED_RING_BAR1_LENGTH + NEED_RING_BAR2_LENGTH + NEED_RING_BAR3_LENGTH + NEED_RING_BAR4_LENGTH + NEED_RING_BAR5_LENGTH;
     private static final String ICON_NEED_HAPPINESS = "Tamework/LinkedPanelIcons/Need_Happiness.png";
     private static final String ICON_NEED_HUNGER = "Tamework/LinkedPanelIcons/Need_Hunger.png";
     private static final String ICON_NEED_THIRST = "Tamework/LinkedPanelIcons/Need_Thirst.png";
@@ -73,22 +73,19 @@ final class LinkedNpcPanelVitalsBinder {
                 commandBuilder,
                 entrySelector + " #NeedHappiness",
                 new NeedIcon("M", ICON_NEED_HAPPINESS),
-                resolveHappinessNeed(entry),
-                HAPPINESS_FILL_COLOR
+                resolveHappinessNeed(entry)
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedHunger",
                 new NeedIcon("F", ICON_NEED_HUNGER),
-                resolveHungerNeed(entry),
-                HUNGER_FILL_COLOR
+                resolveHungerNeed(entry)
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedThirst",
                 new NeedIcon("W", ICON_NEED_THIRST),
-                resolveThirstNeed(entry),
-                THIRST_FILL_COLOR
+                resolveThirstNeed(entry)
         );
     }
 
@@ -172,8 +169,7 @@ final class LinkedNpcPanelVitalsBinder {
     private static void bindNeedRing(UICommandBuilder commandBuilder,
                                      String slotSelector,
                                      NeedIcon icon,
-                                     NeedVisual visual,
-                                     String activeFillColor) {
+                                     NeedVisual visual) {
         commandBuilder.set(slotSelector + ".Visible", true);
         if (icon.hasTexturePath()) {
             commandBuilder.set(slotSelector + " #NeedIcon.Visible", false);
@@ -185,29 +181,12 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(slotSelector + " #NeedIcon.Text", icon.fallbackText());
         }
         commandBuilder.set(slotSelector + " #NeedTooltip.TooltipText", visual.tooltipText());
-        String fillColor = visual.available() ? activeFillColor : UNAVAILABLE_FILL_COLOR;
-        commandBuilder.set(slotSelector + " #RingFillTop.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillRight.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillBottom.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillLeft.Background", fillColor);
-
         SegmentFill fill = resolveSegmentFill(visual.available() ? visual.fillRatio() : 0.0);
-        commandBuilder.setObject(
-                slotSelector + " #RingFillTop.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitTopFillAnchor(toPixels(fill.top()), true)
-        );
-        commandBuilder.setObject(
-                slotSelector + " #RingFillRight.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitRightFillAnchor(toPixels(fill.right()), true)
-        );
-        commandBuilder.setObject(
-                slotSelector + " #RingFillBottom.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitBottomFillAnchor(toPixels(fill.bottom()), true)
-        );
-        commandBuilder.setObject(
-                slotSelector + " #RingFillLeft.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitLeftFillAnchor(toPixels(fill.left()), true)
-        );
+        commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
     }
 
     private static void bindBreedingCooldown(UICommandBuilder commandBuilder,
@@ -223,47 +202,37 @@ final class LinkedNpcPanelVitalsBinder {
                 slotSelector + " #BreedingCooldownTooltip.TooltipText",
                 LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry)
         );
-        String fillColor = BREEDING_ACTIVE_FILL_COLOR;
-        commandBuilder.set(slotSelector + " #RingFillTop.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillRight.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillBottom.Background", fillColor);
-        commandBuilder.set(slotSelector + " #RingFillLeft.Background", fillColor);
-
-        double fillRatio = entry.breedingCooldownRatio();
-        SegmentFill fill = resolveSegmentFill(fillRatio);
-        commandBuilder.setObject(
-                slotSelector + " #RingFillTop.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitTopFillAnchor(toPixels(fill.top()), true)
-        );
-        commandBuilder.setObject(
-                slotSelector + " #RingFillRight.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitRightFillAnchor(toPixels(fill.right()), true)
-        );
-        commandBuilder.setObject(
-                slotSelector + " #RingFillBottom.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitBottomFillAnchor(toPixels(fill.bottom()), true)
-        );
-        commandBuilder.setObject(
-                slotSelector + " #RingFillLeft.Anchor",
-                LinkedNpcPanelAnchorFactory.buildTraitLeftFillAnchor(toPixels(fill.left()), true)
-        );
+        SegmentFill fill = resolveSegmentFill(entry.breedingCooldownRatio());
+        commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar2.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar2Anchor(fill.bar2()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar3.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar3Anchor(fill.bar3()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar4.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar4Anchor(fill.bar4()));
+        commandBuilder.setObject(slotSelector + " #RingFillBar5.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar5Anchor(fill.bar5()));
     }
 
     private static SegmentFill resolveSegmentFill(double fillRatio) {
-        double scaled = clamp(fillRatio) * NEED_RING_SEGMENT_MULTIPLIER;
-        double first = resolveSegmentRatio(scaled, 0.0);
-        double second = resolveSegmentRatio(scaled, 1.0);
-        double third = resolveSegmentRatio(scaled, 2.0);
-        double fourth = resolveSegmentRatio(scaled, 3.0);
-        return new SegmentFill(first, fourth, third, second);
+        int coveredPixels = (int) Math.floor(clamp(fillRatio) * NEED_RING_PERIMETER_PIXELS + 1.0e-9);
+        int remaining = coveredPixels;
+        int bar1 = consumePixels(remaining, (int) NEED_RING_BAR1_LENGTH);
+        remaining -= bar1;
+        int bar2 = consumePixels(remaining, (int) NEED_RING_BAR2_LENGTH);
+        remaining -= bar2;
+        int bar3 = consumePixels(remaining, (int) NEED_RING_BAR3_LENGTH);
+        remaining -= bar3;
+        int bar4 = consumePixels(remaining, (int) NEED_RING_BAR4_LENGTH);
+        remaining -= bar4;
+        int bar5 = consumePixels(remaining, (int) NEED_RING_BAR5_LENGTH);
+        return new SegmentFill(
+                bar1,
+                bar2,
+                bar3,
+                bar4,
+                bar5
+        );
     }
 
-    private static double resolveSegmentRatio(double scaledRatio, double segmentIndex) {
-        return clamp(scaledRatio - segmentIndex);
-    }
-
-    private static int toPixels(double segmentRatio) {
-        return (int) Math.round(clamp(segmentRatio) * NEED_RING_SEGMENT_PIXELS);
+    private static int consumePixels(int remaining, int segmentLength) {
+        return Math.max(0, Math.min(segmentLength, remaining));
     }
 
     private static int percent(double ratio) {
@@ -286,6 +255,6 @@ final class LinkedNpcPanelVitalsBinder {
         }
     }
 
-    private record SegmentFill(double top, double right, double bottom, double left) {
+    private record SegmentFill(int bar1, int bar2, int bar3, int bar4, int bar5) {
     }
 }

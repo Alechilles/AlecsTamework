@@ -65,6 +65,20 @@ public final class CommandNpcRelocationService {
         this.relocationDropListener = relocationDropListener;
     }
 
+    public void cancelPendingRelocation(@Nullable UUID npcUuid) {
+        if (npcUuid == null) {
+            return;
+        }
+        PendingRelocation pending = pendingByNpc.remove(npcUuid);
+        if (pending != null) {
+            pending.markCrossWorldTransferFinished();
+            logTravelDiagnostic(
+                    Level.INFO,
+                    "Cancelled pending relocation for npc=" + npcUuid + " due to explicit lifecycle transition."
+            );
+        }
+    }
+
     public void queueRelocation(World world,
                                 UUID npcUuid,
                                 Vector3d destination,

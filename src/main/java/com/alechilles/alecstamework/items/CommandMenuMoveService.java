@@ -30,6 +30,7 @@ final class CommandMenuMoveService {
     private final CommandResolutionService resolutionService;
     private final CommandLinkMutationService linkMutationService;
     private final CommandLinkedNpcDeathService deathService;
+    private final CommandLinkedNpcCaptureService captureService;
     private final CommandLinkedNpcLostService lostService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandStepExecutionService stepExecutionService;
@@ -43,6 +44,7 @@ final class CommandMenuMoveService {
     CommandMenuMoveService(CommandResolutionService resolutionService,
                            CommandLinkMutationService linkMutationService,
                            CommandLinkedNpcDeathService deathService,
+                           CommandLinkedNpcCaptureService captureService,
                            CommandLinkedNpcLostService lostService,
                            CommandRelocationDispatchService relocationDispatchService,
                            CommandStepExecutionService stepExecutionService,
@@ -55,6 +57,7 @@ final class CommandMenuMoveService {
         this.resolutionService = resolutionService;
         this.linkMutationService = linkMutationService;
         this.deathService = deathService;
+        this.captureService = captureService;
         this.lostService = lostService;
         this.relocationDispatchService = relocationDispatchService;
         this.stepExecutionService = stepExecutionService;
@@ -111,6 +114,15 @@ final class CommandMenuMoveService {
             if (deathService != null
                     && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
                 feedbackService.showWarning(player, "That companion is dead. Use Respawn when it is ready.");
+                return;
+            }
+            if (captureService != null
+                    && captureService.getCapturedSnapshotForToolOrOwner(
+                    npcUuid,
+                    toolId,
+                    player.getUuid()
+            ) != null) {
+                feedbackService.showWarning(player, "That companion is captured in a soul lantern. Spawn it first.");
                 return;
             }
             if (lostService != null && lostService.isLost(npcUuid)) {

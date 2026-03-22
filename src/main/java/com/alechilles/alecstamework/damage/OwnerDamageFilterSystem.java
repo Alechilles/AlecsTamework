@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -12,13 +13,18 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.SystemGroup;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Cancels damage based on owner/tamework protection settings.
@@ -32,19 +38,20 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
     }
 
     private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
+    private final ComponentType<EntityStore, TransformComponent> transformType;
     private final HytaleLogger logger;
+    private final SimpleClaimsTamedDamagePolicyService claimDamagePolicyService;
 
     public OwnerDamageFilterSystem(HytaleLogger logger) {
         this.ownerType = TameworkOwnerComponent.getComponentType();
+        this.transformType = TransformComponent.getComponentType();
         this.logger = logger;
+        this.claimDamagePolicyService = new SimpleClaimsTamedDamagePolicyService();
     }
 
     @Override
     public Query<EntityStore> getQuery() {
-        ComponentType<EntityStore, TameworkOwnerComponent> type = ownerType != null
-                ? ownerType
-                : TameworkOwnerComponent.getComponentType();
-        return type != null ? Query.and(type) : Query.any();
+        return Query.any();
     }
 
     @Override
@@ -59,50 +66,26 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
             if (damage == null || damage.isCancelled()) {
                 return;
             }
-            ComponentType<EntityStore, TameworkOwnerComponent> type = ownerType != null
-                    ? ownerType
-                    : TameworkOwnerComponent.getComponentType();
-            if (type == null) {
-                return;
-            }
-            // Only apply filters to owned NPCs.
-            TameworkOwnerComponent owner = chunk.getComponent(index, type);
-            if (owner == null || owner.getOwnerId() == null) {
-                return;
-            }
             Ref<EntityStore> targetRef = chunk.getReferenceTo(index);
-            String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
-            TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-            boolean blockOwnerDamage = settings.isBlockOwnerDamage();
-            boolean blockAllPlayerDamageIfOwned = settings.isBlockAllPlayerDamageIfOwned();
-            boolean invulnerableIfOwned = settings.isInvulnerableIfOwned();
-            if (!blockOwnerDamage && !blockAllPlayerDamageIfOwned && !invulnerableIfOwned) {
+            if (targetRef == null || !targetRef.isValid()) {
                 return;
             }
-            // Optional full invulnerability for owned pets.
-            if (invulnerableIfOwned) {
+
+            UUID attackerPlayerUuid = resolveAttackerPlayerUuid(damage.getSource(), store);
+            if (shouldDenyOwnedDamage(index, chunk, store, targetRef, attackerPlayerUuid)) {
                 cancelDamage(damage);
                 return;
             }
-            // Owner-based rules only apply to player-sourced damage.
-            Damage.Source source = damage.getSource();
-            if (!(source instanceof Damage.EntitySource)) {
-                return;
-            }
-            Ref<EntityStore> sourceRef = ((Damage.EntitySource) source).getRef();
-            if (sourceRef == null || !sourceRef.isValid()) {
-                return;
-            }
-            Player player = store.getComponent(sourceRef, Player.getComponentType());
-            if (player == null) {
-                return;
-            }
-            // Optionally block all player damage against owned pets.
-            if (blockAllPlayerDamageIfOwned) {
-                cancelDamage(damage);
-                return;
-            }
-            if (blockOwnerDamage && owner.getOwnerId().equals(player.getUuid())) {
+
+            TwGlobalConfig globalConfig = TwGlobalConfig.resolveSimpleClaimsSettingsConfig();
+            SimpleClaimsTamedDamagePolicyService.Decision claimDecision = claimDamagePolicyService.evaluate(
+                    targetRef,
+                    store,
+                    resolveTargetPosition(index, chunk, store, targetRef),
+                    attackerPlayerUuid,
+                    globalConfig
+            );
+            if (!claimDecision.allowed()) {
                 cancelDamage(damage);
             }
         } finally {
@@ -110,6 +93,89 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
                 logSlowDamageFilter(startedNs, damage);
             }
         }
+    }
+
+    private boolean shouldDenyOwnedDamage(int index,
+                                          ArchetypeChunk<EntityStore> chunk,
+                                          Store<EntityStore> store,
+                                          Ref<EntityStore> targetRef,
+                                          @Nullable UUID attackerPlayerUuid) {
+        ComponentType<EntityStore, TameworkOwnerComponent> type = ownerType != null
+                ? ownerType
+                : TameworkOwnerComponent.getComponentType();
+        if (type == null) {
+            return false;
+        }
+        TameworkOwnerComponent owner = chunk.getComponent(index, type);
+        if (owner == null || owner.getOwnerId() == null) {
+            return false;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
+        boolean blockOwnerDamage = settings.isBlockOwnerDamage();
+        boolean blockAllPlayerDamageIfOwned = settings.isBlockAllPlayerDamageIfOwned();
+        boolean invulnerableIfOwned = settings.isInvulnerableIfOwned();
+        if (!blockOwnerDamage && !blockAllPlayerDamageIfOwned && !invulnerableIfOwned) {
+            return false;
+        }
+        if (invulnerableIfOwned) {
+            return true;
+        }
+        if (attackerPlayerUuid == null) {
+            return false;
+        }
+        if (blockAllPlayerDamageIfOwned) {
+            return true;
+        }
+        return blockOwnerDamage && owner.getOwnerId().equals(attackerPlayerUuid);
+    }
+
+    @Nullable
+    private Vector3d resolveTargetPosition(int index,
+                                           ArchetypeChunk<EntityStore> chunk,
+                                           Store<EntityStore> store,
+                                           Ref<EntityStore> targetRef) {
+        ComponentType<EntityStore, TransformComponent> type = transformType != null
+                ? transformType
+                : TransformComponent.getComponentType();
+        if (type == null) {
+            return null;
+        }
+        TransformComponent chunkTransform = chunk.getComponent(index, type);
+        if (chunkTransform != null && chunkTransform.getPosition() != null) {
+            return chunkTransform.getPosition();
+        }
+        TransformComponent storeTransform = store.getComponent(targetRef, type);
+        return storeTransform != null ? storeTransform.getPosition() : null;
+    }
+
+    @Nullable
+    private UUID resolveAttackerPlayerUuid(@Nullable Damage.Source source,
+                                           @Nullable Store<EntityStore> store) {
+        if (source == null || store == null) {
+            return null;
+        }
+        if (source instanceof Damage.ProjectileSource projectileSource) {
+            UUID sourcePlayerUuid = resolvePlayerUuidFromRef(projectileSource.getRef(), store);
+            if (sourcePlayerUuid != null) {
+                return sourcePlayerUuid;
+            }
+            return resolvePlayerUuidFromRef(projectileSource.getProjectile(), store);
+        }
+        if (source instanceof Damage.EntitySource entitySource) {
+            return resolvePlayerUuidFromRef(entitySource.getRef(), store);
+        }
+        return null;
+    }
+
+    @Nullable
+    private UUID resolvePlayerUuidFromRef(@Nullable Ref<EntityStore> sourceRef,
+                                          @Nonnull Store<EntityStore> store) {
+        if (sourceRef == null || !sourceRef.isValid()) {
+            return null;
+        }
+        Player player = store.getComponent(sourceRef, Player.getComponentType());
+        return player != null ? player.getUuid() : null;
     }
 
     private void cancelDamage(Damage damage) {

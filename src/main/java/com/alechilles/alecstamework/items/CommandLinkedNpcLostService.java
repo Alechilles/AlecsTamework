@@ -52,25 +52,35 @@ public final class CommandLinkedNpcLostService {
     private final HytaleLogger logger;
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
+    @Nullable
+    private final CommandLinkedNpcCaptureService captureService;
 
     public CommandLinkedNpcLostService() {
-        this(null, null, null);
+        this(null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath) {
-        this(persistencePath, null, null);
+        this(persistencePath, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath, @Nullable HytaleLogger logger) {
-        this(persistencePath, logger, null);
+        this(persistencePath, logger, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath,
                                        @Nullable HytaleLogger logger,
                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
+        this(persistencePath, logger, stateSnapshotService, null);
+    }
+
+    public CommandLinkedNpcLostService(@Nullable Path persistencePath,
+                                       @Nullable HytaleLogger logger,
+                                       @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                       @Nullable CommandLinkedNpcCaptureService captureService) {
         this.persistencePath = persistencePath != null ? persistencePath.toAbsolutePath().normalize() : null;
         this.logger = logger;
         this.stateSnapshotService = stateSnapshotService;
+        this.captureService = captureService;
         loadPersistedSnapshots();
     }
 
@@ -83,6 +93,15 @@ public final class CommandLinkedNpcLostService {
                                              long droppedAtMs,
                                              int retryAttempts) {
         if (npcUuid == null) {
+            return;
+        }
+        if (captureService != null && captureService.getCapturedSnapshot(npcUuid) != null) {
+            clearLostSnapshot(npcUuid);
+            if (logger != null) {
+                logger.at(Level.FINE).log(
+                        "Skipped lost transition for captured companion (npc=" + npcUuid + ")."
+                );
+            }
             return;
         }
         LostLinkedNpcSnapshot current = snapshotsByNpc.get(npcUuid);

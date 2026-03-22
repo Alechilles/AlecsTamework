@@ -16,6 +16,10 @@ import org.herolias.tooltips.api.TooltipProvider;
 final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     static final String PROVIDER_ID = "Alecstamework.Spawner";
     private static final String DEFAULT_LANGUAGE = "en-US";
+    private static final String CAPTURED_ENTITY_KEY = "CapturedEntity";
+    private static final String CAPTURED_ENTITY_NPC_NAME_KEY = "NpcNameKey";
+    private static final String GENERIC_CAPTURE_CRATE_NAME = "Capture Crate";
+    private static final String GENERIC_CAPTURE_CRATE_KEY = "server.items.captureCrate.name";
     private static final String NAME_LINE_PREFIX = "Name: ";
     private static final String ROLE_LINE_PREFIX = "Role: ";
 
@@ -34,7 +38,7 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
 
     @Override
     public int getPriority() {
-        return TooltipPriority.LATE;
+        return TooltipPriority.OVERRIDE + 1;
     }
 
     @Override
@@ -52,14 +56,22 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         if (metadataDoc == null || !isCaptured(metadataDoc)) {
             return null;
         }
-        String roleId = readString(metadataDoc, TameworkMetadataKeys.CAPTURE_ROLE_ID);
-        String roleDisplay = resolveRoleDisplay(roleId, normalizeLanguage(language));
-        String displayName = firstNonBlank(
-                readString(metadataDoc, TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME),
-                readString(metadataDoc, TameworkMetadataKeys.NPC_NAME),
-                roleDisplay
+        String roleId = firstNonBlank(
+                readString(metadataDoc, TameworkMetadataKeys.CAPTURE_ROLE_ID),
+                readCapturedEntityNpcNameKey(metadataDoc)
         );
+        String roleDisplay = resolveRoleDisplay(roleId, normalizeLanguage(language));
+        String tooltipDisplayName = sanitizeTooltipDisplayName(
+                readString(metadataDoc, TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME),
+                roleDisplay,
+                roleId
+        );
+        String displayName = firstNonBlank(tooltipDisplayName, roleDisplay);
         if (displayName == null || displayName.isBlank()) {
+            return null;
+        }
+        String itemName = formatItemName(tooltipDisplayName, roleDisplay);
+        if (itemName == null || itemName.isBlank()) {
             return null;
         }
 
@@ -69,8 +81,8 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         }
 
         TooltipData.Builder builder = TooltipData.builder()
-                .nameOverride(displayName)
-                .hashInput((mode.name()) + "|" + displayName + "|" + (roleDisplay == null ? "" : roleDisplay));
+                .nameOverride(itemName)
+                .hashInput((mode.name()) + "|" + itemName + "|" + displayName + "|" + (roleDisplay == null ? "" : roleDisplay));
         appendLine(builder, mode, NAME_LINE_PREFIX + displayName);
         if (roleDisplay != null && !roleDisplay.isBlank()) {
             appendLine(builder, mode, ROLE_LINE_PREFIX + roleDisplay);
@@ -123,7 +135,11 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
 
     private static boolean isCaptured(BsonDocument metadataDoc) {
         BsonValue captured = metadataDoc.get(TameworkMetadataKeys.CAPTURED);
-        return captured != null && captured.isBoolean() && captured.asBoolean().getValue();
+        if (captured != null && captured.isBoolean() && captured.asBoolean().getValue()) {
+            return true;
+        }
+        BsonValue capturedEntity = metadataDoc.get(CAPTURED_ENTITY_KEY);
+        return capturedEntity != null && capturedEntity.isDocument();
     }
 
     @Nullable
@@ -141,6 +157,18 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         }
         String raw = value.toString();
         return raw == null || raw.isBlank() ? null : raw;
+    }
+
+    @Nullable
+    private static String readCapturedEntityNpcNameKey(@Nullable BsonDocument metadataDoc) {
+        if (metadataDoc == null || !metadataDoc.containsKey(CAPTURED_ENTITY_KEY)) {
+            return null;
+        }
+        BsonValue capturedEntity = metadataDoc.get(CAPTURED_ENTITY_KEY);
+        if (capturedEntity == null || !capturedEntity.isDocument()) {
+            return null;
+        }
+        return readString(capturedEntity.asDocument(), CAPTURED_ENTITY_NPC_NAME_KEY);
     }
 
     private void appendLine(TooltipData.Builder builder,
@@ -203,6 +231,45 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
 
     private static String normalizeLanguage(@Nullable String language) {
         return language == null || language.isBlank() ? DEFAULT_LANGUAGE : language;
+    }
+
+    @Nullable
+    private static String formatItemName(@Nullable String displayName, @Nullable String roleName) {
+        String resolvedRole = roleName == null || roleName.isBlank() ? null : roleName;
+        String resolvedDisplay = displayName == null || displayName.isBlank() ? null : displayName;
+        if (resolvedDisplay == null) {
+            return resolvedRole;
+        }
+        if (resolvedRole == null) {
+            return resolvedDisplay;
+        }
+        if (resolvedDisplay.equalsIgnoreCase(resolvedRole)) {
+            return resolvedRole;
+        }
+        return resolvedDisplay + " (" + resolvedRole + ")";
+    }
+
+    @Nullable
+    private static String sanitizeTooltipDisplayName(@Nullable String tooltipDisplayName,
+                                                     @Nullable String roleDisplay,
+                                                     @Nullable String roleId) {
+        if (tooltipDisplayName == null) {
+            return null;
+        }
+        String trimmed = tooltipDisplayName.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.equalsIgnoreCase(GENERIC_CAPTURE_CRATE_NAME) || trimmed.equalsIgnoreCase(GENERIC_CAPTURE_CRATE_KEY)) {
+            return null;
+        }
+        if (roleDisplay != null && !roleDisplay.isBlank() && trimmed.equalsIgnoreCase(roleDisplay)) {
+            return null;
+        }
+        if (roleId != null && !roleId.isBlank() && trimmed.equalsIgnoreCase(roleId)) {
+            return null;
+        }
+        return trimmed;
     }
 
     @Nullable

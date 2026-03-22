@@ -16,7 +16,8 @@
     "ServerVersion": "2026.02.19-1a311a592",
     "Dependencies": {},
     "OptionalDependencies": {
-        "org.herolias:DynamicTooltipsLib": "1.5.x"
+        "org.herolias:DynamicTooltipsLib": "1.5.x",
+        "Buuz135:SimpleClaims": "1.0.x"
     },
     "LoadBefore": {},
     "DisabledByDefault": false,

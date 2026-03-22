@@ -29,12 +29,12 @@ class TameworkSpawnerTooltipProviderTest {
 
         TooltipData data = provider.getTooltipData(
                 "*Spawner_Test_State_Filled",
-                capturedMetadata("Fluffy", "Mob_Cat", null).toJson(),
+                capturedMetadata("Fluffy", "Mob_Cat", "Fluffy").toJson(),
                 "en-US"
         );
 
         assertNotNull(data);
-        assertEquals("Fluffy", data.getNameOverride());
+        assertEquals("Fluffy (Mob_Cat)", data.getNameOverride());
         assertEquals(2, data.getLines().size());
         assertEquals("Name: Fluffy", data.getLines().get(0));
         assertTrue(data.getLines().get(1).startsWith("Role: "));
@@ -53,12 +53,12 @@ class TameworkSpawnerTooltipProviderTest {
 
         TooltipData data = provider.getTooltipData(
                 "*Spawner_Test_State_Filled",
-                capturedMetadata("Fluffy", "Mob_Cat", null).toJson(),
+                capturedMetadata("Fluffy", "Mob_Cat", "Fluffy").toJson(),
                 "en-US"
         );
 
         assertNotNull(data);
-        assertEquals("Fluffy", data.getNameOverride());
+        assertEquals("Fluffy (Mob_Cat)", data.getNameOverride());
         assertEquals(0, data.getLines().size());
         assertNotNull(data.getDescriptionOverride());
         assertTrue(data.getDescriptionOverride().contains("Name: Fluffy"));
@@ -99,8 +99,91 @@ class TameworkSpawnerTooltipProviderTest {
         );
 
         assertNotNull(data);
-        assertEquals("Buddy", data.getNameOverride());
-        assertEquals("Name: Buddy", data.getLines().get(0));
+        assertEquals("Mob_Cat", data.getNameOverride());
+        assertEquals("Name: Mob_Cat", data.getLines().get(0));
+    }
+
+    @Test
+    void missingDisplayNameFallsBackToRoleName() {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("Spawner_Test", ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerFilledItemId("*Spawner_Test_State_Filled")
+                .build());
+        TameworkSpawnerTooltipProvider provider = new TameworkSpawnerTooltipProvider(registry, new TranslationRegistry());
+
+        TooltipData data = provider.getTooltipData(
+                "*Spawner_Test_State_Filled",
+                capturedMetadata(null, "Mob_Cat", null).toJson(),
+                "en-US"
+        );
+
+        assertNotNull(data);
+        assertEquals("Mob_Cat", data.getNameOverride());
+        assertEquals("Name: Mob_Cat", data.getLines().get(0));
+    }
+
+    @Test
+    void emptyDisplayNameFallsBackToRoleName() {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("Spawner_Test", ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerFilledItemId("*Spawner_Test_State_Filled")
+                .build());
+        TameworkSpawnerTooltipProvider provider = new TameworkSpawnerTooltipProvider(registry, new TranslationRegistry());
+
+        TooltipData data = provider.getTooltipData(
+                "*Spawner_Test_State_Filled",
+                capturedMetadata("", "Mob_Cat", null).toJson(),
+                "en-US"
+        );
+
+        assertNotNull(data);
+        assertEquals("Mob_Cat", data.getNameOverride());
+        assertEquals("Name: Mob_Cat", data.getLines().get(0));
+    }
+
+    @Test
+    void tooltipRoleNameUsesRoleForItemNameEvenWithGenericNpcName() {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("Spawner_Test", ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerFilledItemId("*Spawner_Test_State_Filled")
+                .build());
+        TameworkSpawnerTooltipProvider provider = new TameworkSpawnerTooltipProvider(registry, new TranslationRegistry());
+
+        TooltipData data = provider.getTooltipData(
+                "*Spawner_Test_State_Filled",
+                capturedMetadata("Cat", "Cat", "Capture Crate").toJson(),
+                "en-US"
+        );
+
+        assertNotNull(data);
+        assertEquals("Cat", data.getNameOverride());
+    }
+
+    @Test
+    void capturedEntityRoleFallbackAndGenericDisplayNameUseRoleOnly() {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("Spawner_Test", ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerFilledItemId("*Spawner_Test_State_Filled")
+                .build());
+        TameworkSpawnerTooltipProvider provider = new TameworkSpawnerTooltipProvider(registry, new TranslationRegistry());
+
+        BsonDocument metadata = new BsonDocument()
+                .append(TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME, new BsonString("Capture Crate"))
+                .append("CapturedEntity", new BsonDocument().append("NpcNameKey", new BsonString("Cat")));
+
+        TooltipData data = provider.getTooltipData(
+                "*Spawner_Test_State_Filled",
+                metadata.toJson(),
+                "en-US"
+        );
+
+        assertNotNull(data);
+        assertEquals("Cat", data.getNameOverride());
+        assertEquals("Name: Cat", data.getLines().get(0));
     }
 
     private static BsonDocument capturedMetadata(String tooltipName, String roleId, String npcName) {

@@ -36,6 +36,10 @@ final class BreedingFertilityOffspringService {
         return Math.max(0, Math.min(MAX_OFFSPRING_PER_BREED, count));
     }
 
+    static int maxOffspringPerBreed() {
+        return MAX_OFFSPRING_PER_BREED;
+    }
+
     private static double resolveFertilityMultiplier(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store) {
         double value = TraitModifierService.resolveMultiplier(

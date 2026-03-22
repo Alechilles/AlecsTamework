@@ -58,6 +58,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
@@ -80,6 +81,7 @@ import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
@@ -321,7 +323,8 @@ public class Tamework extends JavaPlugin {
         commandLinkedNpcLostService = new CommandLinkedNpcLostService(
                 getDataDirectory().resolve("CommandLinkedNpcLost.dat"),
                 getLogger(),
-                commandLinkedNpcStateSnapshotService
+                commandLinkedNpcStateSnapshotService,
+                commandLinkedNpcCaptureService
         );
         commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
         getEntityStoreRegistry().registerSystem(
@@ -364,7 +367,13 @@ public class Tamework extends JavaPlugin {
         );
 
         // Core handler for capture/spawn flows.
-        spawnerFeatureHandler = new SpawnerFeatureHandler(getLogger(), itemFeatureRegistry, commandLinkedNpcCaptureService);
+        spawnerFeatureHandler = new SpawnerFeatureHandler(
+                getLogger(),
+                itemFeatureRegistry,
+                commandLinkedNpcCaptureService,
+                commandNpcRelocationService,
+                commandLinkedNpcLostService
+        );
         // Core handler for naming flows.
         namingFeatureHandler = new NamingFeatureHandler(nameItemRegistry, translationRegistry);
         // Core handler for command-item linking and dispatch.
@@ -401,6 +410,15 @@ public class Tamework extends JavaPlugin {
                 PlayerInteractEvent.class,
                 ownerInteractionListener::onPlayerInteract
         );
+        OwnerPresenceTimelineService ownerPresenceTimelineService = OwnerPresenceTimelineService.get();
+        getEventRegistry().registerGlobal(
+                PlayerConnectEvent.class,
+                ownerPresenceTimelineService::onPlayerConnect
+        );
+        getEventRegistry().registerGlobal(
+                PlayerDisconnectEvent.class,
+                ownerPresenceTimelineService::onPlayerDisconnect
+        );
         if (namingFeatureHandler != null) {
             getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
             getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
@@ -432,6 +450,7 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void start() {
+        OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (hStatsIntegration != null) {
             hStatsIntegration.initialize();

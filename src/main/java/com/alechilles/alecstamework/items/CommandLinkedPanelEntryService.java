@@ -205,7 +205,7 @@ final class CommandLinkedPanelEntryService {
             }
             if (!loaded && !dead && captureService != null) {
                 CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
-                        captureService.getCapturedSnapshotForTool(record.npcUuid, toolId, player.getUuid());
+                        captureService.getCapturedSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
                 if (capturedSnapshot != null) {
                     captured = true;
                     String capturedName = capturedSnapshot.displayName();

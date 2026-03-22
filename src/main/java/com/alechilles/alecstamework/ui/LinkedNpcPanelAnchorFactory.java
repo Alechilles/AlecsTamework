@@ -7,6 +7,18 @@ import com.hypixel.hytale.server.core.ui.Value;
  * Builds anchor values for linked NPC panel elements.
  */
 final class LinkedNpcPanelAnchorFactory {
+    private static final int NEED_RING_THICKNESS = 3;
+    private static final int NEED_RING_TOP_Y = 0;
+    private static final int NEED_RING_SIDE_TOP = 0;
+    private static final int NEED_RING_BOTTOM_Y = 21;
+    private static final int NEED_RING_LEFT_X = 0;
+    private static final int NEED_RING_RIGHT_X = 21;
+    private static final int NEED_RING_TOP_LEFT_START = 0;
+    private static final int NEED_RING_TOP_RIGHT_START = 12;
+    private static final int NEED_RING_TOP_HALF_LENGTH = 12;
+    private static final int NEED_RING_SIDE_LENGTH = 24;
+    private static final int NEED_RING_BOTTOM_LENGTH = 24;
+
     private static final int TRAIT_RING_H_SEGMENT_LENGTH = 18;
     private static final int TRAIT_RING_V_SEGMENT_LENGTH = 18;
     private static final int TRAIT_RING_TOP_Y = 1;
@@ -59,6 +71,34 @@ final class LinkedNpcPanelAnchorFactory {
                 ? TRAIT_RING_V_SEGMENT_TOP
                 : TRAIT_RING_V_SEGMENT_TOP + (TRAIT_RING_V_SEGMENT_LENGTH - clamped);
         return buildAnchor(TRAIT_RING_LEFT_X, top, 2, clamped);
+    }
+
+    static Anchor buildNeedRingBar1Anchor(int width) {
+        int clamped = clamp(width, NEED_RING_TOP_HALF_LENGTH);
+        int left = NEED_RING_TOP_LEFT_START + (NEED_RING_TOP_HALF_LENGTH - clamped);
+        return buildAnchor(left, NEED_RING_TOP_Y, clamped, NEED_RING_THICKNESS);
+    }
+
+    static Anchor buildNeedRingBar2Anchor(int height) {
+        int clamped = clamp(height, NEED_RING_SIDE_LENGTH);
+        return buildAnchor(NEED_RING_LEFT_X, NEED_RING_SIDE_TOP, NEED_RING_THICKNESS, clamped);
+    }
+
+    static Anchor buildNeedRingBar3Anchor(int width) {
+        int clamped = clamp(width, NEED_RING_BOTTOM_LENGTH);
+        return buildAnchor(NEED_RING_TOP_LEFT_START, NEED_RING_BOTTOM_Y, clamped, NEED_RING_THICKNESS);
+    }
+
+    static Anchor buildNeedRingBar4Anchor(int height) {
+        int clamped = clamp(height, NEED_RING_SIDE_LENGTH);
+        int top = NEED_RING_SIDE_TOP + (NEED_RING_SIDE_LENGTH - clamped);
+        return buildAnchor(NEED_RING_RIGHT_X, top, NEED_RING_THICKNESS, clamped);
+    }
+
+    static Anchor buildNeedRingBar5Anchor(int width) {
+        int clamped = clamp(width, NEED_RING_TOP_HALF_LENGTH);
+        int left = NEED_RING_TOP_RIGHT_START + (NEED_RING_TOP_HALF_LENGTH - clamped);
+        return buildAnchor(left, NEED_RING_TOP_Y, clamped, NEED_RING_THICKNESS);
     }
 
     private static Anchor buildAnchor(int left, int top, int width, int height) {

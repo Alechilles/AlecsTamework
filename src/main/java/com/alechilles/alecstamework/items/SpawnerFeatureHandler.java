@@ -47,10 +47,16 @@ public final class SpawnerFeatureHandler {
     private final SpawnerNpcIdentityService npcIdentityService;
     private final SpawnerCaptureFinalizerService captureFinalizerService;
     private final SpawnerCapturePolicyService capturePolicyService;
+    @Nullable
+    private final CommandNpcRelocationService relocationService;
+    @Nullable
+    private final CommandLinkedNpcLostService lostService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
-                                 CommandLinkedNpcCaptureService captureService) {
+                                 CommandLinkedNpcCaptureService captureService,
+                                 @Nullable CommandNpcRelocationService relocationService,
+                                 @Nullable CommandLinkedNpcLostService lostService) {
         this.logger = logger;
         this.registry = registry;
         this.linkedNpcSyncService = new SpawnerLinkedNpcSyncService(captureService);
@@ -76,6 +82,8 @@ public final class SpawnerFeatureHandler {
                 ownershipPolicyService,
                 npcIdentityService
         );
+        this.relocationService = relocationService;
+        this.lostService = lostService;
     }
 
     // Entry point for in-world item interaction; decides capture vs spawn.
@@ -546,6 +554,14 @@ public final class SpawnerFeatureHandler {
         if (!playerInventoryService.updateHeldItem(player, updated)) {
             logger.at(Level.WARNING).log("Spawner stub: failed to update held item.");
             return false;
+        }
+        if (targetUuid != null) {
+            if (relocationService != null) {
+                relocationService.cancelPendingRelocation(targetUuid);
+            }
+            if (lostService != null) {
+                lostService.clearLostSnapshot(targetUuid);
+            }
         }
         effectService.playCaptureEffects(world, targetRef, config);
         captureFinalizerService.clearOwnerIfConfigured(player, config, targetRef);

@@ -172,6 +172,7 @@ public final class CommandItemFeatureHandler {
         this.relocationDispatchService = new CommandRelocationDispatchService(
                 relocationService,
                 deathService,
+                captureService,
                 resolutionService,
                 stepExecutionService,
                 companionPlacementService
@@ -198,6 +199,7 @@ public final class CommandItemFeatureHandler {
                 resolutionService,
                 linkMutationService,
                 deathService,
+                captureService,
                 lostService,
                 relocationDispatchService,
                 stepExecutionService,
@@ -304,6 +306,14 @@ public final class CommandItemFeatureHandler {
                 }
                 if (deathService != null
                         && deathService.getDeadSnapshotForTool(record.npcUuid, toolId, ownerUuid) != null) {
+                    continue;
+                }
+                if (captureService != null
+                        && captureService.getCapturedSnapshotForToolOrOwner(
+                        record.npcUuid,
+                        toolId,
+                        ownerUuid
+                ) != null) {
                     continue;
                 }
                 if (lostService != null && lostService.isLost(record.npcUuid)) {

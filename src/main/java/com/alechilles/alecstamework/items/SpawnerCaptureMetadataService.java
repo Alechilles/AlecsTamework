@@ -34,6 +34,9 @@ import javax.annotation.Nullable;
  * Builds and writes captured-NPC item metadata payloads for spawner items.
  */
 final class SpawnerCaptureMetadataService {
+    private static final String GENERIC_CAPTURE_CRATE_NAME = "Capture Crate";
+    private static final String GENERIC_CAPTURE_CRATE_KEY = "server.items.captureCrate.name";
+
     interface NpcDisplayNameResolver {
         @Nullable
         String resolve(@Nullable Ref<EntityStore> targetRef, @Nullable Store<EntityStore> store, @Nullable NPCEntity npc);
@@ -171,6 +174,11 @@ final class SpawnerCaptureMetadataService {
                 }
             }
         }
+        if (capturedName != null && capturedName.name != null && !capturedName.name.isBlank()) {
+            tooltipDisplayName = capturedName.name;
+        } else {
+            tooltipDisplayName = sanitizeTooltipDisplayName(tooltipDisplayName, npcNameKey);
+        }
         return new CaptureInfo(attachmentsJson, roleIndex, npcNameKey, iconPath, capturedName, tooltipDisplayName);
     }
 
@@ -263,10 +271,7 @@ final class SpawnerCaptureMetadataService {
         }
         String npcNameKey = captureInfo.npcNameKey;
         String tooltipName = captureInfo.tooltipDisplayName;
-        if (tooltipName == null || tooltipName.isBlank()) {
-            tooltipName = npcNameKey;
-        }
-        if (tooltipName != null && !tooltipName.isBlank()) {
+        if (tooltipName != null) {
             wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setNpcNameKey", tooltipName);
         }
         if (npcNameKey != null && !npcNameKey.isBlank()) {
@@ -317,14 +322,14 @@ final class SpawnerCaptureMetadataService {
         if (updated == null || captureInfo == null) {
             return updated;
         }
-        String displayName = captureInfo.tooltipDisplayName;
-        if (displayName == null || displayName.isBlank()) {
-            displayName = captureInfo.npcNameKey;
-        }
-        if (displayName == null || displayName.isBlank()) {
+        if (captureInfo.tooltipDisplayName == null) {
             return clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME);
         }
-        return updated.withMetadata(TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME, Codec.STRING, displayName);
+        return updated.withMetadata(
+                TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME,
+                Codec.STRING,
+                captureInfo.tooltipDisplayName
+        );
     }
 
     @Nullable
@@ -359,6 +364,24 @@ final class SpawnerCaptureMetadataService {
             }
         }
         return true;
+    }
+
+    @Nullable
+    private static String sanitizeTooltipDisplayName(@Nullable String candidate, @Nullable String roleId) {
+        if (candidate == null) {
+            return null;
+        }
+        String trimmed = candidate.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.equalsIgnoreCase(GENERIC_CAPTURE_CRATE_NAME) || trimmed.equalsIgnoreCase(GENERIC_CAPTURE_CRATE_KEY)) {
+            return null;
+        }
+        if (roleId != null && !roleId.isBlank() && trimmed.equalsIgnoreCase(roleId)) {
+            return null;
+        }
+        return trimmed;
     }
 
     @Nullable

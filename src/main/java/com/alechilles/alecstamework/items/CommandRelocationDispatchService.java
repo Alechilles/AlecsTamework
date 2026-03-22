@@ -14,17 +14,20 @@ import java.util.UUID;
 final class CommandRelocationDispatchService {
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
+    private final CommandLinkedNpcCaptureService captureService;
     private final CommandResolutionService resolutionService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandCompanionPlacementService companionPlacementService;
 
     CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcDeathService deathService,
+                                     CommandLinkedNpcCaptureService captureService,
                                      CommandResolutionService resolutionService,
                                      CommandStepExecutionService stepExecutionService,
                                      CommandCompanionPlacementService companionPlacementService) {
         this.relocationService = relocationService;
         this.deathService = deathService;
+        this.captureService = captureService;
         this.resolutionService = resolutionService;
         this.stepExecutionService = stepExecutionService;
         this.companionPlacementService = companionPlacementService;
@@ -48,6 +51,14 @@ final class CommandRelocationDispatchService {
         int queued = 0;
         for (LinkedNpcRecord record : unloadedLinked) {
             if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            if (captureService != null
+                    && captureService.getCapturedSnapshotForToolOrOwner(
+                    record.npcUuid,
+                    context.toolId,
+                    ownerUuid
+            ) != null) {
                 continue;
             }
             if (deathService != null
