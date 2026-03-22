@@ -23,6 +23,8 @@ import javax.annotation.Nullable;
 public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwGlobalConfig>>,
         TwParentFallbackAsset<TwGlobalConfig> {
     private static final int MILLIS_PER_MINUTE = 60_000;
+    private static final String DEFAULT_SIMPLE_CLAIMS_DAMAGE_ALLOW_DAMAGE_PERMISSION_KEY =
+            "tamework.damage_tamed_claim_npc";
     private static final BuilderCodec<GeneralSection> GENERAL_SECTION_CODEC = BuilderCodec.builder(
                     GeneralSection.class, GeneralSection::new
             )
@@ -257,6 +259,66 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .add()
             .build();
+    private static final BuilderCodec<SimpleClaimsBreedingSection> SIMPLE_CLAIMS_BREEDING_SECTION_CODEC = BuilderCodec.builder(
+                    SimpleClaimsBreedingSection.class, SimpleClaimsBreedingSection::new
+            )
+            .<Integer>append(
+                    new KeyedCodec<>("LimitPerClaimChunk", Codec.INTEGER),
+                    (section, value) -> section.limitPerClaimChunk = value,
+                    section -> section.limitPerClaimChunk
+            )
+            .add()
+            .<Integer>append(
+                    new KeyedCodec<>("LimitPerClaimTotal", Codec.INTEGER),
+                    (section, value) -> section.limitPerClaimTotal = value,
+                    section -> section.limitPerClaimTotal
+            )
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("BreedingRequiresClaim", Codec.BOOLEAN),
+                    (section, value) -> section.breedingRequiresClaim = value,
+                    section -> section.breedingRequiresClaim
+            )
+            .add()
+            .build();
+    private static final BuilderCodec<SimpleClaimsDamageSection> SIMPLE_CLAIMS_DAMAGE_SECTION_CODEC = BuilderCodec.builder(
+                    SimpleClaimsDamageSection.class, SimpleClaimsDamageSection::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("ProtectTamedFromNonMembers", Codec.BOOLEAN),
+                    (section, value) -> section.protectTamedFromNonMembers = value,
+                    section -> section.protectTamedFromNonMembers
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("AllowDamagePermissionKey", Codec.STRING),
+                    (section, value) -> section.allowDamagePermissionKey = value,
+                    section -> section.allowDamagePermissionKey
+            )
+            .add()
+            .build();
+    private static final BuilderCodec<SimpleClaimsSection> SIMPLE_CLAIMS_SECTION_CODEC = BuilderCodec.builder(
+                    SimpleClaimsSection.class, SimpleClaimsSection::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("SimpleClaimsEnabled", Codec.BOOLEAN),
+                    (section, value) -> section.simpleClaimsEnabled = value,
+                    section -> section.simpleClaimsEnabled
+            )
+            .add()
+            .<SimpleClaimsBreedingSection>append(
+                    new KeyedCodec<>("Breeding", SIMPLE_CLAIMS_BREEDING_SECTION_CODEC),
+                    (section, value) -> section.breeding = value,
+                    section -> section.breeding
+            )
+            .add()
+            .<SimpleClaimsDamageSection>append(
+                    new KeyedCodec<>("Damage", SIMPLE_CLAIMS_DAMAGE_SECTION_CODEC),
+                    (section, value) -> section.damage = value,
+                    section -> section.damage
+            )
+            .add()
+            .build();
 
     public static final AssetBuilderCodec<String, TwGlobalConfig> CODEC =
             AssetBuilderCodec.builder(
@@ -274,35 +336,49 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     TwGlobalConfig::applyGeneralSection,
                     TwGlobalConfig::toGeneralSection
             )
-            .documentation("Organized section for global enabled/priority settings.")
+            .documentation("Organized section for global enabled/priority settings. Inheritance: omitted section "
+                    + "inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .<OwnershipProtectionSection>append(
                     new KeyedCodec<>("OwnershipProtection", OWNERSHIP_PROTECTION_SECTION_CODEC),
                     TwGlobalConfig::applyOwnershipProtectionSection,
                     TwGlobalConfig::toOwnershipProtectionSection
             )
-            .documentation("Organized section for owner-damage and ownership protection settings.")
+            .documentation("Organized section for owner-damage and ownership protection settings. Inheritance: omitted "
+                    + "section inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .<InteractionDefaultsSection>append(
                     new KeyedCodec<>("InteractionDefaults", INTERACTION_DEFAULTS_SECTION_CODEC),
                     TwGlobalConfig::applyInteractionDefaultsSection,
                     TwGlobalConfig::toInteractionDefaultsSection
             )
-            .documentation("Organized section for interaction parameter defaults.")
+            .documentation("Organized section for interaction parameter defaults. Inheritance: omitted section inherits "
+                    + "from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .<CommandSection>append(
                     new KeyedCodec<>("Command", COMMAND_SECTION_CODEC),
                     TwGlobalConfig::applyCommandSection,
                     TwGlobalConfig::toCommandSection
             )
-            .documentation("Organized section for command runtime and respawn tuning settings.")
+            .documentation("Organized section for command runtime and respawn tuning settings. Inheritance: omitted "
+                    + "section inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .<AssetSetsSection>append(
                     new KeyedCodec<>("AssetSets", ASSET_SETS_SECTION_CODEC),
                     TwGlobalConfig::applyAssetSetsSection,
                     TwGlobalConfig::toAssetSetsSection
             )
-            .documentation("Opt-in asset-set gates that can be enabled by any loaded TwGlobalConfig asset.")
+            .documentation("Opt-in asset-set gates that can be enabled by any loaded TwGlobalConfig asset. Inheritance: "
+                    + "omitted section inherits from parent; when present, only explicitly defined nested fields "
+                    + "override parent.")
+            .add()
+            .<SimpleClaimsSection>append(
+                    new KeyedCodec<>("SimpleClaims", SIMPLE_CLAIMS_SECTION_CODEC),
+                    TwGlobalConfig::applySimpleClaimsSection,
+                    TwGlobalConfig::toSimpleClaimsSection
+            )
+            .documentation("Server-level SimpleClaims integration settings for Tamework systems. Inheritance: omitted "
+                    + "section inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .build();
 
@@ -349,6 +425,13 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private boolean tranquilizerArrowAssetSetEnabled;
     private boolean tranquilizerPotionAssetSetEnabled;
     private boolean feedTroughAssetSetEnabled;
+    private boolean simpleClaimsEnabled;
+    private int simpleClaimsBreedingLimitPerClaimChunk;
+    private int simpleClaimsBreedingLimitPerClaimTotal;
+    private boolean simpleClaimsBreedingRequiresClaim;
+    private boolean simpleClaimsDamageProtectTamedFromNonMembers;
+    private String simpleClaimsDamageAllowDamagePermissionKey = DEFAULT_SIMPLE_CLAIMS_DAMAGE_ALLOW_DAMAGE_PERMISSION_KEY;
+    private boolean simpleClaimsSectionDefined;
 
     public static AssetStore<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> getAssetStore() {
         if (ASSET_STORE == null) {
@@ -391,6 +474,22 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             }
         }
         return cached != null ? cached : defaultConfig();
+    }
+
+    /**
+     * Resolves the best config source for SimpleClaims integration settings.
+     *
+     * <p>Unlike {@link #resolveActive()}, this skips unrelated global configs that do not define a
+     * {@code SimpleClaims} section, so sectionless feature-gate configs cannot suppress claim limits.
+     */
+    @Nonnull
+    public static TwGlobalConfig resolveSimpleClaimsSettingsConfig() {
+        DefaultAssetMap<String, TwGlobalConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return resolveActive();
+        }
+        TwGlobalConfig best = selectBestSimpleClaimsCandidate(assetMap.getAssetMap().values());
+        return best != null ? best : resolveActive();
     }
 
     // Builds a default global config without relying on asset store state.
@@ -469,6 +568,45 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return best;
     }
 
+    @Nullable
+    static TwGlobalConfig selectBestSimpleClaimsCandidate(@Nullable Iterable<TwGlobalConfig> candidates) {
+        if (candidates == null) {
+            return null;
+        }
+        TwGlobalConfig best = null;
+        int bestPriority = Integer.MIN_VALUE;
+        String bestId = null;
+        for (TwGlobalConfig candidate : candidates) {
+            if (candidate == null || !candidate.isEnabled() || !candidate.hasSimpleClaimsSectionDefined()) {
+                continue;
+            }
+            int candidatePriority = candidate.getPriority();
+            if (best == null || candidatePriority > bestPriority) {
+                best = candidate;
+                bestPriority = candidatePriority;
+                bestId = candidate.getId();
+                continue;
+            }
+            if (candidatePriority != bestPriority) {
+                continue;
+            }
+            // For equal-priority SimpleClaims configs, prefer the one that explicitly enables integration.
+            if (candidate.isSimpleClaimsEnabled() != best.isSimpleClaimsEnabled()) {
+                if (candidate.isSimpleClaimsEnabled()) {
+                    best = candidate;
+                    bestId = candidate.getId();
+                }
+                continue;
+            }
+            String candidateId = candidate.getId();
+            if (compareIds(candidateId, bestId) < 0) {
+                best = candidate;
+                bestId = candidateId;
+            }
+        }
+        return best;
+    }
+
     private static int compareIds(String left, String right) {
         String safeLeft = left == null ? "" : left;
         String safeRight = right == null ? "" : right;
@@ -519,6 +657,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         inheritInteractionDefaultsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritCommandSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritAssetSetsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritSimpleClaimsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
     }
 
     public boolean isEnabled() {
@@ -655,6 +794,52 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     public boolean isFeedTroughAssetSetEnabled() {
         return feedTroughAssetSetEnabled;
+    }
+
+    public boolean isSimpleClaimsEnabled() {
+        return simpleClaimsEnabled;
+    }
+
+    public int getSimpleClaimsBreedingLimitPerClaimChunk() {
+        return Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
+    }
+
+    public int getSimpleClaimsBreedingLimitPerClaimTotal() {
+        return Math.max(0, simpleClaimsBreedingLimitPerClaimTotal);
+    }
+
+    public boolean isSimpleClaimsBreedingRequiresClaim() {
+        return simpleClaimsBreedingRequiresClaim;
+    }
+
+    public boolean isSimpleClaimsDamageProtectTamedFromNonMembers() {
+        return simpleClaimsDamageProtectTamedFromNonMembers;
+    }
+
+    @Nonnull
+    public String getSimpleClaimsDamageAllowDamagePermissionKey() {
+        if (simpleClaimsDamageAllowDamagePermissionKey == null
+                || simpleClaimsDamageAllowDamagePermissionKey.isBlank()) {
+            return DEFAULT_SIMPLE_CLAIMS_DAMAGE_ALLOW_DAMAGE_PERMISSION_KEY;
+        }
+        return simpleClaimsDamageAllowDamagePermissionKey.trim();
+    }
+
+    public boolean hasSimpleClaimsSectionDefined() {
+        return simpleClaimsSectionDefined;
+    }
+
+    public int resolveSimpleClaimsBreedingLimitPerClaimChunkCap(int claimChunkCount) {
+        int perChunk = getSimpleClaimsBreedingLimitPerClaimChunk();
+        if (perChunk <= 0) {
+            return 0;
+        }
+        int safeChunkCount = Math.max(0, claimChunkCount);
+        long multiplied = (long) perChunk * (long) safeChunkCount;
+        if (multiplied > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) multiplied;
     }
 
     private void applyGeneralSection(@Nullable GeneralSection section) {
@@ -850,6 +1035,50 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.tranquilizerArrow = tranquilizerArrowAssetSetEnabled;
         section.tranquilizerPotion = tranquilizerPotionAssetSetEnabled;
         section.feedTrough = feedTroughAssetSetEnabled;
+        return section;
+    }
+
+    private void applySimpleClaimsSection(@Nullable SimpleClaimsSection section) {
+        if (section == null) {
+            return;
+        }
+        simpleClaimsSectionDefined = true;
+        if (section.simpleClaimsEnabled != null) {
+            simpleClaimsEnabled = section.simpleClaimsEnabled;
+        }
+        if (section.breeding != null) {
+            SimpleClaimsBreedingSection breeding = section.breeding;
+            if (breeding.limitPerClaimChunk != null) {
+                simpleClaimsBreedingLimitPerClaimChunk = breeding.limitPerClaimChunk;
+            }
+            if (breeding.limitPerClaimTotal != null) {
+                simpleClaimsBreedingLimitPerClaimTotal = breeding.limitPerClaimTotal;
+            }
+            if (breeding.breedingRequiresClaim != null) {
+                simpleClaimsBreedingRequiresClaim = breeding.breedingRequiresClaim;
+            }
+        }
+        if (section.damage != null) {
+            SimpleClaimsDamageSection damage = section.damage;
+            if (damage.protectTamedFromNonMembers != null) {
+                simpleClaimsDamageProtectTamedFromNonMembers = damage.protectTamedFromNonMembers;
+            }
+            if (damage.allowDamagePermissionKey != null) {
+                simpleClaimsDamageAllowDamagePermissionKey = damage.allowDamagePermissionKey;
+            }
+        }
+    }
+
+    private SimpleClaimsSection toSimpleClaimsSection() {
+        SimpleClaimsSection section = new SimpleClaimsSection();
+        section.simpleClaimsEnabled = simpleClaimsEnabled;
+        section.breeding = new SimpleClaimsBreedingSection();
+        section.breeding.limitPerClaimChunk = simpleClaimsBreedingLimitPerClaimChunk;
+        section.breeding.limitPerClaimTotal = simpleClaimsBreedingLimitPerClaimTotal;
+        section.breeding.breedingRequiresClaim = simpleClaimsBreedingRequiresClaim;
+        section.damage = new SimpleClaimsDamageSection();
+        section.damage.protectTamedFromNonMembers = simpleClaimsDamageProtectTamedFromNonMembers;
+        section.damage.allowDamagePermissionKey = getSimpleClaimsDamageAllowDamagePermissionKey();
         return section;
     }
 
@@ -1078,6 +1307,75 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
     }
 
+    private void inheritSimpleClaimsSection(@Nonnull TwGlobalConfig parent,
+                                            @Nonnull Set<String> explicitTopLevelKeys,
+                                            @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("SimpleClaims")) {
+            simpleClaimsEnabled = parent.simpleClaimsEnabled;
+            simpleClaimsBreedingLimitPerClaimChunk = parent.simpleClaimsBreedingLimitPerClaimChunk;
+            simpleClaimsBreedingLimitPerClaimTotal = parent.simpleClaimsBreedingLimitPerClaimTotal;
+            simpleClaimsBreedingRequiresClaim = parent.simpleClaimsBreedingRequiresClaim;
+            simpleClaimsDamageProtectTamedFromNonMembers = parent.simpleClaimsDamageProtectTamedFromNonMembers;
+            simpleClaimsDamageAllowDamagePermissionKey = parent.simpleClaimsDamageAllowDamagePermissionKey;
+            simpleClaimsSectionDefined = parent.simpleClaimsSectionDefined;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("SimpleClaims");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("SimpleClaimsEnabled")) {
+            simpleClaimsEnabled = parent.simpleClaimsEnabled;
+        }
+        if (!nestedExplicit.contains("Breeding")) {
+            simpleClaimsBreedingLimitPerClaimChunk = parent.simpleClaimsBreedingLimitPerClaimChunk;
+            simpleClaimsBreedingLimitPerClaimTotal = parent.simpleClaimsBreedingLimitPerClaimTotal;
+            simpleClaimsBreedingRequiresClaim = parent.simpleClaimsBreedingRequiresClaim;
+        } else {
+            if (!isSimpleClaimsNestedFieldExplicit(nestedExplicit, "Breeding", "LimitPerClaimChunk")) {
+                simpleClaimsBreedingLimitPerClaimChunk = parent.simpleClaimsBreedingLimitPerClaimChunk;
+            }
+            if (!isSimpleClaimsNestedFieldExplicit(nestedExplicit, "Breeding", "LimitPerClaimTotal")) {
+                simpleClaimsBreedingLimitPerClaimTotal = parent.simpleClaimsBreedingLimitPerClaimTotal;
+            }
+            if (!isSimpleClaimsNestedFieldExplicit(nestedExplicit, "Breeding", "BreedingRequiresClaim")) {
+                simpleClaimsBreedingRequiresClaim = parent.simpleClaimsBreedingRequiresClaim;
+            }
+        }
+        if (!nestedExplicit.contains("Damage")) {
+            simpleClaimsDamageProtectTamedFromNonMembers = parent.simpleClaimsDamageProtectTamedFromNonMembers;
+            simpleClaimsDamageAllowDamagePermissionKey = parent.simpleClaimsDamageAllowDamagePermissionKey;
+        } else {
+            if (!isSimpleClaimsNestedFieldExplicit(nestedExplicit, "Damage", "ProtectTamedFromNonMembers")) {
+                simpleClaimsDamageProtectTamedFromNonMembers = parent.simpleClaimsDamageProtectTamedFromNonMembers;
+            }
+            if (!isSimpleClaimsNestedFieldExplicit(nestedExplicit, "Damage", "AllowDamagePermissionKey")) {
+                simpleClaimsDamageAllowDamagePermissionKey = parent.simpleClaimsDamageAllowDamagePermissionKey;
+            }
+        }
+    }
+
+    private static boolean isSimpleClaimsNestedFieldExplicit(@Nonnull Set<String> nestedExplicit,
+                                                             @Nonnull String sectionName,
+                                                             @Nonnull String fieldName) {
+        String qualified = sectionName + "." + fieldName;
+        if (nestedExplicit.contains(qualified)) {
+            return true;
+        }
+        return !containsNestedPrefix(nestedExplicit, sectionName + ".");
+    }
+
+    private static boolean containsNestedPrefix(@Nonnull Set<String> values, @Nonnull String prefix) {
+        for (String value : values) {
+            if (value != null && value.startsWith(prefix)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean hasDeadRespawnCooldownOverride(@Nonnull Set<String> nestedExplicit) {
         return nestedExplicit.contains("DeadRespawnCooldownMs")
                 || nestedExplicit.contains("DeadRespawnCooldownMins");
@@ -1142,6 +1440,23 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Boolean tranquilizerArrow;
         private Boolean tranquilizerPotion;
         private Boolean feedTrough;
+    }
+
+    private static final class SimpleClaimsSection {
+        private Boolean simpleClaimsEnabled;
+        private SimpleClaimsBreedingSection breeding;
+        private SimpleClaimsDamageSection damage;
+    }
+
+    private static final class SimpleClaimsBreedingSection {
+        private Integer limitPerClaimChunk;
+        private Integer limitPerClaimTotal;
+        private Boolean breedingRequiresClaim;
+    }
+
+    private static final class SimpleClaimsDamageSection {
+        private Boolean protectTamedFromNonMembers;
+        private String allowDamagePermissionKey;
     }
 
     public static final class AssetSetToggles {

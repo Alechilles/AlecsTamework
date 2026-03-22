@@ -5,7 +5,7 @@
   },
   "RoleIds": [],
   "OwnershipProtection": {
-    "BlockOwnerDamage": true,
+    "BlockOwnerDamage": false,
     "BlockAllPlayerDamageIfOwned": false,
     "InvulnerableIfOwned": false
   },

@@ -52,7 +52,7 @@
   "OffspringLifecycle": {
     "Enabled": true,
     "TimeToFullGrownMinutes": 7,
-    "BabyStartScale": 0.55,
+    "BabyStartScale": 0.8,
     "AdolescentStartScale": 0.8,
     "AdultStartScale": 0.8,
     "AdolescentSwitchScale": 1.0,

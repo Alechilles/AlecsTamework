@@ -17,6 +17,7 @@ import com.hypixel.hytale.codec.schema.config.Schema;
 import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
+import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -228,14 +229,16 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
             (asset, value) -> asset.allowedRoles = value == null ? new AllowAllRoles() : value,
             asset -> asset.allowedRoles
         )
-        .documentation("Role restrictions for naming targets.")
+        .documentation("Role restrictions for naming targets. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<NamingSettings>append(
             new KeyedCodec<>("Naming", NAMING_CODEC),
             (asset, value) -> asset.naming = value == null ? new NamingSettings() : value,
             asset -> asset.naming
         )
-        .documentation("Naming rules for this item.")
+        .documentation("Naming rules for this item. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .build();
 
@@ -304,9 +307,84 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
 
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwNameItemConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwNameItemConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("ItemId")) itemId = parent.itemId;
-        if (!explicitTopLevelKeys.contains("AllowedRoles")) allowedRoles = parent.allowedRoles;
-        if (!explicitTopLevelKeys.contains("Naming")) naming = parent.naming;
+        if (!explicitTopLevelKeys.contains("AllowedRoles")) {
+            allowedRoles = parent.allowedRoles;
+        } else {
+            inheritAllowedRolesSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "AllowedRoles"));
+        }
+        if (!explicitTopLevelKeys.contains("Naming")) {
+            naming = parent.naming;
+        } else {
+            inheritNamingSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Naming"));
+        }
+    }
+
+    private void inheritAllowedRolesSection(@Nonnull TwNameItemConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Mode")) {
+            allowedRoles = parent.allowedRoles;
+            return;
+        }
+        if (allowedRoles == null || parent.allowedRoles == null) {
+            return;
+        }
+        if (allowedRoles instanceof AllowlistRoles childAllowlist && parent.allowedRoles instanceof AllowlistRoles parentAllowlist) {
+            if (!nestedExplicitKeys.contains("Allowlist")) {
+                childAllowlist.allowlist = parentAllowlist.allowlist;
+            }
+        } else if (allowedRoles instanceof DenylistRoles childDenylist
+                && parent.allowedRoles instanceof DenylistRoles parentDenylist) {
+            if (!nestedExplicitKeys.contains("Denylist")) {
+                childDenylist.denylist = parentDenylist.denylist;
+            }
+        }
+    }
+
+    private void inheritNamingSection(@Nonnull TwNameItemConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (naming == null) {
+            naming = parent.naming;
+            return;
+        }
+        if (parent.naming == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("RequireTamed")) naming.requireTamed = parent.naming.requireTamed;
+        if (!nestedExplicitKeys.contains("RequireOwner")) naming.requireOwner = parent.naming.requireOwner;
+        if (!nestedExplicitKeys.contains("AllowUnownedWhenRequireOwner")) {
+            naming.allowUnownedWhenRequireOwner = parent.naming.allowUnownedWhenRequireOwner;
+        }
+        if (!nestedExplicitKeys.contains("AllowRename")) naming.allowRename = parent.naming.allowRename;
+        if (!nestedExplicitKeys.contains("MinLength")) naming.minLength = parent.naming.minLength;
+        if (!nestedExplicitKeys.contains("MaxLength")) naming.maxLength = parent.naming.maxLength;
+        if (!nestedExplicitKeys.contains("AllowedChars")) naming.allowedChars = parent.naming.allowedChars;
+        if (!nestedExplicitKeys.contains("TrimWhitespace")) naming.trimWhitespace = parent.naming.trimWhitespace;
+        if (!nestedExplicitKeys.contains("ReplaceExisting")) naming.replaceExisting = parent.naming.replaceExisting;
+        if (!nestedExplicitKeys.contains("ConsumeItem")) naming.consumeItem = parent.naming.consumeItem;
+        if (!nestedExplicitKeys.contains("CooldownMs")) naming.cooldownMs = parent.naming.cooldownMs;
+        if (!nestedExplicitKeys.contains("SoundEvent")) naming.soundEvent = parent.naming.soundEvent;
+        if (!nestedExplicitKeys.contains("ParticleSystem")) naming.particleSystem = parent.naming.particleSystem;
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     public String getItemId() {

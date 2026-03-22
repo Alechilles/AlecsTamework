@@ -51,6 +51,26 @@ class TwCompanionConfigInheritanceTest {
         assertTrue(child.getCommand().getTravel().isCrossWorldRecallEnabled());
     }
 
+    @Test
+    void commandTravelSupportsNestedPartialOverridesWithinTravelObject() throws Exception {
+        TwCompanionConfig parent = new TwCompanionConfig();
+        TwCompanionConfig child = new TwCompanionConfig();
+
+        Object parentTravel = getNestedObject(parent, "command", "travel");
+        Object childTravel = getNestedObject(child, "command", "travel");
+        setEnumField(parentTravel, "onTransferFailure", TwCompanionConfig.TransferFailurePolicy.MarkLost);
+        setEnumField(childTravel, "onTransferFailure", TwCompanionConfig.TransferFailurePolicy.Ignore);
+        setBooleanField(parentTravel, "crossWorldRecallEnabled", true);
+        setBooleanField(childTravel, "crossWorldRecallEnabled", false);
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put("Command", Set.of("Travel", "Travel.OnTransferFailure"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("Command"), explicitNestedKeysByTopLevel);
+
+        assertEquals(TwCompanionConfig.TransferFailurePolicy.Ignore, child.getCommand().getTravel().getOnTransferFailure());
+        assertTrue(child.getCommand().getTravel().isCrossWorldRecallEnabled());
+    }
+
     private void setNestedIntField(Object target, String nestedFieldName, String fieldName, int value)
             throws Exception {
         Field nestedField = target.getClass().getDeclaredField(nestedFieldName);

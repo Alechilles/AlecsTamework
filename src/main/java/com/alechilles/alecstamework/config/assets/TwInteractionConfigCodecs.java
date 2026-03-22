@@ -1816,21 +1816,24 @@ public final class TwInteractionConfigCodecs {
             (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             asset -> asset.roleIds
         )
-        .documentation("NPC role IDs this config applies to.")
+        .documentation("NPC role IDs this config applies to. Inheritance: omitted value inherits from parent; explicit "
+                + "array replaces parent value (no merge).")
         .add()
         .<InteractionEntry[]>append(
             new KeyedCodec<>("Interactions", INTERACTION_ARRAY_CODEC),
             (asset, value) -> asset.interactions = value == null ? EMPTY_INTERACTIONS : value,
             asset -> asset.interactions
         )
-        .documentation("Ordered list of interactions (first match wins).")
+        .documentation("Ordered list of interactions (first match wins). Inheritance: omitted value inherits from "
+                + "parent; explicit array replaces parent value (no merge).")
         .add()
         .<Cooldowns>append(
             new KeyedCodec<>("Cooldowns", COOLDOWNS_CODEC),
             (asset, value) -> asset.cooldowns = value == null ? new Cooldowns() : value,
             asset -> asset.cooldowns
         )
-        .documentation("Default cooldown settings.")
+        .documentation("Default cooldown settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .build();
 }

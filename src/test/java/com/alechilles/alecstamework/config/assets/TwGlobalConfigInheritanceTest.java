@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.config.assets;
 
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -101,6 +102,110 @@ class TwGlobalConfigInheritanceTest {
         assertEquals("HarvestInteractionContext", config.getHarvestContextParam());
         assertEquals("Harvest_Ready", config.getHarvestAlarmName());
         assertEquals("TameworkInteract_Cooldown", config.getInteractionCooldownAlarmPrefix());
+    }
+
+    @Test
+    void simpleClaimsBreedingDefaultsAreDisabledAndSafe() {
+        TwGlobalConfig config = new TwGlobalConfig();
+
+        assertFalse(config.isSimpleClaimsEnabled());
+        assertFalse(config.isSimpleClaimsBreedingRequiresClaim());
+        assertEquals(0, config.getSimpleClaimsBreedingLimitPerClaimChunk());
+        assertEquals(0, config.getSimpleClaimsBreedingLimitPerClaimTotal());
+        assertFalse(config.isSimpleClaimsDamageProtectTamedFromNonMembers());
+        assertEquals("tamework.damage_tamed_claim_npc", config.getSimpleClaimsDamageAllowDamagePermissionKey());
+    }
+
+    @Test
+    void simpleClaimsBreedingChunkCapScalesAndClampsOverflow() throws Exception {
+        TwGlobalConfig config = TwGlobalConfig.defaultConfig();
+        setField(config, "simpleClaimsBreedingLimitPerClaimChunk", 3);
+        assertEquals(0, config.resolveSimpleClaimsBreedingLimitPerClaimChunkCap(0));
+        assertEquals(9, config.resolveSimpleClaimsBreedingLimitPerClaimChunkCap(3));
+
+        setField(config, "simpleClaimsBreedingLimitPerClaimChunk", Integer.MAX_VALUE);
+        assertEquals(Integer.MAX_VALUE, config.resolveSimpleClaimsBreedingLimitPerClaimChunkCap(2));
+    }
+
+    @Test
+    void simpleClaimsInheritanceAllowsSimpleClaimsEnabledOverrideWithoutBreedingOverride() throws Exception {
+        TwGlobalConfig parent = new TwGlobalConfig();
+        TwGlobalConfig child = new TwGlobalConfig();
+
+        setField(parent, "simpleClaimsSectionDefined", true);
+        setField(parent, "simpleClaimsEnabled", true);
+        setField(parent, "simpleClaimsBreedingLimitPerClaimChunk", 3);
+        setField(parent, "simpleClaimsBreedingLimitPerClaimTotal", 40);
+        setField(parent, "simpleClaimsBreedingRequiresClaim", true);
+
+        setField(child, "simpleClaimsSectionDefined", true);
+        setField(child, "simpleClaimsEnabled", false);
+        setField(child, "simpleClaimsBreedingLimitPerClaimChunk", 0);
+        setField(child, "simpleClaimsBreedingLimitPerClaimTotal", 0);
+        setField(child, "simpleClaimsBreedingRequiresClaim", false);
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put("SimpleClaims", Set.of("SimpleClaimsEnabled"));
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("SimpleClaims"), explicitNestedKeysByTopLevel);
+
+        assertFalse(child.isSimpleClaimsEnabled());
+        assertEquals(3, child.getSimpleClaimsBreedingLimitPerClaimChunk());
+        assertEquals(40, child.getSimpleClaimsBreedingLimitPerClaimTotal());
+        assertTrue(child.isSimpleClaimsBreedingRequiresClaim());
+    }
+
+    @Test
+    void simpleClaimsInheritanceAllowsPartialNestedDamageOverrides() throws Exception {
+        TwGlobalConfig parent = new TwGlobalConfig();
+        TwGlobalConfig child = new TwGlobalConfig();
+
+        setField(parent, "simpleClaimsSectionDefined", true);
+        setField(parent, "simpleClaimsDamageProtectTamedFromNonMembers", true);
+        setField(parent, "simpleClaimsDamageAllowDamagePermissionKey", "parent.permission");
+
+        setField(child, "simpleClaimsSectionDefined", true);
+        setField(child, "simpleClaimsDamageProtectTamedFromNonMembers", false);
+        setField(child, "simpleClaimsDamageAllowDamagePermissionKey", "child.permission");
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put(
+                "SimpleClaims",
+                Set.of("Damage", "Damage.ProtectTamedFromNonMembers")
+        );
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("SimpleClaims"), explicitNestedKeysByTopLevel);
+
+        assertFalse(child.isSimpleClaimsDamageProtectTamedFromNonMembers());
+        assertEquals("parent.permission", child.getSimpleClaimsDamageAllowDamagePermissionKey());
+    }
+
+    @Test
+    void selectBestSimpleClaimsCandidateIgnoresSectionlessConfigsAndPrefersEnabledOnTie() throws Exception {
+        TwGlobalConfig sectionless = TwGlobalConfig.defaultConfig();
+        setField(sectionless, "id", "TwGlobalConfig_AnimalHusbandry");
+        setField(sectionless, "enabled", true);
+        setField(sectionless, "priority", 0);
+
+        TwGlobalConfig disabledSimpleClaims = TwGlobalConfig.defaultConfig();
+        setField(disabledSimpleClaims, "id", "TwGlobalConfig_Default");
+        setField(disabledSimpleClaims, "enabled", true);
+        setField(disabledSimpleClaims, "priority", 0);
+        setField(disabledSimpleClaims, "simpleClaimsSectionDefined", true);
+        setField(disabledSimpleClaims, "simpleClaimsEnabled", false);
+
+        TwGlobalConfig enabledSimpleClaims = TwGlobalConfig.defaultConfig();
+        setField(enabledSimpleClaims, "id", "TwGlobalConfig_Test");
+        setField(enabledSimpleClaims, "enabled", true);
+        setField(enabledSimpleClaims, "priority", 0);
+        setField(enabledSimpleClaims, "simpleClaimsSectionDefined", true);
+        setField(enabledSimpleClaims, "simpleClaimsEnabled", true);
+
+        TwGlobalConfig selected = TwGlobalConfig.selectBestSimpleClaimsCandidate(
+                List.of(sectionless, disabledSimpleClaims, enabledSimpleClaims)
+        );
+
+        assertEquals(enabledSimpleClaims, selected);
     }
 
     private void setField(Object target, String fieldName, Object value) throws Exception {

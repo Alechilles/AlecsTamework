@@ -334,35 +334,40 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
             (asset, value) -> asset.allowedRoles = value == null ? new AllowlistRoles() : value,
             asset -> asset.allowedRoles
         )
-        .documentation("Role restrictions for what can be captured/spawned.")
+        .documentation("Role restrictions for what can be captured/spawned. Inheritance: omitted section inherits "
+                + "from parent; when present, only explicitly defined nested fields override parent.")
         .add()
         .<CaptureSettings>append(
             new KeyedCodec<>("Capture", CAPTURE_CODEC),
             (asset, value) -> asset.capture = value == null ? new CaptureSettings() : value,
             asset -> asset.capture
         )
-        .documentation("Capture settings for spawner items.")
+        .documentation("Capture settings for spawner items. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<SpawnSettings>append(
             new KeyedCodec<>("Spawn", SPAWN_CODEC),
             (asset, value) -> asset.spawn = value == null ? new SpawnSettings() : value,
             asset -> asset.spawn
         )
-        .documentation("Spawn settings for spawner items.")
+        .documentation("Spawn settings for spawner items. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<SpawnerIconOverride[]>append(
             new KeyedCodec<>("IconOverrides", ICON_OVERRIDE_ARRAY_CODEC),
             (asset, value) -> asset.iconOverrides = value == null ? EMPTY_OVERRIDES : value,
             asset -> asset.iconOverrides
         )
-        .documentation("Icon overrides that apply to all roles.")
+        .documentation("Icon overrides that apply to all roles. Inheritance: omitted value inherits from parent; "
+                + "explicit array replaces parent value (no merge).")
         .add()
         .<Map<String, SpawnerIconOverride[]>>append(
             new KeyedCodec<>("IconOverridesByRole", ICON_OVERRIDES_BY_ROLE_CODEC),
             (asset, value) -> asset.iconOverridesByRole = value == null ? Collections.emptyMap() : value,
             asset -> asset.iconOverridesByRole
         )
-        .documentation("Icon overrides keyed by role ID.")
+        .documentation("Icon overrides keyed by role ID. Inheritance: omitted value inherits from parent; explicit "
+                + "map replaces parent value (no merge).")
         .add()
         .<ItemFeatureConfig.SpawnerTooltipMode>append(
             new KeyedCodec<>("TooltipMode", TOOLTIP_MODE_CODEC),
@@ -445,15 +450,107 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
 
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwSpawnerConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwSpawnerConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("EmptyItemId")) emptyItemId = parent.emptyItemId;
-        if (!explicitTopLevelKeys.contains("AllowedRoles")) allowedRoles = parent.allowedRoles;
+        if (!explicitTopLevelKeys.contains("AllowedRoles")) {
+            allowedRoles = parent.allowedRoles;
+        } else {
+            inheritAllowedRolesSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "AllowedRoles"));
+        }
         if (!explicitTopLevelKeys.contains("FilledItemId")) filledItemId = parent.filledItemId;
         if (!explicitTopLevelKeys.contains("IconDefault")) iconDefault = parent.iconDefault;
-        if (!explicitTopLevelKeys.contains("Capture")) capture = parent.capture;
-        if (!explicitTopLevelKeys.contains("Spawn")) spawn = parent.spawn;
+        if (!explicitTopLevelKeys.contains("Capture")) {
+            capture = parent.capture;
+        } else {
+            inheritCaptureSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Capture"));
+        }
+        if (!explicitTopLevelKeys.contains("Spawn")) {
+            spawn = parent.spawn;
+        } else {
+            inheritSpawnSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Spawn"));
+        }
         if (!explicitTopLevelKeys.contains("IconOverrides")) iconOverrides = parent.iconOverrides;
         if (!explicitTopLevelKeys.contains("IconOverridesByRole")) iconOverridesByRole = parent.iconOverridesByRole;
         if (!explicitTopLevelKeys.contains("TooltipMode")) tooltipMode = parent.tooltipMode;
+    }
+
+    private void inheritAllowedRolesSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Mode")) {
+            allowedRoles = parent.allowedRoles;
+            return;
+        }
+        if (allowedRoles == null || parent.allowedRoles == null) {
+            return;
+        }
+        if (allowedRoles instanceof AllowlistRoles childAllowlist && parent.allowedRoles instanceof AllowlistRoles parentAllowlist) {
+            if (!nestedExplicitKeys.contains("Allowlist")) {
+                childAllowlist.allowlist = parentAllowlist.allowlist;
+            }
+        } else if (allowedRoles instanceof DenylistRoles childDenylist
+                && parent.allowedRoles instanceof DenylistRoles parentDenylist) {
+            if (!nestedExplicitKeys.contains("Denylist")) {
+                childDenylist.denylist = parentDenylist.denylist;
+            }
+        }
+    }
+
+    private void inheritCaptureSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (capture == null) {
+            capture = parent.capture;
+            return;
+        }
+        if (parent.capture == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("ClearsOwner")) capture.clearsOwner = parent.capture.clearsOwner;
+        if (!nestedExplicitKeys.contains("RequireTamed")) capture.requireTamed = parent.capture.requireTamed;
+        if (!nestedExplicitKeys.contains("OwnerRestricted")) capture.ownerRestricted = parent.capture.ownerRestricted;
+        if (!nestedExplicitKeys.contains("RequireOwner")) capture.requireOwner = parent.capture.requireOwner;
+        if (!nestedExplicitKeys.contains("ParticleSystem")) capture.particleSystem = parent.capture.particleSystem;
+        if (!nestedExplicitKeys.contains("SoundEvent")) capture.soundEvent = parent.capture.soundEvent;
+        if (!nestedExplicitKeys.contains("CooldownMs")) capture.cooldownMs = parent.capture.cooldownMs;
+        if (!nestedExplicitKeys.contains("MaxDistance")) capture.maxDistance = parent.capture.maxDistance;
+    }
+
+    private void inheritSpawnSection(@Nonnull TwSpawnerConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (spawn == null) {
+            spawn = parent.spawn;
+            return;
+        }
+        if (parent.spawn == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("AssignsOwner")) spawn.assignsOwner = parent.spawn.assignsOwner;
+        if (!nestedExplicitKeys.contains("OwnerRestricted")) spawn.ownerRestricted = parent.spawn.ownerRestricted;
+        if (!nestedExplicitKeys.contains("RequireOwner")) spawn.requireOwner = parent.spawn.requireOwner;
+        if (!nestedExplicitKeys.contains("ParticleSystem")) spawn.particleSystem = parent.spawn.particleSystem;
+        if (!nestedExplicitKeys.contains("SoundEvent")) spawn.soundEvent = parent.spawn.soundEvent;
+        if (!nestedExplicitKeys.contains("CooldownMs")) spawn.cooldownMs = parent.spawn.cooldownMs;
+        if (!nestedExplicitKeys.contains("MaxDistance")) spawn.maxDistance = parent.spawn.maxDistance;
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     public String getEmptyItemId() {

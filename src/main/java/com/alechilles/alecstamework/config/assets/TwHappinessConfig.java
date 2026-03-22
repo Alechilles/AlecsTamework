@@ -270,30 +270,40 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             asset -> asset.roleIds
         )
+        .documentation("NPC role IDs this config applies to. Inheritance: omitted value inherits from parent; explicit "
+                + "array replaces parent value (no merge).")
         .add()
         .<ValueSettings>append(
             new KeyedCodec<>("Values", VALUE_CODEC),
             (asset, value) -> asset.values = value == null ? new ValueSettings() : value,
             asset -> asset.values
         )
+        .documentation("Base happiness value bounds and defaults. Inheritance: omitted section inherits from parent; "
+                + "when present, only explicitly defined nested fields override parent.")
         .add()
         .<EquilibriumSettings>append(
             new KeyedCodec<>("Equilibrium", EQUILIBRIUM_CODEC),
             (asset, value) -> asset.equilibrium = value == null ? new EquilibriumSettings() : value,
             asset -> asset.equilibrium
         )
+        .documentation("Equilibrium convergence settings. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<ImpulseSettings>append(
             new KeyedCodec<>("Impulses", IMPULSE_CODEC),
             (asset, value) -> asset.impulses = value == null ? new ImpulseSettings() : value,
             asset -> asset.impulses
         )
+        .documentation("Impulse settings for direct happiness gains/losses. Inheritance: omitted section inherits "
+                + "from parent; when present, only explicitly defined nested fields override parent.")
         .add()
         .<ModifierSettings>append(
             new KeyedCodec<>("Modifiers", MODIFIER_CODEC),
             (asset, value) -> asset.modifiers = value == null ? new ModifierSettings() : value,
             asset -> asset.modifiers
         )
+        .documentation("Modifier groups for needs/population/owner offsets. Inheritance: omitted section inherits "
+                + "from parent; when present, only explicitly defined nested fields override parent.")
         .add()
         .build();
 
@@ -461,13 +471,176 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwHappinessConfig parent,
                                            @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwHappinessConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
-        if (!explicitTopLevelKeys.contains("Values")) values = parent.values;
-        if (!explicitTopLevelKeys.contains("Equilibrium")) equilibrium = parent.equilibrium;
-        if (!explicitTopLevelKeys.contains("Impulses")) impulses = parent.impulses;
-        if (!explicitTopLevelKeys.contains("Modifiers")) modifiers = parent.modifiers;
+        if (!explicitTopLevelKeys.contains("Values")) {
+            values = parent.values;
+        } else {
+            inheritValuesSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Values"));
+        }
+        if (!explicitTopLevelKeys.contains("Equilibrium")) {
+            equilibrium = parent.equilibrium;
+        } else {
+            inheritEquilibriumSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Equilibrium"));
+        }
+        if (!explicitTopLevelKeys.contains("Impulses")) {
+            impulses = parent.impulses;
+        } else {
+            inheritImpulsesSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Impulses"));
+        }
+        if (!explicitTopLevelKeys.contains("Modifiers")) {
+            modifiers = parent.modifiers;
+        } else {
+            inheritModifiersSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Modifiers"));
+        }
+    }
+
+    private void inheritValuesSection(@Nonnull TwHappinessConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (values == null) {
+            values = parent.values;
+            return;
+        }
+        if (parent.values == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("CurrentDefault")) values.currentDefault = parent.values.currentDefault;
+        if (!nestedExplicitKeys.contains("Min")) values.min = parent.values.min;
+        if (!nestedExplicitKeys.contains("Max")) values.max = parent.values.max;
+    }
+
+    private void inheritEquilibriumSection(@Nonnull TwHappinessConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (equilibrium == null) {
+            equilibrium = parent.equilibrium;
+            return;
+        }
+        if (parent.equilibrium == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("BaseSetpoint")) {
+            equilibrium.baseSetpoint = parent.equilibrium.baseSetpoint;
+        }
+        if (!nestedExplicitKeys.contains("ConvergencePerMinute")) {
+            equilibrium.convergencePerMinute = parent.equilibrium.convergencePerMinute;
+        }
+    }
+
+    private void inheritImpulsesSection(@Nonnull TwHappinessConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (impulses == null) {
+            impulses = parent.impulses;
+            return;
+        }
+        if (parent.impulses == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("GainOnFeed")) impulses.gainOnFeed = parent.impulses.gainOnFeed;
+        if (!nestedExplicitKeys.contains("GainOnPet")) impulses.gainOnPet = parent.impulses.gainOnPet;
+        if (!nestedExplicitKeys.contains("LoseOnDamage")) impulses.loseOnDamage = parent.impulses.loseOnDamage;
+    }
+
+    private void inheritModifiersSection(@Nonnull TwHappinessConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (modifiers == null) {
+            modifiers = parent.modifiers;
+            return;
+        }
+        if (parent.modifiers == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("OwnerNearbyOffset")) {
+            modifiers.ownerNearbyOffset = parent.modifiers.ownerNearbyOffset;
+        }
+        inheritNeedModifier(
+                nestedExplicitKeys,
+                "Hunger",
+                modifiers.hunger,
+                parent.modifiers.hunger,
+                settings -> modifiers.hunger = settings
+        );
+        inheritNeedModifier(
+                nestedExplicitKeys,
+                "Thirst",
+                modifiers.thirst,
+                parent.modifiers.thirst,
+                settings -> modifiers.thirst = settings
+        );
+        inheritPopulationModifier(nestedExplicitKeys, modifiers, parent.modifiers);
+    }
+
+    private void inheritNeedModifier(@Nonnull Set<String> nestedExplicitKeys,
+                                     @Nonnull String nestedFieldKey,
+                                     @Nullable NeedModifierSettings currentSettings,
+                                     @Nullable NeedModifierSettings parentSettings,
+                                     @Nonnull java.util.function.Consumer<NeedModifierSettings> assignCurrent) {
+        if (!nestedExplicitKeys.contains(nestedFieldKey)) {
+            assignCurrent.accept(parentSettings);
+            return;
+        }
+        if (currentSettings == null) {
+            assignCurrent.accept(parentSettings);
+            return;
+        }
+        if (parentSettings == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains(nestedFieldKey + ".Enabled")) {
+            currentSettings.enabled = parentSettings.enabled;
+        }
+        if (!nestedExplicitKeys.contains(nestedFieldKey + ".Bands")) {
+            currentSettings.bands = parentSettings.bands;
+        }
+    }
+
+    private void inheritPopulationModifier(@Nonnull Set<String> nestedExplicitKeys,
+                                           @Nonnull ModifierSettings currentModifiers,
+                                           @Nonnull ModifierSettings parentModifiers) {
+        if (!nestedExplicitKeys.contains("Population")) {
+            currentModifiers.population = parentModifiers.population;
+            return;
+        }
+        if (currentModifiers.population == null) {
+            currentModifiers.population = parentModifiers.population;
+            return;
+        }
+        if (parentModifiers.population == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Population.Enabled")) {
+            currentModifiers.population.enabled = parentModifiers.population.enabled;
+        }
+        if (!nestedExplicitKeys.contains("Population.Radius")) {
+            currentModifiers.population.radius = parentModifiers.population.radius;
+        }
+        if (!nestedExplicitKeys.contains("Population.Bands")) {
+            currentModifiers.population.bands = parentModifiers.population.bands;
+        }
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     protected TwHappinessConfig() {

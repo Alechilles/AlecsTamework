@@ -242,24 +242,32 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             asset -> asset.roleIds
         )
+        .documentation("NPC role IDs this config applies to. Inheritance: omitted value inherits from parent; explicit "
+                + "array replaces parent value (no merge).")
         .add()
         .<SelectionSettings>append(
             new KeyedCodec<>("Selection", SELECTION_CODEC),
             (asset, value) -> asset.selection = value == null ? new SelectionSettings() : value,
             asset -> asset.selection
         )
+        .documentation("Trait selection settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<InheritanceSettings>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_CODEC),
             (asset, value) -> asset.inheritance = value == null ? new InheritanceSettings() : value,
             asset -> asset.inheritance
         )
+        .documentation("Trait inheritance settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<TraitDefinition[]>append(
             new KeyedCodec<>("Traits", TRAIT_DEFINITION_ARRAY_CODEC),
             (asset, value) -> asset.traits = value == null ? EMPTY_TRAITS : value,
             asset -> asset.traits
         )
+        .documentation("Trait definition list. Inheritance: omitted value inherits from parent; explicit array "
+                + "replaces parent value (no merge).")
         .add()
         .build();
 
@@ -425,12 +433,119 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
 
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwTraitConfig parent, @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwTraitConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
-        if (!explicitTopLevelKeys.contains("Selection")) selection = parent.selection;
-        if (!explicitTopLevelKeys.contains("Inheritance")) inheritance = parent.inheritance;
+        if (!explicitTopLevelKeys.contains("Selection")) {
+            selection = parent.selection;
+        } else {
+            inheritSelectionSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Selection"));
+        }
+        if (!explicitTopLevelKeys.contains("Inheritance")) {
+            inheritance = parent.inheritance;
+        } else {
+            inheritInheritanceSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Inheritance"));
+        }
         if (!explicitTopLevelKeys.contains("Traits")) traits = parent.traits;
+    }
+
+    private void inheritSelectionSection(@Nonnull TwTraitConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (selection == null) {
+            selection = parent.selection;
+            return;
+        }
+        if (parent.selection == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("MaxTraitsPerNpc")) {
+            selection.maxTraitsPerNpc = parent.selection.maxTraitsPerNpc;
+        }
+        if (!nestedExplicitKeys.contains("AllowDuplicateTraits")) {
+            selection.allowDuplicateTraits = parent.selection.allowDuplicateTraits;
+        }
+        if (!nestedExplicitKeys.contains("UseSeededRandom")) {
+            selection.useSeededRandom = parent.selection.useSeededRandom;
+        }
+        if (!nestedExplicitKeys.contains("RollCountWeights")) {
+            selection.rollCountWeights = parent.selection.rollCountWeights;
+        } else {
+            inheritRollCountWeights(parent, nestedExplicitKeys);
+        }
+    }
+
+    private void inheritRollCountWeights(@Nonnull TwTraitConfig parent, @Nonnull Set<String> nestedExplicitKeys) {
+        if (selection == null || parent.selection == null) {
+            return;
+        }
+        if (selection.rollCountWeights == null) {
+            selection.rollCountWeights = parent.selection.rollCountWeights;
+            return;
+        }
+        if (parent.selection.rollCountWeights == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("RollCountWeights.Count0")) {
+            selection.rollCountWeights.count0 = parent.selection.rollCountWeights.count0;
+        }
+        if (!nestedExplicitKeys.contains("RollCountWeights.Count1")) {
+            selection.rollCountWeights.count1 = parent.selection.rollCountWeights.count1;
+        }
+        if (!nestedExplicitKeys.contains("RollCountWeights.Count2")) {
+            selection.rollCountWeights.count2 = parent.selection.rollCountWeights.count2;
+        }
+        if (!nestedExplicitKeys.contains("RollCountWeights.Count3")) {
+            selection.rollCountWeights.count3 = parent.selection.rollCountWeights.count3;
+        }
+        if (!nestedExplicitKeys.contains("RollCountWeights.Count4")) {
+            selection.rollCountWeights.count4 = parent.selection.rollCountWeights.count4;
+        }
+    }
+
+    private void inheritInheritanceSection(@Nonnull TwTraitConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (inheritance == null) {
+            inheritance = parent.inheritance;
+            return;
+        }
+        if (parent.inheritance == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("AllowInheritance")) {
+            inheritance.allowInheritance = parent.inheritance.allowInheritance;
+        }
+        if (!nestedExplicitKeys.contains("InheritanceChance")) {
+            inheritance.inheritanceChance = parent.inheritance.inheritanceChance;
+        }
+        if (!nestedExplicitKeys.contains("MutationChance")) {
+            inheritance.mutationChance = parent.inheritance.mutationChance;
+        }
+        if (!nestedExplicitKeys.contains("PairAlignmentRangeInfluence")) {
+            inheritance.pairAlignmentRangeInfluence = parent.inheritance.pairAlignmentRangeInfluence;
+        }
+        if (!nestedExplicitKeys.contains("PreferParentTraits")) {
+            inheritance.preferParentTraits = parent.inheritance.preferParentTraits;
+        }
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     protected TwTraitConfig() {

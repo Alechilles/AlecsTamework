@@ -23,5 +23,17 @@
     "TranquilizerArrow": false,
     "TranquilizerPotion": false,
     "FeedTrough": false
+  },
+  "SimpleClaims": {
+    "SimpleClaimsEnabled": false,
+    "Breeding": {
+      "LimitPerClaimChunk": 3,
+      "LimitPerClaimTotal": 9,
+      "BreedingRequiresClaim": true
+    },
+    "Damage": {
+      "ProtectTamedFromNonMembers": true,
+      "AllowDamagePermissionKey": "tamework.damage_tamed_claim_npc"
+    }
   }
 }

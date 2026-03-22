@@ -523,6 +523,8 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.itemIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             asset -> asset.itemIds
         )
+        .documentation("Command item IDs this config applies to. Inheritance: omitted value inherits from parent; "
+                + "explicit array replaces parent value (no merge).")
         .add()
         .<Double>append(
             new KeyedCodec<>("Radius", Codec.DOUBLE),
@@ -589,12 +591,16 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.allowedRoles = value == null ? new AllowAllRoles() : value,
             asset -> asset.allowedRoles
         )
+        .documentation("Role restrictions for command targets. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<CommandEntry[]>append(
             new KeyedCodec<>("CommandList", COMMAND_ENTRY_ARRAY_CODEC),
             (asset, value) -> asset.commandList = value == null ? EMPTY_COMMAND_LIST : value,
             asset -> asset.commandList
         )
+        .documentation("Available command entries. Inheritance: omitted value inherits from parent; explicit array "
+                + "replaces parent value (no merge).")
         .add()
         .build();
 
@@ -676,6 +682,13 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwCommandItemConfig parent,
                                            @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwCommandItemConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("ItemIds")) itemIds = parent.itemIds;
         if (!explicitTopLevelKeys.contains("Radius")) radius = parent.radius;
@@ -690,8 +703,44 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!explicitTopLevelKeys.contains("MaxActive")) maxActive = parent.maxActive;
         if (!explicitTopLevelKeys.contains("CooldownSeconds")) cooldownSeconds = parent.cooldownSeconds;
         if (!explicitTopLevelKeys.contains("RequireLineOfSight")) requireLineOfSight = parent.requireLineOfSight;
-        if (!explicitTopLevelKeys.contains("AllowedRoles")) allowedRoles = parent.allowedRoles;
+        if (!explicitTopLevelKeys.contains("AllowedRoles")) {
+            allowedRoles = parent.allowedRoles;
+        } else {
+            inheritAllowedRolesSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "AllowedRoles"));
+        }
         if (!explicitTopLevelKeys.contains("CommandList")) commandList = parent.commandList;
+    }
+
+    private void inheritAllowedRolesSection(@Nonnull TwCommandItemConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Mode")) {
+            allowedRoles = parent.allowedRoles;
+            return;
+        }
+        if (allowedRoles == null || parent.allowedRoles == null) {
+            return;
+        }
+        if (allowedRoles instanceof AllowlistRoles childAllowlist && parent.allowedRoles instanceof AllowlistRoles parentAllowlist) {
+            if (!nestedExplicitKeys.contains("Allowlist")) {
+                childAllowlist.allowlist = parentAllowlist.allowlist;
+            }
+        } else if (allowedRoles instanceof DenylistRoles childDenylist
+                && parent.allowedRoles instanceof DenylistRoles parentDenylist) {
+            if (!nestedExplicitKeys.contains("Denylist")) {
+                childDenylist.denylist = parentDenylist.denylist;
+            }
+        }
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     public boolean isEnabled() {

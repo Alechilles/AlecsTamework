@@ -252,11 +252,47 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwInteractionConfig parent,
                                            @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwInteractionConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
         if (!explicitTopLevelKeys.contains("Interactions")) interactions = parent.interactions;
-        if (!explicitTopLevelKeys.contains("Cooldowns")) cooldowns = parent.cooldowns;
+        if (!explicitTopLevelKeys.contains("Cooldowns")) {
+            cooldowns = parent.cooldowns;
+        } else {
+            inheritCooldownsSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Cooldowns"));
+        }
+    }
+
+    private void inheritCooldownsSection(@Nonnull TwInteractionConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (cooldowns == null) {
+            cooldowns = parent.cooldowns;
+            return;
+        }
+        if (parent.cooldowns == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("InteractionSeconds")) {
+            cooldowns.interactionSeconds = parent.cooldowns.interactionSeconds;
+        }
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     public boolean isEnabled() {

@@ -875,48 +875,64 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             asset -> asset.roleIds
         )
+        .documentation("NPC role IDs this config applies to. Inheritance: omitted value inherits from parent; explicit "
+                + "array replaces parent value (no merge).")
         .add()
         .<HappinessSettings>append(
             new KeyedCodec<>("Happiness", HAPPINESS_CODEC),
             (asset, value) -> asset.happiness = value == null ? new HappinessSettings() : value,
             asset -> asset.happiness
         )
+        .documentation("Breeding happiness settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<EligibilitySettings>append(
             new KeyedCodec<>("Eligibility", ELIGIBILITY_CODEC),
             (asset, value) -> asset.eligibility = value == null ? new EligibilitySettings() : value,
             asset -> asset.eligibility
         )
+        .documentation("Breeding eligibility settings. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<PairingSettings>append(
             new KeyedCodec<>("Pairing", PAIRING_CODEC),
             (asset, value) -> asset.pairing = value == null ? new PairingSettings() : value,
             asset -> asset.pairing
         )
+        .documentation("Breeding pairing settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<CooldownSettings>append(
             new KeyedCodec<>("Cooldowns", COOLDOWN_CODEC),
             (asset, value) -> asset.cooldowns = value == null ? new CooldownSettings() : value,
             asset -> asset.cooldowns
         )
+        .documentation("Breeding cooldown settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<PassiveBreedingSettings>append(
             new KeyedCodec<>("PassiveBreeding", PASSIVE_BREEDING_CODEC),
             (asset, value) -> asset.passiveBreeding = value == null ? new PassiveBreedingSettings() : value,
             asset -> asset.passiveBreeding
         )
+        .documentation("Passive breeding settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<TimingSettings>append(
             new KeyedCodec<>("Timing", TIMING_CODEC),
             (asset, value) -> asset.timing = value == null ? new TimingSettings() : value,
             asset -> asset.timing
         )
+        .documentation("Breeding timing settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<InheritanceSettings>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_CODEC),
             (asset, value) -> asset.inheritance = value == null ? new InheritanceSettings() : value,
             asset -> asset.inheritance
         )
+        .documentation("Breeding inheritance settings. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
         .add()
         .<OffspringLifecycleSettings>append(
             new KeyedCodec<>("OffspringLifecycle", OFFSPRING_LIFECYCLE_CODEC),
@@ -925,12 +941,15 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     : value,
             asset -> asset.offspringLifecycle
         )
+        .documentation("Offspring lifecycle settings. Inheritance: omitted section inherits from parent; when present, "
+                + "only explicitly defined nested fields override parent.")
         .add()
         .<Map<String, RoleOverrideSettings>>append(
             new KeyedCodec<>("RoleOverrides", ROLE_OVERRIDES_BY_ROLE_CODEC),
             (asset, value) -> asset.roleOverrides = value == null ? EMPTY_ROLE_OVERRIDES : value,
             asset -> asset.roleOverrides
         )
+        .documentation("Per-role override patches. Not inherited from parent; define per child config.")
         .add()
         .build();
 
@@ -1106,18 +1125,301 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwBreedingConfig parent,
                                            @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwBreedingConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("RoleIds")) roleIds = parent.roleIds;
-        if (!explicitTopLevelKeys.contains("Happiness")) happiness = parent.happiness;
-        if (!explicitTopLevelKeys.contains("Eligibility")) eligibility = parent.eligibility;
-        if (!explicitTopLevelKeys.contains("Pairing")) pairing = parent.pairing;
-        if (!explicitTopLevelKeys.contains("Cooldowns")) cooldowns = parent.cooldowns;
-        if (!explicitTopLevelKeys.contains("PassiveBreeding")) passiveBreeding = parent.passiveBreeding;
-        if (!explicitTopLevelKeys.contains("Timing")) timing = parent.timing;
-        if (!explicitTopLevelKeys.contains("Inheritance")) inheritance = parent.inheritance;
-        if (!explicitTopLevelKeys.contains("OffspringLifecycle")) offspringLifecycle = parent.offspringLifecycle;
-        if (!explicitTopLevelKeys.contains("RoleOverrides")) roleOverrides = parent.roleOverrides;
+        if (!explicitTopLevelKeys.contains("Happiness")) {
+            happiness = parent.happiness;
+        } else {
+            inheritHappinessSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Happiness"));
+        }
+        if (!explicitTopLevelKeys.contains("Eligibility")) {
+            eligibility = parent.eligibility;
+        } else {
+            inheritEligibilitySection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Eligibility"));
+        }
+        if (!explicitTopLevelKeys.contains("Pairing")) {
+            pairing = parent.pairing;
+        } else {
+            inheritPairingSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Pairing"));
+        }
+        if (!explicitTopLevelKeys.contains("Cooldowns")) {
+            cooldowns = parent.cooldowns;
+        } else {
+            inheritCooldownSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Cooldowns"));
+        }
+        if (!explicitTopLevelKeys.contains("PassiveBreeding")) {
+            passiveBreeding = parent.passiveBreeding;
+        } else {
+            inheritPassiveBreedingSection(
+                    parent,
+                    nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "PassiveBreeding")
+            );
+        }
+        if (!explicitTopLevelKeys.contains("Timing")) {
+            timing = parent.timing;
+        } else {
+            inheritTimingSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Timing"));
+        }
+        if (!explicitTopLevelKeys.contains("Inheritance")) {
+            inheritance = parent.inheritance;
+        } else {
+            inheritInheritanceSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Inheritance"));
+        }
+        if (!explicitTopLevelKeys.contains("OffspringLifecycle")) {
+            offspringLifecycle = parent.offspringLifecycle;
+        } else {
+            inheritOffspringLifecycleSection(
+                    parent,
+                    nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "OffspringLifecycle")
+            );
+        }
+        if (roleOverrides == null) {
+            roleOverrides = EMPTY_ROLE_OVERRIDES;
+        }
+    }
+
+    private void inheritHappinessSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (happiness == null) {
+            happiness = parent.happiness;
+            return;
+        }
+        if (parent.happiness == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Threshold")) {
+            happiness.threshold = parent.happiness.threshold;
+        }
+    }
+
+    private void inheritEligibilitySection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (eligibility == null) {
+            eligibility = parent.eligibility;
+            return;
+        }
+        if (parent.eligibility == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("RequireTamed")) eligibility.requireTamed = parent.eligibility.requireTamed;
+        if (!nestedExplicitKeys.contains("RequireAdult")) eligibility.requireAdult = parent.eligibility.requireAdult;
+        if (!nestedExplicitKeys.contains("RequireNotInCombat")) {
+            eligibility.requireNotInCombat = parent.eligibility.requireNotInCombat;
+        }
+        if (!nestedExplicitKeys.contains("RequireNotSleeping")) {
+            eligibility.requireNotSleeping = parent.eligibility.requireNotSleeping;
+        }
+    }
+
+    private void inheritPairingSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (pairing == null) {
+            pairing = parent.pairing;
+            return;
+        }
+        if (parent.pairing == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("BreedRadius")) pairing.breedRadius = parent.pairing.breedRadius;
+        if (!nestedExplicitKeys.contains("RequireWanderMode")) {
+            pairing.requireWanderMode = parent.pairing.requireWanderMode;
+        }
+        if (!nestedExplicitKeys.contains("RequireSameOwner")) {
+            pairing.requireSameOwner = parent.pairing.requireSameOwner;
+        }
+        if (!nestedExplicitKeys.contains("MaxNearbySameType")) {
+            pairing.maxNearbySameType = parent.pairing.maxNearbySameType;
+        }
+        if (!nestedExplicitKeys.contains("RequireSameRoleId")) {
+            pairing.requireSameRoleId = parent.pairing.requireSameRoleId;
+        }
+        if (!nestedExplicitKeys.contains("RoleMaxNearbySameType")) {
+            pairing.roleMaxNearbySameType = parent.pairing.roleMaxNearbySameType;
+        }
+    }
+
+    private void inheritCooldownSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (cooldowns == null) {
+            cooldowns = parent.cooldowns;
+            return;
+        }
+        if (parent.cooldowns == null) {
+            return;
+        }
+        if (!containsAny(nestedExplicitKeys, "BaseCooldownSeconds", "BaseCooldownMinutes")) {
+            cooldowns.baseCooldownSeconds = parent.cooldowns.baseCooldownSeconds;
+        }
+        if (!nestedExplicitKeys.contains("MinDelaySeconds")) {
+            cooldowns.minDelaySeconds = parent.cooldowns.minDelaySeconds;
+        }
+        if (!nestedExplicitKeys.contains("MaxDelaySeconds")) {
+            cooldowns.maxDelaySeconds = parent.cooldowns.maxDelaySeconds;
+        }
+    }
+
+    private void inheritPassiveBreedingSection(@Nonnull TwBreedingConfig parent,
+                                               @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (passiveBreeding == null) {
+            passiveBreeding = parent.passiveBreeding;
+            return;
+        }
+        if (parent.passiveBreeding == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Enabled")) {
+            passiveBreeding.enabled = parent.passiveBreeding.enabled;
+        }
+        if (!nestedExplicitKeys.contains("SweepIntervalSeconds")) {
+            passiveBreeding.sweepIntervalSeconds = parent.passiveBreeding.sweepIntervalSeconds;
+        }
+        if (!nestedExplicitKeys.contains("Basis")) {
+            passiveBreeding.timerBasis = parent.passiveBreeding.timerBasis;
+        }
+    }
+
+    private void inheritTimingSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (timing == null) {
+            timing = parent.timing;
+            return;
+        }
+        if (parent.timing == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Basis")) timing.timerBasis = parent.timing.timerBasis;
+    }
+
+    private void inheritInheritanceSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (inheritance == null) {
+            inheritance = parent.inheritance;
+            return;
+        }
+        if (parent.inheritance == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("InheritOwner")) inheritance.inheritOwner = parent.inheritance.inheritOwner;
+        if (!nestedExplicitKeys.contains("InheritTamed")) inheritance.inheritTamed = parent.inheritance.inheritTamed;
+        if (!nestedExplicitKeys.contains("InheritAttachments")) {
+            inheritance.inheritAttachments = parent.inheritance.inheritAttachments;
+        }
+        if (!nestedExplicitKeys.contains("InheritTraits")) {
+            inheritance.inheritTraits = parent.inheritance.inheritTraits;
+        }
+        if (!nestedExplicitKeys.contains("AttachmentInheritance")) {
+            inheritance.attachmentInheritance = parent.inheritance.attachmentInheritance;
+        } else {
+            inheritAttachmentInheritanceSection(parent, nestedExplicitKeys);
+        }
+    }
+
+    private void inheritAttachmentInheritanceSection(@Nonnull TwBreedingConfig parent,
+                                                     @Nonnull Set<String> nestedExplicitKeys) {
+        if (inheritance == null || parent.inheritance == null) {
+            return;
+        }
+        if (inheritance.attachmentInheritance == null) {
+            inheritance.attachmentInheritance = parent.inheritance.attachmentInheritance;
+            return;
+        }
+        if (parent.inheritance.attachmentInheritance == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("AttachmentInheritance.ParentWeight")) {
+            inheritance.attachmentInheritance.parentWeight = parent.inheritance.attachmentInheritance.parentWeight;
+        }
+        if (!nestedExplicitKeys.contains("AttachmentInheritance.RandomWeight")) {
+            inheritance.attachmentInheritance.randomWeight = parent.inheritance.attachmentInheritance.randomWeight;
+        }
+        if (!nestedExplicitKeys.contains("AttachmentInheritance.MutationChance")) {
+            inheritance.attachmentInheritance.mutationChance = parent.inheritance.attachmentInheritance.mutationChance;
+        }
+    }
+
+    private void inheritOffspringLifecycleSection(@Nonnull TwBreedingConfig parent,
+                                                  @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (offspringLifecycle == null) {
+            offspringLifecycle = parent.offspringLifecycle;
+            return;
+        }
+        if (parent.offspringLifecycle == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Enabled")) {
+            offspringLifecycle.enabled = parent.offspringLifecycle.enabled;
+        }
+        if (!containsAny(
+                nestedExplicitKeys,
+                "DefaultTimeToFullGrownSeconds",
+                "DefaultTimeToFullGrownMinutes",
+                "TimeToFullGrownSeconds",
+                "TimeToFullGrownMinutes"
+        )) {
+            offspringLifecycle.defaultTimeToFullGrownSeconds = parent.offspringLifecycle.defaultTimeToFullGrownSeconds;
+        }
+        if (!containsAny(nestedExplicitKeys, "DefaultBabyStartScale", "BabyStartScale")) {
+            offspringLifecycle.defaultBabyStartScale = parent.offspringLifecycle.defaultBabyStartScale;
+        }
+        if (!containsAny(nestedExplicitKeys, "DefaultAdolescentStartScale", "AdolescentStartScale")) {
+            offspringLifecycle.defaultAdolescentStartScale = parent.offspringLifecycle.defaultAdolescentStartScale;
+        }
+        if (!containsAny(nestedExplicitKeys, "DefaultAdultStartScale", "AdultStartScale")) {
+            offspringLifecycle.defaultAdultStartScale = parent.offspringLifecycle.defaultAdultStartScale;
+        }
+        if (!containsAny(nestedExplicitKeys, "DefaultAdolescentSwitchScale", "AdolescentSwitchScale")) {
+            offspringLifecycle.defaultAdolescentSwitchScale = parent.offspringLifecycle.defaultAdolescentSwitchScale;
+        }
+        if (!containsAny(nestedExplicitKeys, "DefaultAdultSwitchScale", "AdultSwitchScale")) {
+            offspringLifecycle.defaultAdultSwitchScale = parent.offspringLifecycle.defaultAdultSwitchScale;
+        }
+        if (!nestedExplicitKeys.contains("Families")) {
+            offspringLifecycle.families = parent.offspringLifecycle.families;
+        }
+    }
+
+    private static boolean containsAny(@Nonnull Set<String> nestedExplicitKeys, @Nonnull String... keys) {
+        for (String key : keys) {
+            if (nestedExplicitKeys.contains(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     private static void registerRoleCacheEntry(@Nonnull Map<String, TwBreedingConfig> cache,

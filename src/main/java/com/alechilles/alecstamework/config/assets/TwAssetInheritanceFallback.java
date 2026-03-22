@@ -96,13 +96,27 @@ final class TwAssetInheritanceFallback {
                 if (!entry.getValue().isJsonObject()) {
                     return;
                 }
-                nestedKeysByTopLevel.put(entry.getKey(), new HashSet<>(entry.getValue().getAsJsonObject().keySet()));
+                Set<String> nested = new HashSet<>();
+                collectNestedKeys(entry.getValue().getAsJsonObject(), "", nested);
+                nestedKeysByTopLevel.put(entry.getKey(), nested);
             });
             context.explicitTopLevelKeys.put(idKey, keys);
             context.explicitNestedKeysByTopLevel.put(idKey, nestedKeysByTopLevel);
             return keys;
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    private static void collectNestedKeys(@Nonnull JsonObject object,
+                                          @Nonnull String prefix,
+                                          @Nonnull Set<String> destination) {
+        for (Map.Entry<String, JsonElement> nestedEntry : object.entrySet()) {
+            String key = prefix.isEmpty() ? nestedEntry.getKey() : prefix + "." + nestedEntry.getKey();
+            destination.add(key);
+            if (nestedEntry.getValue().isJsonObject()) {
+                collectNestedKeys(nestedEntry.getValue().getAsJsonObject(), key, destination);
+            }
         }
     }
 

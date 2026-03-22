@@ -94,7 +94,8 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     (asset, value) -> asset.capturePolicy = value == null ? new CapturePolicySettings() : value,
                     asset -> asset.capturePolicy
             )
-            .documentation("Additional Tamework capture intake policy for this coop.")
+            .documentation("Additional Tamework capture intake policy for this coop. Inheritance: omitted section "
+                    + "inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
             .build();
 
@@ -266,10 +267,58 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
     @Override
     public void inheritMissingTopLevelFrom(@Nonnull TwCoopConfig parent,
                                            @Nonnull Set<String> explicitTopLevelKeys) {
+        inheritMissingTopLevelFrom(parent, explicitTopLevelKeys, null);
+    }
+
+    @Override
+    public void inheritMissingTopLevelFrom(@Nonnull TwCoopConfig parent,
+                                           @Nonnull Set<String> explicitTopLevelKeys,
+                                           @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("CoopId")) coopId = parent.coopId;
-        if (!explicitTopLevelKeys.contains("CapturePolicy")) capturePolicy = parent.capturePolicy;
+        if (!explicitTopLevelKeys.contains("CapturePolicy")) {
+            capturePolicy = parent.capturePolicy;
+        } else {
+            inheritCapturePolicySection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "CapturePolicy"));
+        }
+    }
+
+    private void inheritCapturePolicySection(@Nonnull TwCoopConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (capturePolicy == null) {
+            capturePolicy = parent.capturePolicy;
+            return;
+        }
+        if (parent.capturePolicy == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("RequireTamed")) {
+            capturePolicy.requireTamed = parent.capturePolicy.requireTamed;
+        }
+        if (!nestedExplicitKeys.contains("OwnerRestricted")) {
+            capturePolicy.ownerRestricted = parent.capturePolicy.ownerRestricted;
+        }
+        if (!nestedExplicitKeys.contains("RequireOwner")) {
+            capturePolicy.requireOwner = parent.capturePolicy.requireOwner;
+        }
+        if (!nestedExplicitKeys.contains("ParticleSystem")) {
+            capturePolicy.particleSystem = parent.capturePolicy.particleSystem;
+        }
+        if (!nestedExplicitKeys.contains("SoundEvent")) {
+            capturePolicy.soundEvent = parent.capturePolicy.soundEvent;
+        }
+    }
+
+    @Nullable
+    private static Set<String> nestedKeysForTopLevel(@Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel,
+                                                     @Nonnull String topLevelKey) {
+        if (explicitNestedKeysByTopLevel == null) {
+            return null;
+        }
+        return explicitNestedKeysByTopLevel.get(topLevelKey);
     }
 
     public boolean isEnabled() {

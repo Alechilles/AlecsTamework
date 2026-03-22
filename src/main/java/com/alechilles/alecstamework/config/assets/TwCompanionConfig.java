@@ -233,6 +233,8 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (asset, value) -> asset.roleIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
                     asset -> asset.roleIds
             )
+            .documentation("NPC role IDs this config applies to. Inheritance: omitted value inherits from parent; "
+                    + "explicit array replaces parent value (no merge).")
             .add()
             .<OwnershipProtectionSettings>append(
                     new KeyedCodec<>("OwnershipProtection", OWNERSHIP_PROTECTION_CODEC),
@@ -241,12 +243,16 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                             : value,
                     asset -> asset.ownershipProtection
             )
+            .documentation("Owner-damage protection settings. Inheritance: omitted section inherits from parent; when "
+                    + "present, only explicitly defined nested fields override parent.")
             .add()
             .<CommandSettings>append(
                     new KeyedCodec<>("Command", COMMAND_CODEC),
                     (asset, value) -> asset.command = value == null ? new CommandSettings() : value,
                     asset -> asset.command
             )
+            .documentation("Companion command runtime settings. Inheritance: omitted section inherits from parent; when "
+                    + "present, only explicitly defined nested fields override parent.")
             .add()
             .build();
 
@@ -614,6 +620,15 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
         if (!nestedExplicit.contains("Travel")) {
             currentCommand.travel = parentCommand.travel.copy();
+        } else if (currentCommand.travel != null && parentCommand.travel != null) {
+            if (!nestedExplicit.contains("Travel.CrossWorldRecallEnabled")) {
+                currentCommand.travel.crossWorldRecallEnabled = parentCommand.travel.crossWorldRecallEnabled;
+            }
+            if (!nestedExplicit.contains("Travel.OnTransferFailure")) {
+                currentCommand.travel.onTransferFailure = parentCommand.travel.onTransferFailure;
+            }
+        } else if (currentCommand.travel == null) {
+            currentCommand.travel = parentCommand.travel == null ? null : parentCommand.travel.copy();
         }
     }
 
