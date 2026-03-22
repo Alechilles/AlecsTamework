@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 2.4.6-beta - Claim Damage Guardrails + Passive Breeding Sweep Stability - 2026-03-22
+### Added
+- Added `SimpleClaims.Damage` global settings in `TwGlobalConfig` for optional tamed-NPC claim damage protection (`ProtectTamedFromNonMembers`, `AllowDamagePermissionKey`).
+
+### Changed
+- Owner damage filtering now includes optional SimpleClaims-backed tamed-NPC claim checks: non-members are denied unless they are claim members or have the configured party permission key; integration lookup failures fail-open with throttled warnings.
+
+### Fixed
+- Passive breeding sweep no longer hard-crashes the world thread when passive sweep carrier classes fail to resolve at runtime; sweep candidates/reservations now use stable top-level classes, and sweep failures are logged + skipped for that interval.
 
 ## 2.4.5 - Companion Metadata Recovery + Tooltip Bridge - 2026-03-20
 ### Added

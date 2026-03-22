@@ -17,6 +17,41 @@ function Get-NormalizedVersion {
     return (($RawVersion.Trim()) -replace "^v", "")
 }
 
+function Resolve-GitHubPrerelease {
+    param([object]$Config)
+
+    $githubProperty = $Config.PSObject.Properties["github"]
+    if ($null -ne $githubProperty -and $null -ne $githubProperty.Value) {
+        $githubConfig = $githubProperty.Value
+        $prereleaseProperty = $githubConfig.PSObject.Properties["prerelease"]
+        if ($null -ne $prereleaseProperty) {
+            return [bool]$prereleaseProperty.Value
+        }
+    }
+
+    $modtaleProperty = $Config.PSObject.Properties["modtale"]
+    if ($null -ne $modtaleProperty -and $null -ne $modtaleProperty.Value) {
+        $modtaleConfig = $modtaleProperty.Value
+        $channelProperty = $modtaleConfig.PSObject.Properties["releaseChannel"]
+        if ($null -ne $channelProperty -and -not [string]::IsNullOrWhiteSpace("$($channelProperty.Value)")) {
+            $normalizedChannel = "$($channelProperty.Value)".Trim().ToLowerInvariant()
+            return ($normalizedChannel -ne "stable" -and $normalizedChannel -ne "release")
+        }
+    }
+
+    $curseforgeProperty = $Config.PSObject.Properties["curseforge"]
+    if ($null -ne $curseforgeProperty -and $null -ne $curseforgeProperty.Value) {
+        $curseforgeConfig = $curseforgeProperty.Value
+        $releaseTypeProperty = $curseforgeConfig.PSObject.Properties["releaseType"]
+        if ($null -ne $releaseTypeProperty -and -not [string]::IsNullOrWhiteSpace("$($releaseTypeProperty.Value)")) {
+            $normalizedType = "$($releaseTypeProperty.Value)".Trim().ToLowerInvariant()
+            return ($normalizedType -ne "release")
+        }
+    }
+
+    return $false
+}
+
 function Get-GitHubHeaders {
     param([string]$Token)
 
@@ -79,6 +114,7 @@ if ([string]::IsNullOrWhiteSpace($repository)) {
 $normalizedVersion = Get-NormalizedVersion -RawVersion $Version
 $tagName = "v$normalizedVersion"
 $releaseName = "$($config.modName) v$normalizedVersion"
+$isPrerelease = Resolve-GitHubPrerelease -Config $config
 $artifactItem = Get-Item -Path $ArtifactPath
 $artifactName = $artifactItem.Name
 $resolvedArtifactPath = $artifactItem.FullName
@@ -88,6 +124,7 @@ if ($DryRun) {
     Write-Host "Dry-run: would publish '$resolvedArtifactPath' to GitHub repo '$repository'."
     Write-Host "Tag: $tagName"
     Write-Host "Release name: $releaseName"
+    Write-Host "Prerelease: $isPrerelease"
     exit 0
 }
 
@@ -105,7 +142,7 @@ if ($null -eq $release) {
         name = $releaseName
         body = $changelog
         draft = $false
-        prerelease = $false
+        prerelease = $isPrerelease
         generate_release_notes = $false
     } | ConvertTo-Json -Compress
 
@@ -121,7 +158,7 @@ if ($null -eq $release) {
         name = $releaseName
         body = $changelog
         draft = $false
-        prerelease = $false
+        prerelease = $isPrerelease
     } | ConvertTo-Json -Compress
 
     $release = Invoke-GitHubApi `
