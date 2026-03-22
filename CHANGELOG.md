@@ -1,14 +1,24 @@
 # Changelog
 
-## 2.4.6-beta - Claim Damage Guardrails + Passive Breeding Sweep Stability - 2026-03-22
+## 2.4.6-beta - Needs Damage, Inheritance Overhaul, and Claim Guardrails - 2026-03-22
 ### Added
-- Added `SimpleClaims.Damage` global settings in `TwGlobalConfig` for optional tamed-NPC claim damage protection (`ProtectTamedFromNonMembers`, `AllowDamagePermissionKey`).
+- Added `TwNeedsConfig.TickPolicy` with owner-presence-aware ticking controls (`Mode`, `OwnerOfflineGraceHours`, `OwnerOfflineDecayMultiplier`) and default owner-online grace policy (`72h`, then normal decay).
+- Added `TwNeedsConfig.Damage` controls for starvation/dehydration damage (`Enabled`, `Model`, `DualNeedRule`, per-minute rates, `Lethal`), defaulting to disabled for backward-compatible behavior.
+- Added owner activity timeline tracking (`OwnerPresenceTimelineService`) seeded from online players at startup and updated from player connect/disconnect events.
+- Added optional `TwGlobalConfig.SimpleClaims` integration sections for breeding claim caps (`LimitPerClaimChunk`, `LimitPerClaimTotal`, `BreedingRequiresClaim`) and tamed-NPC damage guardrails (`ProtectTamedFromNonMembers`, `AllowDamagePermissionKey`).
+- Added new linked-panel ring/icon UI assets and wild-berry-red needs/thought particle assets (`Want_Food_Wild_Berry_Red`, `ThoughtCloud_Wild_Berry_Red`).
+- Added optional `Buuz135:SimpleClaims` `1.0.x` dependency declaration in `manifest.json`.
 
 ### Changed
-- Owner damage filtering now includes optional SimpleClaims-backed tamed-NPC claim checks: non-members are denied unless they are claim members or have the configured party permission key; integration lookup failures fail-open with throttled warnings.
+- Standardized parent-child inheritance behavior across `Tw*Config` assets to nested-aware object inheritance, with explicit child arrays/maps replacing parent values (no append/union merge).
+- `TwBreedingConfig` now keeps `RoleOverrides` local-only (not inherited), while `RoleIds` remain inheritable when omitted; codec tooltips now document this explicitly.
+- Needs progression now uses owner-presence effective elapsed time for both decay and needs damage: owner-online windows tick fully, offline grace windows can tick at `0`, and post-grace windows apply the configured offline multiplier.
+- Owner damage filtering now applies optional SimpleClaims claim-member/permission checks for tamed targets; denied attacks are cancelled, and claim lookup failures fail-open with throttled warnings.
+- Linked companion panel vitals rendering now uses refreshed segmented ring/mask visuals and updated runtime ring-anchor binding for needs + breeding cooldown indicators.
 
 ### Fixed
-- Passive breeding sweep no longer hard-crashes the world thread when passive sweep carrier classes fail to resolve at runtime; sweep candidates/reservations now use stable top-level classes, and sweep failures are logged + skipped for that interval.
+- Passive breeding sweep no longer hard-crashes the world thread when passive sweep carrier classes fail to resolve at runtime; sweep failures are logged and skipped for that interval.
+- Needs-damage events now bypass trait damage multipliers by source tag, ensuring starvation/dehydration damage follows configured flat rates.
 
 ## 2.4.5 - Companion Metadata Recovery + Tooltip Bridge - 2026-03-20
 ### Added
