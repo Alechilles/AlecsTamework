@@ -14,7 +14,7 @@
   },
   "Command": {
     "RelocationRetryIntervalMs": 2000,
-    "RelocationMaxWaitMs": 120000,
+    "RelocationMaxWaitMs": 20000,
     "RelocationMaxRetryAttempts": 60,
     "LinkedPanelRequireUnlinkConfirm": true
   },
