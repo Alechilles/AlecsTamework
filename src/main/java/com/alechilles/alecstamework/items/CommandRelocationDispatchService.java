@@ -15,6 +15,7 @@ final class CommandRelocationDispatchService {
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
+    private final CommandLinkedNpcCoopService coopService;
     private final CommandResolutionService resolutionService;
     private final CommandStepExecutionService stepExecutionService;
     private final CommandCompanionPlacementService companionPlacementService;
@@ -22,12 +23,14 @@ final class CommandRelocationDispatchService {
     CommandRelocationDispatchService(CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcDeathService deathService,
                                      CommandLinkedNpcCaptureService captureService,
+                                     CommandLinkedNpcCoopService coopService,
                                      CommandResolutionService resolutionService,
                                      CommandStepExecutionService stepExecutionService,
                                      CommandCompanionPlacementService companionPlacementService) {
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
+        this.coopService = coopService;
         this.resolutionService = resolutionService;
         this.stepExecutionService = stepExecutionService;
         this.companionPlacementService = companionPlacementService;
@@ -55,6 +58,14 @@ final class CommandRelocationDispatchService {
             }
             if (captureService != null
                     && captureService.getCapturedSnapshotForToolOrOwner(
+                    record.npcUuid,
+                    context.toolId,
+                    ownerUuid
+            ) != null) {
+                continue;
+            }
+            if (coopService != null
+                    && coopService.getCoopSnapshotForToolOrOwner(
                     record.npcUuid,
                     context.toolId,
                     ownerUuid

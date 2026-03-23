@@ -23,6 +23,7 @@ public final class LinkedNpcEntry {
     private final boolean active;
     private final boolean dead;
     private final boolean captured;
+    private final boolean inCoop;
     private final boolean lost;
     private final boolean hasHome;
     private final long deadRespawnRemainingMs;
@@ -59,6 +60,7 @@ public final class LinkedNpcEntry {
                           boolean hasHome,
                           boolean dead,
                           boolean captured,
+                          boolean inCoop,
                           boolean lost,
                           long deadRespawnRemainingMs,
                           LinkedNpcTraitIndicator[] traitIndicators) {
@@ -78,6 +80,7 @@ public final class LinkedNpcEntry {
                 hasHome,
                 dead,
                 captured,
+                inCoop,
                 lost,
                 deadRespawnRemainingMs,
                 null,
@@ -117,6 +120,7 @@ public final class LinkedNpcEntry {
                           boolean hasHome,
                           boolean dead,
                           boolean captured,
+                          boolean inCoop,
                           boolean lost,
                           long deadRespawnRemainingMs,
                           FutureStat futureStatA,
@@ -142,6 +146,7 @@ public final class LinkedNpcEntry {
                 hasHome,
                 dead,
                 captured,
+                inCoop,
                 lost,
                 deadRespawnRemainingMs,
                 futureStatA,
@@ -181,6 +186,7 @@ public final class LinkedNpcEntry {
                           boolean hasHome,
                           boolean dead,
                           boolean captured,
+                          boolean inCoop,
                           boolean lost,
                           long deadRespawnRemainingMs,
                           FutureStat futureStatA,
@@ -219,6 +225,7 @@ public final class LinkedNpcEntry {
         this.hasHome = hasHome;
         this.dead = dead;
         this.captured = captured;
+        this.inCoop = inCoop;
         this.lost = lost;
         this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
         this.speciesId = speciesId;
@@ -306,6 +313,10 @@ public final class LinkedNpcEntry {
 
     public boolean captured() {
         return captured;
+    }
+
+    public boolean inCoop() {
+        return inCoop;
     }
 
     public boolean lost() {

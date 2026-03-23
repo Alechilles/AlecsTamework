@@ -86,6 +86,7 @@ public final class CommandItemFeatureHandler {
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
+    private final CommandLinkedNpcCoopService coopService;
     private final CommandLinkedNpcLostService lostService;
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
@@ -115,12 +116,14 @@ public final class CommandItemFeatureHandler {
                                      CommandNpcRelocationService relocationService,
                                      CommandLinkedNpcDeathService deathService,
                                      CommandLinkedNpcCaptureService captureService,
+                                     CommandLinkedNpcCoopService coopService,
                                      CommandLinkedNpcLostService lostService,
                                      CommandLinkedNpcStateSnapshotService stateSnapshotService) {
         this.registry = registry;
         this.relocationService = relocationService;
         this.deathService = deathService;
         this.captureService = captureService;
+        this.coopService = coopService;
         this.lostService = lostService;
         this.stateSnapshotService = stateSnapshotService;
         this.linkedNpcRecordStore = new CommandLinkedNpcRecordStore();
@@ -132,6 +135,7 @@ public final class CommandItemFeatureHandler {
                 linkedNpcRecordStore,
                 deathService,
                 captureService,
+                coopService,
                 lostService,
                 npcNameResolver,
                 linkPolicyService,
@@ -173,6 +177,7 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 deathService,
                 captureService,
+                coopService,
                 resolutionService,
                 stepExecutionService,
                 companionPlacementService
@@ -200,6 +205,7 @@ public final class CommandItemFeatureHandler {
                 linkMutationService,
                 deathService,
                 captureService,
+                coopService,
                 lostService,
                 relocationDispatchService,
                 stepExecutionService,
@@ -310,6 +316,14 @@ public final class CommandItemFeatureHandler {
                 }
                 if (captureService != null
                         && captureService.getCapturedSnapshotForToolOrOwner(
+                        record.npcUuid,
+                        toolId,
+                        ownerUuid
+                ) != null) {
+                    continue;
+                }
+                if (coopService != null
+                        && coopService.getCoopSnapshotForToolOrOwner(
                         record.npcUuid,
                         toolId,
                         ownerUuid

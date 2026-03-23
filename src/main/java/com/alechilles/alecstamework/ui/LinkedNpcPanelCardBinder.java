@@ -57,11 +57,29 @@ final class LinkedNpcPanelCardBinder {
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
-        boolean showRecall = isLinked && !entry.dead() && !entry.captured() && !entry.lost() && !pendingUnlink;
-        boolean showSetHome = isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !entry.lost() && !pendingUnlink;
+        boolean showRecall = isLinked
+                && !entry.dead()
+                && !entry.captured()
+                && !entry.inCoop()
+                && !entry.lost()
+                && !pendingUnlink;
+        boolean showSetHome = isLinked
+                && entry.loaded()
+                && !entry.dead()
+                && !entry.captured()
+                && !entry.inCoop()
+                && !entry.lost()
+                && !pendingUnlink;
         boolean showReturnHome =
-                isLinked && !entry.dead() && !entry.captured() && !entry.lost() && entry.hasHome() && !pendingUnlink;
-        boolean canOpenReleaseActions = !isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !entry.lost();
+                isLinked
+                        && !entry.dead()
+                        && !entry.captured()
+                        && !entry.inCoop()
+                        && !entry.lost()
+                        && entry.hasHome()
+                        && !pendingUnlink;
+        boolean canOpenReleaseActions =
+                !isLinked && entry.loaded() && !entry.dead() && !entry.captured() && !entry.inCoop() && !entry.lost();
         boolean showLink = !isLinked && !pendingUnlink;
         boolean showUnlink = isLinked || canOpenReleaseActions;
         boolean showRelease = pendingUnlink && canOpenReleaseActions;

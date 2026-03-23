@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
+import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -22,6 +24,7 @@ import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.metadata.CapturedNPCMetadata;
+import java.util.UUID;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -35,11 +38,27 @@ public final class CoopFeatureHandler {
     private final HytaleLogger logger;
     private final CoopCapturePolicyService capturePolicyService;
     private final CoopEffectService effectService;
+    @Nullable
+    private final CommandLinkedNpcCaptureService captureService;
+    @Nullable
+    private final CommandLinkedNpcCoopService coopService;
+    @Nullable
+    private final CommandNpcRelocationService relocationService;
+    @Nullable
+    private final CommandLinkedNpcLostService lostService;
 
-    public CoopFeatureHandler(HytaleLogger logger) {
+    public CoopFeatureHandler(HytaleLogger logger,
+                              @Nullable CommandLinkedNpcCaptureService captureService,
+                              @Nullable CommandLinkedNpcCoopService coopService,
+                              @Nullable CommandNpcRelocationService relocationService,
+                              @Nullable CommandLinkedNpcLostService lostService) {
         this.logger = logger;
         this.capturePolicyService = new CoopCapturePolicyService();
         this.effectService = new CoopEffectService();
+        this.captureService = captureService;
+        this.coopService = coopService;
+        this.relocationService = relocationService;
+        this.lostService = lostService;
     }
 
     public void onPlayerInteract(@Nullable PlayerInteractEvent event) {
@@ -96,7 +115,7 @@ public final class CoopFeatureHandler {
         }
 
         // Only cancel the event when Tamework successfully handled insertion.
-        if (!insertResident(world, player, heldItem, metadata, coopTarget, config)) {
+        if (!insertResident(world, player, heldItem, metadata, coopTarget, config, policyDecision)) {
             return;
         }
         event.setCancelled(true);
@@ -107,7 +126,8 @@ public final class CoopFeatureHandler {
                                    @Nonnull ItemStack heldItem,
                                    @Nonnull CapturedNPCMetadata metadata,
                                    @Nonnull CoopTarget coopTarget,
-                                   @Nonnull TwCoopConfig config) {
+                                   @Nonnull TwCoopConfig config,
+                                   @Nonnull CoopCapturePolicyService.Decision policyDecision) {
         Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
         if (store == null) {
             return false;
@@ -128,6 +148,50 @@ public final class CoopFeatureHandler {
                 new Vector3d(block.x, block.y, block.z),
                 new Vector3d().assign(Vector3d.FORWARD)
         ));
+        UUID capturedNpcUuid = heldItem.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING);
+        String itemRoleId = heldItem.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING);
+        String itemDisplayName = firstNonBlank(
+                heldItem.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME, Codec.STRING),
+                heldItem.getFromMetadataOrNull(TameworkMetadataKeys.NPC_NAME, Codec.STRING)
+        );
+        if (capturedNpcUuid != null) {
+            CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot capturedSnapshot =
+                    captureService != null ? captureService.getCapturedSnapshot(capturedNpcUuid) : null;
+            if (coopService != null) {
+                UUID ownerUuid = capturedSnapshot != null && capturedSnapshot.ownerId() != null
+                        ? capturedSnapshot.ownerId()
+                        : policyDecision.getOwnerUuid();
+                String[] toolIds = capturedSnapshot != null ? capturedSnapshot.toolIds() : new String[0];
+                String roleId = firstNonBlank(
+                        capturedSnapshot != null ? capturedSnapshot.roleId() : null,
+                        itemRoleId
+                );
+                String displayName = firstNonBlank(
+                        capturedSnapshot != null ? capturedSnapshot.displayName() : null,
+                        itemDisplayName
+                );
+                coopService.recordCoopSnapshot(
+                        new CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot(
+                                capturedNpcUuid,
+                                ownerUuid,
+                                toolIds,
+                                roleId,
+                                displayName,
+                                coopTarget.coopId(),
+                                System.currentTimeMillis()
+                        )
+                );
+            }
+            if (captureService != null) {
+                captureService.clearCapturedSnapshot(capturedNpcUuid);
+            }
+            if (relocationService != null) {
+                relocationService.cancelPendingRelocation(capturedNpcUuid);
+            }
+            if (lostService != null) {
+                lostService.clearLostSnapshot(capturedNpcUuid);
+            }
+        }
         clearCapturedMetadataFromHeldItem(player, heldItem);
         effectService.playIntakeEffects(
                 world,
@@ -170,6 +234,17 @@ public final class CoopFeatureHandler {
             default -> {
             }
         }
+    }
+
+    @Nullable
+    private String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 
     @Nullable

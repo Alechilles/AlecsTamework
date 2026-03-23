@@ -138,6 +138,47 @@ class CommandLinkedNpcLostServiceTest {
         assertNull(service.getLostSnapshot(npcUuid));
     }
 
+    @Test
+    void doesNotMarkCoopedCompanionAsLost() {
+        Path persistencePath = tempDir.resolve("CommandLinkedNpcLost.dat");
+        CommandLinkedNpcCoopService coopService = new CommandLinkedNpcCoopService();
+        CommandLinkedNpcLostService service = new CommandLinkedNpcLostService(
+                persistencePath,
+                null,
+                null,
+                null,
+                coopService
+        );
+        UUID npcUuid = UUID.randomUUID();
+        UUID ownerUuid = UUID.randomUUID();
+
+        coopService.recordCoopSnapshot(
+                new CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot(
+                        npcUuid,
+                        ownerUuid,
+                        new String[] {"tool-alpha"},
+                        "server.npcRole.test",
+                        "Cooped Companion",
+                        "coop/chicken_oak",
+                        System.currentTimeMillis()
+                )
+        );
+
+        service.recordLostFromRelocationDrop(
+                npcUuid,
+                ownerUuid,
+                new Vector3d(10.0, 20.0, 30.0),
+                new Vector3d(40.0, 50.0, 60.0),
+                null,
+                100L,
+                200L,
+                2
+        );
+
+        assertFalse(service.isLost(npcUuid));
+        assertNull(service.getLostSnapshot(npcUuid));
+    }
+
     private void assertVector(Vector3d value, double x, double y, double z) {
         assertNotNull(value);
         assertEquals(x, value.x, 0.0001);

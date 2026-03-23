@@ -46,6 +46,7 @@ final class CommandLinkedPanelEntryService {
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
+    private final CommandLinkedNpcCoopService coopService;
     private final CommandLinkedNpcLostService lostService;
     private final CommandNpcNameResolver npcNameResolver;
     private final CommandLinkPolicyService linkPolicyService;
@@ -54,6 +55,7 @@ final class CommandLinkedPanelEntryService {
     CommandLinkedPanelEntryService(CommandLinkedNpcRecordStore linkedNpcRecordStore,
                                    CommandLinkedNpcDeathService deathService,
                                    CommandLinkedNpcCaptureService captureService,
+                                   CommandLinkedNpcCoopService coopService,
                                    CommandLinkedNpcLostService lostService,
                                    CommandNpcNameResolver npcNameResolver,
                                    CommandLinkPolicyService linkPolicyService,
@@ -61,6 +63,7 @@ final class CommandLinkedPanelEntryService {
         this.linkedNpcRecordStore = linkedNpcRecordStore;
         this.deathService = deathService;
         this.captureService = captureService;
+        this.coopService = coopService;
         this.lostService = lostService;
         this.npcNameResolver = npcNameResolver;
         this.linkPolicyService = linkPolicyService != null ? linkPolicyService : new CommandLinkPolicyService();
@@ -90,6 +93,7 @@ final class CommandLinkedPanelEntryService {
             boolean loaded = false;
             boolean dead = false;
             boolean captured = false;
+            boolean inCoop = false;
             boolean lost = false;
             long deadRespawnRemainingMs = 0L;
             boolean hasHome = record.homePosition != null;
@@ -214,7 +218,18 @@ final class CommandLinkedPanelEntryService {
                     }
                 }
             }
-            if (!loaded && !dead && !captured && lostService != null) {
+            if (!loaded && !dead && !captured && coopService != null) {
+                CommandLinkedNpcCoopService.CoopLinkedNpcSnapshot coopSnapshot =
+                        coopService.getCoopSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
+                if (coopSnapshot != null) {
+                    inCoop = true;
+                    String coopName = coopSnapshot.displayName();
+                    if (coopName != null && !coopName.isBlank()) {
+                        displayName = coopName;
+                    }
+                }
+            }
+            if (!loaded && !dead && !captured && !inCoop && lostService != null) {
                 CommandLinkedNpcLostService.LostLinkedNpcSnapshot lostSnapshot =
                         lostService.getLostSnapshot(record.npcUuid);
                 if (lostSnapshot != null) {
@@ -237,6 +252,7 @@ final class CommandLinkedPanelEntryService {
                     hasHome,
                     dead,
                     captured,
+                    inCoop,
                     lost,
                     deadRespawnRemainingMs,
                     null,

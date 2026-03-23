@@ -30,7 +30,9 @@ import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandCoopResidentSyncSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
@@ -75,6 +77,7 @@ import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
+import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
@@ -115,6 +118,7 @@ public class Tamework extends JavaPlugin {
     private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
+    private CommandLinkedNpcCoopService commandLinkedNpcCoopService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
     private CommandLinkedNpcLostService commandLinkedNpcLostService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
@@ -316,6 +320,9 @@ public class Tamework extends JavaPlugin {
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
                 getDataDirectory().resolve("CommandLinkedNpcCaptures.dat")
         );
+        commandLinkedNpcCoopService = new CommandLinkedNpcCoopService(
+                getDataDirectory().resolve("CommandLinkedNpcCoops.dat")
+        );
         commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
                 getDataDirectory().resolve("CommandLinkedNpcDeaths.dat"),
                 commandLinkedNpcStateSnapshotService
@@ -324,7 +331,20 @@ public class Tamework extends JavaPlugin {
                 getDataDirectory().resolve("CommandLinkedNpcLost.dat"),
                 getLogger(),
                 commandLinkedNpcStateSnapshotService,
-                commandLinkedNpcCaptureService
+                commandLinkedNpcCaptureService,
+                commandLinkedNpcCoopService
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CommandCoopResidentSyncSystem(
+                        commandLinkedNpcCoopService,
+                        commandLinkedNpcCaptureService,
+                        commandNpcRelocationService,
+                        commandLinkedNpcLostService,
+                        commandLinksComponentType,
+                        CoopResidentComponent.getComponentType(),
+                        NPCEntity.getComponentType(),
+                        UUIDComponent.getComponentType()
+                )
         );
         commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
         getEntityStoreRegistry().registerSystem(
@@ -371,6 +391,7 @@ public class Tamework extends JavaPlugin {
                 getLogger(),
                 itemFeatureRegistry,
                 commandLinkedNpcCaptureService,
+                commandLinkedNpcCoopService,
                 commandNpcRelocationService,
                 commandLinkedNpcLostService
         );
@@ -382,6 +403,7 @@ public class Tamework extends JavaPlugin {
                 commandNpcRelocationService,
                 commandLinkedNpcDeathService,
                 commandLinkedNpcCaptureService,
+                commandLinkedNpcCoopService,
                 commandLinkedNpcLostService,
                 commandLinkedNpcStateSnapshotService
         );
@@ -389,7 +411,13 @@ public class Tamework extends JavaPlugin {
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
         );
         // Core handler for coop intake policy overlays.
-        coopFeatureHandler = new CoopFeatureHandler(getLogger());
+        coopFeatureHandler = new CoopFeatureHandler(
+                getLogger(),
+                commandLinkedNpcCaptureService,
+                commandLinkedNpcCoopService,
+                commandNpcRelocationService,
+                commandLinkedNpcLostService
+        );
 
         // Register /tw commands if the server supports it.
         if (getCommandRegistry() != null) {

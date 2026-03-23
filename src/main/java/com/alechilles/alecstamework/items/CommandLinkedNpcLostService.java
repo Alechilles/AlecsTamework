@@ -54,33 +54,44 @@ public final class CommandLinkedNpcLostService {
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     @Nullable
     private final CommandLinkedNpcCaptureService captureService;
+    @Nullable
+    private final CommandLinkedNpcCoopService coopService;
 
     public CommandLinkedNpcLostService() {
-        this(null, null, null, null);
+        this(null, null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath) {
-        this(persistencePath, null, null, null);
+        this(persistencePath, null, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath, @Nullable HytaleLogger logger) {
-        this(persistencePath, logger, null, null);
+        this(persistencePath, logger, null, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath,
                                        @Nullable HytaleLogger logger,
                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
-        this(persistencePath, logger, stateSnapshotService, null);
+        this(persistencePath, logger, stateSnapshotService, null, null);
     }
 
     public CommandLinkedNpcLostService(@Nullable Path persistencePath,
                                        @Nullable HytaleLogger logger,
                                        @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
                                        @Nullable CommandLinkedNpcCaptureService captureService) {
+        this(persistencePath, logger, stateSnapshotService, captureService, null);
+    }
+
+    public CommandLinkedNpcLostService(@Nullable Path persistencePath,
+                                       @Nullable HytaleLogger logger,
+                                       @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                       @Nullable CommandLinkedNpcCaptureService captureService,
+                                       @Nullable CommandLinkedNpcCoopService coopService) {
         this.persistencePath = persistencePath != null ? persistencePath.toAbsolutePath().normalize() : null;
         this.logger = logger;
         this.stateSnapshotService = stateSnapshotService;
         this.captureService = captureService;
+        this.coopService = coopService;
         loadPersistedSnapshots();
     }
 
@@ -100,6 +111,15 @@ public final class CommandLinkedNpcLostService {
             if (logger != null) {
                 logger.at(Level.FINE).log(
                         "Skipped lost transition for captured companion (npc=" + npcUuid + ")."
+                );
+            }
+            return;
+        }
+        if (coopService != null && coopService.getCoopSnapshot(npcUuid) != null) {
+            clearLostSnapshot(npcUuid);
+            if (logger != null) {
+                logger.at(Level.FINE).log(
+                        "Skipped lost transition for cooped companion (npc=" + npcUuid + ")."
                 );
             }
             return;

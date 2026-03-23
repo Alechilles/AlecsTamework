@@ -31,6 +31,7 @@ final class CommandMenuMoveService {
     private final CommandLinkMutationService linkMutationService;
     private final CommandLinkedNpcDeathService deathService;
     private final CommandLinkedNpcCaptureService captureService;
+    private final CommandLinkedNpcCoopService coopService;
     private final CommandLinkedNpcLostService lostService;
     private final CommandRelocationDispatchService relocationDispatchService;
     private final CommandStepExecutionService stepExecutionService;
@@ -45,6 +46,7 @@ final class CommandMenuMoveService {
                            CommandLinkMutationService linkMutationService,
                            CommandLinkedNpcDeathService deathService,
                            CommandLinkedNpcCaptureService captureService,
+                           CommandLinkedNpcCoopService coopService,
                            CommandLinkedNpcLostService lostService,
                            CommandRelocationDispatchService relocationDispatchService,
                            CommandStepExecutionService stepExecutionService,
@@ -58,6 +60,7 @@ final class CommandMenuMoveService {
         this.linkMutationService = linkMutationService;
         this.deathService = deathService;
         this.captureService = captureService;
+        this.coopService = coopService;
         this.lostService = lostService;
         this.relocationDispatchService = relocationDispatchService;
         this.stepExecutionService = stepExecutionService;
@@ -123,6 +126,15 @@ final class CommandMenuMoveService {
                     player.getUuid()
             ) != null) {
                 feedbackService.showWarning(player, "That companion is captured in a soul lantern. Spawn it first.");
+                return;
+            }
+            if (coopService != null
+                    && coopService.getCoopSnapshotForToolOrOwner(
+                    npcUuid,
+                    toolId,
+                    player.getUuid()
+            ) != null) {
+                feedbackService.showWarning(player, "That companion is currently housed in a coop.");
                 return;
             }
             if (lostService != null && lostService.isLost(npcUuid)) {

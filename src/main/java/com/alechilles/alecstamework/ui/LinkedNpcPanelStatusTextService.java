@@ -28,6 +28,9 @@ final class LinkedNpcPanelStatusTextService {
         if (entry.dead()) {
             return "DEAD";
         }
+        if (entry.inCoop()) {
+            return "In Coop";
+        }
         if (entry.lost()) {
             return "LOST";
         }
@@ -38,6 +41,9 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String resolveUnavailableHealthText(LinkedNpcEntry entry) {
+        if (entry != null && entry.inCoop()) {
+            return "Housed in coop.";
+        }
         if (entry != null && entry.lost()) {
             return "Lost companion. Use Respawn to recover.";
         }
@@ -55,6 +61,9 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String resolveUnavailableHappinessText(LinkedNpcEntry entry) {
+        if (entry != null && entry.inCoop()) {
+            return "Happiness: unavailable (in coop).";
+        }
         if (entry != null && entry.lost()) {
             return "Happiness: unavailable (lost).";
         }

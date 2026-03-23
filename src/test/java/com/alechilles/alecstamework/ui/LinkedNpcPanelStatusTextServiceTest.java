@@ -25,6 +25,7 @@ class LinkedNpcPanelStatusTextServiceTest {
                 false,
                 false,
                 false,
+                false,
                 true,
                 0L,
                 LinkedNpcTraitIndicator.EMPTY
@@ -59,11 +60,44 @@ class LinkedNpcPanelStatusTextServiceTest {
                 false,
                 true,
                 false,
+                false,
                 true,
                 0L,
                 LinkedNpcTraitIndicator.EMPTY
         );
 
         assertEquals("DEAD", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(deadAndLostEntry));
+    }
+
+    @Test
+    void exposesInCoopStatusAndHints() {
+        LinkedNpcEntry inCoopEntry = new LinkedNpcEntry(
+                UUID.randomUUID(),
+                "Cooped Companion",
+                0,
+                0,
+                0,
+                0,
+                null,
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                false,
+                false,
+                true,
+                false,
+                0L,
+                LinkedNpcTraitIndicator.EMPTY
+        );
+
+        assertEquals("In Coop", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(inCoopEntry));
+        assertEquals("Housed in coop.", LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(inCoopEntry));
+        assertEquals(
+                "Happiness: unavailable (in coop).",
+                LinkedNpcPanelStatusTextService.resolveUnavailableHappinessText(inCoopEntry)
+        );
     }
 }

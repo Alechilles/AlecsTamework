@@ -49,6 +49,13 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
+        if (entry.inCoop()) {
+            String coopText = "In Coop";
+            commandBuilder.set(healthTextSelector + ".Text", coopText);
+            commandBuilder.set(healthTextShadowSelector + ".Text", coopText);
+            commandBuilder.set(healthFillSelector + ".Visible", false);
+            return;
+        }
         if (entry.lost()) {
             String lostText = "Lost";
             commandBuilder.set(healthTextSelector + ".Text", lostText);
@@ -134,6 +141,9 @@ final class LinkedNpcPanelVitalsBinder {
             return new NeedVisual(0.0, "Hunger: unavailable (lost)", false);
         }
         if (!entry.loaded()) {
+            if (entry.inCoop()) {
+                return new NeedVisual(0.0, "Hunger: unavailable (in coop)", false);
+            }
             if (entry.captured()) {
                 return new NeedVisual(0.0, "Hunger: unavailable (captured)", false);
             }
@@ -158,6 +168,9 @@ final class LinkedNpcPanelVitalsBinder {
             return new NeedVisual(0.0, "Thirst: unavailable (lost)", false);
         }
         if (!entry.loaded()) {
+            if (entry.inCoop()) {
+                return new NeedVisual(0.0, "Thirst: unavailable (in coop)", false);
+            }
             if (entry.captured()) {
                 return new NeedVisual(0.0, "Thirst: unavailable (captured)", false);
             }

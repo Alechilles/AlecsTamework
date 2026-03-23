@@ -51,10 +51,13 @@ public final class SpawnerFeatureHandler {
     private final CommandNpcRelocationService relocationService;
     @Nullable
     private final CommandLinkedNpcLostService lostService;
+    @Nullable
+    private final CommandLinkedNpcCoopService coopService;
 
     public SpawnerFeatureHandler(HytaleLogger logger,
                                  ItemFeatureRegistry registry,
                                  CommandLinkedNpcCaptureService captureService,
+                                 @Nullable CommandLinkedNpcCoopService coopService,
                                  @Nullable CommandNpcRelocationService relocationService,
                                  @Nullable CommandLinkedNpcLostService lostService) {
         this.logger = logger;
@@ -82,6 +85,7 @@ public final class SpawnerFeatureHandler {
                 ownershipPolicyService,
                 npcIdentityService
         );
+        this.coopService = coopService;
         this.relocationService = relocationService;
         this.lostService = lostService;
     }
@@ -359,6 +363,9 @@ public final class SpawnerFeatureHandler {
             linkedNpcSyncService.remapLinkedNpcRecordsAfterRespawn(player, capturedNpcUuid, spawnedNpcUuid);
         }
         linkedNpcSyncService.clearCapturedSnapshotIfPresent(capturedNpcUuid);
+        if (coopService != null && capturedNpcUuid != null) {
+            coopService.clearCoopSnapshot(capturedNpcUuid);
+        }
 
         ItemStack updated = itemStack;
         if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
@@ -561,6 +568,9 @@ public final class SpawnerFeatureHandler {
             }
             if (lostService != null) {
                 lostService.clearLostSnapshot(targetUuid);
+            }
+            if (coopService != null) {
+                coopService.clearCoopSnapshot(targetUuid);
             }
         }
         effectService.playCaptureEffects(world, targetRef, config);
