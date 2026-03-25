@@ -41,6 +41,9 @@ final class InteractionExecutor {
         if (entry instanceof TameInteraction) {
             TameInteraction tame = (TameInteraction) entry;
             boolean applied = effects.applyStartTaming(npcRef, store, player);
+            if (!applied) {
+                return false;
+            }
             applied |= effects.applyTameRoleChange(tame, npcRef, role, store, ctx);
             feedHelper.consumeHeldItem(player, 1);
             applied |= effects.applyCustomEffects(

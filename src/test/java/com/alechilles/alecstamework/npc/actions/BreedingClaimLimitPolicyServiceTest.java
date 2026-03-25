@@ -1,10 +1,8 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
-import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -12,33 +10,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Tests claim-cap policy decision behavior for SimpleClaims-backed breeding limits. */
+/** Tests population-cap policy behavior for claim and per-player breeding limits. */
 class BreedingClaimLimitPolicyServiceTest {
-
-    @Test
-    void countableBreedableAcceptsEnabledBreedingComponentWithoutConfig() {
-        TameworkBreedingComponent breeding = new TameworkBreedingComponent();
-        breeding.setEnabled(true);
-
-        assertTrue(BreedingClaimLimitPolicyService.isCountableBreedable(breeding, null));
-    }
-
-    @Test
-    void countableBreedableAcceptsEnabledConfigWithoutBreedingComponent() throws Exception {
-        TwBreedingConfig config = newBreedingConfig(true);
-
-        assertTrue(BreedingClaimLimitPolicyService.isCountableBreedable(null, config));
-    }
-
-    @Test
-    void countableBreedableRejectsWhenComponentAndConfigAreInactive() throws Exception {
-        TameworkBreedingComponent breeding = new TameworkBreedingComponent();
-        breeding.setEnabled(false);
-        TwBreedingConfig config = newBreedingConfig(false);
-
-        assertFalse(BreedingClaimLimitPolicyService.isCountableBreedable(breeding, config));
-        assertFalse(BreedingClaimLimitPolicyService.isCountableBreedable(null, config));
-    }
 
     @Test
     void noClaimAllowsBreedingWhenClaimIsNotRequired() throws Exception {
@@ -163,6 +136,66 @@ class BreedingClaimLimitPolicyServiceTest {
         assertEquals("simpleclaims-lookup-error", errorDecision.reason());
     }
 
+    @Test
+    void perPlayerDisabledSkipsCap() {
+        BreedingClaimLimitPolicyService.Decision decision =
+                BreedingClaimLimitPolicyService.evaluatePerPlayerResolved(0, 999, 999);
+
+        assertTrue(decision.allowed());
+        assertFalse(decision.capEnforced());
+    }
+
+    @Test
+    void perPlayerCapReachedDeniesWhenAtLimit() {
+        BreedingClaimLimitPolicyService.Decision decision =
+                BreedingClaimLimitPolicyService.evaluatePerPlayerResolved(8, 8, 0);
+
+        assertFalse(decision.allowed());
+        assertEquals("player-cap-reached", decision.reason());
+        assertEquals(0, decision.remainingHeadroom());
+    }
+
+    @Test
+    void perPlayerCapAllowsWhenUnderLimit() {
+        BreedingClaimLimitPolicyService.Decision decision =
+                BreedingClaimLimitPolicyService.evaluatePerPlayerResolved(8, 5, 1);
+
+        assertTrue(decision.allowed());
+        assertTrue(decision.capEnforced());
+        assertEquals(2, decision.remainingHeadroom());
+        assertEquals("player-cap-allow", decision.reason());
+    }
+
+    @Test
+    void ownerBasisForInheritOwnerUsesFirstAvailableParent() {
+        UUID ownerA = UUID.randomUUID();
+        UUID ownerB = UUID.randomUUID();
+        List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(true, ownerA, ownerB);
+
+        assertEquals(1, targets.size());
+        assertEquals(ownerA, targets.get(0));
+    }
+
+    @Test
+    void ownerBasisForNoInheritanceUsesBothDistinctOwners() {
+        UUID ownerA = UUID.randomUUID();
+        UUID ownerB = UUID.randomUUID();
+        List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, ownerA, ownerB);
+
+        assertEquals(2, targets.size());
+        assertEquals(ownerA, targets.get(0));
+        assertEquals(ownerB, targets.get(1));
+    }
+
+    @Test
+    void ownerBasisForNoInheritanceDeduplicatesSameOwner() {
+        UUID owner = UUID.randomUUID();
+        List<UUID> targets = BreedingClaimLimitPolicyService.resolveOwnerTargets(false, owner, owner);
+
+        assertEquals(1, targets.size());
+        assertEquals(owner, targets.get(0));
+    }
+
     private static BreedingClaimLimitPolicyService.ResolvedClaim claimFound(int chunkCount) {
         return new BreedingClaimLimitPolicyService.ResolvedClaim(
                 BreedingClaimLimitPolicyService.ClaimResolutionStatus.CLAIM_FOUND,
@@ -170,14 +203,6 @@ class BreedingClaimLimitPolicyServiceTest {
                 chunkCount,
                 null
         );
-    }
-
-    private static TwBreedingConfig newBreedingConfig(boolean enabled) throws Exception {
-        Constructor<TwBreedingConfig> constructor = TwBreedingConfig.class.getDeclaredConstructor();
-        constructor.setAccessible(true);
-        TwBreedingConfig config = constructor.newInstance();
-        setField(config, "enabled", enabled);
-        return config;
     }
 
     private static TwGlobalConfig globalSettings(boolean simpleClaimsEnabled,

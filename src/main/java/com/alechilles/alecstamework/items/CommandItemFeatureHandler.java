@@ -872,6 +872,8 @@ public final class CommandItemFeatureHandler {
             feedbackService.showWarning(player, "Unable to cull right now.");
             return;
         }
+        clearNpcCommandLinks(npcRef, store);
+        removeNpcFromAllCommandToolRecords(player, npcUuid);
         DeathComponent.tryAddComponent(store, npcRef, new Damage(Damage.NULL_SOURCE, cause, CULL_DAMAGE_AMOUNT));
         String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
         if (displayName == null || displayName.isBlank()) {
@@ -918,16 +920,59 @@ public final class CommandItemFeatureHandler {
             }
         }
 
-        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
-        if (linksType != null) {
-            TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
-            if (links != null) {
-                links.setOwnerId(null);
-                links.setToolIds(new String[0]);
-                links.setHomePosition(null);
-                store.putComponent(npcRef, linksType, links);
-            }
+        clearNpcCommandLinks(npcRef, store);
+    }
+
+    private void clearNpcCommandLinks(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
         }
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        if (linksType == null) {
+            return;
+        }
+        TameworkCommandLinksComponent links = store.getComponent(npcRef, linksType);
+        if (links == null) {
+            return;
+        }
+        links.setOwnerId(null);
+        links.setToolIds(new String[0]);
+        links.setHomePosition(null);
+        store.putComponent(npcRef, linksType, links);
+    }
+
+    private void removeNpcFromAllCommandToolRecords(Player player, UUID npcUuid) {
+        if (player == null || npcUuid == null) {
+            return;
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return;
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        boolean changed = false;
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || stackToolId.isBlank()) {
+                continue;
+            }
+            ItemStack updated = linkMutationService.removeLinkedNpcRecord(stack, npcUuid);
+            if (updated == stack) {
+                continue;
+            }
+            hotbar.setItemStackForSlot(slot, updated);
+            changed = true;
+        }
+        if (!changed) {
+            return;
+        }
+        inventory.markChanged();
+        player.sendInventory();
     }
 
     private void trySetReleaseState(Ref<EntityStore> npcRef,

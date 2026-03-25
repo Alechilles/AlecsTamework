@@ -57,6 +57,7 @@ public final class PassiveBreedingSweepService {
         List<PassiveBreedingSweepCandidate> sweepCandidates = new ArrayList<>();
         List<PassiveBreedingBirthReservation> birthReservations = new ArrayList<>();
         Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> claimReservations = new HashMap<>();
+        Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> playerReservations = new HashMap<>();
         store.forEachChunk(
                 Query.and(npcType, transformType, breedingType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
@@ -87,7 +88,8 @@ public final class PassiveBreedingSweepService {
                     store,
                     breeding,
                     candidate.config(),
-                    claimReservations
+                    claimReservations,
+                    playerReservations
             )) {
                 String typeKey = populationTypeService.resolveTypeKey(candidate.roleId(), candidate.config());
                 if (typeKey != null && !typeKey.isBlank()) {

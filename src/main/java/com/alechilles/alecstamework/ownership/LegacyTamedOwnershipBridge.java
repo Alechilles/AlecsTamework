@@ -48,6 +48,16 @@ public final class LegacyTamedOwnershipBridge {
         if (!TamedStateResolver.isTamed(npcRef, store)) {
             return ClaimResult.none();
         }
+        OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(store, playerId);
+        if (!decision.allowed()) {
+            OwnerMessageUtil.sendPopulationCapReached(
+                    player,
+                    decision.currentCount(),
+                    decision.limit(),
+                    decision.scope()
+            );
+            return ClaimResult.none();
+        }
 
         String ownerName = OwnerNameUtil.resolve(player);
         store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(playerId, ownerName));

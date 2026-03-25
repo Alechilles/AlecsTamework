@@ -71,6 +71,7 @@ import com.alechilles.alecstamework.npc.systems.CompanionAttachmentSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnDiagnosticsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionDespawnProtectionSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitBootstrapOnLoadSystem;
+import com.alechilles.alecstamework.npc.systems.CommandLinkedRevivableDropSuppressionSystem;
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
@@ -315,6 +316,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)
         );
+        getEntityStoreRegistry().registerSystem(new CommandLinkedRevivableDropSuppressionSystem());
         getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
         getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
         getEntityStoreRegistry().registerSystem(

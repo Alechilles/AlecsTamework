@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetOwnerEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetStateEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SetTamedEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StatDelta;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.assetstore.map.IndexedLookupTableAssetMap;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -48,12 +50,15 @@ final class InteractionStateEffects {
 
     // Marks the NPC as tamed and assigns owner based on the interacting player.
     boolean applyStartTaming(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
+        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        if (isNewPlayerOwnershipAcquisitionDenied(npcRef, store, player, ownerType)) {
+            return false;
+        }
         clearTranquilizerEffect(npcRef, store);
         ComponentType<EntityStore, TameworkTamedComponent> tamedType = TameworkTamedComponent.getComponentType();
         if (tamedType != null) {
             store.putComponent(npcRef, tamedType, new TameworkTamedComponent(true));
         }
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
         if (ownerType != null && player != null) {
             PlayerRef ref = player.getPlayerRef();
             UUID ownerId = player.getUuid();
@@ -116,6 +121,9 @@ final class InteractionStateEffects {
                 if (player == null) {
                     return false;
                 }
+                if (isNewPlayerOwnershipAcquisitionDenied(npcRef, store, player, ownerType)) {
+                    return false;
+                }
                 ownerId = player.getUuid();
                 PlayerRef ref = player.getPlayerRef();
                 ownerName = ref != null ? ref.getUsername() : null;
@@ -140,6 +148,34 @@ final class InteractionStateEffects {
             }
         }
         store.putComponent(npcRef, ownerType, new TameworkOwnerComponent(ownerId, ownerName));
+        return true;
+    }
+
+    private boolean isNewPlayerOwnershipAcquisitionDenied(Ref<EntityStore> npcRef,
+                                                          Store<EntityStore> store,
+                                                          Player player,
+                                                          ComponentType<EntityStore, TameworkOwnerComponent> ownerType) {
+        if (npcRef == null || !npcRef.isValid() || store == null || player == null || ownerType == null) {
+            return false;
+        }
+        UUID playerId = player.getUuid();
+        if (playerId == null) {
+            return false;
+        }
+        TameworkOwnerComponent existingOwner = store.getComponent(npcRef, ownerType);
+        if (existingOwner != null && existingOwner.getOwnerId() != null) {
+            return false;
+        }
+        OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(store, playerId);
+        if (decision.allowed()) {
+            return false;
+        }
+        OwnerMessageUtil.sendPopulationCapReached(
+                player,
+                decision.currentCount(),
+                decision.limit(),
+                decision.scope()
+        );
         return true;
     }
 

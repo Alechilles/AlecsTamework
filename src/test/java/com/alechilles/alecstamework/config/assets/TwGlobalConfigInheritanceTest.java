@@ -108,12 +108,72 @@ class TwGlobalConfigInheritanceTest {
     void simpleClaimsBreedingDefaultsAreDisabledAndSafe() {
         TwGlobalConfig config = new TwGlobalConfig();
 
+        assertEquals(0, config.getPopulationLimitPerPlayerOwnedTotal());
+        assertEquals(TwGlobalConfig.PerPlayerLimitScope.PER_WORLD, config.getPopulationPerPlayerLimitScope());
         assertFalse(config.isSimpleClaimsEnabled());
         assertFalse(config.isSimpleClaimsBreedingRequiresClaim());
         assertEquals(0, config.getSimpleClaimsBreedingLimitPerClaimChunk());
         assertEquals(0, config.getSimpleClaimsBreedingLimitPerClaimTotal());
         assertFalse(config.isSimpleClaimsDamageProtectTamedFromNonMembers());
         assertEquals("tamework.damage_tamed_claim_npc", config.getSimpleClaimsDamageAllowDamagePermissionKey());
+    }
+
+    @Test
+    void populationSectionInheritanceSupportsPartialNestedOverrides() throws Exception {
+        TwGlobalConfig parent = new TwGlobalConfig();
+        TwGlobalConfig child = new TwGlobalConfig();
+
+        setField(parent, "populationLimitPerPlayerOwnedTotal", 24);
+        setField(parent, "populationPerPlayerLimitScope", TwGlobalConfig.PerPlayerLimitScope.GLOBAL);
+        setField(child, "populationLimitPerPlayerOwnedTotal", 8);
+        setField(child, "populationPerPlayerLimitScope", TwGlobalConfig.PerPlayerLimitScope.PER_WORLD);
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put("Population", Set.of("LimitPerPlayerOwnedTotal"));
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Population"), explicitNestedKeysByTopLevel);
+
+        assertEquals(8, child.getPopulationLimitPerPlayerOwnedTotal());
+        assertEquals(TwGlobalConfig.PerPlayerLimitScope.GLOBAL, child.getPopulationPerPlayerLimitScope());
+    }
+
+    @Test
+    void legacyBreedingPopulationKeysAreIgnored() throws Exception {
+        TwGlobalConfig parent = new TwGlobalConfig();
+        TwGlobalConfig child = new TwGlobalConfig();
+
+        setField(parent, "populationLimitPerPlayerOwnedTotal", 24);
+        setField(parent, "populationPerPlayerLimitScope", TwGlobalConfig.PerPlayerLimitScope.GLOBAL);
+        setField(child, "populationLimitPerPlayerOwnedTotal", 8);
+        setField(child, "populationPerPlayerLimitScope", TwGlobalConfig.PerPlayerLimitScope.PER_WORLD);
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put("Breeding", Set.of("LimitPerPlayerTotal"));
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Breeding"), explicitNestedKeysByTopLevel);
+
+        assertEquals(24, child.getPopulationLimitPerPlayerOwnedTotal());
+        assertEquals(TwGlobalConfig.PerPlayerLimitScope.GLOBAL, child.getPopulationPerPlayerLimitScope());
+    }
+
+    @Test
+    void perPlayerScopeParsingFallsBackToPerWorldForInvalidOrBlankValues() {
+        assertEquals(
+                TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
+                TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(null)
+        );
+        assertEquals(
+                TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
+                TwGlobalConfig.PerPlayerLimitScope.fromConfigValue("  ")
+        );
+        assertEquals(
+                TwGlobalConfig.PerPlayerLimitScope.PER_WORLD,
+                TwGlobalConfig.PerPlayerLimitScope.fromConfigValue("invalid")
+        );
+        assertEquals(
+                TwGlobalConfig.PerPlayerLimitScope.GLOBAL,
+                TwGlobalConfig.PerPlayerLimitScope.fromConfigValue("global")
+        );
     }
 
     @Test

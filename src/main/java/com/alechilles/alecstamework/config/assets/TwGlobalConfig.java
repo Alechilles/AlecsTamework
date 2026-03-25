@@ -11,6 +11,7 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nonnull;
@@ -259,6 +260,22 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .add()
             .build();
+    private static final BuilderCodec<PopulationSection> POPULATION_SECTION_CODEC = BuilderCodec.builder(
+                    PopulationSection.class, PopulationSection::new
+            )
+            .<Integer>append(
+                    new KeyedCodec<>("LimitPerPlayerOwnedTotal", Codec.INTEGER),
+                    (section, value) -> section.limitPerPlayerOwnedTotal = value,
+                    section -> section.limitPerPlayerOwnedTotal
+            )
+            .add()
+            .<String>append(
+                    new KeyedCodec<>("PerPlayerLimitScope", Codec.STRING),
+                    (section, value) -> section.perPlayerLimitScope = value,
+                    section -> section.perPlayerLimitScope
+            )
+            .add()
+            .build();
     private static final BuilderCodec<SimpleClaimsBreedingSection> SIMPLE_CLAIMS_BREEDING_SECTION_CODEC = BuilderCodec.builder(
                     SimpleClaimsBreedingSection.class, SimpleClaimsBreedingSection::new
             )
@@ -372,6 +389,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     + "omitted section inherits from parent; when present, only explicitly defined nested fields "
                     + "override parent.")
             .add()
+            .<PopulationSection>append(
+                    new KeyedCodec<>("Population", POPULATION_SECTION_CODEC),
+                    TwGlobalConfig::applyPopulationSection,
+                    TwGlobalConfig::toPopulationSection
+            )
+            .documentation("Server-level owned NPC population limits. Inheritance: omitted section inherits from parent; "
+                    + "when present, only explicitly defined nested fields override parent.")
+            .add()
             .<SimpleClaimsSection>append(
                     new KeyedCodec<>("SimpleClaims", SIMPLE_CLAIMS_SECTION_CODEC),
                     TwGlobalConfig::applySimpleClaimsSection,
@@ -425,6 +450,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private boolean tranquilizerArrowAssetSetEnabled;
     private boolean tranquilizerPotionAssetSetEnabled;
     private boolean feedTroughAssetSetEnabled;
+    private int populationLimitPerPlayerOwnedTotal;
+    private PerPlayerLimitScope populationPerPlayerLimitScope = PerPlayerLimitScope.PER_WORLD;
     private boolean simpleClaimsEnabled;
     private int simpleClaimsBreedingLimitPerClaimChunk;
     private int simpleClaimsBreedingLimitPerClaimTotal;
@@ -657,6 +684,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         inheritInteractionDefaultsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritCommandSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritAssetSetsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritPopulationSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritSimpleClaimsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
     }
 
@@ -794,6 +822,18 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
     public boolean isFeedTroughAssetSetEnabled() {
         return feedTroughAssetSetEnabled;
+    }
+
+    public int getPopulationLimitPerPlayerOwnedTotal() {
+        return Math.max(0, populationLimitPerPlayerOwnedTotal);
+    }
+
+    @Nonnull
+    public PerPlayerLimitScope getPopulationPerPlayerLimitScope() {
+        if (populationPerPlayerLimitScope == null) {
+            return PerPlayerLimitScope.PER_WORLD;
+        }
+        return populationPerPlayerLimitScope;
     }
 
     public boolean isSimpleClaimsEnabled() {
@@ -1035,6 +1075,25 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.tranquilizerArrow = tranquilizerArrowAssetSetEnabled;
         section.tranquilizerPotion = tranquilizerPotionAssetSetEnabled;
         section.feedTrough = feedTroughAssetSetEnabled;
+        return section;
+    }
+
+    private void applyPopulationSection(@Nullable PopulationSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.limitPerPlayerOwnedTotal != null) {
+            populationLimitPerPlayerOwnedTotal = section.limitPerPlayerOwnedTotal;
+        }
+        if (section.perPlayerLimitScope != null) {
+            populationPerPlayerLimitScope = PerPlayerLimitScope.fromConfigValue(section.perPlayerLimitScope);
+        }
+    }
+
+    private PopulationSection toPopulationSection() {
+        PopulationSection section = new PopulationSection();
+        section.limitPerPlayerOwnedTotal = populationLimitPerPlayerOwnedTotal;
+        section.perPlayerLimitScope = getPopulationPerPlayerLimitScope().configValue();
         return section;
     }
 
@@ -1307,6 +1366,28 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
     }
 
+    private void inheritPopulationSection(@Nonnull TwGlobalConfig parent,
+                                          @Nonnull Set<String> explicitTopLevelKeys,
+                                          @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("Population")) {
+            populationLimitPerPlayerOwnedTotal = parent.populationLimitPerPlayerOwnedTotal;
+            populationPerPlayerLimitScope = parent.populationPerPlayerLimitScope;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("Population");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("LimitPerPlayerOwnedTotal")) {
+            populationLimitPerPlayerOwnedTotal = parent.populationLimitPerPlayerOwnedTotal;
+        }
+        if (!nestedExplicit.contains("PerPlayerLimitScope")) {
+            populationPerPlayerLimitScope = parent.populationPerPlayerLimitScope;
+        }
+    }
+
     private void inheritSimpleClaimsSection(@Nonnull TwGlobalConfig parent,
                                             @Nonnull Set<String> explicitTopLevelKeys,
                                             @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
@@ -1442,6 +1523,11 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Boolean feedTrough;
     }
 
+    private static final class PopulationSection {
+        private Integer limitPerPlayerOwnedTotal;
+        private String perPlayerLimitScope;
+    }
+
     private static final class SimpleClaimsSection {
         private Boolean simpleClaimsEnabled;
         private SimpleClaimsBreedingSection breeding;
@@ -1457,6 +1543,39 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private static final class SimpleClaimsDamageSection {
         private Boolean protectTamedFromNonMembers;
         private String allowDamagePermissionKey;
+    }
+
+    public enum PerPlayerLimitScope {
+        PER_WORLD("PerWorld"),
+        GLOBAL("Global");
+
+        private final String configValue;
+
+        PerPlayerLimitScope(@Nonnull String configValue) {
+            this.configValue = configValue;
+        }
+
+        @Nonnull
+        public String configValue() {
+            return configValue;
+        }
+
+        @Nonnull
+        public static PerPlayerLimitScope fromConfigValue(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return PER_WORLD;
+            }
+            String normalized = value.trim().toLowerCase(Locale.ROOT);
+            if ("global".equals(normalized)) {
+                return GLOBAL;
+            }
+            if ("perworld".equals(normalized)
+                    || "per_world".equals(normalized)
+                    || "per-world".equals(normalized)) {
+                return PER_WORLD;
+            }
+            return PER_WORLD;
+        }
     }
 
     public static final class AssetSetToggles {

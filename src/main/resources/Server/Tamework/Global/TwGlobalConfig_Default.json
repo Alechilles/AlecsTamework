@@ -24,15 +24,19 @@
     "TranquilizerPotion": false,
     "FeedTrough": false
   },
+  "Population": {
+    "LimitPerPlayerOwnedTotal": 0,
+    "PerPlayerLimitScope": "PerWorld"
+  },
   "SimpleClaims": {
     "SimpleClaimsEnabled": false,
     "Breeding": {
-      "LimitPerClaimChunk": 3,
-      "LimitPerClaimTotal": 9,
-      "BreedingRequiresClaim": true
+      "LimitPerClaimChunk": 0,
+      "LimitPerClaimTotal": 0,
+      "BreedingRequiresClaim": false
     },
     "Damage": {
-      "ProtectTamedFromNonMembers": true,
+      "ProtectTamedFromNonMembers": false,
       "AllowDamagePermissionKey": "tamework.damage_tamed_claim_npc"
     }
   }

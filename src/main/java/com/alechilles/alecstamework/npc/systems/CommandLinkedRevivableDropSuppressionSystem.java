@@ -1,0 +1,64 @@
+package com.alechilles.alecstamework.npc.systems;
+
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.dependency.Dependency;
+import com.hypixel.hytale.component.dependency.Order;
+import com.hypixel.hytale.component.dependency.SystemDependency;
+import com.hypixel.hytale.component.query.Query;
+import com.hypixel.hytale.server.core.asset.type.gameplay.DeathConfig;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathSystems;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.systems.NPCDamageSystems;
+import java.util.Set;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * Suppresses NPC death drops for linked companions that are configured as dead-respawn enabled.
+ */
+public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSystems.OnDeathSystem {
+    @Nonnull
+    @Override
+    public Query<EntityStore> getQuery() {
+        return Query.and(
+                NPCEntity.getComponentType(),
+                TameworkCommandLinksComponent.getComponentType()
+        );
+    }
+
+    @Nonnull
+    @Override
+    public Set<Dependency<EntityStore>> getDependencies() {
+        return Set.of(new SystemDependency<>(Order.BEFORE, NPCDamageSystems.DropDeathItems.class));
+    }
+
+    @Override
+    public void onComponentAdded(@Nonnull Ref<EntityStore> ref,
+                                 @Nonnull DeathComponent component,
+                                 @Nonnull Store<EntityStore> store,
+                                 @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        TameworkCommandLinksComponent links = commandBuffer.getComponent(ref, TameworkCommandLinksComponent.getComponentType());
+        String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
+        boolean deadRespawnEnabled = TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled();
+        if (!shouldSuppressDrops(links, deadRespawnEnabled)) {
+            return;
+        }
+        component.setItemsLossMode(DeathConfig.ItemsLossMode.NONE);
+    }
+
+    static boolean shouldSuppressDrops(@Nullable TameworkCommandLinksComponent links,
+                                       boolean deadRespawnEnabled) {
+        if (!deadRespawnEnabled || links == null) {
+            return false;
+        }
+        String[] toolIds = links.getToolIds();
+        return toolIds != null && toolIds.length > 0;
+    }
+}

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ownership;
 
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import java.util.UUID;
@@ -20,20 +21,9 @@ public final class OwnerMessageUtil {
                                   String ownerName,
                                   UUID ownerUuid,
                                   String verb) {
-        if (player == null) {
+        if (!canSend(player)) {
             return;
         }
-        UUID playerUuid = player.getUuid();
-        if (playerUuid == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        // Rate-limit to avoid spamming chat during rapid interactions.
-        Long last = LAST_SENT.get(playerUuid);
-        if (last != null && now - last < COOLDOWN_MS) {
-            return;
-        }
-        LAST_SENT.put(playerUuid, now);
 
         // Resolve a human-friendly NPC/owner label for messaging.
         String resolvedNpc = npcName != null && !npcName.isBlank() ? npcName : "pet";
@@ -54,19 +44,9 @@ public final class OwnerMessageUtil {
     }
 
     public static void sendUntamed(Player player, String npcName, String foodList) {
-        if (player == null) {
+        if (!canSend(player)) {
             return;
         }
-        UUID playerUuid = player.getUuid();
-        if (playerUuid == null) {
-            return;
-        }
-        long now = System.currentTimeMillis();
-        Long last = LAST_SENT.get(playerUuid);
-        if (last != null && now - last < COOLDOWN_MS) {
-            return;
-        }
-        LAST_SENT.put(playerUuid, now);
 
         // Keep the base message short; optionally append allowed foods.
         String resolvedNpc = npcName != null && !npcName.isBlank() ? npcName : "pet";
@@ -75,5 +55,44 @@ public final class OwnerMessageUtil {
             message += " Try feeding: " + foodList + ".";
         }
         player.sendMessage(Message.raw(message));
+    }
+
+    public static void sendPopulationCapReached(Player player,
+                                                int currentCount,
+                                                int limit,
+                                                TwGlobalConfig.PerPlayerLimitScope scope) {
+        if (!canSend(player)) {
+            return;
+        }
+        int safeCurrent = Math.max(0, currentCount);
+        int safeLimit = Math.max(0, limit);
+        TwGlobalConfig.PerPlayerLimitScope safeScope = scope == null
+                ? TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
+                : scope;
+        String scopeLabel = safeScope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
+                ? "across loaded worlds"
+                : "in this world";
+        player.sendMessage(Message.raw(
+                "You cannot tame more NPCs right now (" + safeCurrent + "/" + safeLimit
+                        + " owned " + scopeLabel + ")."
+        ));
+    }
+
+    private static boolean canSend(Player player) {
+        if (player == null) {
+            return false;
+        }
+        UUID playerUuid = player.getUuid();
+        if (playerUuid == null) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        // Rate-limit to avoid spamming chat during rapid interactions.
+        Long last = LAST_SENT.get(playerUuid);
+        if (last != null && now - last < COOLDOWN_MS) {
+            return false;
+        }
+        LAST_SENT.put(playerUuid, now);
+        return true;
     }
 }

@@ -71,7 +71,7 @@ final class BreedingOffspringService {
                                Store<EntityStore> store,
                                TameworkBreedingComponent sourceBreeding,
                                @Nullable TwBreedingConfig config) {
-        return tryCompletePairing(sourceRef, store, sourceBreeding, config, null);
+        return tryCompletePairing(sourceRef, store, sourceBreeding, config, null, null);
     }
 
     boolean tryCompletePairing(Ref<EntityStore> sourceRef,
@@ -79,6 +79,15 @@ final class BreedingOffspringService {
                                TameworkBreedingComponent sourceBreeding,
                                @Nullable TwBreedingConfig config,
                                @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations) {
+        return tryCompletePairing(sourceRef, store, sourceBreeding, config, pendingClaimReservations, null);
+    }
+
+    boolean tryCompletePairing(Ref<EntityStore> sourceRef,
+                               Store<EntityStore> store,
+                               TameworkBreedingComponent sourceBreeding,
+                               @Nullable TwBreedingConfig config,
+                               @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations,
+                               @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> pendingPlayerReservations) {
         if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
             return false;
         }
@@ -103,39 +112,26 @@ final class BreedingOffspringService {
         }
         Vector3d spawnAnchor = resolveSpawnAnchor(sourceRef, partner.ref, store);
         String sourceRoleId = resolveRoleId(sourceNpc);
-        BreedingClaimLimitPolicyService.Decision claimDecision = claimLimitPolicyService.evaluate(
+        BreedingOffspringProgressionService.OwnerSnapshot parentAOwner = resolveOwnerSnapshot(sourceRef, store);
+        BreedingOffspringProgressionService.OwnerSnapshot parentBOwner = resolveOwnerSnapshot(partner.ref, store);
+        BreedingClaimLimitPolicyService.Decision populationDecision = claimLimitPolicyService.evaluate(
                 store,
                 spawnAnchor,
                 config,
-                0
+                sourceRoleId,
+                parentAOwner.ownerId(),
+                parentBOwner.ownerId(),
+                pendingClaimReservations,
+                pendingPlayerReservations
         );
-        if (!claimDecision.allowed()) {
+        if (!populationDecision.allowed()) {
             logInfo(String.format(
-                    "Breeding pairing blocked by claim limits: reason=%s parentA=%s parentB=%s.",
-                    claimDecision.reason(),
+                    "Breeding pairing blocked by population limits: reason=%s parentA=%s parentB=%s.",
+                    populationDecision.reason(),
                     sourceNpc.getUuid(),
                     partnerNpc.getUuid()
             ));
             return false;
-        }
-        int remainingClaimHeadroom = claimDecision.remainingHeadroom();
-        if (pendingClaimReservations != null
-                && claimDecision.capEnforced()
-                && claimDecision.claimReservationKey() != null) {
-            int pendingReserved = pendingClaimReservations.getOrDefault(claimDecision.claimReservationKey(), 0);
-            remainingClaimHeadroom -= Math.max(0, pendingReserved);
-            if (remainingClaimHeadroom <= 0) {
-                logInfo(String.format(
-                        "Breeding pairing blocked by pending claim reservations: party=%s pending=%d cap=%d current=%d parentA=%s parentB=%s.",
-                        claimDecision.claimReservationKey().partyId(),
-                        pendingReserved,
-                        claimDecision.effectiveCap(),
-                        claimDecision.currentCount(),
-                        sourceNpc.getUuid(),
-                        partnerNpc.getUuid()
-                ));
-                return false;
-            }
         }
 
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
@@ -171,26 +167,34 @@ final class BreedingOffspringService {
                 sourceNpc.getRoleIndex(),
                 partnerNpc.getRoleIndex(),
                 spawnAnchor,
-                resolveOwnerSnapshot(sourceRef, store),
-                resolveOwnerSnapshot(partner.ref, store),
+                parentAOwner,
+                parentBOwner,
                 resolveTamedState(sourceRef, store),
                 resolveTamedState(partner.ref, store),
                 resolveConfigId(config, sourceBreeding, livePartnerBreeding)
         );
         schedulePairingEffects(context, store);
-        if (pendingClaimReservations != null
-                && claimDecision.capEnforced()
-                && claimDecision.claimReservationKey() != null) {
+        if (populationDecision.capEnforced()) {
             int reservationAmount = Math.min(
                     BreedingFertilityOffspringService.maxOffspringPerBreed(),
-                    Math.max(0, remainingClaimHeadroom)
+                    Math.max(0, populationDecision.remainingHeadroom())
             );
             if (reservationAmount > 0) {
-                pendingClaimReservations.merge(
-                        claimDecision.claimReservationKey(),
-                        reservationAmount,
-                        Integer::sum
-                );
+                if (pendingClaimReservations != null && populationDecision.claimReservationKey() != null) {
+                    pendingClaimReservations.merge(
+                            populationDecision.claimReservationKey(),
+                            reservationAmount,
+                            Integer::sum
+                    );
+                }
+                if (pendingPlayerReservations != null) {
+                    for (BreedingClaimLimitPolicyService.PlayerReservationKey ownerKey : populationDecision.playerReservationKeys()) {
+                        if (ownerKey == null) {
+                            continue;
+                        }
+                        pendingPlayerReservations.merge(ownerKey, reservationAmount, Integer::sum);
+                    }
+                }
             }
         }
         return true;
@@ -646,16 +650,20 @@ final class BreedingOffspringService {
             ));
             return;
         }
-        BreedingClaimLimitPolicyService.Decision claimDecision = claimLimitPolicyService.evaluate(
+        BreedingClaimLimitPolicyService.Decision populationDecision = claimLimitPolicyService.evaluate(
                 store,
                 spawnPosition,
                 childBreedingConfig,
-                0
+                spawnRole.roleId(),
+                context.parentAOwner().ownerId(),
+                context.parentBOwner().ownerId(),
+                null,
+                null
         );
-        if (!claimDecision.allowed()) {
+        if (!populationDecision.allowed()) {
             logInfo(String.format(
-                    "Breeding spawn skipped by claim limits: reason=%s parentA=%s parentB=%s role=%s.",
-                    claimDecision.reason(),
+                    "Breeding spawn skipped by population limits: reason=%s parentA=%s parentB=%s role=%s.",
+                    populationDecision.reason(),
                     context.parentAUuid(),
                     context.parentBUuid(),
                     spawnRole.roleId()
@@ -663,30 +671,30 @@ final class BreedingOffspringService {
             return;
         }
         int targetSpawnCount = fertilityRoll.offspringCount();
-        if (claimDecision.capEnforced()) {
-            targetSpawnCount = Math.min(targetSpawnCount, claimDecision.remainingHeadroom());
+        if (populationDecision.capEnforced()) {
+            targetSpawnCount = Math.min(targetSpawnCount, populationDecision.remainingHeadroom());
             if (targetSpawnCount <= 0) {
                 logInfo(String.format(
-                        "Breeding spawn skipped: claim cap reached parentA=%s parentB=%s role=%s cap=%d current=%d pending=%d.",
+                        "Breeding spawn skipped: population cap reached parentA=%s parentB=%s role=%s cap=%d current=%d pending=%d.",
                         context.parentAUuid(),
                         context.parentBUuid(),
                         spawnRole.roleId(),
-                        claimDecision.effectiveCap(),
-                        claimDecision.currentCount(),
-                        claimDecision.pendingReservations()
+                        populationDecision.effectiveCap(),
+                        populationDecision.currentCount(),
+                        populationDecision.pendingReservations()
                 ));
                 return;
             }
             if (targetSpawnCount < fertilityRoll.offspringCount()) {
                 logInfo(String.format(
-                        "Breeding offspring clamped by claim cap: requested=%d allowed=%d parentA=%s parentB=%s role=%s cap=%d current=%d.",
+                        "Breeding offspring clamped by population cap: requested=%d allowed=%d parentA=%s parentB=%s role=%s cap=%d current=%d.",
                         fertilityRoll.offspringCount(),
                         targetSpawnCount,
                         context.parentAUuid(),
                         context.parentBUuid(),
                         spawnRole.roleId(),
-                        claimDecision.effectiveCap(),
-                        claimDecision.currentCount()
+                        populationDecision.effectiveCap(),
+                        populationDecision.currentCount()
                 ));
             }
         }

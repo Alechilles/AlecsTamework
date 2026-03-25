@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -328,7 +330,21 @@ public final class SpawnerFeatureHandler {
         }
         boolean tamed = Boolean.TRUE.equals(itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TAMED, Codec.BOOLEAN));
         if (ownerUuid == null && config.isSpawnAssignsOwner()) {
-            ownerUuid = player.getUuid();
+            UUID playerId = player.getUuid();
+            OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(
+                    world.getEntityStore() != null ? world.getEntityStore().getStore() : null,
+                    playerId
+            );
+            if (!decision.allowed()) {
+                OwnerMessageUtil.sendPopulationCapReached(
+                        player,
+                        decision.currentCount(),
+                        decision.limit(),
+                        decision.scope()
+                );
+                return false;
+            }
+            ownerUuid = playerId;
         }
 
         Store<EntityStore> store = world.getEntityStore().getStore();
