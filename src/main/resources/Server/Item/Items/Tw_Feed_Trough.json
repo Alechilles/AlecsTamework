@@ -55,7 +55,6 @@
     "ParticleColor": "#815c39",
     "BlockSoundSetId": "Wood",
     "Interactions": {
-      "Primary": "Break_Container",
       "Use": "Open_Container"
     },
     "InteractionHint": "server.interactionHints.openTrough",
@@ -69,9 +68,12 @@
         }
       ]
     },
-    "State": {
-      "Id": "container",
-      "Capacity": 5
+    "BlockEntity": {
+      "Components": {
+        "ItemContainerBlock": {
+          "Capacity": 5
+        }
+      }
     }
   },
   "PlayerAnimationsId": "Block",
@@ -127,7 +129,6 @@
         "ParticleColor": "#815c39",
         "BlockSoundSetId": "Wood",
         "Interactions": {
-          "Primary": "Break_Container",
           "Use": {
               "Interactions": [
                 {
@@ -140,7 +141,7 @@
         },
         "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-          "IsUsable": false
+          "IsUsable": true
         },
         "Supporting": {
           "Up": [
@@ -149,9 +150,12 @@
             }
           ]
         },
-        "State": {
-          "Id": "container",
-          "Capacity": 1
+        "BlockEntity": {
+          "Components": {
+            "ItemContainerBlock": {
+              "Capacity": 1
+            }
+          }
         }
       },
       "State": {
@@ -186,7 +190,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -199,7 +202,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -208,9 +211,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -245,7 +251,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -258,7 +263,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -267,9 +272,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -304,7 +312,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -317,7 +324,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -326,9 +333,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -363,7 +373,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -376,7 +385,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -385,9 +394,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -422,7 +434,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -435,7 +446,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -444,9 +455,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -481,7 +495,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -494,7 +507,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -503,9 +516,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -540,7 +556,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -553,7 +568,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -562,9 +577,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -599,7 +617,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -612,7 +629,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -621,9 +638,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -658,7 +678,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -671,7 +690,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -680,9 +699,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         },
@@ -717,7 +739,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": {
               "Interactions": [
                 {
@@ -730,7 +751,7 @@
             },
             "InteractionHint": "server.interactionHints.emptyTrough",
             "Flags": {
-              "IsUsable": false
+              "IsUsable": true
             },
             "Supporting": {
               "Up": [
@@ -739,9 +760,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 1
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 1
+                }
+              }
             }
           }
         }
@@ -783,7 +807,6 @@
         "ParticleColor": "#815c39",
         "BlockSoundSetId": "Wood",
         "Interactions": {
-          "Primary": "Break_Container",
           "Use": "Open_Container"
         },
         "InteractionHint": "server.interactionHints.openTrough",
@@ -797,9 +820,12 @@
             }
           ]
         },
-        "State": {
-          "Id": "container",
-          "Capacity": 5
+        "BlockEntity": {
+          "Components": {
+            "ItemContainerBlock": {
+              "Capacity": 5
+            }
+          }
         }
       },
       "State": {
@@ -834,7 +860,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -848,9 +873,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -885,7 +913,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -899,9 +926,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -936,7 +966,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -950,9 +979,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -987,7 +1019,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -1001,9 +1032,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -1038,7 +1072,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -1052,9 +1085,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -1089,7 +1125,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -1103,9 +1138,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -1140,7 +1178,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -1154,9 +1191,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -1191,7 +1231,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -1205,9 +1244,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -1242,7 +1284,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -1256,9 +1297,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         },
@@ -1293,7 +1337,6 @@
             "ParticleColor": "#815c39",
             "BlockSoundSetId": "Wood",
             "Interactions": {
-              "Primary": "Break_Container",
               "Use": "Open_Container"
             },
             "InteractionHint": "server.interactionHints.openTrough",
@@ -1307,9 +1350,12 @@
                 }
               ]
             },
-            "State": {
-              "Id": "container",
-              "Capacity": 5
+            "BlockEntity": {
+              "Components": {
+                "ItemContainerBlock": {
+                  "Capacity": 5
+                }
+              }
             }
           }
         }
@@ -1326,6 +1372,7 @@
     "Capacity": 5
   }
 }
+
 
 
 

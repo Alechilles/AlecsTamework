@@ -6,6 +6,7 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.protocol.BlockPosition;
 import com.hypixel.hytale.protocol.InteractionState;
@@ -18,8 +19,7 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.CooldownHa
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.SimpleInteraction;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
-import com.hypixel.hytale.server.core.universe.world.meta.BlockState;
-import com.hypixel.hytale.server.core.universe.world.meta.state.ItemContainerState;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 
@@ -92,17 +92,23 @@ public class TameworkClearFeedTroughWaterInteraction extends SimpleInteraction {
             fail(context, time, type, cooldownHandler);
             return;
         }
+        Store<ChunkStore> chunkStore = world.getChunkStore().getStore();
+        if (chunkStore == null) {
+            fail(context, time, type, cooldownHandler);
+            return;
+        }
         WorldChunk chunk = world.getChunk(ChunkUtil.indexChunkFromBlock(targetBlock.x, targetBlock.z));
         if (chunk == null) {
             fail(context, time, type, cooldownHandler);
             return;
         }
-        BlockState blockState = chunk.getState(targetBlock.x, targetBlock.y, targetBlock.z);
-        if (!(blockState instanceof ItemContainerState itemContainerState)) {
-            fail(context, time, type, cooldownHandler);
-            return;
-        }
-        if (!FeedTroughWaterStateService.clearStoredCharges(itemContainerState)) {
+        if (!FeedTroughWaterStateService.clearStoredCharges(
+                chunk,
+                chunkStore,
+                targetBlock.x,
+                targetBlock.y,
+                targetBlock.z
+        )) {
             fail(context, time, type, cooldownHandler);
             return;
         }

@@ -1,16 +1,18 @@
 package com.alechilles.alecstamework.items;
 
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.container.SimpleItemContainer;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
-import com.hypixel.hytale.server.core.universe.world.meta.BlockState;
-import com.hypixel.hytale.server.core.universe.world.meta.state.ItemContainerState;
-import com.hypixel.hytale.event.EventPriority;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.lang.reflect.Method;
 import java.util.List;
 
 /**
@@ -49,9 +51,17 @@ public final class FeedTroughWaterStateService {
         return normalizedBlockId.contains(WATER_STATE_TOKEN);
     }
 
-    public static boolean hasConsumableWater(@Nullable ItemContainerState state,
+    public static boolean hasConsumableWater(@Nullable WorldChunk chunk,
+                                             @Nullable Store<ChunkStore> chunkStore,
+                                             int x,
+                                             int y,
+                                             int z,
                                              @Nullable BlockType blockType) {
-        if (state == null || blockType == null) {
+        if (chunk == null || blockType == null) {
+            return false;
+        }
+        Object state = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
+        if (state == null) {
             return false;
         }
         String normalizedBlockId = normalizeId(blockType.getId());
@@ -68,17 +78,14 @@ public final class FeedTroughWaterStateService {
         return isWaterTroughBlockId(normalizeId(blockType.getId()));
     }
 
-    public static boolean clearStoredCharges(@Nullable ItemContainerState state) {
-        if (state == null) {
-            return false;
-        }
-        WorldChunk chunk = state.getChunk();
+    public static boolean clearStoredCharges(@Nullable WorldChunk chunk,
+                                             @Nullable Store<ChunkStore> chunkStore,
+                                             int x,
+                                             int y,
+                                             int z) {
         if (chunk == null) {
             return false;
         }
-        int x = state.getPosition().x;
-        int y = state.getPosition().y;
-        int z = state.getPosition().z;
         BlockType currentType = chunk.getBlockType(x, y, z);
         if (!isWaterTroughBlockType(currentType)) {
             return false;
@@ -94,28 +101,28 @@ public final class FeedTroughWaterStateService {
         int currentRotation = chunk.getRotationIndex(x, y, z);
         chunk.setBlock(x, y, z, baseIndex, baseType, currentRotation, 0, 198);
 
-        BlockState updatedState = chunk.getState(x, y, z);
-        if (!(updatedState instanceof ItemContainerState updatedContainerState)) {
+        Object updatedState = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
+        if (updatedState == null) {
             return false;
         }
-        if (!resizeContainerToBaseCapacity(updatedContainerState)) {
+        if (!resizeContainerToBaseCapacity(updatedState)) {
             return false;
         }
-        updatedContainerState.setDroplist(null);
-        return true;
+        return FeedTroughContainerCompat.setDroplist(updatedState, null);
     }
 
-    public static boolean consumeSingleCharge(@Nullable ItemContainerState state) {
-        if (state == null) {
-            return false;
-        }
-        WorldChunk chunk = state.getChunk();
+    public static boolean consumeSingleCharge(@Nullable WorldChunk chunk,
+                                              @Nullable Store<ChunkStore> chunkStore,
+                                              int x,
+                                              int y,
+                                              int z) {
         if (chunk == null) {
             return false;
         }
-        int x = state.getPosition().x;
-        int y = state.getPosition().y;
-        int z = state.getPosition().z;
+        Object state = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
+        if (state == null) {
+            return false;
+        }
         BlockType currentType = chunk.getBlockType(x, y, z);
         if (currentType == null) {
             return false;
@@ -146,16 +153,16 @@ public final class FeedTroughWaterStateService {
             chunk.setBlock(x, y, z, targetIndex, targetType, currentRotation, 0, 198);
         }
 
-        BlockState updatedState = chunk.getState(x, y, z);
-        if (updatedState instanceof ItemContainerState updatedContainerState) {
-            setStoredCharges(updatedContainerState, remainingCharges);
+        Object updatedState = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
+        if (updatedState != null) {
+            setStoredCharges(updatedState, remainingCharges);
         }
         return true;
     }
 
-    static int resolveStoredOrInferredCharges(@Nonnull ItemContainerState state,
+    static int resolveStoredOrInferredCharges(@Nonnull Object state,
                                               @Nonnull String normalizedBlockId) {
-        String encoded = state.getDroplist();
+        String encoded = FeedTroughContainerCompat.getDroplist(state);
         int stored = parseStoredCharges(encoded);
         if (stored >= 0) {
             return clampCharges(stored);
@@ -203,12 +210,12 @@ public final class FeedTroughWaterStateService {
         return MAX_WATER_CHARGES;
     }
 
-    private static boolean resizeContainerToBaseCapacity(@Nonnull ItemContainerState state) {
+    private static boolean resizeContainerToBaseCapacity(@Nonnull Object state) {
         short targetCapacity = resolveBaseContainerCapacity();
         if (targetCapacity <= 0) {
             return false;
         }
-        ItemContainer existing = state.getItemContainer();
+        ItemContainer existing = FeedTroughContainerCompat.getItemContainer(state);
         if (existing == null) {
             return false;
         }
@@ -227,10 +234,26 @@ public final class FeedTroughWaterStateService {
             return false;
         }
         if (resized != existing) {
-            simpleResized.registerChangeEvent(EventPriority.LAST, state::onItemChange);
-            state.setItemContainer(simpleResized);
+            bindItemChangeListenerIfSupported(state, simpleResized);
+            if (!FeedTroughContainerCompat.setItemContainer(state, simpleResized)) {
+                return false;
+            }
         }
         return true;
+    }
+
+    private static void bindItemChangeListenerIfSupported(@Nonnull Object state,
+                                                           @Nonnull SimpleItemContainer container) {
+        Method onItemChange = findMethod(state.getClass(), "onItemChange", ItemContainer.ItemContainerChangeEvent.class);
+        if (onItemChange == null) {
+            return;
+        }
+        container.registerChangeEvent(EventPriority.LAST, event -> {
+            try {
+                onItemChange.invoke(state, event);
+            } catch (ReflectiveOperationException ignored) {
+            }
+        });
     }
 
     private static short resolveBaseContainerCapacity() {
@@ -238,11 +261,10 @@ public final class FeedTroughWaterStateService {
         if (baseType == null) {
             return 5;
         }
-        if (baseType.getState() instanceof ItemContainerState.ItemContainerStateData itemContainerStateData) {
-            short configuredCapacity = itemContainerStateData.getCapacity();
-            if (configuredCapacity > 0) {
-                return configuredCapacity;
-            }
+        Object stateData = invokeNoArg(baseType, "getState");
+        Integer configuredCapacity = invokeIntNoArg(stateData, "getCapacity");
+        if (configuredCapacity != null && configuredCapacity > 0 && configuredCapacity <= Short.MAX_VALUE) {
+            return configuredCapacity.shortValue();
         }
         return 5;
     }
@@ -271,13 +293,13 @@ public final class FeedTroughWaterStateService {
         };
     }
 
-    private static void setStoredCharges(@Nonnull ItemContainerState state, int charges) {
+    private static void setStoredCharges(@Nonnull Object state, int charges) {
         int clampedCharges = clampCharges(charges);
         if (clampedCharges <= 0) {
-            state.setDroplist(null);
+            FeedTroughContainerCompat.setDroplist(state, null);
             return;
         }
-        state.setDroplist(CHARGE_STORAGE_PREFIX + clampedCharges);
+        FeedTroughContainerCompat.setDroplist(state, CHARGE_STORAGE_PREFIX + clampedCharges);
     }
 
     private static int parseStoredCharges(@Nullable String encoded) {
@@ -326,5 +348,38 @@ public final class FeedTroughWaterStateService {
             normalized = normalized.substring(1);
         }
         return normalized;
+    }
+
+    @Nullable
+    private static Method findMethod(@Nonnull Class<?> type,
+                                     @Nonnull String methodName,
+                                     @Nonnull Class<?>... parameterTypes) {
+        try {
+            return type.getMethod(methodName, parameterTypes);
+        } catch (NoSuchMethodException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Object invokeNoArg(@Nullable Object target, @Nonnull String methodName) {
+        if (target == null) {
+            return null;
+        }
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            return method.invoke(target);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Integer invokeIntNoArg(@Nullable Object target, @Nonnull String methodName) {
+        Object value = invokeNoArg(target, methodName);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
     }
 }

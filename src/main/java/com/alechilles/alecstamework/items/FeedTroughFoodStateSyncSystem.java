@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
@@ -17,12 +18,12 @@ import com.hypixel.hytale.server.core.entity.entities.player.windows.Window;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
-import com.hypixel.hytale.server.core.universe.world.meta.BlockStateModule;
-import com.hypixel.hytale.server.core.universe.world.meta.state.ItemContainerState;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
+import com.hypixel.hytale.math.util.ChunkUtil;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -36,6 +37,11 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
     private static final int DEFAULT_EMPTY_SLOT_MAX_STACK = 100;
+
+    private static final String MODERN_BLOCK_MODULE_CLASS =
+            "com.hypixel.hytale.server.core.modules.block.BlockModule";
+    private static final String MODERN_ITEM_CONTAINER_BLOCK_CLASS =
+            "com.hypixel.hytale.server.core.modules.block.components.ItemContainerBlock";
 
     private static final String BASE_BLOCK_ID = "Tw_Feed_Trough";
     private static final String FOOD_STATE_PREFIX = "Tw_Feed_Trough_State_Food";
@@ -56,10 +62,23 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
             new ConcurrentHashMap<>();
     private final Map<Ref<ChunkStore>, Map<UUID, EventRegistration<Void, Window.WindowCloseEvent>>> closeRegistrations =
             new ConcurrentHashMap<>();
+    private final Map<Ref<ChunkStore>, Store<ChunkStore>> storesByReference = new ConcurrentHashMap<>();
+
+    @Nullable
+    private volatile ComponentType<ChunkStore, ?> itemContainerComponentType;
+    @Nullable
+    private volatile ComponentType<ChunkStore, ?> blockStateInfoComponentType;
+    private volatile boolean apiResolved;
 
     @Override
     public Query<ChunkStore> getQuery() {
-        return BlockStateModule.get().getComponentType(ItemContainerState.class);
+        ComponentType<ChunkStore, ?> type = resolveItemContainerComponentType();
+        if (type instanceof Query<?>) {
+            @SuppressWarnings("unchecked")
+            Query<ChunkStore> query = (Query<ChunkStore>) type;
+            return query;
+        }
+        return Query.any();
     }
 
     @Override
@@ -67,20 +86,25 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
                               @Nonnull AddReason reason,
                               @Nonnull Store<ChunkStore> store,
                               @Nonnull CommandBuffer<ChunkStore> commandBuffer) {
-        ComponentType<ChunkStore, ItemContainerState> type = BlockStateModule.get().getComponentType(ItemContainerState.class);
+        unregister(ref);
+        storesByReference.put(ref, store);
+        ComponentType<ChunkStore, ?> type = resolveItemContainerComponentType();
         if (type == null) {
             return;
         }
-        ItemContainerState state = commandBuffer.getComponent(ref, type);
+        Object state = commandBuffer.getComponent(ref, castComponentType(type));
         if (state == null) {
             return;
         }
-        BlockType blockType = state.getBlockType();
+        BlockLocation location = resolveBlockLocation(ref, state);
+        if (location == null) {
+            return;
+        }
+        BlockType blockType = location.chunk.getBlockType(location.x, location.y, location.z);
         if (!isFeedTroughFoodSyncTarget(normalizeId(blockType != null ? blockType.getId() : null))) {
             return;
         }
-        unregister(ref);
-        ItemContainer container = state.getItemContainer();
+        ItemContainer container = resolveItemContainer(state);
         if (container == null) {
             return;
         }
@@ -104,24 +128,25 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
             registration.unregister();
         }
         unregisterCloseEvents(ref);
+        storesByReference.remove(ref);
     }
 
-    private void onContainerChanged(@Nonnull Ref<ChunkStore> ref, @Nullable ItemContainerState state) {
+    private void onContainerChanged(@Nonnull Ref<ChunkStore> ref, @Nullable Object state) {
         if (state == null) {
             unregisterCloseEvents(ref);
             return;
         }
-        Map<UUID, ContainerBlockWindow> windows = state.getWindows();
+        Map<UUID, ContainerBlockWindow> windows = resolveWindows(state);
         if (windows == null || windows.isEmpty()) {
             unregisterCloseEvents(ref);
-            syncStateVisual(state);
+            syncStateVisual(ref, state);
             return;
         }
         registerWindowCloseSync(ref, state, windows);
     }
 
     private void registerWindowCloseSync(@Nonnull Ref<ChunkStore> ref,
-                                         @Nonnull ItemContainerState state,
+                                         @Nonnull Object state,
                                          @Nonnull Map<UUID, ContainerBlockWindow> windows) {
         Map<UUID, EventRegistration<Void, Window.WindowCloseEvent>> trackedRegistrations =
                 closeRegistrations.computeIfAbsent(ref, ignored -> new ConcurrentHashMap<>());
@@ -153,8 +178,8 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
                                 closeRegistrations.remove(ref, registrationsByWindow);
                             }
                         }
-                        if (state.getWindows().isEmpty()) {
-                            syncStateVisual(state);
+                        if (resolveWindows(state).isEmpty()) {
+                            syncStateVisual(ref, state);
                         }
                     });
             trackedRegistrations.put(windowOwner, closeRegistration);
@@ -173,17 +198,18 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         }
     }
 
-    private void syncStateVisual(@Nullable ItemContainerState state) {
+    private void syncStateVisual(@Nonnull Ref<ChunkStore> ref, @Nullable Object state) {
         if (state == null) {
             return;
         }
-        WorldChunk chunk = state.getChunk();
-        if (chunk == null) {
+        BlockLocation location = resolveBlockLocation(ref, state);
+        if (location == null) {
             return;
         }
-        int x = state.getPosition().x;
-        int y = state.getPosition().y;
-        int z = state.getPosition().z;
+        WorldChunk chunk = location.chunk;
+        int x = location.x;
+        int y = location.y;
+        int z = location.z;
         BlockType currentType = chunk.getBlockType(x, y, z);
         if (currentType == null) {
             return;
@@ -192,7 +218,7 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
         if (!isFeedTroughFoodSyncTarget(normalizedCurrentId)) {
             return;
         }
-        BlockType targetType = resolveTargetFoodBlockType(state.getItemContainer());
+        BlockType targetType = resolveTargetFoodBlockType(resolveItemContainer(state));
         if (targetType == null) {
             return;
         }
@@ -302,5 +328,155 @@ public final class FeedTroughFoodStateSyncSystem extends RefSystem<ChunkStore> {
             normalized = normalized.substring(1);
         }
         return normalized;
+    }
+
+    @Nullable
+    private ComponentType<ChunkStore, ?> resolveItemContainerComponentType() {
+        if (apiResolved) {
+            return itemContainerComponentType;
+        }
+        synchronized (this) {
+            if (apiResolved) {
+                return itemContainerComponentType;
+            }
+            ComponentType<ChunkStore, ?> modernType = resolveModernItemContainerComponentType();
+            if (modernType != null) {
+                itemContainerComponentType = modernType;
+                blockStateInfoComponentType = resolveModernBlockStateInfoComponentType();
+                apiResolved = true;
+                return modernType;
+            }
+            apiResolved = true;
+            return null;
+        }
+    }
+
+    @Nullable
+    private ComponentType<ChunkStore, ?> resolveModernItemContainerComponentType() {
+        try {
+            Class<?> itemContainerBlockClass = Class.forName(MODERN_ITEM_CONTAINER_BLOCK_CLASS);
+            Method getComponentTypeMethod = itemContainerBlockClass.getMethod("getComponentType");
+            Object componentType = getComponentTypeMethod.invoke(null);
+            if (componentType instanceof ComponentType<?, ?> resolvedType) {
+                return castComponentTypeUnchecked(resolvedType);
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        return null;
+    }
+
+    @Nullable
+    private ComponentType<ChunkStore, ?> resolveModernBlockStateInfoComponentType() {
+        if (blockStateInfoComponentType != null) {
+            return blockStateInfoComponentType;
+        }
+        try {
+            Class<?> blockModuleClass = Class.forName(MODERN_BLOCK_MODULE_CLASS);
+            Method getMethod = blockModuleClass.getMethod("get");
+            Object module = getMethod.invoke(null);
+            Method getBlockStateInfoTypeMethod = blockModuleClass.getMethod("getBlockStateInfoComponentType");
+            Object componentType = getBlockStateInfoTypeMethod.invoke(module);
+            if (componentType instanceof ComponentType<?, ?> resolvedType) {
+                blockStateInfoComponentType = castComponentTypeUnchecked(resolvedType);
+                return blockStateInfoComponentType;
+            }
+        } catch (ReflectiveOperationException ignored) {
+        }
+        return null;
+    }
+
+    @Nullable
+    private ItemContainer resolveItemContainer(@Nullable Object state) {
+        return FeedTroughContainerCompat.getItemContainer(state);
+    }
+
+    @Nonnull
+    @SuppressWarnings("unchecked")
+    private Map<UUID, ContainerBlockWindow> resolveWindows(@Nullable Object state) {
+        if (state == null) {
+            return Map.of();
+        }
+        Object windows = invokeNoArg(state, "getWindows");
+        if (windows instanceof Map<?, ?> map) {
+            return (Map<UUID, ContainerBlockWindow>) map;
+        }
+        return Map.of();
+    }
+
+    @Nullable
+    private BlockLocation resolveBlockLocation(@Nonnull Ref<ChunkStore> ref, @Nullable Object state) {
+        return state == null ? null : resolveModernBlockLocation(ref);
+    }
+
+    @Nullable
+    private BlockLocation resolveModernBlockLocation(@Nonnull Ref<ChunkStore> ref) {
+        Store<ChunkStore> store = storesByReference.get(ref);
+        if (store == null) {
+            return null;
+        }
+        ComponentType<ChunkStore, ?> infoType = resolveModernBlockStateInfoComponentType();
+        if (infoType == null) {
+            return null;
+        }
+        Object info = store.getComponent(ref, castComponentType(infoType));
+        if (info == null) {
+            return null;
+        }
+        Object chunkRefObject = invokeNoArg(info, "getChunkRef");
+        if (!(chunkRefObject instanceof Ref<?> rawChunkRef)) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        Ref<ChunkStore> chunkRef = (Ref<ChunkStore>) rawChunkRef;
+        WorldChunk chunk = store.getComponent(chunkRef, WorldChunk.getComponentType());
+        if (chunk == null) {
+            return null;
+        }
+        Integer indexValue = invokeIntMethod(info, "getIndex");
+        if (indexValue == null) {
+            return null;
+        }
+        int localX = ChunkUtil.xFromBlockInColumn(indexValue);
+        int y = ChunkUtil.yFromBlockInColumn(indexValue);
+        int localZ = ChunkUtil.zFromBlockInColumn(indexValue);
+        int x = ChunkUtil.worldCoordFromLocalCoord(chunk.getX(), localX);
+        int z = ChunkUtil.worldCoordFromLocalCoord(chunk.getZ(), localZ);
+        return new BlockLocation(chunk, x, y, z);
+    }
+
+    @Nullable
+    private Object invokeNoArg(@Nonnull Object target, @Nonnull String methodName) {
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            return method.invoke(target);
+        } catch (ReflectiveOperationException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private Integer invokeIntMethod(@Nonnull Object target, @Nonnull String methodName) {
+        Object value = invokeNoArg(target, methodName);
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T extends Component<ChunkStore>> ComponentType<ChunkStore, T> castComponentType(
+            @Nonnull ComponentType<ChunkStore, ?> type
+    ) {
+        return (ComponentType<ChunkStore, T>) type;
+    }
+
+    @SuppressWarnings("unchecked")
+    private ComponentType<ChunkStore, ? extends Component<ChunkStore>> castComponentTypeUnchecked(
+            @Nonnull ComponentType<?, ?> type
+    ) {
+        return (ComponentType<ChunkStore, ? extends Component<ChunkStore>>) type;
+    }
+
+    private record BlockLocation(@Nonnull WorldChunk chunk, int x, int y, int z) {
     }
 }

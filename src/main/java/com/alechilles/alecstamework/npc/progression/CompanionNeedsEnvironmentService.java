@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.items.FeedTroughContainerCompat;
 import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -14,8 +15,6 @@ import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
-import com.hypixel.hytale.server.core.universe.world.meta.BlockState;
-import com.hypixel.hytale.server.core.universe.world.meta.state.ItemContainerState;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.HashMap;
@@ -221,7 +220,7 @@ public final class CompanionNeedsEnvironmentService {
                     if (worldChunk == null) {
                         continue;
                     }
-                    if (isConsumableWaterSourceAt(worldChunk, x, y, z)) {
+                    if (isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
                         return true;
                     }
                 }
@@ -298,7 +297,7 @@ public final class CompanionNeedsEnvironmentService {
                         continue;
                     }
                     WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk == null || !isConsumableWaterSourceAt(worldChunk, x, y, z)) {
+                    if (worldChunk == null || !isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
                         continue;
                     }
                     Vector3d standPosition = findNearestStandPositionAdjacentToBlock(
@@ -381,7 +380,7 @@ public final class CompanionNeedsEnvironmentService {
                         continue;
                     }
                     WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (!isConsumableWaterTroughAt(worldChunk, x, y, z)) {
+                    if (!isConsumableWaterTroughAt(worldChunk, chunkStoreStore, x, y, z)) {
                         continue;
                     }
                     double distanceSq = distanceSquaredToBlockCenter(scanCenter, x, y, z);
@@ -403,11 +402,7 @@ public final class CompanionNeedsEnvironmentService {
         if (targetChunk == null) {
             return false;
         }
-        BlockState blockState = targetChunk.getState(bestX, bestY, bestZ);
-        if (!(blockState instanceof ItemContainerState itemContainerState)) {
-            return false;
-        }
-        return FeedTroughWaterStateService.consumeSingleCharge(itemContainerState);
+        return FeedTroughWaterStateService.consumeSingleCharge(targetChunk, chunkStoreStore, bestX, bestY, bestZ);
     }
 
     @Nullable
@@ -489,11 +484,18 @@ public final class CompanionNeedsEnvironmentService {
                     if (worldChunk == null) {
                         continue;
                     }
-                    BlockState state = worldChunk.getState(x, y, z);
-                    if (!(state instanceof ItemContainerState containerState)) {
+                    Object containerState = FeedTroughContainerCompat.resolveContainerState(
+                            worldChunk,
+                            chunkStoreStore,
+                            x,
+                            y,
+                            z
+                    );
+                    ItemContainer container = FeedTroughContainerCompat.getItemContainer(containerState);
+                    if (container == null) {
                         continue;
                     }
-                    if (!containsAllowedFood(containerState.getItemContainer(), allowedFoods)) {
+                    if (!containsAllowedFood(container, allowedFoods)) {
                         continue;
                     }
                     Vector3d standPosition = findNearestStandPositionAdjacentToBlock(
@@ -665,8 +667,15 @@ public final class CompanionNeedsEnvironmentService {
                     if (worldChunk == null) {
                         continue;
                     }
-                    BlockState state = worldChunk.getState(x, y, z);
-                    if (!(state instanceof ItemContainerState containerState)) {
+                    Object containerState = FeedTroughContainerCompat.resolveContainerState(
+                            worldChunk,
+                            chunkStoreStore,
+                            x,
+                            y,
+                            z
+                    );
+                    ItemContainer container = FeedTroughContainerCompat.getItemContainer(containerState);
+                    if (container == null) {
                         continue;
                     }
                     scannedContainers++;
@@ -674,7 +683,6 @@ public final class CompanionNeedsEnvironmentService {
                     if (containerDistanceSq < nearestContainerDistanceSq) {
                         nearestContainerDistanceSq = containerDistanceSq;
                     }
-                    ItemContainer container = containerState.getItemContainer();
                     if (!containsAllowedFood(container, allowedFoods)) {
                         continue;
                     }
@@ -860,6 +868,7 @@ public final class CompanionNeedsEnvironmentService {
     }
 
     private static boolean isConsumableWaterSourceAt(@Nullable WorldChunk worldChunk,
+                                                     @Nullable Store<ChunkStore> chunkStore,
                                                      int blockX,
                                                      int blockY,
                                                      int blockZ) {
@@ -869,22 +878,26 @@ public final class CompanionNeedsEnvironmentService {
         if (worldChunk.getFluidId(blockX, blockY, blockZ) != 0) {
             return true;
         }
-        return isConsumableWaterTroughAt(worldChunk, blockX, blockY, blockZ);
+        return isConsumableWaterTroughAt(worldChunk, chunkStore, blockX, blockY, blockZ);
     }
 
     private static boolean isConsumableWaterTroughAt(@Nullable WorldChunk worldChunk,
+                                                     @Nullable Store<ChunkStore> chunkStore,
                                                      int blockX,
                                                      int blockY,
                                                      int blockZ) {
         if (worldChunk == null) {
             return false;
         }
-        BlockState state = worldChunk.getState(blockX, blockY, blockZ);
-        if (!(state instanceof ItemContainerState containerState)) {
-            return false;
-        }
         BlockType blockType = worldChunk.getBlockType(blockX, blockY, blockZ);
-        return FeedTroughWaterStateService.hasConsumableWater(containerState, blockType);
+        return FeedTroughWaterStateService.hasConsumableWater(
+                worldChunk,
+                chunkStore,
+                blockX,
+                blockY,
+                blockZ,
+                blockType
+        );
     }
 
     private static boolean isSolidBlock(int blockId, int fluidId) {
