@@ -25,7 +25,6 @@ import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.SoundUtil;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
-import it.unimi.dsi.fastutil.objects.ObjectList;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -419,7 +418,7 @@ final class InteractionPresentationEffects {
             return List.of();
         }
 
-        ObjectList<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
+        List<Ref<EntityStore>> results = SpatialResource.getThreadLocalReferenceList();
         playerSpatialResource.getSpatialStructure().collect(position, ParticleUtil.DEFAULT_PARTICLE_DISTANCE, results);
         if (results.isEmpty()) {
             return List.of();
