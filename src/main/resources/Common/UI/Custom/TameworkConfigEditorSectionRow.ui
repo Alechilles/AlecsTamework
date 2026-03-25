@@ -1,0 +1,183 @@
+$C = "Common.ui";
+
+Group {
+  Anchor: (Top: 0, Left: 0, Right: 0, Height: 28);
+
+  Group #SectionRowBackground {
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: #1a2b40;
+  }
+
+  Group #SectionGuideDepth1 {
+    Anchor: (Top: 0, Left: 14, Width: 2, Bottom: 0);
+    Background: #3b5673;
+    Visible: false;
+  }
+
+  Group #SectionGuideDepth2 {
+    Anchor: (Top: 0, Left: 36, Width: 2, Bottom: 0);
+    Background: #3b5673;
+    Visible: false;
+  }
+
+  Button #SectionToggleTopButton {
+    Anchor: (Top: 2, Left: 4, Right: 4, Height: 24);
+    LayoutMode: Left;
+    Style: ButtonStyle(
+      Default: (Background: (Color: #00000000)),
+      Hovered: (Background: (Color: #ffffff12)),
+      Pressed: (Background: (Color: #ffffff0a))
+    );
+
+    Group #SectionToggleTopIconContainer {
+      Anchor: (Width: 20, Height: 24);
+      LayoutMode: Middle;
+
+      Group #SectionToggleTopExpandedIcon {
+        Anchor: (Width: 12, Height: 7);
+        Background: "TwConfigCaretUp.png";
+        Visible: true;
+      }
+
+      Group #SectionToggleTopCollapsedIcon {
+        Anchor: (Width: 12, Height: 7);
+        Background: "TwConfigCaretDown.png";
+        Visible: false;
+      }
+    }
+
+    Label #SectionToggleTopLabel {
+      Anchor: (Height: 24);
+      FlexWeight: 1;
+      Text: "SECTION";
+      Style: (
+        FontSize: 13,
+        RenderBold: true,
+        TextColor: #eff4fa,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center,
+        RenderUppercase: true,
+        LetterSpacing: 1
+      );
+    }
+
+    Label #SectionToggleTopCount {
+      Anchor: (Width: 88, Height: 24);
+      Text: "0 fields";
+      Style: (
+        FontSize: 11,
+        TextColor: #a9bfd7,
+        HorizontalAlignment: End,
+        VerticalAlignment: Center
+      );
+    }
+  }
+
+  Button #SectionToggleNestedButton {
+    Anchor: (Top: 2, Left: 26, Right: 4, Height: 24);
+    LayoutMode: Left;
+    Style: ButtonStyle(
+      Default: (Background: (Color: #00000000)),
+      Hovered: (Background: (Color: #ffffff12)),
+      Pressed: (Background: (Color: #ffffff0a))
+    );
+    Visible: false;
+
+    Group #SectionToggleNestedIconContainer {
+      Anchor: (Width: 20, Height: 24);
+      LayoutMode: Middle;
+
+      Group #SectionToggleNestedExpandedIcon {
+        Anchor: (Width: 12, Height: 7);
+        Background: "TwConfigCaretUp.png";
+        Visible: true;
+      }
+
+      Group #SectionToggleNestedCollapsedIcon {
+        Anchor: (Width: 12, Height: 7);
+        Background: "TwConfigCaretDown.png";
+        Visible: false;
+      }
+    }
+
+    Label #SectionToggleNestedLabel {
+      Anchor: (Height: 24);
+      FlexWeight: 1;
+      Text: "SECTION";
+      Style: (
+        FontSize: 13,
+        RenderBold: true,
+        TextColor: #e6f0fa,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center,
+        RenderUppercase: true,
+        LetterSpacing: 1
+      );
+    }
+
+    Label #SectionToggleNestedCount {
+      Anchor: (Width: 88, Height: 24);
+      Text: "0 fields";
+      Style: (
+        FontSize: 11,
+        TextColor: #a9bfd7,
+        HorizontalAlignment: End,
+        VerticalAlignment: Center
+      );
+    }
+  }
+
+  Button #SectionToggleDeepButton {
+    Anchor: (Top: 2, Left: 48, Right: 4, Height: 24);
+    LayoutMode: Left;
+    Style: ButtonStyle(
+      Default: (Background: (Color: #00000000)),
+      Hovered: (Background: (Color: #ffffff12)),
+      Pressed: (Background: (Color: #ffffff0a))
+    );
+    Visible: false;
+
+    Group #SectionToggleDeepIconContainer {
+      Anchor: (Width: 20, Height: 24);
+      LayoutMode: Middle;
+
+      Group #SectionToggleDeepExpandedIcon {
+        Anchor: (Width: 12, Height: 7);
+        Background: "TwConfigCaretUp.png";
+        Visible: true;
+      }
+
+      Group #SectionToggleDeepCollapsedIcon {
+        Anchor: (Width: 12, Height: 7);
+        Background: "TwConfigCaretDown.png";
+        Visible: false;
+      }
+    }
+
+    Label #SectionToggleDeepLabel {
+      Anchor: (Height: 24);
+      FlexWeight: 1;
+      Text: "SECTION";
+      Style: (
+        FontSize: 13,
+        RenderBold: true,
+        TextColor: #dbe9f7,
+        HorizontalAlignment: Start,
+        VerticalAlignment: Center,
+        RenderUppercase: true,
+        LetterSpacing: 1
+      );
+    }
+
+    Label #SectionToggleDeepCount {
+      Anchor: (Width: 88, Height: 24);
+      Text: "0 fields";
+      Style: (
+        FontSize: 11,
+        TextColor: #a9bfd7,
+        HorizontalAlignment: End,
+        VerticalAlignment: Center
+      );
+    }
+  }
+}

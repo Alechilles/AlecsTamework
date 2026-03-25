@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework;
 
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
@@ -9,6 +11,7 @@ import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
+import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -93,6 +96,8 @@ import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
@@ -109,6 +114,8 @@ public class Tamework extends JavaPlugin {
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetPackCoordinator assetPackCoordinator;
+    private TwConfigOverrideManager configOverrideManager;
+    private final Set<String> overrideInitializedWorldKeys = ConcurrentHashMap.newKeySet();
 
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
@@ -137,6 +144,12 @@ public class Tamework extends JavaPlugin {
     private boolean breedingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private String lastGlobalConfigWarningKey;
+    private final Object itemFeatureReloadSuppressionLock = new Object();
+    private int itemFeatureReloadSuppressionDepth;
+    private boolean itemFeatureReloadPending;
+    private final Object overrideAssetEventSuppressionLock = new Object();
+    private int overrideAssetEventSuppressionDepth;
+    private boolean globalReconcilePendingAfterOverrideReload;
     private ComponentType<EntityStore, TameworkOwnerComponent> ownerComponentType;
     private ComponentType<EntityStore, TameworkTamedComponent> tamedComponentType;
     private ComponentType<EntityStore, TameworkHookComponent> hookComponentType;
@@ -167,6 +180,7 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
+        configOverrideManager = new TwConfigOverrideManager(this);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
@@ -457,6 +471,10 @@ public class Tamework extends JavaPlugin {
                     commandItemFeatureHandler::onAddPlayerToWorld
             );
         }
+        getEventRegistry().registerGlobal(
+                AddPlayerToWorldEvent.class,
+                this::onPlayerAddedToWorldForOverrides
+        );
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(
                 "Tamework item configs loaded: spawners="
@@ -479,6 +497,7 @@ public class Tamework extends JavaPlugin {
     @Override
     protected void start() {
         OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
+        initializeOverridesForLoadedWorlds();
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (hStatsIntegration != null) {
             hStatsIntegration.initialize();
@@ -490,10 +509,54 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        overrideInitializedWorldKeys.clear();
         if (spawnerTooltipBridge != null) {
             spawnerTooltipBridge.shutdown();
         }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
+    }
+
+    private void onPlayerAddedToWorldForOverrides(@Nonnull AddPlayerToWorldEvent event) {
+        if (event == null || event.getWorld() == null || configOverrideManager == null) {
+            return;
+        }
+        initializeOverridesForWorld(event.getWorld());
+    }
+
+    private void initializeOverridesForLoadedWorlds() {
+        if (configOverrideManager == null) {
+            return;
+        }
+        Universe universe = Universe.get();
+        if (universe == null || universe.getWorlds() == null || universe.getWorlds().isEmpty()) {
+            return;
+        }
+        for (World world : universe.getWorlds().values()) {
+            if (world == null) {
+                continue;
+            }
+            initializeOverridesForWorld(world);
+        }
+    }
+
+    private void initializeOverridesForWorld(@Nonnull World world) {
+        if (world == null || configOverrideManager == null) {
+            return;
+        }
+        String worldKey = world.getSavePath().toAbsolutePath().normalize().toString().toLowerCase();
+        if (!overrideInitializedWorldKeys.add(worldKey)) {
+            return;
+        }
+        TwConfigOverrideManager.ReloadResult reloadResult = configOverrideManager.reloadOverrides(world);
+        if (reloadResult.hasErrors()) {
+            getLogger().at(Level.WARNING).log(
+                    "Loaded Tamework overrides for world "
+                            + world.getName()
+                            + " with "
+                            + reloadResult.getErrors().size()
+                            + " error(s)."
+            );
+        }
     }
 
     public ItemFeatureRegistry getItemFeatureRegistry() {
@@ -514,6 +577,88 @@ public class Tamework extends JavaPlugin {
 
     public TranslationRegistry getTranslationRegistry() {
         return translationRegistry;
+    }
+
+    public TwConfigOverrideManager getConfigOverrideManager() {
+        return configOverrideManager;
+    }
+
+    public void beginItemFeatureAssetReloadSuppression() {
+        synchronized (itemFeatureReloadSuppressionLock) {
+            itemFeatureReloadSuppressionDepth++;
+        }
+    }
+
+    public void endItemFeatureAssetReloadSuppression() {
+        boolean shouldReload = false;
+        synchronized (itemFeatureReloadSuppressionLock) {
+            if (itemFeatureReloadSuppressionDepth > 0) {
+                itemFeatureReloadSuppressionDepth--;
+            }
+            if (itemFeatureReloadSuppressionDepth == 0 && itemFeatureReloadPending) {
+                itemFeatureReloadPending = false;
+                shouldReload = true;
+            }
+        }
+        if (shouldReload) {
+            getLogger().at(Level.INFO).log("Running deferred item-feature config reload after override reload.");
+            reloadItemFeatureConfigs();
+        }
+    }
+
+    private void requestItemFeatureConfigReloadFromAssetEvent() {
+        boolean suppressed;
+        synchronized (itemFeatureReloadSuppressionLock) {
+            suppressed = itemFeatureReloadSuppressionDepth > 0;
+            if (suppressed) {
+                itemFeatureReloadPending = true;
+            }
+        }
+        if (suppressed) {
+            return;
+        }
+        reloadItemFeatureConfigs();
+    }
+
+    public void beginOverrideAssetEventSuppression() {
+        synchronized (overrideAssetEventSuppressionLock) {
+            overrideAssetEventSuppressionDepth++;
+        }
+    }
+
+    public void endOverrideAssetEventSuppression() {
+        boolean shouldReconcileGlobal = false;
+        synchronized (overrideAssetEventSuppressionLock) {
+            if (overrideAssetEventSuppressionDepth > 0) {
+                overrideAssetEventSuppressionDepth--;
+            }
+            if (overrideAssetEventSuppressionDepth == 0 && globalReconcilePendingAfterOverrideReload) {
+                globalReconcilePendingAfterOverrideReload = false;
+                shouldReconcileGlobal = true;
+            }
+        }
+        if (shouldReconcileGlobal) {
+            getLogger().at(Level.INFO).log("Running deferred global recipe reconcile after override reload.");
+            reconcileTranquilizerRecipeVisibility();
+        }
+    }
+
+    private boolean deferGlobalReconcileIfSuppressed() {
+        synchronized (overrideAssetEventSuppressionLock) {
+            if (overrideAssetEventSuppressionDepth <= 0) {
+                return false;
+            }
+            globalReconcilePendingAfterOverrideReload = true;
+            return true;
+        }
+    }
+
+    @Nonnull
+    public TwConfigOverrideManager.ReloadResult reloadConfigOverrides(@Nonnull World world) {
+        if (configOverrideManager == null || world == null) {
+            return TwConfigOverrideManager.ReloadResult.empty();
+        }
+        return configOverrideManager.reloadOverrides(world);
     }
 
     // Returns the active global config asset or defaults if none are loaded.
@@ -741,43 +886,46 @@ public class Tamework extends JavaPlugin {
     private void onSpawnerAssetsLoaded(
             LoadedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         TwSpawnerConfig.clearInheritanceFallbackCache();
-        reloadItemFeatureConfigs();
+        requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onSpawnerAssetsRemoved(
             RemovedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         TwSpawnerConfig.clearInheritanceFallbackCache();
-        reloadItemFeatureConfigs();
+        requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onNamingAssetsLoaded(
             LoadedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
         TwNameItemConfig.clearInheritanceFallbackCache();
-        reloadItemFeatureConfigs();
+        requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onNamingAssetsRemoved(
             RemovedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
         TwNameItemConfig.clearInheritanceFallbackCache();
-        reloadItemFeatureConfigs();
+        requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onCommandAssetsLoaded(
             LoadedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
-        reloadItemFeatureConfigs();
+        requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onCommandAssetsRemoved(
             RemovedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
-        reloadItemFeatureConfigs();
+        requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onGlobalAssetsLoaded(
             LoadedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
+        if (deferGlobalReconcileIfSuppressed()) {
+            return;
+        }
         reconcileTranquilizerRecipeVisibility();
     }
 
@@ -785,16 +933,25 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
+        if (deferGlobalReconcileIfSuppressed()) {
+            return;
+        }
         reconcileTranquilizerRecipeVisibility();
     }
 
     private void onCraftingRecipeAssetsLoaded(
             LoadedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> event) {
+        if (deferGlobalReconcileIfSuppressed()) {
+            return;
+        }
         reconcileTranquilizerRecipeVisibility();
     }
 
     private void onCraftingRecipeAssetsRemoved(
             RemovedAssetsEvent<String, CraftingRecipe, DefaultAssetMap<String, CraftingRecipe>> event) {
+        if (deferGlobalReconcileIfSuppressed()) {
+            return;
+        }
         reconcileTranquilizerRecipeVisibility();
     }
 

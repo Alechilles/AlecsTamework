@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -32,6 +33,7 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
             return;
         }
+        TwConfigOverrideManager.ReloadResult reloadResult = plugin.reloadConfigOverrides(world);
         int loaded = plugin.reloadItemFeatureConfigs();
         int totalSpawners = plugin.getItemFeatureRegistry() != null
                 ? plugin.getItemFeatureRegistry().snapshot().size()
@@ -40,9 +42,16 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
                 ? plugin.getNameItemRegistry().snapshot().size()
                 : 0;
         commandContext.sender().sendMessage(Message.raw(
-                "Reloaded Tamework item configs. Loaded=" + loaded
+                "Reloaded Tamework configs. OverridePacks=" + reloadResult.getLoadedPacks()
+                        + " OverrideDirs=" + reloadResult.getLoadedDirectories()
+                        + " ItemLoaded=" + loaded
                         + " Spawners=" + totalSpawners
                         + " Naming=" + totalNaming
         ));
+        if (reloadResult.hasErrors()) {
+            commandContext.sender().sendMessage(Message.raw(
+                    "Override reload reported " + reloadResult.getErrors().size() + " error(s). See server log."
+            ));
+        }
     }
 }

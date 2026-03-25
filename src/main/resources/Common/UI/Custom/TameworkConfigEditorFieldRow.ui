@@ -1,0 +1,100 @@
+$C = "Common.ui";
+
+Group {
+  Anchor: (Top: 0, Left: 0, Right: 0, Height: 30);
+
+  Group #FieldRowBackground {
+    Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+    Background: #22364a;
+  }
+
+  Group #FieldGuideDepth1 {
+    Anchor: (Top: 0, Left: 14, Width: 2, Bottom: 0);
+    Background: #3b5673;
+    Visible: false;
+  }
+
+  Group #FieldGuideDepth2 {
+    Anchor: (Top: 0, Left: 36, Width: 2, Bottom: 0);
+    Background: #3b5673;
+    Visible: false;
+  }
+
+  Label #FieldNameTop {
+    Anchor: (Top: 3, Left: 8, Width: 360, Height: 24);
+    Text: "Field";
+    Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
+  }
+
+  Label #FieldNameNested {
+    Anchor: (Top: 3, Left: 30, Width: 338, Height: 24);
+    Text: "Field";
+    Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Visible: false;
+  }
+
+  Label #FieldNameDeep {
+    Anchor: (Top: 3, Left: 52, Width: 316, Height: 24);
+    Text: "Field";
+    Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
+    Visible: false;
+  }
+
+  Label #FieldModeChip {
+    Anchor: (Top: 3, Left: 370, Width: 74, Height: 24);
+    Text: "No Local";
+    Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Center, VerticalAlignment: Center);
+  }
+
+  TextButton #FieldSourceChip {
+    Anchor: (Top: 3, Left: 448, Width: 84, Height: 24);
+    Text: "Default";
+    Style: (...$C.@SmallSecondaryTextButtonStyle);
+    TooltipText: "";
+  }
+
+  Group #FieldValueHost {
+    Anchor: (Top: 3, Left: 536, Right: 60, Height: 24);
+
+    CheckBox #FieldCheckBox {
+      Anchor: (Top: 1, Left: 0, Width: 22, Height: 22);
+      Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+      Padding: (Full: 4);
+      Style: $C.@DefaultCheckBoxStyle;
+      Visible: false;
+    }
+
+    TextField #FieldTextInput {
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
+      Style: $C.@DefaultInputFieldStyle;
+      PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+      Background: $C.@InputBoxBackground;
+      Padding: (Horizontal: 8);
+      PlaceholderText: "Value";
+      MaxLength: 256;
+      Visible: false;
+    }
+
+    DropdownBox #FieldDropdown {
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
+      Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+      MaxSelection: 1;
+      NoItemsText: "No options";
+      Visible: false;
+    }
+
+    Label #FieldHandoff {
+      Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
+      Text: "";
+      Style: (FontSize: 11, TextColor: #a9bed7, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+      Visible: false;
+    }
+  }
+
+  TextButton #FieldResetButton {
+    Anchor: (Top: 3, Right: 0, Width: 56, Height: 24);
+    Text: "Reset";
+    Style: (...$C.@SmallSecondaryTextButtonStyle);
+    Visible: false;
+  }
+}

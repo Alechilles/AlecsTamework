@@ -1,0 +1,213 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer #TwConfigRoot {
+    Anchor: (Width: 1260, Height: 820);
+
+    #Title {
+      $C.@Title #TwConfigTitle {
+        @Alignment = Start;
+        @Text = "Tamework Config Editor (Global)";
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
+
+      Group {
+        Anchor: (Height: 26);
+
+        TextButton #TwConfigRefreshButton {
+          Anchor: (Left: 0, Width: 94, Height: 24);
+          Text: "Refresh";
+          Style: (...$C.@SmallSecondaryTextButtonStyle);
+        }
+
+        TextButton #TwConfigApplyButton {
+          Anchor: (Right: 106, Width: 94, Height: 24);
+          Text: "Apply";
+          Style: (...$C.@SmallSecondaryTextButtonStyle);
+        }
+
+        TextButton #TwConfigCloseButton {
+          Anchor: (Right: 0, Width: 94, Height: 24);
+          Text: "Close";
+          Style: (...$C.@SmallSecondaryTextButtonStyle);
+        }
+      }
+
+      Label #TwConfigStatusLine {
+        Anchor: (Top: 2, Height: 20);
+        Text: "";
+        Style: (FontSize: 12, TextColor: #9fd1ff, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+      }
+
+      Label #TwConfigWarningLine {
+        Anchor: (Top: 1, Height: 20);
+        Text: "";
+        Style: (FontSize: 12, TextColor: #ffcf84, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+      }
+
+      Group {
+        Anchor: (Top: 4);
+        FlexWeight: 1;
+        LayoutMode: Left;
+
+        Group #TwConfigLeftPane {
+          Anchor: (Width: 330, Top: 0, Bottom: 0);
+          LayoutMode: Top;
+          Background: #13243a;
+          Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
+
+          Label {
+            Anchor: (Height: 20);
+            Text: "TwGlobal Assets";
+            Style: (FontSize: 14, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          TextField #TwConfigAssetFilterInput {
+            Anchor: (Top: 6, Height: 24);
+            Style: $C.@DefaultInputFieldStyle;
+            PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+            Background: $C.@InputBoxBackground;
+            PlaceholderText: "Search assets";
+            MaxLength: 80;
+            Padding: (Horizontal: 8);
+          }
+
+          DropdownBox #TwConfigAssetDropdown {
+            Anchor: (Top: 6, Height: 24);
+            Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+            MaxSelection: 1;
+            NoItemsText: "No assets";
+          }
+
+          Label #TwConfigAssetCount {
+            Anchor: (Top: 4, Height: 18);
+            Text: "Global assets: 0";
+            Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          Label {
+            Anchor: (Top: 6, Height: 18);
+            Text: "Override File Path";
+            Style: (FontSize: 11, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          Label #TwConfigOverridePath {
+            Anchor: (Top: 1, Bottom: 0);
+            Text: "";
+            Style: (FontSize: 11, TextColor: #c4d3e6, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+          }
+        }
+
+        Group { Anchor: (Width: 8); }
+
+        Group #TwConfigRightPane {
+          Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+          LayoutMode: Top;
+
+          Label #TwConfigSelectedAssetTitle {
+            Anchor: (Height: 22);
+            Text: "";
+            Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          Label #TwConfigSelectedAssetMeta {
+            Anchor: (Top: 1, Height: 18);
+            Text: "";
+            Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+          }
+
+          Label #TwConfigSelectedAssetChain {
+            Anchor: (Top: 1, Height: 16);
+            Text: "";
+            Style: (FontSize: 11, TextColor: #9fb4cc, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+          }
+
+          TextField #TwConfigPropertyFilterInput {
+            Anchor: (Top: 3, Height: 24);
+            Style: $C.@DefaultInputFieldStyle;
+            PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+            Background: $C.@InputBoxBackground;
+            PlaceholderText: "Search properties";
+            MaxLength: 80;
+            Padding: (Horizontal: 8);
+          }
+
+          Group {
+            Anchor: (Top: 4);
+            FlexWeight: 1;
+            Background: #11243d;
+
+            Group #TwConfigPropertyViewport {
+              Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+              LayoutMode: TopScrolling;
+              KeepScrollPosition: true;
+              ScrollbarStyle: $C.@DefaultScrollbarStyle;
+              Padding: (Left: 4, Right: 4, Top: 4, Bottom: 4);
+
+              Group #TwConfigPropertyRows {
+                LayoutMode: Top;
+                Anchor: (Bottom: 0);
+              }
+            }
+
+            Label #TwConfigPropertyEmptyState {
+              Anchor: (Top: 8, Left: 8, Right: 8, Height: 22);
+              Text: "No properties available.";
+              Style: (FontSize: 13, TextColor: #b2c3d6, HorizontalAlignment: Start, VerticalAlignment: Center);
+              Visible: false;
+            }
+          }
+        }
+      }
+    }
+
+    Group #TwConfigApplyConfirmOverlay {
+      Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+      Background: #09121f(0.85);
+      Visible: false;
+
+      Group {
+        Anchor: (Top: 290, Left: 430, Width: 400, Height: 170);
+        Background: #14253d;
+
+        Label {
+          Anchor: (Top: 14, Left: 14, Width: 372, Height: 22);
+          Text: "Apply Staged Config Drafts?";
+          Style: (FontSize: 18, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Label #TwConfigApplyConfirmCount {
+          Anchor: (Top: 46, Left: 14, Width: 372, Height: 20);
+          Text: "Pending draft files: 0";
+          Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+        }
+
+        Label {
+          Anchor: (Top: 68, Left: 14, Width: 372, Height: 40);
+          Text: "This validates, writes atomically, creates rollback snapshots, and reloads overrides.";
+          Style: (FontSize: 12, TextColor: #a9bed7, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
+        }
+
+        Group {
+          Anchor: (Top: 122, Left: 14, Width: 372, Height: 26);
+          TextButton #TwConfigCancelApplyButton {
+            Anchor: (Right: 96, Width: 84, Height: 24);
+            Text: "Cancel";
+            Style: (...$C.@SmallSecondaryTextButtonStyle);
+          }
+          TextButton #TwConfigConfirmApplyButton {
+            Anchor: (Right: 0, Width: 84, Height: 24);
+            Text: "Confirm";
+            Style: (...$C.@SmallSecondaryTextButtonStyle);
+          }
+        }
+      }
+    }
+  }
+}
