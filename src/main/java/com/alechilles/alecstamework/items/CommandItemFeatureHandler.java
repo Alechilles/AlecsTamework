@@ -785,8 +785,6 @@ public final class CommandItemFeatureHandler {
                 feedbackService.showWarning(player, "That NPC is not linked to this tool.");
             } else {
                 hotbar.setItemStackForSlot(slot, updatedStack);
-                inventory.markChanged();
-                player.sendInventory();
                 feedbackService.showSuccess(player, "Removed linked NPC.");
             }
             return;
@@ -971,8 +969,6 @@ public final class CommandItemFeatureHandler {
         if (!changed) {
             return;
         }
-        inventory.markChanged();
-        player.sendInventory();
     }
 
     private void trySetReleaseState(Ref<EntityStore> npcRef,
@@ -1077,8 +1073,6 @@ public final class CommandItemFeatureHandler {
                     return;
                 }
                 hotbar.setItemStackForSlot(slot, updatedStack);
-                inventory.markChanged();
-                player.sendInventory();
                 String name = deadSnapshot.displayName();
                 if (name == null || name.isBlank()) {
                     name = "companion";
@@ -1114,8 +1108,6 @@ public final class CommandItemFeatureHandler {
                 return;
             }
             hotbar.setItemStackForSlot(slot, recoveryResult.updatedStack());
-            inventory.markChanged();
-            player.sendInventory();
             String recoveredName = recoveryResult.recoveredName();
             if (recoveredName == null || recoveredName.isBlank()) {
                 recoveredName = record.cachedDisplayName;
@@ -1207,8 +1199,6 @@ public final class CommandItemFeatureHandler {
                     npcNameResolver.resolveNpcRoleId(npc)
             );
             hotbar.setItemStackForSlot(slot, updatedStack);
-            inventory.markChanged();
-            player.sendInventory();
             feedbackService.showSuccess(player, "Set home for " + npcNameResolver.resolveNpcDisplayName(npcRef, store, npc) + ".");
             return;
         }

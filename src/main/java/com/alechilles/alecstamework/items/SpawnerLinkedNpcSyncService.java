@@ -165,8 +165,6 @@ final class SpawnerLinkedNpcSyncService {
             changedAny = true;
         }
         if (changedAny) {
-            inventory.markChanged();
-            player.sendInventory();
         }
     }
 

@@ -72,8 +72,6 @@ final class CommandToolInventoryService {
             return false;
         }
         hotbar.setItemStackForSlot((short) slot, updated);
-        inventory.markChanged();
-        player.sendInventory();
         return true;
     }
 
@@ -98,8 +96,6 @@ final class CommandToolInventoryService {
             }
             ItemStack updated = stack.withMetadata(TameworkMetadataKeys.COMMAND_SELECTED_ID, Codec.STRING, commandId);
             hotbar.setItemStackForSlot(slot, updated);
-            inventory.markChanged();
-            player.sendInventory();
             return true;
         }
         return false;
@@ -170,8 +166,6 @@ final class CommandToolInventoryService {
                 return false;
             }
             hotbar.setItemStackForSlot(slot, updated);
-            inventory.markChanged();
-            player.sendInventory();
             return true;
         }
         return false;

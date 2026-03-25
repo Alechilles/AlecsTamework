@@ -265,8 +265,6 @@ final class CommandMenuMoveService {
             int queued = relocationDispatchService.queueRelocationsForUnloaded(context, unloadedRecipients);
             if (context.itemChanged) {
                 hotbar.setItemStackForSlot(slot, context.workingItem);
-                inventory.markChanged();
-                player.sendInventory();
             }
             if (affected <= 0 && queued <= 0) {
                 feedbackService.showWarning(player, returnHome ? "No companions could return home." : "No NPCs could execute that command.");

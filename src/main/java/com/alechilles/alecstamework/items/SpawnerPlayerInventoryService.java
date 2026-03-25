@@ -57,8 +57,6 @@ final class SpawnerPlayerInventoryService {
         }
         byte activeSlot = inventory.getActiveHotbarSlot();
         hotbar.setItemStackForSlot((short) activeSlot, updated);
-        inventory.markChanged();
-        player.sendInventory();
         return true;
     }
 
@@ -75,8 +73,6 @@ final class SpawnerPlayerInventoryService {
             return false;
         }
         hotbar.setItemStackForSlot((short) slot, updated);
-        inventory.markChanged();
-        player.sendInventory();
         return true;
     }
 }
