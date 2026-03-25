@@ -6,6 +6,7 @@
 - Added `TwNeedsConfig.Damage` controls for starvation/dehydration damage (`Enabled`, `Model`, `DualNeedRule`, per-minute rates, `Lethal`), defaulting to disabled for backward-compatible behavior.
 - Added owner activity timeline tracking (`OwnerPresenceTimelineService`) seeded from online players at startup and updated from player connect/disconnect events.
 - Added optional `TwGlobalConfig.SimpleClaims` integration sections for breeding claim caps (`LimitPerClaimChunk`, `LimitPerClaimTotal`, `BreedingRequiresClaim`) and tamed-NPC damage guardrails (`ProtectTamedFromNonMembers`, `AllowDamagePermissionKey`).
+- Added top-level `TwGlobalConfig.Population` owner-cap settings (`LimitPerPlayerOwnedTotal`, `PerPlayerLimitScope` with `PerWorld`/`Global`) used for breeding and tame acquisition.
 - Added new linked-panel ring/icon UI assets and wild-berry-red needs/thought particle assets (`Want_Food_Wild_Berry_Red`, `ThoughtCloud_Wild_Berry_Red`).
 - Added optional `Buuz135:SimpleClaims` `1.0.x` dependency declaration in `manifest.json`.
 
@@ -14,11 +15,16 @@
 - `TwBreedingConfig` now keeps `RoleOverrides` local-only (not inherited), while `RoleIds` remain inheritable when omitted; codec tooltips now document this explicitly.
 - Needs progression now uses owner-presence effective elapsed time for both decay and needs damage: owner-online windows tick fully, offline grace windows can tick at `0`, and post-grace windows apply the configured offline multiplier.
 - Owner damage filtering now applies optional SimpleClaims claim-member/permission checks for tamed targets; denied attacks are cancelled, and claim lookup failures fail-open with throttled warnings.
+- Breeding population enforcement now combines SimpleClaims claim caps with new per-player owned-NPC caps at pairing precheck, spawn-time recheck/clamp, and passive-sweep reservation scheduling.
+- SimpleClaims breeding claim population counts now include all owned NPCs (`TameworkOwnerComponent.ownerId`), not only breedable NPCs.
+- New ownership acquisition gates now block player-driven tame claims (interaction taming/set-owner, legacy first-claim bridge, and spawn-assign-owner item spawns) when the owner population cap is reached.
 - Linked companion panel vitals rendering now uses refreshed segmented ring/mask visuals and updated runtime ring-anchor binding for needs + breeding cooldown indicators.
 
 ### Fixed
 - Passive breeding sweep no longer hard-crashes the world thread when passive sweep carrier classes fail to resolve at runtime; sweep failures are logged and skipped for that interval.
 - Needs-damage events now bypass trait damage multipliers by source tag, ensuring starvation/dehydration damage follows configured flat rates.
+- Linked companions with dead-respawn enabled no longer drop death loot while linked, preventing revive-loop drop duplication.
+- Nearby-panel `Cull` now unlinks companions before death is applied, so cull drops still process as normal and culled companions are removed from linked tool records.
 
 ## 2.4.5 - Companion Metadata Recovery + Tooltip Bridge - 2026-03-20
 ### Added
