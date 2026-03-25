@@ -13,7 +13,7 @@
     ],
     "Website": "",
     "Main": "com.alechilles.alecstamework.Tamework",
-    "ServerVersion": "2026.02.19-1a311a592",
+    "ServerVersion": "2026.03.23-338988e70",
     "Dependencies": {},
     "OptionalDependencies": {
         "org.herolias:DynamicTooltipsLib": "1.5.x",

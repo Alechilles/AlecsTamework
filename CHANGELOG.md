@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.4.7-prerelease-beta - Pre-release 2026.03.23 Compatibility - 2026-03-25
+### Changed
+- Updated Tamework release target to Hytale pre-release `2026.03.23-338988e70`.
+- Feed trough container/state handling now uses pre-release `ItemContainerBlock`-backed block entity container data instead of legacy container state metadata.
+- Feed trough block variants now use valid pre-release interaction wiring (`Open_Container`/custom `Use` actions) and usable-state flags so trough interactions trigger correctly.
+- Feed trough water/food sync, clear-water interaction flow, and companion-needs trough access paths were updated to use the new container component access model.
+- Command/spawner inventory update paths were migrated off removed legacy inventory sync calls and now avoid direct calls to deprecated inventory/player methods removed in pre-release.
+
+### Fixed
+- Fixed startup crash from missing `world.meta.BlockStateModule` references in feed trough sync registration.
+- Fixed startup asset validation failures caused by removed `Break_Container` root interaction references in feed trough assets.
+- Fixed feed trough interaction no-op behavior after startup by migrating block container definitions and usable interaction flags to pre-release-compatible schema.
+- Fixed world-thread crashes when linking command tools or remapping linked spawner NPCs due to removed `Inventory.markChanged()` and `Player.sendInventory()` methods.
+
 ## 2.4.6-beta - Needs Damage, Inheritance Overhaul, and Claim Guardrails - 2026-03-22
 ### Added
 - Added `TwNeedsConfig.TickPolicy` with owner-presence-aware ticking controls (`Mode`, `OwnerOfflineGraceHours`, `OwnerOfflineDecayMultiplier`) and default owner-online grace policy (`72h`, then normal decay).

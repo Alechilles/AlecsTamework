@@ -73,7 +73,7 @@ This mod does not add anything to the game on it's own. If you are a player look
 
 ```json
 "Dependencies": {
-"Alechilles:Alec's Tamework!": "2.4.5"
+"Alechilles:Alec's Tamework!": "2.4.7-prerelease-beta"
 },
 "IncludesAssetPack": true
 ```

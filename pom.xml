@@ -6,7 +6,7 @@
 
     <groupId>com.alechilles</groupId>
     <artifactId>alecstamework</artifactId>
-    <version>2.4.6-beta</version>
+    <version>2.4.7-prerelease-beta</version>
     <packaging>jar</packaging>
 
     <name>.Alec's Tamework!</name>
@@ -18,7 +18,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
-        <hytale.install.path>${hytale.install.path.release}</hytale.install.path>
+        <hytale.install.path>${hytale.install.path.prerelease}</hytale.install.path>
         <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/UserData</hytale.userdata.path>
         <hytale.toolkit.path>C:/Users/22ale/AppData/Local/Hytale-Toolkit</hytale.toolkit.path>
         <hytale.jdk.path>C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot</hytale.jdk.path>
