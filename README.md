@@ -54,9 +54,9 @@ This mod does not add anything to the game on it's own. If you are a player look
   - Deterministic trait rolls with duplicate/conflict controls and role-scoped trait pools (`TwTraitConfig`).
   - Inheritance/mutation flows with trait modifiers for health, speed, damage, harvest, and other gameplay effects.
   - In-game authoring/debug commands such as `/tw gettraits`, `/tw settraits`, `/tw addtrait`, and `/tw getlifestage`.
-- **Coop Integration** - Optional Tamework intake policy overlays for vanilla coops.
+- **Coop Integration** - Tamework-managed coop runtime for configured coop ids.
   - Configure per-coop behavior through `TwCoopConfig` assets keyed by `CoopId`.
-  - Tamework policy checks run before vanilla coop admission flow to keep compatibility with vanilla capacity/species gates.
+  - Managed coop capture/release uses a resident ledger to preserve state continuity across coop cycles.
 - **Examples and Documentation** - Plenty of examples and thorough documentation to help you integrate Tamework.
   - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
 
@@ -68,12 +68,12 @@ This mod does not add anything to the game on it's own. If you are a player look
   - Allow unlocking new behaviors, stat increases, etc.
   - Will include a talent tree UI
 
-## Quick Start (2.4.x)
+## Quick Start (2.5.x)
 1. Add the dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-"Alechilles:Alec's Tamework!": "2.4.7-prerelease-beta"
+"Alechilles:Alec's Tamework!": "2.5.0"
 },
 "IncludesAssetPack": true
 ```
@@ -145,8 +145,8 @@ Optional prompt updater (see the example template for full usage):
 }
 ```
 
-10. Coop intake policy overlays (optional):
-   Create a `TwCoopConfig` under `<ModRoot>/Server/Tamework/Farming/Coops/` keyed to your coop id (`CoopId`, for example `Coop_Chicken`) to enforce Tamework capture policy checks before coop admission.
+10. Coop runtime config (optional):
+   Create a `TwCoopConfig` under `<ModRoot>/Server/Tamework/Items/Coops/` keyed to your coop id (`CoopId`, for example `Coop_Chicken`) to configure Tamework-managed coop capture/release behavior.
 
 11. After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
 
@@ -173,8 +173,8 @@ Optional prompt updater (see the example template for full usage):
 - **TwTraitConfig**: role-scoped trait pools and inheritance behavior.
   Location: `<ModRoot>/Server/Tamework/Traits/*.json`
   Notes: each trait definition can now optionally set `IconPath` for linked-panel icon rendering; when omitted, the UI falls back to first-letter glyphs.
-- **TwCoopConfig**: coop-id scoped intake policy overlays for captured NPC insertion.
-  Location: `<ModRoot>/Server/Tamework/Farming/Coops/*.json`
+- **TwCoopConfig**: coop-id scoped managed coop runtime behavior.
+  Location: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
 - After editing spawner, naming, or command item configs, use `/tw reloadconfig`.
 
 ## Contributor Architecture Snapshot

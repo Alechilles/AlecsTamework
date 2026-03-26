@@ -13,7 +13,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
 - `TwBreedingConfig`: `<ModRoot>/Server/Tamework/Breeding/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
-- `TwCoopConfig`: `<ModRoot>/Server/Tamework/Farming/Coops/*.json`
+- `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
 
 ## Resolution patterns
 ### Single active global config

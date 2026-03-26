@@ -1,19 +1,31 @@
 # Changelog
 
 ## Unreleased
+_No entries yet._
+
+## 2.5.0 - Coop Runtime Rebuild + Pre-release Stability - 2026-03-26
 ### Added
 - Added a Tamework-authoritative coop runtime for pre-release that manages coop intake/release state through a resident ledger keyed by `world + coop block position + resident slot`.
 - Added `TwDebugConfig` asset support (`Server/Tamework/Debug`) to define default `/tw debug...` toggle states that are re-applied on startup and `/tw reloadconfig`.
 
 ### Changed
+- Promoted all `2.4.6-beta` and `2.4.7-prerelease-beta` changes into stable `2.5.0` (see detailed sections below).
 - Overhauled `CommandLinkedNpcCoopService` internals into the authoritative coop-ledger facade used by command panel/status flows, release resolution, and UUID remapping.
 - Coop release/capture snapshot handling now restores full resident progression/state payloads (owner/tamed/name, links, attachments, needs/happiness, breeding, traits, and lifecycle state) instead of relying on vanilla replacement heuristics.
+- `TwCoopConfig` discovery moved to `Server/Tamework/Items/Coops` for the managed coop runtime model.
+- Feed trough food/water charge tracking now uses block component state rather than generated per-charge droplist assets.
+- Asset codec decode error handling now uses hardened parsing and silences noisy `decodeJson` stderr spam for expected fallback paths.
+- Cross-world companion transfer now defers relocation while NPCs are mounted and handles closed source worlds gracefully.
 
 ### Fixed
 - Fixed coop cycles that left command panel entries stuck in `UNLOADED` after subsequent night/day capture-release passes.
 - Fixed coop resident identity/state drift where re-emerged residents could become effectively new/defaultized NPCs instead of restoring the stored resident state.
 - Fixed attachment/progression resets across coop and spawner capture-respawn paths, including needs/happiness persistence.
 - Fixed remaining coop attachment pop-in by applying attachment restoration earlier in the load/release path.
+- Fixed coop snapshot tracking scope so non-coop NPCs no longer enter coop replacement tracking flows.
+- Fixed stale mount-owner references and stale role support references during world/portal transfers to reduce cross-store reference crashes.
+- Fixed mounted NPC teleport transfer stability by preserving required mount interaction components across chunk/world moves.
+- Fixed portal relocation race paths by dismounting players/NPCs before queued teleport relocation is applied.
 
 ## 2.4.7-prerelease-beta - Pre-release 2026.03.23 Compatibility - 2026-03-25
 ### Changed
