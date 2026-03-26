@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -487,6 +488,31 @@ public final class CommandNpcRelocationService {
                             + sourceWorld.getName()
             );
             destinationWorld.execute(() -> applyTransferFailurePolicy(destinationWorld, npcUuid, pending));
+            return;
+        }
+        if (isUnsafeCrossWorldTransferState(sourceStore, sourceRef, sourceNpc)) {
+            String reason = sourceNpc.getRole() == null
+                    ? "role-null"
+                    : "mounted";
+            logTravelDiagnostic(
+                    Level.INFO,
+                    "Cross-world transfer deferred for npc="
+                            + npcUuid
+                            + ", sourceWorld="
+                            + sourceWorld.getName()
+                            + ", destinationWorld="
+                            + destinationWorld.getName()
+                            + ", reason="
+                            + reason
+            );
+            destinationWorld.execute(() -> {
+                if (pendingByNpc.get(npcUuid) != pending) {
+                    return;
+                }
+                pending.markCrossWorldTransferFinished();
+                pending.resetRelocationIssue();
+                retryPending(destinationWorld, npcUuid, pending);
+            });
             return;
         }
         String sourceState = resolveCurrentStateName(sourceNpc);
@@ -1052,6 +1078,19 @@ public final class CommandNpcRelocationService {
             return false;
         }
         return safeGetComponent(store, ref, NPCEntity.getComponentType()) != null;
+    }
+
+    private boolean isUnsafeCrossWorldTransferState(@Nullable Store<EntityStore> sourceStore,
+                                                    @Nullable Ref<EntityStore> sourceRef,
+                                                    @Nullable NPCEntity sourceNpc) {
+        if (sourceStore == null || sourceRef == null || !sourceRef.isValid() || sourceNpc == null) {
+            return true;
+        }
+        if (sourceNpc.getRole() == null) {
+            return true;
+        }
+        ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
+        return mountType != null && safeGetComponent(sourceStore, sourceRef, mountType) != null;
     }
 
     @Nullable
