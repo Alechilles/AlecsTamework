@@ -50,8 +50,7 @@ public final class CoopResidentStateSnapshotService {
             return null;
         }
         CoopResidentComponent coopResident = store.getComponent(reference, CoopResidentComponent.getComponentType());
-        if (reason == RemoveReason.REMOVE && coopResident == null) {
-            // Vanilla coop intake removes marked residents with REMOVE; keep those, skip unrelated hard removes.
+        if (coopResident == null) {
             return null;
         }
         NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
@@ -59,9 +58,12 @@ public final class CoopResidentStateSnapshotService {
         if (npcUuid == null) {
             return null;
         }
-        CoopContext coopContext = coopResident != null ? resolveCoopContext(store, coopResident) : null;
-        Vector3i coopLocation = coopResident != null ? coopResident.getCoopLocation() : null;
-        int residentSlot = coopContext != null && coopContext.coopBlock() != null
+        CoopContext coopContext = resolveCoopContext(store, coopResident);
+        Vector3i coopLocation = coopResident.getCoopLocation();
+        if (coopContext == null || coopContext.coopId() == null || coopLocation == null) {
+            return null;
+        }
+        int residentSlot = coopContext.coopBlock() != null
                 ? CoopResidentSlotResolver.resolveResidentSlotByUuid(coopContext.coopBlock(), npcUuid)
                 : -1;
         String roleId = resolveRoleId(npc);
@@ -76,7 +78,7 @@ public final class CoopResidentStateSnapshotService {
         if (snapshot == null) {
             return null;
         }
-        if (coopContext != null && residentSlot >= 0) {
+        if (residentSlot >= 0) {
             snapshotsByNpc.put(npcUuid, snapshot);
             debugCoop(
                     "state snapshot capture npc=" + npcUuid
