@@ -83,6 +83,7 @@ import com.alechilles.alecstamework.npc.systems.CommandLinkedRevivableDropSuppre
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
+import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
@@ -324,6 +325,7 @@ public class Tamework extends JavaPlugin {
                         npcNameComponentType
                 )
         );
+        getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
         getEntityStoreRegistry().registerSystem(
                 new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType())
         );
