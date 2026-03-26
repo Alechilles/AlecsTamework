@@ -416,7 +416,28 @@ public final class CommandNpcRelocationService {
                         + ", destinationWorld="
                         + destinationWorld.getName()
         );
-        sourceWorld.execute(() -> transferPendingAcrossWorlds(sourceWorld, destinationWorld, npcUuid, pending));
+        try {
+            sourceWorld.execute(() -> transferPendingAcrossWorlds(sourceWorld, destinationWorld, npcUuid, pending));
+        } catch (RuntimeException ex) {
+            pending.markCrossWorldTransferFinished();
+            pending.resetRelocationIssue();
+            knownWorldByNpc.remove(npcUuid, sourceWorld);
+            logTravelDiagnostic(
+                    Level.WARNING,
+                    "Unable to start cross-world transfer for npc="
+                            + npcUuid
+                            + ": source world is no longer accepting tasks (sourceWorld="
+                            + sourceWorld.getName()
+                            + ", destinationWorld="
+                            + destinationWorld.getName()
+                            + ", reason="
+                            + ex.getClass().getSimpleName()
+                            + ": "
+                            + ex.getMessage()
+                            + ")"
+            );
+            return false;
+        }
         return true;
     }
 
