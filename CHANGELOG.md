@@ -3,7 +3,7 @@
 ## Unreleased
 _No entries yet._
 
-## 2.5.0 - Coop Runtime Rebuild + Pre-release Stability - 2026-03-26
+## 2.5.0 - Coop Runtime Rebuild + Update 4 Stability - 2026-03-26
 ### Added
 - Added a Tamework-authoritative coop runtime for pre-release that manages coop intake/release state through a resident ledger keyed by `world + coop block position + resident slot`.
 - Added `TwDebugConfig` asset support (`Server/Tamework/Debug`) to define default `/tw debug...` toggle states that are re-applied on startup and `/tw reloadconfig`.
