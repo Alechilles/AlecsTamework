@@ -1,8 +1,10 @@
 package com.alechilles.alecstamework.items;
 
+import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
@@ -60,12 +62,20 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
         store.forEachChunk(
                 Query.and(playerType, teleportType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
-                        collectSameWorldTeleportCandidates(chunk, playerType, teleportType, world, activeTeleportingPlayers)
+                        collectSameWorldTeleportCandidates(
+                                chunk,
+                                commandBuffer,
+                                playerType,
+                                teleportType,
+                                world,
+                                activeTeleportingPlayers
+                        )
         );
         queuedPlayers.retainAll(activeTeleportingPlayers);
     }
 
     private void collectSameWorldTeleportCandidates(ArchetypeChunk<EntityStore> chunk,
+                                                    CommandBuffer<EntityStore> commandBuffer,
                                                     ComponentType<EntityStore, Player> playerType,
                                                     ComponentType<EntityStore, Teleport> teleportType,
                                                     World world,
@@ -78,6 +88,7 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
             if (playerUuid == null || teleport == null) {
                 continue;
             }
+            dismountBeforePortalTransfer(chunk, commandBuffer, i, player);
             World destinationWorld = teleport.getWorld();
             if (destinationWorld != null && !isSameWorld(destinationWorld, world)) {
                 continue;
@@ -88,6 +99,20 @@ public final class CommandTeleportArrivalRelocationSystem extends TickingSystem<
             }
             scheduleArrivalQueue(world, playerUuid);
         }
+    }
+
+    private void dismountBeforePortalTransfer(ArchetypeChunk<EntityStore> chunk,
+                                              CommandBuffer<EntityStore> commandBuffer,
+                                              int index,
+                                              Player player) {
+        if (chunk == null || player == null || player.getMountEntityId() == 0) {
+            return;
+        }
+        Ref<EntityStore> playerRef = chunk.getReferenceTo(index);
+        if (playerRef == null || !playerRef.isValid()) {
+            return;
+        }
+        MountPlugin.checkDismountNpc(commandBuffer, playerRef, player);
     }
 
     private void scheduleArrivalQueue(World world, UUID playerUuid) {
