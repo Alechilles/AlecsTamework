@@ -72,7 +72,10 @@
       "Components": {
         "ItemContainerBlock": {
           "Capacity": 5
-        }
+        },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
+                }
       }
     }
   },
@@ -154,7 +157,10 @@
           "Components": {
             "ItemContainerBlock": {
               "Capacity": 1
-            }
+            },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
+                }
           }
         }
       },
@@ -215,6 +221,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -276,6 +285,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -337,6 +349,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -398,6 +413,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -459,6 +477,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -520,6 +541,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -581,6 +605,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -642,6 +669,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -703,6 +733,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -764,6 +797,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 1
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -824,7 +860,10 @@
           "Components": {
             "ItemContainerBlock": {
               "Capacity": 5
-            }
+            },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
+                }
           }
         }
       },
@@ -877,6 +916,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -930,6 +972,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -983,6 +1028,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1036,6 +1084,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1089,6 +1140,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1142,6 +1196,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1195,6 +1252,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1248,6 +1308,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1301,6 +1364,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1354,6 +1420,9 @@
               "Components": {
                 "ItemContainerBlock": {
                   "Capacity": 5
+                },
+                "TameworkFeedTroughWaterCharges": {
+                  "WaterCharges": 0
                 }
               }
             }
@@ -1372,6 +1441,7 @@
     "Capacity": 5
   }
 }
+
 
 
 

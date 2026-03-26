@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.event.EventPriority;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
@@ -34,7 +35,7 @@ public final class FeedTroughWaterStateService {
     private static final String WATER_STATE_20_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_20";
     private static final String WATER_STATE_10_BLOCK_ID = "Tw_Feed_Trough_State_Water_State_10";
 
-    private static final String CHARGE_STORAGE_PREFIX = "tw_water_charges:";
+    private static final String LEGACY_CHARGE_STORAGE_PREFIX = "tw_water_charges:";
 
     public static final int MAX_WATER_CHARGES = 200;
 
@@ -68,7 +69,7 @@ public final class FeedTroughWaterStateService {
         if (!isWaterTroughBlockId(normalizedBlockId)) {
             return false;
         }
-        return resolveStoredOrInferredCharges(state, normalizedBlockId) > 0;
+        return resolveStoredOrInferredCharges(state, normalizedBlockId, chunk, chunkStore, x, y, z, false) > 0;
     }
 
     public static boolean isWaterTroughBlockType(@Nullable BlockType blockType) {
@@ -108,7 +109,8 @@ public final class FeedTroughWaterStateService {
         if (!resizeContainerToBaseCapacity(updatedState)) {
             return false;
         }
-        return FeedTroughContainerCompat.setDroplist(updatedState, null);
+        setStoredCharges(chunk, chunkStore, x, y, z, updatedState, 0);
+        return true;
     }
 
     public static boolean consumeSingleCharge(@Nullable WorldChunk chunk,
@@ -132,7 +134,7 @@ public final class FeedTroughWaterStateService {
             return false;
         }
 
-        int charges = resolveStoredOrInferredCharges(state, normalizedCurrentId);
+        int charges = resolveStoredOrInferredCharges(state, normalizedCurrentId, chunk, chunkStore, x, y, z, true);
         if (charges <= 0) {
             return false;
         }
@@ -155,19 +157,40 @@ public final class FeedTroughWaterStateService {
 
         Object updatedState = FeedTroughContainerCompat.resolveContainerState(chunk, chunkStore, x, y, z);
         if (updatedState != null) {
-            setStoredCharges(updatedState, remainingCharges);
+            setStoredCharges(chunk, chunkStore, x, y, z, updatedState, remainingCharges);
         }
         return true;
     }
 
     static int resolveStoredOrInferredCharges(@Nonnull Object state,
-                                              @Nonnull String normalizedBlockId) {
+                                              @Nonnull String normalizedBlockId,
+                                              @Nullable WorldChunk chunk,
+                                              @Nullable Store<ChunkStore> chunkStore,
+                                              int x,
+                                              int y,
+                                              int z,
+                                              boolean allowWriteBack) {
+        TameworkFeedTroughWaterChargesComponent waterChargesComponent =
+                TameworkFeedTroughWaterChargesComponent.resolve(chunk, chunkStore, x, y, z);
+        if (waterChargesComponent != null && waterChargesComponent.getWaterCharges() > 0) {
+            return clampCharges(waterChargesComponent.getWaterCharges());
+        }
+
         String encoded = FeedTroughContainerCompat.getDroplist(state);
         int stored = parseStoredCharges(encoded);
         if (stored >= 0) {
-            return clampCharges(stored);
+            int clampedStored = clampCharges(stored);
+            if (allowWriteBack) {
+                setStoredCharges(chunk, chunkStore, x, y, z, state, clampedStored);
+            }
+            return clampedStored;
         }
-        return inferChargesFromWaterBlockId(normalizedBlockId);
+
+        int inferred = inferChargesFromWaterBlockId(normalizedBlockId);
+        if (allowWriteBack && inferred > 0) {
+            setComponentCharges(chunk, chunkStore, x, y, z, inferred);
+        }
+        return inferred;
     }
 
     static int inferChargesFromWaterBlockId(@Nullable String normalizedBlockId) {
@@ -293,13 +316,16 @@ public final class FeedTroughWaterStateService {
         };
     }
 
-    private static void setStoredCharges(@Nonnull Object state, int charges) {
+    private static void setStoredCharges(@Nullable WorldChunk chunk,
+                                         @Nullable Store<ChunkStore> chunkStore,
+                                         int x,
+                                         int y,
+                                         int z,
+                                         @Nonnull Object state,
+                                         int charges) {
         int clampedCharges = clampCharges(charges);
-        if (clampedCharges <= 0) {
-            FeedTroughContainerCompat.setDroplist(state, null);
-            return;
-        }
-        FeedTroughContainerCompat.setDroplist(state, CHARGE_STORAGE_PREFIX + clampedCharges);
+        setComponentCharges(chunk, chunkStore, x, y, z, clampedCharges);
+        FeedTroughContainerCompat.setDroplist(state, null);
     }
 
     private static int parseStoredCharges(@Nullable String encoded) {
@@ -307,10 +333,10 @@ public final class FeedTroughWaterStateService {
             return -1;
         }
         String trimmed = encoded.trim();
-        if (!trimmed.startsWith(CHARGE_STORAGE_PREFIX)) {
+        if (!trimmed.startsWith(LEGACY_CHARGE_STORAGE_PREFIX)) {
             return -1;
         }
-        String value = trimmed.substring(CHARGE_STORAGE_PREFIX.length());
+        String value = trimmed.substring(LEGACY_CHARGE_STORAGE_PREFIX.length());
         if (value.isBlank()) {
             return -1;
         }
@@ -323,6 +349,20 @@ public final class FeedTroughWaterStateService {
 
     private static int clampCharges(int charges) {
         return Math.max(0, Math.min(MAX_WATER_CHARGES, charges));
+    }
+
+    private static void setComponentCharges(@Nullable WorldChunk chunk,
+                                            @Nullable Store<ChunkStore> chunkStore,
+                                            int x,
+                                            int y,
+                                            int z,
+                                            int charges) {
+        TameworkFeedTroughWaterChargesComponent waterChargesComponent =
+                TameworkFeedTroughWaterChargesComponent.resolve(chunk, chunkStore, x, y, z);
+        if (waterChargesComponent == null) {
+            return;
+        }
+        waterChargesComponent.setWaterCharges(clampCharges(charges));
     }
 
     @Nullable

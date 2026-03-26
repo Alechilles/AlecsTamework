@@ -97,7 +97,7 @@ public class TameworkClearFeedTroughWaterInteraction extends SimpleInteraction {
             fail(context, time, type, cooldownHandler);
             return;
         }
-        WorldChunk chunk = world.getChunk(ChunkUtil.indexChunkFromBlock(targetBlock.x, targetBlock.z));
+        WorldChunk chunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(targetBlock.x, targetBlock.z));
         if (chunk == null) {
             fail(context, time, type, cooldownHandler);
             return;
