@@ -35,7 +35,12 @@ import com.hypixel.hytale.server.core.modules.entity.component.ModelComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.role.support.MarkedEntitySupport;
+import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.lang.reflect.Field;
+import java.util.Collection;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -48,6 +53,12 @@ import javax.annotation.Nullable;
 public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStore> {
     @Nullable
     private static final Field COOP_RESIDENTS_FIELD = resolveCoopResidentsField();
+    @Nullable
+    private static final Field STATE_INTERACTABLE_PLAYERS_FIELD = resolveStateSupportField("interactablePlayers");
+    @Nullable
+    private static final Field STATE_INTERACTED_PLAYERS_FIELD = resolveStateSupportField("interactedPlayers");
+    @Nullable
+    private static final Field STATE_CONTEXTUAL_INTERACTIONS_FIELD = resolveStateSupportField("contextualInteractions");
 
     private final CommandNpcRelocationService relocationService;
     private final CommandLinkedNpcDeathService deathService;
@@ -76,6 +87,7 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
                               @Nonnull AddReason reason,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        sanitizeRoleReferencesOnAdd(reference, store);
         if (coopService != null) {
             applyCoopAttachmentPreload(reference, store, commandBuffer);
         }
@@ -322,6 +334,106 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
         }
     }
 
+    private void sanitizeRoleReferencesOnAdd(@Nonnull Ref<EntityStore> reference, @Nonnull Store<EntityStore> store) {
+        if (reference == null || !reference.isValid() || store == null) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        if (npc == null) {
+            return;
+        }
+        Role role = npc.getRole();
+        if (role == null) {
+            return;
+        }
+        sanitizeMarkedEntitySupport(role, store);
+        sanitizeStateSupport(role, store);
+    }
+
+    private void sanitizeMarkedEntitySupport(@Nonnull Role role, @Nonnull Store<EntityStore> store) {
+        MarkedEntitySupport markedEntitySupport = role.getMarkedEntitySupport();
+        if (markedEntitySupport == null) {
+            return;
+        }
+        Ref<EntityStore>[] targets = markedEntitySupport.getEntityTargets();
+        if (targets == null || targets.length == 0) {
+            return;
+        }
+        for (int slot = 0; slot < targets.length; slot++) {
+            Ref<EntityStore> target = targets[slot];
+            if (isRefInCurrentStore(target, store)) {
+                continue;
+            }
+            markedEntitySupport.setMarkedEntity(slot, null);
+        }
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private void sanitizeStateSupport(@Nonnull Role role, @Nonnull Store<EntityStore> store) {
+        StateSupport stateSupport = role.getStateSupport();
+        if (stateSupport == null) {
+            return;
+        }
+        Ref<EntityStore> iterationTarget = stateSupport.getInteractionIterationTarget();
+        if (!isRefInCurrentStore(iterationTarget, store)) {
+            stateSupport.setInteractionIterationTarget(null);
+        }
+
+        Collection<Ref<EntityStore>> interactablePlayers =
+                readFieldValue(stateSupport, STATE_INTERACTABLE_PLAYERS_FIELD, Collection.class);
+        pruneRefCollection(interactablePlayers, store);
+
+        Collection<Ref<EntityStore>> interactedPlayers =
+                readFieldValue(stateSupport, STATE_INTERACTED_PLAYERS_FIELD, Collection.class);
+        pruneRefCollection(interactedPlayers, store);
+
+        Map<Ref<EntityStore>, String> contextualInteractions =
+                readFieldValue(stateSupport, STATE_CONTEXTUAL_INTERACTIONS_FIELD, Map.class);
+        if (contextualInteractions != null && !contextualInteractions.isEmpty()) {
+            Iterator<Map.Entry<Ref<EntityStore>, String>> iterator = contextualInteractions.entrySet().iterator();
+            while (iterator.hasNext()) {
+                Map.Entry<Ref<EntityStore>, String> entry = iterator.next();
+                if (!isRefInCurrentStore(entry.getKey(), store)) {
+                    iterator.remove();
+                }
+            }
+        }
+    }
+
+    private void pruneRefCollection(@Nullable Collection<Ref<EntityStore>> refs, @Nonnull Store<EntityStore> store) {
+        if (refs == null || refs.isEmpty()) {
+            return;
+        }
+        Iterator<Ref<EntityStore>> iterator = refs.iterator();
+        while (iterator.hasNext()) {
+            Ref<EntityStore> candidate = iterator.next();
+            if (!isRefInCurrentStore(candidate, store)) {
+                iterator.remove();
+            }
+        }
+    }
+
+    private boolean isRefInCurrentStore(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        return ref != null && ref.isValid() && ref.getStore() == store;
+    }
+
+    @Nullable
+    @SuppressWarnings("unchecked")
+    private static <T> T readFieldValue(@Nonnull Object owner, @Nullable Field field, @Nonnull Class<T> type) {
+        if (owner == null || field == null || type == null) {
+            return null;
+        }
+        try {
+            Object value = field.get(owner);
+            if (type.isInstance(value)) {
+                return (T) value;
+            }
+        } catch (IllegalAccessException ignored) {
+            return null;
+        }
+        return null;
+    }
+
     private record CoopResidentContext(@Nullable String worldName,
                                        @Nullable String coopId,
                                        @Nonnull Vector3i coopLocation,
@@ -384,6 +496,17 @@ public final class CommandNpcRelocationOnLoadSystem extends RefSystem<EntityStor
     private static Field resolveCoopResidentsField() {
         try {
             Field field = CoopBlock.class.getDeclaredField("residents");
+            field.setAccessible(true);
+            return field;
+        } catch (Exception | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Field resolveStateSupportField(@Nonnull String name) {
+        try {
+            Field field = StateSupport.class.getDeclaredField(name);
             field.setAccessible(true);
             return field;
         } catch (Exception | LinkageError ignored) {
