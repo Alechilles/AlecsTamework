@@ -1,0 +1,48 @@
+{
+  "Enabled": true,
+  "Priority": 100,
+  "CoopId": "Coop_Chicken",
+  "CapturePolicy": {
+    "RequireTamed": false,
+    "OwnerRestricted": false,
+    "RequireOwner": false,
+    "ParticleSystem": "Entities/Basic/Particles/Love/Hearts",
+    "SoundEvent": "SFX_Pet_Interact_Success"
+  },
+  "LifecycleRules": {
+    "MaxResidents": 6,
+    "ResidentRoamStartHour": 6,
+    "ResidentRoamEndHour": 18,
+    "ResidentSpawnOffset": {
+      "X": 0.0,
+      "Y": 0.0,
+      "Z": 3.0
+    },
+    "CaptureWildNPCsInRange": true,
+    "WildCaptureRadius": 10.0,
+    "AcceptedRoleIds": [
+      "chicken",
+      "chicken_desert",
+      "skrill",
+      "tamed_chicken",
+      "tamed_chicken_desert",
+      "tamed_skrill"
+    ]
+  },
+  "ProduceRules": {
+    "DropsByRole": {
+      "Chicken": "Drop_Chicken_Produce",
+      "Chicken_Desert": "Drop_Chicken_Produce",
+      "Skrill": "Drop_Chicken_Produce",
+      "Tamed_Chicken": "Drop_Chicken_Produce",
+      "Tamed_Chicken_Desert": "Drop_Chicken_Produce",
+      "Tamed_Skrill": "Drop_Chicken_Produce"
+    },
+    "IntervalGameHours": 1,
+    "ItemsPerTick": 1
+  },
+  "IdentityRules": {
+    "RequireSnapshotOnRelease": true,
+    "PreserveUUID": false
+  }
+}

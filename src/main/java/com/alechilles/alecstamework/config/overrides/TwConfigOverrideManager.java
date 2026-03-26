@@ -29,6 +29,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -49,6 +50,7 @@ public final class TwConfigOverrideManager {
     private final Tamework plugin;
     private final Object reloadLock = new Object();
     private final Set<String> loadedOverrideSourcePackKeys = new HashSet<>();
+    private final Map<String, Path> canonicalSourcePathsByDescriptorKey = new ConcurrentHashMap<>();
 
     public TwConfigOverrideManager(@Nonnull Tamework plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -227,6 +229,9 @@ public final class TwConfigOverrideManager {
                 }
                 JsonObject sourceJson = readSourceJson(descriptor);
                 JsonObject overrideJson = readOverrideJson(world, descriptor);
+                if (TwConfigJsonUtil.isEmptyObject(sourceJson) && TwConfigJsonUtil.isEmptyObject(overrideJson)) {
+                    continue;
+                }
                 JsonObject mergedForLoad = TwConfigJsonUtil.merge(sourceJson, overrideJson);
                 Path stagedPackRoot = stagingRoot.resolve(encodePackKey(descriptor.sourcePackKey()));
                 Path stagedPath = resolvePortable(stagedPackRoot, descriptor.relativeServerPath()).normalize();
@@ -549,8 +554,19 @@ public final class TwConfigOverrideManager {
                 if (assetId.isBlank()) {
                     continue;
                 }
-                String sourcePackKey = resolveSourcePackKey(assetMap, key);
-                Path sourcePath = resolveSourcePath(assetMap, key);
+                String rawSourcePackKey = resolveSourcePackKey(assetMap, key);
+                String sourcePackKey = normalizeSourcePackKey(rawSourcePackKey);
+                Path discoveredSourcePath = resolveSourcePath(assetMap, key);
+                String descriptorKey = descriptorKey(binding.familyKey, sourcePackKey, assetId);
+                Path sourcePath = discoveredSourcePath;
+                if (isOverridePackKey(rawSourcePackKey)) {
+                    Path cachedSourcePath = canonicalSourcePathsByDescriptorKey.get(descriptorKey);
+                    if (cachedSourcePath != null) {
+                        sourcePath = cachedSourcePath;
+                    }
+                } else if (discoveredSourcePath != null) {
+                    canonicalSourcePathsByDescriptorKey.put(descriptorKey, discoveredSourcePath);
+                }
                 Object asset = entry.getValue();
                 String parentAssetId = resolveParentAssetId(asset);
                 Path relativeServerPath = resolveRelativeServerPath(sourcePath, binding.storePath, assetId);
@@ -590,6 +606,34 @@ public final class TwConfigOverrideManager {
         return "<unknown-pack>";
     }
 
+    @Nonnull
+    static String normalizeSourcePackKey(@Nullable String sourcePackKey) {
+        String current = sourcePackKey == null ? "<unknown-pack>" : sourcePackKey.trim();
+        if (current.isBlank()) {
+            return "<unknown-pack>";
+        }
+        current = decodePackKey(current);
+        while (current.startsWith(OVERRIDE_PACK_PREFIX)) {
+            current = current.substring(OVERRIDE_PACK_PREFIX.length());
+        }
+        return current.isBlank() ? "<unknown-pack>" : current;
+    }
+
+    private static boolean isOverridePackKey(@Nullable String sourcePackKey) {
+        return sourcePackKey != null && sourcePackKey.startsWith(OVERRIDE_PACK_PREFIX);
+    }
+
+    @Nonnull
+    private static String descriptorKey(@Nonnull String familyKey,
+                                        @Nonnull String sourcePackKey,
+                                        @Nonnull String assetId) {
+        return familyKey.toLowerCase(Locale.ROOT)
+                + "|"
+                + sourcePackKey.toLowerCase(Locale.ROOT)
+                + "|"
+                + assetId.toLowerCase(Locale.ROOT);
+    }
+
     @Nullable
     private Path resolveSourcePath(@Nonnull AssetMap<?, ?> assetMap, @Nonnull Object key) {
         try {
@@ -620,11 +664,11 @@ public final class TwConfigOverrideManager {
     }
 
     @Nonnull
-    private Path resolveRelativeServerPath(@Nullable Path sourcePath,
-                                           @Nonnull String storePath,
-                                           @Nonnull String assetId) {
+    static Path resolveRelativeServerPath(@Nullable Path sourcePath,
+                                          @Nonnull String storePath,
+                                          @Nonnull String assetId) {
         if (sourcePath != null && sourcePath.getNameCount() > 0) {
-            for (int i = 0; i < sourcePath.getNameCount(); i++) {
+            for (int i = sourcePath.getNameCount() - 1; i >= 0; i--) {
                 String segment = sourcePath.getName(i).toString();
                 if ("server".equalsIgnoreCase(segment)) {
                     return sourcePath.subpath(i, sourcePath.getNameCount());
@@ -642,7 +686,7 @@ public final class TwConfigOverrideManager {
     }
 
     @Nonnull
-    private String sanitizeFileName(@Nonnull String assetId) {
+    private static String sanitizeFileName(@Nonnull String assetId) {
         String sanitized = assetId.replaceAll("[^A-Za-z0-9._-]", "_");
         return sanitized.isBlank() ? "Unknown" : sanitized;
     }

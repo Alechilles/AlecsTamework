@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
@@ -29,7 +30,8 @@ final class SpawnerNpcProgressionMetadataService {
         if (stack == null || npcRef == null || store == null || !npcRef.isValid()) {
             return stack;
         }
-        ItemStack updated = applyHappinessMetadata(stack, npcRef, store);
+        ItemStack updated = applyNeedsMetadata(stack, npcRef, store);
+        updated = applyHappinessMetadata(updated, npcRef, store);
         updated = applyBreedingMetadata(updated, npcRef, store);
         updated = applyTraitsMetadata(updated, npcRef, store);
         return applyLifeStageMetadata(updated, npcRef, store);
@@ -41,6 +43,7 @@ final class SpawnerNpcProgressionMetadataService {
         if (stack == null || npcRef == null || store == null || !npcRef.isValid()) {
             return;
         }
+        restoreNeedsComponent(stack, npcRef, store);
         restoreHappinessComponent(stack, npcRef, store);
         restoreBreedingComponent(stack, npcRef, store);
         restoreTraitsComponent(stack, npcRef, store);
@@ -48,9 +51,8 @@ final class SpawnerNpcProgressionMetadataService {
     }
 
     ItemStack clearProgressionMetadata(@Nullable ItemStack stack) {
-        ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_VALUE);
-        updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS);
+        ItemStack updated = clearNeedsMetadata(stack);
+        updated = clearHappinessMetadata(updated);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_CONFIG_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_HAPPINESS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_ENABLED);
@@ -74,29 +76,151 @@ final class SpawnerNpcProgressionMetadataService {
         return updated;
     }
 
+    private ItemStack applyNeedsMetadata(ItemStack stack,
+                                         Ref<EntityStore> npcRef,
+                                         Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkNeedsComponent> type = TameworkNeedsComponent.getComponentType();
+        if (type == null) {
+            return stack;
+        }
+        TameworkNeedsComponent component = store.getComponent(npcRef, type);
+        if (component == null) {
+            return clearNeedsMetadata(stack);
+        }
+        ItemStack updated = stack;
+        if (component.getConfigId() != null && !component.getConfigId().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.NEEDS_CONFIG_ID, Codec.STRING, component.getConfigId());
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.NEEDS_CONFIG_ID);
+        }
+        updated = updated.withMetadata(TameworkMetadataKeys.NEEDS_HUNGER, Codec.DOUBLE, component.getHunger());
+        updated = updated.withMetadata(TameworkMetadataKeys.NEEDS_THIRST, Codec.DOUBLE, component.getThirst());
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.NEEDS_APPLIED_HAPPINESS_PENALTY,
+                Codec.DOUBLE,
+                component.getAppliedHappinessPenalty()
+        );
+        updated = updated.withMetadata(TameworkMetadataKeys.NEEDS_LAST_UPDATE_MS, Codec.LONG, component.getLastUpdateMs());
+        updated = updated.withMetadata(
+                TameworkMetadataKeys.NEEDS_LAST_PASSIVE_SWEEP_MS,
+                Codec.LONG,
+                component.getLastPassiveSweepMs()
+        );
+        return updated;
+    }
+
+    private ItemStack clearNeedsMetadata(@Nullable ItemStack stack) {
+        ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.NEEDS_CONFIG_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.NEEDS_HUNGER);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.NEEDS_THIRST);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.NEEDS_APPLIED_HAPPINESS_PENALTY);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.NEEDS_LAST_UPDATE_MS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.NEEDS_LAST_PASSIVE_SWEEP_MS);
+        return updated;
+    }
+
+    private ItemStack clearHappinessMetadata(@Nullable ItemStack stack) {
+        ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_VALUE);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS);
+        return updated;
+    }
+
     private ItemStack applyHappinessMetadata(ItemStack stack,
                                              Ref<EntityStore> npcRef,
                                              Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkHappinessComponent> type = TameworkHappinessComponent.getComponentType();
-        if (type == null) {
-            return stack;
-        }
-        TameworkHappinessComponent component = store.getComponent(npcRef, type);
-        if (component == null) {
-            ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
-            updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_VALUE);
-            updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS);
-            return updated;
+        TameworkHappinessComponent component = type != null ? store.getComponent(npcRef, type) : null;
+        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
+        TameworkBreedingComponent breedingComponent = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
+        if (component == null && breedingComponent == null) {
+            return clearHappinessMetadata(stack);
         }
         ItemStack updated = stack;
-        if (component.getConfigId() != null && !component.getConfigId().isBlank()) {
-            updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_CONFIG_ID, Codec.STRING, component.getConfigId());
+        String configId = component != null ? component.getConfigId() : null;
+        if (configId != null && !configId.isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_CONFIG_ID, Codec.STRING, configId);
         } else {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.HAPPINESS_CONFIG_ID);
         }
-        updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_VALUE, Codec.DOUBLE, component.getValue());
-        updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS, Codec.LONG, component.getLastUpdateMs());
+        double value = component != null && Double.isFinite(component.getValue())
+                ? component.getValue()
+                : breedingComponent != null && Double.isFinite(breedingComponent.getHappiness())
+                ? breedingComponent.getHappiness()
+                : 0.0;
+        long lastUpdateMs = component != null && component.getLastUpdateMs() > 0L
+                ? component.getLastUpdateMs()
+                : breedingComponent != null && breedingComponent.getLastHappinessUpdateMs() > 0L
+                ? breedingComponent.getLastHappinessUpdateMs()
+                : 0L;
+        updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_VALUE, Codec.DOUBLE, value);
+        updated = updated.withMetadata(TameworkMetadataKeys.HAPPINESS_LAST_UPDATE_MS, Codec.LONG, lastUpdateMs);
         return updated;
+    }
+
+    private void restoreNeedsComponent(ItemStack stack,
+                                       Ref<EntityStore> npcRef,
+                                       Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkNeedsComponent> type = TameworkNeedsComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.NEEDS_CONFIG_ID, Codec.STRING);
+        Double hunger = stack.getFromMetadataOrNull(TameworkMetadataKeys.NEEDS_HUNGER, Codec.DOUBLE);
+        Double thirst = stack.getFromMetadataOrNull(TameworkMetadataKeys.NEEDS_THIRST, Codec.DOUBLE);
+        Double appliedPenalty = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.NEEDS_APPLIED_HAPPINESS_PENALTY,
+                Codec.DOUBLE
+        );
+        Long lastUpdateMs = stack.getFromMetadataOrNull(TameworkMetadataKeys.NEEDS_LAST_UPDATE_MS, Codec.LONG);
+        Long lastPassiveSweepMs = stack.getFromMetadataOrNull(
+                TameworkMetadataKeys.NEEDS_LAST_PASSIVE_SWEEP_MS,
+                Codec.LONG
+        );
+        boolean hasData = (configId != null && !configId.isBlank())
+                || hunger != null
+                || thirst != null
+                || appliedPenalty != null
+                || lastUpdateMs != null
+                || lastPassiveSweepMs != null;
+        if (!hasData) {
+            return;
+        }
+        TameworkNeedsComponent existing = store.getComponent(npcRef, type);
+        String resolvedConfigId = (configId != null && !configId.isBlank())
+                ? configId
+                : existing != null ? existing.getConfigId() : null;
+        double resolvedHunger = hunger != null
+                ? hunger
+                : existing != null ? existing.getHunger() : 0.0;
+        double resolvedThirst = thirst != null
+                ? thirst
+                : existing != null ? existing.getThirst() : 0.0;
+        double resolvedPenalty = appliedPenalty != null
+                ? appliedPenalty
+                : existing != null ? existing.getAppliedHappinessPenalty() : 0.0;
+        long resolvedLastUpdateMs = lastUpdateMs != null && lastUpdateMs > 0L
+                ? lastUpdateMs
+                : existing != null && existing.getLastUpdateMs() > 0L
+                ? existing.getLastUpdateMs()
+                : 0L;
+        long resolvedLastPassiveSweepMs = lastPassiveSweepMs != null && lastPassiveSweepMs > 0L
+                ? lastPassiveSweepMs
+                : existing != null && existing.getLastPassiveSweepMs() > 0L
+                ? existing.getLastPassiveSweepMs()
+                : 0L;
+        store.putComponent(
+                npcRef,
+                type,
+                new TameworkNeedsComponent(
+                        resolvedConfigId,
+                        resolvedHunger,
+                        resolvedThirst,
+                        resolvedPenalty,
+                        resolvedLastUpdateMs,
+                        resolvedLastPassiveSweepMs
+                )
+        );
     }
 
     private ItemStack applyBreedingMetadata(ItemStack stack,

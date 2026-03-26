@@ -17,7 +17,6 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
-import com.hypixel.hytale.server.core.modules.block.BlockModule;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
@@ -140,6 +139,7 @@ public final class CoopFeatureHandler {
         if (!coop.tryPutResident(metadata, worldTime)) {
             return false;
         }
+        int residentSlot = CoopResidentSlotResolver.resolveMostRecentResidentSlot(coop);
 
         Vector3i block = coopTarget.blockPosition();
         world.execute(() -> coop.ensureSpawnResidentsInWorld(
@@ -178,6 +178,7 @@ public final class CoopFeatureHandler {
                                 roleId,
                                 displayName,
                                 coopTarget.coopId(),
+                                residentSlot,
                                 System.currentTimeMillis()
                         )
                 );
@@ -249,14 +250,11 @@ public final class CoopFeatureHandler {
 
     @Nullable
     private CoopTarget resolveCoopTarget(@Nonnull World world, @Nonnull Vector3i blockPosition) {
-        WorldChunk worldChunk = world.getChunk(ChunkUtil.indexChunkFromBlock(blockPosition.x, blockPosition.z));
+        WorldChunk worldChunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(blockPosition.x, blockPosition.z));
         if (worldChunk == null) {
             return null;
         }
         Ref<ChunkStore> blockRef = worldChunk.getBlockComponentEntity(blockPosition.x, blockPosition.y, blockPosition.z);
-        if (blockRef == null) {
-            blockRef = BlockModule.ensureBlockEntity(worldChunk, blockPosition.x, blockPosition.y, blockPosition.z);
-        }
         if (blockRef == null || !blockRef.isValid()) {
             return null;
         }

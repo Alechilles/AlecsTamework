@@ -41,7 +41,11 @@ final class CoopCapturePolicyService {
         if (itemStack == null) {
             return null;
         }
-        return itemStack.getFromMetadataOrNull(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING);
+        UUID ownerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING);
+        if (ownerUuid != null) {
+            return ownerUuid;
+        }
+        return itemStack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID, Codec.UUID_STRING);
     }
 
     @Nullable

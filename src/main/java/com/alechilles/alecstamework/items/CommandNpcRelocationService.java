@@ -4,6 +4,8 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.hypixel.hytale.component.AddReason;
+import com.hypixel.hytale.component.Component;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Holder;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
@@ -283,7 +285,7 @@ public final class CommandNpcRelocationService {
                 retryPending(world, npcUuid, pending);
                 return false;
             }
-            NPCEntity npc = store.getComponent(ref, NPCEntity.getComponentType());
+            NPCEntity npc = safeGetComponent(store, ref, NPCEntity.getComponentType());
             if (npc == null) {
                 pending.resetRelocationIssue();
                 retryPending(world, npcUuid, pending);
@@ -307,7 +309,7 @@ public final class CommandNpcRelocationService {
                 pendingByNpc.remove(npcUuid, pending);
                 return false;
             }
-            TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
+            TransformComponent transform = safeGetComponent(store, ref, TransformComponent.getComponentType());
             if (transform == null) {
                 pending.resetRelocationIssue();
                 retryPending(world, npcUuid, pending);
@@ -475,7 +477,7 @@ public final class CommandNpcRelocationService {
             });
             return;
         }
-        NPCEntity sourceNpc = sourceStore.getComponent(sourceRef, NPCEntity.getComponentType());
+        NPCEntity sourceNpc = safeGetComponent(sourceStore, sourceRef, NPCEntity.getComponentType());
         if (sourceNpc == null) {
             logTravelDiagnostic(
                     Level.WARNING,
@@ -544,8 +546,62 @@ public final class CommandNpcRelocationService {
                 );
                 return;
             }
-            Ref<EntityStore> destinationRef = destinationStore.addEntity(drainedHolder, AddReason.SPAWN);
+            Ref<EntityStore> destinationRef = null;
+            try {
+                destinationRef = destinationStore.addEntity(drainedHolder, AddReason.SPAWN);
+            } catch (Exception ex) {
+                if (isEntityPresentInWorld(destinationWorld, npcUuid)) {
+                    pending.markCrossWorldTransferFinished();
+                    knownWorldByNpc.put(npcUuid, destinationWorld);
+                    logTravelDiagnostic(
+                            Level.INFO,
+                            "Cross-world transfer accepted destination entity after add exception for npc="
+                                    + npcUuid
+                                    + ", sourceWorld="
+                                    + sourceWorld.getName()
+                                    + ", destinationWorld="
+                                    + destinationWorld.getName()
+                    );
+                    scheduleTryApply(destinationWorld, npcUuid, INITIAL_APPLY_DELAY_MS);
+                    return;
+                }
+                logTravelDiagnostic(
+                        Level.WARNING,
+                        "Cross-world transfer failed while adding destination entity for npc="
+                                + npcUuid
+                                + ", destinationWorld="
+                                + destinationWorld.getName()
+                                + ", reason="
+                                + ex.getClass().getSimpleName()
+                                + ": "
+                                + ex.getMessage()
+                );
+                restoreSourceEntityAndApplyFailure(
+                        sourceWorld,
+                        sourceStore,
+                        drainedHolder,
+                        destinationWorld,
+                        npcUuid,
+                        pending
+                );
+                return;
+            }
             if (destinationRef == null || !destinationRef.isValid()) {
+                if (isEntityPresentInWorld(destinationWorld, npcUuid)) {
+                    pending.markCrossWorldTransferFinished();
+                    knownWorldByNpc.put(npcUuid, destinationWorld);
+                    logTravelDiagnostic(
+                            Level.INFO,
+                            "Cross-world transfer accepted destination entity with non-valid add ref for npc="
+                                    + npcUuid
+                                    + ", sourceWorld="
+                                    + sourceWorld.getName()
+                                    + ", destinationWorld="
+                                    + destinationWorld.getName()
+                    );
+                    scheduleTryApply(destinationWorld, npcUuid, INITIAL_APPLY_DELAY_MS);
+                    return;
+                }
                 logTravelDiagnostic(
                         Level.WARNING,
                         "Cross-world transfer failed while adding destination entity for npc="
@@ -604,9 +660,27 @@ public final class CommandNpcRelocationService {
         if (sourceWorld == null || sourceStore == null || drainedHolder == null) {
             return;
         }
-        Ref<EntityStore> restored = sourceStore.addEntity(drainedHolder, AddReason.SPAWN);
-        if (npcUuid != null && restored != null && restored.isValid()) {
+        if (npcUuid != null && isEntityPresentInWorld(sourceWorld, npcUuid)) {
             knownWorldByNpc.put(npcUuid, sourceWorld);
+            return;
+        }
+        try {
+            Ref<EntityStore> restored = sourceStore.addEntity(drainedHolder, AddReason.SPAWN);
+            if (npcUuid != null && restored != null && restored.isValid()) {
+                knownWorldByNpc.put(npcUuid, sourceWorld);
+            }
+        } catch (Exception ex) {
+            logTravelDiagnostic(
+                    Level.WARNING,
+                    "Cross-world restore skipped for npc="
+                            + npcUuid
+                            + ", sourceWorld="
+                            + sourceWorld.getName()
+                            + ", reason="
+                            + ex.getClass().getSimpleName()
+                            + ": "
+                            + ex.getMessage()
+            );
         }
     }
 
@@ -956,13 +1030,42 @@ public final class CommandNpcRelocationService {
         if (reference == null || store == null) {
             return null;
         }
-        NPCEntity npc = store.getComponent(reference, NPCEntity.getComponentType());
+        NPCEntity npc = safeGetComponent(store, reference, NPCEntity.getComponentType());
         if (npc == null || npc.getUuid() == null) {
             return null;
         }
-        TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
+        TransformComponent transform = safeGetComponent(store, reference, TransformComponent.getComponentType());
         Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
         return new NpcSnapshot(npc.getUuid(), position);
+    }
+
+    private boolean isEntityPresentInWorld(@Nullable World world, @Nullable UUID npcUuid) {
+        if (world == null || npcUuid == null) {
+            return false;
+        }
+        Ref<EntityStore> ref = world.getEntityRef(npcUuid);
+        if (ref == null || !ref.isValid()) {
+            return false;
+        }
+        Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+        if (store == null) {
+            return false;
+        }
+        return safeGetComponent(store, ref, NPCEntity.getComponentType()) != null;
+    }
+
+    @Nullable
+    private <T extends Component<EntityStore>> T safeGetComponent(@Nullable Store<EntityStore> store,
+                                                                  @Nullable Ref<EntityStore> reference,
+                                                                  @Nullable ComponentType<EntityStore, T> componentType) {
+        if (store == null || reference == null || !reference.isValid() || componentType == null) {
+            return null;
+        }
+        try {
+            return store.getComponent(reference, componentType);
+        } catch (IndexOutOfBoundsException | IllegalArgumentException ex) {
+            return null;
+        }
     }
 
     private static final class NpcSnapshot {

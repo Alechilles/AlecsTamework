@@ -133,6 +133,80 @@ class TwConfigInheritanceContractTest {
     }
 
     @Test
+    void coopLifecycleNestedMergeAndArrayReplacementWork() throws Exception {
+        TwCoopConfig parent = new TwCoopConfig();
+        TwCoopConfig child = new TwCoopConfig();
+
+        TwCoopConfig.LifecycleRules parentLifecycle = new TwCoopConfig.LifecycleRules();
+        TwCoopConfig.LifecycleRules childLifecycle = new TwCoopConfig.LifecycleRules();
+        String[] childAccepted = new String[] { "role.child" };
+        setField(parentLifecycle, "maxResidents", 9);
+        setField(parentLifecycle, "captureWildNPCsInRange", false);
+        setField(parentLifecycle, "acceptedRoleIds", new String[] { "role.parent" });
+        setField(childLifecycle, "maxResidents", 2);
+        setField(childLifecycle, "acceptedRoleIds", childAccepted);
+        setField(parent, "lifecycleRules", parentLifecycle);
+        setField(child, "lifecycleRules", childLifecycle);
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("LifecycleRules", Set.of("AcceptedRoleIds"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("LifecycleRules"), nested);
+
+        assertEquals(9, child.getLifecycleRules().getMaxResidents());
+        assertFalse(child.getLifecycleRules().isCaptureWildNPCsInRange());
+        assertSame(childAccepted, child.getLifecycleRules().getAcceptedRoleIds());
+    }
+
+    @Test
+    void coopProduceNestedMergeAndMapReplacementWork() throws Exception {
+        TwCoopConfig parent = new TwCoopConfig();
+        TwCoopConfig child = new TwCoopConfig();
+
+        TwCoopConfig.ProduceRules parentProduce = new TwCoopConfig.ProduceRules();
+        TwCoopConfig.ProduceRules childProduce = new TwCoopConfig.ProduceRules();
+        Map<String, String> parentDrops = Map.of("Role_A", "Drop_A");
+        Map<String, String> childDrops = Map.of("Role_B", "Drop_B");
+        setField(parentProduce, "dropsByRole", parentDrops);
+        setField(parentProduce, "intervalGameHours", 4);
+        setField(parentProduce, "itemsPerTick", 3);
+        setField(childProduce, "dropsByRole", childDrops);
+        setField(childProduce, "intervalGameHours", 1);
+        setField(childProduce, "itemsPerTick", 1);
+        setField(parent, "produceRules", parentProduce);
+        setField(child, "produceRules", childProduce);
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("ProduceRules", Set.of("DropsByRole"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("ProduceRules"), nested);
+
+        assertSame(childDrops, child.getProduceRules().getDropsByRole());
+        assertEquals(4, child.getProduceRules().getIntervalGameHours());
+        assertEquals(3, child.getProduceRules().getItemsPerTick());
+    }
+
+    @Test
+    void coopIdentityNestedMergeCopiesMissingFieldsOnly() throws Exception {
+        TwCoopConfig parent = new TwCoopConfig();
+        TwCoopConfig child = new TwCoopConfig();
+
+        TwCoopConfig.IdentityRules parentIdentity = new TwCoopConfig.IdentityRules();
+        TwCoopConfig.IdentityRules childIdentity = new TwCoopConfig.IdentityRules();
+        setField(parentIdentity, "requireSnapshotOnRelease", false);
+        setField(parentIdentity, "preserveUUID", true);
+        setField(childIdentity, "requireSnapshotOnRelease", true);
+        setField(childIdentity, "preserveUUID", false);
+        setField(parent, "identityRules", parentIdentity);
+        setField(child, "identityRules", childIdentity);
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("IdentityRules", Set.of("RequireSnapshotOnRelease"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("IdentityRules"), nested);
+
+        assertTrue(child.getIdentityRules().isRequireSnapshotOnRelease());
+        assertTrue(child.getIdentityRules().isPreserveUUID());
+    }
+
+    @Test
     void happinessModifierNestedMergeAndBandsReplacementWork() throws Exception {
         TwHappinessConfig parent = new TwHappinessConfig();
         TwHappinessConfig child = new TwHappinessConfig();

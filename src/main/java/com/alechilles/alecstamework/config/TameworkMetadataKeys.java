@@ -10,10 +10,17 @@ public final class TameworkMetadataKeys {
     public static final String CAPTURE_ROLE_ID = "Tamework.CaptureRoleId";
     public static final String ATTACHMENTS = "Tamework.Attachments";
     public static final String OWNER_UUID = "Tamework.OwnerUuid";
+    public static final String CAPTURE_SOURCE_OWNER_UUID = "Tamework.CaptureSourceOwnerUuid";
     public static final String TAMED = "Tamework.Tamed";
     public static final String HAPPINESS_CONFIG_ID = "Tamework.Happiness.ConfigId";
     public static final String HAPPINESS_VALUE = "Tamework.Happiness.Value";
     public static final String HAPPINESS_LAST_UPDATE_MS = "Tamework.Happiness.LastUpdateMs";
+    public static final String NEEDS_CONFIG_ID = "Tamework.Needs.ConfigId";
+    public static final String NEEDS_HUNGER = "Tamework.Needs.Hunger";
+    public static final String NEEDS_THIRST = "Tamework.Needs.Thirst";
+    public static final String NEEDS_APPLIED_HAPPINESS_PENALTY = "Tamework.Needs.AppliedHappinessPenalty";
+    public static final String NEEDS_LAST_UPDATE_MS = "Tamework.Needs.LastUpdateMs";
+    public static final String NEEDS_LAST_PASSIVE_SWEEP_MS = "Tamework.Needs.LastPassiveSweepMs";
     public static final String BREEDING_CONFIG_ID = "Tamework.Breeding.ConfigId";
     public static final String BREEDING_HAPPINESS = "Tamework.Breeding.Happiness";
     public static final String BREEDING_ENABLED = "Tamework.Breeding.Enabled";

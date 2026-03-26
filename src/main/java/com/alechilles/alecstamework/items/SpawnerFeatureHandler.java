@@ -561,6 +561,18 @@ public final class SpawnerFeatureHandler {
             updated = updated.withMetadata(TameworkMetadataKeys.TAMED, Codec.BOOLEAN, true);
         }
         updated = itemStackMetadataService.applyOwnerMetadata(updated, ownerToStore);
+        if (existingOwner != null) {
+            updated = updated.withMetadata(
+                    TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID,
+                    Codec.UUID_STRING,
+                    existingOwner
+            );
+        } else {
+            updated = itemStackMetadataService.clearMetadataKey(
+                    updated,
+                    TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID
+            );
+        }
         if (captureInfo.npcNameKey() != null && !captureInfo.npcNameKey().isBlank()) {
             updated = updated.withMetadata(TameworkMetadataKeys.CAPTURE_ROLE_ID, Codec.STRING, captureInfo.npcNameKey());
         } else {

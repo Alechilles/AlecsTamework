@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -130,7 +131,7 @@ final class CommandLinkedPanelEntryService {
             if (world != null) {
                 Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
                 if (npcRef != null && npcRef.isValid()) {
-                    NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+                    NPCEntity npc = safeGetComponent(store, npcRef, NPCEntity.getComponentType());
                     if (npc != null) {
                         loaded = true;
                         displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
@@ -140,7 +141,7 @@ final class CommandLinkedPanelEntryService {
                             speciesLabel = resolvedRoleId;
                         }
                         TameworkCommandLinksComponent links =
-                                store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+                                safeGetComponent(store, npcRef, TameworkCommandLinksComponent.getComponentType());
                         if (links != null && links.hasHome()) {
                             hasHome = true;
                         }
@@ -290,7 +291,7 @@ final class CommandLinkedPanelEntryService {
         if (npcRef == null || !npcRef.isValid() || store == null || traitType == null) {
             return LinkedNpcTraitIndicator.EMPTY;
         }
-        TameworkTraitsComponent traits = store.getComponent(npcRef, traitType);
+        TameworkTraitsComponent traits = safeGetComponent(store, npcRef, traitType);
         if (traits == null) {
             return LinkedNpcTraitIndicator.EMPTY;
         }
@@ -349,7 +350,7 @@ final class CommandLinkedPanelEntryService {
         if (statType == null) {
             return null;
         }
-        EntityStatMap statMap = store.getComponent(npcRef, statType);
+        EntityStatMap statMap = safeGetComponent(store, npcRef, statType);
         if (statMap == null) {
             return null;
         }
@@ -417,7 +418,7 @@ final class CommandLinkedPanelEntryService {
         if (npcRef == null || !npcRef.isValid() || store == null || needsType == null) {
             return null;
         }
-        TameworkNeedsComponent needs = store.getComponent(npcRef, needsType);
+        TameworkNeedsComponent needs = safeGetComponent(store, npcRef, needsType);
         if (needs == null) {
             return null;
         }
@@ -612,6 +613,19 @@ final class CommandLinkedPanelEntryService {
         return null;
     }
 
+    private <T extends Component<EntityStore>> T safeGetComponent(Store<EntityStore> store,
+                                                                  Ref<EntityStore> npcRef,
+                                                                  ComponentType<EntityStore, T> componentType) {
+        if (store == null || npcRef == null || !npcRef.isValid() || componentType == null) {
+            return null;
+        }
+        try {
+            return store.getComponent(npcRef, componentType);
+        } catch (IndexOutOfBoundsException | IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
     private String normalizeOptional(String value) {
         if (value == null || value.isBlank()) {
             return null;
@@ -709,7 +723,7 @@ final class CommandLinkedPanelEntryService {
         if (breedingType == null) {
             return null;
         }
-        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
+        TameworkBreedingComponent breeding = safeGetComponent(store, npcRef, breedingType);
         if (breeding == null) {
             return new BreedingCooldownSnapshot(false, false, false, 0L, 0.0);
         }

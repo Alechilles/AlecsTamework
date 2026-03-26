@@ -130,17 +130,9 @@ public final class TameworkNpcBuilderRegistrar {
 
         npcActionsRegistered = true;
         plugin.getLogger().at(Level.INFO).log("Registered Tamework NPC capture actions.");
-        try {
-            if (npcPlugin.getBuilderManager() == null) {
-                plugin.getLogger().at(Level.WARNING).log("NPC builder manager unavailable; skipping validation trigger.");
-                return;
-            }
-            npcPlugin.getBuilderManager().getAllBuilders()
-                    .forEach((index, info) -> npcPlugin.forceValidation(index));
-            plugin.getLogger().at(Level.INFO).log("Triggered NPC validation after registering Tamework builders.");
-        } catch (Exception ex) {
-            plugin.getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to revalidate NPC assets after registering Tamework builders.");
-        }
+        // Avoid forcing early validation before mod asset replacement has completed.
+        // The normal NPC asset build/validation pass will run after pack loading.
+        plugin.getLogger().at(Level.INFO)
+                .log("Skipped early NPC revalidation after registering Tamework builders.");
     }
 }

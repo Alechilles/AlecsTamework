@@ -78,7 +78,11 @@ final class CommandLinkPolicyService {
 
     UUID resolveOwnerId(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         TameworkOwnerComponent owner = store.getComponent(npcRef, TameworkOwnerComponent.getComponentType());
-        return owner != null ? owner.getOwnerId() : null;
+        if (owner != null && owner.getOwnerId() != null) {
+            return owner.getOwnerId();
+        }
+        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+        return links != null ? links.getOwnerId() : null;
     }
 
     String resolveRoleId(NPCEntity npc) {

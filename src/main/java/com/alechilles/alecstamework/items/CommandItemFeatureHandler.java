@@ -28,9 +28,12 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.codec.Codec;
+import com.hypixel.hytale.component.ArchetypeChunk;
+import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -55,6 +58,7 @@ import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
@@ -440,6 +444,11 @@ public final class CommandItemFeatureHandler {
         boolean updateHeldItem = tool.changed;
         if (tool.toolId == null || tool.toolId.isBlank()) {
             return false;
+        }
+        ItemStack reconciled = reconcileStaleLinkedNpcRecords(player, store, config, working, tool.toolId);
+        if (reconciled != working) {
+            working = reconciled;
+            updateHeldItem = true;
         }
 
         if (isOpenSelectionMenuCommand(commandIdOverride)) {
@@ -1224,6 +1233,260 @@ public final class CommandItemFeatureHandler {
         menuMoveService.applyMenuMoveCommand(player, toolId, npcUuid, returnHome, this::resolveCommandLabel);
     }
 
+    private ItemStack reconcileStaleLinkedNpcRecords(Player player,
+                                                     Store<EntityStore> store,
+                                                     TwCommandItemConfig config,
+                                                     ItemStack stack,
+                                                     String toolId) {
+        if (player == null || store == null || stack == null || stack.isEmpty() || toolId == null || toolId.isBlank()) {
+            return stack;
+        }
+        World world = player.getWorld();
+        UUID ownerUuid = player.getUuid();
+        if (world == null || ownerUuid == null) {
+            return stack;
+        }
+        List<LinkedNpcRecord> records = linkedNpcRecordStore.read(stack);
+        if (records.isEmpty()) {
+            return stack;
+        }
+
+        Set<UUID> recordedNpcUuids = new HashSet<>();
+        ArrayList<LinkedNpcRecord> staleRecords = new ArrayList<>();
+        for (LinkedNpcRecord record : records) {
+            if (record == null || record.npcUuid == null) {
+                continue;
+            }
+            recordedNpcUuids.add(record.npcUuid);
+            if (!isLikelyStaleLinkedRecord(record, world, store, toolId, ownerUuid)) {
+                continue;
+            }
+            staleRecords.add(record);
+        }
+        if (staleRecords.isEmpty()) {
+            return stack;
+        }
+
+        ArrayList<LinkedRecordCandidate> loadedCandidates = collectMissingLoadedLinkedCandidates(
+                store,
+                toolId,
+                ownerUuid,
+                recordedNpcUuids,
+                config
+        );
+        if (loadedCandidates.isEmpty()) {
+            return stack;
+        }
+
+        ArrayList<LinkedNpcRecord> updatedRecords = new ArrayList<>(records);
+        Set<UUID> updatedUuids = new HashSet<>(recordedNpcUuids);
+        boolean changed = false;
+        for (LinkedRecordCandidate candidate : loadedCandidates) {
+            if (candidate == null || candidate.npcUuid == null || updatedUuids.contains(candidate.npcUuid)) {
+                continue;
+            }
+            LinkedNpcRecord staleMatch = selectStaleRecordForCandidate(staleRecords, candidate);
+            if (staleMatch == null) {
+                continue;
+            }
+            removeRecordByUuid(updatedRecords, staleMatch.npcUuid);
+            staleRecords.remove(staleMatch);
+            LinkedNpcRecord migrated = candidate.toRecord(staleMatch);
+            updatedRecords.add(migrated);
+            updatedUuids.add(candidate.npcUuid);
+            changed = true;
+            debugCoop(
+                    "linked record auto-remap old=" + staleMatch.npcUuid
+                            + " new=" + candidate.npcUuid
+                            + " tool=" + toolId
+            );
+        }
+
+        return changed ? linkedNpcRecordStore.write(stack, updatedRecords) : stack;
+    }
+
+    private boolean isLikelyStaleLinkedRecord(LinkedNpcRecord record,
+                                              World world,
+                                              Store<EntityStore> store,
+                                              String toolId,
+                                              UUID ownerUuid) {
+        if (record == null || record.npcUuid == null || world == null || store == null) {
+            return false;
+        }
+        if (isKnownUnavailableLinkedRecord(record.npcUuid, toolId, ownerUuid)) {
+            return false;
+        }
+        Ref<EntityStore> entityRef = world.getEntityRef(record.npcUuid);
+        if (entityRef == null || !entityRef.isValid()) {
+            return true;
+        }
+        return safeGetNpc(store, entityRef) == null;
+    }
+
+    private boolean isKnownUnavailableLinkedRecord(UUID npcUuid, String toolId, UUID ownerUuid) {
+        if (npcUuid == null) {
+            return false;
+        }
+        if (deathService != null && deathService.getDeadSnapshotForTool(npcUuid, toolId, ownerUuid) != null) {
+            return true;
+        }
+        if (captureService != null
+                && captureService.getCapturedSnapshotForToolOrOwner(npcUuid, toolId, ownerUuid) != null) {
+            return true;
+        }
+        if (coopService != null && coopService.getCoopSnapshotForToolOrOwner(npcUuid, toolId, ownerUuid) != null) {
+            return true;
+        }
+        return lostService != null && lostService.isLost(npcUuid);
+    }
+
+    private ArrayList<LinkedRecordCandidate> collectMissingLoadedLinkedCandidates(Store<EntityStore> store,
+                                                                                   String toolId,
+                                                                                   UUID ownerUuid,
+                                                                                   Set<UUID> recordedNpcUuids,
+                                                                                   TwCommandItemConfig config) {
+        ArrayList<LinkedRecordCandidate> out = new ArrayList<>();
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
+        if (linksType == null || npcType == null) {
+            return out;
+        }
+        store.forEachChunk(
+                Query.and(linksType, npcType),
+                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
+                    for (int i = 0; i < chunk.size(); i++) {
+                        NPCEntity npc = chunk.getComponent(i, npcType);
+                        TameworkCommandLinksComponent links = chunk.getComponent(i, linksType);
+                        if (npc == null || links == null || npc.getUuid() == null) {
+                            continue;
+                        }
+                        if (!links.containsToolId(toolId)) {
+                            continue;
+                        }
+                        if (links.getOwnerId() != null && !links.getOwnerId().equals(ownerUuid)) {
+                            continue;
+                        }
+                        if (recordedNpcUuids.contains(npc.getUuid())) {
+                            continue;
+                        }
+                        String roleId = resolveRoleIdForCandidate(npc);
+                        if (!linkPolicyService.isRoleAllowed(roleId, config)) {
+                            continue;
+                        }
+                        Ref<EntityStore> npcRef = chunk.getReferenceTo(i);
+                        if (npcRef == null || !npcRef.isValid()) {
+                            continue;
+                        }
+                        TransformComponent transform = chunk.getComponent(i, TransformComponent.getComponentType());
+                        Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
+                        Vector3d homePosition = links.hasHome() ? links.getHomePosition() : null;
+                        String displayName = npcNameResolver.resolveNpcDisplayNameFromComponents(npcRef, store);
+                        String nameKey = npcNameResolver.resolveNpcNameKey(npc);
+                        String cachedCommandState = resolveCachedCommandState(npc);
+                        out.add(new LinkedRecordCandidate(
+                                npc.getUuid(),
+                                position,
+                                homePosition,
+                                displayName,
+                                nameKey,
+                                roleId,
+                                cachedCommandState
+                        ));
+                    }
+                }
+        );
+        return out;
+    }
+
+    private LinkedNpcRecord selectStaleRecordForCandidate(List<LinkedNpcRecord> staleRecords,
+                                                          LinkedRecordCandidate candidate) {
+        if (staleRecords == null || staleRecords.isEmpty() || candidate == null || candidate.npcUuid == null) {
+            return null;
+        }
+        String targetRole = normalizeIdentifier(candidate.cachedRoleId);
+        LinkedNpcRecord roleMatch = null;
+        for (LinkedNpcRecord stale : staleRecords) {
+            if (stale == null || stale.npcUuid == null) {
+                continue;
+            }
+            if (targetRole == null) {
+                continue;
+            }
+            if (!targetRole.equals(normalizeIdentifier(stale.cachedRoleId))) {
+                continue;
+            }
+            roleMatch = stale;
+            break;
+        }
+        if (roleMatch != null) {
+            return roleMatch;
+        }
+        for (LinkedNpcRecord stale : staleRecords) {
+            if (stale != null && stale.npcUuid != null) {
+                return stale;
+            }
+        }
+        return null;
+    }
+
+    private void removeRecordByUuid(List<LinkedNpcRecord> records, UUID npcUuid) {
+        if (records == null || records.isEmpty() || npcUuid == null) {
+            return;
+        }
+        records.removeIf(record -> record != null && npcUuid.equals(record.npcUuid));
+    }
+
+    private NPCEntity safeGetNpc(Store<EntityStore> store, Ref<EntityStore> npcRef) {
+        if (store == null || npcRef == null || !npcRef.isValid()) {
+            return null;
+        }
+        try {
+            return store.getComponent(npcRef, NPCEntity.getComponentType());
+        } catch (IndexOutOfBoundsException | IllegalArgumentException ignored) {
+            return null;
+        }
+    }
+
+    private String resolveRoleIdForCandidate(NPCEntity npc) {
+        if (npc == null) {
+            return null;
+        }
+        String roleId = linkPolicyService.resolveRoleId(npc);
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
+        }
+        return npcNameResolver.resolveNpcRoleId(npc);
+    }
+
+    private String resolveCachedCommandState(NPCEntity npc) {
+        if (npc == null || npc.getRole() == null || npc.getRole().getStateSupport() == null) {
+            return null;
+        }
+        String stateName = npc.getRole().getStateSupport().getStateName();
+        return (stateName != null && !stateName.isBlank()) ? stateName : null;
+    }
+
+    private String normalizeIdentifier(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
+    }
+
+    private void debugCoop(String message) {
+        CoopDebugLogger.log(message);
+    }
+
     private String resolveTravelRoleId(LinkedNpcRecord record) {
         if (record != null && record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
             return record.cachedRoleId;
@@ -1338,6 +1601,53 @@ public final class CommandItemFeatureHandler {
 
     private boolean updateHeldItem(Player player, ItemStack updated) {
         return toolInventoryService.updateHeldItem(player, updated);
+    }
+
+    private record LinkedRecordCandidate(UUID npcUuid,
+                                         Vector3d lastKnownPosition,
+                                         Vector3d homePosition,
+                                         String cachedDisplayName,
+                                         String cachedNameKey,
+                                         String cachedRoleId,
+                                         String cachedCommandState) {
+        private LinkedNpcRecord toRecord(LinkedNpcRecord previous) {
+            if (previous == null) {
+                return new LinkedNpcRecord(
+                        npcUuid,
+                        lastKnownPosition,
+                        homePosition,
+                        cachedDisplayName,
+                        cachedNameKey,
+                        cachedRoleId,
+                        cachedCommandState,
+                        true,
+                        false,
+                        null
+                );
+            }
+            return new LinkedNpcRecord(
+                    npcUuid,
+                    lastKnownPosition != null ? lastKnownPosition : previous.lastKnownPosition,
+                    homePosition != null ? homePosition : previous.homePosition,
+                    firstNonBlank(cachedDisplayName, previous.cachedDisplayName),
+                    firstNonBlank(cachedNameKey, previous.cachedNameKey),
+                    firstNonBlank(cachedRoleId, previous.cachedRoleId),
+                    firstNonBlank(cachedCommandState, previous.cachedCommandState),
+                    previous.active,
+                    previous.breedingEnabled,
+                    previous.groupId
+            );
+        }
+
+        private static String firstNonBlank(String first, String second) {
+            if (first != null && !first.isBlank()) {
+                return first;
+            }
+            if (second != null && !second.isBlank()) {
+                return second;
+            }
+            return null;
+        }
     }
 
 }

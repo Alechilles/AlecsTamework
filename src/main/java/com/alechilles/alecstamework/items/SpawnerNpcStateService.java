@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
@@ -130,12 +131,14 @@ final class SpawnerNpcStateService {
             return null;
         }
         ComponentType<EntityStore, TameworkOwnerComponent> type = TameworkOwnerComponent.getComponentType();
-        if (type == null) {
-            return null;
-        }
         Store<EntityStore> store = world.getEntityStore().getStore();
-        TameworkOwnerComponent owner = store.getComponent(targetRef, type);
-        return owner != null ? owner.getOwnerId() : null;
+        TameworkOwnerComponent owner = type != null ? store.getComponent(targetRef, type) : null;
+        if (owner != null && owner.getOwnerId() != null) {
+            return owner.getOwnerId();
+        }
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        TameworkCommandLinksComponent links = linksType != null ? store.getComponent(targetRef, linksType) : null;
+        return links != null ? links.getOwnerId() : null;
     }
 
     String resolveOwnerNameFromComponent(Ref<EntityStore> targetRef, World world) {

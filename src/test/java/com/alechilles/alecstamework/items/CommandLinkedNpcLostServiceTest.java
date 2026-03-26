@@ -160,6 +160,7 @@ class CommandLinkedNpcLostServiceTest {
                         "server.npcRole.test",
                         "Cooped Companion",
                         "coop/chicken_oak",
+                        -1,
                         System.currentTimeMillis()
                 )
         );

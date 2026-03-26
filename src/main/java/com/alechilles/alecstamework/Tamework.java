@@ -3,6 +3,7 @@ package com.alechilles.alecstamework;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
+import java.nio.file.Path;
 
 import javax.annotation.Nonnull;
 
@@ -16,6 +17,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
+import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -33,6 +35,7 @@ import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
+import com.alechilles.alecstamework.items.CommandCoopManagedWildCaptureSystem;
 import com.alechilles.alecstamework.items.CommandCoopResidentSyncSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
@@ -42,7 +45,11 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandTeleportArrivalRelocationSystem;
 import com.alechilles.alecstamework.items.CoopFeatureHandler;
+import com.alechilles.alecstamework.items.CoopDebugLogger;
+import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
+import com.alechilles.alecstamework.items.FeedTroughWaterChargeDroplistCompatService;
+import com.alechilles.alecstamework.items.components.TameworkFeedTroughWaterChargesComponent;
 import com.alechilles.alecstamework.items.NamingFeatureHandler;
 import com.alechilles.alecstamework.items.OwnerInteractionListener;
 import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
@@ -64,6 +71,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
+import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
@@ -86,6 +94,7 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
+import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
@@ -99,6 +108,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
 import com.hypixel.hytale.server.npc.components.SpawnMarkerReference;
@@ -124,12 +134,14 @@ public class Tamework extends JavaPlugin {
     private CommandItemFeatureHandler commandItemFeatureHandler;
     private CoopFeatureHandler coopFeatureHandler;
     private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
+    private FeedTroughWaterChargeDroplistCompatService feedTroughWaterChargeDroplistCompatService;
     private CommandNpcRelocationService commandNpcRelocationService;
     private CommandLinkedNpcCaptureService commandLinkedNpcCaptureService;
     private CommandLinkedNpcCoopService commandLinkedNpcCoopService;
     private CommandLinkedNpcDeathService commandLinkedNpcDeathService;
     private CommandLinkedNpcLostService commandLinkedNpcLostService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
+    private CoopResidentStateSnapshotService coopResidentStateSnapshotService;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private SpawnerTooltipBridge spawnerTooltipBridge;
@@ -144,6 +156,7 @@ public class Tamework extends JavaPlugin {
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
     private boolean traitAssetsRegistered;
+    private boolean debugAssetsRegistered;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
     private int itemFeatureReloadSuppressionDepth;
@@ -163,12 +176,16 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
+    private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugPromptLogs;
     private volatile boolean debugDespawnLogs;
     private volatile String debugDespawnRoleFilter;
     private volatile boolean debugLagLogs;
+    private volatile boolean debugCoopLogs;
+    private volatile boolean debugBreedingLogs;
+    private volatile boolean debugNeedsConsumeDiagnosticsLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -183,6 +200,7 @@ public class Tamework extends JavaPlugin {
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
         configOverrideManager = new TwConfigOverrideManager(this);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
+        feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
@@ -210,8 +228,11 @@ public class Tamework extends JavaPlugin {
         registerNeedsAssets();
         registerBreedingAssets();
         registerTraitAssets();
+        registerDebugAssets();
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
+        getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
         // Register components that persist owner and tamed state on NPCs.
         ownerComponentType = getEntityStoreRegistry().registerComponent(
@@ -286,6 +307,12 @@ public class Tamework extends JavaPlugin {
                 TameworkLifeStageComponent.CODEC
         );
 
+        feedTroughWaterChargesComponentType = getChunkStoreRegistry().registerComponent(
+                TameworkFeedTroughWaterChargesComponent.class,
+                "TameworkFeedTroughWaterCharges",
+                TameworkFeedTroughWaterChargesComponent.CODEC
+        );
+
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
@@ -333,29 +360,33 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService();
+        Path runtimeDataDirectory = new TameworkDataPathService(getLogger())
+                .resolveAndMigrateDataDirectory(getDataDirectory());
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
-                getDataDirectory().resolve("CommandLinkedNpcCaptures.dat")
+                runtimeDataDirectory.resolve("CommandLinkedNpcCaptures.dat")
         );
         commandLinkedNpcCoopService = new CommandLinkedNpcCoopService(
-                getDataDirectory().resolve("CommandLinkedNpcCoops.dat")
+                runtimeDataDirectory.resolve("CommandLinkedNpcCoops.dat")
         );
         commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
-                getDataDirectory().resolve("CommandLinkedNpcDeaths.dat"),
+                runtimeDataDirectory.resolve("CommandLinkedNpcDeaths.dat"),
                 commandLinkedNpcStateSnapshotService
         );
         commandLinkedNpcLostService = new CommandLinkedNpcLostService(
-                getDataDirectory().resolve("CommandLinkedNpcLost.dat"),
+                runtimeDataDirectory.resolve("CommandLinkedNpcLost.dat"),
                 getLogger(),
                 commandLinkedNpcStateSnapshotService,
                 commandLinkedNpcCaptureService,
                 commandLinkedNpcCoopService
         );
+        coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
         getEntityStoreRegistry().registerSystem(
                 new CommandCoopResidentSyncSystem(
                         commandLinkedNpcCoopService,
                         commandLinkedNpcCaptureService,
                         commandNpcRelocationService,
                         commandLinkedNpcLostService,
+                        coopResidentStateSnapshotService,
                         commandLinksComponentType,
                         CoopResidentComponent.getComponentType(),
                         NPCEntity.getComponentType(),
@@ -368,7 +399,18 @@ public class Tamework extends JavaPlugin {
                         commandNpcRelocationService,
                         commandLinkedNpcDeathService,
                         commandLinkedNpcLostService,
-                        commandLinkedNpcStateSnapshotService
+                        commandLinkedNpcStateSnapshotService,
+                        coopResidentStateSnapshotService,
+                        commandLinkedNpcCoopService
+                )
+        );
+        getChunkStoreRegistry().registerSystem(
+                new CommandCoopManagedWildCaptureSystem(
+                        commandLinkedNpcCoopService,
+                        commandLinkedNpcCaptureService,
+                        commandNpcRelocationService,
+                        commandLinkedNpcLostService,
+                        coopResidentStateSnapshotService
                 )
         );
         getChunkStoreRegistry().registerSystem(new FeedTroughFoodStateSyncSystem());
@@ -439,6 +481,7 @@ public class Tamework extends JavaPlugin {
         if (getCommandRegistry() != null) {
             getCommandRegistry().registerCommand(new TameworkCommandRoot());
         }
+        applyDebugConfigDefaults();
 
         // Global listener to enforce coop capture-intake policies where configured.
         if (coopFeatureHandler != null) {
@@ -670,6 +713,39 @@ public class Tamework extends JavaPlugin {
         return config;
     }
 
+    public void applyDebugConfigDefaults() {
+        TwDebugConfig config = TwDebugConfig.resolveActive();
+        TwDebugConfig.DebugCommandsSection commands = config.getDebugCommands();
+        setDebugHookEnabled(commands.isHook());
+        setDebugSpawnerEnabled(commands.isSpawner());
+        setDebugPromptEnabled(commands.isPrompt());
+        setDebugDespawnEnabled(commands.isDespawn());
+        setDebugLagEnabled(commands.isLag());
+        setDebugCoopEnabled(commands.isCoop());
+        setDebugBreedingEnabled(commands.isBreeding());
+        setDebugNeedsConsumeDiagnosticsEnabled(commands.isNeedsConsumeDiagnostics());
+        String roleFilter = commands.getDespawnRoleFilter();
+        if (roleFilter == null || roleFilter.isBlank()) {
+            clearDebugDespawnRoleFilter();
+        } else {
+            setDebugDespawnRoleFilter(roleFilter);
+        }
+        getLogger().at(Level.INFO).log(
+                "Applied Tamework debug defaults from "
+                        + (config.getId() == null ? "<default>" : config.getId())
+                        + ": hook=" + isDebugHookEnabled()
+                        + ", spawner=" + isDebugSpawnerEnabled()
+                        + ", prompt=" + isDebugPromptEnabled()
+                        + ", despawn=" + isDebugDespawnEnabled()
+                        + ", lag=" + isDebugLagEnabled()
+                        + ", coop=" + isDebugCoopEnabled()
+                        + ", breeding=" + isDebugBreedingEnabled()
+                        + ", needsConsumeDiagnostics=" + isDebugNeedsConsumeDiagnosticsEnabled()
+                        + ", despawnRoleFilter="
+                        + (getDebugDespawnRoleFilter() == null ? "<none>" : getDebugDespawnRoleFilter())
+        );
+    }
+
     public int reloadItemFeatureConfigs() {
         if (itemFeatureRegistry == null) {
             return 0;
@@ -811,7 +887,7 @@ public class Tamework extends JavaPlugin {
         }
         getAssetRegistry().register(
                 HytaleAssetStore.builder(TwCoopConfig.class, new DefaultAssetMap<>())
-                        .setPath("Tamework/Farming/Coops")
+                        .setPath("Tamework/Items/Coops")
                         .setCodec(TwCoopConfig.CODEC)
                         .setKeyFunction(TwCoopConfig::getId)
                         .build()
@@ -885,6 +961,22 @@ public class Tamework extends JavaPlugin {
         traitAssetsRegistered = true;
     }
 
+    private void registerDebugAssets() {
+        if (debugAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwDebugConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Debug")
+                        .setCodec(TwDebugConfig.CODEC)
+                        .setKeyFunction(TwDebugConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwDebugConfig.class, this::onDebugAssetsRemoved);
+        debugAssetsRegistered = true;
+    }
+
     private void onSpawnerAssetsLoaded(
             LoadedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         TwSpawnerConfig.clearInheritanceFallbackCache();
@@ -947,6 +1039,7 @@ public class Tamework extends JavaPlugin {
             return;
         }
         reconcileTranquilizerRecipeVisibility();
+        reconcileFeedTroughWaterChargeDroplistCompat();
     }
 
     private void onCraftingRecipeAssetsRemoved(
@@ -955,6 +1048,17 @@ public class Tamework extends JavaPlugin {
             return;
         }
         reconcileTranquilizerRecipeVisibility();
+        reconcileFeedTroughWaterChargeDroplistCompat();
+    }
+
+    private void onItemDropListAssetsLoaded(
+            LoadedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
+        reconcileFeedTroughWaterChargeDroplistCompat();
+    }
+
+    private void onItemDropListAssetsRemoved(
+            RemovedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
+        reconcileFeedTroughWaterChargeDroplistCompat();
     }
 
     private void reconcileTranquilizerRecipeVisibility() {
@@ -962,6 +1066,13 @@ public class Tamework extends JavaPlugin {
             return;
         }
         tranquilizerRecipeVisibilityService.reconcile();
+    }
+
+    private void reconcileFeedTroughWaterChargeDroplistCompat() {
+        if (feedTroughWaterChargeDroplistCompatService == null) {
+            return;
+        }
+        feedTroughWaterChargeDroplistCompatService.reconcile();
     }
 
     private void onCompanionAssetsLoaded(
@@ -1032,6 +1143,18 @@ public class Tamework extends JavaPlugin {
     private void onTraitAssetsRemoved(
             RemovedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
+    }
+
+    private void onDebugAssetsLoaded(
+            LoadedAssetsEvent<String, TwDebugConfig, DefaultAssetMap<String, TwDebugConfig>> event) {
+        TwDebugConfig.clearCache();
+        applyDebugConfigDefaults();
+    }
+
+    private void onDebugAssetsRemoved(
+            RemovedAssetsEvent<String, TwDebugConfig, DefaultAssetMap<String, TwDebugConfig>> event) {
+        TwDebugConfig.clearCache();
+        applyDebugConfigDefaults();
     }
 
     private int loadSpawnerItemAssets() {
@@ -1169,6 +1292,10 @@ public class Tamework extends JavaPlugin {
         return lifeStageComponentType;
     }
 
+    public ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> getFeedTroughWaterChargesComponentType() {
+        return feedTroughWaterChargesComponentType;
+    }
+
     public boolean isDebugHookEnabled() {
         return debugHookLogs;
     }
@@ -1275,6 +1402,50 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugLagEnabled() {
         debugLagLogs = !debugLagLogs;
         return debugLagLogs;
+    }
+
+    public boolean isDebugCoopEnabled() {
+        return debugCoopLogs;
+    }
+
+    public boolean setDebugCoopEnabled(boolean enabled) {
+        debugCoopLogs = enabled;
+        CoopDebugLogger.setEnabled(enabled);
+        return debugCoopLogs;
+    }
+
+    public boolean toggleDebugCoopEnabled() {
+        debugCoopLogs = !debugCoopLogs;
+        CoopDebugLogger.setEnabled(debugCoopLogs);
+        return debugCoopLogs;
+    }
+
+    public boolean isDebugBreedingEnabled() {
+        return debugBreedingLogs;
+    }
+
+    public boolean setDebugBreedingEnabled(boolean enabled) {
+        debugBreedingLogs = enabled;
+        return debugBreedingLogs;
+    }
+
+    public boolean toggleDebugBreedingEnabled() {
+        debugBreedingLogs = !debugBreedingLogs;
+        return debugBreedingLogs;
+    }
+
+    public boolean isDebugNeedsConsumeDiagnosticsEnabled() {
+        return debugNeedsConsumeDiagnosticsLogs;
+    }
+
+    public boolean setDebugNeedsConsumeDiagnosticsEnabled(boolean enabled) {
+        debugNeedsConsumeDiagnosticsLogs = enabled;
+        return debugNeedsConsumeDiagnosticsLogs;
+    }
+
+    public boolean toggleDebugNeedsConsumeDiagnosticsEnabled() {
+        debugNeedsConsumeDiagnosticsLogs = !debugNeedsConsumeDiagnosticsLogs;
+        return debugNeedsConsumeDiagnosticsLogs;
     }
 
     // Logs a warning if required global config fields are missing.

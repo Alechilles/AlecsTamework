@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwCoopConfig;
+import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
@@ -31,7 +32,8 @@ public enum TwConfigFamily {
     NEEDS("needs", "Needs", "Tamework/Needs", true, true),
     BREEDING("breeding", "Breeding", "Tamework/Breeding", true, true),
     TRAIT("trait", "Traits", "Tamework/Traits", true, true),
-    COOP("coop", "Coops", "Tamework/Farming/Coops", true, true),
+    COOP("coop", "Coops", "Tamework/Items/Coops", true, true),
+    DEBUG("debug", "Debug", "Tamework/Debug", true, true),
     OTHER("other", "Other", "", false, false);
 
     private final String id;
@@ -123,6 +125,7 @@ public enum TwConfigFamily {
             case BREEDING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwBreedingConfig.getAssetStore();
             case TRAIT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTraitConfig.getAssetStore();
             case COOP -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwCoopConfig.getAssetStore();
+            case DEBUG -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwDebugConfig.getAssetStore();
             case OTHER -> null;
         };
     }

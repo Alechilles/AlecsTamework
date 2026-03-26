@@ -10,6 +10,8 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayer
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
@@ -33,25 +35,44 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
             return;
         }
-        TwConfigOverrideManager.ReloadResult reloadResult = plugin.reloadConfigOverrides(world);
-        int loaded = plugin.reloadItemFeatureConfigs();
-        int totalSpawners = plugin.getItemFeatureRegistry() != null
-                ? plugin.getItemFeatureRegistry().snapshot().size()
-                : 0;
-        int totalNaming = plugin.getNameItemRegistry() != null
-                ? plugin.getNameItemRegistry().snapshot().size()
-                : 0;
-        commandContext.sender().sendMessage(Message.raw(
-                "Reloaded Tamework configs. OverridePacks=" + reloadResult.getLoadedPacks()
-                        + " OverrideDirs=" + reloadResult.getLoadedDirectories()
-                        + " ItemLoaded=" + loaded
-                        + " Spawners=" + totalSpawners
-                        + " Naming=" + totalNaming
-        ));
-        if (reloadResult.hasErrors()) {
+        commandContext.sender().sendMessage(Message.raw("Reloading Tamework configs..."));
+        CompletableFuture.supplyAsync(() -> {
+            TwConfigOverrideManager.ReloadResult reloadResult = plugin.reloadConfigOverrides(world);
+            int loaded = plugin.reloadItemFeatureConfigs();
+            int totalSpawners = plugin.getItemFeatureRegistry() != null
+                    ? plugin.getItemFeatureRegistry().snapshot().size()
+                    : 0;
+            int totalNaming = plugin.getNameItemRegistry() != null
+                    ? plugin.getNameItemRegistry().snapshot().size()
+                    : 0;
+            return new ReloadSummary(reloadResult, loaded, totalSpawners, totalNaming);
+        }).whenComplete((summary, throwable) -> world.execute(() -> {
+            if (throwable != null || summary == null) {
+                plugin.getLogger().at(Level.WARNING).withCause(throwable).log("Async /tw reloadconfig failed.");
+                commandContext.sender().sendMessage(Message.raw("Reload failed. See server log for details."));
+                return;
+            }
+            plugin.applyDebugConfigDefaults();
             commandContext.sender().sendMessage(Message.raw(
-                    "Override reload reported " + reloadResult.getErrors().size() + " error(s). See server log."
+                    "Reloaded Tamework configs. OverridePacks=" + summary.reloadResult().getLoadedPacks()
+                            + " OverrideDirs=" + summary.reloadResult().getLoadedDirectories()
+                            + " ItemLoaded=" + summary.itemLoaded()
+                            + " Spawners=" + summary.totalSpawners()
+                            + " Naming=" + summary.totalNaming()
+                            + " DebugDefaults=applied"
             ));
-        }
+            if (summary.reloadResult().hasErrors()) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "Override reload reported " + summary.reloadResult().getErrors().size()
+                                + " error(s). See server log."
+                ));
+            }
+        }));
+    }
+
+    private record ReloadSummary(@Nonnull TwConfigOverrideManager.ReloadResult reloadResult,
+                                 int itemLoaded,
+                                 int totalSpawners,
+                                 int totalNaming) {
     }
 }
