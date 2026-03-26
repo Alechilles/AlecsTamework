@@ -13,6 +13,53 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Invoke-ModtaleJsonRequest {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Method,
+        [Parameter(Mandatory = $true)]
+        [string]$Url,
+        [Parameter(Mandatory = $true)]
+        [string]$ApiKey,
+        [string]$JsonBody = ""
+    )
+
+    $responseTempFile = New-TemporaryFile
+    $curlArgs = @(
+        "-sS",
+        "-X", $Method,
+        $Url,
+        "-H", "X-MODTALE-KEY: $ApiKey",
+        "-H", "Content-Type: application/json"
+    )
+    if (-not [string]::IsNullOrWhiteSpace($JsonBody)) {
+        $curlArgs += @("-d", $JsonBody)
+    }
+
+    $statusCode = & curl.exe @curlArgs -o $responseTempFile -w "%{http_code}"
+    $statusCode = $statusCode.Trim()
+    if ($LASTEXITCODE -ne 0) {
+        Remove-Item -Path $responseTempFile -Force -ErrorAction SilentlyContinue
+        throw "Modtale request failed for $Method $Url (curl exit code $LASTEXITCODE)."
+    }
+
+    $response = ""
+    if (Test-Path -Path $responseTempFile) {
+        $response = Get-Content -Path $responseTempFile -Raw
+        Remove-Item -Path $responseTempFile -Force -ErrorAction SilentlyContinue
+    }
+
+    $statusCodeInt = 0
+    if (-not [int]::TryParse($statusCode, [ref]$statusCodeInt)) {
+        throw "Modtale request returned invalid HTTP status '$statusCode' for $Method $Url."
+    }
+
+    return @{
+        StatusCode = $statusCodeInt
+        ResponseBody = $response
+    }
+}
+
 if (-not (Test-Path -Path $ConfigPath)) {
     throw "Release config '$ConfigPath' was not found."
 }
@@ -133,6 +180,48 @@ if ($statusCodeInt -lt 200 -or $statusCodeInt -ge 300) {
         }
     }
     Remove-Item -Path $knownVersionsTempFile -Force -ErrorAction SilentlyContinue
+
+    $alreadyExists = ($statusCodeInt -eq 400) -and ($responseSummary -match "(?i)already exists")
+    if ($alreadyExists) {
+        $updatePayloadObject = @{
+            $versionFieldName = $normalizedVersion
+            $changelogFieldName = $changelog
+            $channelFieldName = $channel
+            $gameVersionFieldName = @($config.modtale.gameVersions)
+        }
+        $updatePayload = $updatePayloadObject | ConvertTo-Json -Depth 16 -Compress
+
+        $candidateUpdates = @(
+            @{ Method = "PATCH"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/$normalizedVersion" },
+            @{ Method = "PUT"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/$normalizedVersion" },
+            @{ Method = "PATCH"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/by-version/$normalizedVersion" },
+            @{ Method = "PUT"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/by-version/$normalizedVersion" },
+            @{ Method = "PATCH"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions" },
+            @{ Method = "PUT"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions" }
+        )
+
+        $attemptErrors = @()
+        foreach ($candidate in $candidateUpdates) {
+            try {
+                $result = Invoke-ModtaleJsonRequest -Method $candidate.Method -Url $candidate.Url -ApiKey $effectiveApiKey -JsonBody $updatePayload
+                if ($result.StatusCode -ge 200 -and $result.StatusCode -lt 300) {
+                    Write-Host "Modtale version already existed; updated existing version metadata via $($candidate.Method) $($candidate.Url) (HTTP $($result.StatusCode))."
+                    if (-not [string]::IsNullOrWhiteSpace($result.ResponseBody)) {
+                        Write-Output $result.ResponseBody
+                    }
+                    return
+                }
+
+                $bodySummary = if ([string]::IsNullOrWhiteSpace($result.ResponseBody)) { "<empty>" } else { $result.ResponseBody }
+                $attemptErrors += "$($candidate.Method) $($candidate.Url) => HTTP $($result.StatusCode): $bodySummary"
+            } catch {
+                $attemptErrors += "$($candidate.Method) $($candidate.Url) => $($_.Exception.Message)"
+            }
+        }
+
+        $attemptSummary = if ($attemptErrors.Count -eq 0) { "No update endpoints attempted." } else { ($attemptErrors -join " || ") }
+        throw "Modtale upload failed because version '$normalizedVersion' already exists and update fallback did not succeed. Attempts: $attemptSummary"
+    }
 
     throw "Modtale upload failed with HTTP status $statusCode. Response: $responseSummary$knownVersionsSummary"
 }
