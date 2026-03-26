@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
@@ -155,8 +156,8 @@ final class BreedingOffspringService {
                 now,
                 store
         );
-        logCooldownApplied(sourceNpc, sourceCooldown);
-        logCooldownApplied(partnerNpc, partnerCooldown);
+        logCooldownApplied(sourceNpc, parentAOwner, sourceCooldown);
+        logCooldownApplied(partnerNpc, parentBOwner, partnerCooldown);
         moveParentsToPairingPosition(sourceRef, sourceNpc, partner.ref, partnerNpc, store);
 
         OffspringSpawnContext context = new OffspringSpawnContext(
@@ -464,13 +465,16 @@ final class BreedingOffspringService {
         return (double) gameDurationMs / (currentRate * 1000.0);
     }
 
-    private void logCooldownApplied(@Nullable NPCEntity npc, @Nonnull CooldownResolution cooldown) {
+    private void logCooldownApplied(@Nullable NPCEntity npc,
+                                    @Nullable BreedingOffspringProgressionService.OwnerSnapshot owner,
+                                    @Nonnull CooldownResolution cooldown) {
         if (npc == null || npc.getUuid() == null) {
             return;
         }
         logInfo(String.format(
-                "Breeding cooldown applied: npc=%s basis=%s base=%ds random=%ds traitMult=%.3f configured=%.2fs gameMs=%d realApprox=%.2fs rateCurrent=%.4f rateBaseline=%.4f.",
+                "Breeding cooldown applied: npc=%s owner=%s basis=%s base=%ds random=%ds traitMult=%.3f configured=%.2fs gameMs=%d realApprox=%.2fs rateCurrent=%.4f rateBaseline=%.4f.",
                 npc.getUuid(),
+                describeOwner(owner),
                 cooldown.basis(),
                 cooldown.baseSeconds(),
                 cooldown.randomDelaySeconds(),
@@ -481,6 +485,17 @@ final class BreedingOffspringService {
                 cooldown.currentRate(),
                 cooldown.baselineRate()
         ));
+    }
+
+    private static String describeOwner(@Nullable BreedingOffspringProgressionService.OwnerSnapshot owner) {
+        if (owner == null || owner.ownerId() == null) {
+            return "<none>";
+        }
+        String ownerName = owner.ownerName();
+        if (ownerName == null || ownerName.isBlank()) {
+            return owner.ownerId().toString();
+        }
+        return ownerName + " (" + owner.ownerId() + ")";
     }
 
     private void schedulePairingEffects(OffspringSpawnContext context, Store<EntityStore> sourceStore) {
@@ -747,13 +762,15 @@ final class BreedingOffspringService {
                     store
             );
             spawnHeartsParticle(childRef, store);
-            logCooldownApplied(childNpc, childCooldown);
+            BreedingOffspringProgressionService.OwnerSnapshot childOwner = resolveOwnerSnapshot(childRef, store);
+            logCooldownApplied(childNpc, childOwner, childCooldown);
             logInfo(String.format(
-                    "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s.",
+                    "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s offspringOwner=%s.",
                     childNpc.getUuid(),
                     spawnRole.roleId(),
                     context.parentAUuid(),
-                    context.parentBUuid()
+                    context.parentBUuid(),
+                    describeOwner(childOwner)
             ));
             spawnedCount++;
         }
@@ -882,16 +899,21 @@ final class BreedingOffspringService {
             return BreedingOffspringProgressionService.OwnerSnapshot.empty();
         }
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (ownerType == null) {
-            return BreedingOffspringProgressionService.OwnerSnapshot.empty();
+        TameworkOwnerComponent ownerComponent = ownerType != null ? store.getComponent(npcRef, ownerType) : null;
+        UUID ownerId = ownerComponent != null ? ownerComponent.getOwnerId() : null;
+        if (ownerId == null) {
+            ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+            TameworkCommandLinksComponent linksComponent = linksType != null ? store.getComponent(npcRef, linksType) : null;
+            if (linksComponent != null) {
+                ownerId = linksComponent.getOwnerId();
+            }
         }
-        TameworkOwnerComponent ownerComponent = store.getComponent(npcRef, ownerType);
-        if (ownerComponent == null) {
+        if (ownerId == null) {
             return BreedingOffspringProgressionService.OwnerSnapshot.empty();
         }
         return new BreedingOffspringProgressionService.OwnerSnapshot(
-                ownerComponent.getOwnerId(),
-                ownerComponent.getOwnerName()
+                ownerId,
+                ownerComponent != null ? ownerComponent.getOwnerName() : null
         );
     }
 
@@ -951,10 +973,14 @@ final class BreedingOffspringService {
 
     private void logInfo(String message) {
         Tamework instance = Tamework.getInstance();
-        if (instance == null || instance.getLogger() == null || message == null || message.isBlank()) {
+        if (instance == null
+                || instance.getLogger() == null
+                || !instance.isDebugBreedingEnabled()
+                || message == null
+                || message.isBlank()) {
             return;
         }
-        instance.getLogger().at(Level.FINE).log(message);
+        instance.getLogger().at(Level.INFO).log(message);
     }
 
     private record PairingTargets(Vector3d parentATarget, Vector3d parentBTarget) {

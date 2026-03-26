@@ -21,40 +21,64 @@ Group {
   }
 
   Label #FieldNameTop {
-    Anchor: (Top: 3, Left: 8, Width: 360, Height: 24);
+    Anchor: (Top: 3, Left: 8, Width: 304, Height: 24);
     Text: "Field";
     Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
   }
 
   Label #FieldNameNested {
-    Anchor: (Top: 3, Left: 30, Width: 338, Height: 24);
+    Anchor: (Top: 3, Left: 30, Width: 282, Height: 24);
     Text: "Field";
     Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
     Visible: false;
   }
 
   Label #FieldNameDeep {
-    Anchor: (Top: 3, Left: 52, Width: 316, Height: 24);
+    Anchor: (Top: 3, Left: 52, Width: 260, Height: 24);
     Text: "Field";
     Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
     Visible: false;
   }
 
   Label #FieldModeChip {
-    Anchor: (Top: 3, Left: 370, Width: 74, Height: 24);
+    Anchor: (Top: 3, Left: 374, Width: 74, Height: 24);
     Text: "No Local";
     Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Center, VerticalAlignment: Center);
+    Visible: false;
+  }
+
+  Group #FieldStateBadge {
+    Anchor: (Top: 3, Left: 294, Width: 16, Height: 24);
+    LayoutMode: Middle;
+    Visible: false;
+
+    Group {
+      Anchor: (Width: 16, Height: 16);
+      Background: #00000000;
+
+      Group #FieldStateBadgeCheckIcon {
+        Anchor: (Top: 1, Left: 1, Width: 14, Height: 14);
+        Background: "TwConfigAccept.png";
+        Visible: false;
+      }
+
+      Group #FieldStateBadgeCautionIcon {
+        Anchor: (Top: 0, Left: 0, Width: 16, Height: 16);
+        Background: "TwConfigCaution.png";
+        Visible: false;
+      }
+    }
   }
 
   TextButton #FieldSourceChip {
-    Anchor: (Top: 3, Left: 448, Width: 84, Height: 24);
+    Anchor: (Top: 3, Left: 374, Width: 88, Height: 24);
     Text: "Default";
     Style: (...$C.@SmallSecondaryTextButtonStyle);
     TooltipText: "";
   }
 
   Group #FieldValueHost {
-    Anchor: (Top: 3, Left: 536, Right: 60, Height: 24);
+    Anchor: (Top: 3, Left: 466, Right: 6, Height: 24);
 
     CheckBox #FieldCheckBox {
       Anchor: (Top: 1, Left: 0, Width: 22, Height: 22);
@@ -92,7 +116,7 @@ Group {
   }
 
   TextButton #FieldResetButton {
-    Anchor: (Top: 3, Right: 0, Width: 56, Height: 24);
+    Anchor: (Top: 3, Left: 314, Width: 56, Height: 24);
     Text: "Reset";
     Style: (...$C.@SmallSecondaryTextButtonStyle);
     Visible: false;

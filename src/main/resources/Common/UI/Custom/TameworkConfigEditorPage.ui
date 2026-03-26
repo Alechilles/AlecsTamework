@@ -4,30 +4,19 @@ $C.@PageOverlay {
   LayoutMode: Middle;
 
   $C.@DecoratedContainer #TwConfigRoot {
-    Anchor: (Width: 1260, Height: 820);
+    Anchor: (Width: 1040, Height: 680);
 
     #Title {
       $C.@Title #TwConfigTitle {
         @Alignment = Start;
         @Text = "Tamework Config Editor (Global)";
       }
-    }
-
-    #Content {
-      LayoutMode: Top;
-      Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
 
       Group {
-        Anchor: (Height: 26);
-
-        TextButton #TwConfigRefreshButton {
-          Anchor: (Left: 0, Width: 94, Height: 24);
-          Text: "Refresh";
-          Style: (...$C.@SmallSecondaryTextButtonStyle);
-        }
+        Anchor: (Top: 5, Right: 10, Width: 198, Height: 24);
 
         TextButton #TwConfigApplyButton {
-          Anchor: (Right: 106, Width: 94, Height: 24);
+          Anchor: (Left: 0, Width: 94, Height: 24);
           Text: "Apply";
           Style: (...$C.@SmallSecondaryTextButtonStyle);
         }
@@ -38,21 +27,28 @@ $C.@PageOverlay {
           Style: (...$C.@SmallSecondaryTextButtonStyle);
         }
       }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
 
       Label #TwConfigStatusLine {
-        Anchor: (Top: 2, Height: 20);
+        Anchor: (Top: 0, Height: 0);
         Text: "";
-        Style: (FontSize: 12, TextColor: #9fd1ff, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        Style: (FontSize: 11, TextColor: #c6d7ea, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        Visible: false;
       }
 
       Label #TwConfigWarningLine {
-        Anchor: (Top: 1, Height: 20);
+        Anchor: (Top: 0, Height: 0);
         Text: "";
         Style: (FontSize: 12, TextColor: #ffcf84, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+        Visible: false;
       }
 
       Group {
-        Anchor: (Top: 4);
+        Anchor: (Top: 2);
         FlexWeight: 1;
         LayoutMode: Left;
 
@@ -107,13 +103,24 @@ $C.@PageOverlay {
         Group { Anchor: (Width: 8); }
 
         Group #TwConfigRightPane {
-          Anchor: (Left: 0, Right: 0, Top: 0, Bottom: 0);
+          Anchor: (Top: 0, Bottom: 0);
+          FlexWeight: 1;
           LayoutMode: Top;
 
-          Label #TwConfigSelectedAssetTitle {
-            Anchor: (Height: 22);
-            Text: "";
-            Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+          Group {
+            Anchor: (Height: 24);
+
+            Label #TwConfigSelectedAssetTitle {
+              Anchor: (Left: 0, Right: 102, Height: 24);
+              Text: "";
+              Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            TextButton #TwConfigRefreshButton {
+              Anchor: (Right: 0, Width: 94, Height: 24);
+              Text: "Refresh";
+              Style: (...$C.@SmallSecondaryTextButtonStyle);
+            }
           }
 
           Label #TwConfigSelectedAssetMeta {
@@ -122,10 +129,20 @@ $C.@PageOverlay {
             Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
           }
 
-          Label #TwConfigSelectedAssetChain {
+          Group {
             Anchor: (Top: 1, Height: 16);
-            Text: "";
-            Style: (FontSize: 11, TextColor: #9fb4cc, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+
+            Label #TwConfigSelectedAssetChain {
+              Anchor: (Left: 0, Right: 330, Height: 16);
+              Text: "";
+              Style: (FontSize: 11, TextColor: #9fb4cc, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: false);
+            }
+
+            Label #TwConfigInlineNotice {
+              Anchor: (Right: 0, Width: 320, Height: 16);
+              Text: "";
+              Style: (FontSize: 11, TextColor: #ffcf84, HorizontalAlignment: End, VerticalAlignment: Center, Wrap: false);
+            }
           }
 
           TextField #TwConfigPropertyFilterInput {
@@ -138,6 +155,39 @@ $C.@PageOverlay {
             Padding: (Horizontal: 8);
           }
 
+          Group #TwConfigPropertyHeaderRow {
+            Anchor: (Top: 4, Height: 24);
+            Background: #1a2b40;
+
+            Group {
+              Anchor: (Top: 0, Left: 4, Right: 4, Bottom: 0);
+
+              Label #TwConfigHeaderProperty {
+                Anchor: (Left: 8, Width: 306, Height: 24);
+                Text: "Property";
+                Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Start, VerticalAlignment: Center, RenderUppercase: true);
+              }
+
+              Label #TwConfigHeaderReset {
+                Anchor: (Left: 314, Width: 56, Height: 24);
+                Text: "Reset";
+                Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Center, VerticalAlignment: Center, RenderUppercase: true);
+              }
+
+              Label #TwConfigHeaderSource {
+                Anchor: (Left: 374, Width: 88, Height: 24);
+                Text: "Source";
+                Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Center, VerticalAlignment: Center, RenderUppercase: true);
+              }
+
+              Label #TwConfigHeaderValue {
+                Anchor: (Left: 466, Right: 6, Height: 24);
+                Text: "Value";
+                Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Start, VerticalAlignment: Center, RenderUppercase: true);
+              }
+            }
+          }
+
           Group {
             Anchor: (Top: 4);
             FlexWeight: 1;
@@ -148,11 +198,11 @@ $C.@PageOverlay {
               LayoutMode: TopScrolling;
               KeepScrollPosition: true;
               ScrollbarStyle: $C.@DefaultScrollbarStyle;
-              Padding: (Left: 4, Right: 4, Top: 4, Bottom: 4);
+              Padding: (Left: 4, Right: 0, Top: 4, Bottom: 4);
 
               Group #TwConfigPropertyRows {
                 LayoutMode: Top;
-                Anchor: (Bottom: 0);
+                Anchor: (Left: 0, Right: 0, Bottom: 0);
               }
             }
 

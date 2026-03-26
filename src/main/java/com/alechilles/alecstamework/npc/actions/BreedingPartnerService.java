@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
@@ -68,6 +69,7 @@ final class BreedingPartnerService {
         Vector3d sourcePos = sourceTransform.getPosition();
         ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
 
         store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
             int size = chunk.size();
@@ -106,9 +108,13 @@ final class BreedingPartnerService {
                 if (requireWander && !isInWanderState(candidateNpc.getRole())) {
                     continue;
                 }
-                UUID candidateOwnerId = ownerType != null
-                        ? resolveOwnerId(chunk.getComponent(i, ownerType))
+                TameworkOwnerComponent candidateOwner = ownerType != null
+                        ? chunk.getComponent(i, ownerType)
                         : null;
+                TameworkCommandLinksComponent candidateLinks = linksType != null
+                        ? chunk.getComponent(i, linksType)
+                        : null;
+                UUID candidateOwnerId = resolveOwnerId(candidateOwner, candidateLinks);
                 if (requireSameOwner && !sameOwner(sourceOwnerId, candidateOwnerId)) {
                     continue;
                 }
@@ -153,14 +159,18 @@ final class BreedingPartnerService {
             return null;
         }
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (ownerType == null) {
-            return null;
-        }
-        return resolveOwnerId(store.getComponent(npcRef, ownerType));
+        TameworkOwnerComponent owner = ownerType != null ? store.getComponent(npcRef, ownerType) : null;
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        TameworkCommandLinksComponent links = linksType != null ? store.getComponent(npcRef, linksType) : null;
+        return resolveOwnerId(owner, links);
     }
 
-    private static UUID resolveOwnerId(@Nullable TameworkOwnerComponent owner) {
-        return owner != null ? owner.getOwnerId() : null;
+    private static UUID resolveOwnerId(@Nullable TameworkOwnerComponent owner,
+                                       @Nullable TameworkCommandLinksComponent links) {
+        if (owner != null && owner.getOwnerId() != null) {
+            return owner.getOwnerId();
+        }
+        return links != null ? links.getOwnerId() : null;
     }
 
     private static double sanitizeRadius(double radius) {

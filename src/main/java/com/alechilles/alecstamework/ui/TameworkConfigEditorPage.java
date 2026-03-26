@@ -26,6 +26,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -37,6 +38,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -101,6 +104,7 @@ public final class TameworkConfigEditorPage
     private String statusLine = "";
     private String warningLine = "";
     private boolean applyConfirmVisible = false;
+    private boolean applyInProgress = false;
 
     public TameworkConfigEditorPage(@Nonnull PlayerRef playerRef,
                                     @Nonnull Tamework plugin,
@@ -159,8 +163,11 @@ public final class TameworkConfigEditorPage
                     refreshUi();
                 }
                 case A_SET_VALUE -> {
+                    FieldDef field = FIELDS.get(trim(data.path));
                     stageValue(data.path, data.value);
-                    refreshUi();
+                    if (shouldRefreshAfterSetValue(field)) {
+                        refreshUi();
+                    }
                 }
                 default -> {
                 }
@@ -199,6 +206,11 @@ public final class TameworkConfigEditorPage
     }
 
     private void onApplyRequest() {
+        if (applyInProgress) {
+            warningLine = "Apply already in progress.";
+            statusLine = "";
+            return;
+        }
         applyConfirmVisible = false;
         String validationError = firstValidationError();
         if (validationError != null) {
@@ -212,6 +224,11 @@ public final class TameworkConfigEditorPage
     }
 
     private void onApplyConfirm() {
+        if (applyInProgress) {
+            warningLine = "Apply already in progress.";
+            statusLine = "";
+            return;
+        }
         applyConfirmVisible = false;
         String validationError = firstValidationError();
         if (validationError != null) {
@@ -220,19 +237,40 @@ public final class TameworkConfigEditorPage
             return;
         }
 
+        TwConfigSnapshot snapshotAtSubmit = snapshot;
+        TwConfigAssetDescriptor selectedAtSubmit = selectedDescriptor();
         LinkedHashMap<TwConfigAssetDescriptor, JsonObject> drafted = new LinkedHashMap<>();
         for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
             drafted.put(descriptor, TwConfigJsonUtil.copyObject(draftByKey.get(descriptor.descriptorKey())));
         }
-        TwConfigOverrideManager.ApplyResult result = overrideManager.applyDraft(world, snapshot, drafted, selectedDescriptor());
-        if (result.isSuccess()) {
-            reloadSnapshot(false);
-            statusLine = result.getMessage();
-            warningLine = "";
-            return;
-        }
-        statusLine = "";
-        warningLine = result.getMessage();
+
+        applyInProgress = true;
+        statusLine = "Applying config overrides...";
+        warningLine = "";
+        refreshUi();
+
+        CompletableFuture
+                .supplyAsync(() -> overrideManager.applyDraft(world, snapshotAtSubmit, drafted, selectedAtSubmit))
+                .whenComplete((result, throwable) -> world.execute(() -> {
+                    applyInProgress = false;
+                    if (throwable != null || result == null) {
+                        plugin.getLogger().at(Level.WARNING).withCause(throwable).log("TwConfig async apply failed.");
+                        statusLine = "";
+                        warningLine = "Apply failed. See server log for details.";
+                        refreshUi();
+                        return;
+                    }
+                    if (result.isSuccess()) {
+                        reloadSnapshot(false);
+                        statusLine = result.getMessage();
+                        warningLine = "";
+                        refreshUi();
+                        return;
+                    }
+                    statusLine = "";
+                    warningLine = result.getMessage();
+                    refreshUi();
+                }));
     }
 
     private void reloadSnapshot(boolean clearStatus) {
@@ -311,8 +349,11 @@ public final class TameworkConfigEditorPage
         commandBuilder.set("#TwConfigAssetDropdown.Entries", assetDropdownEntries());
         commandBuilder.set("#TwConfigAssetDropdown.Value", selectedDescriptorKey == null ? "" : selectedDescriptorKey);
         commandBuilder.set("#TwConfigAssetCount.Text", "Global assets: " + filteredDescriptors().size());
-        commandBuilder.set("#TwConfigStatusLine.Text", statusLine);
-        commandBuilder.set("#TwConfigWarningLine.Text", resolvedWarningLine());
+        String resolvedWarning = resolvedWarningLine();
+        String inlineNotice = resolvedWarning.isBlank() ? statusLine : resolvedWarning;
+        commandBuilder.set("#TwConfigStatusLine.Text", inlineNotice);
+        commandBuilder.set("#TwConfigInlineNotice.Text", inlineNotice);
+        commandBuilder.set("#TwConfigWarningLine.Text", "");
         commandBuilder.set("#TwConfigApplyConfirmOverlay.Visible", applyConfirmVisible);
         commandBuilder.set("#TwConfigApplyConfirmCount.Text", "Pending draft files: " + pendingDraftFileCount());
 
@@ -329,7 +370,7 @@ public final class TameworkConfigEditorPage
         commandBuilder.set("#TwConfigSelectedAssetTitle.Text", selected.assetId());
         commandBuilder.set("#TwConfigSelectedAssetMeta.Text", "TwGlobalConfig | Pack: " + selected.sourcePackKey());
         commandBuilder.set("#TwConfigSelectedAssetChain.Text", inheritanceChainText(selected));
-        commandBuilder.set("#TwConfigOverridePath.Text", overrideManager.resolveOverridePath(world, selected).toString());
+        commandBuilder.set("#TwConfigOverridePath.Text", shortenedPathForUi(overrideManager.resolveOverridePath(world, selected)));
         commandBuilder.set("#TwConfigPropertyEmptyState.Visible", false);
         renderRows(selected, commandBuilder, eventBuilder);
     }
@@ -341,6 +382,8 @@ public final class TameworkConfigEditorPage
         String descriptorKey = descriptor.descriptorKey();
         JsonObject effective = effectiveJson(descriptorKey, new HashSet<>());
         JsonObject merged = mergedCurrentJson(descriptorKey);
+        JsonObject draft = draft(descriptorKey);
+        JsonObject disk = disk(descriptorKey);
         List<RowDef> visibleRows = visibleRows(descriptor);
 
         for (int i = 0; i < visibleRows.size(); i++) {
@@ -353,6 +396,9 @@ public final class TameworkConfigEditorPage
                 int depthLevel = depthBucket(section.depth);
                 String toggleText = section.label;
                 String countText = formatFieldCount(sectionFieldCount(section.id));
+                boolean hasStagedEdits = sectionHasStagedOverrides(section.id, draft, disk);
+                boolean hasAppliedLocal = !hasStagedEdits && sectionHasAppliedOverrides(section.id, disk);
+                boolean showBadge = hasStagedEdits || hasAppliedLocal;
 
                 commandBuilder.set(root + " #SectionRowBackground.Background", sectionBackgroundColor(section.depth));
                 commandBuilder.set(root + " #SectionGuideDepth1.Visible", depthLevel >= 1);
@@ -366,6 +412,27 @@ public final class TameworkConfigEditorPage
                 commandBuilder.set(root + " #SectionToggleTopCount.Text", countText);
                 commandBuilder.set(root + " #SectionToggleNestedCount.Text", countText);
                 commandBuilder.set(root + " #SectionToggleDeepCount.Text", countText);
+                commandBuilder.set(root + " #SectionToggleTopDirtyBadge.Visible", false);
+                commandBuilder.set(root + " #SectionToggleNestedDirtyBadge.Visible", false);
+                commandBuilder.set(root + " #SectionToggleDeepDirtyBadge.Visible", false);
+                commandBuilder.set(root + " #SectionToggleTopDirtyBadgeText.Visible", false);
+                commandBuilder.set(root + " #SectionToggleNestedDirtyBadgeText.Visible", false);
+                commandBuilder.set(root + " #SectionToggleDeepDirtyBadgeText.Visible", false);
+                commandBuilder.set(root + " #SectionToggleTopDirtyBadgeCautionIcon.Visible", hasStagedEdits);
+                commandBuilder.set(root + " #SectionToggleNestedDirtyBadgeCautionIcon.Visible", hasStagedEdits);
+                commandBuilder.set(root + " #SectionToggleDeepDirtyBadgeCautionIcon.Visible", hasStagedEdits);
+                commandBuilder.set(root + " #SectionToggleTopDirtyBadgeCheckIcon.Visible", hasAppliedLocal);
+                commandBuilder.set(root + " #SectionToggleNestedDirtyBadgeCheckIcon.Visible", hasAppliedLocal);
+                commandBuilder.set(root + " #SectionToggleDeepDirtyBadgeCheckIcon.Visible", hasAppliedLocal);
+                commandBuilder.set(root + " #SectionToggleTopRightBadge.Visible", showBadge);
+                commandBuilder.set(root + " #SectionToggleNestedRightBadge.Visible", showBadge);
+                commandBuilder.set(root + " #SectionToggleDeepRightBadge.Visible", showBadge);
+                commandBuilder.set(root + " #SectionToggleTopRightBadgeCautionIcon.Visible", hasStagedEdits);
+                commandBuilder.set(root + " #SectionToggleNestedRightBadgeCautionIcon.Visible", hasStagedEdits);
+                commandBuilder.set(root + " #SectionToggleDeepRightBadgeCautionIcon.Visible", hasStagedEdits);
+                commandBuilder.set(root + " #SectionToggleTopRightBadgeCheckIcon.Visible", hasAppliedLocal);
+                commandBuilder.set(root + " #SectionToggleNestedRightBadgeCheckIcon.Visible", hasAppliedLocal);
+                commandBuilder.set(root + " #SectionToggleDeepRightBadgeCheckIcon.Visible", hasAppliedLocal);
                 commandBuilder.set(root + " #SectionToggleTopExpandedIcon.Visible", !collapsed);
                 commandBuilder.set(root + " #SectionToggleTopCollapsedIcon.Visible", collapsed);
                 commandBuilder.set(root + " #SectionToggleNestedExpandedIcon.Visible", !collapsed);
@@ -396,8 +463,12 @@ public final class TameworkConfigEditorPage
 
             FieldDef field = row.field;
             commandBuilder.append("#TwConfigPropertyRows", UI_FIELD_ROW);
-            JsonObject draft = draft(descriptorKey);
             boolean overridden = TwConfigJsonUtil.hasPath(draft, field.path);
+            JsonElement draftValue = TwConfigJsonUtil.getPath(draft, field.path);
+            JsonElement diskValue = TwConfigJsonUtil.getPath(disk, field.path);
+            boolean fieldHasStagedEdits = !jsonElementsEqual(draftValue, diskValue);
+            boolean fieldHasAppliedLocal = !fieldHasStagedEdits && TwConfigJsonUtil.hasPath(disk, field.path);
+            boolean fieldShowBadge = fieldHasStagedEdits || fieldHasAppliedLocal;
             JsonElement value = fieldValue(field, draft, effective, merged, descriptor);
             String textValue = fieldDisplayValue(field, value, descriptorKey);
             boolean hasBufferedInput = inputs(descriptorKey).containsKey(field.path);
@@ -415,10 +486,12 @@ public final class TameworkConfigEditorPage
             commandBuilder.set(root + " #FieldNameTop.Text", fieldLabel);
             commandBuilder.set(root + " #FieldNameNested.Text", fieldLabel);
             commandBuilder.set(root + " #FieldNameDeep.Text", fieldLabel);
-            commandBuilder.set(root + " #FieldModeChip.Text", field.handoffOnly ? "Read-only" : (overridden ? "Local" : "No Local"));
             commandBuilder.set(root + " #FieldSourceChip.Text", sourceBadge.label());
             commandBuilder.set(root + " #FieldSourceChip.TooltipText", sourceBadge.tooltip());
             commandBuilder.set(root + " #FieldSourceChip.Visible", true);
+            commandBuilder.set(root + " #FieldStateBadge.Visible", fieldShowBadge);
+            commandBuilder.set(root + " #FieldStateBadgeCautionIcon.Visible", fieldHasStagedEdits);
+            commandBuilder.set(root + " #FieldStateBadgeCheckIcon.Visible", fieldHasAppliedLocal);
             commandBuilder.set(root + " #FieldResetButton.Visible", !field.handoffOnly && overridden);
             commandBuilder.set(host + " #FieldCheckBox.Visible", field.kind == FieldKind.BOOLEAN && !field.handoffOnly);
             commandBuilder.set(host + " #FieldTextInput.Visible", (field.kind == FieldKind.STRING || field.kind == FieldKind.INTEGER || field.kind == FieldKind.DOUBLE) && !field.handoffOnly);
@@ -440,6 +513,12 @@ public final class TameworkConfigEditorPage
                 commandBuilder.set(host + " #FieldTextInput.PlaceholderText", placeholder);
                 eventBuilder.addEventBinding(
                         CustomUIEventBindingType.ValueChanged,
+                        host + " #FieldTextInput",
+                        EventData.of(K_ACTION, A_SET_VALUE).append(K_PATH, field.path).append(K_FIELD_VALUE, root + " #FieldTextInput.Value"),
+                        false
+                );
+                eventBuilder.addEventBinding(
+                        CustomUIEventBindingType.Validating,
                         host + " #FieldTextInput",
                         EventData.of(K_ACTION, A_SET_VALUE).append(K_PATH, field.path).append(K_FIELD_VALUE, root + " #FieldTextInput.Value"),
                         false
@@ -630,6 +709,13 @@ public final class TameworkConfigEditorPage
         }
     }
 
+    private static boolean shouldRefreshAfterSetValue(@Nullable FieldDef field) {
+        if (field == null) {
+            return true;
+        }
+        return field.kind == FieldKind.BOOLEAN || field.kind == FieldKind.OPTION;
+    }
+
     @Nullable
     private JsonElement parseInput(@Nonnull FieldDef field, @Nonnull String raw, @Nonnull List<String> options) {
         String trimmed = raw.trim();
@@ -733,19 +819,19 @@ public final class TameworkConfigEditorPage
     @Nonnull
     private List<String> optionsFor(@Nonnull FieldDef field, @Nonnull TwConfigAssetDescriptor descriptor) {
         if ("Parent".equalsIgnoreCase(field.path)) {
-            ArrayList<String> options = new ArrayList<>();
-            options.add(PARENT_NONE_VALUE);
+            LinkedHashSet<String> parentAssetIds = new LinkedHashSet<>();
             for (TwConfigAssetDescriptor candidate : descriptorByKey.values()) {
                 if (candidate.assetId().equalsIgnoreCase(descriptor.assetId())) {
                     continue;
                 }
-                if (!candidate.sourcePackKey().equalsIgnoreCase(descriptor.sourcePackKey())) {
-                    continue;
-                }
-                options.add(candidate.assetId());
+                parentAssetIds.add(candidate.assetId());
             }
-            options.sort(String.CASE_INSENSITIVE_ORDER);
-            return options;
+            ArrayList<String> sorted = new ArrayList<>(parentAssetIds);
+            sorted.sort(String.CASE_INSENSITIVE_ORDER);
+            ArrayList<String> options = new ArrayList<>(sorted.size() + 1);
+            options.add(PARENT_NONE_VALUE);
+            options.addAll(sorted);
+            return List.copyOf(options);
         }
         return field.options;
     }
@@ -847,23 +933,23 @@ public final class TameworkConfigEditorPage
             return new SourceBadge("Handoff", "Complex field (path-only handoff): " + field.path);
         }
         if (TwConfigJsonUtil.hasPath(draft, field.path)) {
-            return new SourceBadge("This", "Local override in " + descriptor.assetId() + ".");
+            return new SourceBadge("Local", "Local override in " + descriptor.assetId() + ".");
         }
         if ("Parent".equalsIgnoreCase(field.path)) {
             JsonElement explicitParent = TwConfigJsonUtil.getPath(merged, "Parent");
             if (explicitParent != null && explicitParent.isJsonPrimitive()) {
                 String value = explicitParent.getAsString();
                 if (value != null && !value.isBlank()) {
-                    return new SourceBadge("This", "Parent link defined on this asset: " + value.trim());
+                    return new SourceBadge("Asset", "Parent link defined on this asset: " + value.trim());
                 }
             }
             if (descriptor.parentAssetId() != null && !descriptor.parentAssetId().isBlank()) {
-                return new SourceBadge("This", "Parent link from asset metadata: " + descriptor.parentAssetId().trim());
+                return new SourceBadge("Asset", "Parent link from asset metadata: " + descriptor.parentAssetId().trim());
             }
             return new SourceBadge("Default", "No parent configured.");
         }
         if (TwConfigJsonUtil.hasPath(merged, field.path)) {
-            return new SourceBadge("This", "Defined on this asset: " + descriptor.assetId() + ".");
+            return new SourceBadge("Asset", "Defined on this asset: " + descriptor.assetId() + ".");
         }
 
         HashSet<String> visited = new HashSet<>();
@@ -1029,6 +1115,11 @@ public final class TameworkConfigEditorPage
     }
 
     @Nonnull
+    private JsonObject disk(@Nonnull String descriptorKey) {
+        return diskByKey.computeIfAbsent(descriptorKey, key -> new JsonObject());
+    }
+
+    @Nonnull
     private LinkedHashMap<String, String> inputs(@Nonnull String descriptorKey) {
         return inputByDescriptor.computeIfAbsent(descriptorKey, key -> new LinkedHashMap<>());
     }
@@ -1166,6 +1257,48 @@ public final class TameworkConfigEditorPage
         return count;
     }
 
+    private boolean sectionHasAppliedOverrides(@Nonnull String sectionId, @Nonnull JsonObject disk) {
+        for (FieldDef field : FIELDS.values()) {
+            if (field.sectionId == null) {
+                continue;
+            }
+            if (!isSectionOrAncestor(field.sectionId, sectionId)) {
+                continue;
+            }
+            if (TwConfigJsonUtil.hasPath(disk, field.path)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean sectionHasStagedOverrides(@Nonnull String sectionId, @Nonnull JsonObject draft, @Nonnull JsonObject disk) {
+        for (FieldDef field : FIELDS.values()) {
+            if (field.sectionId == null) {
+                continue;
+            }
+            if (!isSectionOrAncestor(field.sectionId, sectionId)) {
+                continue;
+            }
+            JsonElement draftValue = TwConfigJsonUtil.getPath(draft, field.path);
+            JsonElement diskValue = TwConfigJsonUtil.getPath(disk, field.path);
+            if (!jsonElementsEqual(draftValue, diskValue)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean jsonElementsEqual(@Nullable JsonElement a, @Nullable JsonElement b) {
+        if (a == null && b == null) {
+            return true;
+        }
+        if (a == null || b == null) {
+            return false;
+        }
+        return a.equals(b);
+    }
+
     @Nonnull
     private static String formatFieldCount(int count) {
         int clamped = Math.max(0, count);
@@ -1256,6 +1389,73 @@ public final class TameworkConfigEditorPage
             case 1 -> "#274056";
             default -> "#2c4860";
         };
+    }
+
+    @Nonnull
+    private static String shortenedPathForUi(@Nullable Path path) {
+        if (path == null) {
+            return "";
+        }
+        Path normalized = path.toAbsolutePath().normalize();
+        ArrayList<String> segments = new ArrayList<>();
+        for (Path segment : normalized) {
+            if (segment == null) {
+                continue;
+            }
+            String part = segment.toString();
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            segments.add(part);
+        }
+        if (segments.isEmpty()) {
+            return normalized.toString();
+        }
+
+        int startIndex = -1;
+        for (int i = 0; i < segments.size(); i++) {
+            if ("server".equalsIgnoreCase(segments.get(i))) {
+                startIndex = i;
+                break;
+            }
+        }
+        if (startIndex < 0) {
+            for (int i = 0; i < segments.size(); i++) {
+                if ("universe".equalsIgnoreCase(segments.get(i))) {
+                    startIndex = i;
+                    break;
+                }
+            }
+        }
+        if (startIndex < 0) {
+            startIndex = Math.max(0, segments.size() - 6);
+        }
+
+        StringBuilder out = new StringBuilder();
+        if (startIndex > 0) {
+            out.append("...\\");
+        }
+        for (int i = startIndex; i < segments.size(); i++) {
+            if (i > startIndex) {
+                out.append("\\");
+            }
+            out.append(normalizePathSegmentForUi(segments.get(i)));
+        }
+        return out.toString();
+    }
+
+    @Nonnull
+    private static String normalizePathSegmentForUi(@Nonnull String segment) {
+        if ("server".equalsIgnoreCase(segment)) {
+            return "Server";
+        }
+        if ("universe".equalsIgnoreCase(segment)) {
+            return "Universe";
+        }
+        if ("tamework".equalsIgnoreCase(segment)) {
+            return "Tamework";
+        }
+        return segment;
     }
 
     private void refreshUi() {

@@ -33,5 +33,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugPromptCommand());
         addSubCommand(new TameworkDebugDespawnCommand());
         addSubCommand(new TameworkDebugLagCommand());
+        addSubCommand(new TameworkDebugCoopCommand());
+        addSubCommand(new TameworkDebugNeedsConsumeCommand());
     }
 }

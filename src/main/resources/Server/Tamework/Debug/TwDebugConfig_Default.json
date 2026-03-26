@@ -1,0 +1,15 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "DebugCommands": {
+    "Hook": false,
+    "Spawner": false,
+    "Prompt": false,
+    "Despawn": false,
+    "DespawnRoleFilter": "",
+    "Lag": false,
+    "Coop": false,
+    "Breeding": false,
+    "NeedsConsume": false
+  }
+}

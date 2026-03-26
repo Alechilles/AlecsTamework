@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.Tamework;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -57,7 +58,7 @@ final class NeedsConsumeDiagnostics {
                                 int consumedItems,
                                 double hungerGain,
                                 double thirstGain) {
-        if (!diagnostics || !LOGGER.isLoggable(level.javaLevel)) {
+        if (!diagnostics || !isRuntimeEnabled() || !LOGGER.isLoggable(level.javaLevel)) {
             return;
         }
         LOGGER.log(level.javaLevel, String.format(
@@ -70,5 +71,10 @@ final class NeedsConsumeDiagnostics {
                 thirstGain,
                 reason
         ));
+    }
+
+    private static boolean isRuntimeEnabled() {
+        Tamework instance = Tamework.getInstance();
+        return instance != null && instance.isDebugNeedsConsumeDiagnosticsEnabled();
     }
 }

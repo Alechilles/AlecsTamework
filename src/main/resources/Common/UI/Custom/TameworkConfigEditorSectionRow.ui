@@ -21,7 +21,7 @@ Group {
   }
 
   Button #SectionToggleTopButton {
-    Anchor: (Top: 2, Left: 4, Right: 4, Height: 24);
+    Anchor: (Top: 2, Left: 4, Right: 0, Height: 24);
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
@@ -61,20 +61,82 @@ Group {
       );
     }
 
-    Label #SectionToggleTopCount {
-      Anchor: (Width: 88, Height: 24);
-      Text: "0 fields";
-      Style: (
-        FontSize: 11,
-        TextColor: #a9bfd7,
-        HorizontalAlignment: End,
-        VerticalAlignment: Center
-      );
+    Group #SectionToggleTopDirtyBadge {
+      Anchor: (Width: 18, Height: 24);
+      LayoutMode: Middle;
+      Visible: false;
+
+      Group #SectionToggleTopDirtyBadgeCircle {
+        Anchor: (Width: 16, Height: 16);
+        Background: #00000000;
+
+        Label #SectionToggleTopDirtyBadgeText {
+          Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+          Text: "!";
+          Style: (
+            FontSize: 10,
+            RenderBold: true,
+            TextColor: #111111,
+            HorizontalAlignment: Center,
+            VerticalAlignment: Center
+          );
+        }
+
+        Group #SectionToggleTopDirtyBadgeCheckIcon {
+          Anchor: (Top: 1, Left: 1, Width: 14, Height: 14);
+          Background: "TwConfigAccept.png";
+          Visible: false;
+        }
+
+        Group #SectionToggleTopDirtyBadgeCautionIcon {
+          Anchor: (Top: 0, Left: 0, Width: 16, Height: 16);
+          Background: "TwConfigCaution.png";
+          Visible: false;
+        }
+      }
+    }
+
+    Group {
+      Anchor: (Width: 94, Height: 24);
+
+      Label #SectionToggleTopCount {
+        Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
+        Text: "0 fields";
+        Style: (
+          FontSize: 11,
+          TextColor: #a9bfd7,
+          HorizontalAlignment: End,
+          VerticalAlignment: Center
+        );
+      }
+    }
+
+    Group #SectionToggleTopRightBadge {
+      Anchor: (Width: 18, Height: 24);
+      LayoutMode: Middle;
+      Visible: false;
+
+      Group {
+        Anchor: (Width: 16, Height: 16);
+        Background: #00000000;
+
+        Group #SectionToggleTopRightBadgeCheckIcon {
+          Anchor: (Top: 1, Left: 1, Width: 14, Height: 14);
+          Background: "TwConfigAccept.png";
+          Visible: false;
+        }
+
+        Group #SectionToggleTopRightBadgeCautionIcon {
+          Anchor: (Top: 0, Left: 0, Width: 16, Height: 16);
+          Background: "TwConfigCaution.png";
+          Visible: false;
+        }
+      }
     }
   }
 
   Button #SectionToggleNestedButton {
-    Anchor: (Top: 2, Left: 26, Right: 4, Height: 24);
+    Anchor: (Top: 2, Left: 26, Right: 0, Height: 24);
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
@@ -115,20 +177,82 @@ Group {
       );
     }
 
-    Label #SectionToggleNestedCount {
-      Anchor: (Width: 88, Height: 24);
-      Text: "0 fields";
-      Style: (
-        FontSize: 11,
-        TextColor: #a9bfd7,
-        HorizontalAlignment: End,
-        VerticalAlignment: Center
-      );
+    Group #SectionToggleNestedDirtyBadge {
+      Anchor: (Width: 18, Height: 24);
+      LayoutMode: Middle;
+      Visible: false;
+
+      Group #SectionToggleNestedDirtyBadgeCircle {
+        Anchor: (Width: 16, Height: 16);
+        Background: #00000000;
+
+        Label #SectionToggleNestedDirtyBadgeText {
+          Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+          Text: "!";
+          Style: (
+            FontSize: 10,
+            RenderBold: true,
+            TextColor: #111111,
+            HorizontalAlignment: Center,
+            VerticalAlignment: Center
+          );
+        }
+
+        Group #SectionToggleNestedDirtyBadgeCheckIcon {
+          Anchor: (Top: 1, Left: 1, Width: 14, Height: 14);
+          Background: "TwConfigAccept.png";
+          Visible: false;
+        }
+
+        Group #SectionToggleNestedDirtyBadgeCautionIcon {
+          Anchor: (Top: 0, Left: 0, Width: 16, Height: 16);
+          Background: "TwConfigCaution.png";
+          Visible: false;
+        }
+      }
+    }
+
+    Group {
+      Anchor: (Width: 94, Height: 24);
+
+      Label #SectionToggleNestedCount {
+        Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
+        Text: "0 fields";
+        Style: (
+          FontSize: 11,
+          TextColor: #a9bfd7,
+          HorizontalAlignment: End,
+          VerticalAlignment: Center
+        );
+      }
+    }
+
+    Group #SectionToggleNestedRightBadge {
+      Anchor: (Width: 18, Height: 24);
+      LayoutMode: Middle;
+      Visible: false;
+
+      Group {
+        Anchor: (Width: 16, Height: 16);
+        Background: #00000000;
+
+        Group #SectionToggleNestedRightBadgeCheckIcon {
+          Anchor: (Top: 1, Left: 1, Width: 14, Height: 14);
+          Background: "TwConfigAccept.png";
+          Visible: false;
+        }
+
+        Group #SectionToggleNestedRightBadgeCautionIcon {
+          Anchor: (Top: 0, Left: 0, Width: 16, Height: 16);
+          Background: "TwConfigCaution.png";
+          Visible: false;
+        }
+      }
     }
   }
 
   Button #SectionToggleDeepButton {
-    Anchor: (Top: 2, Left: 48, Right: 4, Height: 24);
+    Anchor: (Top: 2, Left: 48, Right: 0, Height: 24);
     LayoutMode: Left;
     Style: ButtonStyle(
       Default: (Background: (Color: #00000000)),
@@ -169,15 +293,77 @@ Group {
       );
     }
 
-    Label #SectionToggleDeepCount {
-      Anchor: (Width: 88, Height: 24);
-      Text: "0 fields";
-      Style: (
-        FontSize: 11,
-        TextColor: #a9bfd7,
-        HorizontalAlignment: End,
-        VerticalAlignment: Center
-      );
+    Group #SectionToggleDeepDirtyBadge {
+      Anchor: (Width: 18, Height: 24);
+      LayoutMode: Middle;
+      Visible: false;
+
+      Group #SectionToggleDeepDirtyBadgeCircle {
+        Anchor: (Width: 16, Height: 16);
+        Background: #00000000;
+
+        Label #SectionToggleDeepDirtyBadgeText {
+          Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+          Text: "!";
+          Style: (
+            FontSize: 10,
+            RenderBold: true,
+            TextColor: #111111,
+            HorizontalAlignment: Center,
+            VerticalAlignment: Center
+          );
+        }
+
+        Group #SectionToggleDeepDirtyBadgeCheckIcon {
+          Anchor: (Top: 1, Left: 1, Width: 14, Height: 14);
+          Background: "TwConfigAccept.png";
+          Visible: false;
+        }
+
+        Group #SectionToggleDeepDirtyBadgeCautionIcon {
+          Anchor: (Top: 0, Left: 0, Width: 16, Height: 16);
+          Background: "TwConfigCaution.png";
+          Visible: false;
+        }
+      }
+    }
+
+    Group {
+      Anchor: (Width: 94, Height: 24);
+
+      Label #SectionToggleDeepCount {
+        Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
+        Text: "0 fields";
+        Style: (
+          FontSize: 11,
+          TextColor: #a9bfd7,
+          HorizontalAlignment: End,
+          VerticalAlignment: Center
+        );
+      }
+    }
+
+    Group #SectionToggleDeepRightBadge {
+      Anchor: (Width: 18, Height: 24);
+      LayoutMode: Middle;
+      Visible: false;
+
+      Group {
+        Anchor: (Width: 16, Height: 16);
+        Background: #00000000;
+
+        Group #SectionToggleDeepRightBadgeCheckIcon {
+          Anchor: (Top: 1, Left: 1, Width: 14, Height: 14);
+          Background: "TwConfigAccept.png";
+          Visible: false;
+        }
+
+        Group #SectionToggleDeepRightBadgeCautionIcon {
+          Anchor: (Top: 0, Left: 0, Width: 16, Height: 16);
+          Background: "TwConfigCaution.png";
+          Visible: false;
+        }
+      }
     }
   }
 }
