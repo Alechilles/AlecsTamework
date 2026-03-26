@@ -84,6 +84,7 @@ import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
+import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
@@ -97,11 +98,13 @@ import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
+import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -316,6 +319,14 @@ public class Tamework extends JavaPlugin {
 
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
+        );
+        getEntityStoreRegistry().registerSystem(
+                new MountedOwnerReferenceSanitySystem(
+                        NPCEntity.getComponentType(),
+                        NPCMountComponent.getComponentType(),
+                        Player.getComponentType(),
+                        Interactable.getComponentType()
+                )
         );
         getEntityStoreRegistry().registerSystem(
                 new NpcMountedNameplateVisibilitySystem(
