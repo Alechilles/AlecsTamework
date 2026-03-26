@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+### Added
+- Added a Tamework-authoritative coop runtime for pre-release that manages coop intake/release state through a resident ledger keyed by `world + coop block position + resident slot`.
+- Added `TwDebugConfig` asset support (`Server/Tamework/Debug`) to define default `/tw debug...` toggle states that are re-applied on startup and `/tw reloadconfig`.
+
+### Changed
+- Overhauled `CommandLinkedNpcCoopService` internals into the authoritative coop-ledger facade used by command panel/status flows, release resolution, and UUID remapping.
+- Coop release/capture snapshot handling now restores full resident progression/state payloads (owner/tamed/name, links, attachments, needs/happiness, breeding, traits, and lifecycle state) instead of relying on vanilla replacement heuristics.
+
+### Fixed
+- Fixed coop cycles that left command panel entries stuck in `UNLOADED` after subsequent night/day capture-release passes.
+- Fixed coop resident identity/state drift where re-emerged residents could become effectively new/defaultized NPCs instead of restoring the stored resident state.
+- Fixed attachment/progression resets across coop and spawner capture-respawn paths, including needs/happiness persistence.
+- Fixed remaining coop attachment pop-in by applying attachment restoration earlier in the load/release path.
+
 ## 2.4.7-prerelease-beta - Pre-release 2026.03.23 Compatibility - 2026-03-25
 ### Changed
 - Updated Tamework release target to Hytale pre-release `2026.03.23-338988e70`.
