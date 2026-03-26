@@ -27,6 +27,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
+import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -246,6 +247,10 @@ public final class CommandItemFeatureHandler {
             return;
         }
         World world = event.getWorld();
+        UUID playerUuid = player.getUuid();
+        if (playerUuid != null) {
+            world.execute(() -> dismountPlayerAfterWorldJoin(world, playerUuid));
+        }
         CompletableFuture.runAsync(
                 () -> world.execute(() -> queueWorldChangeTravelRelocations(player, world)),
                 CompletableFuture.delayedExecutor(250L, TimeUnit.MILLISECONDS)
@@ -256,6 +261,7 @@ public final class CommandItemFeatureHandler {
         if (destinationWorld == null || playerUuid == null || relocationService == null) {
             return;
         }
+        dismountPlayerAfterWorldJoin(destinationWorld, playerUuid);
         Store<EntityStore> destinationStore =
                 destinationWorld.getEntityStore() != null ? destinationWorld.getEntityStore().getStore() : null;
         if (destinationStore == null) {
@@ -270,6 +276,25 @@ public final class CommandItemFeatureHandler {
             return;
         }
         queueWorldChangeTravelRelocations(player, destinationWorld);
+    }
+
+    private void dismountPlayerAfterWorldJoin(World world, UUID playerUuid) {
+        if (world == null || playerUuid == null) {
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+        if (store == null) {
+            return;
+        }
+        Ref<EntityStore> playerRef = world.getEntityRef(playerUuid);
+        if (playerRef == null || !playerRef.isValid()) {
+            return;
+        }
+        Player player = store.getComponent(playerRef, Player.getComponentType());
+        if (player == null || player.getMountEntityId() == 0) {
+            return;
+        }
+        MountPlugin.checkDismountNpc(store, playerRef, player);
     }
 
     private void queueWorldChangeTravelRelocations(Player player, World destinationWorld) {

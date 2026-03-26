@@ -10,6 +10,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.TickingSystem;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -19,18 +20,8 @@ import javax.annotation.Nonnull;
  * Ensures mounted NPCs carry Interactable so vanilla mount transfer/remove flows can safely remove it.
  */
 public final class MountedInteractableSafetySystem extends TickingSystem<EntityStore> {
-    private static final long SWEEP_INTERVAL_MS = 200L;
-
-    private long nextSweepAtMs;
-
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        long nowMs = System.currentTimeMillis();
-        if (nowMs < nextSweepAtMs) {
-            return;
-        }
-        nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
-
         ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, Interactable> interactableType = Interactable.getComponentType();
@@ -57,8 +48,15 @@ public final class MountedInteractableSafetySystem extends TickingSystem<EntityS
                 continue;
             }
             NPCMountComponent mountComponent = chunk.getComponent(i, mountType);
-            if (mountComponent == null || mountComponent.getOwnerPlayerRef() == null) {
+            if (mountComponent == null) {
                 continue;
+            }
+            PlayerRef ownerPlayerRef = mountComponent.getOwnerPlayerRef();
+            if (ownerPlayerRef == null) {
+                continue;
+            }
+            if (isInvalidOwnerReference(ownerPlayerRef, store)) {
+                mountComponent.setOwnerPlayerRef(null);
             }
             if (containsComponent(store, ref, interactableType)) {
                 continue;
@@ -76,5 +74,14 @@ public final class MountedInteractableSafetySystem extends TickingSystem<EntityS
         } catch (IndexOutOfBoundsException | IllegalArgumentException ex) {
             return false;
         }
+    }
+
+    private boolean isInvalidOwnerReference(@Nonnull PlayerRef ownerPlayerRef,
+                                            @Nonnull Store<EntityStore> store) {
+        Ref<EntityStore> ownerRef = ownerPlayerRef.getReference();
+        if (ownerRef == null || !ownerRef.isValid()) {
+            return true;
+        }
+        return ownerRef.getStore() != store;
     }
 }
