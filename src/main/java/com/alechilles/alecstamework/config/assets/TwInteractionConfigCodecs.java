@@ -75,19 +75,10 @@ public final class TwInteractionConfigCodecs {
             "Accessories"
     };
 
-    private static final Codec<String[]> STRING_ARRAY_OR_SINGLE_CODEC = new Codec<>() {
+    private static final Codec<String[]> STRING_ARRAY_OR_SINGLE_CODEC = new TwSilentCodec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return ArrayUtil.EMPTY_STRING_ARRAY;
-            }
-            if (bsonValue.isArray()) {
-                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
-            }
-            if (bsonValue.isString()) {
-                return new String[] { bsonValue.asString().getValue() };
-            }
-            throw new CodecException("Expected string or string array", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringArrayOrEmpty(bsonValue);
         }
 
         @Override
@@ -107,10 +98,10 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
-    private static final Codec<String> PLAYER_MOVEMENT_STATE_CODEC = new Codec<>() {
+    private static final Codec<String> PLAYER_MOVEMENT_STATE_CODEC = new TwSilentCodec<>() {
         @Override
         public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            return Codec.STRING.decode(bsonValue, extraInfo);
+            return TwCodecLenient.asStringOrNull(bsonValue);
         }
 
         @Override
@@ -127,16 +118,10 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
-    private static final Codec<String> ITEM_ASSET_CODEC = new Codec<>() {
+    private static final Codec<String> ITEM_ASSET_CODEC = new TwSilentCodec<>() {
         @Override
         public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return null;
-            }
-            if (bsonValue.isString()) {
-                return bsonValue.asString().getValue();
-            }
-            throw new CodecException("Expected string", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringOrNull(bsonValue);
         }
 
         @Override
@@ -156,16 +141,10 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
-    private static final Codec<String> NPC_ROLE_ASSET_CODEC = new Codec<>() {
+    private static final Codec<String> NPC_ROLE_ASSET_CODEC = new TwSilentCodec<>() {
         @Override
         public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return null;
-            }
-            if (bsonValue.isString()) {
-                return bsonValue.asString().getValue();
-            }
-            throw new CodecException("Expected string", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringOrNull(bsonValue);
         }
 
         @Override
@@ -185,19 +164,10 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
-    private static final Codec<String[]> ITEM_ASSET_ARRAY_OR_SINGLE_CODEC = new Codec<>() {
+    private static final Codec<String[]> ITEM_ASSET_ARRAY_OR_SINGLE_CODEC = new TwSilentCodec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return ArrayUtil.EMPTY_STRING_ARRAY;
-            }
-            if (bsonValue.isArray()) {
-                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
-            }
-            if (bsonValue.isString()) {
-                return new String[] { bsonValue.asString().getValue() };
-            }
-            throw new CodecException("Expected string or string array", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringArrayOrEmpty(bsonValue);
         }
 
         @Override
@@ -219,19 +189,10 @@ public final class TwInteractionConfigCodecs {
         }
     };
 
-    private static final Codec<String[]> ITEM_ASSET_ARRAY_CODEC = new Codec<>() {
+    private static final Codec<String[]> ITEM_ASSET_ARRAY_CODEC = new TwSilentCodec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return ArrayUtil.EMPTY_STRING_ARRAY;
-            }
-            if (bsonValue.isArray()) {
-                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
-            }
-            if (bsonValue.isString()) {
-                return new String[] { bsonValue.asString().getValue() };
-            }
-            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringArrayOrEmpty(bsonValue);
         }
 
         @Override
@@ -254,16 +215,10 @@ public final class TwInteractionConfigCodecs {
     };
 
     private static Codec<String> assetRefCodec(String assetType) {
-        return new Codec<>() {
+        return new TwSilentCodec<>() {
             @Override
             public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-                if (Codec.isNullBsonValue(bsonValue)) {
-                    return null;
-                }
-                if (bsonValue.isString()) {
-                    return bsonValue.asString().getValue();
-                }
-                throw new CodecException("Expected string", bsonValue, extraInfo, null);
+                return TwCodecLenient.asStringOrNull(bsonValue);
             }
 
             @Override
@@ -288,19 +243,10 @@ public final class TwInteractionConfigCodecs {
     private static final Codec<String> SOUND_EVENT_CODEC = assetRefCodec("SoundEvent");
     private static final Codec<String> ITEM_DROP_LIST_CODEC = assetRefCodec("ItemDropList");
 
-    private static final Codec<String[]> EQUIPPED_SLOT_ARRAY_OR_SINGLE_CODEC = new Codec<>() {
+    private static final Codec<String[]> EQUIPPED_SLOT_ARRAY_OR_SINGLE_CODEC = new TwSilentCodec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return ArrayUtil.EMPTY_STRING_ARRAY;
-            }
-            if (bsonValue.isArray()) {
-                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
-            }
-            if (bsonValue.isString()) {
-                return new String[] { bsonValue.asString().getValue() };
-            }
-            throw new CodecException("Expected string or string array", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringArrayOrEmpty(bsonValue);
         }
 
         @Override
@@ -1441,14 +1387,21 @@ public final class TwInteractionConfigCodecs {
     public static final ArrayCodec<FeedItem> FEED_ITEM_ARRAY_CODEC =
             new ArrayCodec<>(FEED_ITEM_CODEC, FeedItem[]::new);
 
-    private static final Codec<FeedItem[]> FEED_ITEM_ARRAY_OR_SINGLE_CODEC = new Codec<>() {
+    private static final Codec<FeedItem[]> FEED_ITEM_ARRAY_OR_SINGLE_CODEC = new TwSilentCodec<>() {
         @Override
         public FeedItem[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
             if (Codec.isNullBsonValue(bsonValue)) {
                 return EMPTY_FEED_ITEMS;
             }
             if (bsonValue.isDocument()) {
-                return new FeedItem[] { FEED_ITEM_CODEC.decode(bsonValue, extraInfo) };
+                try {
+                    return new FeedItem[] { FEED_ITEM_CODEC.decode(bsonValue, extraInfo) };
+                } catch (CodecException ignored) {
+                    String extracted = TwCodecLenient.asStringOrNull(bsonValue);
+                    return extracted == null || extracted.isBlank()
+                            ? EMPTY_FEED_ITEMS
+                            : new FeedItem[] { new FeedItem(extracted, null) };
+                }
             }
             if (bsonValue.isString()) {
                 return new FeedItem[] { new FeedItem(bsonValue.asString().getValue(), null) };
@@ -1464,14 +1417,27 @@ public final class TwInteractionConfigCodecs {
                         continue;
                     }
                     if (value.isDocument()) {
-                        items.add(FEED_ITEM_CODEC.decode(value, extraInfo));
+                        try {
+                            items.add(FEED_ITEM_CODEC.decode(value, extraInfo));
+                        } catch (CodecException ignored) {
+                            String extracted = TwCodecLenient.asStringOrNull(value);
+                            if (extracted != null && !extracted.isBlank()) {
+                                items.add(new FeedItem(extracted, null));
+                            }
+                        }
                         continue;
                     }
-                    throw new CodecException("Expected feed item object or string", value, extraInfo, null);
+                    String extracted = TwCodecLenient.asStringOrNull(value);
+                    if (extracted != null && !extracted.isBlank()) {
+                        items.add(new FeedItem(extracted, null));
+                    }
                 }
                 return items.toArray(EMPTY_FEED_ITEMS);
             }
-            throw new CodecException("Expected feed item object, string, or array", bsonValue, extraInfo, null);
+            String extracted = TwCodecLenient.asStringOrNull(bsonValue);
+            return extracted == null || extracted.isBlank()
+                    ? EMPTY_FEED_ITEMS
+                    : new FeedItem[] { new FeedItem(extracted, null) };
         }
 
         @Override

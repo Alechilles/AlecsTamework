@@ -13,7 +13,6 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
-import com.hypixel.hytale.codec.exception.CodecException;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.codec.schema.SchemaContext;
 import com.hypixel.hytale.codec.schema.config.ArraySchema;
@@ -55,16 +54,10 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         }
     }
 
-    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new Codec<>() {
+    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new TwSilentCodec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return ArrayUtil.EMPTY_STRING_ARRAY;
-            }
-            if (bsonValue.isArray()) {
-                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
-            }
-            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringArrayOrEmpty(bsonValue);
         }
 
         @Override
@@ -86,13 +79,13 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         }
     };
 
-    private static final Codec<ItemFeatureConfig.SpawnerTooltipMode> TOOLTIP_MODE_CODEC = new Codec<>() {
+    private static final Codec<ItemFeatureConfig.SpawnerTooltipMode> TOOLTIP_MODE_CODEC = new TwSilentCodec<>() {
         @Override
         public ItemFeatureConfig.SpawnerTooltipMode decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
+            String raw = TwCodecLenient.asStringOrNull(bsonValue);
+            if (raw == null || raw.isBlank()) {
                 return ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
             }
-            String raw = Codec.STRING.decode(bsonValue, extraInfo);
             return ItemFeatureConfig.SpawnerTooltipMode.fromString(raw);
         }
 

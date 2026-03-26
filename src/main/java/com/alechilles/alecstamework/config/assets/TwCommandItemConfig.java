@@ -12,7 +12,6 @@ import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
 import com.hypixel.hytale.codec.codecs.map.MapCodec;
-import com.hypixel.hytale.codec.exception.CodecException;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.codec.schema.SchemaContext;
 import com.hypixel.hytale.codec.schema.config.ArraySchema;
@@ -133,16 +132,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 
-    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new Codec<>() {
+    private static final Codec<String[]> NPC_ROLE_ARRAY_CODEC = new TwSilentCodec<>() {
         @Override
         public String[] decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-            if (Codec.isNullBsonValue(bsonValue)) {
-                return ArrayUtil.EMPTY_STRING_ARRAY;
-            }
-            if (bsonValue.isArray()) {
-                return Codec.STRING_ARRAY.decode(bsonValue, extraInfo);
-            }
-            throw new CodecException("Expected string array", bsonValue, extraInfo, null);
+            return TwCodecLenient.asStringArrayOrEmpty(bsonValue);
         }
 
         @Override
@@ -165,16 +158,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     };
 
     private static Codec<String> assetRefCodec(String assetType) {
-        return new Codec<>() {
+        return new TwSilentCodec<>() {
             @Override
             public String decode(@Nonnull BsonValue bsonValue, ExtraInfo extraInfo) {
-                if (Codec.isNullBsonValue(bsonValue)) {
-                    return null;
-                }
-                if (bsonValue.isString()) {
-                    return bsonValue.asString().getValue();
-                }
-                throw new CodecException("Expected string", bsonValue, extraInfo, null);
+                return TwCodecLenient.asStringOrNull(bsonValue);
             }
 
             @Override
