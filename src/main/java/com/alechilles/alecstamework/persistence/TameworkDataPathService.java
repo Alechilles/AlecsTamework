@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -26,6 +27,10 @@ public final class TameworkDataPathService {
 
     private static final String COOP_LEDGER_FILE = "CommandLinkedNpcCoops.dat";
     private static final String COOP_MIGRATION_MARKER_FILE = "CommandLinkedNpcCoops.dat.runtime-v2.marker";
+    private static final String SQLITE_DB_FILE = "tamework.sqlite";
+    private static final String SQLITE_WAL_FILE = "tamework.sqlite-wal";
+    private static final String SQLITE_SHM_FILE = "tamework.sqlite-shm";
+    private static final String SQLITE_IMPORT_MARKER_FILE = "tamework.sqlite.legacy-dat-import-v2.marker";
 
     private static final String[] KNOWN_DATA_FILES = new String[] {
             "CommandLinkedNpcCaptures.dat",
@@ -68,6 +73,12 @@ public final class TameworkDataPathService {
             return legacyDir;
         }
         migrateLegacyDataFiles(legacyDir, preferredDir);
+        Path historicalDataDir = resolveHistoricalServerAnchoredDataDirectory(legacyDir);
+        if (historicalDataDir != null
+                && !historicalDataDir.equals(preferredDir)
+                && !historicalDataDir.equals(legacyDir)) {
+            migrateLegacyDataFiles(historicalDataDir, preferredDir);
+        }
         ensureCoopMigrationMarker(preferredDir);
         return preferredDir;
     }
@@ -158,6 +169,26 @@ public final class TameworkDataPathService {
         return false;
     }
 
+    @Nullable
+    private Path resolveHistoricalServerAnchoredDataDirectory(@Nonnull Path legacyDataDirectory) {
+        Path serverAncestor = findAncestorNamed(legacyDataDirectory, SERVER_DIR_NAME);
+        if (serverAncestor == null) {
+            return null;
+        }
+        return serverAncestor.resolve(UNIVERSE_DIR_NAME).resolve(TAMEWORK_DIR_NAME).resolve(DATA_DIR_NAME).normalize();
+    }
+
+    private boolean shouldMigrateRuntimeFile(@Nonnull String fileName) {
+        String normalized = fileName.toLowerCase(Locale.ROOT);
+        if (normalized.endsWith(".dat")) {
+            return true;
+        }
+        if (normalized.startsWith("tamework.sqlite")) {
+            return true;
+        }
+        return normalized.startsWith("tamework_pre_v2_") && normalized.endsWith(".sqlite.bak");
+    }
+
     private void migrateLegacyDataFiles(@Nonnull Path legacyDirectory, @Nonnull Path targetDirectory) {
         if (legacyDirectory.equals(targetDirectory) || !Files.exists(legacyDirectory)) {
             return;
@@ -174,16 +205,27 @@ public final class TameworkDataPathService {
                 movedFileNames.add(fileName);
             }
         }
+        for (String fileName : new String[] {SQLITE_DB_FILE, SQLITE_WAL_FILE, SQLITE_SHM_FILE, SQLITE_IMPORT_MARKER_FILE}) {
+            Path source = legacyDirectory.resolve(fileName);
+            Path target = targetDirectory.resolve(fileName);
+            if (moveIfNeeded(source, target)) {
+                movedCount++;
+                movedFileNames.add(fileName);
+            }
+        }
 
-        // Move any additional .dat files that may have been introduced by future runtime features.
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(legacyDirectory, "*.dat")) {
+        // Move additional runtime artifacts that may have been introduced by future persistence updates.
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(legacyDirectory)) {
             for (Path source : stream) {
                 Path fileNamePath = source.getFileName();
-                if (fileNamePath == null) {
+                if (fileNamePath == null || Files.isDirectory(source)) {
                     continue;
                 }
                 String fileName = fileNamePath.toString();
                 if (movedFileNames.contains(fileName)) {
+                    continue;
+                }
+                if (!shouldMigrateRuntimeFile(fileName)) {
                     continue;
                 }
                 if (moveIfNeeded(source, targetDirectory.resolve(fileName))) {
@@ -191,7 +233,7 @@ public final class TameworkDataPathService {
                 }
             }
         } catch (Exception ignored) {
-            // Ignore migration scan failures; known files are already handled explicitly.
+            // Ignore migration scan failures; known files are handled explicitly.
         }
 
         if (movedCount > 0) {

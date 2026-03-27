@@ -88,6 +88,34 @@ class TameworkDataPathServiceTest {
     }
 
     @Test
+    void migratesHistoricalServerAnchoredDataDirectoryToCorrectNestedRoot() throws Exception {
+        Path runtimeRoot = tempDir.resolve("server").resolve("hytale");
+        Path legacyDataDir = runtimeRoot.resolve("mods").resolve("Alechilles_Alec's Tamework!");
+        Path historicalWrongDataDir = tempDir.resolve("server")
+                .resolve("universe")
+                .resolve("Tamework")
+                .resolve("Data");
+        Files.createDirectories(legacyDataDir);
+        Files.createDirectories(runtimeRoot.resolve("universe"));
+        Files.createDirectories(historicalWrongDataDir);
+        Files.writeString(historicalWrongDataDir.resolve("CommandLinkedNpcCaptures.dat"), "captures", StandardCharsets.UTF_8);
+        Files.writeString(historicalWrongDataDir.resolve("tamework.sqlite"), "sqlite-db", StandardCharsets.UTF_8);
+        Files.writeString(historicalWrongDataDir.resolve("tamework.sqlite-wal"), "sqlite-wal", StandardCharsets.UTF_8);
+
+        TameworkDataPathService service = new TameworkDataPathService();
+        Path resolved = service.resolveAndMigrateDataDirectory(legacyDataDir);
+
+        Path expected = runtimeRoot.resolve("universe").resolve("Tamework").resolve("Data").normalize();
+        assertEquals(expected, resolved);
+        assertEquals("captures", Files.readString(expected.resolve("CommandLinkedNpcCaptures.dat")));
+        assertEquals("sqlite-db", Files.readString(expected.resolve("tamework.sqlite")));
+        assertEquals("sqlite-wal", Files.readString(expected.resolve("tamework.sqlite-wal")));
+        assertFalse(Files.exists(historicalWrongDataDir.resolve("CommandLinkedNpcCaptures.dat")));
+        assertFalse(Files.exists(historicalWrongDataDir.resolve("tamework.sqlite")));
+        assertFalse(Files.exists(historicalWrongDataDir.resolve("tamework.sqlite-wal")));
+    }
+
+    @Test
     void fallsBackToLegacyDirectoryWhenNoServerAncestorExists() throws Exception {
         Path legacyDataDir = tempDir.resolve("TameworkData");
         Files.createDirectories(legacyDataDir);
