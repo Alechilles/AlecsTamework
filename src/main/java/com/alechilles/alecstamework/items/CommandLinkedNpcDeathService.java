@@ -118,7 +118,7 @@ public final class CommandLinkedNpcDeathService {
         UUID npcUuid = npc != null ? npc.getUuid() : null;
         if (npcUuid != null) {
             if (deadByNpc.remove(npcUuid) != null) {
-                persistSnapshots();
+                deleteSnapshot(npcUuid);
             }
         }
     }
@@ -137,14 +137,14 @@ public final class CommandLinkedNpcDeathService {
         UUID npcUuid = npc.getUuid();
         if (!wasDeathRemoval(reference, reason, store)) {
             if (deadByNpc.remove(npcUuid) != null) {
-                persistSnapshots();
+                deleteSnapshot(npcUuid);
             }
             return;
         }
         TameworkCommandLinksComponent links = store.getComponent(reference, TameworkCommandLinksComponent.getComponentType());
         if (links == null || links.getToolIds() == null || links.getToolIds().length == 0) {
             if (deadByNpc.remove(npcUuid) != null) {
-                persistSnapshots();
+                deleteSnapshot(npcUuid);
             }
             return;
         }
@@ -197,8 +197,9 @@ public final class CommandLinkedNpcDeathService {
                                 cached.breedingEnabled()
                         )
                 );
-                enqueueProfileUpdate(deadByNpc.get(npcUuid), null, null);
-                persistSnapshots();
+                DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
+                enqueueProfileUpdate(persisted, null, null);
+                persistSnapshot(persisted);
                 return;
             }
         }
@@ -328,8 +329,9 @@ public final class CommandLinkedNpcDeathService {
                         breedingEnabled
                 )
         );
-        enqueueProfileUpdate(deadByNpc.get(npcUuid), null, null);
-        persistSnapshots();
+        DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
+        enqueueProfileUpdate(persisted, null, null);
+        persistSnapshot(persisted);
     }
 
     @Nullable
@@ -366,7 +368,7 @@ public final class CommandLinkedNpcDeathService {
             stateSnapshotService.clearSnapshot(npcUuid);
         }
         if (deadByNpc.remove(npcUuid) != null) {
-            persistSnapshots();
+            deleteSnapshot(npcUuid);
         }
     }
 
@@ -404,7 +406,6 @@ public final class CommandLinkedNpcDeathService {
 
     private void persistSnapshots() {
         if (repository != null) {
-            repository.replaceAllAsync(deadByNpc.values());
             return;
         }
         if (persistencePath == null) {
@@ -437,6 +438,25 @@ public final class CommandLinkedNpcDeathService {
         }
     }
 
+    private void persistSnapshot(@Nullable DeadLinkedNpcSnapshot snapshot) {
+        if (snapshot == null || snapshot.npcUuid() == null) {
+            return;
+        }
+        if (repository != null) {
+            repository.upsertAsync(snapshot);
+            return;
+        }
+        persistSnapshots();
+    }
+
+    private void deleteSnapshot(@Nonnull UUID npcUuid) {
+        if (repository != null) {
+            repository.deleteAsync(npcUuid);
+            return;
+        }
+        persistSnapshots();
+    }
+
     private boolean canMutate() {
         if (healthService == null || healthService.isHealthy()) {
             return true;
@@ -452,7 +472,10 @@ public final class CommandLinkedNpcDeathService {
     private void enqueueProfileUpdate(@Nullable DeadLinkedNpcSnapshot snapshot,
                                       @Nullable String coopId,
                                       @Nullable Integer coopSlot) {
-        if (profileRepository == null || snapshot == null || snapshot.npcUuid() == null) {
+        if (profileRepository == null
+                || repository != null
+                || snapshot == null
+                || snapshot.npcUuid() == null) {
             return;
         }
         profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(

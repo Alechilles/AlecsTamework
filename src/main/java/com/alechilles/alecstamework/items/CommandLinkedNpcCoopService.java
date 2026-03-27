@@ -177,7 +177,7 @@ public final class CommandLinkedNpcCoopService {
         }
 
         if (changed) {
-            persistLedger();
+            clearLedgerNpcReferences(npcUuid);
         }
     }
 
@@ -196,7 +196,7 @@ public final class CommandLinkedNpcCoopService {
         if (removed.housedNpcUuid != null) {
             removeCoopedIndex(removed.housedNpcUuid);
         }
-        persistLedger();
+        clearLedgerSlot(context);
     }
 
     @Nullable
@@ -219,7 +219,7 @@ public final class CommandLinkedNpcCoopService {
         ledgerBySlot.clear();
         coopedByNpc.clear();
         slotKeyByNpc.clear();
-        persistLedger();
+        clearLedgerAll();
     }
 
     /**
@@ -291,7 +291,7 @@ public final class CommandLinkedNpcCoopService {
                     coopId,
                     context.residentSlot()
             );
-            persistLedger();
+            upsertLedgerEntry(next);
             debugCoop(
                     "ledger capture npc=" + npcUuid
                             + " coop=" + coopId
@@ -457,7 +457,7 @@ public final class CommandLinkedNpcCoopService {
                 entry.coopId,
                 entry.residentSlot
         );
-        persistLedger();
+        releaseLedgerEntry(entry, previousNpcUuid, currentNpcUuid);
 
         debugCoop(
                 "release resolved current=" + currentNpcUuid
@@ -629,14 +629,6 @@ public final class CommandLinkedNpcCoopService {
 
     private void persistLedger() {
         if (repository != null) {
-            ArrayList<CoopLedgerRow> rows = new ArrayList<>();
-            for (CoopLedgerEntry entry : ledgerBySlot.values()) {
-                if (entry == null || entry.slotKey == null) {
-                    continue;
-                }
-                rows.add(toLedgerRow(entry));
-            }
-            repository.replaceAllAsync(rows);
             return;
         }
         if (persistencePath == null) {
@@ -788,6 +780,61 @@ public final class CommandLinkedNpcCoopService {
         );
     }
 
+    private void upsertLedgerEntry(@Nullable CoopLedgerEntry entry) {
+        if (entry == null) {
+            return;
+        }
+        if (repository != null) {
+            repository.upsertSlotAsync(toLedgerRow(entry));
+            return;
+        }
+        persistLedger();
+    }
+
+    private void releaseLedgerEntry(@Nullable CoopLedgerEntry entry,
+                                    @Nullable UUID previousNpcUuid,
+                                    @Nullable UUID currentNpcUuid) {
+        if (entry == null) {
+            return;
+        }
+        if (repository != null) {
+            repository.releaseAndRemapAsync(toLedgerRow(entry), previousNpcUuid, currentNpcUuid);
+            return;
+        }
+        persistLedger();
+    }
+
+    private void clearLedgerSlot(@Nonnull CoopSlotContext context) {
+        if (repository != null) {
+            repository.clearSlotAsync(
+                    context.worldName(),
+                    context.coopId(),
+                    context.x(),
+                    context.y(),
+                    context.z(),
+                    context.residentSlot()
+            );
+            return;
+        }
+        persistLedger();
+    }
+
+    private void clearLedgerNpcReferences(@Nonnull UUID npcUuid) {
+        if (repository != null) {
+            repository.clearNpcReferencesAsync(npcUuid);
+            return;
+        }
+        persistLedger();
+    }
+
+    private void clearLedgerAll() {
+        if (repository != null) {
+            repository.clearAllAsync();
+            return;
+        }
+        persistLedger();
+    }
+
     private boolean canMutate() {
         if (healthService == null || healthService.isHealthy()) {
             return true;
@@ -807,7 +854,7 @@ public final class CommandLinkedNpcCoopService {
                                       @Nullable String[] toolIds,
                                       @Nullable String coopId,
                                       @Nullable Integer coopSlot) {
-        if (profileRepository == null || npcUuid == null) {
+        if (profileRepository == null || repository != null || npcUuid == null) {
             return;
         }
         profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
