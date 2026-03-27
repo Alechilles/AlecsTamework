@@ -55,9 +55,18 @@ public final class NpcProfileRepository {
     }
 
     public boolean pruneInactiveSnapshotHistoryAsync(long cutoffMs) {
+        return pruneInactiveSnapshotHistoryAsync(cutoffMs, 20);
+    }
+
+    public boolean pruneInactiveSnapshotHistoryAsync(long cutoffMs, int maxInactivePerProfileType) {
+        int safeMaxInactivePerProfileType = Math.max(1, maxInactivePerProfileType);
         return writeQueue.submit(
                 "snapshot_history_prune",
-                connection -> pruneInactiveSnapshotHistoryInTransaction(connection, cutoffMs)
+                connection -> pruneInactiveSnapshotHistoryInTransaction(
+                        connection,
+                        cutoffMs,
+                        safeMaxInactivePerProfileType
+                )
         );
     }
 
@@ -134,40 +143,63 @@ public final class NpcProfileRepository {
         String profileId = resolveOrCreateProfileIdInTransaction(connection, update.npcUuid());
         long nowMs = System.currentTimeMillis();
         String currentNpcUuid = resolveEffectiveCurrentUuidForUpsert(connection, profileId, npcUuidString);
+        ExistingProfileRow existingRow = loadExistingProfileRowInTransaction(connection, profileId);
+        String ownerUuid = update.ownerUuid() != null
+                ? update.ownerUuid().toString()
+                : existingRow != null ? existingRow.ownerUuid() : null;
+        String displayName = trimToNull(update.displayName());
+        if (displayName == null && existingRow != null) {
+            displayName = existingRow.displayName();
+        }
+        String roleId = trimToNull(update.roleId());
+        if (roleId == null && existingRow != null) {
+            roleId = existingRow.roleId();
+        }
         JsonObject state = buildStateJson(update);
         String stateJson = state.size() > 0 ? state.toString() : null;
+        if (stateJson == null && existingRow != null) {
+            stateJson = existingRow.stateJson();
+        }
         String stateHash = stateJson != null ? Integer.toHexString(stateJson.hashCode()) : null;
+        boolean profileUnchanged = existingRow != null
+                && Objects.equals(existingRow.currentNpcUuid(), currentNpcUuid)
+                && Objects.equals(existingRow.ownerUuid(), ownerUuid)
+                && Objects.equals(existingRow.displayName(), displayName)
+                && Objects.equals(existingRow.roleId(), roleId)
+                && Objects.equals(existingRow.stateJson(), stateJson)
+                && Objects.equals(existingRow.stateHash(), stateHash);
 
-        try (PreparedStatement statement = connection.prepareStatement(
-                """
-                INSERT INTO npc_profiles (
-                    profile_id, current_npc_uuid, owner_uuid, display_name, role_id,
-                    state_json, state_hash, last_world_name, created_at_ms, updated_at_ms, last_active_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(profile_id) DO UPDATE SET
-                    current_npc_uuid = excluded.current_npc_uuid,
-                    owner_uuid = COALESCE(excluded.owner_uuid, npc_profiles.owner_uuid),
-                    display_name = COALESCE(excluded.display_name, npc_profiles.display_name),
-                    role_id = COALESCE(excluded.role_id, npc_profiles.role_id),
-                    state_json = COALESCE(excluded.state_json, npc_profiles.state_json),
-                    state_hash = COALESCE(excluded.state_hash, npc_profiles.state_hash),
-                    last_world_name = COALESCE(excluded.last_world_name, npc_profiles.last_world_name),
-                    updated_at_ms = excluded.updated_at_ms,
-                    last_active_at_ms = excluded.last_active_at_ms
-                """
-        )) {
-            statement.setString(1, profileId);
-            statement.setString(2, currentNpcUuid);
-            SqliteValueCodec.bindUuid(statement, 3, update.ownerUuid());
-            statement.setString(4, trimToNull(update.displayName()));
-            statement.setString(5, trimToNull(update.roleId()));
-            statement.setString(6, stateJson);
-            statement.setString(7, stateHash);
-            statement.setString(8, null);
-            statement.setLong(9, nowMs);
-            statement.setLong(10, nowMs);
-            statement.setLong(11, nowMs);
-            statement.executeUpdate();
+        if (!profileUnchanged) {
+            try (PreparedStatement statement = connection.prepareStatement(
+                    """
+                    INSERT INTO npc_profiles (
+                        profile_id, current_npc_uuid, owner_uuid, display_name, role_id,
+                        state_json, state_hash, last_world_name, created_at_ms, updated_at_ms, last_active_at_ms
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ON CONFLICT(profile_id) DO UPDATE SET
+                        current_npc_uuid = excluded.current_npc_uuid,
+                        owner_uuid = excluded.owner_uuid,
+                        display_name = excluded.display_name,
+                        role_id = excluded.role_id,
+                        state_json = excluded.state_json,
+                        state_hash = excluded.state_hash,
+                        updated_at_ms = excluded.updated_at_ms,
+                        last_active_at_ms = excluded.last_active_at_ms
+                    """
+            )) {
+                statement.setString(1, profileId);
+                statement.setString(2, currentNpcUuid);
+                statement.setString(3, ownerUuid);
+                statement.setString(4, displayName);
+                statement.setString(5, roleId);
+                statement.setString(6, stateJson);
+                statement.setString(7, stateHash);
+                statement.setString(8, null);
+                statement.setLong(9, nowMs);
+                statement.setLong(10, nowMs);
+                statement.setLong(11, nowMs);
+                statement.executeUpdate();
+            }
         }
 
         if (!Objects.equals(currentNpcUuid, npcUuidString)) {
@@ -221,6 +253,12 @@ public final class NpcProfileRepository {
             return;
         }
 
+        String[] sanitized = sanitizeToolIds(toolIds);
+        String[] existing = loadToolLinks(connection, profileId, linkType);
+        if (Arrays.equals(existing, sanitized)) {
+            return;
+        }
+
         try (PreparedStatement delete = connection.prepareStatement(
                 "DELETE FROM npc_tool_links WHERE profile_id = ? AND link_type = ?"
         )) {
@@ -228,8 +266,6 @@ public final class NpcProfileRepository {
             delete.setString(2, linkType);
             delete.executeUpdate();
         }
-
-        String[] sanitized = sanitizeToolIds(toolIds);
         if (sanitized.length == 0) {
             return;
         }
@@ -449,11 +485,34 @@ public final class NpcProfileRepository {
         }
     }
 
-    void pruneInactiveSnapshotHistoryInTransaction(@Nonnull Connection connection, long cutoffMs) throws Exception {
+    void pruneInactiveSnapshotHistoryInTransaction(@Nonnull Connection connection,
+                                                   long cutoffMs,
+                                                   int maxInactivePerProfileType) throws Exception {
         try (PreparedStatement statement = connection.prepareStatement(
                 "DELETE FROM npc_snapshots WHERE is_active = 0 AND created_at_ms < ?"
         )) {
             statement.setLong(1, cutoffMs);
+            statement.executeUpdate();
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                DELETE FROM npc_snapshots
+                WHERE snapshot_id IN (
+                    SELECT snapshot_id
+                    FROM (
+                        SELECT snapshot_id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY profile_id, snapshot_type
+                                   ORDER BY created_at_ms DESC, snapshot_version DESC, snapshot_id DESC
+                               ) AS row_num
+                        FROM npc_snapshots
+                        WHERE is_active = 0
+                    ) ranked
+                    WHERE ranked.row_num > ?
+                )
+                """
+        )) {
+            statement.setInt(1, Math.max(1, maxInactivePerProfileType));
             statement.executeUpdate();
         }
     }
@@ -593,6 +652,7 @@ public final class NpcProfileRepository {
                 .filter(value -> value != null && !value.isBlank())
                 .map(String::trim)
                 .distinct()
+                .sorted()
                 .toArray(String[]::new);
     }
 
@@ -603,5 +663,41 @@ public final class NpcProfileRepository {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    @Nullable
+    private ExistingProfileRow loadExistingProfileRowInTransaction(@Nonnull Connection connection,
+                                                                   @Nonnull String profileId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT current_npc_uuid, owner_uuid, display_name, role_id, state_json, state_hash
+                FROM npc_profiles
+                WHERE profile_id = ?
+                LIMIT 1
+                """
+        )) {
+            statement.setString(1, profileId);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                return new ExistingProfileRow(
+                        trimToNull(rs.getString("current_npc_uuid")),
+                        trimToNull(rs.getString("owner_uuid")),
+                        trimToNull(rs.getString("display_name")),
+                        trimToNull(rs.getString("role_id")),
+                        trimToNull(rs.getString("state_json")),
+                        trimToNull(rs.getString("state_hash"))
+                );
+            }
+        }
+    }
+
+    private record ExistingProfileRow(@Nullable String currentNpcUuid,
+                                      @Nullable String ownerUuid,
+                                      @Nullable String displayName,
+                                      @Nullable String roleId,
+                                      @Nullable String stateJson,
+                                      @Nullable String stateHash) {
     }
 }

@@ -6,6 +6,7 @@ import java.util.logging.Level;
 import java.nio.file.Path;
 
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
@@ -666,6 +667,11 @@ public class Tamework extends JavaPlugin {
 
     public TwConfigOverrideManager getConfigOverrideManager() {
         return configOverrideManager;
+    }
+
+    @Nullable
+    public TameworkPersistenceRuntime getPersistenceRuntime() {
+        return persistenceRuntime;
     }
 
     public void beginItemFeatureAssetReloadSuppression() {
