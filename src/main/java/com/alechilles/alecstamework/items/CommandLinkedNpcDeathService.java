@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.persistence.sqlite.DeathRepository;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -49,29 +52,65 @@ public final class CommandLinkedNpcDeathService {
     private static final String ATTACHMENT_KV_SEPARATOR = ",";
 
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
+    @Nullable
+    private final DeathRepository repository;
+    @Nullable
+    private final PersistenceHealthService healthService;
+    @Nullable
+    private final NpcProfileRepository profileRepository;
     private final Path persistencePath;
     private final Object persistenceLock = new Object();
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
 
     public CommandLinkedNpcDeathService() {
-        this(null, null);
+        this(null, null, null, null, null);
     }
 
     public CommandLinkedNpcDeathService(@Nullable Path persistencePath) {
-        this(persistencePath, null);
+        this(persistencePath, null, null, null, null);
     }
 
     public CommandLinkedNpcDeathService(@Nullable Path persistencePath,
                                         @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService) {
+        this(persistencePath, stateSnapshotService, null, null, null);
+    }
+
+    public CommandLinkedNpcDeathService(@Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                        @Nonnull DeathRepository repository,
+                                        @Nonnull PersistenceHealthService healthService,
+                                        @Nullable NpcProfileRepository profileRepository) {
+        this(null, stateSnapshotService, repository, healthService, profileRepository);
+    }
+
+    @Nonnull
+    public static List<DeadLinkedNpcSnapshot> loadLegacySnapshots(@Nullable Path legacyPath) {
+        if (legacyPath == null || !Files.exists(legacyPath)) {
+            return List.of();
+        }
+        CommandLinkedNpcDeathService service = new CommandLinkedNpcDeathService(legacyPath, null, null, null, null);
+        return new ArrayList<>(service.deadByNpc.values());
+    }
+
+    private CommandLinkedNpcDeathService(@Nullable Path persistencePath,
+                                         @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
+                                         @Nullable DeathRepository repository,
+                                         @Nullable PersistenceHealthService healthService,
+                                         @Nullable NpcProfileRepository profileRepository) {
         this.persistencePath = persistencePath != null
                 ? persistencePath.toAbsolutePath().normalize()
                 : null;
         this.stateSnapshotService = stateSnapshotService;
+        this.repository = repository;
+        this.healthService = healthService;
+        this.profileRepository = profileRepository;
         loadPersistedSnapshots();
     }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
+        if (!canMutate()) {
+            return;
+        }
         if (reference == null || !reference.isValid() || store == null) {
             return;
         }
@@ -85,6 +124,9 @@ public final class CommandLinkedNpcDeathService {
     }
 
     public void onNpcRemoved(Ref<EntityStore> reference, RemoveReason reason, Store<EntityStore> store) {
+        if (!canMutate()) {
+            return;
+        }
         if (reference == null || store == null) {
             return;
         }
@@ -155,6 +197,7 @@ public final class CommandLinkedNpcDeathService {
                                 cached.breedingEnabled()
                         )
                 );
+                enqueueProfileUpdate(deadByNpc.get(npcUuid), null, null);
                 persistSnapshots();
                 return;
             }
@@ -285,6 +328,7 @@ public final class CommandLinkedNpcDeathService {
                         breedingEnabled
                 )
         );
+        enqueueProfileUpdate(deadByNpc.get(npcUuid), null, null);
         persistSnapshots();
     }
 
@@ -312,6 +356,9 @@ public final class CommandLinkedNpcDeathService {
     }
 
     public void clearDeadSnapshot(UUID npcUuid) {
+        if (!canMutate()) {
+            return;
+        }
         if (npcUuid == null) {
             return;
         }
@@ -324,6 +371,15 @@ public final class CommandLinkedNpcDeathService {
     }
 
     private void loadPersistedSnapshots() {
+        if (repository != null) {
+            for (DeadLinkedNpcSnapshot snapshot : repository.loadAll()) {
+                if (snapshot == null || snapshot.npcUuid() == null) {
+                    continue;
+                }
+                deadByNpc.put(snapshot.npcUuid(), snapshot);
+            }
+            return;
+        }
         if (persistencePath == null) {
             return;
         }
@@ -347,6 +403,10 @@ public final class CommandLinkedNpcDeathService {
     }
 
     private void persistSnapshots() {
+        if (repository != null) {
+            repository.replaceAllAsync(deadByNpc.values());
+            return;
+        }
         if (persistencePath == null) {
             return;
         }
@@ -375,6 +435,39 @@ public final class CommandLinkedNpcDeathService {
                 // Ignore persistence write issues; runtime tracking remains available.
             }
         }
+    }
+
+    private boolean canMutate() {
+        if (healthService == null || healthService.isHealthy()) {
+            return true;
+        }
+        PersistenceHealthService.HealthState state = healthService.getState();
+        CoopDebugLogger.log(
+                "persistence blocked mutation service=death reason="
+                        + (state.reason() != null ? state.reason() : "unknown")
+        );
+        return false;
+    }
+
+    private void enqueueProfileUpdate(@Nullable DeadLinkedNpcSnapshot snapshot,
+                                      @Nullable String coopId,
+                                      @Nullable Integer coopSlot) {
+        if (profileRepository == null || snapshot == null || snapshot.npcUuid() == null) {
+            return;
+        }
+        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                snapshot.npcUuid(),
+                snapshot.ownerId(),
+                snapshot.ownerName(),
+                snapshot.roleId(),
+                snapshot.displayName(),
+                snapshot.customName(),
+                snapshot.tamed(),
+                coopId,
+                coopSlot,
+                null,
+                snapshot.toolIds()
+        ));
     }
 
     private String encodeSnapshot(DeadLinkedNpcSnapshot snapshot) {

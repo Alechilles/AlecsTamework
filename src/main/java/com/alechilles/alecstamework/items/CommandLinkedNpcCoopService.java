@@ -1,5 +1,9 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.persistence.sqlite.CoopLedgerRepository;
+import com.alechilles.alecstamework.persistence.sqlite.CoopLedgerRow;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -9,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,22 +32,55 @@ public final class CommandLinkedNpcCoopService {
     private final ConcurrentHashMap<String, CoopLedgerEntry> ledgerBySlot = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, String> slotKeyByNpc = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, CoopLinkedNpcSnapshot> coopedByNpc = new ConcurrentHashMap<>();
+    @Nullable
+    private final CoopLedgerRepository repository;
+    @Nullable
+    private final PersistenceHealthService healthService;
+    @Nullable
+    private final NpcProfileRepository profileRepository;
     private final Path persistencePath;
-    private final Path migrationMarkerPath;
     private final Object persistenceLock = new Object();
 
     public CommandLinkedNpcCoopService() {
-        this(null);
+        this(null, null, null, null);
     }
 
     public CommandLinkedNpcCoopService(@Nullable Path persistencePath) {
+        this(persistencePath, null, null, null);
+    }
+
+    public CommandLinkedNpcCoopService(@Nonnull CoopLedgerRepository repository,
+                                       @Nonnull PersistenceHealthService healthService,
+                                       @Nullable NpcProfileRepository profileRepository) {
+        this(null, repository, healthService, profileRepository);
+    }
+
+    @Nonnull
+    public static List<CoopLedgerRow> loadLegacyLedgerRows(@Nullable Path legacyPath) {
+        if (legacyPath == null || !Files.exists(legacyPath)) {
+            return List.of();
+        }
+        CommandLinkedNpcCoopService service = new CommandLinkedNpcCoopService(legacyPath, null, null, null);
+        ArrayList<CoopLedgerRow> rows = new ArrayList<>();
+        for (CoopLedgerEntry entry : service.ledgerBySlot.values()) {
+            if (entry == null || entry.slotKey == null) {
+                continue;
+            }
+            rows.add(service.toLedgerRow(entry));
+        }
+        return rows;
+    }
+
+    private CommandLinkedNpcCoopService(@Nullable Path persistencePath,
+                                        @Nullable CoopLedgerRepository repository,
+                                        @Nullable PersistenceHealthService healthService,
+                                        @Nullable NpcProfileRepository profileRepository) {
         this.persistencePath = persistencePath != null
                 ? persistencePath.toAbsolutePath().normalize()
                 : null;
-        this.migrationMarkerPath = this.persistencePath != null
-                ? this.persistencePath.resolveSibling(this.persistencePath.getFileName() + ".runtime-v2.marker")
-                : null;
-        runColdStartMigrationIfNeeded();
+        this.repository = repository;
+        this.healthService = healthService;
+        this.profileRepository = profileRepository;
         loadPersistedLedger();
     }
 
@@ -98,6 +136,9 @@ public final class CommandLinkedNpcCoopService {
      * Compatibility shim for older capture callsites that cannot provide world/block context.
      */
     public void recordCoopSnapshot(@Nullable CoopLinkedNpcSnapshot snapshot) {
+        if (!canMutate()) {
+            return;
+        }
         if (snapshot == null || snapshot.npcUuid() == null) {
             return;
         }
@@ -113,6 +154,9 @@ public final class CommandLinkedNpcCoopService {
     }
 
     public void clearCoopSnapshot(@Nullable UUID npcUuid) {
+        if (!canMutate()) {
+            return;
+        }
         if (npcUuid == null) {
             return;
         }
@@ -138,6 +182,9 @@ public final class CommandLinkedNpcCoopService {
     }
 
     public void clearLedgerEntry(@Nullable CoopSlotContext context) {
+        if (!canMutate()) {
+            return;
+        }
         if (context == null) {
             return;
         }
@@ -163,6 +210,9 @@ public final class CommandLinkedNpcCoopService {
     }
 
     public void clearAllLedgerEntries() {
+        if (!canMutate()) {
+            return;
+        }
         if (ledgerBySlot.isEmpty() && coopedByNpc.isEmpty()) {
             return;
         }
@@ -182,6 +232,9 @@ public final class CommandLinkedNpcCoopService {
                                 @Nullable String[] fallbackToolIds,
                                 @Nullable String fallbackDisplayName,
                                 @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot) {
+        if (!canMutate()) {
+            return;
+        }
         if (npcUuid == null || context == null) {
             return;
         }
@@ -229,6 +282,15 @@ public final class CommandLinkedNpcCoopService {
         putCoopedIndex(npcUuid, slotKey, next.toSnapshot());
 
         if (occupantChanged || snapshotChanged || previous == null) {
+            enqueueProfileUpdate(
+                    npcUuid,
+                    ownerId,
+                    normalizedRoleId,
+                    displayName,
+                    toolIds,
+                    coopId,
+                    context.residentSlot()
+            );
             persistLedger();
             debugCoop(
                     "ledger capture npc=" + npcUuid
@@ -255,6 +317,9 @@ public final class CommandLinkedNpcCoopService {
                                                      @Nullable String[] fallbackToolIds,
                                                      @Nullable String fallbackDisplayName,
                                                      @Nullable CoopResidentStateSnapshotService.CoopResidentStateSnapshot stateSnapshot) {
+        if (!canMutate()) {
+            return false;
+        }
         if (npcUuid == null || coopId == null || coopId.isBlank()) {
             return false;
         }
@@ -320,6 +385,9 @@ public final class CommandLinkedNpcCoopService {
                                             @Nullable String roleId,
                                             @Nullable CoopSlotContext context,
                                             boolean requireSnapshotOnRelease) {
+        if (!canMutate()) {
+            return ReleaseResolution.failure("persistence_unavailable");
+        }
         if (currentNpcUuid == null || context == null) {
             return ReleaseResolution.failure("invalid_context");
         }
@@ -380,6 +448,15 @@ public final class CommandLinkedNpcCoopService {
             entry.roleId = normalizedRoleId;
         }
         ledgerBySlot.put(entry.slotKey, entry);
+        enqueueProfileUpdate(
+                currentNpcUuid,
+                entry.ownerId,
+                entry.roleId,
+                entry.displayName,
+                entry.toolIds,
+                entry.coopId,
+                entry.residentSlot
+        );
         persistLedger();
 
         debugCoop(
@@ -512,29 +589,20 @@ public final class CommandLinkedNpcCoopService {
         return match;
     }
 
-    private void runColdStartMigrationIfNeeded() {
-        if (persistencePath == null || migrationMarkerPath == null) {
+    private void loadPersistedLedger() {
+        if (repository != null) {
+            for (CoopLedgerRow row : repository.loadAll()) {
+                CoopLedgerEntry entry = fromLedgerRow(row);
+                if (entry == null || entry.slotKey == null) {
+                    continue;
+                }
+                ledgerBySlot.put(entry.slotKey, entry);
+                if (entry.housedNpcUuid != null) {
+                    putCoopedIndex(entry.housedNpcUuid, entry.slotKey, entry.toSnapshot());
+                }
+            }
             return;
         }
-        synchronized (persistenceLock) {
-            if (Files.exists(migrationMarkerPath)) {
-                return;
-            }
-            try {
-                Files.deleteIfExists(persistencePath);
-                Files.deleteIfExists(persistencePath.resolveSibling("CoopResidentSnapshots.dat"));
-                Path parent = migrationMarkerPath.getParent();
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-                Files.writeString(migrationMarkerPath, "runtime-v2", StandardCharsets.UTF_8);
-            } catch (Exception ignored) {
-                // Ignore migration write failures. Runtime can still function in-memory.
-            }
-        }
-    }
-
-    private void loadPersistedLedger() {
         if (persistencePath == null) {
             return;
         }
@@ -560,6 +628,17 @@ public final class CommandLinkedNpcCoopService {
     }
 
     private void persistLedger() {
+        if (repository != null) {
+            ArrayList<CoopLedgerRow> rows = new ArrayList<>();
+            for (CoopLedgerEntry entry : ledgerBySlot.values()) {
+                if (entry == null || entry.slotKey == null) {
+                    continue;
+                }
+                rows.add(toLedgerRow(entry));
+            }
+            repository.replaceAllAsync(rows);
+            return;
+        }
         if (persistencePath == null) {
             return;
         }
@@ -656,6 +735,94 @@ public final class CommandLinkedNpcCoopService {
                 releasedAtMs,
                 null
         );
+    }
+
+    @Nonnull
+    private CoopLedgerRow toLedgerRow(@Nonnull CoopLedgerEntry entry) {
+        return new CoopLedgerRow(
+                entry.slotKey,
+                entry.worldName,
+                entry.coopId,
+                entry.x,
+                entry.y,
+                entry.z,
+                entry.residentSlot,
+                entry.housedNpcUuid,
+                entry.lastReleasedNpcUuid,
+                entry.ownerId,
+                entry.toolIds,
+                entry.roleId,
+                entry.displayName,
+                entry.housedAtMs,
+                entry.releasedAtMs,
+                null
+        );
+    }
+
+    @Nullable
+    private CoopLedgerEntry fromLedgerRow(@Nullable CoopLedgerRow row) {
+        if (row == null || row.slotKey() == null || row.slotKey().isBlank()) {
+            return null;
+        }
+        String coopId = normalizeIdentifier(row.coopId());
+        if (coopId == null) {
+            return null;
+        }
+        return new CoopLedgerEntry(
+                row.slotKey(),
+                normalizeIdentifier(row.worldName()),
+                coopId,
+                row.x(),
+                row.y(),
+                row.z(),
+                row.residentSlot(),
+                row.housedNpcUuid(),
+                row.lastReleasedNpcUuid(),
+                row.ownerId(),
+                sanitizeToolIds(row.toolIds()),
+                normalizeRoleId(row.roleId()),
+                row.displayName(),
+                row.housedAtMs(),
+                row.releasedAtMs(),
+                null
+        );
+    }
+
+    private boolean canMutate() {
+        if (healthService == null || healthService.isHealthy()) {
+            return true;
+        }
+        PersistenceHealthService.HealthState state = healthService.getState();
+        debugCoop(
+                "persistence blocked mutation service=coop reason="
+                        + (state.reason() != null ? state.reason() : "unknown")
+        );
+        return false;
+    }
+
+    private void enqueueProfileUpdate(@Nullable UUID npcUuid,
+                                      @Nullable UUID ownerId,
+                                      @Nullable String roleId,
+                                      @Nullable String displayName,
+                                      @Nullable String[] toolIds,
+                                      @Nullable String coopId,
+                                      @Nullable Integer coopSlot) {
+        if (profileRepository == null || npcUuid == null) {
+            return;
+        }
+        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                npcUuid,
+                ownerId,
+                null,
+                roleId,
+                displayName,
+                null,
+                null,
+                coopId,
+                coopSlot,
+                null,
+                toolIds
+        ));
     }
 
     @Nullable

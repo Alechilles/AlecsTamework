@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -25,6 +26,7 @@ import java.util.Arrays;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -36,6 +38,16 @@ import javax.annotation.Nullable;
 public final class CommandLinkedNpcStateSnapshotService {
     private final ConcurrentHashMap<UUID, CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> snapshotsByNpc =
             new ConcurrentHashMap<>();
+    @Nullable
+    private final NpcProfileRepository profileRepository;
+
+    public CommandLinkedNpcStateSnapshotService() {
+        this(null);
+    }
+
+    public CommandLinkedNpcStateSnapshotService(@Nullable NpcProfileRepository profileRepository) {
+        this.profileRepository = profileRepository;
+    }
 
     public void onNpcAdded(Ref<EntityStore> reference, Store<EntityStore> store) {
         refreshFromEntity(reference, store);
@@ -74,6 +86,7 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         snapshotsByNpc.put(npcUuid, snapshot);
+        upsertProfile(snapshot);
     }
 
     @Nullable
@@ -89,6 +102,25 @@ public final class CommandLinkedNpcStateSnapshotService {
             return;
         }
         snapshotsByNpc.remove(npcUuid);
+    }
+
+    private void upsertProfile(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        if (profileRepository == null || snapshot.npcUuid() == null) {
+            return;
+        }
+        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                snapshot.npcUuid(),
+                snapshot.ownerId(),
+                snapshot.ownerName(),
+                snapshot.roleId(),
+                snapshot.displayName(),
+                snapshot.customName(),
+                snapshot.tamed(),
+                null,
+                null,
+                null,
+                snapshot.toolIds()
+        ));
     }
 
     @Nullable

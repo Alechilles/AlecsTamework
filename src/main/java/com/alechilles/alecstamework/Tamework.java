@@ -72,6 +72,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
+import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
@@ -148,6 +149,7 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcLostService commandLinkedNpcLostService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private CoopResidentStateSnapshotService coopResidentStateSnapshotService;
+    private TameworkPersistenceRuntime persistenceRuntime;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private SpawnerTooltipBridge spawnerTooltipBridge;
@@ -383,25 +385,35 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
-        commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService();
         Path runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
+        persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
+        commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
+                persistenceRuntime.getNpcProfileRepository()
+        );
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
-                runtimeDataDirectory.resolve("CommandLinkedNpcCaptures.dat")
+                persistenceRuntime.getCaptureRepository(),
+                persistenceRuntime.getHealthService(),
+                persistenceRuntime.getNpcProfileRepository()
         );
         commandLinkedNpcCoopService = new CommandLinkedNpcCoopService(
-                runtimeDataDirectory.resolve("CommandLinkedNpcCoops.dat")
+                persistenceRuntime.getCoopLedgerRepository(),
+                persistenceRuntime.getHealthService(),
+                persistenceRuntime.getNpcProfileRepository()
         );
         commandLinkedNpcDeathService = new CommandLinkedNpcDeathService(
-                runtimeDataDirectory.resolve("CommandLinkedNpcDeaths.dat"),
-                commandLinkedNpcStateSnapshotService
+                commandLinkedNpcStateSnapshotService,
+                persistenceRuntime.getDeathRepository(),
+                persistenceRuntime.getHealthService(),
+                persistenceRuntime.getNpcProfileRepository()
         );
         commandLinkedNpcLostService = new CommandLinkedNpcLostService(
-                runtimeDataDirectory.resolve("CommandLinkedNpcLost.dat"),
                 getLogger(),
                 commandLinkedNpcStateSnapshotService,
                 commandLinkedNpcCaptureService,
-                commandLinkedNpcCoopService
+                commandLinkedNpcCoopService,
+                persistenceRuntime.getLostRepository(),
+                persistenceRuntime.getHealthService()
         );
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
         getEntityStoreRegistry().registerSystem(
@@ -581,6 +593,10 @@ public class Tamework extends JavaPlugin {
         overrideInitializedWorldKeys.clear();
         if (spawnerTooltipBridge != null) {
             spawnerTooltipBridge.shutdown();
+        }
+        if (persistenceRuntime != null) {
+            persistenceRuntime.close();
+            persistenceRuntime = null;
         }
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }

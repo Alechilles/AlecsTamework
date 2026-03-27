@@ -1,5 +1,8 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.persistence.sqlite.CaptureRepository;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.hypixel.hytale.math.vector.Vector3d;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -10,6 +13,7 @@ import java.util.Base64;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -20,17 +24,48 @@ public final class CommandLinkedNpcCaptureService {
     private static final String ARRAY_SEPARATOR = ";";
 
     private final ConcurrentHashMap<UUID, CapturedLinkedNpcSnapshot> capturedByNpc = new ConcurrentHashMap<>();
+    @Nullable
+    private final CaptureRepository repository;
+    @Nullable
+    private final PersistenceHealthService healthService;
+    @Nullable
+    private final NpcProfileRepository profileRepository;
     private final Path persistencePath;
     private final Object persistenceLock = new Object();
 
     public CommandLinkedNpcCaptureService() {
-        this(null);
+        this(null, null, null, null);
     }
 
     public CommandLinkedNpcCaptureService(@Nullable Path persistencePath) {
+        this(persistencePath, null, null, null);
+    }
+
+    public CommandLinkedNpcCaptureService(@Nonnull CaptureRepository repository,
+                                          @Nonnull PersistenceHealthService healthService,
+                                          @Nullable NpcProfileRepository profileRepository) {
+        this(null, repository, healthService, profileRepository);
+    }
+
+    @Nonnull
+    public static List<CapturedLinkedNpcSnapshot> loadLegacySnapshots(@Nullable Path legacyPath) {
+        if (legacyPath == null || !Files.exists(legacyPath)) {
+            return List.of();
+        }
+        CommandLinkedNpcCaptureService service = new CommandLinkedNpcCaptureService(legacyPath, null, null, null);
+        return new ArrayList<>(service.capturedByNpc.values());
+    }
+
+    private CommandLinkedNpcCaptureService(@Nullable Path persistencePath,
+                                           @Nullable CaptureRepository repository,
+                                           @Nullable PersistenceHealthService healthService,
+                                           @Nullable NpcProfileRepository profileRepository) {
         this.persistencePath = persistencePath != null
                 ? persistencePath.toAbsolutePath().normalize()
                 : null;
+        this.repository = repository;
+        this.healthService = healthService;
+        this.profileRepository = profileRepository;
         loadPersistedSnapshots();
     }
 
@@ -81,6 +116,9 @@ public final class CommandLinkedNpcCaptureService {
     }
 
     public void recordCapturedSnapshot(@Nullable CapturedLinkedNpcSnapshot snapshot) {
+        if (!canMutate()) {
+            return;
+        }
         if (snapshot == null || snapshot.npcUuid() == null || snapshot.toolIds() == null || snapshot.toolIds().length == 0) {
             return;
         }
@@ -101,10 +139,14 @@ public final class CommandLinkedNpcCaptureService {
                         snapshot.capturedAtMs() > 0L ? snapshot.capturedAtMs() : System.currentTimeMillis()
                 )
         );
+        enqueueProfileUpdate(capturedByNpc.get(snapshot.npcUuid()));
         persistSnapshots();
     }
 
     public void clearCapturedSnapshot(UUID npcUuid) {
+        if (!canMutate()) {
+            return;
+        }
         if (npcUuid == null) {
             return;
         }
@@ -114,6 +156,31 @@ public final class CommandLinkedNpcCaptureService {
     }
 
     private void loadPersistedSnapshots() {
+        if (repository != null) {
+            for (CapturedLinkedNpcSnapshot snapshot : repository.loadAll()) {
+                if (snapshot == null || snapshot.npcUuid() == null) {
+                    continue;
+                }
+                String[] toolIds = sanitizeToolIds(snapshot.toolIds());
+                if (toolIds.length == 0) {
+                    continue;
+                }
+                capturedByNpc.put(
+                        snapshot.npcUuid(),
+                        new CapturedLinkedNpcSnapshot(
+                                snapshot.npcUuid(),
+                                snapshot.ownerId(),
+                                toolIds,
+                                snapshot.roleId(),
+                                snapshot.displayName(),
+                                snapshot.lastKnownPosition(),
+                                snapshot.homePosition(),
+                                snapshot.capturedAtMs()
+                        )
+                );
+            }
+            return;
+        }
         if (persistencePath == null) {
             return;
         }
@@ -137,6 +204,10 @@ public final class CommandLinkedNpcCaptureService {
     }
 
     private void persistSnapshots() {
+        if (repository != null) {
+            repository.replaceAllAsync(capturedByNpc.values());
+            return;
+        }
         if (persistencePath == null) {
             return;
         }
@@ -165,6 +236,37 @@ public final class CommandLinkedNpcCaptureService {
                 // Ignore persistence write issues; runtime tracking remains available.
             }
         }
+    }
+
+    private boolean canMutate() {
+        if (healthService == null || healthService.isHealthy()) {
+            return true;
+        }
+        PersistenceHealthService.HealthState state = healthService.getState();
+        CoopDebugLogger.log(
+                "persistence blocked mutation service=capture reason="
+                        + (state.reason() != null ? state.reason() : "unknown")
+        );
+        return false;
+    }
+
+    private void enqueueProfileUpdate(@Nullable CapturedLinkedNpcSnapshot snapshot) {
+        if (profileRepository == null || snapshot == null || snapshot.npcUuid() == null) {
+            return;
+        }
+        profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                snapshot.npcUuid(),
+                snapshot.ownerId(),
+                null,
+                snapshot.roleId(),
+                snapshot.displayName(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                snapshot.toolIds()
+        ));
     }
 
     private String encodeSnapshot(CapturedLinkedNpcSnapshot snapshot) {
