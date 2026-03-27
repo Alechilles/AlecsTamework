@@ -29,6 +29,38 @@ class TameworkDataPathServiceTest {
     }
 
     @Test
+    void resolvesUniverseDataDirectoryForNestedLinuxStyleLayout() throws Exception {
+        Path runtimeRoot = tempDir.resolve("server").resolve("hytale");
+        Files.createDirectories(runtimeRoot.resolve("universe"));
+        Path legacyDataDir = runtimeRoot.resolve("mods").resolve("Alechilles_Alec's Tamework!");
+        TameworkDataPathService service = new TameworkDataPathService();
+
+        Path resolved = service.resolvePreferredDataDirectory(legacyDataDir);
+
+        assertEquals(
+                runtimeRoot.resolve("universe").resolve("Tamework").resolve("Data").normalize(),
+                resolved
+        );
+    }
+
+    @Test
+    void prefersNearestUniverseAncestorOverHigherServerAncestor() throws Exception {
+        Path outerServer = tempDir.resolve("server");
+        Path innerRoot = outerServer.resolve("hytale");
+        Files.createDirectories(outerServer.resolve("universe"));
+        Files.createDirectories(innerRoot.resolve("universe"));
+        Path legacyDataDir = innerRoot.resolve("mods").resolve("Alechilles_Alec's Tamework!");
+        TameworkDataPathService service = new TameworkDataPathService();
+
+        Path resolved = service.resolvePreferredDataDirectory(legacyDataDir);
+
+        assertEquals(
+                innerRoot.resolve("universe").resolve("Tamework").resolve("Data").normalize(),
+                resolved
+        );
+    }
+
+    @Test
     void migratesLegacyDatFilesToUniverseDataDirectory() throws Exception {
         Path legacyDataDir = tempDir.resolve("Server").resolve("mods").resolve("Alechilles_Alec's Tamework!");
         Files.createDirectories(legacyDataDir);

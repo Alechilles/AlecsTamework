@@ -17,6 +17,10 @@ import javax.annotation.Nullable;
  */
 public final class TameworkDataPathService {
     private static final String UNIVERSE_DIR_NAME = "universe";
+    private static final String WORLDS_DIR_NAME = "worlds";
+    private static final String MODS_DIR_NAME = "mods";
+    private static final String SERVER_DIR_NAME = "server";
+    private static final String HYTALE_DIR_NAME = "hytale";
     private static final String TAMEWORK_DIR_NAME = "Tamework";
     private static final String DATA_DIR_NAME = "Data";
 
@@ -70,15 +74,88 @@ public final class TameworkDataPathService {
 
     @Nonnull
     Path resolvePreferredDataDirectory(@Nonnull Path legacyDataDirectory) {
-        Path cursor = legacyDataDirectory;
+        Path runtimeRoot = resolveRuntimeRoot(legacyDataDirectory);
+        if (runtimeRoot == null) {
+            return legacyDataDirectory;
+        }
+        return runtimeRoot.resolve(UNIVERSE_DIR_NAME).resolve(TAMEWORK_DIR_NAME).resolve(DATA_DIR_NAME).normalize();
+    }
+
+    @Nullable
+    private Path resolveRuntimeRoot(@Nonnull Path legacyDataDirectory) {
+        Path rootWithUniverse = findAncestorWithChildDirectory(legacyDataDirectory, UNIVERSE_DIR_NAME);
+        if (rootWithUniverse != null) {
+            return rootWithUniverse;
+        }
+
+        Path modsDir = findAncestorNamed(legacyDataDirectory, MODS_DIR_NAME);
+        if (modsDir != null && modsDir.getParent() != null && isLikelyRuntimeRoot(modsDir.getParent())) {
+            return modsDir.getParent();
+        }
+
+        Path serverAncestor = findAncestorNamed(legacyDataDirectory, SERVER_DIR_NAME);
+        if (serverAncestor != null) {
+            return serverAncestor;
+        }
+        return null;
+    }
+
+    @Nullable
+    private Path findAncestorNamed(@Nonnull Path startingPath, @Nonnull String expectedName) {
+        Path cursor = startingPath;
         while (cursor != null) {
             Path fileName = cursor.getFileName();
-            if (fileName != null && "server".equalsIgnoreCase(fileName.toString())) {
-                return cursor.resolve(UNIVERSE_DIR_NAME).resolve(TAMEWORK_DIR_NAME).resolve(DATA_DIR_NAME).normalize();
+            if (fileName != null && expectedName.equalsIgnoreCase(fileName.toString())) {
+                return cursor;
             }
             cursor = cursor.getParent();
         }
-        return legacyDataDirectory;
+        return null;
+    }
+
+    @Nullable
+    private Path findAncestorWithChildDirectory(@Nonnull Path startingPath, @Nonnull String childDirectoryName) {
+        Path cursor = startingPath;
+        while (cursor != null) {
+            if (hasChildDirectory(cursor, childDirectoryName)) {
+                return cursor;
+            }
+            cursor = cursor.getParent();
+        }
+        return null;
+    }
+
+    private boolean isLikelyRuntimeRoot(@Nonnull Path directory) {
+        Path fileName = directory.getFileName();
+        String currentName = fileName != null ? fileName.toString() : null;
+        if (currentName != null
+                && (SERVER_DIR_NAME.equalsIgnoreCase(currentName) || HYTALE_DIR_NAME.equalsIgnoreCase(currentName))) {
+            return true;
+        }
+        return hasChildDirectory(directory, UNIVERSE_DIR_NAME) || hasChildDirectory(directory, WORLDS_DIR_NAME);
+    }
+
+    private boolean hasChildDirectory(@Nonnull Path parent, @Nonnull String childDirectoryName) {
+        Path direct = parent.resolve(childDirectoryName);
+        if (Files.isDirectory(direct)) {
+            return true;
+        }
+        if (!Files.isDirectory(parent)) {
+            return false;
+        }
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(parent)) {
+            for (Path child : stream) {
+                if (!Files.isDirectory(child) || child.getFileName() == null) {
+                    continue;
+                }
+                if (childDirectoryName.equalsIgnoreCase(child.getFileName().toString())) {
+                    return true;
+                }
+            }
+        } catch (Exception ignored) {
+            return false;
+        }
+        return false;
     }
 
     private void migrateLegacyDataFiles(@Nonnull Path legacyDirectory, @Nonnull Path targetDirectory) {
