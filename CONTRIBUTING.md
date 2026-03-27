@@ -13,8 +13,8 @@ If you’re unsure where to start, open an issue describing what you want to wor
 ## Project structure
 - `src/main/java` — plugin code
 - `src/main/resources` — assets and example NPCs
-- `docs` — versioned documentation for the repo
-- `https://github.com/Alechilles/AlecsTamework.wiki.git` — external wiki used for public docs
+- `wiki` — canonical public and contributor documentation
+- `docs` — legacy source notes that have been absorbed into the canonical wiki
 
 ## How to contribute
 1. **Discuss first**
@@ -48,5 +48,5 @@ By submitting a contribution, you agree that your contribution is licensed under
 
 Questions? Open an issue or ask in the discussion threads.
 ## Internal developer docs
-See /docs in this repo for architecture, config discovery, and build notes.
+See `/wiki/Developer-Documentation` for the canonical contributor docs. `/docs` remains as legacy source material.
 

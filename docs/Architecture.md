@@ -44,4 +44,4 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Bundled assets/examples: `src/main/resources/Server/Tamework`
 
 ## Versioned docs
-Public end-user docs live in the wiki repo. Internal contributor docs live under `/docs`.
+Canonical public and contributor docs now live under `/wiki` in the main repo. `/docs` remains as legacy source material used to seed that wiki.

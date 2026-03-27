@@ -58,7 +58,7 @@ This mod does not add anything to the game on it's own. If you are a player look
   - Configure per-coop behavior through `TwCoopConfig` assets keyed by `CoopId`.
   - Managed coop capture/release uses a resident ledger to preserve state continuity across coop cycles.
 - **Examples and Documentation** - Plenty of examples and thorough documentation to help you integrate Tamework.
-  - [Check out the wiki here](https://github.com/Alechilles/AlecsTamework/wiki)
+  - [Check out the canonical wiki in this repo](wiki/Home.md)
 
 ## Roadmap
 - **NPC XP/leveling system**
@@ -90,7 +90,7 @@ Optional for custom spawner tooltip lines:
 
 2. Choose your interaction path:
    Tamework's optimized system (`TameworkInteract` + `TwInteractionConfig`) or vanilla instruction flow (full control but a lot more work).
-   This quick-start guide will use `TameworkInteract`, but you can find more information on the components for use with the [vanilla flow here](https://github.com/Alechilles/AlecsTamework/wiki/Interactions-Vanilla).
+   This quick-start guide will use `TameworkInteract`, but you can find more information on both the optimized and vanilla paths in [Interaction Paths and Role Wiring](wiki/Modder-Documentation/Interaction-Paths-and-Role-Wiring.md).
 
 3. Copy a template:
    `Server/NPC/Roles/_Core/Templates/Template_Tamework_Example.json` or `Template_Tamework_Example_Simple.json`
@@ -183,22 +183,18 @@ Optional prompt updater (see the example template for full usage):
   - `SpawnerFeatureHandler` (with `Spawner*Service` collaborators)
   - `NamingFeatureHandler` (with `Naming*Service` collaborators)
   - `CommandItemFeatureHandler` (with `Command*Service` collaborators)
-- Detailed contributor map: `docs/Architecture.md`
+- Detailed contributor map: `wiki/Developer-Documentation/Architecture-Overview.md`
 
 ## Documentation (Wiki)
-- Home: https://github.com/Alechilles/AlecsTamework/wiki
-- Quick‑Start: https://github.com/Alechilles/AlecsTamework/wiki/Quick-Start
-- Interactions (Optimized): https://github.com/Alechilles/AlecsTamework/wiki/Interactions-Optimized
-- Interactions (Vanilla): https://github.com/Alechilles/AlecsTamework/wiki/Interactions-Vanilla
-- Items: https://github.com/Alechilles/AlecsTamework/wiki/Items
-- Spawner Config (Assets): https://github.com/Alechilles/AlecsTamework/wiki/Item-Config
-- Naming Items: https://github.com/Alechilles/AlecsTamework/wiki/Naming-Items
-- Command Items: https://github.com/Alechilles/AlecsTamework/wiki/Command-Items
-- Actions and Sensors: https://github.com/Alechilles/AlecsTamework/wiki/Actions-and-Sensors
-- Hooks and Bridges: https://github.com/Alechilles/AlecsTamework/wiki/Hooks-and-Bridges
-- Templates: https://github.com/Alechilles/AlecsTamework/wiki/Templates
-- Components: https://github.com/Alechilles/AlecsTamework/wiki/Components
-- Troubleshooting: https://github.com/Alechilles/AlecsTamework/wiki/Troubleshooting
+- Home: [wiki/Home.md](wiki/Home.md)
+- Player Guides: [wiki/Player-Guides/index.md](wiki/Player-Guides/index.md)
+- Modder Documentation: [wiki/Modder-Documentation/index.md](wiki/Modder-Documentation/index.md)
+- Developer Documentation: [wiki/Developer-Documentation/index.md](wiki/Developer-Documentation/index.md)
+- Setup and Quick Start: [wiki/Modder-Documentation/Setup-and-Quick-Start.md](wiki/Modder-Documentation/Setup-and-Quick-Start.md)
+- Interaction Paths and Role Wiring: [wiki/Modder-Documentation/Interaction-Paths-and-Role-Wiring.md](wiki/Modder-Documentation/Interaction-Paths-and-Role-Wiring.md)
+- Command System and Linked Panel Guide: [wiki/Modder-Documentation/Command-System-and-Linked-Panel-Guide.md](wiki/Modder-Documentation/Command-System-and-Linked-Panel-Guide.md)
+- TwInteractionConfig Reference: [wiki/Modder-Documentation/TwInteractionConfig-Reference.md](wiki/Modder-Documentation/TwInteractionConfig-Reference.md)
+- Architecture Overview: [wiki/Developer-Documentation/Architecture-Overview.md](wiki/Developer-Documentation/Architecture-Overview.md)
 
 ## Issue Reporting
 If you run into a bug or behavior issue, please submit a report:
