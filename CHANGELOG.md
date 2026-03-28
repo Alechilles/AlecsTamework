@@ -3,10 +3,14 @@
 ## Unreleased
 _No entries yet._
 
-## 2.5.2 - CurseForge Packaging Hotfix - 2026-03-27
+## 2.5.2 - Portal Return Threading Fixes - 2026-03-27
+### Changed
+- Reverted the experimental SQLite native-library resource renaming workaround and restored standard shaded `sqlite-jdbc` packaging for the release artifact.
+
 ### Fixed
-- Fixed release packaging for bundled SQLite support by storing native binaries under renamed `.bin` resource paths and restoring the real platform filename at runtime before driver initialization.
-- Fixed CurseForge processing failures caused by shipping blacklisted native-library extensions directly inside the published jar.
+- Fixed global owner-population cap checks to count foreign-world ownership on each target world's executor instead of directly iterating cross-world stores from the active world thread.
+- Fixed post-portal command linking and legacy first-claim ownership acquisition crashing after a player returned from an instance world while global per-player population caps were enabled.
+- Fixed breeding's global per-player population cap path to reuse the same cross-world-safe owner counting helper, preventing the same `Store.assertThread()` failure class in breeding checks.
 
 ## 2.5.1 - Persistence Refresh + Portal Instance Hotfix - 2026-03-27
 ### Changed

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -14,7 +15,6 @@ import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -158,7 +158,7 @@ final class BreedingClaimLimitPolicyService {
                             ? PlayerReservationKey.global(ownerId)
                             : PlayerReservationKey.perWorld(worldName, ownerId);
                     playerReservationKeys.add(reservationKey);
-                    int currentCount = countOwnedPopulationForOwner(scope, store, worldName, ownerId);
+                    int currentCount = countOwnedPopulationForOwner(scope, store, ownerId);
                     int pendingReservations = pendingPlayerReservations == null
                             ? 0
                             : Math.max(0, pendingPlayerReservations.getOrDefault(reservationKey, 0));
@@ -476,53 +476,8 @@ final class BreedingClaimLimitPolicyService {
 
     private int countOwnedPopulationForOwner(@Nonnull TwGlobalConfig.PerPlayerLimitScope scope,
                                              @Nullable Store<EntityStore> store,
-                                             @Nullable String worldName,
                                              @Nonnull UUID ownerId) {
-        if (scope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL) {
-            Universe universe = Universe.get();
-            Map<String, World> worldsByName = universe != null ? universe.getWorlds() : null;
-            if (worldsByName == null || worldsByName.isEmpty()) {
-                return countOwnedPopulationInStore(store, ownerId);
-            }
-            int total = 0;
-            for (World world : worldsByName.values()) {
-                if (world == null || world.getEntityStore() == null) {
-                    continue;
-                }
-                Store<EntityStore> worldStore = world.getEntityStore().getStore();
-                total += countOwnedPopulationInStore(worldStore, ownerId);
-            }
-            return Math.max(0, total);
-        }
-        if (worldName == null || worldName.isBlank()) {
-            return 0;
-        }
-        return countOwnedPopulationInStore(store, ownerId);
-    }
-
-    private int countOwnedPopulationInStore(@Nullable Store<EntityStore> store, @Nonnull UUID ownerId) {
-        if (store == null || ownerId == null) {
-            return 0;
-        }
-        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
-        ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
-        if (npcType == null || ownerType == null) {
-            return 0;
-        }
-        int[] count = new int[] {0};
-        store.forEachChunk(
-                Query.and(npcType, ownerType),
-                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
-                    int size = chunk.size();
-                    for (int i = 0; i < size; i++) {
-                        TameworkOwnerComponent owner = chunk.getComponent(i, ownerType);
-                        if (owner != null && ownerId.equals(owner.getOwnerId())) {
-                            count[0]++;
-                        }
-                    }
-                }
-        );
-        return Math.max(0, count[0]);
+        return OwnerPopulationCapService.countOwnedPopulation(scope, store, ownerId);
     }
 
     @Nonnull

@@ -47,7 +47,6 @@ public final class SqliteConnectionManager {
                 return;
             }
             try {
-                SqliteNativeLibraryBootstrap.prepare();
                 Class.forName("org.sqlite.JDBC");
                 driverLoaded = true;
             } catch (ClassNotFoundException ex) {
