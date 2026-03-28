@@ -23,19 +23,21 @@ final class LegacyDatImporter {
 
     private final Path runtimeDataDirectory;
     private final SqliteConnectionManager connectionManager;
+    private final SqliteSchemaMigrator schemaMigrator;
 
     LegacyDatImporter(@Nonnull Path runtimeDataDirectory,
-                      @Nonnull SqliteConnectionManager connectionManager) {
+                      @Nonnull SqliteConnectionManager connectionManager,
+                      @Nonnull SqliteSchemaMigrator schemaMigrator) {
         this.runtimeDataDirectory = runtimeDataDirectory;
         this.connectionManager = connectionManager;
+        this.schemaMigrator = schemaMigrator;
     }
 
-    boolean importAll(@Nonnull String migrationId,
-                      @Nonnull CaptureRepository captureRepository,
+    boolean importAll(@Nonnull CaptureRepository captureRepository,
                       @Nonnull CoopLedgerRepository coopRepository,
                       @Nonnull DeathRepository deathRepository,
                       @Nonnull LostRepository lostRepository) throws Exception {
-        if (isMigrationApplied(migrationId)) {
+        if (isMigrationApplied()) {
             return false;
         }
 
@@ -55,11 +57,23 @@ final class LegacyDatImporter {
         try (Connection connection = connectionManager.openConnection()) {
             connection.setAutoCommit(false);
             try {
-                captureRepository.replaceAllInTransaction(connection, captureRows);
-                coopRepository.replaceAllInTransaction(connection, coopRows);
-                deathRepository.replaceAllInTransaction(connection, deathRows);
-                lostRepository.replaceAllInTransaction(connection, lostRows);
-                recordMigration(connection, migrationId);
+                for (CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot row : captureRows) {
+                    captureRepository.upsertInTransaction(connection, row);
+                }
+                for (CoopLedgerRow row : coopRows) {
+                    coopRepository.upsertSlotInTransaction(connection, row);
+                }
+                for (CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot row : deathRows) {
+                    deathRepository.upsertInTransaction(connection, row);
+                }
+                for (CommandLinkedNpcLostService.LostLinkedNpcSnapshot row : lostRows) {
+                    lostRepository.upsertInTransaction(connection, row);
+                }
+                schemaMigrator.recordMigration(
+                        connection,
+                        SqliteSchemaMigrator.MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2,
+                        SqliteSchemaMigrator.MIGRATION_NAME_LEGACY_DAT_IMPORT_V2
+                );
                 connection.commit();
             } catch (Exception ex) {
                 connection.rollback();
@@ -81,25 +95,15 @@ final class LegacyDatImporter {
         return true;
     }
 
-    private boolean isMigrationApplied(@Nonnull String migrationId) throws Exception {
+    private boolean isMigrationApplied() throws Exception {
         try (Connection connection = connectionManager.openConnection();
              PreparedStatement statement = connection.prepareStatement(
-                     "SELECT 1 FROM schema_migrations WHERE migration_id = ? LIMIT 1"
+                     "SELECT 1 FROM schema_migrations WHERE version = ? LIMIT 1"
              )) {
-            statement.setString(1, migrationId);
+            statement.setInt(1, SqliteSchemaMigrator.MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2);
             try (ResultSet rs = statement.executeQuery()) {
                 return rs.next();
             }
-        }
-    }
-
-    private void recordMigration(@Nonnull Connection connection, @Nonnull String migrationId) throws Exception {
-        try (PreparedStatement statement = connection.prepareStatement(
-                "INSERT INTO schema_migrations (migration_id, applied_at_ms) VALUES (?, ?)"
-        )) {
-            statement.setString(1, migrationId);
-            statement.setLong(2, System.currentTimeMillis());
-            statement.executeUpdate();
         }
     }
 

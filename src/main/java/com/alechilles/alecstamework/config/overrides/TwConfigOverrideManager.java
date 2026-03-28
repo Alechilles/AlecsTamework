@@ -62,6 +62,11 @@ public final class TwConfigOverrideManager {
     }
 
     @Nonnull
+    public String resolveOverrideScopeKey(@Nonnull World world) {
+        return normalizeScopeKey(resolveOverrideRoot(world));
+    }
+
+    @Nonnull
     public Path resolveOverridePath(@Nonnull World world, @Nonnull TwConfigAssetDescriptor descriptor) {
         Path packRoot = resolveOverrideRoot(world).resolve(packDirectoryName(descriptor.sourcePackKey()));
         return resolvePortable(packRoot, overrideRelativePath(descriptor)).normalize();
@@ -80,8 +85,13 @@ public final class TwConfigOverrideManager {
 
     @Nonnull
     private Path resolveUniverseRoot(@Nonnull World world) {
-        Path savePath = world.getSavePath().toAbsolutePath().normalize();
-        Path cursor = savePath;
+        return resolveUniverseRoot(world.getSavePath());
+    }
+
+    @Nonnull
+    static Path resolveUniverseRoot(@Nonnull Path savePath) {
+        Path normalizedSavePath = savePath.toAbsolutePath().normalize();
+        Path cursor = normalizedSavePath;
         while (cursor != null) {
             Path fileName = cursor.getFileName();
             if (fileName != null && "universe".equalsIgnoreCase(fileName.toString())) {
@@ -89,14 +99,19 @@ public final class TwConfigOverrideManager {
             }
             cursor = cursor.getParent();
         }
-        Path parent = savePath.getParent();
+        Path parent = normalizedSavePath.getParent();
         if (parent != null
                 && parent.getFileName() != null
                 && "worlds".equalsIgnoreCase(parent.getFileName().toString())
                 && parent.getParent() != null) {
             return parent.getParent();
         }
-        return savePath;
+        return normalizedSavePath;
+    }
+
+    @Nonnull
+    static String normalizeScopeKey(@Nonnull Path path) {
+        return path.toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
     }
 
     @Nonnull

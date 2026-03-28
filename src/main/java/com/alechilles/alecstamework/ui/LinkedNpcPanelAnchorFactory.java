@@ -19,14 +19,17 @@ final class LinkedNpcPanelAnchorFactory {
     private static final int NEED_RING_SIDE_LENGTH = 24;
     private static final int NEED_RING_BOTTOM_LENGTH = 24;
 
-    private static final int TRAIT_RING_H_SEGMENT_LENGTH = 18;
-    private static final int TRAIT_RING_V_SEGMENT_LENGTH = 18;
-    private static final int TRAIT_RING_TOP_Y = 1;
+    private static final int TRAIT_RING_THICKNESS = 3;
+    private static final int TRAIT_RING_TOP_Y = 0;
+    private static final int TRAIT_RING_SIDE_TOP = 0;
     private static final int TRAIT_RING_BOTTOM_Y = 21;
-    private static final int TRAIT_RING_LEFT_X = 1;
+    private static final int TRAIT_RING_LEFT_X = 0;
     private static final int TRAIT_RING_RIGHT_X = 21;
-    private static final int TRAIT_RING_H_SEGMENT_LEFT = 3;
-    private static final int TRAIT_RING_V_SEGMENT_TOP = 3;
+    private static final int TRAIT_RING_TOP_LEFT_START = 0;
+    private static final int TRAIT_RING_TOP_RIGHT_START = 12;
+    private static final int TRAIT_RING_TOP_HALF_LENGTH = 12;
+    private static final int TRAIT_RING_SIDE_LENGTH = 24;
+    private static final int TRAIT_RING_BOTTOM_LENGTH = 24;
 
     private LinkedNpcPanelAnchorFactory() {
     }
@@ -41,36 +44,41 @@ final class LinkedNpcPanelAnchorFactory {
         return anchor;
     }
 
-    static Anchor buildTraitTopFillAnchor(int width, boolean counterClockwise) {
-        int clamped = clamp(width, TRAIT_RING_H_SEGMENT_LENGTH);
+    static Anchor buildTraitRingBar1Anchor(int width, boolean counterClockwise) {
+        int clamped = clamp(width, TRAIT_RING_TOP_HALF_LENGTH);
         int left = counterClockwise
-                ? TRAIT_RING_H_SEGMENT_LEFT + (TRAIT_RING_H_SEGMENT_LENGTH - clamped)
-                : TRAIT_RING_H_SEGMENT_LEFT;
-        return buildAnchor(left, TRAIT_RING_TOP_Y, clamped, 2);
+                ? TRAIT_RING_TOP_LEFT_START + (TRAIT_RING_TOP_HALF_LENGTH - clamped)
+                : TRAIT_RING_TOP_RIGHT_START;
+        return buildAnchor(left, TRAIT_RING_TOP_Y, clamped, TRAIT_RING_THICKNESS);
     }
 
-    static Anchor buildTraitRightFillAnchor(int height, boolean counterClockwise) {
-        int clamped = clamp(height, TRAIT_RING_V_SEGMENT_LENGTH);
-        int top = counterClockwise
-                ? TRAIT_RING_V_SEGMENT_TOP + (TRAIT_RING_V_SEGMENT_LENGTH - clamped)
-                : TRAIT_RING_V_SEGMENT_TOP;
-        return buildAnchor(TRAIT_RING_RIGHT_X, top, 2, clamped);
+    static Anchor buildTraitRingBar2Anchor(int height, boolean counterClockwise) {
+        int clamped = clamp(height, TRAIT_RING_SIDE_LENGTH);
+        int left = counterClockwise ? TRAIT_RING_LEFT_X : TRAIT_RING_RIGHT_X;
+        return buildAnchor(left, TRAIT_RING_SIDE_TOP, TRAIT_RING_THICKNESS, clamped);
     }
 
-    static Anchor buildTraitBottomFillAnchor(int width, boolean counterClockwise) {
-        int clamped = clamp(width, TRAIT_RING_H_SEGMENT_LENGTH);
+    static Anchor buildTraitRingBar3Anchor(int width, boolean counterClockwise) {
+        int clamped = clamp(width, TRAIT_RING_BOTTOM_LENGTH);
         int left = counterClockwise
-                ? TRAIT_RING_H_SEGMENT_LEFT
-                : TRAIT_RING_H_SEGMENT_LEFT + (TRAIT_RING_H_SEGMENT_LENGTH - clamped);
-        return buildAnchor(left, TRAIT_RING_BOTTOM_Y, clamped, 2);
+                ? TRAIT_RING_TOP_LEFT_START
+                : TRAIT_RING_TOP_LEFT_START + (TRAIT_RING_BOTTOM_LENGTH - clamped);
+        return buildAnchor(left, TRAIT_RING_BOTTOM_Y, clamped, TRAIT_RING_THICKNESS);
     }
 
-    static Anchor buildTraitLeftFillAnchor(int height, boolean counterClockwise) {
-        int clamped = clamp(height, TRAIT_RING_V_SEGMENT_LENGTH);
-        int top = counterClockwise
-                ? TRAIT_RING_V_SEGMENT_TOP
-                : TRAIT_RING_V_SEGMENT_TOP + (TRAIT_RING_V_SEGMENT_LENGTH - clamped);
-        return buildAnchor(TRAIT_RING_LEFT_X, top, 2, clamped);
+    static Anchor buildTraitRingBar4Anchor(int height, boolean counterClockwise) {
+        int clamped = clamp(height, TRAIT_RING_SIDE_LENGTH);
+        int left = counterClockwise ? TRAIT_RING_RIGHT_X : TRAIT_RING_LEFT_X;
+        int top = TRAIT_RING_SIDE_TOP + (TRAIT_RING_SIDE_LENGTH - clamped);
+        return buildAnchor(left, top, TRAIT_RING_THICKNESS, clamped);
+    }
+
+    static Anchor buildTraitRingBar5Anchor(int width, boolean counterClockwise) {
+        int clamped = clamp(width, TRAIT_RING_TOP_HALF_LENGTH);
+        int left = counterClockwise
+                ? TRAIT_RING_TOP_RIGHT_START + (TRAIT_RING_TOP_HALF_LENGTH - clamped)
+                : TRAIT_RING_TOP_LEFT_START;
+        return buildAnchor(left, TRAIT_RING_TOP_Y, clamped, TRAIT_RING_THICKNESS);
     }
 
     static Anchor buildNeedRingBar1Anchor(int width) {

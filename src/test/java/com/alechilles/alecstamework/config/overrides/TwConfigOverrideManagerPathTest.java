@@ -39,4 +39,28 @@ class TwConfigOverrideManagerPathTest {
                 resolved
         );
     }
+
+    @Test
+    void resolveUniverseRootUsesSharedOverrideScopeForInstanceWorlds() {
+        Path defaultWorldSavePath = Path.of(
+                "C:/Users/22ale/AppData/Roaming/Hytale/Saves/MyUniverse/universe/worlds/default"
+        );
+        Path instanceWorldSavePath = Path.of(
+                "C:/Users/22ale/AppData/Roaming/Hytale/Saves/MyUniverse/universe/worlds/"
+                        + "instance-Portals_Hedera-eccce206-7b1b-4f9f-b047-506895b403e1"
+        );
+
+        Path defaultOverrideRoot = TwConfigOverrideManager.resolveUniverseRoot(defaultWorldSavePath)
+                .resolve(TwConfigOverrideManager.OVERRIDE_ROOT_RELATIVE)
+                .normalize();
+        Path instanceOverrideRoot = TwConfigOverrideManager.resolveUniverseRoot(instanceWorldSavePath)
+                .resolve(TwConfigOverrideManager.OVERRIDE_ROOT_RELATIVE)
+                .normalize();
+
+        assertEquals(defaultOverrideRoot, instanceOverrideRoot);
+        assertEquals(
+                TwConfigOverrideManager.normalizeScopeKey(defaultOverrideRoot),
+                TwConfigOverrideManager.normalizeScopeKey(instanceOverrideRoot)
+        );
+    }
 }

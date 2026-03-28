@@ -1,82 +1,112 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.hypixel.hytale.math.vector.Vector3d;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public final class DeathRepository {
+    private static final String SNAPSHOT_TYPE = "death";
+    private static final String LINK_TYPE = "death";
+
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
+    private final NpcProfileRepository profileRepository;
 
     public DeathRepository(@Nonnull SqliteConnectionManager connectionManager,
                            @Nonnull PersistenceWriteQueue writeQueue) {
+        this(connectionManager, writeQueue, new NpcProfileRepository(connectionManager, writeQueue));
+    }
+
+    public DeathRepository(@Nonnull SqliteConnectionManager connectionManager,
+                           @Nonnull PersistenceWriteQueue writeQueue,
+                           @Nonnull NpcProfileRepository profileRepository) {
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
+        this.profileRepository = profileRepository;
     }
 
     @Nonnull
     public List<CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> loadAll() {
         ArrayList<CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> rows = new ArrayList<>();
         try (Connection connection = connectionManager.openConnection();
-             Statement statement = connection.createStatement();
-             ResultSet rs = statement.executeQuery("SELECT * FROM death_snapshots")) {
-            while (rs.next()) {
-                UUID npcUuid = SqliteValueCodec.parseUuid(rs.getString("npc_uuid"));
-                if (npcUuid == null) {
-                    continue;
+             PreparedStatement statement = connection.prepareStatement(
+                     """
+                     SELECT s.profile_id, s.payload_json, p.current_npc_uuid, p.owner_uuid, p.role_id, p.display_name
+                     FROM npc_snapshots s
+                     INNER JOIN npc_profiles p ON p.profile_id = s.profile_id
+                     WHERE s.snapshot_type = ? AND s.is_active = 1
+                     """
+             )) {
+            statement.setString(1, SNAPSHOT_TYPE);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    UUID npcUuid = SqliteValueCodec.parseUuid(rs.getString("current_npc_uuid"));
+                    String profileId = rs.getString("profile_id");
+                    if (npcUuid == null || profileId == null || profileId.isBlank()) {
+                        continue;
+                    }
+
+                    JsonObject payload = parseJsonObject(rs.getString("payload_json"));
+                    if (payload == null) {
+                        continue;
+                    }
+                    String[] toolIds = profileRepository.loadToolLinks(connection, profileId, LINK_TYPE);
+                    UUID ownerId = coalesceUuid(
+                            SqliteValueCodec.parseUuid(rs.getString("owner_uuid")),
+                            parseUuid(payload, "ownerId")
+                    );
+                    String roleId = coalesceNonBlank(rs.getString("role_id"), getString(payload, "roleId"));
+                    String displayName = coalesceNonBlank(rs.getString("display_name"), getString(payload, "displayName"));
+
+                    rows.add(new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
+                            npcUuid,
+                            ownerId,
+                            getString(payload, "ownerName"),
+                            toolIds,
+                            roleId,
+                            getBoolean(payload, "tamed", false),
+                            getString(payload, "customName"),
+                            displayName,
+                            readVector(payload, "lastKnownPosition"),
+                            readVector(payload, "homePosition"),
+                            getLong(payload, "diedAtMs", System.currentTimeMillis()),
+                            getLong(payload, "respawnAvailableAtMs", System.currentTimeMillis()),
+                            getString(payload, "breedingConfigId"),
+                            getDoubleObj(payload, "breedingHappiness"),
+                            getLong(payload, "breedingCooldownUntilMs", 0L),
+                            parseUuid(payload, "breedingLastPartnerUuid"),
+                            getString(payload, "traitsConfigId"),
+                            getLong(payload, "traitsRollSeed", 0L),
+                            getString(payload, "traitsValues"),
+                            getString(payload, "happinessConfigId"),
+                            getDoubleObj(payload, "happinessValue"),
+                            getLong(payload, "happinessLastUpdateMs", 0L),
+                            getString(payload, "lifeStage"),
+                            getLong(payload, "lifeStageBornAtMs", 0L),
+                            getLong(payload, "lifeStageAdolescentAtMs", 0L),
+                            getLong(payload, "lifeStageAdultAtMs", 0L),
+                            getLong(payload, "lifeStageFullyGrownAtMs", 0L),
+                            getDouble(payload, "lifeStageBabyScale", 0.55),
+                            getDouble(payload, "lifeStageAdolescentScale", 0.80),
+                            getDouble(payload, "lifeStageAdolescentSwitchScale", 0.80),
+                            getDouble(payload, "lifeStageAdultStartScale", 0.80),
+                            getDouble(payload, "lifeStageAdultSwitchScale", 1.00),
+                            getDouble(payload, "lifeStageAdultScale", 1.00),
+                            getBoolean(payload, "lifeStageGrowthScalingEnabled", false),
+                            getString(payload, "attachmentsConfigId"),
+                            getString(payload, "attachmentsValues"),
+                            getBoolean(payload, "breedingEnabled", false)
+                    ));
                 }
-                UUID ownerUuid = SqliteValueCodec.parseUuid(rs.getString("owner_uuid"));
-                Vector3d lastKnown = SqliteValueCodec.readVector3d(rs, "last_known_x", "last_known_y", "last_known_z");
-                Vector3d home = SqliteValueCodec.readVector3d(rs, "home_x", "home_y", "home_z");
-                UUID breedingLastPartnerUuid = SqliteValueCodec.parseUuid(rs.getString("breeding_last_partner_uuid"));
-                String[] toolIds = loadTools(connection, npcUuid);
-                rows.add(new CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot(
-                        npcUuid,
-                        ownerUuid,
-                        rs.getString("owner_name"),
-                        toolIds,
-                        rs.getString("role_id"),
-                        rs.getInt("tamed") != 0,
-                        rs.getString("custom_name"),
-                        rs.getString("display_name"),
-                        lastKnown,
-                        home,
-                        rs.getLong("died_at_ms"),
-                        rs.getLong("respawn_available_at_ms"),
-                        rs.getString("breeding_config_id"),
-                        (Double) rs.getObject("breeding_happiness"),
-                        rs.getLong("breeding_cooldown_until_ms"),
-                        breedingLastPartnerUuid,
-                        rs.getString("traits_config_id"),
-                        rs.getLong("traits_roll_seed"),
-                        rs.getString("traits_values"),
-                        rs.getString("happiness_config_id"),
-                        (Double) rs.getObject("happiness_value"),
-                        rs.getLong("happiness_last_update_ms"),
-                        rs.getString("life_stage"),
-                        rs.getLong("life_stage_born_at_ms"),
-                        rs.getLong("life_stage_adolescent_at_ms"),
-                        rs.getLong("life_stage_adult_at_ms"),
-                        rs.getLong("life_stage_fully_grown_at_ms"),
-                        rs.getDouble("life_stage_baby_scale"),
-                        rs.getDouble("life_stage_adolescent_scale"),
-                        rs.getDouble("life_stage_adolescent_switch_scale"),
-                        rs.getDouble("life_stage_adult_start_scale"),
-                        rs.getDouble("life_stage_adult_switch_scale"),
-                        rs.getDouble("life_stage_adult_scale"),
-                        rs.getInt("life_stage_growth_scaling_enabled") != 0,
-                        rs.getString("attachments_config_id"),
-                        rs.getString("attachments_values"),
-                        rs.getInt("breeding_enabled") != 0
-                ));
             }
         } catch (Exception ignored) {
             return List.of();
@@ -84,117 +114,236 @@ public final class DeathRepository {
         return rows;
     }
 
-    public boolean replaceAllAsync(@Nonnull Collection<CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> rows) {
-        return writeQueue.submit("death_replace_all", connection -> replaceAllInTransaction(connection, rows));
+    public boolean upsertAsync(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        return writeQueue.submit("death_upsert", connection -> upsertInTransaction(connection, snapshot));
     }
 
-    void replaceAllInTransaction(@Nonnull Connection connection,
-                                 @Nonnull Collection<CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot> rows) throws Exception {
-        try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("DELETE FROM death_snapshot_tools");
-            statement.executeUpdate("DELETE FROM death_snapshots");
-        }
+    public boolean deleteAsync(@Nonnull UUID npcUuid) {
+        return writeQueue.submit("death_delete", connection -> deleteInTransaction(connection, npcUuid));
+    }
 
-        try (PreparedStatement insertSnapshot = connection.prepareStatement(
-                """
-                INSERT INTO death_snapshots (
-                    npc_uuid, owner_uuid, owner_name, role_id, tamed,
-                    custom_name, display_name,
-                    last_known_x, last_known_y, last_known_z,
-                    home_x, home_y, home_z,
-                    died_at_ms, respawn_available_at_ms,
-                    breeding_config_id, breeding_happiness, breeding_cooldown_until_ms,
-                    breeding_last_partner_uuid,
-                    traits_config_id, traits_roll_seed, traits_values,
-                    happiness_config_id, happiness_value, happiness_last_update_ms,
-                    life_stage,
-                    life_stage_born_at_ms, life_stage_adolescent_at_ms, life_stage_adult_at_ms, life_stage_fully_grown_at_ms,
-                    life_stage_baby_scale, life_stage_adolescent_scale, life_stage_adolescent_switch_scale,
-                    life_stage_adult_start_scale, life_stage_adult_switch_scale, life_stage_adult_scale,
-                    life_stage_growth_scaling_enabled,
-                    attachments_config_id, attachments_values, breeding_enabled
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
+    void upsertInTransaction(@Nonnull Connection connection,
+                             @Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) throws Exception {
+        if (snapshot.npcUuid() == null) {
+            return;
+        }
+        profileRepository.upsertProfileInTransaction(connection, new NpcProfileRepository.ProfileUpdate(
+                snapshot.npcUuid(),
+                snapshot.ownerId(),
+                snapshot.ownerName(),
+                snapshot.roleId(),
+                snapshot.displayName(),
+                snapshot.customName(),
+                snapshot.tamed(),
+                null,
+                null,
+                null,
+                snapshot.toolIds()
+        ));
+        String profileId = profileRepository.resolveOrCreateProfileIdInTransaction(connection, snapshot.npcUuid());
+        profileRepository.replaceToolLinksInTransaction(connection, profileId, LINK_TYPE, snapshot.toolIds());
+        profileRepository.setActiveSnapshotInTransaction(
+                connection,
+                profileId,
+                SNAPSHOT_TYPE,
+                toPayloadJson(snapshot),
+                Math.max(1L, snapshot.diedAtMs())
         );
-             PreparedStatement insertTool = connection.prepareStatement(
-                     "INSERT INTO death_snapshot_tools (npc_uuid, tool_id) VALUES (?, ?)"
-             )) {
-            for (CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot row : rows) {
-                if (row == null || row.npcUuid() == null) {
-                    continue;
-                }
-                int i = 1;
-                insertSnapshot.setString(i++, row.npcUuid().toString());
-                SqliteValueCodec.bindUuid(insertSnapshot, i++, row.ownerId());
-                insertSnapshot.setString(i++, row.ownerName());
-                insertSnapshot.setString(i++, row.roleId());
-                insertSnapshot.setInt(i++, row.tamed() ? 1 : 0);
-                insertSnapshot.setString(i++, row.customName());
-                insertSnapshot.setString(i++, row.displayName());
-                SqliteValueCodec.bindVector3d(insertSnapshot, i, i + 1, i + 2, row.lastKnownPosition());
-                i += 3;
-                SqliteValueCodec.bindVector3d(insertSnapshot, i, i + 1, i + 2, row.homePosition());
-                i += 3;
-                insertSnapshot.setLong(i++, row.diedAtMs());
-                insertSnapshot.setLong(i++, row.respawnAvailableAtMs());
-                insertSnapshot.setString(i++, row.breedingConfigId());
-                insertSnapshot.setObject(i++, row.breedingHappiness());
-                insertSnapshot.setLong(i++, row.breedingCooldownUntilMs());
-                SqliteValueCodec.bindUuid(insertSnapshot, i++, row.breedingLastPartnerUuid());
-                insertSnapshot.setString(i++, row.traitsConfigId());
-                insertSnapshot.setLong(i++, row.traitsRollSeed());
-                insertSnapshot.setString(i++, row.traitsValues());
-                insertSnapshot.setString(i++, row.happinessConfigId());
-                insertSnapshot.setObject(i++, row.happinessValue());
-                insertSnapshot.setLong(i++, row.happinessLastUpdateMs());
-                insertSnapshot.setString(i++, row.lifeStage());
-                insertSnapshot.setLong(i++, row.lifeStageBornAtMs());
-                insertSnapshot.setLong(i++, row.lifeStageAdolescentAtMs());
-                insertSnapshot.setLong(i++, row.lifeStageAdultAtMs());
-                insertSnapshot.setLong(i++, row.lifeStageFullyGrownAtMs());
-                insertSnapshot.setDouble(i++, row.lifeStageBabyScale());
-                insertSnapshot.setDouble(i++, row.lifeStageAdolescentScale());
-                insertSnapshot.setDouble(i++, row.lifeStageAdolescentSwitchScale());
-                insertSnapshot.setDouble(i++, row.lifeStageAdultStartScale());
-                insertSnapshot.setDouble(i++, row.lifeStageAdultSwitchScale());
-                insertSnapshot.setDouble(i++, row.lifeStageAdultScale());
-                insertSnapshot.setInt(i++, row.lifeStageGrowthScalingEnabled() ? 1 : 0);
-                insertSnapshot.setString(i++, row.attachmentsConfigId());
-                insertSnapshot.setString(i++, row.attachmentsValues());
-                insertSnapshot.setInt(i, row.breedingEnabled() ? 1 : 0);
-                insertSnapshot.addBatch();
+        profileRepository.setProfileStateInTransaction(connection, profileId, null, true, null, null, null);
+    }
 
-                if (row.toolIds() != null) {
-                    for (String toolId : row.toolIds()) {
-                        if (toolId == null || toolId.isBlank()) {
-                            continue;
-                        }
-                        insertTool.setString(1, row.npcUuid().toString());
-                        insertTool.setString(2, toolId);
-                        insertTool.addBatch();
-                    }
-                }
-            }
-            insertSnapshot.executeBatch();
-            insertTool.executeBatch();
+    void deleteInTransaction(@Nonnull Connection connection, @Nonnull UUID npcUuid) throws Exception {
+        String profileId = profileRepository.resolveProfileIdInTransaction(connection, npcUuid);
+        if (profileId == null || profileId.isBlank()) {
+            return;
+        }
+        profileRepository.deactivateSnapshotTypeInTransaction(connection, profileId, SNAPSHOT_TYPE);
+        profileRepository.replaceToolLinksInTransaction(connection, profileId, LINK_TYPE, new String[0]);
+        profileRepository.setProfileStateInTransaction(connection, profileId, null, false, null, null, null);
+    }
+
+    @Nonnull
+    private String toPayloadJson(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        JsonObject payload = new JsonObject();
+        if (snapshot.ownerId() != null) {
+            payload.addProperty("ownerId", snapshot.ownerId().toString());
+        }
+        putString(payload, "ownerName", snapshot.ownerName());
+        putString(payload, "roleId", snapshot.roleId());
+        payload.addProperty("tamed", snapshot.tamed());
+        putString(payload, "customName", snapshot.customName());
+        putString(payload, "displayName", snapshot.displayName());
+        putVector(payload, "lastKnownPosition", snapshot.lastKnownPosition());
+        putVector(payload, "homePosition", snapshot.homePosition());
+        payload.addProperty("diedAtMs", snapshot.diedAtMs());
+        payload.addProperty("respawnAvailableAtMs", snapshot.respawnAvailableAtMs());
+        putString(payload, "breedingConfigId", snapshot.breedingConfigId());
+        if (snapshot.breedingHappiness() != null) {
+            payload.addProperty("breedingHappiness", snapshot.breedingHappiness());
+        }
+        payload.addProperty("breedingCooldownUntilMs", snapshot.breedingCooldownUntilMs());
+        if (snapshot.breedingLastPartnerUuid() != null) {
+            payload.addProperty("breedingLastPartnerUuid", snapshot.breedingLastPartnerUuid().toString());
+        }
+        putString(payload, "traitsConfigId", snapshot.traitsConfigId());
+        payload.addProperty("traitsRollSeed", snapshot.traitsRollSeed());
+        putString(payload, "traitsValues", snapshot.traitsValues());
+        putString(payload, "happinessConfigId", snapshot.happinessConfigId());
+        if (snapshot.happinessValue() != null) {
+            payload.addProperty("happinessValue", snapshot.happinessValue());
+        }
+        payload.addProperty("happinessLastUpdateMs", snapshot.happinessLastUpdateMs());
+        putString(payload, "lifeStage", snapshot.lifeStage());
+        payload.addProperty("lifeStageBornAtMs", snapshot.lifeStageBornAtMs());
+        payload.addProperty("lifeStageAdolescentAtMs", snapshot.lifeStageAdolescentAtMs());
+        payload.addProperty("lifeStageAdultAtMs", snapshot.lifeStageAdultAtMs());
+        payload.addProperty("lifeStageFullyGrownAtMs", snapshot.lifeStageFullyGrownAtMs());
+        payload.addProperty("lifeStageBabyScale", snapshot.lifeStageBabyScale());
+        payload.addProperty("lifeStageAdolescentScale", snapshot.lifeStageAdolescentScale());
+        payload.addProperty("lifeStageAdolescentSwitchScale", snapshot.lifeStageAdolescentSwitchScale());
+        payload.addProperty("lifeStageAdultStartScale", snapshot.lifeStageAdultStartScale());
+        payload.addProperty("lifeStageAdultSwitchScale", snapshot.lifeStageAdultSwitchScale());
+        payload.addProperty("lifeStageAdultScale", snapshot.lifeStageAdultScale());
+        payload.addProperty("lifeStageGrowthScalingEnabled", snapshot.lifeStageGrowthScalingEnabled());
+        putString(payload, "attachmentsConfigId", snapshot.attachmentsConfigId());
+        putString(payload, "attachmentsValues", snapshot.attachmentsValues());
+        payload.addProperty("breedingEnabled", snapshot.breedingEnabled());
+        return payload.toString();
+    }
+
+    @Nullable
+    private JsonObject parseJsonObject(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return JsonParser.parseString(raw).getAsJsonObject();
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
-    private String[] loadTools(@Nonnull Connection connection, @Nonnull UUID npcUuid) throws Exception {
-        ArrayList<String> tools = new ArrayList<>();
-        try (PreparedStatement statement = connection.prepareStatement(
-                "SELECT tool_id FROM death_snapshot_tools WHERE npc_uuid = ?"
-        )) {
-            statement.setString(1, npcUuid.toString());
-            try (ResultSet rs = statement.executeQuery()) {
-                while (rs.next()) {
-                    String toolId = rs.getString("tool_id");
-                    if (toolId != null && !toolId.isBlank()) {
-                        tools.add(toolId);
-                    }
-                }
-            }
+    private void putString(@Nonnull JsonObject object, @Nonnull String key, @Nullable String value) {
+        if (value != null && !value.isBlank()) {
+            object.addProperty(key, value);
         }
-        return tools.toArray(new String[0]);
+    }
+
+    private void putVector(@Nonnull JsonObject target, @Nonnull String key, @Nullable Vector3d value) {
+        if (value == null) {
+            return;
+        }
+        JsonObject vector = new JsonObject();
+        vector.addProperty("x", value.x);
+        vector.addProperty("y", value.y);
+        vector.addProperty("z", value.z);
+        target.add(key, vector);
+    }
+
+    @Nullable
+    private Vector3d readVector(@Nonnull JsonObject source, @Nonnull String key) {
+        if (!source.has(key) || !source.get(key).isJsonObject()) {
+            return null;
+        }
+        JsonObject vector = source.getAsJsonObject(key);
+        try {
+            return new Vector3d(
+                    vector.get("x").getAsDouble(),
+                    vector.get("y").getAsDouble(),
+                    vector.get("z").getAsDouble()
+            );
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private String getString(@Nonnull JsonObject source, @Nonnull String key) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            String value = source.get(key).getAsString();
+            return value == null || value.isBlank() ? null : value;
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private long getLong(@Nonnull JsonObject source, @Nonnull String key, long fallback) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return source.get(key).getAsLong();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private double getDouble(@Nonnull JsonObject source, @Nonnull String key, double fallback) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return source.get(key).getAsDouble();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    @Nullable
+    private Double getDoubleObj(@Nonnull JsonObject source, @Nonnull String key) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return source.get(key).getAsDouble();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private boolean getBoolean(@Nonnull JsonObject source, @Nonnull String key, boolean fallback) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return source.get(key).getAsBoolean();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    @Nullable
+    private UUID parseUuid(@Nonnull JsonObject source, @Nonnull String key) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(source.get(key).getAsString());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private UUID coalesceUuid(@Nullable UUID first, @Nullable UUID second) {
+        if (first != null) {
+            return first;
+        }
+        return second;
+    }
+
+    @Nullable
+    private String coalesceNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 }
+

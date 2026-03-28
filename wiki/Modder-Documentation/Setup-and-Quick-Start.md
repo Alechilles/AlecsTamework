@@ -15,7 +15,7 @@ Add Tamework in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.5.0"
+  "Alechilles:Alec's Tamework!": "2.5.1"
 },
 "IncludesAssetPack": true
 ```

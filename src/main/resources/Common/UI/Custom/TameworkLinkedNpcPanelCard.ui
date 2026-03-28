@@ -49,55 +49,70 @@ Group {
     }
 
     Group #TraitStrip {
-        Anchor: (Top: 1, Right: 34, Width: 80, Height: 24);
+        Anchor: (Top: 1, Right: 34, Width: 108, Height: 24);
         LayoutMode: Left;
 
         Group #TraitSlot0 {
             Anchor: (Width: 24, Height: 24);
             Visible: false;
 
-            Group #RingTrackTop {
-                Anchor: (Top: 1, Left: 3, Width: 18, Height: 2);
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
                 Background: #23354a;
             }
 
-            Group #RingTrackRight {
-                Anchor: (Top: 3, Left: 21, Width: 2, Height: 18);
-                Background: #23354a;
-            }
-
-            Group #RingTrackBottom {
-                Anchor: (Top: 21, Left: 3, Width: 18, Height: 2);
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
                 Background: #23354a;
             }
 
             Group #RingTrackLeft {
-                Anchor: (Top: 3, Left: 1, Width: 2, Height: 18);
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
                 Background: #23354a;
             }
 
-            Group #RingFillTop {
-                Anchor: (Top: 1, Left: 3, Width: 0, Height: 2);
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
                 Background: #6fc576;
             }
 
-            Group #RingFillRight {
-                Anchor: (Top: 3, Left: 21, Width: 2, Height: 0);
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
                 Background: #6fc576;
             }
 
-            Group #RingFillBottom {
-                Anchor: (Top: 21, Left: 3, Width: 0, Height: 2);
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
                 Background: #6fc576;
             }
 
-            Group #RingFillLeft {
-                Anchor: (Top: 3, Left: 1, Width: 2, Height: 0);
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
                 Background: #6fc576;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #6fc576;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
             }
 
             Group {
-                Anchor: (Top: 5, Left: 5, Width: 14, Height: 14);
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
                 Background: #081220;
             }
 
@@ -130,48 +145,63 @@ Group {
             Anchor: (Width: 24, Height: 24);
             Visible: false;
 
-            Group #RingTrackTop {
-                Anchor: (Top: 1, Left: 3, Width: 18, Height: 2);
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
                 Background: #23354a;
             }
 
-            Group #RingTrackRight {
-                Anchor: (Top: 3, Left: 21, Width: 2, Height: 18);
-                Background: #23354a;
-            }
-
-            Group #RingTrackBottom {
-                Anchor: (Top: 21, Left: 3, Width: 18, Height: 2);
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
                 Background: #23354a;
             }
 
             Group #RingTrackLeft {
-                Anchor: (Top: 3, Left: 1, Width: 2, Height: 18);
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
                 Background: #23354a;
             }
 
-            Group #RingFillTop {
-                Anchor: (Top: 1, Left: 3, Width: 0, Height: 2);
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
                 Background: #6fc576;
             }
 
-            Group #RingFillRight {
-                Anchor: (Top: 3, Left: 21, Width: 2, Height: 0);
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
                 Background: #6fc576;
             }
 
-            Group #RingFillBottom {
-                Anchor: (Top: 21, Left: 3, Width: 0, Height: 2);
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
                 Background: #6fc576;
             }
 
-            Group #RingFillLeft {
-                Anchor: (Top: 3, Left: 1, Width: 2, Height: 0);
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
                 Background: #6fc576;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #6fc576;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
             }
 
             Group {
-                Anchor: (Top: 5, Left: 5, Width: 14, Height: 14);
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
                 Background: #081220;
             }
 
@@ -204,48 +234,152 @@ Group {
             Anchor: (Width: 24, Height: 24);
             Visible: false;
 
-            Group #RingTrackTop {
-                Anchor: (Top: 1, Left: 3, Width: 18, Height: 2);
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
                 Background: #23354a;
             }
 
-            Group #RingTrackRight {
-                Anchor: (Top: 3, Left: 21, Width: 2, Height: 18);
-                Background: #23354a;
-            }
-
-            Group #RingTrackBottom {
-                Anchor: (Top: 21, Left: 3, Width: 18, Height: 2);
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
                 Background: #23354a;
             }
 
             Group #RingTrackLeft {
-                Anchor: (Top: 3, Left: 1, Width: 2, Height: 18);
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
                 Background: #23354a;
             }
 
-            Group #RingFillTop {
-                Anchor: (Top: 1, Left: 3, Width: 0, Height: 2);
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
                 Background: #6fc576;
             }
 
-            Group #RingFillRight {
-                Anchor: (Top: 3, Left: 21, Width: 2, Height: 0);
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
                 Background: #6fc576;
             }
 
-            Group #RingFillBottom {
-                Anchor: (Top: 21, Left: 3, Width: 0, Height: 2);
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
                 Background: #6fc576;
             }
 
-            Group #RingFillLeft {
-                Anchor: (Top: 3, Left: 1, Width: 2, Height: 0);
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
                 Background: #6fc576;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #6fc576;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
             }
 
             Group {
-                Anchor: (Top: 5, Left: 5, Width: 14, Height: 14);
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
+                Background: #081220;
+            }
+
+            Group #TraitIconImage {
+                Anchor: (Top: 6, Left: 6, Width: 12, Height: 12);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Trait_Disposition.png");
+                Visible: false;
+            }
+
+            Label #TraitIcon {
+                Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
+                Text: "?";
+                Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
+            }
+
+            TextButton #TraitTooltip {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Style: @TraitTooltipButtonStyle;
+                Text: "";
+                TooltipText: "Trait";
+                TextTooltipStyle: @LinkedActionTooltipStyle;
+            }
+        }
+
+        Group {
+            Anchor: (Width: 4);
+        }
+
+        Group #TraitSlot3 {
+            Anchor: (Width: 24, Height: 24);
+            Visible: false;
+
+            Group #RingTrackTopLeft {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackTopRight {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackLeft {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingTrackBottom {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #23354a;
+            }
+
+            Group #RingTrackRight {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #23354a;
+            }
+
+            Group #RingFillBar1 {
+                Anchor: (Top: 0, Left: 0, Width: 12, Height: 3);
+                Background: #6fc576;
+            }
+
+            Group #RingFillBar2 {
+                Anchor: (Top: 0, Left: 0, Width: 3, Height: 24);
+                Background: #6fc576;
+            }
+
+            Group #RingFillBar3 {
+                Anchor: (Top: 21, Left: 0, Width: 24, Height: 3);
+                Background: #6fc576;
+            }
+
+            Group #RingFillBar4 {
+                Anchor: (Top: 0, Left: 21, Width: 3, Height: 24);
+                Background: #6fc576;
+            }
+
+            Group #RingFillBar5 {
+                Anchor: (Top: 0, Left: 12, Width: 12, Height: 3);
+                Background: #6fc576;
+            }
+
+            Group #CornerMaskOverlay {
+                Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
+                Background: (TexturePath: "Tamework/LinkedPanelIcons/Corner_Mask_24.png");
+            }
+
+            Group {
+                Anchor: (Top: 3, Left: 3, Width: 18, Height: 18);
                 Background: #081220;
             }
 

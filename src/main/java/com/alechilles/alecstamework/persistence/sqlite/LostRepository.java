@@ -1,51 +1,72 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.hypixel.hytale.math.vector.Vector3d;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 public final class LostRepository {
+    private static final String SNAPSHOT_TYPE = "lost";
+
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
+    private final NpcProfileRepository profileRepository;
 
     public LostRepository(@Nonnull SqliteConnectionManager connectionManager,
                           @Nonnull PersistenceWriteQueue writeQueue) {
+        this(connectionManager, writeQueue, new NpcProfileRepository(connectionManager, writeQueue));
+    }
+
+    public LostRepository(@Nonnull SqliteConnectionManager connectionManager,
+                          @Nonnull PersistenceWriteQueue writeQueue,
+                          @Nonnull NpcProfileRepository profileRepository) {
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
+        this.profileRepository = profileRepository;
     }
 
     @Nonnull
     public List<CommandLinkedNpcLostService.LostLinkedNpcSnapshot> loadAll() {
         ArrayList<CommandLinkedNpcLostService.LostLinkedNpcSnapshot> rows = new ArrayList<>();
         try (Connection connection = connectionManager.openConnection();
-             Statement statement = connection.createStatement();
-             ResultSet rs = statement.executeQuery("SELECT * FROM lost_snapshots")) {
-            while (rs.next()) {
-                UUID npcUuid = SqliteValueCodec.parseUuid(rs.getString("npc_uuid"));
-                if (npcUuid == null) {
-                    continue;
+             PreparedStatement statement = connection.prepareStatement(
+                     """
+                     SELECT s.profile_id, s.payload_json, p.current_npc_uuid
+                     FROM npc_snapshots s
+                     INNER JOIN npc_profiles p ON p.profile_id = s.profile_id
+                     WHERE s.snapshot_type = ? AND s.is_active = 1
+                     """
+             )) {
+            statement.setString(1, SNAPSHOT_TYPE);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    UUID npcUuid = SqliteValueCodec.parseUuid(rs.getString("current_npc_uuid"));
+                    if (npcUuid == null) {
+                        continue;
+                    }
+                    JsonObject payload = parseJsonObject(rs.getString("payload_json"));
+                    if (payload == null) {
+                        continue;
+                    }
+                    rows.add(new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
+                            npcUuid,
+                            readVector(payload, "lastKnownPosition"),
+                            readVector(payload, "homePosition"),
+                            getLong(payload, "lastRelocationQueuedAtMs", 0L),
+                            getLong(payload, "lostAtMs", 0L),
+                            getInt(payload, "relocationRetryAttempts", 0),
+                            parseUuid(payload, "replacementNpcUuid"),
+                            getLong(payload, "recoveredAtMs", 0L)
+                    ));
                 }
-                Vector3d lastKnown = SqliteValueCodec.readVector3d(rs, "last_known_x", "last_known_y", "last_known_z");
-                Vector3d home = SqliteValueCodec.readVector3d(rs, "home_x", "home_y", "home_z");
-                UUID replacementUuid = SqliteValueCodec.parseUuid(rs.getString("replacement_npc_uuid"));
-                rows.add(new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
-                        npcUuid,
-                        lastKnown,
-                        home,
-                        rs.getLong("last_relocation_queued_at_ms"),
-                        rs.getLong("lost_at_ms"),
-                        rs.getInt("relocation_retry_attempts"),
-                        replacementUuid,
-                        rs.getLong("recovered_at_ms")
-                ));
             }
         } catch (Exception ignored) {
             return List.of();
@@ -53,45 +74,139 @@ public final class LostRepository {
         return rows;
     }
 
-    public boolean replaceAllAsync(@Nonnull Collection<CommandLinkedNpcLostService.LostLinkedNpcSnapshot> rows) {
-        return writeQueue.submit("lost_replace_all", connection -> replaceAllInTransaction(connection, rows));
+    public boolean upsertAsync(@Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot) {
+        return writeQueue.submit("lost_upsert", connection -> upsertInTransaction(connection, snapshot));
     }
 
-    void replaceAllInTransaction(@Nonnull Connection connection,
-                                 @Nonnull Collection<CommandLinkedNpcLostService.LostLinkedNpcSnapshot> rows) throws Exception {
-        try (Statement statement = connection.createStatement()) {
-            statement.executeUpdate("DELETE FROM lost_snapshots");
-        }
+    public boolean deleteAsync(@Nonnull UUID npcUuid) {
+        return writeQueue.submit("lost_delete", connection -> deleteInTransaction(connection, npcUuid));
+    }
 
-        try (PreparedStatement insert = connection.prepareStatement(
-                """
-                INSERT INTO lost_snapshots (
-                    npc_uuid,
-                    last_known_x, last_known_y, last_known_z,
-                    home_x, home_y, home_z,
-                    last_relocation_queued_at_ms,
-                    lost_at_ms,
-                    relocation_retry_attempts,
-                    replacement_npc_uuid,
-                    recovered_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
-        )) {
-            for (CommandLinkedNpcLostService.LostLinkedNpcSnapshot row : rows) {
-                if (row == null || row.npcUuid() == null) {
-                    continue;
-                }
-                insert.setString(1, row.npcUuid().toString());
-                SqliteValueCodec.bindVector3d(insert, 2, 3, 4, row.lastKnownPosition());
-                SqliteValueCodec.bindVector3d(insert, 5, 6, 7, row.homePosition());
-                insert.setLong(8, row.lastRelocationQueuedAtMs());
-                insert.setLong(9, row.lostAtMs());
-                insert.setInt(10, row.relocationRetryAttempts());
-                SqliteValueCodec.bindUuid(insert, 11, row.replacementNpcUuid());
-                insert.setLong(12, row.recoveredAtMs());
-                insert.addBatch();
-            }
-            insert.executeBatch();
+    void upsertInTransaction(@Nonnull Connection connection,
+                             @Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot) throws Exception {
+        if (snapshot.npcUuid() == null) {
+            return;
+        }
+        profileRepository.upsertProfileInTransaction(connection, new NpcProfileRepository.ProfileUpdate(
+                snapshot.npcUuid(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        ));
+        String profileId = profileRepository.resolveOrCreateProfileIdInTransaction(connection, snapshot.npcUuid());
+        profileRepository.setActiveSnapshotInTransaction(
+                connection,
+                profileId,
+                SNAPSHOT_TYPE,
+                toPayloadJson(snapshot),
+                Math.max(1L, snapshot.lostAtMs())
+        );
+        profileRepository.setProfileStateInTransaction(connection, profileId, null, null, true, null, null);
+    }
+
+    void deleteInTransaction(@Nonnull Connection connection, @Nonnull UUID npcUuid) throws Exception {
+        String profileId = profileRepository.resolveProfileIdInTransaction(connection, npcUuid);
+        if (profileId == null || profileId.isBlank()) {
+            return;
+        }
+        profileRepository.deactivateSnapshotTypeInTransaction(connection, profileId, SNAPSHOT_TYPE);
+        profileRepository.setProfileStateInTransaction(connection, profileId, null, null, false, null, null);
+    }
+
+    @Nonnull
+    private String toPayloadJson(@Nonnull CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot) {
+        JsonObject payload = new JsonObject();
+        putVector(payload, "lastKnownPosition", snapshot.lastKnownPosition());
+        putVector(payload, "homePosition", snapshot.homePosition());
+        payload.addProperty("lastRelocationQueuedAtMs", snapshot.lastRelocationQueuedAtMs());
+        payload.addProperty("lostAtMs", snapshot.lostAtMs());
+        payload.addProperty("relocationRetryAttempts", snapshot.relocationRetryAttempts());
+        if (snapshot.replacementNpcUuid() != null) {
+            payload.addProperty("replacementNpcUuid", snapshot.replacementNpcUuid().toString());
+        }
+        payload.addProperty("recoveredAtMs", snapshot.recoveredAtMs());
+        return payload.toString();
+    }
+
+    @Nullable
+    private JsonObject parseJsonObject(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return JsonParser.parseString(raw).getAsJsonObject();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private void putVector(@Nonnull JsonObject target, @Nonnull String key, @Nullable Vector3d value) {
+        if (value == null) {
+            return;
+        }
+        JsonObject vector = new JsonObject();
+        vector.addProperty("x", value.x);
+        vector.addProperty("y", value.y);
+        vector.addProperty("z", value.z);
+        target.add(key, vector);
+    }
+
+    @Nullable
+    private Vector3d readVector(@Nonnull JsonObject source, @Nonnull String key) {
+        if (!source.has(key) || !source.get(key).isJsonObject()) {
+            return null;
+        }
+        JsonObject vector = source.getAsJsonObject(key);
+        try {
+            return new Vector3d(
+                    vector.get("x").getAsDouble(),
+                    vector.get("y").getAsDouble(),
+                    vector.get("z").getAsDouble()
+            );
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    private long getLong(@Nonnull JsonObject source, @Nonnull String key, long fallback) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return source.get(key).getAsLong();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    private int getInt(@Nonnull JsonObject source, @Nonnull String key, int fallback) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return fallback;
+        }
+        try {
+            return source.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return fallback;
+        }
+    }
+
+    @Nullable
+    private UUID parseUuid(@Nonnull JsonObject source, @Nonnull String key) {
+        if (!source.has(key) || source.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return UUID.fromString(source.get(key).getAsString());
+        } catch (Exception ignored) {
+            return null;
         }
     }
 }
+

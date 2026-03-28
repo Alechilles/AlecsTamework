@@ -139,8 +139,9 @@ public final class CommandLinkedNpcCaptureService {
                         snapshot.capturedAtMs() > 0L ? snapshot.capturedAtMs() : System.currentTimeMillis()
                 )
         );
-        enqueueProfileUpdate(capturedByNpc.get(snapshot.npcUuid()));
-        persistSnapshots();
+        CapturedLinkedNpcSnapshot persisted = capturedByNpc.get(snapshot.npcUuid());
+        enqueueProfileUpdate(persisted);
+        persistSnapshot(persisted);
     }
 
     public void clearCapturedSnapshot(UUID npcUuid) {
@@ -151,7 +152,7 @@ public final class CommandLinkedNpcCaptureService {
             return;
         }
         if (capturedByNpc.remove(npcUuid) != null) {
-            persistSnapshots();
+            deleteSnapshot(npcUuid);
         }
     }
 
@@ -205,7 +206,6 @@ public final class CommandLinkedNpcCaptureService {
 
     private void persistSnapshots() {
         if (repository != null) {
-            repository.replaceAllAsync(capturedByNpc.values());
             return;
         }
         if (persistencePath == null) {
@@ -238,6 +238,25 @@ public final class CommandLinkedNpcCaptureService {
         }
     }
 
+    private void persistSnapshot(@Nullable CapturedLinkedNpcSnapshot snapshot) {
+        if (snapshot == null || snapshot.npcUuid() == null) {
+            return;
+        }
+        if (repository != null) {
+            repository.upsertAsync(snapshot);
+            return;
+        }
+        persistSnapshots();
+    }
+
+    private void deleteSnapshot(@Nonnull UUID npcUuid) {
+        if (repository != null) {
+            repository.deleteAsync(npcUuid);
+            return;
+        }
+        persistSnapshots();
+    }
+
     private boolean canMutate() {
         if (healthService == null || healthService.isHealthy()) {
             return true;
@@ -251,7 +270,10 @@ public final class CommandLinkedNpcCaptureService {
     }
 
     private void enqueueProfileUpdate(@Nullable CapturedLinkedNpcSnapshot snapshot) {
-        if (profileRepository == null || snapshot == null || snapshot.npcUuid() == null) {
+        if (profileRepository == null
+                || repository != null
+                || snapshot == null
+                || snapshot.npcUuid() == null) {
             return;
         }
         profileRepository.upsertAsync(new NpcProfileRepository.ProfileUpdate(

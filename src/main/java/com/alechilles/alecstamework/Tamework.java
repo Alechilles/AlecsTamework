@@ -134,7 +134,7 @@ public class Tamework extends JavaPlugin {
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetPackCoordinator assetPackCoordinator;
     private TwConfigOverrideManager configOverrideManager;
-    private final Set<String> overrideInitializedWorldKeys = ConcurrentHashMap.newKeySet();
+    private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
 
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
@@ -591,7 +591,7 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
-        overrideInitializedWorldKeys.clear();
+        overrideInitializedScopeKeys.clear();
         if (spawnerTooltipBridge != null) {
             spawnerTooltipBridge.shutdown();
         }
@@ -629,8 +629,9 @@ public class Tamework extends JavaPlugin {
         if (world == null || configOverrideManager == null) {
             return;
         }
-        String worldKey = world.getSavePath().toAbsolutePath().normalize().toString().toLowerCase();
-        if (!overrideInitializedWorldKeys.add(worldKey)) {
+        // Override files are resolved from the universe root, so instance worlds share one reload scope.
+        String overrideScopeKey = configOverrideManager.resolveOverrideScopeKey(world);
+        if (!overrideInitializedScopeKeys.add(overrideScopeKey)) {
             return;
         }
         TwConfigOverrideManager.ReloadResult reloadResult = configOverrideManager.reloadOverrides(world);

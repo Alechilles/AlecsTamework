@@ -2,7 +2,7 @@
   "modName": "Alec's Tamework!",
   "repository": "Alechilles/AlecsTamework",
   "github": {
-    "prerelease": true
+    "prerelease": false
   },
   "packaging": "jar",
   "artifactNameTemplate": "Alec's Tamework! v{version}.jar",

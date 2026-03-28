@@ -42,7 +42,7 @@ import java.util.UUID;
  * health snapshots, and home flags) from command orchestration flows.
  */
 final class CommandLinkedPanelEntryService {
-    private static final int MAX_TRAIT_INDICATORS = 3;
+    private static final int MAX_TRAIT_INDICATORS = 4;
 
     private final CommandLinkedNpcRecordStore linkedNpcRecordStore;
     private final CommandLinkedNpcDeathService deathService;

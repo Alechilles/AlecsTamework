@@ -204,7 +204,7 @@ public final class CommandLinkedNpcLostService {
                         0L
                 )
         );
-        persistSnapshots();
+        persistSnapshot(snapshotsByNpc.get(npcUuid));
         if (logger != null) {
             logger.at(Level.INFO).log(
                     "Marked linked companion as lost after relocation retries (npc="
@@ -255,7 +255,7 @@ public final class CommandLinkedNpcLostService {
             return;
         }
         if (snapshotsByNpc.remove(npcUuid, snapshot)) {
-            persistSnapshots();
+            deleteSnapshot(npcUuid);
         }
     }
 
@@ -335,7 +335,7 @@ public final class CommandLinkedNpcLostService {
             return;
         }
         if (snapshotsByNpc.remove(npcUuid, snapshot)) {
-            persistSnapshots();
+            deleteSnapshot(npcUuid);
         }
     }
 
@@ -384,7 +384,7 @@ public final class CommandLinkedNpcLostService {
             stateSnapshotService.clearSnapshot(originalNpcUuid);
         }
         recoverySnapshotsByNpc.remove(originalNpcUuid);
-        persistSnapshots();
+        persistSnapshot(snapshotsByNpc.get(originalNpcUuid));
     }
 
     private void loadPersistedSnapshots() {
@@ -421,7 +421,6 @@ public final class CommandLinkedNpcLostService {
 
     private void persistSnapshots() {
         if (repository != null) {
-            repository.replaceAllAsync(snapshotsByNpc.values());
             return;
         }
         if (persistencePath == null) {
@@ -452,6 +451,25 @@ public final class CommandLinkedNpcLostService {
                 // Ignore persistence write issues; runtime tracking remains available.
             }
         }
+    }
+
+    private void persistSnapshot(@Nullable LostLinkedNpcSnapshot snapshot) {
+        if (snapshot == null || snapshot.npcUuid() == null) {
+            return;
+        }
+        if (repository != null) {
+            repository.upsertAsync(snapshot);
+            return;
+        }
+        persistSnapshots();
+    }
+
+    private void deleteSnapshot(@Nonnull UUID npcUuid) {
+        if (repository != null) {
+            repository.deleteAsync(npcUuid);
+            return;
+        }
+        persistSnapshots();
     }
 
     private boolean canMutate() {

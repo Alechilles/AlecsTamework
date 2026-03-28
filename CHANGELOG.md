@@ -3,6 +3,17 @@
 ## Unreleased
 _No entries yet._
 
+## 2.5.1 - Persistence Refresh + Portal Instance Hotfix - 2026-03-27
+### Changed
+- Reworked linked companion persistence onto a shared SQLite profile/snapshot schema across capture, lost, death, and coop tracking, with incremental per-record updates instead of broad snapshot table rewrites.
+- Updated legacy persistence import and schema migration paths to populate the normalized profile, alias, tool-link, snapshot, coop-slot, and profile-state tables used by the new runtime.
+- Linked companion panel trait indicators now support up to four visible traits and use a wider segmented ring layout with refreshed masking/icon presentation.
+- Refreshed the project README and modder quick-start docs to better position Tamework as a framework dependency and point modders to the current documentation flow.
+
+### Fixed
+- Fixed cross-world instance transfers reloading TwConfig overrides once per generated world path instead of once per shared universe override root, preventing same-universe portal transfers from stalling the world thread.
+- Fixed linked capture and lost-companion persistence paths to upsert/delete only the touched records, reducing stale rewrites and keeping profile updates aligned with the new persistence model.
+
 ## 2.5.0 - Coop Runtime Rebuild + Update 4 Stability - 2026-03-26
 ### Added
 - Added a Tamework-authoritative coop runtime for pre-release that manages coop intake/release state through a resident ledger keyed by `world + coop block position + resident slot`.
