@@ -3,6 +3,11 @@
 ## Unreleased
 _No entries yet._
 
+## 2.5.2 - CurseForge Packaging Hotfix - 2026-03-27
+### Fixed
+- Fixed release packaging for bundled SQLite support by storing native binaries under renamed `.bin` resource paths and restoring the real platform filename at runtime before driver initialization.
+- Fixed CurseForge processing failures caused by shipping blacklisted native-library extensions directly inside the published jar.
+
 ## 2.5.1 - Persistence Refresh + Portal Instance Hotfix - 2026-03-27
 ### Changed
 - Reworked linked companion persistence onto a shared SQLite profile/snapshot schema across capture, lost, death, and coop tracking, with incremental per-record updates instead of broad snapshot table rewrites.

@@ -6,7 +6,7 @@
 
     <groupId>com.alechilles</groupId>
     <artifactId>alecstamework</artifactId>
-    <version>2.5.1</version>
+    <version>2.5.2</version>
     <packaging>jar</packaging>
 
     <name>.Alec's Tamework!</name>
@@ -16,6 +16,7 @@
         <maven.compiler.source>25</maven.compiler.source>
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <sqlite.jdbc.version>3.49.1.0</sqlite.jdbc.version>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
         <hytale.install.path>${hytale.install.path.release}</hytale.install.path>
@@ -50,7 +51,7 @@
         <dependency>
             <groupId>org.xerial</groupId>
             <artifactId>sqlite-jdbc</artifactId>
-            <version>3.49.1.0</version>
+            <version>${sqlite.jdbc.version}</version>
         </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -84,6 +85,10 @@
                     <exclude>manifest-assets.json</exclude>
                 </excludes>
             </resource>
+            <resource>
+                <directory>${project.build.directory}/generated-resources/sqlite-native-renamed</directory>
+                <filtering>false</filtering>
+            </resource>
         </resources>
         <plugins>
             <plugin>
@@ -110,6 +115,60 @@
             </plugin>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <version>3.8.1</version>
+                <executions>
+                    <execution>
+                        <id>unpack-sqlite-native-libraries</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>unpack</goal>
+                        </goals>
+                        <configuration>
+                            <artifactItems>
+                                <artifactItem>
+                                    <groupId>org.xerial</groupId>
+                                    <artifactId>sqlite-jdbc</artifactId>
+                                    <version>${sqlite.jdbc.version}</version>
+                                    <includes>org/sqlite/native/**</includes>
+                                    <outputDirectory>${project.build.directory}/generated-resources/sqlite-native-raw</outputDirectory>
+                                </artifactItem>
+                            </artifactItems>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <id>rename-sqlite-native-libraries</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <mkdir dir="${project.build.directory}/generated-resources/sqlite-native-renamed" />
+                                <copy todir="${project.build.directory}/generated-resources/sqlite-native-renamed"
+                                      includeemptydirs="false"
+                                      overwrite="true">
+                                    <fileset dir="${project.build.directory}/generated-resources/sqlite-native-raw">
+                                        <include name="org/sqlite/native/**/*.dll" />
+                                        <include name="org/sqlite/native/**/*.so" />
+                                        <include name="org/sqlite/native/**/*.dylib" />
+                                    </fileset>
+                                    <globmapper from="*" to="*.bin" />
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>3.6.0</version>
                 <executions>
@@ -120,6 +179,14 @@
                         </goals>
                         <configuration>
                             <createDependencyReducedPom>false</createDependencyReducedPom>
+                            <filters>
+                                <filter>
+                                    <artifact>org.xerial:sqlite-jdbc</artifact>
+                                    <excludes>
+                                        <exclude>org/sqlite/native/**</exclude>
+                                    </excludes>
+                                </filter>
+                            </filters>
                         </configuration>
                     </execution>
                 </executions>
