@@ -1,13 +1,17 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+import java.sql.Array;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -28,9 +32,26 @@ public final class NpcProfileRepository {
                                 @Nullable String[] toolIds) {
     }
 
+    public record ProfileRecord(@Nonnull String profileId,
+                                @Nullable UUID currentNpcUuid,
+                                @Nullable UUID ownerUuid,
+                                @Nullable String ownerName,
+                                @Nullable String roleId,
+                                @Nullable String displayName,
+                                @Nullable String customName,
+                                @Nullable Boolean tamed,
+                                @Nullable String coopId,
+                                @Nullable Integer coopSlot,
+                                @Nonnull String[] toolIds,
+                                @Nonnull String[] activeSnapshotTypes,
+                                long updatedAtMs) {
+    }
+
     @Nullable
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
+    @Nullable
+    private volatile PersistenceChangeObserver changeObserver;
 
     public NpcProfileRepository(@Nonnull SqliteConnectionManager connectionManager,
                                 @Nonnull PersistenceWriteQueue writeQueue) {
@@ -43,8 +64,23 @@ public final class NpcProfileRepository {
         this.writeQueue = writeQueue;
     }
 
+    public void setChangeObserver(@Nullable PersistenceChangeObserver changeObserver) {
+        this.changeObserver = changeObserver;
+    }
+
     public boolean upsertAsync(@Nonnull ProfileUpdate update) {
-        return writeQueue.submit("npc_profile_upsert", connection -> upsertProfileInTransaction(connection, update));
+        AtomicReference<ProfileRecord> beforeRef = new AtomicReference<>();
+        AtomicReference<ProfileRecord> afterRef = new AtomicReference<>();
+        return writeQueue.submit(
+                "npc_profile_upsert",
+                connection -> {
+                    beforeRef.set(loadProfileByNpcUuidInTransaction(connection, update.npcUuid()));
+                    upsertProfileInTransaction(connection, update);
+                    String profileId = resolveProfileIdInTransaction(connection, update.npcUuid());
+                    afterRef.set(profileId != null ? loadProfileByIdInTransaction(connection, profileId) : null);
+                },
+                () -> notifyProfileChanged(beforeRef.get(), afterRef.get())
+        );
     }
 
     public boolean remapCurrentUuidAsync(@Nonnull UUID previousNpcUuid, @Nonnull UUID currentNpcUuid) {
@@ -79,6 +115,58 @@ public final class NpcProfileRepository {
             return resolveProfileIdInTransaction(connection, npcUuid);
         } catch (Exception ignored) {
             return null;
+        }
+    }
+
+    @Nullable
+    public ProfileRecord loadProfileById(@Nullable String profileId) {
+        if (connectionManager == null || profileId == null || profileId.isBlank()) {
+            return null;
+        }
+        try (Connection connection = connectionManager.openConnection()) {
+            return loadProfileByIdInTransaction(connection, profileId);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public ProfileRecord loadProfileByNpcUuid(@Nullable UUID npcUuid) {
+        if (connectionManager == null || npcUuid == null) {
+            return null;
+        }
+        try (Connection connection = connectionManager.openConnection()) {
+            return loadProfileByNpcUuidInTransaction(connection, npcUuid);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    public String loadActiveSnapshotPayload(@Nullable String profileId, @Nullable String snapshotType) {
+        if (connectionManager == null
+                || profileId == null
+                || profileId.isBlank()
+                || snapshotType == null
+                || snapshotType.isBlank()) {
+            return null;
+        }
+        try (Connection connection = connectionManager.openConnection()) {
+            return loadActiveSnapshotPayloadInTransaction(connection, profileId, snapshotType);
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nonnull
+    public LinkedHashSet<String> listActiveSnapshotTypes(@Nullable String profileId) {
+        if (connectionManager == null || profileId == null || profileId.isBlank()) {
+            return new LinkedHashSet<>();
+        }
+        try (Connection connection = connectionManager.openConnection()) {
+            return loadActiveSnapshotTypesInTransaction(connection, profileId);
+        } catch (Exception ignored) {
+            return new LinkedHashSet<>();
         }
     }
 
@@ -136,6 +224,16 @@ public final class NpcProfileRepository {
         }
         upsertAliasInTransaction(connection, npcUuid.toString(), profileId, true, nowMs);
         return profileId;
+    }
+
+    @Nullable
+    ProfileRecord loadProfileByNpcUuidInTransaction(@Nonnull Connection connection,
+                                                    @Nonnull UUID npcUuid) throws Exception {
+        String profileId = resolveProfileIdInTransaction(connection, npcUuid);
+        if (profileId == null || profileId.isBlank()) {
+            return null;
+        }
+        return loadProfileByIdInTransaction(connection, profileId);
     }
 
     void upsertProfileInTransaction(@Nonnull Connection connection, @Nonnull ProfileUpdate update) throws Exception {
@@ -305,6 +403,30 @@ public final class NpcProfileRepository {
         )) {
             statement.setString(1, profileId);
             statement.setString(2, linkType);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    String toolId = trimToNull(rs.getString("tool_uuid"));
+                    if (toolId != null) {
+                        toolIds.add(toolId);
+                    }
+                }
+            }
+        }
+        return toolIds.toArray(new String[0]);
+    }
+
+    @Nonnull
+    String[] loadAllToolLinks(@Nonnull Connection connection, @Nonnull String profileId) throws Exception {
+        LinkedHashSet<String> toolIds = new LinkedHashSet<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT DISTINCT tool_uuid
+                FROM npc_tool_links
+                WHERE profile_id = ?
+                ORDER BY tool_uuid
+                """
+        )) {
+            statement.setString(1, profileId);
             try (ResultSet rs = statement.executeQuery()) {
                 while (rs.next()) {
                     String toolId = trimToNull(rs.getString("tool_uuid"));
@@ -517,6 +639,125 @@ public final class NpcProfileRepository {
         }
     }
 
+    @Nullable
+    String loadActiveSnapshotPayloadInTransaction(@Nonnull Connection connection,
+                                                  @Nonnull String profileId,
+                                                  @Nonnull String snapshotType) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT payload_json
+                FROM npc_snapshots
+                WHERE profile_id = ? AND snapshot_type = ? AND is_active = 1
+                ORDER BY snapshot_version DESC
+                LIMIT 1
+                """
+        )) {
+            statement.setString(1, profileId);
+            statement.setString(2, snapshotType);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                return trimToNull(rs.getString("payload_json"));
+            }
+        }
+    }
+
+    @Nonnull
+    LinkedHashSet<String> loadActiveSnapshotTypesInTransaction(@Nonnull Connection connection,
+                                                               @Nonnull String profileId) throws Exception {
+        LinkedHashSet<String> types = new LinkedHashSet<>();
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT snapshot_type
+                FROM npc_snapshots
+                WHERE profile_id = ? AND is_active = 1
+                ORDER BY snapshot_type
+                """
+        )) {
+            statement.setString(1, profileId);
+            try (ResultSet rs = statement.executeQuery()) {
+                while (rs.next()) {
+                    String snapshotType = trimToNull(rs.getString("snapshot_type"));
+                    if (snapshotType != null) {
+                        types.add(snapshotType);
+                    }
+                }
+            }
+        }
+        return types;
+    }
+
+    @Nullable
+    ProfileRecord loadProfileByIdInTransaction(@Nonnull Connection connection,
+                                               @Nonnull String profileId) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement(
+                """
+                SELECT profile_id, current_npc_uuid, owner_uuid, display_name, role_id, state_json, updated_at_ms
+                FROM npc_profiles
+                WHERE profile_id = ?
+                LIMIT 1
+                """
+        )) {
+            statement.setString(1, profileId);
+            try (ResultSet rs = statement.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                JsonObject state = parseJsonObject(trimToNull(rs.getString("state_json")));
+                String[] toolIds = loadAllToolLinks(connection, profileId);
+                String[] activeSnapshotTypes = loadActiveSnapshotTypesInTransaction(connection, profileId)
+                        .toArray(new String[0]);
+                return new ProfileRecord(
+                        profileId,
+                        SqliteValueCodec.parseUuid(rs.getString("current_npc_uuid")),
+                        SqliteValueCodec.parseUuid(rs.getString("owner_uuid")),
+                        getJsonString(state, "owner_name"),
+                        trimToNull(rs.getString("role_id")),
+                        trimToNull(rs.getString("display_name")),
+                        getJsonString(state, "custom_name"),
+                        getJsonBoolean(state, "tamed"),
+                        getJsonString(state, "coop_id"),
+                        getJsonInteger(state, "coop_slot"),
+                        toolIds,
+                        activeSnapshotTypes,
+                        rs.getLong("updated_at_ms")
+                );
+            }
+        }
+    }
+
+    void notifyProfileChanged(@Nullable ProfileRecord before, @Nullable ProfileRecord after) {
+        PersistenceChangeObserver observer = changeObserver;
+        if (observer != null) {
+            observer.onProfileChanged(before, after);
+        }
+    }
+
+    void notifyCaptureRecorded(@Nonnull com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot snapshot,
+                               @Nullable ProfileRecord profile) {
+        PersistenceChangeObserver observer = changeObserver;
+        if (observer != null) {
+            observer.onCaptureRecorded(snapshot, profile);
+        }
+    }
+
+    void notifyDeathRecorded(@Nonnull com.alechilles.alecstamework.items.CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+                             @Nullable ProfileRecord profile) {
+        PersistenceChangeObserver observer = changeObserver;
+        if (observer != null) {
+            observer.onDeathRecorded(snapshot, profile);
+        }
+    }
+
+    void notifyLostRecorded(@Nonnull com.alechilles.alecstamework.items.CommandLinkedNpcLostService.LostLinkedNpcSnapshot snapshot,
+                            @Nullable ProfileRecord profile) {
+        PersistenceChangeObserver observer = changeObserver;
+        if (observer != null) {
+            observer.onLostRecorded(snapshot, profile);
+        }
+    }
+
     private void setAliasCurrentInTransaction(@Nonnull Connection connection,
                                               @Nonnull String profileId,
                                               @Nonnull String npcUuid,
@@ -640,6 +881,54 @@ public final class NpcProfileRepository {
     private void putBoolean(@Nonnull JsonObject object, @Nonnull String key, @Nullable Boolean value) {
         if (value != null) {
             object.addProperty(key, value);
+        }
+    }
+
+    @Nullable
+    private JsonObject parseJsonObject(@Nullable String raw) {
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return JsonParser.parseString(raw).getAsJsonObject();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private String getJsonString(@Nullable JsonObject object, @Nonnull String key) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return trimToNull(object.get(key).getAsString());
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private Boolean getJsonBoolean(@Nullable JsonObject object, @Nonnull String key) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return object.get(key).getAsBoolean();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private Integer getJsonInteger(@Nullable JsonObject object, @Nonnull String key) {
+        if (object == null || !object.has(key) || object.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            return object.get(key).getAsInt();
+        } catch (Exception ignored) {
+            return null;
         }
     }
 

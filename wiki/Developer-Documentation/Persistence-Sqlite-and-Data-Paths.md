@@ -16,6 +16,7 @@ Parent: [Developer Documentation Index](/mod/alecs-tamework/developer-documentat
 - `SqliteSchemaMigrator`
 - `PersistenceWriteQueue`
 - `PersistenceHealthService`
+- `ApiProfileDataRepository`
 - `CaptureRepository`
 - `CoopLedgerRepository`
 - `DeathRepository`
@@ -28,6 +29,8 @@ Parent: [Developer Documentation Index](/mod/alecs-tamework/developer-documentat
 - Imports legacy `.dat` data once when needed
 - Schedules WAL checkpoints, vacuum, and snapshot pruning
 - Exposes queue metrics and health diagnostics
+- Routes profile-scoped experimental API writes through the same queued SQLite path
+- Emits persistence-backed profile, capture, death, and lost change callbacks through a repository observer
 
 ## Persistence domains
 - Captured NPC records
@@ -35,6 +38,7 @@ Parent: [Developer Documentation Index](/mod/alecs-tamework/developer-documentat
 - Death snapshots
 - Lost-companion state
 - Shared NPC profile snapshots
+- Experimental profile-scoped extension JSON in `api_profile_data`
 
 ## Maintenance advice
 - Treat persistence health degradation as a first-class runtime signal

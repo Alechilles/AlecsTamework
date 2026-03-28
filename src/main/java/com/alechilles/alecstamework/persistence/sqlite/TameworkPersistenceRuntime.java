@@ -42,6 +42,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private final SqliteConnectionManager connectionManager;
     private final PersistenceWriteQueue writeQueue;
     private final ScheduledExecutorService maintenanceExecutor;
+    private final ApiProfileDataRepository apiProfileDataRepository;
     private final CaptureRepository captureRepository;
     private final CoopLedgerRepository coopLedgerRepository;
     private final DeathRepository deathRepository;
@@ -57,6 +58,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                                        @Nonnull SqliteConnectionManager connectionManager,
                                        @Nonnull PersistenceWriteQueue writeQueue,
                                        @Nonnull ScheduledExecutorService maintenanceExecutor,
+                                       @Nonnull ApiProfileDataRepository apiProfileDataRepository,
                                        @Nonnull CaptureRepository captureRepository,
                                        @Nonnull CoopLedgerRepository coopLedgerRepository,
                                        @Nonnull DeathRepository deathRepository,
@@ -70,6 +72,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         this.connectionManager = connectionManager;
         this.writeQueue = writeQueue;
         this.maintenanceExecutor = maintenanceExecutor;
+        this.apiProfileDataRepository = apiProfileDataRepository;
         this.captureRepository = captureRepository;
         this.coopLedgerRepository = coopLedgerRepository;
         this.deathRepository = deathRepository;
@@ -116,6 +119,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         }
 
         NpcProfileRepository npcProfileRepository = new NpcProfileRepository(connectionManager, writeQueue);
+        ApiProfileDataRepository apiProfileDataRepository = new ApiProfileDataRepository(connectionManager, writeQueue);
         CaptureRepository captureRepository = new CaptureRepository(connectionManager, writeQueue, npcProfileRepository);
         CoopLedgerRepository coopLedgerRepository = new CoopLedgerRepository(connectionManager, writeQueue, npcProfileRepository);
         DeathRepository deathRepository = new DeathRepository(connectionManager, writeQueue, npcProfileRepository);
@@ -128,6 +132,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
                 connectionManager,
                 writeQueue,
                 maintenanceExecutor,
+                apiProfileDataRepository,
                 captureRepository,
                 coopLedgerRepository,
                 deathRepository,
@@ -161,6 +166,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Nonnull
     public CaptureRepository getCaptureRepository() {
         return captureRepository;
+    }
+
+    @Nonnull
+    public ApiProfileDataRepository getApiProfileDataRepository() {
+        return apiProfileDataRepository;
     }
 
     @Nonnull

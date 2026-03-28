@@ -61,10 +61,16 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     }
 
     public boolean submit(@Nonnull String operationName, @Nonnull SqlTransaction transaction) {
+        return submit(operationName, transaction, null);
+    }
+
+    public boolean submit(@Nonnull String operationName,
+                          @Nonnull SqlTransaction transaction,
+                          @Nullable Runnable afterCommit) {
         if (closed.get() || !healthService.isHealthy()) {
             return false;
         }
-        return queue.offer(new WriteTask(operationName, transaction));
+        return queue.offer(new WriteTask(operationName, transaction, afterCommit));
     }
 
     @Nonnull
@@ -158,6 +164,17 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                 connection.setAutoCommit(true);
             }
         }
+        for (WriteTask task : batch) {
+            try {
+                task.runAfterCommit();
+            } catch (Exception ex) {
+                if (logger != null) {
+                    logger.at(Level.SEVERE).log(
+                            "SQLite after-commit callback failed (" + task.operationName + "): " + ex.getMessage()
+                    );
+                }
+            }
+        }
     }
 
     private void markFailure(@Nonnull String reason, @Nonnull Exception ex) {
@@ -222,10 +239,21 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private static final class WriteTask {
         private final String operationName;
         private final SqlTransaction transaction;
+        @Nullable
+        private final Runnable afterCommit;
 
-        private WriteTask(@Nonnull String operationName, @Nonnull SqlTransaction transaction) {
+        private WriteTask(@Nonnull String operationName,
+                          @Nonnull SqlTransaction transaction,
+                          @Nullable Runnable afterCommit) {
             this.operationName = Objects.requireNonNull(operationName);
             this.transaction = Objects.requireNonNull(transaction);
+            this.afterCommit = afterCommit;
+        }
+
+        private void runAfterCommit() {
+            if (afterCommit != null) {
+                afterCommit.run();
+            }
         }
     }
 

@@ -10,6 +10,7 @@ import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -115,11 +116,36 @@ public final class DeathRepository {
     }
 
     public boolean upsertAsync(@Nonnull CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
-        return writeQueue.submit("death_upsert", connection -> upsertInTransaction(connection, snapshot));
+        AtomicReference<NpcProfileRepository.ProfileRecord> beforeRef = new AtomicReference<>();
+        AtomicReference<NpcProfileRepository.ProfileRecord> afterRef = new AtomicReference<>();
+        return writeQueue.submit(
+                "death_upsert",
+                connection -> {
+                    beforeRef.set(profileRepository.loadProfileByNpcUuidInTransaction(connection, snapshot.npcUuid()));
+                    upsertInTransaction(connection, snapshot);
+                    String profileId = profileRepository.resolveProfileIdInTransaction(connection, snapshot.npcUuid());
+                    afterRef.set(profileId != null ? profileRepository.loadProfileByIdInTransaction(connection, profileId) : null);
+                },
+                () -> {
+                    profileRepository.notifyProfileChanged(beforeRef.get(), afterRef.get());
+                    profileRepository.notifyDeathRecorded(snapshot, afterRef.get());
+                }
+        );
     }
 
     public boolean deleteAsync(@Nonnull UUID npcUuid) {
-        return writeQueue.submit("death_delete", connection -> deleteInTransaction(connection, npcUuid));
+        AtomicReference<NpcProfileRepository.ProfileRecord> beforeRef = new AtomicReference<>();
+        AtomicReference<NpcProfileRepository.ProfileRecord> afterRef = new AtomicReference<>();
+        return writeQueue.submit(
+                "death_delete",
+                connection -> {
+                    String profileId = profileRepository.resolveProfileIdInTransaction(connection, npcUuid);
+                    beforeRef.set(profileId != null ? profileRepository.loadProfileByIdInTransaction(connection, profileId) : null);
+                    deleteInTransaction(connection, npcUuid);
+                    afterRef.set(profileId != null ? profileRepository.loadProfileByIdInTransaction(connection, profileId) : null);
+                },
+                () -> profileRepository.notifyProfileChanged(beforeRef.get(), afterRef.get())
+        );
     }
 
     void upsertInTransaction(@Nonnull Connection connection,
@@ -346,4 +372,3 @@ public final class DeathRepository {
         return null;
     }
 }
-

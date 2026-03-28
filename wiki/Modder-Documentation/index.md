@@ -12,6 +12,7 @@ This section covers how to implement Tamework systems in another mod. It is orga
 
 ## Child Pages
 - [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)
+- [Tamework API (Experimental)](/mod/alecs-tamework/experimental-tamework-api)
 - [Interaction Paths and Role Wiring](/mod/alecs-tamework/interaction-paths-and-role-wiring)
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
 - [Spawner System Guide](/mod/alecs-tamework/spawner-system-guide)

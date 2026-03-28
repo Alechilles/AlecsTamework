@@ -8,6 +8,10 @@ import java.nio.file.Path;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
+import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.TameworkConfigFamily;
+import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
+import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
@@ -151,6 +155,8 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private CoopResidentStateSnapshotService coopResidentStateSnapshotService;
     private TameworkPersistenceRuntime persistenceRuntime;
+    private TameworkApi api;
+    private TameworkEventBus apiEventBus;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private SpawnerTooltipBridge spawnerTooltipBridge;
@@ -389,8 +395,15 @@ public class Tamework extends JavaPlugin {
         Path runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
+        apiEventBus = new TameworkEventBus(getLogger());
+        persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
                 persistenceRuntime.getNpcProfileRepository()
+        );
+        api = new TameworkApiImpl(
+                persistenceRuntime,
+                apiEventBus,
+                commandLinkedNpcStateSnapshotService
         );
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
                 persistenceRuntime.getCaptureRepository(),
@@ -595,6 +608,14 @@ public class Tamework extends JavaPlugin {
         if (spawnerTooltipBridge != null) {
             spawnerTooltipBridge.shutdown();
         }
+        api = null;
+        if (persistenceRuntime != null) {
+            persistenceRuntime.getNpcProfileRepository().setChangeObserver(null);
+        }
+        if (apiEventBus != null) {
+            apiEventBus.close();
+            apiEventBus = null;
+        }
         if (persistenceRuntime != null) {
             persistenceRuntime.close();
             persistenceRuntime = null;
@@ -673,6 +694,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkPersistenceRuntime getPersistenceRuntime() {
         return persistenceRuntime;
+    }
+
+    @Nullable
+    public TameworkApi getApi() {
+        return api;
     }
 
     public void beginItemFeatureAssetReloadSuppression() {
@@ -1027,36 +1053,48 @@ public class Tamework extends JavaPlugin {
     private void onSpawnerAssetsLoaded(
             LoadedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         TwSpawnerConfig.clearInheritanceFallbackCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.SPAWNER, event.getLoadedAssets().keySet());
+        }
         requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onSpawnerAssetsRemoved(
             RemovedAssetsEvent<String, TwSpawnerConfig, DefaultAssetMap<String, TwSpawnerConfig>> event) {
         TwSpawnerConfig.clearInheritanceFallbackCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.SPAWNER, event.getRemovedAssets());
         requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onNamingAssetsLoaded(
             LoadedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
         TwNameItemConfig.clearInheritanceFallbackCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.NAME_ITEM, event.getLoadedAssets().keySet());
+        }
         requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onNamingAssetsRemoved(
             RemovedAssetsEvent<String, TwNameItemConfig, DefaultAssetMap<String, TwNameItemConfig>> event) {
         TwNameItemConfig.clearInheritanceFallbackCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.NAME_ITEM, event.getRemovedAssets());
         requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onCommandAssetsLoaded(
             LoadedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.COMMAND_ITEM, event.getLoadedAssets().keySet());
+        }
         requestItemFeatureConfigReloadFromAssetEvent();
     }
 
     private void onCommandAssetsRemoved(
             RemovedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.COMMAND_ITEM, event.getRemovedAssets());
         requestItemFeatureConfigReloadFromAssetEvent();
     }
 
@@ -1064,6 +1102,9 @@ public class Tamework extends JavaPlugin {
             LoadedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.GLOBAL, event.getLoadedAssets().keySet());
+        }
         if (deferGlobalReconcileIfSuppressed()) {
             return;
         }
@@ -1074,6 +1115,7 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwGlobalConfig, DefaultAssetMap<String, TwGlobalConfig>> event) {
         TwGlobalConfig.clearCache();
         lastGlobalConfigWarningKey = null;
+        emitExperimentalConfigReload(TameworkConfigFamily.GLOBAL, event.getRemovedAssets());
         if (deferGlobalReconcileIfSuppressed()) {
             return;
         }
@@ -1125,83 +1167,129 @@ public class Tamework extends JavaPlugin {
     private void onCompanionAssetsLoaded(
             LoadedAssetsEvent<String, TwCompanionConfig, DefaultAssetMap<String, TwCompanionConfig>> event) {
         TwCompanionConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.COMPANION, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onCompanionAssetsRemoved(
             RemovedAssetsEvent<String, TwCompanionConfig, DefaultAssetMap<String, TwCompanionConfig>> event) {
         TwCompanionConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.COMPANION, event.getRemovedAssets());
     }
 
     private void onInteractionAssetsLoaded(
             LoadedAssetsEvent<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> event) {
         TwInteractionConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.INTERACTION, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onInteractionAssetsRemoved(
             RemovedAssetsEvent<String, TwInteractionConfig, DefaultAssetMap<String, TwInteractionConfig>> event) {
         TwInteractionConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.INTERACTION, event.getRemovedAssets());
+    }
+
+    private void emitExperimentalConfigReload(@Nonnull TameworkConfigFamily family, @Nullable Iterable<String> changedIds) {
+        if (apiEventBus == null || changedIds == null) {
+            return;
+        }
+        java.util.ArrayList<String> normalizedIds = new java.util.ArrayList<>();
+        for (String changedId : changedIds) {
+            if (changedId == null || changedId.isBlank()) {
+                continue;
+            }
+            normalizedIds.add(changedId.trim());
+        }
+        apiEventBus.emitConfigReload(family, normalizedIds);
     }
 
     private void onCoopAssetsLoaded(
             LoadedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
         TwCoopConfig.clearCoopCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.COOP, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onCoopAssetsRemoved(
             RemovedAssetsEvent<String, TwCoopConfig, DefaultAssetMap<String, TwCoopConfig>> event) {
         TwCoopConfig.clearCoopCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.COOP, event.getRemovedAssets());
     }
 
     private void onHappinessAssetsLoaded(
             LoadedAssetsEvent<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> event) {
         TwHappinessConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.HAPPINESS, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onHappinessAssetsRemoved(
             RemovedAssetsEvent<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> event) {
         TwHappinessConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.HAPPINESS, event.getRemovedAssets());
     }
 
     private void onNeedsAssetsLoaded(
             LoadedAssetsEvent<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> event) {
         TwNeedsConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.NEEDS, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onNeedsAssetsRemoved(
             RemovedAssetsEvent<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> event) {
         TwNeedsConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.NEEDS, event.getRemovedAssets());
     }
 
     private void onBreedingAssetsLoaded(
             LoadedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
         TwBreedingConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onBreedingAssetsRemoved(
             RemovedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
         TwBreedingConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
     }
 
     private void onTraitAssetsLoaded(
             LoadedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onTraitAssetsRemoved(
             RemovedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getRemovedAssets());
     }
 
     private void onDebugAssetsLoaded(
             LoadedAssetsEvent<String, TwDebugConfig, DefaultAssetMap<String, TwDebugConfig>> event) {
         TwDebugConfig.clearCache();
         applyDebugConfigDefaults();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.DEBUG, event.getLoadedAssets().keySet());
+        }
     }
 
     private void onDebugAssetsRemoved(
             RemovedAssetsEvent<String, TwDebugConfig, DefaultAssetMap<String, TwDebugConfig>> event) {
         TwDebugConfig.clearCache();
         applyDebugConfigDefaults();
+        emitExperimentalConfigReload(TameworkConfigFamily.DEBUG, event.getRemovedAssets());
     }
 
     private int loadSpawnerItemAssets() {
@@ -1521,5 +1609,6 @@ public class Tamework extends JavaPlugin {
     }
 
 }
+
 
 

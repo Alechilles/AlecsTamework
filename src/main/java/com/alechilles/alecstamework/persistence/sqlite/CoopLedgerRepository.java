@@ -4,10 +4,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -85,15 +87,44 @@ public final class CoopLedgerRepository {
     }
 
     public boolean upsertSlotAsync(@Nonnull CoopLedgerRow row) {
-        return writeQueue.submit("coop_slot_upsert", connection -> upsertSlotInTransaction(connection, row));
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> beforeRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> afterRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        return writeQueue.submit(
+                "coop_slot_upsert",
+                connection -> {
+                    LinkedHashSet<String> affectedProfileIds = collectRowProfileIds(connection, row);
+                    beforeRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                    upsertSlotInTransaction(connection, row);
+                    affectedProfileIds.addAll(collectRowProfileIds(connection, row));
+                    afterRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                },
+                () -> notifyProfileChanges(beforeRef.get(), afterRef.get())
+        );
     }
 
     public boolean releaseAndRemapAsync(@Nonnull CoopLedgerRow row,
                                         @Nullable UUID previousNpcUuid,
                                         @Nullable UUID currentNpcUuid) {
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> beforeRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> afterRef =
+                new AtomicReference<>(new LinkedHashMap<>());
         return writeQueue.submit(
                 "coop_release_remap",
-                connection -> releaseAndRemapInTransaction(connection, row, previousNpcUuid, currentNpcUuid)
+                connection -> {
+                    LinkedHashSet<String> affectedProfileIds = collectRowProfileIds(connection, row);
+                    addResolvedProfileId(connection, affectedProfileIds, previousNpcUuid);
+                    addResolvedProfileId(connection, affectedProfileIds, currentNpcUuid);
+                    beforeRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                    releaseAndRemapInTransaction(connection, row, previousNpcUuid, currentNpcUuid);
+                    affectedProfileIds.addAll(collectRowProfileIds(connection, row));
+                    addResolvedProfileId(connection, affectedProfileIds, previousNpcUuid);
+                    addResolvedProfileId(connection, affectedProfileIds, currentNpcUuid);
+                    afterRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                },
+                () -> notifyProfileChanges(beforeRef.get(), afterRef.get())
         );
     }
 
@@ -103,18 +134,62 @@ public final class CoopLedgerRepository {
                                   int y,
                                   int z,
                                   int residentSlot) {
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> beforeRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> afterRef =
+                new AtomicReference<>(new LinkedHashMap<>());
         return writeQueue.submit(
                 "coop_slot_clear",
-                connection -> clearSlotInTransaction(connection, worldName, coopId, x, y, z, residentSlot)
+                connection -> {
+                    LinkedHashSet<String> affectedProfileIds = collectSlotProfileIds(
+                            connection,
+                            worldName,
+                            coopId,
+                            x,
+                            y,
+                            z,
+                            residentSlot
+                    );
+                    beforeRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                    clearSlotInTransaction(connection, worldName, coopId, x, y, z, residentSlot);
+                    afterRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                },
+                () -> notifyProfileChanges(beforeRef.get(), afterRef.get())
         );
     }
 
     public boolean clearNpcReferencesAsync(@Nonnull UUID npcUuid) {
-        return writeQueue.submit("coop_clear_npc_refs", connection -> clearNpcReferencesInTransaction(connection, npcUuid));
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> beforeRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> afterRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        return writeQueue.submit(
+                "coop_clear_npc_refs",
+                connection -> {
+                    LinkedHashSet<String> affectedProfileIds = findProfileIdsForNpcReference(connection, npcUuid);
+                    beforeRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                    clearNpcReferencesInTransaction(connection, npcUuid);
+                    afterRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                },
+                () -> notifyProfileChanges(beforeRef.get(), afterRef.get())
+        );
     }
 
     public boolean clearAllAsync() {
-        return writeQueue.submit("coop_clear_all", this::clearAllInTransaction);
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> beforeRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        AtomicReference<LinkedHashMap<String, NpcProfileRepository.ProfileRecord>> afterRef =
+                new AtomicReference<>(new LinkedHashMap<>());
+        return writeQueue.submit(
+                "coop_clear_all",
+                connection -> {
+                    LinkedHashSet<String> affectedProfileIds = findAllCoopProfileIds(connection);
+                    beforeRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                    clearAllInTransaction(connection);
+                    afterRef.set(loadProfilesInTransaction(connection, affectedProfileIds));
+                },
+                () -> notifyProfileChanges(beforeRef.get(), afterRef.get())
+        );
     }
 
     void upsertSlotInTransaction(@Nonnull Connection connection, @Nonnull CoopLedgerRow row) throws Exception {
@@ -427,5 +502,113 @@ public final class CoopLedgerRepository {
                                 @Nullable UUID housedNpcUuid,
                                 @Nullable UUID lastReleasedNpcUuid) {
     }
-}
 
+    @Nonnull
+    private LinkedHashSet<String> collectRowProfileIds(@Nonnull Connection connection,
+                                                       @Nonnull CoopLedgerRow row) throws Exception {
+        LinkedHashSet<String> profileIds = new LinkedHashSet<>();
+        addResolvedProfileId(connection, profileIds, row.housedNpcUuid());
+        addResolvedProfileId(connection, profileIds, row.lastReleasedNpcUuid());
+        profileIds.addAll(collectSlotProfileIds(
+                connection,
+                row.worldName(),
+                row.coopId(),
+                row.x(),
+                row.y(),
+                row.z(),
+                row.residentSlot()
+        ));
+        return profileIds;
+    }
+
+    @Nonnull
+    private LinkedHashSet<String> collectSlotProfileIds(@Nonnull Connection connection,
+                                                        @Nullable String worldName,
+                                                        @Nullable String coopId,
+                                                        int x,
+                                                        int y,
+                                                        int z,
+                                                        int residentSlot) throws Exception {
+        LinkedHashSet<String> profileIds = new LinkedHashSet<>();
+        String normalizedCoopId = normalizeIdentifier(coopId);
+        if (normalizedCoopId == null || residentSlot < 0) {
+            return profileIds;
+        }
+        ExistingSlot existing = findExistingSlot(connection, normalizeWorld(worldName), normalizedCoopId, x, y, z, residentSlot);
+        if (existing != null) {
+            addProfileId(profileIds, existing.profileId());
+        }
+        return profileIds;
+    }
+
+    private void addResolvedProfileId(@Nonnull Connection connection,
+                                      @Nonnull LinkedHashSet<String> target,
+                                      @Nullable UUID npcUuid) throws Exception {
+        if (npcUuid == null) {
+            return;
+        }
+        addProfileId(target, profileRepository.resolveProfileIdInTransaction(connection, npcUuid));
+    }
+
+    private void addProfileId(@Nonnull LinkedHashSet<String> target, @Nullable String profileId) {
+        if (profileId != null && !profileId.isBlank()) {
+            target.add(profileId);
+        }
+    }
+
+    @Nonnull
+    private LinkedHashSet<String> findProfileIdsForNpcReference(@Nonnull Connection connection,
+                                                                @Nonnull UUID npcUuid) throws Exception {
+        LinkedHashSet<String> profileIds = new LinkedHashSet<>();
+        try (PreparedStatement query = connection.prepareStatement(
+                "SELECT DISTINCT profile_id FROM coop_slots WHERE housed_npc_uuid = ? OR last_released_npc_uuid = ?"
+        )) {
+            String npcUuidString = npcUuid.toString();
+            query.setString(1, npcUuidString);
+            query.setString(2, npcUuidString);
+            try (ResultSet rs = query.executeQuery()) {
+                while (rs.next()) {
+                    addProfileId(profileIds, rs.getString("profile_id"));
+                }
+            }
+        }
+        return profileIds;
+    }
+
+    @Nonnull
+    private LinkedHashSet<String> findAllCoopProfileIds(@Nonnull Connection connection) throws Exception {
+        LinkedHashSet<String> profileIds = new LinkedHashSet<>();
+        try (PreparedStatement query = connection.prepareStatement("SELECT DISTINCT profile_id FROM coop_slots");
+             ResultSet rs = query.executeQuery()) {
+            while (rs.next()) {
+                addProfileId(profileIds, rs.getString("profile_id"));
+            }
+        }
+        return profileIds;
+    }
+
+    @Nonnull
+    private LinkedHashMap<String, NpcProfileRepository.ProfileRecord> loadProfilesInTransaction(
+            @Nonnull Connection connection,
+            @Nonnull Iterable<String> profileIds) throws Exception {
+        LinkedHashMap<String, NpcProfileRepository.ProfileRecord> profiles = new LinkedHashMap<>();
+        for (String profileId : profileIds) {
+            if (profileId == null || profileId.isBlank()) {
+                continue;
+            }
+            profiles.put(profileId, profileRepository.loadProfileByIdInTransaction(connection, profileId));
+        }
+        return profiles;
+    }
+
+    private void notifyProfileChanges(
+            @Nonnull LinkedHashMap<String, NpcProfileRepository.ProfileRecord> beforeProfiles,
+            @Nonnull LinkedHashMap<String, NpcProfileRepository.ProfileRecord> afterProfiles) {
+        LinkedHashSet<String> profileIds = new LinkedHashSet<>();
+        profileIds.addAll(beforeProfiles.keySet());
+        profileIds.addAll(afterProfiles.keySet());
+        for (String profileId : profileIds) {
+            profileRepository.notifyProfileChanged(beforeProfiles.get(profileId), afterProfiles.get(profileId));
+        }
+    }
+}

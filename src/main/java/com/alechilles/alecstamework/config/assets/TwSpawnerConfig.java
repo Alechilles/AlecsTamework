@@ -550,6 +550,10 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         return emptyItemId;
     }
 
+    public String getFilledItemId() {
+        return filledItemId;
+    }
+
     public ItemFeatureConfig toItemFeatureConfig() {
         CaptureSettings captureSettings = capture != null ? capture : new CaptureSettings();
         SpawnSettings spawnSettings = spawn != null ? spawn : new SpawnSettings();

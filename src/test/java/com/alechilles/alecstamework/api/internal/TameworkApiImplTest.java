@@ -1,0 +1,200 @@
+package com.alechilles.alecstamework.api.internal;
+
+import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
+import com.alechilles.alecstamework.api.NpcProfileView;
+import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
+import com.hypixel.hytale.math.vector.Vector3d;
+import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+
+import java.nio.file.Path;
+import java.util.List;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BooleanSupplier;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class TameworkApiImplTest {
+    @TempDir
+    Path tempDir;
+
+    @Test
+    void exposesVersionCapabilitiesProfilesEventsAndProfileData() throws Exception {
+        try (TameworkPersistenceRuntime runtime = TameworkPersistenceRuntime.initialize(tempDir, null)) {
+            TameworkEventBus bus = new TameworkEventBus(null);
+            runtime.getNpcProfileRepository().setChangeObserver(bus);
+            CommandLinkedNpcStateSnapshotService stateSnapshotService =
+                    new CommandLinkedNpcStateSnapshotService(runtime.getNpcProfileRepository());
+            TameworkApi api = new TameworkApiImpl(
+                    runtime,
+                    bus,
+                    stateSnapshotService
+            );
+
+            assertEquals("0.1.0", api.getApiVersion());
+            assertEquals(
+                    EnumSet.of(
+                            TameworkApiCapability.PROFILES,
+                            TameworkApiCapability.COMMAND_LINKS,
+                            TameworkApiCapability.POLICY,
+                            TameworkApiCapability.PROFILE_DATA,
+                            TameworkApiCapability.EVENTS,
+                            TameworkApiCapability.CONFIG_READ,
+                            TameworkApiCapability.DIAGNOSTICS
+                    ),
+                    api.getCapabilities()
+            );
+
+            UUID npcUuid = UUID.randomUUID();
+            UUID ownerUuid = UUID.randomUUID();
+            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                    npcUuid,
+                    ownerUuid,
+                    "Owner A",
+                    "Mob_Test",
+                    "Display A",
+                    "Custom A",
+                    true,
+                    null,
+                    null,
+                    null,
+                    new String[]{"tool-a"}
+            )));
+
+            assertTrue(awaitUntil(() -> api.profiles().resolveProfileId(npcUuid).isPresent()));
+            String profileId = api.profiles().resolveProfileId(npcUuid).orElseThrow();
+            Optional<NpcProfileView> byProfileId = api.profiles().getByProfileId(profileId);
+            Optional<NpcProfileView> byNpcUuid = api.profiles().getByNpcUuid(npcUuid);
+            assertTrue(byProfileId.isPresent());
+            assertTrue(byNpcUuid.isPresent());
+            assertEquals(profileId, byNpcUuid.orElseThrow().profileId());
+            assertTrue(api.policies().getOwnershipByProfileId(profileId).isPresent());
+            assertTrue(api.policies().isOwner(profileId, ownerUuid));
+            assertTrue(api.commandLinks().getByProfileId(profileId).isPresent());
+            assertEquals(Set.of("tool-a"), api.commandLinks().listLinkedToolIds(profileId));
+            assertFalse(api.commandLinks().hasHomePosition(profileId));
+
+            UUID remappedUuid = UUID.randomUUID();
+            assertTrue(runtime.getNpcProfileRepository().remapCurrentUuidAsync(npcUuid, remappedUuid));
+            assertTrue(awaitUntil(() -> api.profiles().resolveProfileId(remappedUuid).orElse("").equals(profileId)));
+
+            assertTrue(runtime.getCaptureRepository().upsertAsync(new CommandLinkedNpcCaptureService.CapturedLinkedNpcSnapshot(
+                    remappedUuid,
+                    ownerUuid,
+                    new String[]{"tool-a"},
+                    "Mob_Test",
+                    "Display A",
+                    new Vector3d(9.0, 8.0, 7.0),
+                    new Vector3d(3.0, 4.0, 5.0),
+                    System.currentTimeMillis()
+            )));
+            assertTrue(awaitUntil(() -> api.commandLinks().hasHomePosition(profileId)));
+            assertEquals(3.0, api.commandLinks().getHomePosition(profileId).orElseThrow().x());
+            assertEquals(4.0, api.commandLinks().getHomePosition(profileId).orElseThrow().y());
+            assertEquals(5.0, api.commandLinks().getHomePosition(profileId).orElseThrow().z());
+            assertTrue(api.commandLinks().getByNpcUuid(remappedUuid).isPresent());
+            assertEquals(
+                    9.0,
+                    api.commandLinks().getByProfileId(profileId).orElseThrow().lastKnownPosition().x()
+            );
+
+            assertTrue(api.profileData().put(profileId, "example.plugin", "state", "{\"level\":2}"));
+            assertTrue(awaitUntil(() -> api.profileData().get(profileId, "example.plugin", "state")
+                    .orElse("")
+                    .equals("{\"level\":2}")));
+            assertFalse(api.profileData().put(profileId, "example.plugin", "state", "not json"));
+            assertFalse(api.profileData().put(profileId, "Alechilles:Tamework", "state", "{\"level\":3}"));
+
+            AtomicInteger profileChangeEvents = new AtomicInteger();
+            AutoCloseable subscription = api.events().subscribe(NpcProfileChangedEvent.class, event -> {
+                if (profileId.equals(event.profileId())) {
+                    profileChangeEvents.incrementAndGet();
+                }
+            });
+            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                    remappedUuid,
+                    ownerUuid,
+                    "Owner A",
+                    "Mob_Test",
+                    "Display B",
+                    "Custom A",
+                    true,
+                    null,
+                    null,
+                    null,
+                    new String[]{"tool-a"}
+            )));
+            assertTrue(awaitUntil(() -> profileChangeEvents.get() >= 1));
+
+            subscription.close();
+            assertTrue(runtime.getNpcProfileRepository().upsertAsync(new NpcProfileRepository.ProfileUpdate(
+                    remappedUuid,
+                    ownerUuid,
+                    "Owner A",
+                    "Mob_Test",
+                    "Display C",
+                    "Custom C",
+                    true,
+                    null,
+                    null,
+                    null,
+                    new String[]{"tool-a"}
+            )));
+            Thread.sleep(150L);
+            assertEquals(1, profileChangeEvents.get());
+
+            assertNotNull(api.configs().getGlobalConfig());
+            assertNotNull(api.diagnostics().getPersistenceDiagnostics());
+        }
+    }
+
+    @Test
+    void buildsUsefulRoleIdCandidatesFromNonCanonicalInputs() {
+        assertEquals(
+                List.of("npcRoles.Tamed_Cow.name", "Tamed_Cow"),
+                List.copyOf(TameworkApiImpl.buildRoleIdCandidates(" npcRoles.Tamed_Cow.name "))
+        );
+        assertEquals(
+                List.of(
+                        "Server/NPC/Roles/Creature/Livestock/Tamed/Tamed_Cow.json",
+                        "Server/NPC/Roles/Creature/Livestock/Tamed/Tamed_Cow",
+                        "Tamed_Cow"
+                ),
+                List.copyOf(TameworkApiImpl.buildRoleIdCandidates(
+                        "Server/NPC/Roles/Creature/Livestock/Tamed/Tamed_Cow.json"
+                ))
+        );
+        assertEquals(
+                List.of("AnimalHusbandry:Cow", "Cow"),
+                List.copyOf(TameworkApiImpl.buildRoleIdCandidates("AnimalHusbandry:Cow"))
+        );
+        assertEquals(
+                List.of("Creature.Livestock.Cow", "Cow"),
+                List.copyOf(TameworkApiImpl.buildRoleIdCandidates("Creature.Livestock.Cow"))
+        );
+    }
+
+    private boolean awaitUntil(BooleanSupplier condition) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + 3_000L;
+        while (System.currentTimeMillis() < deadline) {
+            if (condition.getAsBoolean()) {
+                return true;
+            }
+            Thread.sleep(20L);
+        }
+        return condition.getAsBoolean();
+    }
+}

@@ -11,17 +11,22 @@ import javax.annotation.Nonnull;
  */
 public final class SqliteSchemaMigrator {
     public static final int SCHEMA_VERSION_V2 = 2;
+    public static final int SCHEMA_VERSION_V3 = 3;
     public static final int MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2 = 2001;
     public static final String MIGRATION_NAME_SCHEMA_V2 = "schema_v2";
+    public static final String MIGRATION_NAME_SCHEMA_V3 = "schema_v3_api_profile_data";
     public static final String MIGRATION_NAME_LEGACY_DAT_IMPORT_V2 = "legacy_dat_import_v2";
 
     public void migrate(@Nonnull Connection connection) throws Exception {
         createMigrationsTable(connection);
-        if (isVersionApplied(connection, SCHEMA_VERSION_V2)) {
-            return;
+        if (!isVersionApplied(connection, SCHEMA_VERSION_V2)) {
+            applySchemaV2(connection);
+            recordMigration(connection, SCHEMA_VERSION_V2, MIGRATION_NAME_SCHEMA_V2);
         }
-        applySchemaV2(connection);
-        recordMigration(connection, SCHEMA_VERSION_V2, MIGRATION_NAME_SCHEMA_V2);
+        if (!isVersionApplied(connection, SCHEMA_VERSION_V3)) {
+            applySchemaV3(connection);
+            recordMigration(connection, SCHEMA_VERSION_V3, MIGRATION_NAME_SCHEMA_V3);
+        }
     }
 
     private void createMigrationsTable(@Nonnull Connection connection) throws Exception {
@@ -159,6 +164,28 @@ public final class SqliteSchemaMigrator {
                         FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE
                     )
                     """);
+        }
+    }
+
+    private void applySchemaV3(@Nonnull Connection connection) throws Exception {
+        try (Statement statement = connection.createStatement()) {
+            statement.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS api_profile_data (
+                        profile_id TEXT NOT NULL,
+                        namespace TEXT NOT NULL,
+                        data_key TEXT NOT NULL,
+                        json_payload TEXT NOT NULL,
+                        created_at_ms INTEGER NOT NULL,
+                        updated_at_ms INTEGER NOT NULL,
+                        PRIMARY KEY (profile_id, namespace, data_key),
+                        FOREIGN KEY (profile_id) REFERENCES npc_profiles(profile_id) ON DELETE CASCADE
+                    )
+                    """
+            );
+            statement.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_api_profile_data_profile_namespace ON api_profile_data(profile_id, namespace)"
+            );
         }
     }
 }

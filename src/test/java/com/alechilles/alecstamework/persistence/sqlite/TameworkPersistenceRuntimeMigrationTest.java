@@ -6,6 +6,10 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.hypixel.hytale.math.vector.Vector3d;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.util.UUID;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
@@ -70,6 +74,8 @@ class TameworkPersistenceRuntimeMigrationTest {
             assertFalse(runtime.getLostRepository().loadAll().isEmpty());
         }
 
+        assertTrue(apiProfileDataTableExists());
+
         assertFalse(Files.exists(capturesDat));
         assertFalse(Files.exists(coopsDat));
         assertFalse(Files.exists(lostDat));
@@ -78,6 +84,17 @@ class TameworkPersistenceRuntimeMigrationTest {
         assertTrue(Files.exists(backupRoot));
         try (Stream<Path> backups = Files.list(backupRoot)) {
             assertTrue(backups.findAny().isPresent());
+        }
+    }
+
+    private boolean apiProfileDataTableExists() throws Exception {
+        Path sqlitePath = tempDir.resolve(TameworkPersistenceRuntime.SQLITE_FILENAME);
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + sqlitePath);
+             PreparedStatement statement = connection.prepareStatement(
+                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'api_profile_data'"
+             );
+             ResultSet resultSet = statement.executeQuery()) {
+            return resultSet.next();
         }
     }
 }
