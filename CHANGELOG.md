@@ -3,6 +3,20 @@
 ## Unreleased
 _No entries yet._
 
+## 2.5.3 - Experimental Integration API - 2026-03-28
+### Added
+- Added a public Tamework integration API with stable entrypoint access for downstream mods, including profile reads, command-link reads, policy checks, diagnostics, namespaced profile data, config views, and lifecycle/config events.
+- Added a read-only `CommandLinksApi` surface for linked tool ids and saved NPC home-position reads so integrations can inspect stored command-link state without reaching into internals.
+- Added modder-facing API documentation covering capabilities, null-safe access patterns, event semantics, and namespaced data rules.
+
+### Changed
+- Wired config-family asset reloads into the API event stream so live config reloads surface through the same integration boundary used by downstream mods.
+- Expanded the read-only API config surface to companion, interaction, spawner, name-item, command-item, happiness, needs, breeding, and trait families with detached DTO views.
+
+### Fixed
+- Fixed role-scoped API config detail serialization so integrations and debugger tooling receive JSON payloads instead of serializer failures on raw `Tw*Config` instances.
+- Fixed command-link API reads to resolve saved home-position state from live links, snapshot cache, and persisted capture/death/lost snapshots.
+
 ## 2.5.2 - Portal Return Threading Fixes - 2026-03-27
 ### Changed
 - Reverted the experimental SQLite native-library resource renaming workaround and restored standard shaded `sqlite-jdbc` packaging for the release artifact.
