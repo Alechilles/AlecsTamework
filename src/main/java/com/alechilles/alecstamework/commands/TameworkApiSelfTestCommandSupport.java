@@ -16,6 +16,8 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.List;
+import java.util.Locale;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -97,11 +99,31 @@ final class TameworkApiSelfTestCommandSupport {
     }
 
     static void sendReport(@Nonnull CommandContext commandContext,
+                           @Nonnull Tamework plugin,
+                           @Nonnull Player player,
                            @Nonnull ApiSelfTestRunReport report,
+                           @Nonnull ApiSelfTestRunner.Suite suite,
                            boolean verbose) {
         List<String> lines = ApiSelfTestReportFormatter.format(report, verbose);
         for (String line : lines) {
             commandContext.sender().sendMessage(Message.raw(line));
+        }
+        List<String> logLines = ApiSelfTestReportFormatter.format(report, true);
+        String suiteName = suite.name().toLowerCase(Locale.ROOT).replace('_', '-');
+        plugin.getLogger().at(Level.INFO).log(
+                "[tw api test] run suite="
+                        + suiteName
+                        + " requester="
+                        + player.getUuid()
+                        + " chatVerbose="
+                        + verbose
+                        + " totals="
+                        + report.totalPassed()
+                        + "/"
+                        + report.totalAssertions()
+        );
+        for (String line : logLines) {
+            plugin.getLogger().at(Level.INFO).log("[tw api test] " + line);
         }
     }
 }

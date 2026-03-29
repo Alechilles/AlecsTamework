@@ -73,7 +73,14 @@ public final class TameworkApiTestRunCommand extends AbstractPlayerCommand {
                 fixtureSet
         );
         ApiSelfTestRunReport report = runner.run(context, parsed.suite());
-        TameworkApiSelfTestCommandSupport.sendReport(commandContext, report, parsed.verbose());
+        TameworkApiSelfTestCommandSupport.sendReport(
+                commandContext,
+                plugin,
+                player,
+                report,
+                parsed.suite(),
+                parsed.verbose()
+        );
     }
 
     private ParsedArgs parse(@Nonnull CommandContext commandContext) {
