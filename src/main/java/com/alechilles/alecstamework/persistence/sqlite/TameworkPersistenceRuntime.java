@@ -198,6 +198,10 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
         return writeQueue.getMetrics();
     }
 
+    public boolean awaitWriteQueueIdle(long timeoutMs) {
+        return writeQueue.awaitIdle(timeoutMs);
+    }
+
     @Nonnull
     public PersistenceHealthService.HealthState getHealthState() {
         return healthService.getState();

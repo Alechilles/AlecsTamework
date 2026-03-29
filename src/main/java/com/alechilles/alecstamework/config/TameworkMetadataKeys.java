@@ -65,6 +65,9 @@ public final class TameworkMetadataKeys {
     public static final String COMMAND_HOME_X = "Tamework.Command.HomeX";
     public static final String COMMAND_HOME_Y = "Tamework.Command.HomeY";
     public static final String COMMAND_HOME_Z = "Tamework.Command.HomeZ";
+    public static final String API_SELF_TEST_FIXTURE_SET_ID = "Tamework.ApiSelfTest.FixtureSetId";
+    public static final String API_SELF_TEST_OWNER_UUID = "Tamework.ApiSelfTest.OwnerUuid";
+    public static final String API_SELF_TEST_WORLD_NAME = "Tamework.ApiSelfTest.WorldName";
 
     private TameworkMetadataKeys() {
     }

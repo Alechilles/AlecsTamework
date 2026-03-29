@@ -1,0 +1,414 @@
+package com.alechilles.alecstamework.selftest;
+
+import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
+import com.alechilles.alecstamework.api.CommandLinkView;
+import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
+import com.alechilles.alecstamework.api.DiagnosticsApi;
+import com.alechilles.alecstamework.api.InteractionConfigView;
+import com.alechilles.alecstamework.api.NpcProfileView;
+import com.alechilles.alecstamework.api.OwnershipPolicyView;
+import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
+import com.alechilles.alecstamework.api.PolicyApi;
+import com.alechilles.alecstamework.api.PopulationCapDecisionView;
+import com.alechilles.alecstamework.api.RoleScopedConfigView;
+import com.alechilles.alecstamework.api.TameworkApi;
+import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.api.TameworkConfigReadApi;
+import com.alechilles.alecstamework.api.Vector3View;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import javax.annotation.Nonnull;
+
+/**
+ * Executes live contract checks against Tamework's public integration API.
+ */
+public final class ApiSelfTestRunner {
+    public enum Suite {
+        CORE,
+        PROFILE,
+        COMMAND_LINKS,
+        CONFIGS,
+        POLICIES,
+        DIAGNOSTICS,
+        ALL;
+
+        @Nonnull
+        public static Suite parse(@Nonnull String raw) {
+            return valueOf(raw.trim().replace('-', '_').toUpperCase(Locale.ROOT));
+        }
+    }
+
+    @Nonnull
+    public ApiSelfTestRunReport run(@Nonnull ApiSelfTestContext context, @Nonnull Suite suite) {
+        ArrayList<ApiSelfTestSuiteResult> suites = new ArrayList<>();
+        if (suite == Suite.ALL || suite == Suite.CORE) {
+            suites.add(runCore(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.PROFILE) {
+            suites.add(runProfile(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.COMMAND_LINKS) {
+            suites.add(runCommandLinks(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.CONFIGS) {
+            suites.add(runConfigs(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.POLICIES) {
+            suites.add(runPolicies(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.DIAGNOSTICS) {
+            suites.add(runDiagnostics(context));
+        }
+        return new ApiSelfTestRunReport(suites);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runCore(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        TameworkApi api = context.api();
+        assertions.add(pass("api available", "version=" + api.getApiVersion()));
+        assertions.add(check(
+                "api version present",
+                api.getApiVersion() != null && !api.getApiVersion().isBlank(),
+                "version=" + api.getApiVersion()
+        ));
+
+        EnumSet<TameworkApiCapability> expected = EnumSet.of(
+                TameworkApiCapability.PROFILES,
+                TameworkApiCapability.COMMAND_LINKS,
+                TameworkApiCapability.POLICY,
+                TameworkApiCapability.CONFIG_READ,
+                TameworkApiCapability.DIAGNOSTICS
+        );
+        EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
+        assertions.add(check(
+                "required capabilities advertised",
+                capabilities.containsAll(expected),
+                "capabilities=" + capabilities
+        ));
+        assertions.add(check(
+                "global config available",
+                api.configs().getGlobalConfig() != null,
+                "global config read succeeded"
+        ));
+        assertions.add(check(
+                "diagnostics available",
+                api.diagnostics().getPersistenceDiagnostics() != null,
+                "diagnostics read succeeded"
+        ));
+        return new ApiSelfTestSuiteResult("core", assertions);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runProfile(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        ApiSelfTestFixtureSet fixtureSet = requireFixtureSet(context, assertions, "profile");
+        if (fixtureSet == null) {
+            return new ApiSelfTestSuiteResult("profile", assertions);
+        }
+        for (ApiSelfTestFixtureRecord fixture : fixtureSet.fixtures().values()) {
+            UUID npcUuid = fixture.npcUuid();
+            Optional<String> resolvedProfileId = context.api().profiles().resolveProfileId(npcUuid);
+            assertions.add(check(
+                    fixture.fixtureKey() + " profile id resolves",
+                    resolvedProfileId.isPresent(),
+                    resolvedProfileId.orElse("<empty>")
+            ));
+            if (resolvedProfileId.isEmpty()) {
+                continue;
+            }
+            Optional<NpcProfileView> byNpcUuid = context.api().profiles().getByNpcUuid(npcUuid);
+            Optional<NpcProfileView> byProfileId = context.api().profiles().getByProfileId(resolvedProfileId.get());
+            assertions.add(check(
+                    fixture.fixtureKey() + " getByNpcUuid returns profile",
+                    byNpcUuid.isPresent(),
+                    byNpcUuid.map(view -> view.profileId() + " owner=" + view.ownerUuid()).orElse("<empty>")
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " getByProfileId returns profile",
+                    byProfileId.isPresent(),
+                    byProfileId.map(view -> view.profileId() + " owner=" + view.ownerUuid()).orElse("<empty>")
+            ));
+            if (byNpcUuid.isEmpty() || byProfileId.isEmpty()) {
+                continue;
+            }
+            NpcProfileView npcView = byNpcUuid.get();
+            NpcProfileView profileView = byProfileId.get();
+            assertions.add(check(
+                    fixture.fixtureKey() + " profile lookups agree",
+                    npcView.profileId().equals(profileView.profileId()),
+                    npcView.profileId() + " vs " + profileView.profileId()
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " role id matches fixture",
+                    fixture.roleId().equalsIgnoreCase(npcView.roleId()),
+                    "role=" + npcView.roleId()
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " tamed flag present",
+                    npcView.tamed(),
+                    "tamed=" + npcView.tamed()
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " tool ids include fixture tool",
+                    npcView.toolIds().contains(fixtureSet.toolId()),
+                    "toolIds=" + npcView.toolIds()
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " lastUpdatedAtMs populated",
+                    npcView.lastUpdatedAtMs() > 0L,
+                    "lastUpdatedAtMs=" + npcView.lastUpdatedAtMs()
+            ));
+        }
+        return new ApiSelfTestSuiteResult("profile", assertions);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runCommandLinks(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        ApiSelfTestFixtureSet fixtureSet = requireFixtureSet(context, assertions, "command-links");
+        if (fixtureSet == null) {
+            return new ApiSelfTestSuiteResult("command-links", assertions);
+        }
+        for (ApiSelfTestFixtureRecord fixture : fixtureSet.fixtures().values()) {
+            Optional<CommandLinkView> view = context.api().commandLinks().getByNpcUuid(fixture.npcUuid());
+            assertions.add(check(
+                    fixture.fixtureKey() + " command links resolve",
+                    view.isPresent(),
+                    view.map(v -> "profile=" + v.profileId() + ", tools=" + v.toolIds()).orElse("<empty>")
+            ));
+            if (view.isEmpty()) {
+                continue;
+            }
+            Optional<String> profileId = context.api().profiles().resolveProfileId(fixture.npcUuid());
+            assertions.add(check(
+                    fixture.fixtureKey() + " profile id resolves for command links",
+                    profileId.isPresent(),
+                    profileId.orElse("<empty>")
+            ));
+            CommandLinkView commandLinkView = view.get();
+            assertions.add(check(
+                    fixture.fixtureKey() + " linked tool id matches fixture",
+                    commandLinkView.toolIds().contains(fixtureSet.toolId()),
+                    "toolIds=" + commandLinkView.toolIds()
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " has home position",
+                    commandLinkView.hasHomePosition(),
+                    describePosition(commandLinkView.homePosition())
+            ));
+            if (profileId.isEmpty()) {
+                continue;
+            }
+            Optional<Vector3View> homePosition = context.api().commandLinks().getHomePosition(profileId.get());
+            assertions.add(check(
+                    fixture.fixtureKey() + " profile home position resolves",
+                    homePosition.isPresent(),
+                    describePosition(homePosition.orElse(null))
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " listLinkedToolIds includes tool",
+                    context.api().commandLinks().listLinkedToolIds(profileId.get()).contains(fixtureSet.toolId()),
+                    "toolId=" + fixtureSet.toolId()
+            ));
+        }
+        return new ApiSelfTestSuiteResult("command-links", assertions);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runConfigs(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        ApiSelfTestFixtureSet fixtureSet = requireFixtureSet(context, assertions, "configs");
+        if (fixtureSet == null) {
+            return new ApiSelfTestSuiteResult("configs", assertions);
+        }
+        ApiSelfTestFixtureRecord fixture = fixtureSet.getFixture(ApiSelfTestFixtureManager.FIXTURE_KEY_OWNED);
+        if (fixture == null) {
+            assertions.add(fail("owned fixture available", "missing " + ApiSelfTestFixtureManager.FIXTURE_KEY_OWNED));
+            return new ApiSelfTestSuiteResult("configs", assertions);
+        }
+        String roleId = fixture.roleId();
+        TameworkConfigReadApi configs = context.api().configs();
+        Optional<InteractionConfigView> interaction = configs.resolveInteractionConfigForRole(roleId);
+        assertions.add(check(
+                "interaction config resolves",
+                interaction.isPresent(),
+                interaction.map(view -> view.id() + " priority=" + view.priority()).orElse("<empty>")
+        ));
+        assertions.add(checkRoleConfig("companion config resolves", configs.resolveCompanionConfigForRole(roleId)));
+        assertions.add(checkRoleConfig("happiness config resolves", configs.resolveHappinessConfigForRole(roleId)));
+        assertions.add(checkRoleConfig("needs config resolves", configs.resolveNeedsConfigForRole(roleId)));
+        assertions.add(checkRoleConfig("breeding config resolves", configs.resolveBreedingConfigForRole(roleId)));
+        assertions.add(checkRoleConfig("trait config resolves", configs.resolveTraitConfigForRole(roleId)));
+        return new ApiSelfTestSuiteResult("configs", assertions);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runPolicies(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        ApiSelfTestFixtureSet fixtureSet = requireFixtureSet(context, assertions, "policies");
+        if (fixtureSet == null) {
+            return new ApiSelfTestSuiteResult("policies", assertions);
+        }
+        PolicyApi policyApi = context.api().policies();
+        UUID playerUuid = context.player().getUuid();
+        ApiSelfTestFixtureRecord owned = fixtureSet.getFixture(ApiSelfTestFixtureManager.FIXTURE_KEY_OWNED);
+        ApiSelfTestFixtureRecord stranger = fixtureSet.getFixture(ApiSelfTestFixtureManager.FIXTURE_KEY_STRANGER);
+        if (owned == null || stranger == null) {
+            assertions.add(fail("fixtures available", "owned=" + owned + ", stranger=" + stranger));
+            return new ApiSelfTestSuiteResult("policies", assertions);
+        }
+        runPolicyChecksForFixture(assertions, policyApi, fixtureSet, owned, playerUuid, true);
+        runPolicyChecksForFixture(assertions, policyApi, fixtureSet, stranger, playerUuid, false);
+        PopulationCapDecisionView population = policyApi.evaluatePopulationCap(playerUuid);
+        assertions.add(check(
+                "population cap decision coherent",
+                population.limit() >= 0 && population.currentCount() >= 0,
+                "limit=" + population.limit() + ", current=" + population.currentCount()
+        ));
+        return new ApiSelfTestSuiteResult("policies", assertions);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runDiagnostics(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        DiagnosticsApi diagnosticsApi = context.api().diagnostics();
+        PersistenceDiagnosticsView diagnostics = diagnosticsApi.getPersistenceDiagnostics();
+        assertions.add(check(
+                "persistence diagnostics returned",
+                diagnostics != null,
+                diagnostics == null ? "<null>" : diagnostics.databasePath()
+        ));
+        if (diagnostics != null) {
+            assertions.add(check(
+                    "database path present",
+                    diagnostics.databasePath() != null && !diagnostics.databasePath().isBlank(),
+                    diagnostics.databasePath()
+            ));
+            assertions.add(check(
+                    "health status present",
+                    diagnostics.health() != null
+                            && diagnostics.health().status() != null
+                            && !diagnostics.health().status().isBlank(),
+                    diagnostics.health() != null ? diagnostics.health().status() : "<null>"
+            ));
+            assertions.add(check(
+                    "queue metrics readable",
+                    diagnostics.queueMetrics() != null
+                            && diagnostics.queueMetrics().maxBatchSize() >= 0
+                            && diagnostics.queueMetrics().queueDepth() >= 0,
+                    diagnostics.queueMetrics() == null
+                            ? "<null>"
+                            : "queueDepth="
+                            + diagnostics.queueMetrics().queueDepth()
+                            + ", maxBatch="
+                            + diagnostics.queueMetrics().maxBatchSize()
+            ));
+        }
+        return new ApiSelfTestSuiteResult("diagnostics", assertions);
+    }
+
+    private void runPolicyChecksForFixture(@Nonnull List<ApiSelfTestAssertion> assertions,
+                                           @Nonnull PolicyApi policyApi,
+                                           @Nonnull ApiSelfTestFixtureSet fixtureSet,
+                                           @Nonnull ApiSelfTestFixtureRecord fixture,
+                                           @Nonnull UUID playerUuid,
+                                           boolean shouldBeOwner) {
+        Optional<String> profileId = Optional.ofNullable(policyApi.getOwnershipByNpcUuid(fixture.npcUuid())
+                .map(OwnershipPolicyView::profileId)
+                .orElse(null));
+        assertions.add(check(
+                fixture.fixtureKey() + " ownership resolves",
+                profileId.isPresent(),
+                profileId.orElse("<empty>")
+        ));
+        if (profileId.isEmpty()) {
+            return;
+        }
+        Optional<OwnershipPolicyView> ownership = policyApi.getOwnershipByProfileId(profileId.get());
+        assertions.add(check(
+                fixture.fixtureKey() + " ownership view present",
+                ownership.isPresent(),
+                ownership.map(view -> "owner=" + view.ownerUuid()).orElse("<empty>")
+        ));
+        if (ownership.isPresent()) {
+            assertions.add(check(
+                    fixture.fixtureKey() + " isOwner matches expectation",
+                    policyApi.isOwner(profileId.get(), playerUuid) == shouldBeOwner,
+                    "isOwner=" + policyApi.isOwner(profileId.get(), playerUuid)
+            ));
+            assertions.add(check(
+                    fixture.fixtureKey() + " ownership owner matches expectation",
+                    shouldBeOwner == playerUuid.equals(ownership.get().ownerUuid()),
+                    "ownerUuid=" + ownership.get().ownerUuid()
+            ));
+        }
+        ClaimAccessDecisionView claimAccess = policyApi.evaluateClaimAccess(profileId.get(), playerUuid);
+        assertions.add(check(
+                fixture.fixtureKey() + " claim access coherent",
+                claimAccess.status() != null && (!claimAccess.available() || claimAccess.status() != ClaimAccessDecisionView.Status.UNAVAILABLE || !claimAccess.allowed()),
+                "status=" + claimAccess.status() + ", allowed=" + claimAccess.allowed()
+        ));
+        DamagePolicyDecisionView damage = policyApi.evaluateDamage(profileId.get(), playerUuid);
+        assertions.add(check(
+                fixture.fixtureKey() + " damage decision coherent",
+                profileId.get().equals(damage.profileId()) && damage.status() != null && damage.reason() != null,
+                "status=" + damage.status() + ", reason=" + damage.reason()
+        ));
+        assertions.add(check(
+                fixture.fixtureKey() + " damage ownership matches fixture",
+                damage.ownership() != null && fixtureSet.getFixture(fixture.fixtureKey()) != null,
+                damage.ownership() == null ? "<null>" : "owner=" + damage.ownership().ownerUuid()
+        ));
+    }
+
+    @Nonnull
+    private ApiSelfTestAssertion checkRoleConfig(@Nonnull String name,
+                                                 @Nonnull Optional<RoleScopedConfigView> view) {
+        return check(
+                name,
+                view.isPresent() && view.get().detailsJson() != null && !view.get().detailsJson().isBlank(),
+                view.map(value -> value.id() + " roles=" + value.roleIds()).orElse("<empty>")
+        );
+    }
+
+    @Nonnull
+    private ApiSelfTestFixtureSet requireFixtureSet(@Nonnull ApiSelfTestContext context,
+                                                    @Nonnull List<ApiSelfTestAssertion> assertions,
+                                                    @Nonnull String suiteName) {
+        ApiSelfTestFixtureSet fixtureSet = context.fixtureSet();
+        if (fixtureSet == null) {
+            assertions.add(fail(suiteName + " fixtures available", "Run /tw api test prepare first."));
+        }
+        return fixtureSet;
+    }
+
+    @Nonnull
+    private ApiSelfTestAssertion pass(@Nonnull String name, @Nonnull String detail) {
+        return new ApiSelfTestAssertion(name, true, detail);
+    }
+
+    @Nonnull
+    private ApiSelfTestAssertion fail(@Nonnull String name, @Nonnull String detail) {
+        return new ApiSelfTestAssertion(name, false, detail);
+    }
+
+    @Nonnull
+    private ApiSelfTestAssertion check(@Nonnull String name, boolean passed, @Nonnull String detail) {
+        return new ApiSelfTestAssertion(name, passed, detail);
+    }
+
+    @Nonnull
+    private String describePosition(Vector3View position) {
+        if (position == null) {
+            return "<null>";
+        }
+        return String.format(Locale.ROOT, "(%.2f, %.2f, %.2f)", position.x(), position.y(), position.z());
+    }
+}

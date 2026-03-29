@@ -90,6 +90,18 @@ public final class NpcProfileRepository {
         );
     }
 
+    public boolean deleteProfileTreeAsync(@Nonnull UUID npcUuid) {
+        AtomicReference<ProfileRecord> beforeRef = new AtomicReference<>();
+        return writeQueue.submit(
+                "npc_profile_delete",
+                connection -> {
+                    beforeRef.set(loadProfileByNpcUuidInTransaction(connection, npcUuid));
+                    deleteProfileTreeInTransaction(connection, npcUuid);
+                },
+                () -> notifyProfileChanged(beforeRef.get(), null)
+        );
+    }
+
     public boolean pruneInactiveSnapshotHistoryAsync(long cutoffMs) {
         return pruneInactiveSnapshotHistoryAsync(cutoffMs, 20);
     }
@@ -338,6 +350,19 @@ public final class NpcProfileRepository {
 
         upsertAliasInTransaction(connection, previousNpcUuid.toString(), profileId, false, nowMs);
         setAliasCurrentInTransaction(connection, profileId, currentUuidString, nowMs);
+    }
+
+    void deleteProfileTreeInTransaction(@Nonnull Connection connection, @Nonnull UUID npcUuid) throws Exception {
+        String profileId = resolveProfileIdInTransaction(connection, npcUuid);
+        if (profileId == null || profileId.isBlank()) {
+            return;
+        }
+        try (PreparedStatement statement = connection.prepareStatement(
+                "DELETE FROM npc_profiles WHERE profile_id = ?"
+        )) {
+            statement.setString(1, profileId);
+            statement.executeUpdate();
+        }
     }
 
     void replaceToolLinksInTransaction(@Nonnull Connection connection,

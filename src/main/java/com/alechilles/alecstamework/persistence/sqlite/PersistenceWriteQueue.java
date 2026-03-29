@@ -46,6 +46,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private final AtomicInteger lastBatchSize = new AtomicInteger(0);
     private final AtomicLong lastBatchDurationNs = new AtomicLong(0L);
     private final AtomicInteger maxBatchSize = new AtomicInteger(0);
+    private final AtomicInteger activeBatchSize = new AtomicInteger(0);
     private final AtomicReference<String> lastFailureReason = new AtomicReference<>(null);
     private final AtomicLong lastFailureAtMs = new AtomicLong(0L);
 
@@ -71,6 +72,24 @@ public final class PersistenceWriteQueue implements AutoCloseable {
             return false;
         }
         return queue.offer(new WriteTask(operationName, transaction, afterCommit));
+    }
+
+    public boolean awaitIdle(long timeoutMs) {
+        long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0L, timeoutMs));
+        while (System.nanoTime() <= deadlineNs) {
+            if (queue.isEmpty() && activeBatchSize.get() == 0) {
+                return true;
+            }
+            if (closed.get() && queue.isEmpty() && activeBatchSize.get() == 0) {
+                return true;
+            }
+            sleepQuietly(10L);
+            if (Thread.currentThread().isInterrupted()) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
+        return queue.isEmpty() && activeBatchSize.get() == 0;
     }
 
     @Nonnull
@@ -125,28 +144,33 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         if (batch.isEmpty()) {
             return;
         }
-        int attempt = 0;
-        while (attempt <= MAX_TRANSIENT_RETRIES && !closed.get()) {
-            attempt++;
-            long startedNs = System.nanoTime();
-            try {
-                runBatchOnce(batch);
-                long durationNs = Math.max(0L, System.nanoTime() - startedNs);
-                recordBatchSuccess(batch.size(), durationNs);
-                return;
-            } catch (Exception ex) {
-                if (isTransientBusyFailure(ex) && attempt <= MAX_TRANSIENT_RETRIES) {
-                    retryAttempts.incrementAndGet();
-                    sleepQuietly(RETRY_BACKOFF_MS * attempt);
-                    continue;
+        activeBatchSize.set(batch.size());
+        try {
+            int attempt = 0;
+            while (attempt <= MAX_TRANSIENT_RETRIES && !closed.get()) {
+                attempt++;
+                long startedNs = System.nanoTime();
+                try {
+                    runBatchOnce(batch);
+                    long durationNs = Math.max(0L, System.nanoTime() - startedNs);
+                    recordBatchSuccess(batch.size(), durationNs);
+                    return;
+                } catch (Exception ex) {
+                    if (isTransientBusyFailure(ex) && attempt <= MAX_TRANSIENT_RETRIES) {
+                        retryAttempts.incrementAndGet();
+                        sleepQuietly(RETRY_BACKOFF_MS * attempt);
+                        continue;
+                    }
+                    String operation = batch.get(0).operationName;
+                    markFailure("sqlite_write_failed:" + operation + ":" + ex.getClass().getSimpleName(), ex);
+                    throw ex;
                 }
-                String operation = batch.get(0).operationName;
-                markFailure("sqlite_write_failed:" + operation + ":" + ex.getClass().getSimpleName(), ex);
-                throw ex;
             }
+            markFailure("sqlite_write_batch_failed", new IllegalStateException("write queue retry exhausted"));
+            throw new IllegalStateException("write queue retry exhausted");
+        } finally {
+            activeBatchSize.set(0);
         }
-        markFailure("sqlite_write_batch_failed", new IllegalStateException("write queue retry exhausted"));
-        throw new IllegalStateException("write queue retry exhausted");
     }
 
     private void runBatchOnce(@Nonnull List<WriteTask> batch) throws Exception {
