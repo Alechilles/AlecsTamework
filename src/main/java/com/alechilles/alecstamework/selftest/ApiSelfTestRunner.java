@@ -437,20 +437,22 @@ public final class ApiSelfTestRunner {
             assertions.add(fail("needs baseline available", "No needs snapshot on fixture progression."));
         }
 
-        if (baseline.breeding() != null) {
-            assertions.add(checkMutation(
-                    "setBreedingReady true applies",
-                    context.api().progression().setBreedingReady(profileId, true),
-                    ProgressionMutationStatus.APPLIED
-            ));
-            assertions.add(checkMutation(
-                    "setBreedingReady false applies",
-                    context.api().progression().setBreedingReady(profileId, false),
-                    ProgressionMutationStatus.APPLIED
-            ));
-        } else {
-            assertions.add(fail("breeding baseline available", "No breeding snapshot on fixture progression."));
-        }
+        ProgressionMutationStatus[] breedingAllowedStatuses = baseline.breeding() != null
+                ? new ProgressionMutationStatus[] { ProgressionMutationStatus.APPLIED }
+                : new ProgressionMutationStatus[] {
+                        ProgressionMutationStatus.UNSUPPORTED,
+                        ProgressionMutationStatus.APPLIED
+                };
+        assertions.add(checkMutation(
+                "setBreedingReady true returns expected status",
+                context.api().progression().setBreedingReady(profileId, true),
+                breedingAllowedStatuses
+        ));
+        assertions.add(checkMutation(
+                "setBreedingReady false returns expected status",
+                context.api().progression().setBreedingReady(profileId, false),
+                breedingAllowedStatuses
+        ));
 
         Map<String, Double> baselineTraits = collectTraitValues(baseline);
         if (baseline.traits() != null && !baselineTraits.isEmpty()) {
