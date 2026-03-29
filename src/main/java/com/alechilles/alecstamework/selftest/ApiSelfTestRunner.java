@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.selftest;
 
 import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
 import com.alechilles.alecstamework.api.CommandLinkView;
+import com.alechilles.alecstamework.api.CommandItemConfigView;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
 import com.alechilles.alecstamework.api.InteractionEffectSpec;
@@ -9,6 +10,7 @@ import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.InteractionExtensionApi;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
+import com.alechilles.alecstamework.api.NameItemConfigView;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
@@ -18,6 +20,7 @@ import com.alechilles.alecstamework.api.ProgressionMutationResult;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
+import com.alechilles.alecstamework.api.SpawnerConfigView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
@@ -38,6 +41,11 @@ import javax.annotation.Nullable;
  * Executes live contract checks against Tamework's public integration API.
  */
 public final class ApiSelfTestRunner {
+    private static final String EXAMPLE_SPAWNER_ITEM_ID = "Spawner_Tamework_Example";
+    private static final String EXAMPLE_SPAWNER_FILLED_ITEM_ID = "*Spawner_Tamework_Example_State_Filled";
+    private static final String EXAMPLE_NAME_ITEM_ID = "Tamework_Nametag_Example";
+    private static final String EXAMPLE_COMMAND_ITEM_ID = "Tamework_Command_Whistle_Example";
+
     public enum Suite {
         CORE,
         PROFILE,
@@ -96,13 +104,7 @@ public final class ApiSelfTestRunner {
                 "version=" + api.getApiVersion()
         ));
 
-        EnumSet<TameworkApiCapability> expected = EnumSet.of(
-                TameworkApiCapability.PROFILES,
-                TameworkApiCapability.COMMAND_LINKS,
-                TameworkApiCapability.POLICY,
-                TameworkApiCapability.CONFIG_READ,
-                TameworkApiCapability.DIAGNOSTICS
-        );
+        EnumSet<TameworkApiCapability> expected = EnumSet.allOf(TameworkApiCapability.class);
         EnumSet<TameworkApiCapability> capabilities = api.getCapabilities();
         assertions.add(check(
                 "required capabilities advertised",
@@ -263,6 +265,62 @@ public final class ApiSelfTestRunner {
         assertions.add(checkRoleConfig("needs config resolves", configs.resolveNeedsConfigForRole(roleId)));
         assertions.add(checkRoleConfig("breeding config resolves", configs.resolveBreedingConfigForRole(roleId)));
         assertions.add(checkRoleConfig("trait config resolves", configs.resolveTraitConfigForRole(roleId)));
+
+        Optional<SpawnerConfigView> spawnerByEmptyItem = configs.resolveSpawnerConfigForItemId(EXAMPLE_SPAWNER_ITEM_ID);
+        assertions.add(check(
+                "spawner config resolves for empty item",
+                spawnerByEmptyItem.isPresent(),
+                spawnerByEmptyItem.map(view -> view.id() + " empty=" + view.emptyItemId()).orElse("<empty>")
+        ));
+        Optional<SpawnerConfigView> spawnerByFilledItem = configs.resolveSpawnerConfigForItemId(EXAMPLE_SPAWNER_FILLED_ITEM_ID);
+        assertions.add(check(
+                "spawner config resolves for filled item",
+                spawnerByFilledItem.isPresent(),
+                spawnerByFilledItem.map(view -> view.id() + " filled=" + view.filledItemId()).orElse("<empty>")
+        ));
+        if (spawnerByEmptyItem.isPresent()) {
+            Optional<SpawnerConfigView> spawnerById = configs.getSpawnerConfigById(spawnerByEmptyItem.get().id());
+            assertions.add(check(
+                    "spawner config by-id round trip",
+                    spawnerById.isPresent() && !spawnerById.get().detailsJson().isBlank(),
+                    spawnerById.map(view -> view.id()).orElse("<empty>")
+            ));
+        }
+
+        Optional<NameItemConfigView> nameItem = configs.resolveNameItemConfigForItemId(EXAMPLE_NAME_ITEM_ID);
+        assertions.add(check(
+                "name-item config resolves",
+                nameItem.isPresent(),
+                nameItem.map(view -> view.id() + " item=" + view.itemId()).orElse("<empty>")
+        ));
+        if (nameItem.isPresent()) {
+            Optional<NameItemConfigView> nameItemById = configs.getNameItemConfigById(nameItem.get().id());
+            assertions.add(check(
+                    "name-item config by-id round trip",
+                    nameItemById.isPresent() && !nameItemById.get().detailsJson().isBlank(),
+                    nameItemById.map(NameItemConfigView::id).orElse("<empty>")
+            ));
+        }
+
+        Optional<CommandItemConfigView> commandItem = configs.resolveCommandItemConfigForItemId(EXAMPLE_COMMAND_ITEM_ID);
+        assertions.add(check(
+                "command-item config resolves",
+                commandItem.isPresent(),
+                commandItem.map(view -> view.id() + " itemIds=" + view.itemIds()).orElse("<empty>")
+        ));
+        if (commandItem.isPresent()) {
+            assertions.add(check(
+                    "command-item config includes example item id",
+                    commandItem.get().itemIds().contains(EXAMPLE_COMMAND_ITEM_ID),
+                    "itemIds=" + commandItem.get().itemIds()
+            ));
+            Optional<CommandItemConfigView> commandItemById = configs.getCommandItemConfigById(commandItem.get().id());
+            assertions.add(check(
+                    "command-item config by-id round trip",
+                    commandItemById.isPresent() && !commandItemById.get().detailsJson().isBlank(),
+                    commandItemById.map(CommandItemConfigView::id).orElse("<empty>")
+            ));
+        }
         return new ApiSelfTestSuiteResult("configs", assertions);
     }
 

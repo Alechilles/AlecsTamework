@@ -58,7 +58,7 @@ public final class TameworkApiTestRunCommand extends AbstractPlayerCommand {
         ParsedArgs parsed = parse(commandContext);
         if (parsed == null) {
             commandContext.sender().sendMessage(Message.raw(
-                    "Usage: /tw api test run [core|profile|command-links|configs|policies|diagnostics|all] [verbose]"
+                    "Usage: /tw api test run [core|profile|command-links|configs|progression|interaction-extensions|policies|diagnostics|all] [verbose]"
             ));
             return;
         }
