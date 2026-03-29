@@ -41,6 +41,7 @@ import javax.annotation.Nullable;
  */
 public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<ChunkStore> {
     private static final long SWEEP_INTERVAL_MS = 250L;
+    private static final long LIFECYCLE_RECONCILE_INTERVAL_MS = 2_000L;
 
     private final CommandLinkedNpcCoopService coopService;
     @Nullable
@@ -53,6 +54,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private final CoopResidentStateSnapshotService stateSnapshotService;
 
     private long nextSweepAtMs;
+    private long nextLifecycleReconcileAtMs;
 
     @Nullable
     private volatile ComponentType<ChunkStore, ?> blockStateInfoType;
@@ -91,7 +93,16 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return;
         }
 
-        ArrayList<ManagedCoopTarget> coopTargets = collectManagedCoops(store, worldTime);
+        ArrayList<ManagedCoopContext> managedCoops = collectManagedCoops(store, worldTime);
+        if (managedCoops.isEmpty()) {
+            return;
+        }
+        if (nowMs >= nextLifecycleReconcileAtMs) {
+            nextLifecycleReconcileAtMs = nowMs + LIFECYCLE_RECONCILE_INTERVAL_MS;
+            reconcileManagedCoopLifecycle(managedCoops, world, entityStore);
+        }
+
+        ArrayList<ManagedCoopTarget> coopTargets = buildCaptureTargets(managedCoops);
         if (coopTargets.isEmpty()) {
             return;
         }
@@ -184,9 +195,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     @Nonnull
-    private ArrayList<ManagedCoopTarget> collectManagedCoops(@Nonnull Store<ChunkStore> chunkStore,
-                                                              @Nonnull WorldTimeResource worldTime) {
-        ArrayList<ManagedCoopTarget> out = new ArrayList<>();
+    private ArrayList<ManagedCoopContext> collectManagedCoops(@Nonnull Store<ChunkStore> chunkStore,
+                                                               @Nonnull WorldTimeResource worldTime) {
+        ArrayList<ManagedCoopContext> out = new ArrayList<>();
         ComponentType<ChunkStore, CoopBlock> coopType = CoopBlock.getComponentType();
         if (coopType == null) {
             return out;
@@ -203,7 +214,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                                               @Nonnull ArchetypeChunk<ChunkStore> chunk,
                                               @Nonnull ComponentType<ChunkStore, CoopBlock> coopType,
                                               @Nonnull WorldTimeResource worldTime,
-                                              @Nonnull ArrayList<ManagedCoopTarget> out) {
+                                              @Nonnull ArrayList<ManagedCoopContext> out) {
         int size = chunk.size();
         for (int i = 0; i < size; i++) {
             Ref<ChunkStore> reference = chunk.getReferenceTo(i);
@@ -225,24 +236,58 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 continue;
             }
             TwCoopConfig.LifecycleRules lifecycleRules = config.getLifecycleRules();
-            if (!lifecycleRules.isCaptureWildNPCsInRange()) {
+            out.add(new ManagedCoopContext(
+                    coopBlock,
+                    normalizeIdentifier(coopId),
+                    location,
+                    lifecycleRules,
+                    coopBlock.shouldResidentsBeInCoop(worldTime)
+            ));
+        }
+    }
+
+    private void reconcileManagedCoopLifecycle(@Nonnull ArrayList<ManagedCoopContext> managedCoops,
+                                               @Nonnull World world,
+                                               @Nonnull Store<EntityStore> entityStore) {
+        for (ManagedCoopContext managedCoop : managedCoops) {
+            if (managedCoop.shouldResidentsBeInCoop()) {
+                managedCoop.coopBlock().ensureNoResidentsInWorld(entityStore);
                 continue;
             }
-            if (!coopBlock.shouldResidentsBeInCoop(worldTime)) {
+            Vector3i block = managedCoop.location().block();
+            managedCoop.coopBlock().ensureSpawnResidentsInWorld(
+                    world,
+                    entityStore,
+                    new Vector3d(block.x, block.y, block.z),
+                    new Vector3d().assign(Vector3d.FORWARD)
+            );
+        }
+    }
+
+    @Nonnull
+    private ArrayList<ManagedCoopTarget> buildCaptureTargets(@Nonnull ArrayList<ManagedCoopContext> managedCoops) {
+        ArrayList<ManagedCoopTarget> targets = new ArrayList<>();
+        for (ManagedCoopContext managedCoop : managedCoops) {
+            if (!managedCoop.shouldResidentsBeInCoop()) {
+                continue;
+            }
+            TwCoopConfig.LifecycleRules lifecycleRules = managedCoop.lifecycleRules();
+            if (!lifecycleRules.isCaptureWildNPCsInRange()) {
                 continue;
             }
             double radius = lifecycleRules.getWildCaptureRadius();
             if (radius <= 0.0) {
                 continue;
             }
-            out.add(new ManagedCoopTarget(
-                    coopBlock,
-                    normalizeIdentifier(coopId),
-                    location,
+            targets.add(new ManagedCoopTarget(
+                    managedCoop.coopBlock(),
+                    managedCoop.coopId(),
+                    managedCoop.location(),
                     radius * radius,
                     normalizeRoleSet(lifecycleRules.getAcceptedRoleIds())
             ));
         }
+        return targets;
     }
 
     @Nonnull
@@ -484,6 +529,13 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private record CoopLocation(@Nonnull Vector3i block) {
+    }
+
+    private record ManagedCoopContext(@Nonnull CoopBlock coopBlock,
+                                      @Nullable String coopId,
+                                      @Nonnull CoopLocation location,
+                                      @Nonnull TwCoopConfig.LifecycleRules lifecycleRules,
+                                      boolean shouldResidentsBeInCoop) {
     }
 
     private record ManagedCoopTarget(@Nonnull CoopBlock coopBlock,
