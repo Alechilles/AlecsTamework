@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.api.NpcProfileChangedEvent;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
+import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -44,11 +45,13 @@ class TameworkApiImplTest {
                     stateSnapshotService
             );
 
-            assertEquals("0.1.0", api.getApiVersion());
+            assertEquals("0.3.0", api.getApiVersion());
             assertEquals(
                     EnumSet.of(
                             TameworkApiCapability.PROFILES,
                             TameworkApiCapability.COMMAND_LINKS,
+                            TameworkApiCapability.PROGRESSION,
+                            TameworkApiCapability.PROGRESSION_MUTATIONS,
                             TameworkApiCapability.POLICY,
                             TameworkApiCapability.PROFILE_DATA,
                             TameworkApiCapability.EVENTS,
@@ -81,6 +84,40 @@ class TameworkApiImplTest {
             assertTrue(byProfileId.isPresent());
             assertTrue(byNpcUuid.isPresent());
             assertEquals(profileId, byNpcUuid.orElseThrow().profileId());
+            assertTrue(api.progression().getByProfileId(profileId).isEmpty());
+            assertTrue(api.progression().getByNpcUuid(npcUuid).isEmpty());
+            assertEquals(
+                    ProgressionMutationStatus.NOT_LOADED,
+                    api.progression().setHappiness(profileId, 75.0).status()
+            );
+            assertEquals(
+                    ProgressionMutationStatus.NOT_LOADED,
+                    api.progression().setNeeds(profileId, 10.0, 20.0).status()
+            );
+            assertEquals(
+                    ProgressionMutationStatus.INVALID_ARGUMENT,
+                    api.progression().setNeeds(profileId, null, null).status()
+            );
+            assertEquals(
+                    ProgressionMutationStatus.INVALID_ARGUMENT,
+                    api.progression().setHappiness(profileId, Double.NaN).status()
+            );
+            assertEquals(
+                    ProgressionMutationStatus.INVALID_ARGUMENT,
+                    api.progression().applyHappinessDelta(profileId, Double.POSITIVE_INFINITY).status()
+            );
+            assertEquals(
+                    ProgressionMutationStatus.INVALID_ARGUMENT,
+                    api.progression().setTraits(profileId, null).status()
+            );
+            assertEquals(
+                    ProgressionMutationStatus.INVALID_ARGUMENT,
+                    api.progression().setStoredAttachments(profileId, null).status()
+            );
+            assertEquals(
+                    ProgressionMutationStatus.NOT_FOUND,
+                    api.progression().setHappiness(UUID.randomUUID(), 10.0).status()
+            );
             assertTrue(api.policies().getOwnershipByProfileId(profileId).isPresent());
             assertTrue(api.policies().isOwner(profileId, ownerUuid));
             assertTrue(api.commandLinks().getByProfileId(profileId).isPresent());

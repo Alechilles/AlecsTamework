@@ -11,6 +11,8 @@ public interface TameworkApi {
 
     CommandLinksApi commandLinks();
 
+    ProgressionApi progression();
+
     PolicyApi policies();
 
     ProfileDataApi profileData();

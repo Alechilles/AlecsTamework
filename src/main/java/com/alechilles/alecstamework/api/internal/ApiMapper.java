@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.api.InteractionConfigView;
 import com.alechilles.alecstamework.api.NameItemConfigView;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
+import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.ProfileChangeType;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.SpawnerConfigView;
@@ -21,6 +22,13 @@ import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
@@ -34,9 +42,11 @@ import com.google.gson.JsonSerializer;
 import com.hypixel.hytale.math.vector.Vector3d;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -110,6 +120,154 @@ final class ApiMapper {
                 lastKnownPosition,
                 toOrderedSet(profile.activeSnapshotTypes()),
                 profile.updatedAtMs()
+        );
+    }
+
+    @Nonnull
+    static ProgressionView.HappinessView mapHappiness(@Nullable String configId,
+                                                      long lastUpdateMs,
+                                                      @Nonnull String source,
+                                                      @Nonnull CompanionHappinessService.HappinessSnapshot snapshot) {
+        List<ProgressionView.ModifierEntryView> modifiers = snapshot.modifiers().stream()
+                .filter(Objects::nonNull)
+                .map(ApiMapper::mapModifierEntry)
+                .toList();
+        return new ProgressionView.HappinessView(
+                configId,
+                snapshot.value(),
+                snapshot.min(),
+                snapshot.max(),
+                lastUpdateMs,
+                source,
+                snapshot.baseSetpoint(),
+                snapshot.target(),
+                modifiers
+        );
+    }
+
+    @Nonnull
+    static ProgressionView.NeedsView mapNeeds(@Nonnull TameworkNeedsComponent component,
+                                              @Nullable TwNeedsConfig config) {
+        Integer hungerPercent = null;
+        Integer thirstPercent = null;
+        if (config != null) {
+            TwNeedsConfig.ValueSettings values = config.getValues();
+            hungerPercent = percent(component.getHunger(), values.getHungerMin(), values.getHungerMax());
+            thirstPercent = percent(component.getThirst(), values.getThirstMin(), values.getThirstMax());
+        }
+        return new ProgressionView.NeedsView(
+                component.getConfigId(),
+                component.getHunger(),
+                component.getThirst(),
+                hungerPercent,
+                thirstPercent,
+                component.getAppliedHappinessPenalty(),
+                component.getLastUpdateMs(),
+                component.getLastPassiveSweepMs()
+        );
+    }
+
+    @Nonnull
+    static ProgressionView.BreedingView mapBreeding(@Nullable String configId,
+                                                    @Nonnull TameworkBreedingComponent component,
+                                                    long nowMs,
+                                                    @Nullable Double effectiveHappiness,
+                                                    @Nullable Double threshold,
+                                                    @Nullable Boolean eligible,
+                                                    double fertilityMultiplier) {
+        boolean cooldownActive = component.isCooldownActive(nowMs);
+        long cooldownRemainingMs = cooldownActive
+                ? Math.max(0L, component.getCooldownUntilMs() - nowMs)
+                : 0L;
+        return new ProgressionView.BreedingView(
+                configId,
+                component.isEnabled(),
+                component.isReady(),
+                component.isReady() && !cooldownActive,
+                cooldownActive,
+                component.getCooldownUntilMs(),
+                component.getCooldownStartedAtMs(),
+                component.getCooldownDurationMs(),
+                cooldownRemainingMs,
+                component.getLastPartnerUuid(),
+                component.getHappiness(),
+                component.getLastHappinessUpdateMs(),
+                effectiveHappiness,
+                threshold,
+                eligible,
+                fertilityMultiplier
+        );
+    }
+
+    @Nonnull
+    static ProgressionView.LifeStageView mapLifeStage(@Nonnull String stage,
+                                                      boolean adult,
+                                                      double currentScale,
+                                                      @Nullable TameworkLifeStageComponent component) {
+        return new ProgressionView.LifeStageView(
+                stage,
+                adult,
+                component != null && component.isGrowthScalingEnabled(),
+                currentScale,
+                component != null ? component.getBornAtMs() : 0L,
+                component != null ? component.getAdolescentAtMs() : 0L,
+                component != null ? component.getAdultAtMs() : 0L,
+                component != null ? component.getFullyGrownAtMs() : 0L,
+                component != null ? component.getBabyScale() : 0.0,
+                component != null ? component.getAdolescentScale() : 0.0,
+                component != null ? component.getAdolescentSwitchScale() : 0.0,
+                component != null ? component.getAdultStartScale() : 0.0,
+                component != null ? component.getAdultSwitchScale() : 0.0,
+                component != null ? component.getAdultScale() : 0.0,
+                component != null ? component.getAdultRoleId() : null,
+                component != null ? component.getBabyRoleId() : null,
+                component != null ? component.getAdolescentRoleId() : null
+        );
+    }
+
+    @Nonnull
+    static ProgressionView.TraitsView mapTraits(@Nonnull TameworkTraitsComponent component,
+                                                @Nullable TwTraitConfig config) {
+        LinkedHashMap<String, String> effectKeys = new LinkedHashMap<>();
+        if (config != null) {
+            for (TwTraitConfig.TraitDefinition definition : config.getTraits()) {
+                if (definition == null || definition.getId() == null || definition.getId().isBlank()) {
+                    continue;
+                }
+                effectKeys.putIfAbsent(definition.getId().trim().toLowerCase(), definition.getEffectKey());
+            }
+        }
+        List<ProgressionView.TraitValueView> values = Arrays.stream(component.getTraitValues())
+                .filter(Objects::nonNull)
+                .filter(value -> value.getId() != null && !value.getId().isBlank())
+                .map(value -> new ProgressionView.TraitValueView(
+                        value.getId(),
+                        value.getValue(),
+                        effectKeys.get(value.getId().trim().toLowerCase())
+                ))
+                .toList();
+        return new ProgressionView.TraitsView(
+                component.getConfigId(),
+                component.getRollSeed(),
+                values
+        );
+    }
+
+    @Nonnull
+    static ProgressionView.AttachmentsView mapAttachments(@Nullable TameworkAttachmentsComponent component,
+                                                          @Nullable java.util.Map<String, String> currentAttachmentIds) {
+        LinkedHashMap<String, String> stored = new LinkedHashMap<>();
+        if (component != null && component.getAttachmentIds() != null) {
+            stored.putAll(component.getAttachmentIds());
+        }
+        LinkedHashMap<String, String> current = new LinkedHashMap<>();
+        if (currentAttachmentIds != null) {
+            current.putAll(currentAttachmentIds);
+        }
+        return new ProgressionView.AttachmentsView(
+                component != null ? component.getConfigId() : null,
+                Collections.unmodifiableMap(stored),
+                Collections.unmodifiableMap(current)
         );
     }
 
@@ -471,5 +629,28 @@ final class ApiMapper {
             return null;
         }
         return getter.apply(profile);
+    }
+
+    @Nonnull
+    private static ProgressionView.ModifierEntryView mapModifierEntry(
+            @Nonnull CompanionHappinessModifierService.ModifierEntry modifier) {
+        return new ProgressionView.ModifierEntryView(
+                modifier.id(),
+                modifier.label(),
+                modifier.value()
+        );
+    }
+
+    @Nullable
+    private static Integer percent(double current, double min, double max) {
+        if (!Double.isFinite(current) || !Double.isFinite(min) || !Double.isFinite(max)) {
+            return null;
+        }
+        double range = max - min;
+        if (range <= 0.0) {
+            return null;
+        }
+        double clamped = Math.max(min, Math.min(max, current));
+        return (int) Math.round(((clamped - min) / range) * 100.0);
     }
 }

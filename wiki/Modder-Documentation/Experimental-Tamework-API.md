@@ -12,7 +12,7 @@ Use this page when another mod wants to read Tamework profile data, store profil
 
 ## Experimental contract
 - The API contract is currently experimental and versioned separately from the mod version.
-- The current experimental API version is `0.1.0`.
+- The current experimental API version is `0.3.0`.
 - Expect additive changes and occasional cleanup while downstream integrations prove out the surface.
 - Do not depend on internal repositories, SQLite tables, or `Tw*Config` implementation classes even if they are visible in the jar.
 
@@ -21,7 +21,7 @@ Add Tamework as a dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.5.2"
+  "Alechilles:Alec's Tamework!": "2.5.3"
 }
 ```
 
@@ -44,15 +44,18 @@ The root API exposes:
 - `getCapabilities()`
 - `profiles()`
 - `commandLinks()`
+- `progression()`
 - `policies()`
 - `profileData()`
 - `events()`
 - `configs()`
 - `diagnostics()`
 
-Check `getCapabilities()` before assuming a feature exists. Phase 1 currently advertises:
+Check `getCapabilities()` before assuming a feature exists. The current experimental build advertises:
 - `PROFILES`
 - `COMMAND_LINKS`
+- `PROGRESSION`
+- `PROGRESSION_MUTATIONS`
 - `POLICY`
 - `PROFILE_DATA`
 - `EVENTS`
@@ -92,8 +95,69 @@ api.commandLinks().getHomePosition(profileId).ifPresent(home -> {
 });
 ```
 
+## Progression reads
+`progression()` exposes live companion progression state for loaded NPCs:
+- Read progression by profile id
+- Read progression by current NPC UUID
+- Read detached snapshots for happiness, needs, breeding, life stage, traits, and attachments
+
+`ProgressionView` is live-state only. If the NPC is not currently loaded, `progression().getBy...(...)` returns empty instead of guessing from persistence snapshots.
+
+The progression subviews currently expose:
+- `HappinessView`: current value, min/max band, last update timestamp, source, equilibrium base/target, and active modifiers
+- `NeedsView`: hunger, thirst, percent values when config is available, applied happiness penalty, and timestamps
+- `BreedingView`: enabled/ready flags, cooldown state, tracked happiness, effective happiness, threshold, eligibility, and fertility multiplier
+- `LifeStageView`: resolved stage, growth timeline, current scale, and configured role/scaling breakpoints
+- `TraitsView`: roll seed and rolled trait values
+- `AttachmentsView`: stored attachment ids and the currently applied model attachments
+
+Example:
+
+```java
+api.progression().getByNpcUuid(npcUuid).ifPresent(progression -> {
+    ProgressionView.BreedingView breeding = progression.breeding();
+    if (breeding != null && Boolean.TRUE.equals(breeding.eligible())) {
+        double effective = breeding.effectiveHappiness();
+    }
+});
+```
+
+## Progression mutations
+`progression()` also exposes controlled live-state writes for loaded NPCs. These methods mutate Tamework’s progression components through the same rules-aware services the mod uses internally rather than asking integrations to edit ECS components directly.
+
+Current mutation methods:
+- `setHappiness(...)`
+- `applyHappinessDelta(...)`
+- `setNeeds(...)`
+- `setBreedingReady(...)`
+- `rerollTraits(...)`
+- `setTraits(...)`
+- `refreshLifeStage(...)`
+- `setStoredAttachments(...)`
+- `syncStoredAttachments(...)`
+
+All progression mutations return a `ProgressionMutationResult` with:
+- `status()`: `APPLIED`, `NOT_FOUND`, `NOT_LOADED`, `INVALID_ARGUMENT`, `UNSUPPORTED`, or `ERROR`
+- `message()`: a compact explanation of what happened
+- `progression()`: the detached post-mutation `ProgressionView` when Tamework can snapshot the live NPC state
+
+Guidelines:
+- Use profile ids when you want a stable target across UUID remaps.
+- Expect `NOT_LOADED` when the profile exists but the live NPC is not currently loaded.
+- Expect `UNSUPPORTED` when the target NPC does not currently have the relevant progression system enabled.
+- Treat `ERROR` as an unexpected runtime failure rather than a validation result.
+
+Example:
+
+```java
+ProgressionMutationResult result = api.progression().setHappiness(profileId, 82.5);
+if (result.applied() && result.progression() != null && result.progression().happiness() != null) {
+    double appliedValue = result.progression().happiness().value();
+}
+```
+
 ## Profile-scoped extension data
-`profileData()` is the only Phase 1 write surface. It stores UTF-8 JSON text keyed by:
+`profileData()` is the persistence-backed extension write surface. It stores UTF-8 JSON text keyed by:
 - `profileId`
 - `namespace`
 - `key`
@@ -178,6 +242,14 @@ Claim and damage checks are best-effort and use the mob’s live world context w
 
 `PersistenceDiagnosticsView` includes the SQLite path, file sizes, write-queue metrics, and current persistence health state. This is intended for tooling, admin UIs, and integration debugging rather than gameplay logic.
 
+## In-game self-tests
+Tamework also ships an in-game self-test harness for this API under `/tw api test ...`.
+
+Use it when you want to validate that the live server runtime, persistence layer, bundled example assets, and public API surface all still agree without writing a separate integration mod.
+
+See:
+- [In-Game API Self-Tests](/mod/alecs-tamework/in-game-api-self-tests)
+
 ## What not to use
 - Do not write directly to `tamework.sqlite`.
 - Do not depend on repository classes like `NpcProfileRepository` or `CaptureRepository`.
@@ -186,5 +258,6 @@ Claim and damage checks are best-effort and use the mob’s live world context w
 
 ## Related Pages
 - [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)
+- [In-Game API Self-Tests](/mod/alecs-tamework/in-game-api-self-tests)
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
