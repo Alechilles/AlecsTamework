@@ -47,6 +47,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private final AtomicLong lastBatchDurationNs = new AtomicLong(0L);
     private final AtomicInteger maxBatchSize = new AtomicInteger(0);
     private final AtomicInteger activeBatchSize = new AtomicInteger(0);
+    private final AtomicInteger pendingTaskCount = new AtomicInteger(0);
     private final AtomicReference<String> lastFailureReason = new AtomicReference<>(null);
     private final AtomicLong lastFailureAtMs = new AtomicLong(0L);
 
@@ -71,16 +72,20 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         if (closed.get() || !healthService.isHealthy()) {
             return false;
         }
-        return queue.offer(new WriteTask(operationName, transaction, afterCommit));
+        boolean accepted = queue.offer(new WriteTask(operationName, transaction, afterCommit));
+        if (accepted) {
+            pendingTaskCount.incrementAndGet();
+        }
+        return accepted;
     }
 
     public boolean awaitIdle(long timeoutMs) {
         long deadlineNs = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(Math.max(0L, timeoutMs));
         while (System.nanoTime() <= deadlineNs) {
-            if (queue.isEmpty() && activeBatchSize.get() == 0) {
+            if (pendingTaskCount.get() == 0 && activeBatchSize.get() == 0) {
                 return true;
             }
-            if (closed.get() && queue.isEmpty() && activeBatchSize.get() == 0) {
+            if (closed.get() && pendingTaskCount.get() == 0 && activeBatchSize.get() == 0) {
                 return true;
             }
             sleepQuietly(10L);
@@ -89,7 +94,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                 return false;
             }
         }
-        return queue.isEmpty() && activeBatchSize.get() == 0;
+        return pendingTaskCount.get() == 0 && activeBatchSize.get() == 0;
     }
 
     @Nonnull
@@ -170,6 +175,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
             throw new IllegalStateException("write queue retry exhausted");
         } finally {
             activeBatchSize.set(0);
+            decrementPendingTaskCount(batch.size());
         }
     }
 
@@ -257,7 +263,15 @@ public final class PersistenceWriteQueue implements AutoCloseable {
             return;
         }
         workerThread.interrupt();
+        decrementPendingTaskCount(queue.size());
         queue.clear();
+    }
+
+    private void decrementPendingTaskCount(int count) {
+        if (count <= 0) {
+            return;
+        }
+        pendingTaskCount.updateAndGet(current -> Math.max(0, current - count));
     }
 
     private static final class WriteTask {
