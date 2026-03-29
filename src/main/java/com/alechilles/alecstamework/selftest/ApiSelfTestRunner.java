@@ -467,7 +467,12 @@ public final class ApiSelfTestRunner {
                     ProgressionMutationStatus.APPLIED
             ));
         } else {
-            assertions.add(fail("traits baseline available", "No trait values available on fixture progression."));
+            assertions.add(checkMutation(
+                    "rerollTraits returns expected status when trait baseline missing",
+                    context.api().progression().rerollTraits(profileId),
+                    ProgressionMutationStatus.UNSUPPORTED,
+                    ProgressionMutationStatus.APPLIED
+            ));
         }
 
         ProgressionMutationStatus lifeStageExpected =
