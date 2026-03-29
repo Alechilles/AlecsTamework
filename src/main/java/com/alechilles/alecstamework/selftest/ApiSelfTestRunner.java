@@ -4,7 +4,11 @@ import com.alechilles.alecstamework.api.ClaimAccessDecisionView;
 import com.alechilles.alecstamework.api.CommandLinkView;
 import com.alechilles.alecstamework.api.DamagePolicyDecisionView;
 import com.alechilles.alecstamework.api.DiagnosticsApi;
+import com.alechilles.alecstamework.api.InteractionEffectSpec;
 import com.alechilles.alecstamework.api.InteractionConfigView;
+import com.alechilles.alecstamework.api.InteractionExtensionApi;
+import com.alechilles.alecstamework.api.InteractionPresetDefinition;
+import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.alechilles.alecstamework.api.NpcProfileView;
 import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
@@ -28,6 +32,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Executes live contract checks against Tamework's public integration API.
@@ -39,6 +44,7 @@ public final class ApiSelfTestRunner {
         COMMAND_LINKS,
         CONFIGS,
         PROGRESSION,
+        INTERACTION_EXTENSIONS,
         POLICIES,
         DIAGNOSTICS,
         ALL;
@@ -66,6 +72,9 @@ public final class ApiSelfTestRunner {
         }
         if (suite == Suite.ALL || suite == Suite.PROGRESSION) {
             suites.add(runProgression(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.INTERACTION_EXTENSIONS) {
+            suites.add(runInteractionExtensions(context));
         }
         if (suite == Suite.ALL || suite == Suite.POLICIES) {
             suites.add(runPolicies(context));
@@ -498,6 +507,102 @@ public final class ApiSelfTestRunner {
     }
 
     @Nonnull
+    private ApiSelfTestSuiteResult runInteractionExtensions(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        InteractionExtensionApi extensions = context.api().interactionExtensions();
+        if (extensions == null) {
+            assertions.add(fail("interaction extension api available", "<null>"));
+            return new ApiSelfTestSuiteResult("interaction-extensions", assertions);
+        }
+
+        String idSuffix = UUID.randomUUID().toString().replace("-", "");
+        String requirementId = "selftest.requirement." + idSuffix;
+        String effectId = "selftest.effect." + idSuffix;
+        String presetId = "selftest.preset." + idSuffix;
+
+        AutoCloseable requirementRegistration = null;
+        AutoCloseable effectRegistration = null;
+        AutoCloseable presetRegistration = null;
+        try {
+            requirementRegistration = extensions.registerRequirement(requirementId, (requirementContext, spec) -> true);
+            effectRegistration = extensions.registerEffect(effectId, (effectContext, spec) -> true);
+            presetRegistration = extensions.registerPreset(new InteractionPresetDefinition(
+                    presetId,
+                    List.of(new InteractionRequirementSpec(requirementId, "flag", List.of("x"), null)),
+                    List.of(new InteractionEffectSpec(effectId, "mode", List.of("follow"), null))
+            ));
+
+            assertions.add(check(
+                    "registered requirement id is listed",
+                    extensions.listRequirementIds().contains(requirementId),
+                    "requirements=" + extensions.listRequirementIds()
+            ));
+            assertions.add(check(
+                    "registered effect id is listed",
+                    extensions.listEffectIds().contains(effectId),
+                    "effects=" + extensions.listEffectIds()
+            ));
+            assertions.add(check(
+                    "registered preset id is listed",
+                    extensions.listPresetIds().contains(presetId),
+                    "presets=" + extensions.listPresetIds()
+            ));
+            assertions.add(check(
+                    "registered preset resolves",
+                    extensions.getPreset(presetId.toUpperCase(Locale.ROOT)).isPresent(),
+                    extensions.getPreset(presetId).map(InteractionPresetDefinition::id).orElse("<empty>")
+            ));
+        } catch (Exception ex) {
+            assertions.add(fail("interaction extension registration", ex.getClass().getSimpleName() + ": " + ex.getMessage()));
+        } finally {
+            closeQuietly(presetRegistration);
+            closeQuietly(effectRegistration);
+            closeQuietly(requirementRegistration);
+        }
+
+        assertions.add(check(
+                "requirement unregistered on close",
+                !extensions.listRequirementIds().contains(requirementId),
+                "requirements=" + extensions.listRequirementIds()
+        ));
+        assertions.add(check(
+                "effect unregistered on close",
+                !extensions.listEffectIds().contains(effectId),
+                "effects=" + extensions.listEffectIds()
+        ));
+        assertions.add(check(
+                "preset unregistered on close",
+                !extensions.getPreset(presetId).isPresent(),
+                "presets=" + extensions.listPresetIds()
+        ));
+
+        boolean invalidRequirementRejected = false;
+        try {
+            extensions.registerRequirement("   ", (requirementContext, spec) -> true);
+        } catch (IllegalArgumentException expected) {
+            invalidRequirementRejected = true;
+        }
+        assertions.add(check("blank requirement id rejected", invalidRequirementRejected, Boolean.toString(invalidRequirementRejected)));
+
+        boolean invalidEffectRejected = false;
+        try {
+            extensions.registerEffect("", (effectContext, spec) -> true);
+        } catch (IllegalArgumentException expected) {
+            invalidEffectRejected = true;
+        }
+        assertions.add(check("blank effect id rejected", invalidEffectRejected, Boolean.toString(invalidEffectRejected)));
+
+        boolean invalidPresetRejected = false;
+        try {
+            extensions.registerPreset(new InteractionPresetDefinition(" ", List.of(), List.of()));
+        } catch (IllegalArgumentException expected) {
+            invalidPresetRejected = true;
+        }
+        assertions.add(check("blank preset id rejected", invalidPresetRejected, Boolean.toString(invalidPresetRejected)));
+        return new ApiSelfTestSuiteResult("interaction-extensions", assertions);
+    }
+
+    @Nonnull
     private ApiSelfTestSuiteResult runPolicies(@Nonnull ApiSelfTestContext context) {
         ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
         ApiSelfTestFixtureSet fixtureSet = requireFixtureSet(context, assertions, "policies");
@@ -707,6 +812,17 @@ public final class ApiSelfTestRunner {
 
     private double clampDouble(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private void closeQuietly(@Nullable AutoCloseable closeable) {
+        if (closeable == null) {
+            return;
+        }
+        try {
+            closeable.close();
+        } catch (Exception ignored) {
+            // best-effort cleanup for in-game self-test registration handles.
+        }
     }
 
     @Nonnull
