@@ -22,7 +22,7 @@ Use the commands in this order:
 Available commands:
 - `/tw api test prepare`
 - `/tw api test status`
-- `/tw api test run [core|profile|command-links|configs|policies|diagnostics|all] [verbose]`
+- `/tw api test run [core|profile|command-links|configs|progression|interaction-extensions|policies|diagnostics|all] [verbose]`
 - `/tw api test reset`
 
 These commands are intended for trusted operators and use the `tamework.api.test` permission node with the usual OP/Admin/Operator fallback groups.
@@ -59,6 +59,21 @@ Each fixture is marked with an internal self-test component, linked to the gener
 - needs config resolution
 - breeding config resolution
 - trait config resolution
+- spawner config resolution (empty/filled item ids + by-id round-trip)
+- name-item config resolution (item-id + by-id round-trip)
+- command-item config resolution (item-id + by-id round-trip)
+
+`run progression` checks:
+- progression reads by profile id and NPC UUID
+- controlled mutation calls for happiness/needs/breeding/traits/life-stage/attachments
+- invalid-argument behavior for mutation methods that require valid input payloads
+- best-effort baseline restore at the end of the suite so repeated runs stay stable
+
+`run interaction-extensions` checks:
+- requirement/effect/preset registration through the public API
+- id listing and preset lookup behavior
+- unregister behavior via closing returned `AutoCloseable` handles
+- blank-id rejection behavior for requirement/effect/preset registration
 
 `run policies` checks:
 - ownership reads
