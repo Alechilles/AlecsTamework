@@ -27,16 +27,34 @@ final class InteractionExecutor {
     }
 
     // Applies a single interaction entry and any configured custom effects.
-    boolean applyInteraction(InteractionEntry entry,
+    boolean applyInteraction(ActionTameworkInteract.ResolvedInteraction interaction,
                              Ref<EntityStore> npcRef,
                              Role role,
                              InfoProvider infoProvider,
                              Store<EntityStore> store,
                              Player player,
                              InteractionContextSnapshot ctx) {
+        if (interaction == null || interaction.entry == null) {
+            return false;
+        }
+        InteractionEntry entry = interaction.entry;
+        String interactionConfigId = interaction.configId;
+        int interactionIndex = interaction.index;
         boolean harvestInteraction = entry instanceof HarvestInteraction;
         if (entry instanceof CustomInteraction) {
-            return effects.applyCustomEffects(entry.getEffects(), npcRef, role, infoProvider, store, player, ctx, harvestInteraction);
+            return effects.applyCustomEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    entry,
+                    entry.getEffects(),
+                    npcRef,
+                    role,
+                    infoProvider,
+                    store,
+                    player,
+                    ctx,
+                    harvestInteraction
+            );
         }
         if (entry instanceof TameInteraction) {
             TameInteraction tame = (TameInteraction) entry;
@@ -47,6 +65,9 @@ final class InteractionExecutor {
             applied |= effects.applyTameRoleChange(tame, npcRef, role, store, ctx);
             feedHelper.consumeHeldItem(player, 1);
             applied |= effects.applyCustomEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    entry,
                     entry.getEffects(),
                     npcRef,
                     role,
@@ -65,6 +86,9 @@ final class InteractionExecutor {
             feedHelper.consumeHeldItem(player, 1);
             return applied
                     | effects.applyCustomEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    entry,
                     entry.getEffects(),
                     npcRef,
                     role,
@@ -79,6 +103,9 @@ final class InteractionExecutor {
             boolean applied = effects.applyStartHarvest(npcRef, role, store);
             return applied
                     | effects.applyCustomEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    entry,
                     entry.getEffects(),
                     npcRef,
                     role,
@@ -93,6 +120,9 @@ final class InteractionExecutor {
             boolean applied = effects.applyMount(npcRef, role, infoProvider, store);
             return applied
                     | effects.applyCustomEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    entry,
                     entry.getEffects(),
                     npcRef,
                     role,
@@ -116,6 +146,9 @@ final class InteractionExecutor {
             );
             return applied
                     | effects.applyCustomEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    entry,
                     entry.getEffects(),
                     npcRef,
                     role,
@@ -133,6 +166,9 @@ final class InteractionExecutor {
                 return false;
             }
             return effects.applyCustomEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    entry,
                     entry.getEffects(),
                     npcRef,
                     role,

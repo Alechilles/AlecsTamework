@@ -1,13 +1,20 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.InteractionEffectContext;
+import com.alechilles.alecstamework.api.InteractionEffectSpec;
+import com.alechilles.alecstamework.api.InteractionPresetDefinition;
+import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemInventoryEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AddItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Effects;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FloatingTextEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HookEffect;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeStep;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModifyStatsEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.PlaySoundEffect;
@@ -29,7 +36,12 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 import java.util.logging.Level;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Tamework interact effects. */
 final class TameworkInteractEffects {
@@ -41,8 +53,11 @@ final class TameworkInteractEffects {
     private final InteractionMountEffects mountEffects;
     private final InteractionHookEffects hookEffects;
     private final InteractionBreedingEffects breedingEffects;
+    @Nullable
+    private final InteractionExtensionRuntime extensionRuntime;
 
-    TameworkInteractEffects(ActionTameworkInteract owner) {
+    TameworkInteractEffects(ActionTameworkInteract owner,
+                            @Nullable InteractionExtensionRuntime extensionRuntime) {
         this.owner = owner;
         this.inventoryEffects = new InteractionInventoryEffects(owner);
         this.presentationEffects = new InteractionPresentationEffects(owner);
@@ -51,9 +66,13 @@ final class TameworkInteractEffects {
         this.mountEffects = new InteractionMountEffects(owner);
         this.hookEffects = new InteractionHookEffects(owner);
         this.breedingEffects = new InteractionBreedingEffects(owner);
+        this.extensionRuntime = extensionRuntime;
     }
 
-    boolean applyCustomEffects(Effects effects,
+    boolean applyCustomEffects(@Nullable String interactionConfigId,
+                               int interactionIndex,
+                               @Nonnull InteractionEntry entry,
+                               Effects effects,
                                Ref<EntityStore> npcRef,
                                Role role,
                                InfoProvider infoProvider,
@@ -61,10 +80,24 @@ final class TameworkInteractEffects {
                                Player player,
                                InteractionContextSnapshot ctx,
                                boolean harvestInteraction) {
-        if (effects == null) {
-            return false;
-        }
         boolean applied = false;
+        if (entry instanceof CustomInteraction customInteraction) {
+            applied |= applyPresetEffects(
+                    interactionConfigId,
+                    interactionIndex,
+                    customInteraction,
+                    npcRef,
+                    role,
+                    infoProvider,
+                    store,
+                    player,
+                    ctx,
+                    harvestInteraction
+            );
+        }
+        if (effects == null) {
+            return applied;
+        }
         SetRoleEffect setRole = effects.getSetRole();
         if (setRole != null) {
             applied |= applySetRole(setRole, npcRef, role, store, ctx);
@@ -132,6 +165,18 @@ final class TameworkInteractEffects {
         if (uiMessage != null) {
             applied |= presentationEffects.applyUiMessage(uiMessage, player);
         }
+        applied |= applyConfiguredCustomEffects(
+                interactionConfigId,
+                interactionIndex,
+                effects.getCustom(),
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                harvestInteraction
+        );
         return applied;
     }
 
@@ -226,6 +271,127 @@ final class TameworkInteractEffects {
                                Role role,
                                Store<EntityStore> store) {
         return breedingEffects.applyStartBreeding(interaction, npcRef, role, store);
+    }
+
+    private boolean applyPresetEffects(@Nullable String interactionConfigId,
+                                       int interactionIndex,
+                                       @Nullable CustomInteraction interaction,
+                                       Ref<EntityStore> npcRef,
+                                       Role role,
+                                       InfoProvider infoProvider,
+                                       Store<EntityStore> store,
+                                       Player player,
+                                       InteractionContextSnapshot ctx,
+                                       boolean harvestInteraction) {
+        if (interaction == null
+                || extensionRuntime == null
+                || interaction.getPresetId() == null
+                || interaction.getPresetId().isBlank()) {
+            return false;
+        }
+        Optional<InteractionPresetDefinition> preset = extensionRuntime.resolvePreset(interaction.getPresetId());
+        if (preset.isEmpty()) {
+            return false;
+        }
+        InteractionEffectContext runtimeContext = buildEffectContext(
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                harvestInteraction
+        );
+        if (runtimeContext == null) {
+            return false;
+        }
+        boolean applied = false;
+        for (InteractionEffectSpec effectSpec : preset.get().effects()) {
+            applied |= extensionRuntime.applyEffect(effectSpec, runtimeContext);
+        }
+        return applied;
+    }
+
+    private boolean applyConfiguredCustomEffects(@Nullable String interactionConfigId,
+                                                 int interactionIndex,
+                                                 @Nullable CustomEffect[] customEffects,
+                                                 Ref<EntityStore> npcRef,
+                                                 Role role,
+                                                 InfoProvider infoProvider,
+                                                 Store<EntityStore> store,
+                                                 Player player,
+                                                 InteractionContextSnapshot ctx,
+                                                 boolean harvestInteraction) {
+        if (extensionRuntime == null || customEffects == null || customEffects.length == 0) {
+            return false;
+        }
+        InteractionEffectContext runtimeContext = buildEffectContext(
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                harvestInteraction
+        );
+        if (runtimeContext == null) {
+            return false;
+        }
+        boolean applied = false;
+        for (CustomEffect customEffect : customEffects) {
+            if (customEffect == null) {
+                continue;
+            }
+            InteractionEffectSpec spec = new InteractionEffectSpec(
+                    customEffect.getId(),
+                    customEffect.getParam(),
+                    toValues(customEffect.getValues()),
+                    customEffect.getJsonPayload()
+            );
+            applied |= extensionRuntime.applyEffect(spec, runtimeContext);
+        }
+        return applied;
+    }
+
+    @Nullable
+    private InteractionEffectContext buildEffectContext(@Nullable String interactionConfigId,
+                                                        int interactionIndex,
+                                                        Ref<EntityStore> npcRef,
+                                                        Role role,
+                                                        InfoProvider infoProvider,
+                                                        Store<EntityStore> store,
+                                                        Player player,
+                                                        InteractionContextSnapshot ctx,
+                                                        boolean harvestInteraction) {
+        if (npcRef == null || role == null || store == null) {
+            return null;
+        }
+        return new InteractionEffectContext(
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx != null ? ctx.playerId : null,
+                ctx != null ? ctx.activeItemId : null,
+                harvestInteraction
+        );
+    }
+
+    private List<String> toValues(@Nullable String[] values) {
+        if (values == null || values.length == 0) {
+            return List.of();
+        }
+        return Arrays.stream(values)
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .toList();
     }
 
     // Logs and suppresses non-fatal custom effect failures to avoid world-thread crashes.

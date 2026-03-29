@@ -10,6 +10,8 @@ import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
+import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
+import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
@@ -78,6 +80,9 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
+import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
+import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
@@ -157,6 +162,9 @@ public class Tamework extends JavaPlugin {
     private TameworkPersistenceRuntime persistenceRuntime;
     private TameworkApi api;
     private TameworkEventBus apiEventBus;
+    private InteractionExtensionRegistry interactionExtensionRegistry;
+    private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
+    private ApiSelfTestRunner apiSelfTestRunner;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private SpawnerTooltipBridge spawnerTooltipBridge;
@@ -191,6 +199,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
+    private ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> apiSelfTestFixtureMarkerComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
@@ -322,6 +331,12 @@ public class Tamework extends JavaPlugin {
                 TameworkLifeStageComponent.CODEC
         );
 
+        apiSelfTestFixtureMarkerComponentType = getEntityStoreRegistry().registerComponent(
+                ApiSelfTestFixtureMarkerComponent.class,
+                "TameworkApiSelfTestFixture",
+                ApiSelfTestFixtureMarkerComponent.CODEC
+        );
+
         feedTroughWaterChargesComponentType = getChunkStoreRegistry().registerComponent(
                 TameworkFeedTroughWaterChargesComponent.class,
                 "TameworkFeedTroughWaterCharges",
@@ -396,6 +411,7 @@ public class Tamework extends JavaPlugin {
                 .resolveAndMigrateDataDirectory(getDataDirectory());
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
         apiEventBus = new TameworkEventBus(getLogger());
+        interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
                 persistenceRuntime.getNpcProfileRepository()
@@ -403,8 +419,11 @@ public class Tamework extends JavaPlugin {
         api = new TameworkApiImpl(
                 persistenceRuntime,
                 apiEventBus,
-                commandLinkedNpcStateSnapshotService
+                commandLinkedNpcStateSnapshotService,
+                interactionExtensionRegistry
         );
+        apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(persistenceRuntime);
+        apiSelfTestRunner = new ApiSelfTestRunner();
         commandLinkedNpcCaptureService = new CommandLinkedNpcCaptureService(
                 persistenceRuntime.getCaptureRepository(),
                 persistenceRuntime.getHealthService(),
@@ -620,6 +639,8 @@ public class Tamework extends JavaPlugin {
             persistenceRuntime.close();
             persistenceRuntime = null;
         }
+        apiSelfTestFixtureManager = null;
+        apiSelfTestRunner = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
 
@@ -699,6 +720,21 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkApi getApi() {
         return api;
+    }
+
+    @Nullable
+    public InteractionExtensionRuntime getInteractionExtensionRuntime() {
+        return interactionExtensionRegistry;
+    }
+
+    @Nullable
+    public ApiSelfTestFixtureManager getApiSelfTestFixtureManager() {
+        return apiSelfTestFixtureManager;
+    }
+
+    @Nullable
+    public ApiSelfTestRunner getApiSelfTestRunner() {
+        return apiSelfTestRunner;
     }
 
     public void beginItemFeatureAssetReloadSuppression() {
@@ -1425,6 +1461,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkLifeStageComponent> getLifeStageComponentType() {
         return lifeStageComponentType;
+    }
+
+    public ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> getApiSelfTestFixtureMarkerComponentType() {
+        return apiSelfTestFixtureMarkerComponentType;
     }
 
     public ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> getFeedTroughWaterChargesComponentType() {

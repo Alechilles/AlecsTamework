@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
@@ -111,11 +113,22 @@ public class ActionTameworkInteract extends TameworkActionBase {
         InteractionMatchHelpers matchHelpers = new InteractionMatchHelpers(this, paramAccess, alarmHelper);
         InteractionParamMatcher paramMatcher = new InteractionParamMatcher(paramAccess);
         InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(this);
-        TameworkInteractEffects effects = new TameworkInteractEffects(this);
+        InteractionExtensionRuntime interactionExtensionRuntime = null;
+        Tamework plugin = Tamework.getInstance();
+        if (plugin != null) {
+            interactionExtensionRuntime = plugin.getInteractionExtensionRuntime();
+        }
+        TameworkInteractEffects effects = new TameworkInteractEffects(this, interactionExtensionRuntime);
         InteractionExecutor executor = new InteractionExecutor(effects, feedHelper);
         InteractionCooldowns cooldowns = new InteractionCooldowns(this, cooldownAlarmPrefix);
         TameworkInteractRequirements requirements =
-                new TameworkInteractRequirements(this, feedHelper, alarmHelper, harvestAlarmName);
+                new TameworkInteractRequirements(
+                        this,
+                        feedHelper,
+                        alarmHelper,
+                        harvestAlarmName,
+                        interactionExtensionRuntime
+                );
         InteractionSelector selector =
                 new InteractionSelector(this, requirements, cooldowns, alarmHelper, harvestAlarmName);
         InteractionDiagnostics diagnostics = new InteractionDiagnostics(this, alarmHelper, harvestAlarmName);
@@ -451,16 +464,19 @@ public class ActionTameworkInteract extends TameworkActionBase {
 
     // Captures the selected interaction entry and cooldown metadata.
     static final class ResolvedInteraction {
+        final String configId;
         final InteractionEntry entry;
         final int index;
         final int cooldownSeconds;
         final String cooldownAlarmName;
         final boolean blockedByCooldown;
 
-        ResolvedInteraction(InteractionEntry entry,
+        ResolvedInteraction(String configId,
+                            InteractionEntry entry,
                             int index,
                             int cooldownSeconds,
                             String cooldownAlarmName) {
+            this.configId = configId;
             this.entry = entry;
             this.index = index;
             this.cooldownSeconds = cooldownSeconds;
@@ -468,11 +484,13 @@ public class ActionTameworkInteract extends TameworkActionBase {
             this.blockedByCooldown = false;
         }
 
-        ResolvedInteraction(InteractionEntry entry,
+        ResolvedInteraction(String configId,
+                            InteractionEntry entry,
                             int index,
                             int cooldownSeconds,
                             String cooldownAlarmName,
                             boolean blockedByCooldown) {
+            this.configId = configId;
             this.entry = entry;
             this.index = index;
             this.cooldownSeconds = cooldownSeconds;

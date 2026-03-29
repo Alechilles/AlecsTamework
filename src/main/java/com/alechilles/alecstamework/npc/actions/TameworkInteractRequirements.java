@@ -1,5 +1,10 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.api.InteractionPresetDefinition;
+import com.alechilles.alecstamework.api.InteractionRequirementContext;
+import com.alechilles.alecstamework.api.InteractionRequirementSpec;
+import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
@@ -19,7 +24,11 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 import java.util.function.Predicate;
+import javax.annotation.Nullable;
 
 /** Tamework interact requirements. */
 final class TameworkInteractRequirements {
@@ -27,39 +36,71 @@ final class TameworkInteractRequirements {
     private final InteractionFeedHelper feedHelper;
     private final InteractionAlarmHelper alarmHelper;
     private final String harvestAlarmName;
+    @Nullable
+    private final InteractionExtensionRuntime extensionRuntime;
 
     // Builds the requirement evaluator with shared helpers.
     TameworkInteractRequirements(ActionTameworkInteract owner,
                                  InteractionFeedHelper feedHelper,
                                  InteractionAlarmHelper alarmHelper,
-                                 String harvestAlarmName) {
+                                 String harvestAlarmName,
+                                 @Nullable InteractionExtensionRuntime extensionRuntime) {
         this.owner = owner;
         this.feedHelper = feedHelper;
         this.alarmHelper = alarmHelper;
         this.harvestAlarmName = harvestAlarmName;
+        this.extensionRuntime = extensionRuntime;
     }
 
-    boolean requirementsMet(InteractionEntry entry,
+    boolean requirementsMet(@Nullable String interactionConfigId,
+                            int interactionIndex,
+                            InteractionEntry entry,
                             Ref<EntityStore> npcRef,
                             Role role,
                             InfoProvider infoProvider,
                             Store<EntityStore> store,
                             Player player,
                             InteractionContextSnapshot ctx) {
-        return requirementsMetInternal(entry, npcRef, role, infoProvider, store, player, ctx, false);
+        return requirementsMetInternal(
+                interactionConfigId,
+                interactionIndex,
+                entry,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                false
+        );
     }
 
-    boolean requirementsMetForPrompt(InteractionEntry entry,
+    boolean requirementsMetForPrompt(@Nullable String interactionConfigId,
+                                     int interactionIndex,
+                                     InteractionEntry entry,
                                      Ref<EntityStore> npcRef,
                                      Role role,
                                      InfoProvider infoProvider,
                                      Store<EntityStore> store,
                                      Player player,
                                      InteractionContextSnapshot ctx) {
-        return requirementsMetInternal(entry, npcRef, role, infoProvider, store, player, ctx, true);
+        return requirementsMetInternal(
+                interactionConfigId,
+                interactionIndex,
+                entry,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                true
+        );
     }
 
-    private boolean requirementsMetInternal(InteractionEntry entry,
+    private boolean requirementsMetInternal(@Nullable String interactionConfigId,
+                                            int interactionIndex,
+                                            InteractionEntry entry,
                                             Ref<EntityStore> npcRef,
                                             Role role,
                                             InfoProvider infoProvider,
@@ -68,8 +109,33 @@ final class TameworkInteractRequirements {
                                             InteractionContextSnapshot ctx,
                                             boolean forPrompt) {
         RequirementGroup requires = entry.getRequires();
-        if (entry instanceof CustomInteraction) {
-            return requires == null || evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player, ctx, forPrompt);
+        if (entry instanceof CustomInteraction customInteraction) {
+            if (requires != null && !evaluateRequirementGroup(
+                    interactionConfigId,
+                    interactionIndex,
+                    requires,
+                    npcRef,
+                    role,
+                    infoProvider,
+                    store,
+                    player,
+                    ctx,
+                    forPrompt
+            )) {
+                return false;
+            }
+            return evaluateCustomPresetRequirements(
+                    customInteraction,
+                    interactionConfigId,
+                    interactionIndex,
+                    npcRef,
+                    role,
+                    infoProvider,
+                    store,
+                    player,
+                    ctx,
+                    forPrompt
+            );
         }
         boolean baseRequirementsMet = false;
         if (entry instanceof TameInteraction) {
@@ -88,10 +154,23 @@ final class TameworkInteractRequirements {
         if (!baseRequirementsMet) {
             return false;
         }
-        return requires == null || evaluateRequirementGroup(requires, npcRef, role, infoProvider, store, player, ctx, forPrompt);
+        return requires == null || evaluateRequirementGroup(
+                interactionConfigId,
+                interactionIndex,
+                requires,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                forPrompt
+        );
     }
 
-    private boolean evaluateRequirementGroup(RequirementGroup group,
+    private boolean evaluateRequirementGroup(@Nullable String interactionConfigId,
+                                             int interactionIndex,
+                                             RequirementGroup group,
                                              Ref<EntityStore> npcRef,
                                              Role role,
                                              InfoProvider infoProvider,
@@ -102,17 +181,41 @@ final class TameworkInteractRequirements {
         if (group == null) {
             return false;
         }
-        if (!evaluateAllBucket(group.getAll(), npcRef, role, infoProvider, store, player, ctx, forPrompt)) {
+        if (!evaluateAllBucket(
+                interactionConfigId,
+                interactionIndex,
+                group.getAll(),
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                forPrompt
+        )) {
             return false;
         }
         RequirementBucket any = group.getAny();
         if (any == null || any.isEmpty()) {
             return true;
         }
-        return evaluateAnyBucket(any, npcRef, role, infoProvider, store, player, ctx, forPrompt);
+        return evaluateAnyBucket(
+                interactionConfigId,
+                interactionIndex,
+                any,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                forPrompt
+        );
     }
 
-    private boolean evaluateAllBucket(RequirementBucket bucket,
+    private boolean evaluateAllBucket(@Nullable String interactionConfigId,
+                                      int interactionIndex,
+                                      RequirementBucket bucket,
                                       Ref<EntityStore> npcRef,
                                       Role role,
                                       InfoProvider infoProvider,
@@ -201,10 +304,27 @@ final class TameworkInteractRequirements {
                 requirement -> matchesInteractionContext(requirement, role, infoProvider, ctx, forPrompt))) {
             return false;
         }
+        if (!requireAnyMatch(bucket.getCustom(),
+                requirement -> evaluateCustomRequirement(
+                        requirement,
+                        interactionConfigId,
+                        interactionIndex,
+                        npcRef,
+                        role,
+                        infoProvider,
+                        store,
+                        player,
+                        ctx,
+                        forPrompt
+                ))) {
+            return false;
+        }
         return true;
     }
 
-    private boolean evaluateAnyBucket(RequirementBucket bucket,
+    private boolean evaluateAnyBucket(@Nullable String interactionConfigId,
+                                      int interactionIndex,
+                                      RequirementBucket bucket,
                                       Ref<EntityStore> npcRef,
                                       Role role,
                                       InfoProvider infoProvider,
@@ -291,6 +411,21 @@ final class TameworkInteractRequirements {
         }
         if (anyMatch(bucket.getInteractionContext(),
                 requirement -> matchesInteractionContext(requirement, role, infoProvider, ctx, forPrompt))) {
+            return true;
+        }
+        if (anyMatch(bucket.getCustom(),
+                requirement -> evaluateCustomRequirement(
+                        requirement,
+                        interactionConfigId,
+                        interactionIndex,
+                        npcRef,
+                        role,
+                        infoProvider,
+                        store,
+                        player,
+                        ctx,
+                        forPrompt
+                ))) {
             return true;
         }
         return false;
@@ -478,6 +613,121 @@ final class TameworkInteractRequirements {
         }
         long now = BreedingTimeService.resolveCurrentTimeMs(store);
         return breeding.isCooldownActive(now);
+    }
+
+    private boolean evaluateCustomPresetRequirements(CustomInteraction interaction,
+                                                     @Nullable String interactionConfigId,
+                                                     int interactionIndex,
+                                                     Ref<EntityStore> npcRef,
+                                                     Role role,
+                                                     InfoProvider infoProvider,
+                                                     Store<EntityStore> store,
+                                                     Player player,
+                                                     InteractionContextSnapshot ctx,
+                                                     boolean forPrompt) {
+        if (interaction == null || interaction.getPresetId() == null || interaction.getPresetId().isBlank()) {
+            return true;
+        }
+        if (extensionRuntime == null) {
+            return false;
+        }
+        Optional<InteractionPresetDefinition> preset = extensionRuntime.resolvePreset(interaction.getPresetId());
+        if (preset.isEmpty()) {
+            return false;
+        }
+        InteractionRequirementContext runtimeContext = buildRequirementContext(
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                forPrompt
+        );
+        if (runtimeContext == null) {
+            return false;
+        }
+        for (InteractionRequirementSpec requirementSpec : preset.get().requirements()) {
+            if (!extensionRuntime.evaluateRequirement(requirementSpec, runtimeContext)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean evaluateCustomRequirement(CustomRequirement requirement,
+                                              @Nullable String interactionConfigId,
+                                              int interactionIndex,
+                                              Ref<EntityStore> npcRef,
+                                              Role role,
+                                              InfoProvider infoProvider,
+                                              Store<EntityStore> store,
+                                              Player player,
+                                              InteractionContextSnapshot ctx,
+                                              boolean forPrompt) {
+        if (requirement == null || extensionRuntime == null) {
+            return false;
+        }
+        InteractionRequirementContext runtimeContext = buildRequirementContext(
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                forPrompt
+        );
+        if (runtimeContext == null) {
+            return false;
+        }
+        InteractionRequirementSpec spec = new InteractionRequirementSpec(
+                requirement.getId(),
+                requirement.getParam(),
+                toValues(requirement.getValues()),
+                requirement.getJsonPayload()
+        );
+        return extensionRuntime.evaluateRequirement(spec, runtimeContext);
+    }
+
+    @Nullable
+    private InteractionRequirementContext buildRequirementContext(@Nullable String interactionConfigId,
+                                                                  int interactionIndex,
+                                                                  Ref<EntityStore> npcRef,
+                                                                  Role role,
+                                                                  InfoProvider infoProvider,
+                                                                  Store<EntityStore> store,
+                                                                  Player player,
+                                                                  InteractionContextSnapshot ctx,
+                                                                  boolean forPrompt) {
+        if (npcRef == null || role == null || store == null) {
+            return null;
+        }
+        return new InteractionRequirementContext(
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx != null ? ctx.playerId : null,
+                ctx != null ? ctx.activeItemId : null,
+                forPrompt
+        );
+    }
+
+    private List<String> toValues(@Nullable String[] values) {
+        if (values == null || values.length == 0) {
+            return List.of();
+        }
+        return Arrays.stream(values)
+                .filter(value -> value != null && !value.isBlank())
+                .map(String::trim)
+                .toList();
     }
 
     private boolean matchesPresetItems(Boolean useLovedItemsFlag,

@@ -6,6 +6,7 @@ public enum TameworkApiCapability {
     PROGRESSION,
     PROGRESSION_MUTATIONS,
     POLICY,
+    INTERACTION_EXTENSIONS,
     PROFILE_DATA,
     EVENTS,
     CONFIG_READ,

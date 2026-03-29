@@ -70,6 +70,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     static final StringRequirement[] EMPTY_STRING_REQUIREMENTS = new StringRequirement[0];
     static final MovementStateRequirement[] EMPTY_MOVEMENT_STATE_REQUIREMENTS = new MovementStateRequirement[0];
     static final InteractionContextRequirement[] EMPTY_CONTEXT_REQUIREMENTS = new InteractionContextRequirement[0];
+    static final CustomRequirement[] EMPTY_CUSTOM_REQUIREMENTS = new CustomRequirement[0];
+    static final CustomEffect[] EMPTY_CUSTOM_EFFECTS = new CustomEffect[0];
     static final StatDelta[] EMPTY_STAT_DELTAS = new StatDelta[0];
     static final ItemQuantity[] EMPTY_ITEM_QUANTITIES = new ItemQuantity[0];
 
@@ -103,6 +105,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final ArrayCodec<MovementStateRequirement> MOVEMENT_STATE_REQUIREMENT_ARRAY_CODEC = TwInteractionConfigCodecs.MOVEMENT_STATE_REQUIREMENT_ARRAY_CODEC;
     public static final BuilderCodec<InteractionContextRequirement> INTERACTION_CONTEXT_REQUIREMENT_CODEC = TwInteractionConfigCodecs.INTERACTION_CONTEXT_REQUIREMENT_CODEC;
     public static final ArrayCodec<InteractionContextRequirement> INTERACTION_CONTEXT_REQUIREMENT_ARRAY_CODEC = TwInteractionConfigCodecs.INTERACTION_CONTEXT_REQUIREMENT_ARRAY_CODEC;
+    public static final BuilderCodec<CustomRequirement> CUSTOM_REQUIREMENT_CODEC = TwInteractionConfigCodecs.CUSTOM_REQUIREMENT_CODEC;
+    public static final ArrayCodec<CustomRequirement> CUSTOM_REQUIREMENT_ARRAY_CODEC = TwInteractionConfigCodecs.CUSTOM_REQUIREMENT_ARRAY_CODEC;
     public static final BuilderCodec<RequirementBucket> REQUIREMENT_BUCKET_CODEC = TwInteractionConfigCodecs.REQUIREMENT_BUCKET_CODEC;
     public static final BuilderCodec<RequirementGroup> REQUIREMENT_GROUP_CODEC = TwInteractionConfigCodecs.REQUIREMENT_GROUP_CODEC;
     public static final BuilderCodec<HookEffect> HOOK_EFFECT_CODEC = TwInteractionConfigCodecs.HOOK_EFFECT_CODEC;
@@ -123,6 +127,8 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     public static final ArrayCodec<ItemQuantity> ITEM_QUANTITY_ARRAY_CODEC = TwInteractionConfigCodecs.ITEM_QUANTITY_ARRAY_CODEC;
     public static final BuilderCodec<RemoveItemsInventoryEffect> REMOVE_ITEMS_INVENTORY_EFFECT_CODEC = TwInteractionConfigCodecs.REMOVE_ITEMS_INVENTORY_EFFECT_CODEC;
     public static final BuilderCodec<AddItemInventoryEffect> ADD_ITEM_INVENTORY_EFFECT_CODEC = TwInteractionConfigCodecs.ADD_ITEM_INVENTORY_EFFECT_CODEC;
+    public static final BuilderCodec<CustomEffect> CUSTOM_EFFECT_CODEC = TwInteractionConfigCodecs.CUSTOM_EFFECT_CODEC;
+    public static final ArrayCodec<CustomEffect> CUSTOM_EFFECT_ARRAY_CODEC = TwInteractionConfigCodecs.CUSTOM_EFFECT_ARRAY_CODEC;
     public static final BuilderCodec<Effects> EFFECTS_CODEC = TwInteractionConfigCodecs.EFFECTS_CODEC;
     public static final BuilderCodec<CustomInteraction> CUSTOM_INTERACTION_CODEC = TwInteractionConfigCodecs.CUSTOM_INTERACTION_CODEC;
     public static final StringCodecMapCodec<InteractionEntry, BuilderCodec<? extends InteractionEntry>> INTERACTION_CODEC = TwInteractionConfigCodecs.INTERACTION_CODEC;
@@ -528,7 +534,13 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public static final class CustomInteraction extends InteractionEntry {
+        String presetId;
+
         public CustomInteraction() {
+        }
+
+        public String getPresetId() {
+            return presetId;
         }
     }
 
@@ -565,6 +577,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         StringRequirement[] npcState = EMPTY_STRING_REQUIREMENTS;
         MovementStateRequirement[] playerMovementState = EMPTY_MOVEMENT_STATE_REQUIREMENTS;
         InteractionContextRequirement[] interactionContext = EMPTY_CONTEXT_REQUIREMENTS;
+        CustomRequirement[] custom = EMPTY_CUSTOM_REQUIREMENTS;
 
         public boolean isLovedItems() {
             return lovedItems;
@@ -642,6 +655,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
             return interactionContext == null ? EMPTY_CONTEXT_REQUIREMENTS : interactionContext;
         }
 
+        public CustomRequirement[] getCustom() {
+            return custom == null ? EMPTY_CUSTOM_REQUIREMENTS : custom;
+        }
+
         public boolean isEmpty() {
             return !lovedItems
                     && !isHarvestable
@@ -661,7 +678,31 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
                     && getAlarmState().length == 0
                     && getNpcState().length == 0
                     && getPlayerMovementState().length == 0
-                    && getInteractionContext().length == 0;
+                    && getInteractionContext().length == 0
+                    && getCustom().length == 0;
+        }
+    }
+
+    public static final class CustomRequirement {
+        String id;
+        String param;
+        String[] values = ArrayUtil.EMPTY_STRING_ARRAY;
+        String jsonPayload;
+
+        public String getId() {
+            return id;
+        }
+
+        public String getParam() {
+            return param;
+        }
+
+        public String[] getValues() {
+            return values == null ? ArrayUtil.EMPTY_STRING_ARRAY : values;
+        }
+
+        public String getJsonPayload() {
+            return jsonPayload;
         }
     }
 
@@ -829,6 +870,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         HookEffect triggerNpcHook;
         FloatingTextEffect showFloatingText;
         UiMessageEffect showUiMessage;
+        CustomEffect[] custom = EMPTY_CUSTOM_EFFECTS;
 
         public SetTamedEffect getSetTamed() {
             return setTamed;
@@ -892,6 +934,33 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public UiMessageEffect getShowUiMessage() {
             return showUiMessage;
+        }
+
+        public CustomEffect[] getCustom() {
+            return custom == null ? EMPTY_CUSTOM_EFFECTS : custom;
+        }
+    }
+
+    public static final class CustomEffect {
+        String id;
+        String param;
+        String[] values = ArrayUtil.EMPTY_STRING_ARRAY;
+        String jsonPayload;
+
+        public String getId() {
+            return id;
+        }
+
+        public String getParam() {
+            return param;
+        }
+
+        public String[] getValues() {
+            return values == null ? ArrayUtil.EMPTY_STRING_ARRAY : values;
+        }
+
+        public String getJsonPayload() {
+            return jsonPayload;
         }
     }
 

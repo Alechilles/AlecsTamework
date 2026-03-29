@@ -12,7 +12,7 @@ Use this page when another mod wants to read Tamework profile data, store profil
 
 ## Experimental contract
 - The API contract is currently experimental and versioned separately from the mod version.
-- The current experimental API version is `0.3.0`.
+- The current experimental API version is `0.4.0`.
 - Expect additive changes and occasional cleanup while downstream integrations prove out the surface.
 - Do not depend on internal repositories, SQLite tables, or `Tw*Config` implementation classes even if they are visible in the jar.
 
@@ -46,6 +46,7 @@ The root API exposes:
 - `commandLinks()`
 - `progression()`
 - `policies()`
+- `interactionExtensions()`
 - `profileData()`
 - `events()`
 - `configs()`
@@ -57,6 +58,7 @@ Check `getCapabilities()` before assuming a feature exists. The current experime
 - `PROGRESSION`
 - `PROGRESSION_MUTATIONS`
 - `POLICY`
+- `INTERACTION_EXTENSIONS`
 - `PROFILE_DATA`
 - `EVENTS`
 - `CONFIG_READ`
@@ -155,6 +157,17 @@ if (result.applied() && result.progression() != null && result.progression().hap
     double appliedValue = result.progression().happiness().value();
 }
 ```
+
+## Interaction extensions
+`interactionExtensions()` lets downstream mods register custom interaction requirements/effects and optional reusable presets without patching Tamework internals.
+
+Phase 3 extension hooks:
+- register requirement handlers by id
+- register effect handlers by id
+- register preset definitions that bundle requirement/effect specs
+- unregister by closing the returned `AutoCloseable`
+
+At runtime, Tamework evaluates custom requirement specs from `Requires.All.Custom` / `Requires.Any.Custom`, and executes custom effect specs from `Effects.Custom`. `Custom` interaction entries can also reference a registered preset via `PresetId`.
 
 ## Profile-scoped extension data
 `profileData()` is the persistence-backed extension write surface. It stores UTF-8 JSON text keyed by:

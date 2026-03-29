@@ -20,7 +20,7 @@ class ActionTameworkInteractPromptTest {
 
         Object promptState = resolvePromptState(
                 action,
-                new ActionTameworkInteract.ResolvedInteraction(entry, 0, 0, null)
+                new ActionTameworkInteract.ResolvedInteraction(null, entry, 0, 0, null)
         );
 
         assertTrue((Boolean) readField(promptState, "interactable"));

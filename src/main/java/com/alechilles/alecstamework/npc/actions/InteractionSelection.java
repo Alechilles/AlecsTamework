@@ -207,6 +207,16 @@ final class InteractionSelection {
                             Store<EntityStore> store,
                             Player player,
                             InteractionContextSnapshot ctx) {
-        return requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx);
+        return requirements.requirementsMet(
+                null,
+                -1,
+                entry,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx
+        );
     }
 }

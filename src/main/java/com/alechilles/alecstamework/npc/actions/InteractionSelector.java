@@ -50,6 +50,7 @@ final class InteractionSelector {
                                                                           Player player,
                                                                           InteractionContextSnapshot ctx) {
         InteractionEntry[] entries = config != null ? config.getInteractions() : null;
+        String interactionConfigId = config != null ? config.getId() : null;
         if (entries == null || entries.length == 0) {
             return null;
         }
@@ -71,6 +72,7 @@ final class InteractionSelector {
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
                 if (contextual && blockedContext == null) {
                     blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                            interactionConfigId,
                             entry,
                             index,
                             cooldownSeconds,
@@ -83,6 +85,7 @@ final class InteractionSelector {
             if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, true)) {
                 if (contextual && blockedContext == null) {
                     blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                            interactionConfigId,
                             entry,
                             index,
                             cooldownSeconds,
@@ -92,12 +95,28 @@ final class InteractionSelector {
                 }
                 continue;
             }
-            if (!requirements.requirementsMetForPrompt(entry, npcRef, role, infoProvider, store, player, ctx)) {
+            if (!requirements.requirementsMetForPrompt(
+                    interactionConfigId,
+                    index,
+                    entry,
+                    npcRef,
+                    role,
+                    infoProvider,
+                    store,
+                    player,
+                    ctx
+            )) {
                 continue;
             }
             if (score > bestScore) {
                 bestScore = score;
-                best = new ActionTameworkInteract.ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
+                best = new ActionTameworkInteract.ResolvedInteraction(
+                        interactionConfigId,
+                        entry,
+                        index,
+                        cooldownSeconds,
+                        cooldownAlarmName
+                );
             }
         }
         return best != null ? best : blockedContext;
@@ -112,6 +131,7 @@ final class InteractionSelector {
                                                                                  InteractionContextSnapshot ctx,
                                                                                  boolean contextualOnly) {
         InteractionEntry[] entries = config != null ? config.getInteractions() : null;
+        String interactionConfigId = config != null ? config.getId() : null;
         if (entries == null || entries.length == 0) {
             return null;
         }
@@ -132,6 +152,7 @@ final class InteractionSelector {
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
                 if (isContextualEntry(entry) && blockedContext == null) {
                     blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                            interactionConfigId,
                             entry,
                             index,
                             cooldownSeconds,
@@ -144,6 +165,7 @@ final class InteractionSelector {
             if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, false)) {
                 if (isContextualEntry(entry) && blockedContext == null) {
                     blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                            interactionConfigId,
                             entry,
                             index,
                             cooldownSeconds,
@@ -153,8 +175,24 @@ final class InteractionSelector {
                 }
                 continue;
             }
-            if (requirements.requirementsMet(entry, npcRef, role, infoProvider, store, player, ctx)) {
-                return new ActionTameworkInteract.ResolvedInteraction(entry, index, cooldownSeconds, cooldownAlarmName);
+            if (requirements.requirementsMet(
+                    interactionConfigId,
+                    index,
+                    entry,
+                    npcRef,
+                    role,
+                    infoProvider,
+                    store,
+                    player,
+                    ctx
+            )) {
+                return new ActionTameworkInteract.ResolvedInteraction(
+                        interactionConfigId,
+                        entry,
+                        index,
+                        cooldownSeconds,
+                        cooldownAlarmName
+                );
             }
         }
         return blockedContext;

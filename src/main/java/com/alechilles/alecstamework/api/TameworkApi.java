@@ -15,6 +15,8 @@ public interface TameworkApi {
 
     PolicyApi policies();
 
+    InteractionExtensionApi interactionExtensions();
+
     ProfileDataApi profileData();
 
     TameworkEventsApi events();

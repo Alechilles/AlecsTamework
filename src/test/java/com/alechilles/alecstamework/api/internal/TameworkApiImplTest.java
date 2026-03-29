@@ -42,10 +42,11 @@ class TameworkApiImplTest {
             TameworkApi api = new TameworkApiImpl(
                     runtime,
                     bus,
-                    stateSnapshotService
+                    stateSnapshotService,
+                    new InteractionExtensionRegistry(null)
             );
 
-            assertEquals("0.3.0", api.getApiVersion());
+            assertEquals("0.4.0", api.getApiVersion());
             assertEquals(
                     EnumSet.of(
                             TameworkApiCapability.PROFILES,
@@ -53,6 +54,7 @@ class TameworkApiImplTest {
                             TameworkApiCapability.PROGRESSION,
                             TameworkApiCapability.PROGRESSION_MUTATIONS,
                             TameworkApiCapability.POLICY,
+                            TameworkApiCapability.INTERACTION_EXTENSIONS,
                             TameworkApiCapability.PROFILE_DATA,
                             TameworkApiCapability.EVENTS,
                             TameworkApiCapability.CONFIG_READ,

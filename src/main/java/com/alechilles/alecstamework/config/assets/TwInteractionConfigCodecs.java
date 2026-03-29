@@ -52,6 +52,8 @@ public final class TwInteractionConfigCodecs {
     private static final MovementStateRequirement[] EMPTY_MOVEMENT_STATE_REQUIREMENTS = new MovementStateRequirement[0];
     private static final AlarmRequirement[] EMPTY_ALARM_REQUIREMENTS = new AlarmRequirement[0];
     private static final ParamRequirement[] EMPTY_PARAM_REQUIREMENTS = new ParamRequirement[0];
+    private static final CustomRequirement[] EMPTY_CUSTOM_REQUIREMENTS = new CustomRequirement[0];
+    private static final CustomEffect[] EMPTY_CUSTOM_EFFECTS = new CustomEffect[0];
     private static final StatDelta[] EMPTY_STAT_DELTAS = new StatDelta[0];
     private static final ItemQuantity[] EMPTY_ITEM_QUANTITIES = new ItemQuantity[0];
     private static final String[] PLAYER_MOVEMENT_STATE_ENUM = new String[] {
@@ -536,6 +538,43 @@ public final class TwInteractionConfigCodecs {
     public static final ArrayCodec<InteractionContextRequirement> INTERACTION_CONTEXT_REQUIREMENT_ARRAY_CODEC =
             new ArrayCodec<>(INTERACTION_CONTEXT_REQUIREMENT_CODEC, InteractionContextRequirement[]::new);
 
+    public static final BuilderCodec<CustomRequirement> CUSTOM_REQUIREMENT_CODEC = BuilderCodec.builder(
+            CustomRequirement.class,
+            CustomRequirement::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Id", Codec.STRING),
+            (requirement, value) -> requirement.id = value,
+            requirement -> requirement.id
+        )
+        .documentation("Registered custom requirement id.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Param", Codec.STRING),
+            (requirement, value) -> requirement.param = value,
+            requirement -> requirement.param
+        )
+        .documentation("Optional parameter label for the custom requirement.")
+        .add()
+        .<String[]>append(
+            new KeyedCodec<>("Values", STRING_ARRAY_OR_SINGLE_CODEC),
+            (requirement, value) -> requirement.values = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
+            requirement -> requirement.values
+        )
+        .documentation("Optional string payload values for the custom requirement.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("JsonPayload", Codec.STRING),
+            (requirement, value) -> requirement.jsonPayload = value,
+            requirement -> requirement.jsonPayload
+        )
+        .documentation("Optional JSON payload string consumed by the custom requirement handler.")
+        .add()
+        .build();
+
+    public static final ArrayCodec<CustomRequirement> CUSTOM_REQUIREMENT_ARRAY_CODEC =
+            new ArrayCodec<>(CUSTOM_REQUIREMENT_CODEC, CustomRequirement[]::new);
+
     public static final BuilderCodec<RequirementBucket> REQUIREMENT_BUCKET_CODEC = BuilderCodec.builder(
             RequirementBucket.class,
             RequirementBucket::new
@@ -673,6 +712,13 @@ public final class TwInteractionConfigCodecs {
             bucket -> bucket.interactionContext
         )
         .documentation("Custom checks against interaction context.")
+        .add()
+        .<CustomRequirement[]>append(
+            new KeyedCodec<>("Custom", CUSTOM_REQUIREMENT_ARRAY_CODEC),
+            (bucket, value) -> bucket.custom = value == null ? EMPTY_CUSTOM_REQUIREMENTS : value,
+            bucket -> bucket.custom
+        )
+        .documentation("Custom extension requirements evaluated through InteractionExtensionApi handlers.")
         .add()
         .build();
 
@@ -1127,6 +1173,43 @@ public final class TwInteractionConfigCodecs {
         .add()
         .build();
 
+    public static final BuilderCodec<CustomEffect> CUSTOM_EFFECT_CODEC = BuilderCodec.builder(
+            CustomEffect.class,
+            CustomEffect::new
+    )
+        .<String>append(
+            new KeyedCodec<>("Id", Codec.STRING),
+            (effect, value) -> effect.id = value,
+            effect -> effect.id
+        )
+        .documentation("Registered custom effect id.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Param", Codec.STRING),
+            (effect, value) -> effect.param = value,
+            effect -> effect.param
+        )
+        .documentation("Optional parameter label for the custom effect.")
+        .add()
+        .<String[]>append(
+            new KeyedCodec<>("Values", STRING_ARRAY_OR_SINGLE_CODEC),
+            (effect, value) -> effect.values = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
+            effect -> effect.values
+        )
+        .documentation("Optional string payload values for the custom effect.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("JsonPayload", Codec.STRING),
+            (effect, value) -> effect.jsonPayload = value,
+            effect -> effect.jsonPayload
+        )
+        .documentation("Optional JSON payload string consumed by the custom effect handler.")
+        .add()
+        .build();
+
+    public static final ArrayCodec<CustomEffect> CUSTOM_EFFECT_ARRAY_CODEC =
+            new ArrayCodec<>(CUSTOM_EFFECT_CODEC, CustomEffect[]::new);
+
     public static final BuilderCodec<Effects> EFFECTS_CODEC = BuilderCodec.builder(
             Effects.class,
             Effects::new
@@ -1242,6 +1325,13 @@ public final class TwInteractionConfigCodecs {
             effects -> effects.showUiMessage
         )
         .documentation("Show a temporary UI message to the interacting player.")
+        .add()
+        .<CustomEffect[]>append(
+            new KeyedCodec<>("Custom", CUSTOM_EFFECT_ARRAY_CODEC),
+            (effects, value) -> effects.custom = value == null ? EMPTY_CUSTOM_EFFECTS : value,
+            effects -> effects.custom
+        )
+        .documentation("Custom extension effects evaluated through InteractionExtensionApi handlers.")
         .add()
         .build();
 
@@ -1707,6 +1797,13 @@ public final class TwInteractionConfigCodecs {
             CustomInteraction::new,
             INTERACTION_BASE_CODEC
     )
+        .<String>append(
+            new KeyedCodec<>("PresetId", Codec.STRING),
+            (entry, value) -> entry.presetId = value,
+            entry -> entry.presetId
+        )
+        .documentation("Optional interaction extension preset id registered through InteractionExtensionApi.")
+        .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,

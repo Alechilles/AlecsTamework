@@ -28,7 +28,7 @@ final class InteractionExecution {
         if (interaction == null) {
             return false;
         }
-        boolean applied = executor.applyInteraction(interaction.entry, npcRef, role, infoProvider, store, player, ctx);
+        boolean applied = executor.applyInteraction(interaction, npcRef, role, infoProvider, store, player, ctx);
         if (applied) {
             cooldowns.applyInteractionCooldown(interaction, npcRef, store);
         }

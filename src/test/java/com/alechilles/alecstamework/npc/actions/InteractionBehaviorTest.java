@@ -214,7 +214,7 @@ class InteractionBehaviorTest {
         InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(interact);
         InteractionCooldowns cooldowns = new InteractionCooldowns(interact, "TameworkInteract_Cooldown");
         TameworkInteractRequirements requirements =
-                new TameworkInteractRequirements(interact, feedHelper, alarmHelper, "Harvest_Ready");
+                new TameworkInteractRequirements(interact, feedHelper, alarmHelper, "Harvest_Ready", null);
         InteractionSelector selector =
                 new InteractionSelector(interact, requirements, cooldowns, alarmHelper, "Harvest_Ready");
         InteractionDiagnostics diagnostics =
@@ -228,7 +228,7 @@ class InteractionBehaviorTest {
                 selector,
                 diagnostics
         );
-        InteractionExecutor executor = new InteractionExecutor(new TameworkInteractEffects(interact), feedHelper);
+        InteractionExecutor executor = new InteractionExecutor(new TameworkInteractEffects(interact, null), feedHelper);
         InteractionExecution execution = new InteractionExecution(executor, cooldowns);
 
         Field resolutionField = ActionTameworkInteract.class.getDeclaredField("resolution");
