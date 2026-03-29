@@ -370,6 +370,12 @@ public final class ApiSelfTestRunner {
                     baseline.npcUuid() + " vs " + byNpcUuid.get().npcUuid()
             ));
         }
+        String progressionRoleId = firstNonBlank(baseline.roleId(), fixture.roleId());
+        assertions.add(check(
+                "progression role id available",
+                !isBlank(progressionRoleId),
+                progressionRoleId != null ? progressionRoleId : "<empty>"
+        ));
 
         assertions.add(checkMutation(
                 "setNeeds rejects missing hunger/thirst",
@@ -398,7 +404,7 @@ public final class ApiSelfTestRunner {
         ));
 
         try {
-            runProgressionMutationChecks(assertions, context, resolvedProfileId, baseline);
+            runProgressionMutationChecks(assertions, context, resolvedProfileId, progressionRoleId, baseline);
         } finally {
             restoreProgressionBaseline(assertions, context, resolvedProfileId, baseline);
         }
@@ -408,6 +414,7 @@ public final class ApiSelfTestRunner {
     private void runProgressionMutationChecks(@Nonnull List<ApiSelfTestAssertion> assertions,
                                               @Nonnull ApiSelfTestContext context,
                                               @Nonnull String profileId,
+                                              @Nullable String roleId,
                                               @Nonnull ProgressionView baseline) {
         if (baseline.happiness() != null) {
             double min = baseline.happiness().min();
@@ -437,12 +444,16 @@ public final class ApiSelfTestRunner {
             assertions.add(fail("needs baseline available", "No needs snapshot on fixture progression."));
         }
 
-        ProgressionMutationStatus[] breedingAllowedStatuses = baseline.breeding() != null
+        boolean breedingConfigured = !isBlank(roleId)
+                && context.api().configs().resolveBreedingConfigForRole(roleId).isPresent();
+        assertions.add(check(
+                "breeding config resolution expected for role",
+                breedingConfigured || baseline.breeding() == null,
+                "role=" + roleId + ", hasBaseline=" + (baseline.breeding() != null)
+        ));
+        ProgressionMutationStatus[] breedingAllowedStatuses = breedingConfigured
                 ? new ProgressionMutationStatus[] { ProgressionMutationStatus.APPLIED }
-                : new ProgressionMutationStatus[] {
-                        ProgressionMutationStatus.UNSUPPORTED,
-                        ProgressionMutationStatus.APPLIED
-                };
+                : new ProgressionMutationStatus[] { ProgressionMutationStatus.UNSUPPORTED };
         assertions.add(checkMutation(
                 "setBreedingReady true returns expected status",
                 context.api().progression().setBreedingReady(profileId, true),
@@ -454,24 +465,36 @@ public final class ApiSelfTestRunner {
                 breedingAllowedStatuses
         ));
 
+        boolean traitConfigured = !isBlank(roleId)
+                && context.api().configs().resolveTraitConfigForRole(roleId).isPresent();
         Map<String, Double> baselineTraits = collectTraitValues(baseline);
-        if (baseline.traits() != null && !baselineTraits.isEmpty()) {
-            assertions.add(checkMutation(
-                    "rerollTraits applies",
-                    context.api().progression().rerollTraits(profileId),
-                    ProgressionMutationStatus.APPLIED
+        ProgressionMutationResult rerollTraitsResult = context.api().progression().rerollTraits(profileId);
+        assertions.add(checkMutation(
+                "rerollTraits returns expected status",
+                rerollTraitsResult,
+                traitConfigured ? ProgressionMutationStatus.APPLIED : ProgressionMutationStatus.UNSUPPORTED
+        ));
+        if (traitConfigured) {
+            Map<String, Double> traitValuesToReapply = !baselineTraits.isEmpty()
+                    ? baselineTraits
+                    : collectTraitValues(rerollTraitsResult.progression());
+            assertions.add(check(
+                    "trait values available for setTraits validation",
+                    !traitValuesToReapply.isEmpty(),
+                    "role=" + roleId + ", baselineTraits=" + baselineTraits.size()
             ));
+            if (!traitValuesToReapply.isEmpty()) {
+                assertions.add(checkMutation(
+                        "setTraits applies",
+                        context.api().progression().setTraits(profileId, traitValuesToReapply),
+                        ProgressionMutationStatus.APPLIED
+                ));
+            }
+        } else if (baseline.traits() != null && !baselineTraits.isEmpty()) {
             assertions.add(checkMutation(
-                    "setTraits applies",
+                    "setTraits rejects unsupported trait path",
                     context.api().progression().setTraits(profileId, baselineTraits),
-                    ProgressionMutationStatus.APPLIED
-            ));
-        } else {
-            assertions.add(checkMutation(
-                    "rerollTraits returns expected status when trait baseline missing",
-                    context.api().progression().rerollTraits(profileId),
-                    ProgressionMutationStatus.UNSUPPORTED,
-                    ProgressionMutationStatus.APPLIED
+                    ProgressionMutationStatus.UNSUPPORTED
             ));
         }
 
@@ -877,6 +900,21 @@ public final class ApiSelfTestRunner {
 
     private double clampDouble(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
+    }
+
+    private boolean isBlank(@Nullable String value) {
+        return value == null || value.isBlank();
+    }
+
+    @Nullable
+    private String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (!isBlank(first)) {
+            return first;
+        }
+        if (!isBlank(second)) {
+            return second;
+        }
+        return null;
     }
 
     private void closeQuietly(@Nullable AutoCloseable closeable) {
