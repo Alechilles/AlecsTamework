@@ -10,6 +10,9 @@ import com.alechilles.alecstamework.api.OwnershipPolicyView;
 import com.alechilles.alecstamework.api.PersistenceDiagnosticsView;
 import com.alechilles.alecstamework.api.PolicyApi;
 import com.alechilles.alecstamework.api.PopulationCapDecisionView;
+import com.alechilles.alecstamework.api.ProgressionMutationResult;
+import com.alechilles.alecstamework.api.ProgressionMutationStatus;
+import com.alechilles.alecstamework.api.ProgressionView;
 import com.alechilles.alecstamework.api.RoleScopedConfigView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
@@ -17,6 +20,7 @@ import com.alechilles.alecstamework.api.TameworkConfigReadApi;
 import com.alechilles.alecstamework.api.Vector3View;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,6 +38,7 @@ public final class ApiSelfTestRunner {
         PROFILE,
         COMMAND_LINKS,
         CONFIGS,
+        PROGRESSION,
         POLICIES,
         DIAGNOSTICS,
         ALL;
@@ -58,6 +63,9 @@ public final class ApiSelfTestRunner {
         }
         if (suite == Suite.ALL || suite == Suite.CONFIGS) {
             suites.add(runConfigs(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.PROGRESSION) {
+            suites.add(runProgression(context));
         }
         if (suite == Suite.ALL || suite == Suite.POLICIES) {
             suites.add(runPolicies(context));
@@ -250,6 +258,246 @@ public final class ApiSelfTestRunner {
     }
 
     @Nonnull
+    private ApiSelfTestSuiteResult runProgression(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        ApiSelfTestFixtureSet fixtureSet = requireFixtureSet(context, assertions, "progression");
+        if (fixtureSet == null) {
+            return new ApiSelfTestSuiteResult("progression", assertions);
+        }
+        ApiSelfTestFixtureRecord fixture = fixtureSet.getFixture(ApiSelfTestFixtureManager.FIXTURE_KEY_OWNED);
+        if (fixture == null) {
+            assertions.add(fail("owned fixture available", "missing " + ApiSelfTestFixtureManager.FIXTURE_KEY_OWNED));
+            return new ApiSelfTestSuiteResult("progression", assertions);
+        }
+
+        Optional<String> profileId = context.api().profiles().resolveProfileId(fixture.npcUuid());
+        assertions.add(check(
+                "progression fixture profile id resolves",
+                profileId.isPresent(),
+                profileId.orElse("<empty>")
+        ));
+        if (profileId.isEmpty()) {
+            return new ApiSelfTestSuiteResult("progression", assertions);
+        }
+        String resolvedProfileId = profileId.get();
+        Optional<ProgressionView> baselineProgression = context.api().progression().getByProfileId(resolvedProfileId);
+        assertions.add(check(
+                "progression available by profile id",
+                baselineProgression.isPresent(),
+                baselineProgression.map(this::describeProgression).orElse("<empty>")
+        ));
+        Optional<ProgressionView> byNpcUuid = context.api().progression().getByNpcUuid(fixture.npcUuid());
+        assertions.add(check(
+                "progression available by npc uuid",
+                byNpcUuid.isPresent(),
+                byNpcUuid.map(this::describeProgression).orElse("<empty>")
+        ));
+        if (baselineProgression.isEmpty()) {
+            return new ApiSelfTestSuiteResult("progression", assertions);
+        }
+        ProgressionView baseline = baselineProgression.get();
+        if (byNpcUuid.isPresent()) {
+            assertions.add(check(
+                    "progression lookups agree",
+                    baseline.npcUuid().equals(byNpcUuid.get().npcUuid()),
+                    baseline.npcUuid() + " vs " + byNpcUuid.get().npcUuid()
+            ));
+        }
+
+        assertions.add(checkMutation(
+                "setNeeds rejects missing hunger/thirst",
+                context.api().progression().setNeeds(resolvedProfileId, null, null),
+                ProgressionMutationStatus.INVALID_ARGUMENT
+        ));
+        assertions.add(checkMutation(
+                "setHappiness rejects NaN",
+                context.api().progression().setHappiness(resolvedProfileId, Double.NaN),
+                ProgressionMutationStatus.INVALID_ARGUMENT
+        ));
+        assertions.add(checkMutation(
+                "applyHappinessDelta rejects infinity",
+                context.api().progression().applyHappinessDelta(resolvedProfileId, Double.POSITIVE_INFINITY),
+                ProgressionMutationStatus.INVALID_ARGUMENT
+        ));
+        assertions.add(checkMutation(
+                "setTraits rejects null map",
+                context.api().progression().setTraits(resolvedProfileId, null),
+                ProgressionMutationStatus.INVALID_ARGUMENT
+        ));
+        assertions.add(checkMutation(
+                "setStoredAttachments rejects null map",
+                context.api().progression().setStoredAttachments(resolvedProfileId, null),
+                ProgressionMutationStatus.INVALID_ARGUMENT
+        ));
+
+        try {
+            runProgressionMutationChecks(assertions, context, resolvedProfileId, baseline);
+        } finally {
+            restoreProgressionBaseline(assertions, context, resolvedProfileId, baseline);
+        }
+        return new ApiSelfTestSuiteResult("progression", assertions);
+    }
+
+    private void runProgressionMutationChecks(@Nonnull List<ApiSelfTestAssertion> assertions,
+                                              @Nonnull ApiSelfTestContext context,
+                                              @Nonnull String profileId,
+                                              @Nonnull ProgressionView baseline) {
+        if (baseline.happiness() != null) {
+            double min = baseline.happiness().min();
+            double max = baseline.happiness().max();
+            double target = clampDouble(baseline.happiness().value() + 1.0, min, max);
+            assertions.add(checkMutation(
+                    "setHappiness applies",
+                    context.api().progression().setHappiness(profileId, target),
+                    ProgressionMutationStatus.APPLIED
+            ));
+            assertions.add(checkMutation(
+                    "applyHappinessDelta applies",
+                    context.api().progression().applyHappinessDelta(profileId, -1.0),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        } else {
+            assertions.add(fail("happiness baseline available", "No happiness snapshot on fixture progression."));
+        }
+
+        if (baseline.needs() != null) {
+            assertions.add(checkMutation(
+                    "setNeeds applies",
+                    context.api().progression().setNeeds(profileId, baseline.needs().hunger(), baseline.needs().thirst()),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        } else {
+            assertions.add(fail("needs baseline available", "No needs snapshot on fixture progression."));
+        }
+
+        if (baseline.breeding() != null) {
+            assertions.add(checkMutation(
+                    "setBreedingReady true applies",
+                    context.api().progression().setBreedingReady(profileId, true),
+                    ProgressionMutationStatus.APPLIED
+            ));
+            assertions.add(checkMutation(
+                    "setBreedingReady false applies",
+                    context.api().progression().setBreedingReady(profileId, false),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        } else {
+            assertions.add(fail("breeding baseline available", "No breeding snapshot on fixture progression."));
+        }
+
+        Map<String, Double> baselineTraits = collectTraitValues(baseline);
+        if (baseline.traits() != null && !baselineTraits.isEmpty()) {
+            assertions.add(checkMutation(
+                    "rerollTraits applies",
+                    context.api().progression().rerollTraits(profileId),
+                    ProgressionMutationStatus.APPLIED
+            ));
+            assertions.add(checkMutation(
+                    "setTraits applies",
+                    context.api().progression().setTraits(profileId, baselineTraits),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        } else {
+            assertions.add(fail("traits baseline available", "No trait values available on fixture progression."));
+        }
+
+        ProgressionMutationStatus lifeStageExpected =
+                baseline.lifeStage() != null ? ProgressionMutationStatus.APPLIED : ProgressionMutationStatus.UNSUPPORTED;
+        assertions.add(checkMutation(
+                "refreshLifeStage returns expected status",
+                context.api().progression().refreshLifeStage(profileId),
+                lifeStageExpected
+        ));
+
+        Map<String, String> baselineAttachments = collectAttachmentSelections(baseline);
+        boolean attachmentsAvailable = baseline.attachments() != null;
+        ProgressionMutationResult setAttachmentsResult =
+                context.api().progression().setStoredAttachments(profileId, baselineAttachments);
+        assertions.add(checkMutation(
+                "setStoredAttachments returns expected status",
+                setAttachmentsResult,
+                attachmentsAvailable ? ProgressionMutationStatus.APPLIED : ProgressionMutationStatus.UNSUPPORTED
+        ));
+
+        ProgressionMutationResult syncAttachmentsResult = context.api().progression().syncStoredAttachments(profileId);
+        if (!attachmentsAvailable) {
+            assertions.add(checkMutation(
+                    "syncStoredAttachments returns unsupported when attachments missing",
+                    syncAttachmentsResult,
+                    ProgressionMutationStatus.UNSUPPORTED
+            ));
+            return;
+        }
+        if (setAttachmentsResult.status() != ProgressionMutationStatus.APPLIED) {
+            assertions.add(fail(
+                    "syncStoredAttachments precondition",
+                    "setStoredAttachments did not apply: " + describeMutation(setAttachmentsResult)
+            ));
+            return;
+        }
+        ProgressionView attachmentAppliedProgression = setAttachmentsResult.progression();
+        boolean hasStoredSelections = attachmentAppliedProgression != null
+                && attachmentAppliedProgression.attachments() != null
+                && !attachmentAppliedProgression.attachments().storedAttachmentIds().isEmpty();
+        assertions.add(checkMutation(
+                "syncStoredAttachments returns expected status",
+                syncAttachmentsResult,
+                hasStoredSelections ? ProgressionMutationStatus.APPLIED : ProgressionMutationStatus.UNSUPPORTED
+        ));
+    }
+
+    private void restoreProgressionBaseline(@Nonnull List<ApiSelfTestAssertion> assertions,
+                                            @Nonnull ApiSelfTestContext context,
+                                            @Nonnull String profileId,
+                                            @Nonnull ProgressionView baseline) {
+        if (baseline.happiness() != null) {
+            assertions.add(checkMutation(
+                    "restore baseline happiness",
+                    context.api().progression().setHappiness(profileId, baseline.happiness().value()),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        }
+        if (baseline.needs() != null) {
+            assertions.add(checkMutation(
+                    "restore baseline needs",
+                    context.api().progression().setNeeds(profileId, baseline.needs().hunger(), baseline.needs().thirst()),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        }
+        if (baseline.breeding() != null) {
+            assertions.add(checkMutation(
+                    "restore baseline breeding ready flag",
+                    context.api().progression().setBreedingReady(profileId, baseline.breeding().readyFlag()),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        }
+        Map<String, Double> baselineTraits = collectTraitValues(baseline);
+        if (baseline.traits() != null && !baselineTraits.isEmpty()) {
+            assertions.add(checkMutation(
+                    "restore baseline traits",
+                    context.api().progression().setTraits(profileId, baselineTraits),
+                    ProgressionMutationStatus.APPLIED
+            ));
+        }
+        Map<String, String> baselineAttachments = collectAttachmentSelections(baseline);
+        if (baseline.attachments() != null) {
+            assertions.add(checkMutation(
+                    "restore baseline stored attachments",
+                    context.api().progression().setStoredAttachments(profileId, baselineAttachments),
+                    ProgressionMutationStatus.APPLIED
+            ));
+            if (!baselineAttachments.isEmpty()) {
+                assertions.add(checkMutation(
+                        "restore baseline attachment sync",
+                        context.api().progression().syncStoredAttachments(profileId),
+                        ProgressionMutationStatus.APPLIED,
+                        ProgressionMutationStatus.UNSUPPORTED
+                ));
+            }
+        }
+    }
+
+    @Nonnull
     private ApiSelfTestSuiteResult runPolicies(@Nonnull ApiSelfTestContext context) {
         ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
         ApiSelfTestFixtureSet fixtureSet = requireFixtureSet(context, assertions, "policies");
@@ -402,6 +650,63 @@ public final class ApiSelfTestRunner {
     @Nonnull
     private ApiSelfTestAssertion check(@Nonnull String name, boolean passed, @Nonnull String detail) {
         return new ApiSelfTestAssertion(name, passed, detail);
+    }
+
+    @Nonnull
+    private ApiSelfTestAssertion checkMutation(@Nonnull String name,
+                                               @Nonnull ProgressionMutationResult result,
+                                               @Nonnull ProgressionMutationStatus... allowedStatuses) {
+        for (ProgressionMutationStatus allowedStatus : allowedStatuses) {
+            if (result.status() == allowedStatus) {
+                return pass(name, describeMutation(result));
+            }
+        }
+        return fail(name, describeMutation(result));
+    }
+
+    @Nonnull
+    private String describeMutation(@Nonnull ProgressionMutationResult result) {
+        return result.status() + ": " + result.message();
+    }
+
+    @Nonnull
+    private String describeProgression(@Nonnull ProgressionView progression) {
+        return "npc="
+                + progression.npcUuid()
+                + ", role="
+                + progression.roleId()
+                + ", happiness="
+                + (progression.happiness() != null ? progression.happiness().value() : "<none>");
+    }
+
+    @Nonnull
+    private Map<String, Double> collectTraitValues(@Nonnull ProgressionView progression) {
+        if (progression.traits() == null || progression.traits().values().isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashMap<String, Double> values = new LinkedHashMap<>();
+        for (ProgressionView.TraitValueView traitValue : progression.traits().values()) {
+            values.put(traitValue.id(), traitValue.value());
+        }
+        return Map.copyOf(values);
+    }
+
+    @Nonnull
+    private Map<String, String> collectAttachmentSelections(@Nonnull ProgressionView progression) {
+        if (progression.attachments() == null) {
+            return Map.of();
+        }
+        if (!progression.attachments().storedAttachmentIds().isEmpty()) {
+            return Map.copyOf(new LinkedHashMap<>(progression.attachments().storedAttachmentIds()));
+        }
+        if (!progression.attachments().currentAttachmentIds().isEmpty()) {
+            return Map.copyOf(new LinkedHashMap<>(progression.attachments().currentAttachmentIds()));
+        }
+        return Map.of();
+    }
+
+    private double clampDouble(double value, double min, double max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     @Nonnull
