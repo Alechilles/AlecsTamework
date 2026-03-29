@@ -88,6 +88,8 @@ Each fixture is marked with an internal self-test component, linked to the gener
 
 Add `verbose` to print each individual assertion instead of only the suite summaries.
 
+`run` also logs a full verbose self-test report to the server logs on every execution, even when chat output is non-verbose.
+
 ## Reset behavior
 `reset` removes:
 - live self-test NPC fixtures in the current world
