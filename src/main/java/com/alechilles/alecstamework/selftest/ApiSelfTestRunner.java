@@ -25,6 +25,9 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
 import com.alechilles.alecstamework.api.Vector3View;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
@@ -336,6 +339,7 @@ public final class ApiSelfTestRunner {
             assertions.add(fail("owned fixture available", "missing " + ApiSelfTestFixtureManager.FIXTURE_KEY_OWNED));
             return new ApiSelfTestSuiteResult("progression", assertions);
         }
+        bootstrapFixtureProgression(context, fixture);
 
         Optional<String> profileId = context.api().profiles().resolveProfileId(fixture.npcUuid());
         assertions.add(check(
@@ -409,6 +413,19 @@ public final class ApiSelfTestRunner {
             restoreProgressionBaseline(assertions, context, resolvedProfileId, baseline);
         }
         return new ApiSelfTestSuiteResult("progression", assertions);
+    }
+
+    private void bootstrapFixtureProgression(@Nonnull ApiSelfTestContext context,
+                                             @Nonnull ApiSelfTestFixtureRecord fixture) {
+        Ref<EntityStore> npcRef = context.world().getEntityRef(fixture.npcUuid());
+        if (npcRef == null || !npcRef.isValid()) {
+            return;
+        }
+        CompanionProgressionBootstrapService.ensureProgressionComponents(
+                npcRef,
+                context.store(),
+                fixture.roleId()
+        );
     }
 
     private void runProgressionMutationChecks(@Nonnull List<ApiSelfTestAssertion> assertions,

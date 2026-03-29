@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
@@ -374,6 +375,11 @@ public final class ApiSelfTestFixtureManager {
                     )
             );
         }
+        CompanionProgressionBootstrapService.ensureProgressionComponents(
+                npcRef,
+                store,
+                TameworkIds.NPC_ROLE_TAMEWORK_EXAMPLE
+        );
         ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> markerType = ApiSelfTestFixtureMarkerComponent.getComponentType();
         if (markerType != null) {
             store.putComponent(
