@@ -12,32 +12,31 @@ Tamework does not add a full gameplay expansion by itself. Players usually exper
 
 ## 1) Player Guides
 - [Player Guides Index](/mod/alecs-tamework/player-guides-index)
-- [What Tamework Is](/mod/alecs-tamework/what-tamework-is)
-- [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
-- [Command Radial and Controls](/mod/alecs-tamework/command-radial-and-controls)
-- [Naming, Capture, and Command Items](/mod/alecs-tamework/naming-capture-and-command-items)
-- [Happiness, Needs, Breeding, and Traits](/mod/alecs-tamework/happiness-needs-breeding-and-traits)
+- [Getting Started Index](/mod/alecs-tamework/getting-started-index)
+- [Companion Controls Index](/mod/alecs-tamework/companion-controls-index)
+- [Systems Index](/mod/alecs-tamework/systems-index)
+- [Troubleshooting and Glossary Index](/mod/alecs-tamework/troubleshooting-and-glossary-index)
 
 ## 2) Modder Documentation
 - [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
-- [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)
-- [Interaction Paths and Role Wiring](/mod/alecs-tamework/interaction-paths-and-role-wiring)
-- [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
-- [Command System and Linked Panel Guide](/mod/alecs-tamework/command-system-and-linked-panel-guide)
-- [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
-- [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
+- [Start Here Index](/mod/alecs-tamework/start-here-index)
+- [Public API Index](/mod/alecs-tamework/public-api-index)
+- [API Recipes Index](/mod/alecs-tamework/api-recipes-index)
+- [System Integration Index](/mod/alecs-tamework/system-integration-index)
+- [Config Reference Index](/mod/alecs-tamework/config-reference-index)
+- [Testing and Diagnostics Index](/mod/alecs-tamework/testing-and-diagnostics-index)
+- [Optional Integrations Index](/mod/alecs-tamework/optional-integrations-index)
 
 ## 3) Developer Documentation
 - [Developer Documentation Index](/mod/alecs-tamework/developer-documentation-index)
-- [Architecture Overview](/mod/alecs-tamework/architecture-overview)
-- [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)
-- [Config Loading, Registries, Inheritance, and Overrides](/mod/alecs-tamework/config-loading-registries-inheritance-and-overrides)
-- [Command Runtime and Linked Panel Internals](/mod/alecs-tamework/command-runtime-and-linked-panel-internals)
-- [Integrations, Telemetry, and Build Workflow](/mod/alecs-tamework/integrations-telemetry-and-build-workflow)
+- [Core Architecture Index](/mod/alecs-tamework/core-architecture-index)
+- [Runtime Subsystems Index](/mod/alecs-tamework/runtime-subsystems-index)
+- [Data and Persistence Index](/mod/alecs-tamework/data-and-persistence-index)
+- [Tooling and Contribution Index](/mod/alecs-tamework/tooling-and-contribution-index)
 
 ## Recommended Starting Points
-- Players using a Tamework-powered mod should start with [What Tamework Is](/mod/alecs-tamework/what-tamework-is) and [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide).
-- Modders adding Tamework to a project should start with [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start) and [Interaction Paths and Role Wiring](/mod/alecs-tamework/interaction-paths-and-role-wiring).
-- Developers working inside the Tamework codebase should start with [Architecture Overview](/mod/alecs-tamework/architecture-overview) and [Config Loading, Registries, Inheritance, and Overrides](/mod/alecs-tamework/config-loading-registries-inheritance-and-overrides).
+- Players using a Tamework-powered mod should start with [Getting Started Index](/mod/alecs-tamework/getting-started-index) and [Companion Controls Index](/mod/alecs-tamework/companion-controls-index).
+- Modders adding Tamework to a project should start with [Start Here Index](/mod/alecs-tamework/start-here-index) and [Public API Overview](/mod/alecs-tamework/public-api-overview).
+- Developers working inside the Tamework codebase should start with [Core Architecture Index](/mod/alecs-tamework/core-architecture-index) and [Data and Persistence Index](/mod/alecs-tamework/data-and-persistence-index).
 
 > [Screenshot Placeholder: Linked companion panel open beside the command radial menu]
