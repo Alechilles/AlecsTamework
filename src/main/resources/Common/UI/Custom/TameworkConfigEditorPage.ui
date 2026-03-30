@@ -9,7 +9,7 @@ $C.@PageOverlay {
     #Title {
       $C.@Title #TwConfigTitle {
         @Alignment = Start;
-        @Text = "Tamework Config Editor (Global)";
+        @Text = %server.tamework.ui.configEditor.title;
       }
 
       Group {
@@ -17,13 +17,13 @@ $C.@PageOverlay {
 
         TextButton #TwConfigApplyButton {
           Anchor: (Left: 0, Width: 94, Height: 24);
-          Text: "Apply";
+          Text: %server.tamework.ui.shared.button.apply;
           Style: (...$C.@SmallSecondaryTextButtonStyle);
         }
 
         TextButton #TwConfigCloseButton {
           Anchor: (Right: 0, Width: 94, Height: 24);
-          Text: "Close";
+          Text: %server.tamework.ui.shared.button.close;
           Style: (...$C.@SmallSecondaryTextButtonStyle);
         }
       }
@@ -60,7 +60,7 @@ $C.@PageOverlay {
 
           Label {
             Anchor: (Height: 20);
-            Text: "TwGlobal Assets";
+            Text: %server.tamework.ui.configEditor.assets.title;
             Style: (FontSize: 14, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
           }
 
@@ -69,7 +69,7 @@ $C.@PageOverlay {
             Style: $C.@DefaultInputFieldStyle;
             PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
             Background: $C.@InputBoxBackground;
-            PlaceholderText: "Search assets";
+            PlaceholderText: %server.tamework.ui.configEditor.assets.searchPlaceholder;
             MaxLength: 80;
             Padding: (Horizontal: 8);
           }
@@ -78,18 +78,18 @@ $C.@PageOverlay {
             Anchor: (Top: 6, Height: 24);
             Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
             MaxSelection: 1;
-            NoItemsText: "No assets";
+            NoItemsText: %server.tamework.ui.configEditor.assets.none;
           }
 
           Label #TwConfigAssetCount {
             Anchor: (Top: 4, Height: 18);
-            Text: "Global assets: 0";
+            Text: %server.tamework.ui.configEditor.assetCount.initial;
             Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
           }
 
           Label {
             Anchor: (Top: 6, Height: 18);
-            Text: "Override File Path";
+            Text: %server.tamework.ui.configEditor.overridePath.label;
             Style: (FontSize: 11, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
           }
 
@@ -118,7 +118,7 @@ $C.@PageOverlay {
 
             TextButton #TwConfigRefreshButton {
               Anchor: (Right: 0, Width: 94, Height: 24);
-              Text: "Refresh";
+              Text: %server.tamework.ui.shared.button.refresh;
               Style: (...$C.@SmallSecondaryTextButtonStyle);
             }
           }
@@ -150,7 +150,7 @@ $C.@PageOverlay {
             Style: $C.@DefaultInputFieldStyle;
             PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
             Background: $C.@InputBoxBackground;
-            PlaceholderText: "Search properties";
+            PlaceholderText: %server.tamework.ui.configEditor.properties.searchPlaceholder;
             MaxLength: 80;
             Padding: (Horizontal: 8);
           }
@@ -164,25 +164,25 @@ $C.@PageOverlay {
 
               Label #TwConfigHeaderProperty {
                 Anchor: (Left: 8, Width: 306, Height: 24);
-                Text: "Property";
+                Text: %server.tamework.ui.configEditor.header.property;
                 Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Start, VerticalAlignment: Center, RenderUppercase: true);
               }
 
               Label #TwConfigHeaderReset {
                 Anchor: (Left: 314, Width: 56, Height: 24);
-                Text: "Reset";
+                Text: %server.tamework.ui.configEditor.header.reset;
                 Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Center, VerticalAlignment: Center, RenderUppercase: true);
               }
 
               Label #TwConfigHeaderSource {
                 Anchor: (Left: 374, Width: 88, Height: 24);
-                Text: "Source";
+                Text: %server.tamework.ui.configEditor.header.source;
                 Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Center, VerticalAlignment: Center, RenderUppercase: true);
               }
 
               Label #TwConfigHeaderValue {
                 Anchor: (Left: 466, Right: 6, Height: 24);
-                Text: "Value";
+                Text: %server.tamework.ui.configEditor.header.value;
                 Style: (FontSize: 11, RenderBold: true, TextColor: #a9bfd7, HorizontalAlignment: Start, VerticalAlignment: Center, RenderUppercase: true);
               }
             }
@@ -208,7 +208,7 @@ $C.@PageOverlay {
 
             Label #TwConfigPropertyEmptyState {
               Anchor: (Top: 8, Left: 8, Right: 8, Height: 22);
-              Text: "No properties available.";
+              Text: %server.tamework.ui.configEditor.properties.empty;
               Style: (FontSize: 13, TextColor: #b2c3d6, HorizontalAlignment: Start, VerticalAlignment: Center);
               Visible: false;
             }
@@ -228,19 +228,19 @@ $C.@PageOverlay {
 
         Label {
           Anchor: (Top: 14, Left: 14, Width: 372, Height: 22);
-          Text: "Apply Staged Config Drafts?";
+          Text: %server.tamework.ui.configEditor.applyConfirm.title;
           Style: (FontSize: 18, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
         Label #TwConfigApplyConfirmCount {
           Anchor: (Top: 46, Left: 14, Width: 372, Height: 20);
-          Text: "Pending draft files: 0";
+          Text: %server.tamework.ui.configEditor.pendingDraftCount.initial;
           Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
 
         Label {
           Anchor: (Top: 68, Left: 14, Width: 372, Height: 40);
-          Text: "This validates, writes atomically, creates rollback snapshots, and reloads overrides.";
+          Text: %server.tamework.ui.configEditor.applyConfirm.description;
           Style: (FontSize: 12, TextColor: #a9bed7, HorizontalAlignment: Start, VerticalAlignment: Start, Wrap: true);
         }
 
@@ -248,12 +248,12 @@ $C.@PageOverlay {
           Anchor: (Top: 122, Left: 14, Width: 372, Height: 26);
           TextButton #TwConfigCancelApplyButton {
             Anchor: (Right: 96, Width: 84, Height: 24);
-            Text: "Cancel";
+            Text: %server.tamework.ui.shared.button.cancel;
             Style: (...$C.@SmallSecondaryTextButtonStyle);
           }
           TextButton #TwConfigConfirmApplyButton {
             Anchor: (Right: 0, Width: 84, Height: 24);
-            Text: "Confirm";
+            Text: %server.tamework.ui.shared.button.confirm;
             Style: (...$C.@SmallSecondaryTextButtonStyle);
           }
         }
@@ -261,3 +261,4 @@ $C.@PageOverlay {
     }
   }
 }
+

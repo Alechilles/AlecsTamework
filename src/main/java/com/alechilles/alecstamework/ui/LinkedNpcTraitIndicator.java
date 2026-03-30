@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
+
 /**
  * Immutable trait indicator model rendered in linked companion cards.
  */
@@ -23,7 +25,7 @@ public final class LinkedNpcTraitIndicator {
                                    boolean belowDefault) {
         this.iconText = sanitizeText(iconText, "?");
         this.iconTexturePath = sanitizeTexturePath(iconTexturePath);
-        this.label = sanitizeText(label, "Trait");
+        this.label = sanitizeText(label, LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.card.trait.tooltip"));
         this.tooltipText = sanitizeText(tooltipText, this.label);
         this.fillRatio = clamp(fillRatio);
         this.counterClockwise = counterClockwise;

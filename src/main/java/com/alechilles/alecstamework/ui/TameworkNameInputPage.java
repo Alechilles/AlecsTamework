@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -25,6 +26,9 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
     private static final String KEY_ACTION = "Action";
     private static final String KEY_NAME_INPUT = "@NpcNameInput";
     private static final String ACTION_CANCEL = "Cancel";
+    private static final String DEFAULT_TITLE_KEY = "tamework.ui.nameInput.title";
+    private static final String DEFAULT_SUBTITLE_KEY = "tamework.ui.nameInput.subtitle";
+    private static final String DEFAULT_PLACEHOLDER_KEY = "tamework.ui.nameInput.placeholder";
 
     private final String title;
     private final String subtitle;
@@ -44,9 +48,9 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
                                  @Nonnull Runnable cancelCallback,
                                  @Nonnull Consumer<String> submitCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, NameInputEventData.CODEC);
-        this.title = normalizeText(title, "Name Companion");
-        this.subtitle = normalizeText(subtitle, "Enter a name and click Apply.");
-        this.placeholder = normalizeText(placeholder, "Enter companion name");
+        this.title = normalizeText(title, LocalizedText.resolve(playerRef, DEFAULT_TITLE_KEY));
+        this.subtitle = normalizeText(subtitle, LocalizedText.resolve(playerRef, DEFAULT_SUBTITLE_KEY));
+        this.placeholder = normalizeText(placeholder, LocalizedText.resolve(playerRef, DEFAULT_PLACEHOLDER_KEY));
         this.initialValue = initialValue != null ? initialValue : "";
         this.maxLength = Math.max(1, maxLength);
         this.cancelCallback = cancelCallback;

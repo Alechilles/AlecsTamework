@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.UUID;
 
 /**
@@ -10,20 +11,24 @@ final class LinkedNpcPanelSubtitleService {
     }
 
     static String resolveSubtitle(LinkedNpcEntry[] entries, UUID pendingUnlinkNpcUuid) {
+        return resolveSubtitle(entries, pendingUnlinkNpcUuid, null);
+    }
+
+    static String resolveSubtitle(LinkedNpcEntry[] entries, UUID pendingUnlinkNpcUuid, String language) {
         int total = entries != null ? entries.length : 0;
         if (pendingUnlinkNpcUuid != null) {
             LinkedNpcEntry pendingEntry = resolvePendingEntry(entries, pendingUnlinkNpcUuid);
             String pendingName = pendingEntry != null ? pendingEntry.displayName() : null;
             if (pendingName == null || pendingName.isBlank()) {
-                pendingName = "this NPC";
+                pendingName = LocalizedText.resolve(language, "tamework.ui.linkedPanel.subtitle.defaultNpcName");
             }
             if (pendingEntry != null && !pendingEntry.linked()) {
-                return "Choose Release or Cull for " + pendingName;
+                return LocalizedText.format(language, "tamework.ui.linkedPanel.subtitle.releaseOrCull", pendingName);
             }
-            return "Click X again to remove " + pendingName;
+            return LocalizedText.format(language, "tamework.ui.linkedPanel.subtitle.confirmRemove", pendingName);
         }
         if (total <= 0) {
-            return "No NPCs";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.subtitle.none");
         }
         int linkedCount = 0;
         if (entries != null) {
@@ -34,9 +39,11 @@ final class LinkedNpcPanelSubtitleService {
             }
         }
         if (linkedCount < total) {
-            return total + " NPCs (" + linkedCount + " linked)";
+            return LocalizedText.format(language, "tamework.ui.linkedPanel.subtitle.mixedCount", total, linkedCount);
         }
-        return linkedCount + " linked NPC" + (linkedCount == 1 ? "" : "s");
+        return linkedCount == 1
+                ? LocalizedText.format(language, "tamework.ui.linkedPanel.subtitle.linkedSingle", linkedCount)
+                : LocalizedText.format(language, "tamework.ui.linkedPanel.subtitle.linkedPlural", linkedCount);
     }
 
     static boolean containsEntry(LinkedNpcEntry[] entries, UUID npcUuid) {

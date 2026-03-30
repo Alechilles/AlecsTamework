@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
+
 /**
  * Formats linked NPC panel status and health text labels.
  */
@@ -8,92 +10,124 @@ final class LinkedNpcPanelStatusTextService {
     }
 
     static String resolveDeadHealthText(LinkedNpcEntry entry) {
+        return resolveDeadHealthText(entry, null);
+    }
+
+    static String resolveDeadHealthText(LinkedNpcEntry entry, String language) {
         if (entry == null || !entry.dead()) {
-            return "Dead";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.dead");
         }
         if (entry.deadRespawnRemainingMs() < 0L) {
-            return "Dead: respawn disabled.";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.deadRespawnDisabled");
         }
         long remainingMs = Math.max(0L, entry.deadRespawnRemainingMs());
         if (remainingMs <= 0L) {
-            return "Dead: ready to respawn.";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.deadReadyToRespawn");
         }
-        return "Dead: respawn in " + formatRemainingTime(remainingMs) + ".";
+        return LocalizedText.format(
+                language,
+                "tamework.ui.linkedPanel.health.deadRespawnIn",
+                formatRemainingTime(remainingMs, language)
+        );
     }
 
     static String resolveAvailabilityStatusText(LinkedNpcEntry entry) {
+        return resolveAvailabilityStatusText(entry, null);
+    }
+
+    static String resolveAvailabilityStatusText(LinkedNpcEntry entry, String language) {
         if (entry == null) {
-            return "UNLOADED";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.unloaded");
         }
         if (entry.dead()) {
-            return "DEAD";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.dead");
         }
         if (entry.inCoop()) {
-            return "In Coop";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.inCoop");
         }
         if (entry.lost()) {
-            return "LOST";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.lost");
         }
         if (entry.captured()) {
-            return "CAPTURED";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.captured");
         }
-        return "UNLOADED";
+        return LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.unloaded");
     }
 
     static String resolveUnavailableHealthText(LinkedNpcEntry entry) {
+        return resolveUnavailableHealthText(entry, null);
+    }
+
+    static String resolveUnavailableHealthText(LinkedNpcEntry entry, String language) {
         if (entry != null && entry.inCoop()) {
-            return "Housed in coop.";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.unavailable.inCoop");
         }
         if (entry != null && entry.lost()) {
-            return "Lost companion. Use Respawn to recover.";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.unavailable.lost");
         }
         if (entry != null && entry.captured()) {
-            return "Captured in item.";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.unavailable.captured");
         }
-        return "Unloaded (commands still queue).";
+        return LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.unavailable.unloaded");
     }
 
     static String resolveDeadHappinessText(LinkedNpcEntry entry) {
+        return resolveDeadHappinessText(entry, null);
+    }
+
+    static String resolveDeadHappinessText(LinkedNpcEntry entry, String language) {
         if (entry == null || !entry.dead()) {
-            return "Happiness: unavailable";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable");
         }
-        return "Happiness: unavailable (dead).";
+        return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable.dead");
     }
 
     static String resolveUnavailableHappinessText(LinkedNpcEntry entry) {
+        return resolveUnavailableHappinessText(entry, null);
+    }
+
+    static String resolveUnavailableHappinessText(LinkedNpcEntry entry, String language) {
         if (entry != null && entry.inCoop()) {
-            return "Happiness: unavailable (in coop).";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable.inCoop");
         }
         if (entry != null && entry.lost()) {
-            return "Happiness: unavailable (lost).";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable.lost");
         }
         if (entry != null && entry.captured()) {
-            return "Happiness: unavailable (captured).";
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable.captured");
         }
-        return "Happiness: unavailable (unloaded).";
+        return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable.unloaded");
     }
 
     static String resolveBreedingCooldownTooltip(LinkedNpcEntry entry) {
-        if (entry == null || !entry.loaded()) {
-            return "Breeding CD: unavailable";
-        }
-        if (!entry.breedingCooldownKnown()) {
-            return "Breeding CD: unavailable";
-        }
-        if (!entry.breedingCooldownActive()) {
-            return "Breeding CD: ready";
-        }
-        return "Breeding CD: " + formatRemainingClock(entry.breedingCooldownRemainingMs());
+        return resolveBreedingCooldownTooltip(entry, null);
     }
 
-    private static String formatRemainingTime(long remainingMs) {
+    static String resolveBreedingCooldownTooltip(LinkedNpcEntry entry, String language) {
+        if (entry == null || !entry.loaded()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unavailable");
+        }
+        if (!entry.breedingCooldownKnown()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.unavailable");
+        }
+        if (!entry.breedingCooldownActive()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.breedingCooldown.ready");
+        }
+        return LocalizedText.format(
+                language,
+                "tamework.ui.linkedPanel.breedingCooldown.remaining",
+                formatRemainingClock(entry.breedingCooldownRemainingMs())
+        );
+    }
+
+    private static String formatRemainingTime(long remainingMs, String language) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long minutes = totalSeconds / 60L;
         long seconds = totalSeconds % 60L;
         if (minutes <= 0L) {
-            return seconds + "s";
+            return LocalizedText.format(language, "tamework.ui.shared.duration.seconds", seconds);
         }
-        return minutes + "m " + seconds + "s";
+        return LocalizedText.format(language, "tamework.ui.shared.duration.minutesSeconds", minutes, seconds);
     }
 
     private static String formatRemainingClock(long remainingMs) {

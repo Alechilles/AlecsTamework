@@ -10,14 +10,14 @@ Group #TameworkLinkedPanelRoot {
         #Title {
             $C.@Title #TameworkLinkedPanelTitle {
                 @Alignment = Start;
-                @Text = "Linked NPCs";
+                @Text = %server.tamework.ui.linkedPanel.title.linked;
             }
 
             DropdownBox #TameworkLinkedPanelModeDropdown {
                 Anchor: (Top: 2, Right: 8, Width: 132, Height: 24);
                 Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 11));
                 MaxSelection: 1;
-                NoItemsText: "No modes";
+                NoItemsText: %server.tamework.ui.linkedPanel.mode.noModes;
             }
         }
 
@@ -30,7 +30,7 @@ Group #TameworkLinkedPanelRoot {
 
                 Label #TameworkLinkedPanelSubtitle {
                     Anchor: (Left: 2, Width: 138, Height: 20);
-                    Text: "No linked NPCs";
+                    Text: %server.tamework.ui.linkedPanel.subtitle.none;
                     Style: (FontSize: 14, TextColor: #c4d2e1, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
@@ -58,7 +58,7 @@ Group #TameworkLinkedPanelRoot {
 
                         Label #TameworkLinkedPanelRadiusValue {
                             Anchor: (Width: 68, Height: 24);
-                            Text: "Radius: 24m";
+                            Text: %server.tamework.ui.linkedPanel.radius.value.default;
                             Style: (FontSize: 12, TextColor: #dbe8f6, HorizontalAlignment: Center, VerticalAlignment: Center);
                         }
 
@@ -80,7 +80,7 @@ Group #TameworkLinkedPanelRoot {
                 $C.@SmallSecondaryTextButton #TameworkLinkedPanelManageGroupsButton {
                     @Sounds = $C.@ButtonSounds;
                     @Anchor = (Right: 2, Width: 88, Height: 24);
-                    @Text = "Groups";
+                    @Text = %server.tamework.ui.linkedPanel.manageGroups;
                 }
             }
 
@@ -94,7 +94,7 @@ Group #TameworkLinkedPanelRoot {
 
                 Label #TameworkLinkedPanelSortLabel {
                     Anchor: (Width: 26, Height: 24);
-                    Text: "Sort:";
+                    Text: %server.tamework.ui.linkedPanel.sort.label;
                     Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
@@ -106,7 +106,7 @@ Group #TameworkLinkedPanelRoot {
                     Anchor: (Width: 92, Height: 24);
                     Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 11));
                     MaxSelection: 1;
-                    NoItemsText: "No sort options";
+                    NoItemsText: %server.tamework.ui.linkedPanel.sort.noneOptions;
                 }
 
                 Group {
@@ -115,7 +115,7 @@ Group #TameworkLinkedPanelRoot {
 
                 Label #TameworkLinkedPanelFilterLabel {
                     Anchor: (Width: 34, Height: 24);
-                    Text: "Filter:";
+                    Text: %server.tamework.ui.linkedPanel.filter.label;
                     Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
@@ -127,7 +127,7 @@ Group #TameworkLinkedPanelRoot {
                     Anchor: (Width: 92, Height: 24);
                     Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 11), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 11), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 11));
                     MaxSelection: 1;
-                    NoItemsText: "No filter options";
+                    NoItemsText: %server.tamework.ui.linkedPanel.filter.noneOptions;
                 }
 
                 Group {
@@ -145,7 +145,7 @@ Group #TameworkLinkedPanelRoot {
                         Background: $C.@InputBoxBackground;
                         Anchor: (Width: 138, Height: 24);
                         Padding: (Horizontal: 8);
-                        PlaceholderText: "Filter Text";
+                        PlaceholderText: %server.tamework.ui.linkedPanel.filter.placeholder;
                         MaxLength: 40;
                     }
                 }
@@ -153,7 +153,7 @@ Group #TameworkLinkedPanelRoot {
 
             Label #TameworkLinkedPanelEmptyState {
                 Anchor: (Top: 8, Height: 48);
-                Text: "No linked NPCs yet. Primary-use on an owned NPC to link it.";
+                Text: %server.tamework.ui.linkedPanel.emptyState;
                 Style: (FontSize: 14, TextColor: #b2c3d6, HorizontalAlignment: Start, VerticalAlignment: Start);
                 Visible: false;
             }
@@ -184,13 +184,13 @@ Group #TameworkLinkedPanelRoot {
 
                 Label #TameworkLinkedPanelGroupAssignTitle {
                     Anchor: (Top: 10, Left: 14, Width: 330, Height: 24);
-                    Text: "Assign Group";
+                    Text: %server.tamework.ui.linkedPanel.groupAssign.title;
                     Style: (FontSize: 18, RenderBold: true, TextColor: #dce8f6, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
                 Label #TameworkLinkedPanelGroupAssignSubtitle {
                     Anchor: (Top: 40, Left: 14, Width: 330, Height: 24);
-                    Text: "Choose a group.";
+                    Text: %server.tamework.ui.linkedPanel.groupAssign.prompt;
                     Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
                 }
 
@@ -198,7 +198,7 @@ Group #TameworkLinkedPanelRoot {
                     Anchor: (Top: 72, Left: 14, Width: 330, Height: 26);
                     Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8, LabelStyle: (...$C.@DefaultDropdownBoxLabelStyle, RenderUppercase: false, FontSize: 12), EntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, FontSize: 12), SelectedEntryLabelStyle: (...$C.@DefaultDropdownBoxEntryLabelStyle, RenderUppercase: false, RenderBold: true, FontSize: 12));
                     MaxSelection: 1;
-                    NoItemsText: "No groups";
+                    NoItemsText: %server.tamework.ui.linkedPanel.groupAssign.noneGroups;
                 }
 
                 Group #TameworkLinkedPanelGroupAssignButtons {
@@ -212,7 +212,7 @@ Group #TameworkLinkedPanelRoot {
                     $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignCancelButton {
                         @Sounds = $C.@ButtonSounds;
                         @Anchor = (Width: 92, Height: 24);
-                        @Text = "Cancel";
+                        @Text = %server.tamework.ui.shared.button.cancel;
                     }
 
                     Group {
@@ -222,10 +222,11 @@ Group #TameworkLinkedPanelRoot {
                     $C.@SmallSecondaryTextButton #TameworkLinkedPanelGroupAssignApplyButton {
                         @Sounds = $C.@ButtonSounds;
                         @Anchor = (Width: 92, Height: 24);
-                        @Text = "Apply";
+                        @Text = %server.tamework.ui.shared.button.apply;
                     }
                 }
             }
         }
     }
 }
+

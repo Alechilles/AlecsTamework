@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreHomeS
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
@@ -482,7 +483,7 @@ public final class CommandItemFeatureHandler {
             }
             boolean opened = openSelectionMenu(player, store, config, working, tool.toolId);
             if (!opened) {
-                feedbackService.showWarning(player, "No command choices are available for this item.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.noChoices");
             }
             return opened;
         }
@@ -497,11 +498,11 @@ public final class CommandItemFeatureHandler {
                 updateHeldItem(player, working);
             }
             if (selection.command == null) {
-                feedbackService.showWarning(player, "No command is configured for this item.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.noConfiguredCommand");
                 return false;
             }
-            String label = resolveCommandLabel(selection.command);
-            feedbackService.showDefault(player, "Selected: " + label);
+            String label = resolveCommandLabel(player, selection.command);
+            feedbackService.showDefaultKey(player, "tamework.ui.notifications.command.selection.selected", label);
             return true;
         }
 
@@ -516,9 +517,15 @@ public final class CommandItemFeatureHandler {
                     updateHeldItem(player, working);
                 }
                 if (link.linked && !link.active) {
-                    feedbackService.showSuccess(player, "Linked " + link.npcName + " as inactive.");
+                    feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.link.successInactive", link.npcName);
                 } else {
-                    feedbackService.showSuccess(player, (link.linked ? "Linked " : "Unlinked ") + link.npcName + ".");
+                    feedbackService.showSuccessKey(
+                            player,
+                            link.linked
+                                    ? "tamework.ui.notifications.command.link.success"
+                                    : "tamework.ui.notifications.command.link.unlinked",
+                            link.npcName
+                    );
                 }
                 return true;
             }
@@ -529,7 +536,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            feedbackService.showWarning(player, "That command item is on cooldown.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.cooldown");
             return false;
         }
 
@@ -538,7 +545,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            feedbackService.showWarning(player, "No command is configured for this item.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.noConfiguredCommand");
             return false;
         }
 
@@ -593,7 +600,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            feedbackService.showWarning(player, "No companions matched this command.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.execution.noRecipients");
             return false;
         }
 
@@ -625,7 +632,7 @@ public final class CommandItemFeatureHandler {
             if (updateHeldItem) {
                 updateHeldItem(player, working);
             }
-            feedbackService.showWarning(player, "No NPCs could execute that command.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.execution.none");
             return false;
         }
 
@@ -642,7 +649,15 @@ public final class CommandItemFeatureHandler {
         if (updateHeldItem) {
             updateHeldItem(player, working);
         }
-        feedbackService.emitCommandExecutionFeedback(context.player, context.playerRef, context.store, context.command, affected, queued, this::resolveCommandLabel);
+        feedbackService.emitCommandExecutionFeedback(
+                context.player,
+                context.playerRef,
+                context.store,
+                context.command,
+                affected,
+                queued,
+                cmdEntry -> resolveCommandLabel(context.player, cmdEntry)
+        );
         return true;
     }
 
@@ -749,22 +764,22 @@ public final class CommandItemFeatureHandler {
         }
         World world = player.getWorld();
         if (world == null) {
-            feedbackService.showWarning(player, "Unable to reopen the command panel.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.reopenFailed");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
-            feedbackService.showWarning(player, "Unable to reopen the command panel.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.reopenFailed");
             return;
         }
         ItemStack toolStack = findCommandToolStack(player, toolId);
         if (toolStack == null || toolStack.isEmpty()) {
-            feedbackService.showWarning(player, "Unable to find that command item.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
             return;
         }
         boolean opened = openSelectionMenu(player, store, config, toolStack, toolId);
         if (!opened) {
-            feedbackService.showWarning(player, "Unable to reopen the command panel.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.reopenFailed");
         }
     }
 
@@ -778,16 +793,16 @@ public final class CommandItemFeatureHandler {
         }
         CommandEntry selected = config.findCommandById(commandId);
         if (selected == null) {
-            feedbackService.showWarning(player, "That command is no longer available.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.unavailable");
             return;
         }
         boolean updated = toolInventoryService.setSelectedCommandOnTool(player, toolId, selected.getId());
         if (!updated) {
-            feedbackService.showWarning(player, "Unable to apply the selected command.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.applyFailed");
             return;
         }
-        String label = resolveCommandLabel(selected);
-        feedbackService.showDefault(player, "Selected: " + label);
+        String label = resolveCommandLabel(player, selected);
+        feedbackService.showDefaultKey(player, "tamework.ui.notifications.command.selection.selected", label);
     }
 
     private void applyMenuUnlink(Player player,
@@ -798,7 +813,7 @@ public final class CommandItemFeatureHandler {
         }
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            feedbackService.showWarning(player, "Unable to unlink right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.unlink.unavailable");
             return;
         }
         ItemContainer hotbar = inventory.getHotbar();
@@ -816,14 +831,14 @@ public final class CommandItemFeatureHandler {
             boolean itemChanged = updatedStack != stack;
             boolean componentChanged = linkMutationService.unlinkLoadedNpcFromTool(player, npcUuid, toolId);
             if (!itemChanged && !componentChanged) {
-                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
             } else {
                 hotbar.setItemStackForSlot(slot, updatedStack);
-                feedbackService.showSuccess(player, "Removed linked NPC.");
+                feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.unlink.success");
             }
             return;
         }
-        feedbackService.showWarning(player, "Unable to find that command item.");
+        feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
     }
 
     private void applyMenuRelease(Player player,
@@ -835,26 +850,26 @@ public final class CommandItemFeatureHandler {
         }
         World world = player.getWorld();
         if (world == null) {
-            feedbackService.showWarning(player, "Unable to release right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.unavailable");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
-            feedbackService.showWarning(player, "Unable to release right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.unavailable");
             return;
         }
         Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
         if (npcRef == null || !npcRef.isValid()) {
-            feedbackService.showWarning(player, "That mob must be loaded to release.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.mustBeLoaded");
             return;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null) {
-            feedbackService.showWarning(player, "That mob must be loaded to release.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.mustBeLoaded");
             return;
         }
         if (!canApplyNearbyReleaseCull(player, config, npcRef, store)) {
-            feedbackService.showWarning(player, "You can only release owned nearby companions.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.release.ownedNearbyOnly");
             return;
         }
         clearNpcTamedOwnershipAndLinks(npcRef, store);
@@ -863,9 +878,9 @@ public final class CommandItemFeatureHandler {
         npc.setDespawnTime(RELEASE_DESPAWN_DELAY_SECONDS);
         String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
         if (displayName == null || displayName.isBlank()) {
-            displayName = "mob";
+            displayName = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultMobName");
         }
-        feedbackService.showSuccess(player, "Released " + displayName + ". It will despawn shortly.");
+        feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.release.success", displayName);
     }
 
     private void applyMenuCull(Player player,
@@ -877,31 +892,31 @@ public final class CommandItemFeatureHandler {
         }
         World world = player.getWorld();
         if (world == null) {
-            feedbackService.showWarning(player, "Unable to cull right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.unavailable");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
-            feedbackService.showWarning(player, "Unable to cull right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.unavailable");
             return;
         }
         Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
         if (npcRef == null || !npcRef.isValid()) {
-            feedbackService.showWarning(player, "That mob must be loaded to cull.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.mustBeLoaded");
             return;
         }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null) {
-            feedbackService.showWarning(player, "That mob must be loaded to cull.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.mustBeLoaded");
             return;
         }
         if (!canApplyNearbyReleaseCull(player, config, npcRef, store)) {
-            feedbackService.showWarning(player, "You can only cull owned nearby companions.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.ownedNearbyOnly");
             return;
         }
         DamageCause cause = DamageCause.COMMAND != null ? DamageCause.COMMAND : DamageCause.PHYSICAL;
         if (cause == null) {
-            feedbackService.showWarning(player, "Unable to cull right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.cull.unavailable");
             return;
         }
         clearNpcCommandLinks(npcRef, store);
@@ -909,9 +924,9 @@ public final class CommandItemFeatureHandler {
         DeathComponent.tryAddComponent(store, npcRef, new Damage(Damage.NULL_SOURCE, cause, CULL_DAMAGE_AMOUNT));
         String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
         if (displayName == null || displayName.isBlank()) {
-            displayName = "mob";
+            displayName = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultMobName");
         }
-        feedbackService.showSuccess(player, "Culled " + displayName + ".");
+        feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.cull.success", displayName);
     }
 
     private boolean canApplyNearbyReleaseCull(Player player,
@@ -1031,23 +1046,23 @@ public final class CommandItemFeatureHandler {
             return;
         }
         if (deathService == null && lostService == null) {
-            feedbackService.showWarning(player, "Companion recovery tracking is unavailable.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.trackingUnavailable");
             return;
         }
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            feedbackService.showWarning(player, "Unable to respawn right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
             return;
         }
         World world = player.getWorld();
         if (world == null) {
-            feedbackService.showWarning(player, "Unable to respawn right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> playerRef = player.getReference();
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            feedbackService.showWarning(player, "Unable to respawn right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.unavailable");
             return;
         }
         ItemContainer hotbar = inventory.getHotbar();
@@ -1063,7 +1078,7 @@ public final class CommandItemFeatureHandler {
             }
             LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
-                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
             }
             CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot deadSnapshot =
@@ -1075,12 +1090,16 @@ public final class CommandItemFeatureHandler {
                 }
                 TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
                 if (!companionSettings.isDeadRespawnEnabled()) {
-                    feedbackService.showWarning(player, "Dead companion respawn is disabled.");
+                    feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.disabled");
                     return;
                 }
                 long remainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
                 if (remainingMs > 0L) {
-                    feedbackService.showWarning(player, "Respawn cooldown remaining: " + formatDuration(remainingMs) + ".");
+                    feedbackService.showWarningKey(
+                            player,
+                            "tamework.ui.notifications.command.respawn.cooldownRemaining",
+                            formatDuration(player, remainingMs)
+                    );
                     return;
                 }
                 double safeSpawnDistance = resolvePositiveDouble(
@@ -1103,19 +1122,19 @@ public final class CommandItemFeatureHandler {
                         followRetryDelayMs
                 );
                 if (updatedStack == null) {
-                    feedbackService.showWarning(player, "Failed to respawn that companion.");
+                    feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.failed");
                     return;
                 }
                 hotbar.setItemStackForSlot(slot, updatedStack);
                 String name = deadSnapshot.displayName();
                 if (name == null || name.isBlank()) {
-                    name = "companion";
+                    name = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultCompanionName");
                 }
-                feedbackService.showSuccess(player, "Respawned " + name + ".");
+                feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.respawn.success", name);
                 return;
             }
             if (lostService == null || !lostService.isLost(npcUuid)) {
-                feedbackService.showWarning(player, "That companion is not marked as dead or lost.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.notDeadOrLost");
                 return;
             }
             String roleId = record.cachedRoleId;
@@ -1136,7 +1155,7 @@ public final class CommandItemFeatureHandler {
             if (!recoveryResult.isSuccess()) {
                 String errorMessage = recoveryResult.errorMessage();
                 if (errorMessage == null || errorMessage.isBlank()) {
-                    errorMessage = "Failed to recover that companion.";
+                    errorMessage = LocalizedText.resolve(player, "tamework.ui.notifications.command.respawn.recoverFailed");
                 }
                 feedbackService.showWarning(player, errorMessage);
                 return;
@@ -1147,12 +1166,12 @@ public final class CommandItemFeatureHandler {
                 recoveredName = record.cachedDisplayName;
             }
             if (recoveredName == null || recoveredName.isBlank()) {
-                recoveredName = "companion";
+                recoveredName = LocalizedText.resolve(player, "tamework.ui.notifications.command.shared.defaultCompanionName");
             }
-            feedbackService.showSuccess(player, "Recovered " + recoveredName + ".");
+            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.respawn.recovered", recoveredName);
             return;
         }
-        feedbackService.showWarning(player, "Unable to find that command item.");
+        feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
     }
 
     private void applyMenuSetHome(Player player,
@@ -1163,17 +1182,17 @@ public final class CommandItemFeatureHandler {
         }
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            feedbackService.showWarning(player, "Unable to set home right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.unavailable");
             return;
         }
         World world = player.getWorld();
         if (world == null) {
-            feedbackService.showWarning(player, "Unable to set home right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.unavailable");
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (store == null) {
-            feedbackService.showWarning(player, "Unable to set home right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.unavailable");
             return;
         }
         ItemContainer hotbar = inventory.getHotbar();
@@ -1189,32 +1208,32 @@ public final class CommandItemFeatureHandler {
             }
             LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
-                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
             }
             Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
             if (npcRef == null || !npcRef.isValid()) {
-                feedbackService.showWarning(player, "That companion must be loaded to set home.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.mustBeLoaded");
                 return;
             }
             NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
             if (npc == null) {
-                feedbackService.showWarning(player, "That companion must be loaded to set home.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.mustBeLoaded");
                 return;
             }
             TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
             if (links == null || !links.containsToolId(toolId)) {
-                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
             }
             UUID ownerId = links.getOwnerId();
             if (ownerId != null && !ownerId.equals(player.getUuid())) {
-                feedbackService.showWarning(player, "You cannot set home for that companion.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.notAllowed");
                 return;
             }
             TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
             if (transform == null) {
-                feedbackService.showWarning(player, "Unable to read that companion's position.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.setHome.positionUnavailable");
                 return;
             }
             Vector3d home = new Vector3d(transform.getPosition());
@@ -1233,10 +1252,14 @@ public final class CommandItemFeatureHandler {
                     npcNameResolver.resolveNpcRoleId(npc)
             );
             hotbar.setItemStackForSlot(slot, updatedStack);
-            feedbackService.showSuccess(player, "Set home for " + npcNameResolver.resolveNpcDisplayName(npcRef, store, npc) + ".");
+            feedbackService.showSuccessKey(
+                    player,
+                    "tamework.ui.notifications.command.setHome.success",
+                    npcNameResolver.resolveNpcDisplayName(npcRef, store, npc)
+            );
             return;
         }
-        feedbackService.showWarning(player, "Unable to find that command item.");
+        feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
     }
 
     private void applyMenuRecall(Player player,
@@ -1255,7 +1278,13 @@ public final class CommandItemFeatureHandler {
                                       String toolId,
                                       UUID npcUuid,
                                       boolean returnHome) {
-        menuMoveService.applyMenuMoveCommand(player, toolId, npcUuid, returnHome, this::resolveCommandLabel);
+        menuMoveService.applyMenuMoveCommand(
+                player,
+                toolId,
+                npcUuid,
+                returnHome,
+                cmdEntry -> resolveCommandLabel(player, cmdEntry)
+        );
     }
 
     private ItemStack reconcileStaleLinkedNpcRecords(Player player,
@@ -1519,14 +1548,14 @@ public final class CommandItemFeatureHandler {
         return null;
     }
 
-    private String formatDuration(long remainingMs) {
+    private String formatDuration(Player player, long remainingMs) {
         long totalSeconds = Math.max(0L, (remainingMs + 999L) / 1000L);
         long minutes = totalSeconds / 60L;
         long seconds = totalSeconds % 60L;
         if (minutes <= 0L) {
-            return seconds + "s";
+            return LocalizedText.format(player, "tamework.ui.shared.duration.seconds", seconds);
         }
-        return minutes + "m " + seconds + "s";
+        return LocalizedText.format(player, "tamework.ui.shared.duration.minutesSeconds", minutes, seconds);
     }
 
     private ItemStack findCommandToolStack(Player player, String toolId) {
@@ -1576,9 +1605,9 @@ public final class CommandItemFeatureHandler {
         return left.trim().equalsIgnoreCase(right.trim());
     }
 
-    private String resolveCommandLabel(CommandEntry command) {
+    private String resolveCommandLabel(Player player, CommandEntry command) {
         if (command == null) {
-            return "Unknown";
+            return LocalizedText.resolve(player, "tamework.ui.notifications.command.unknown");
         }
         if (command.getDisplayName() != null && !command.getDisplayName().isBlank()) {
             return command.getDisplayName();
@@ -1586,7 +1615,7 @@ public final class CommandItemFeatureHandler {
         if (command.getId() != null && !command.getId().isBlank()) {
             return command.getId();
         }
-        return "Unknown";
+        return LocalizedText.resolve(player, "tamework.ui.notifications.command.unknown");
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
@@ -31,13 +32,16 @@ class LinkedNpcPanelStatusTextServiceTest {
                 LinkedNpcTraitIndicator.EMPTY
         );
 
-        assertEquals("LOST", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(lostEntry));
         assertEquals(
-                "Lost companion. Use Respawn to recover.",
+                LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.status.lost"),
+                LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(lostEntry)
+        );
+        assertEquals(
+                LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.health.unavailable.lost"),
                 LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(lostEntry)
         );
         assertEquals(
-                "Happiness: unavailable (lost).",
+                LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.happiness.unavailable.lost"),
                 LinkedNpcPanelStatusTextService.resolveUnavailableHappinessText(lostEntry)
         );
     }
@@ -66,7 +70,10 @@ class LinkedNpcPanelStatusTextServiceTest {
                 LinkedNpcTraitIndicator.EMPTY
         );
 
-        assertEquals("DEAD", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(deadAndLostEntry));
+        assertEquals(
+                LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.status.dead"),
+                LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(deadAndLostEntry)
+        );
     }
 
     @Test
@@ -93,10 +100,16 @@ class LinkedNpcPanelStatusTextServiceTest {
                 LinkedNpcTraitIndicator.EMPTY
         );
 
-        assertEquals("In Coop", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(inCoopEntry));
-        assertEquals("Housed in coop.", LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(inCoopEntry));
         assertEquals(
-                "Happiness: unavailable (in coop).",
+                LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.status.inCoop"),
+                LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(inCoopEntry)
+        );
+        assertEquals(
+                LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.health.unavailable.inCoop"),
+                LinkedNpcPanelStatusTextService.resolveUnavailableHealthText(inCoopEntry)
+        );
+        assertEquals(
+                LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.happiness.unavailable.inCoop"),
                 LinkedNpcPanelStatusTextService.resolveUnavailableHappinessText(inCoopEntry)
         );
     }

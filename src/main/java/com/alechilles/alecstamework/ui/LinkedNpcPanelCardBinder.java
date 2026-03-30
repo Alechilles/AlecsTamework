@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
 import com.hypixel.hytale.server.core.ui.Anchor;
 import com.hypixel.hytale.server.core.ui.Value;
@@ -23,6 +24,17 @@ final class LinkedNpcPanelCardBinder {
                      boolean appendCard,
                      boolean pendingUnlink,
                      CardBindingConfig config) {
+        bind(commandBuilder, eventBuilder, index, entry, appendCard, pendingUnlink, config, null);
+    }
+
+    static void bind(UICommandBuilder commandBuilder,
+                     UIEventBuilder eventBuilder,
+                     int index,
+                     LinkedNpcEntry entry,
+                     boolean appendCard,
+                     boolean pendingUnlink,
+                     CardBindingConfig config,
+                     String language) {
         String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
         String nameSelector = entrySelector + " #Name";
         String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
@@ -93,9 +105,14 @@ final class LinkedNpcPanelCardBinder {
         boolean showInactiveBadge = isLinked && !entry.active() && !pendingUnlink;
 
         commandBuilder.set(statusUnloadedSelector + ".Visible", !entry.loaded() && !pendingUnlink && !showRespawn);
-        commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry));
+        commandBuilder.set(statusUnloadedSelector + ".Text", LinkedNpcPanelStatusTextService.resolveAvailabilityStatusText(entry, language));
         commandBuilder.set(statusConfirmSelector + ".Visible", pendingUnlink);
-        commandBuilder.set(statusConfirmSelector + ".Text", isLinked ? "CONFIRM REMOVE" : "RELEASE OR CULL");
+        commandBuilder.set(
+                statusConfirmSelector + ".Text",
+                isLinked
+                        ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.confirmRemove")
+                        : LocalizedText.resolve(language, "tamework.ui.linkedPanel.card.releaseOrCull")
+        );
         commandBuilder.set(linkSelector + ".Visible", showLink);
         commandBuilder.set(removeSelector + ".Visible", showUnlink);
         commandBuilder.set(activeToggleActiveSelector + ".Visible", showActiveToggleActive);
@@ -110,7 +127,7 @@ final class LinkedNpcPanelCardBinder {
                 pendingUnlink
         );
         commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor());
-        LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry);
+        LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
         commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
         commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());

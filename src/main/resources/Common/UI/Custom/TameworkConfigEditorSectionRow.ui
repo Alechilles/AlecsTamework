@@ -49,7 +49,7 @@ Group {
     Label #SectionToggleTopLabel {
       Anchor: (Height: 24);
       FlexWeight: 1;
-      Text: "SECTION";
+      Text: %server.tamework.ui.configEditor.section.defaultLabel;
       Style: (
         FontSize: 13,
         RenderBold: true,
@@ -101,7 +101,7 @@ Group {
 
       Label #SectionToggleTopCount {
         Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
-        Text: "0 fields";
+        Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
           TextColor: #a9bfd7,
@@ -165,7 +165,7 @@ Group {
     Label #SectionToggleNestedLabel {
       Anchor: (Height: 24);
       FlexWeight: 1;
-      Text: "SECTION";
+      Text: %server.tamework.ui.configEditor.section.defaultLabel;
       Style: (
         FontSize: 13,
         RenderBold: true,
@@ -217,7 +217,7 @@ Group {
 
       Label #SectionToggleNestedCount {
         Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
-        Text: "0 fields";
+        Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
           TextColor: #a9bfd7,
@@ -281,7 +281,7 @@ Group {
     Label #SectionToggleDeepLabel {
       Anchor: (Height: 24);
       FlexWeight: 1;
-      Text: "SECTION";
+      Text: %server.tamework.ui.configEditor.section.defaultLabel;
       Style: (
         FontSize: 13,
         RenderBold: true,
@@ -333,7 +333,7 @@ Group {
 
       Label #SectionToggleDeepCount {
         Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
-        Text: "0 fields";
+        Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
           TextColor: #a9bfd7,
@@ -367,3 +367,4 @@ Group {
     }
   }
 }
+

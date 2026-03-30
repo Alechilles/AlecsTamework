@@ -18,7 +18,7 @@ Group {
 
   Label #GroupName {
     Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
-    Text: "Group";
+    Text: %server.tamework.ui.shared.label.group;
     Style: (
       FontSize: 14,
       RenderBold: true,
@@ -34,14 +34,14 @@ Group {
     Background: $C.@InputBoxBackground;
     Anchor: (Top: 1, Left: 24, Right: 114, Height: 22);
     Padding: (Horizontal: 6);
-    PlaceholderText: "Group name";
+    PlaceholderText: %server.tamework.ui.shared.placeholder.groupName;
     MaxLength: 24;
     Visible: false;
   }
 
   TextButton #EditButton {
     Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
-    Text: "Edit";
+    Text: %server.tamework.ui.shared.button.edit;
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle
     );
@@ -49,7 +49,7 @@ Group {
 
   TextButton #CompleteButton {
     Anchor: (Top: 1, Right: 62, Width: 48, Height: 24);
-    Text: "Done";
+    Text: %server.tamework.ui.shared.button.done;
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle
     );
@@ -58,9 +58,10 @@ Group {
 
   TextButton #DeleteButton {
     Anchor: (Top: 1, Right: 0, Width: 58, Height: 24);
-    Text: "Delete";
+    Text: %server.tamework.ui.shared.button.delete;
     Style: (
       ...$C.@SmallSecondaryTextButtonStyle
     );
   }
 }
+

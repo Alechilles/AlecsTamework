@@ -48,13 +48,13 @@ final class CommandPanelActionService {
         }
         World world = player.getWorld();
         if (world == null) {
-            feedbackService.showWarning(player, "Unable to link right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.unavailable");
             return;
         }
         Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
         Store<EntityStore> store = world.getEntityStore().getStore();
         if (npcRef == null || !npcRef.isValid() || store == null) {
-            feedbackService.showWarning(player, "That companion must be loaded to link.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.mustBeLoaded");
             return;
         }
         LinkToggleResult[] resultHolder = new LinkToggleResult[1];
@@ -72,18 +72,18 @@ final class CommandPanelActionService {
         });
         LinkToggleResult result = resultHolder[0];
         if (result == null || !result.toggled) {
-            feedbackService.showWarning(player, "Unable to link that companion.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.failed");
             return;
         }
         if (!result.linked) {
-            feedbackService.showWarning(player, "That companion is already linked.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.link.alreadyLinked");
             return;
         }
         if (result.active) {
-            feedbackService.showSuccess(player, "Linked " + result.npcName + ".");
+            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.link.success", result.npcName);
             return;
         }
-        feedbackService.showSuccess(player, "Linked " + result.npcName + " as inactive.");
+        feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.link.successInactive", result.npcName);
     }
 
     void applyToggleActive(Player player,
@@ -104,13 +104,18 @@ final class CommandPanelActionService {
         CommandLinkMutationService.ActiveToggleResult result = resultHolder[0];
         if (result == null || !result.toggled) {
             if (result != null && result.blockedByMaxActive) {
-                feedbackService.showWarning(player, "Max active companions reached for this tool.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.toggleActive.maxReached");
                 return;
             }
-            feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
             return;
         }
-        feedbackService.showSuccess(player, result.active ? "Companion activated." : "Companion set inactive.");
+        feedbackService.showSuccessKey(
+                player,
+                result.active
+                        ? "tamework.ui.notifications.command.toggleActive.enabled"
+                        : "tamework.ui.notifications.command.toggleActive.disabled"
+        );
     }
 
     void applyToggleBreeding(Player player,
@@ -129,11 +134,16 @@ final class CommandPanelActionService {
         });
         CommandLinkMutationService.BreedingToggleResult result = resultHolder[0];
         if (result == null || !result.toggled) {
-            feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
             return;
         }
         applyLoadedNpcBreedingToggle(player, npcUuid, result.breedingEnabled);
-        feedbackService.showSuccess(player, result.breedingEnabled ? "Breeding enabled." : "Breeding disabled.");
+        feedbackService.showSuccessKey(
+                player,
+                result.breedingEnabled
+                        ? "tamework.ui.notifications.command.toggleBreeding.enabled"
+                        : "tamework.ui.notifications.command.toggleBreeding.disabled"
+        );
     }
 
     void applyTogglePanelMode(Player player,
@@ -145,7 +155,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.togglePanelMode(stack, config)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update panel mode.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.modeUpdateFailed");
         }
     }
 
@@ -158,7 +168,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.setPanelMode(stack, modeValue)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update panel mode.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.modeUpdateFailed");
         }
     }
 
@@ -172,7 +182,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.stepNearbyRadius(stack, config, increase)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update panel radius.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.radiusUpdateFailed");
         }
     }
 
@@ -183,7 +193,7 @@ final class CommandPanelActionService {
                 panelPreferenceService::cycleSort
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update sort mode.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.sortUpdateFailed");
         }
     }
 
@@ -194,7 +204,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.setSort(stack, sortValue)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update sort mode.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.sortUpdateFailed");
         }
     }
 
@@ -205,7 +215,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.setFilterMode(stack, filterModeValue)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update filter mode.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.filterModeUpdateFailed");
         }
     }
 
@@ -216,7 +226,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.applySelectedFilterText(stack, value)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update filter.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.filterUpdateFailed");
         }
     }
 
@@ -227,7 +237,7 @@ final class CommandPanelActionService {
                 panelPreferenceService::clearFilters
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to clear filters.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.clearFiltersFailed");
         }
     }
 
@@ -238,7 +248,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.setNameFilter(stack, value)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update name filter.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.nameFilterUpdateFailed");
         }
     }
 
@@ -249,7 +259,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.setSpeciesFilter(stack, value)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update species filter.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.speciesFilterUpdateFailed");
         }
     }
 
@@ -260,7 +270,7 @@ final class CommandPanelActionService {
                 stack -> panelPreferenceService.setGroupFilter(stack, value)
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update group filter.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.groupFilterUpdateFailed");
         }
     }
 
@@ -283,7 +293,7 @@ final class CommandPanelActionService {
                 }
         );
         if (!updated && player != null && normalizedGroupId != null) {
-            feedbackService.showWarning(player, "Unable to assign that group.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.assignFailed");
         }
     }
 
@@ -304,11 +314,11 @@ final class CommandPanelActionService {
                 new Object[] { safeForLog(toolId), updated }
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to create group.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.createFailed");
             return;
         }
         if (player != null) {
-            feedbackService.showSuccess(player, "Group created.");
+            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.created");
         }
     }
 
@@ -329,11 +339,11 @@ final class CommandPanelActionService {
                 new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to rename group.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.renameFailed");
             return;
         }
         if (player != null) {
-            feedbackService.showSuccess(player, "Group renamed.");
+            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.renamed");
         }
     }
 
@@ -354,11 +364,11 @@ final class CommandPanelActionService {
                 new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to update group color.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.recolorFailed");
             return;
         }
         if (player != null) {
-            feedbackService.showSuccess(player, "Group color updated.");
+            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.recolored");
         }
     }
 
@@ -385,11 +395,11 @@ final class CommandPanelActionService {
                 new Object[] { safeForLog(toolId), safeForLog(groupId), updated }
         );
         if (!updated && player != null) {
-            feedbackService.showWarning(player, "Unable to delete group.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.group.deleteFailed");
             return;
         }
         if (player != null) {
-            feedbackService.showSuccess(player, "Group deleted.");
+            feedbackService.showSuccessKey(player, "tamework.ui.notifications.command.group.deleted");
         }
     }
 

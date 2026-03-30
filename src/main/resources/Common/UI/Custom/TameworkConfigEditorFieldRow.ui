@@ -22,27 +22,27 @@ Group {
 
   Label #FieldNameTop {
     Anchor: (Top: 3, Left: 8, Width: 304, Height: 24);
-    Text: "Field";
+    Text: %server.tamework.ui.configEditor.field.nameDefault;
     Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
   }
 
   Label #FieldNameNested {
     Anchor: (Top: 3, Left: 30, Width: 282, Height: 24);
-    Text: "Field";
+    Text: %server.tamework.ui.configEditor.field.nameDefault;
     Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
     Visible: false;
   }
 
   Label #FieldNameDeep {
     Anchor: (Top: 3, Left: 52, Width: 260, Height: 24);
-    Text: "Field";
+    Text: %server.tamework.ui.configEditor.field.nameDefault;
     Style: (FontSize: 12, TextColor: #d6e1ee, HorizontalAlignment: Start, VerticalAlignment: Center);
     Visible: false;
   }
 
   Label #FieldModeChip {
     Anchor: (Top: 3, Left: 374, Width: 74, Height: 24);
-    Text: "No Local";
+    Text: %server.tamework.ui.configEditor.field.mode.noLocal;
     Style: (FontSize: 11, TextColor: #bfd0e5, HorizontalAlignment: Center, VerticalAlignment: Center);
     Visible: false;
   }
@@ -72,7 +72,7 @@ Group {
 
   TextButton #FieldSourceChip {
     Anchor: (Top: 3, Left: 374, Width: 88, Height: 24);
-    Text: "Default";
+    Text: %server.tamework.ui.configEditor.source.default.label;
     Style: (...$C.@SmallSecondaryTextButtonStyle);
     TooltipText: "";
   }
@@ -94,7 +94,7 @@ Group {
       PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
       Background: $C.@InputBoxBackground;
       Padding: (Horizontal: 8);
-      PlaceholderText: "Value";
+      PlaceholderText: %server.tamework.ui.configEditor.field.valuePlaceholder;
       MaxLength: 256;
       Visible: false;
     }
@@ -103,7 +103,7 @@ Group {
       Anchor: (Top: 0, Left: 0, Right: 0, Height: 24);
       Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
       MaxSelection: 1;
-      NoItemsText: "No options";
+      NoItemsText: %server.tamework.ui.configEditor.field.noOptions;
       Visible: false;
     }
 
@@ -117,8 +117,9 @@ Group {
 
   TextButton #FieldResetButton {
     Anchor: (Top: 3, Left: 314, Width: 56, Height: 24);
-    Text: "Reset";
+    Text: %server.tamework.ui.shared.button.reset;
     Style: (...$C.@SmallSecondaryTextButtonStyle);
     Visible: false;
   }
 }
+

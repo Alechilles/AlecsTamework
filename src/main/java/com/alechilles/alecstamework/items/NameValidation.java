@@ -20,43 +20,39 @@ final class NameValidation {
                                          boolean hasTameworkName,
                                          boolean hasAnyName) {
         if (rules == null) {
-            return NameValidationResult.fail("Naming rules are unavailable.");
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.rulesUnavailable");
         }
         if (rawName == null) {
-            return NameValidationResult.fail("Name cannot be empty.");
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.empty");
         }
 
         String normalized = rules.isTrimWhitespace() ? rawName.trim() : rawName;
         if (normalized.isBlank()) {
-            return NameValidationResult.fail("Name cannot be empty.");
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.empty");
         }
 
         if (hasTameworkName && !rules.isAllowRename()) {
-            return NameValidationResult.fail("This NPC has already been named.");
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.alreadyNamed");
         }
         if (hasAnyName && !rules.isReplaceExisting()) {
-            return NameValidationResult.fail("This NPC already has a name.");
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.alreadyHasName");
         }
 
         int length = normalized.length();
         if (length < rules.getMinLength()) {
-            return NameValidationResult.fail(
-                    "Name must be at least " + rules.getMinLength() + " characters."
-            );
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.minLength", rules.getMinLength());
         }
         if (length > rules.getMaxLength()) {
-            return NameValidationResult.fail(
-                    "Name must be at most " + rules.getMaxLength() + " characters."
-            );
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.maxLength", rules.getMaxLength());
         }
 
         if (containsControlChars(normalized)) {
-            return NameValidationResult.fail("Name contains invalid characters.");
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.invalidCharacters");
         }
 
         Pattern allowedPattern = resolveAllowedPattern(rules.getAllowedChars());
         if (allowedPattern != null && !allowedPattern.matcher(normalized).matches()) {
-            return NameValidationResult.fail("Name contains invalid characters.");
+            return NameValidationResult.fail("tamework.ui.notifications.name.validation.invalidCharacters");
         }
 
         return NameValidationResult.ok(normalized);
@@ -124,20 +120,22 @@ final class NameValidation {
     static final class NameValidationResult {
         private final boolean ok;
         private final String normalizedName;
-        private final String errorMessage;
+        private final String errorKey;
+        private final Object[] errorArgs;
 
-        private NameValidationResult(boolean ok, String normalizedName, String errorMessage) {
+        private NameValidationResult(boolean ok, String normalizedName, String errorKey, Object[] errorArgs) {
             this.ok = ok;
             this.normalizedName = normalizedName;
-            this.errorMessage = errorMessage;
+            this.errorKey = errorKey;
+            this.errorArgs = errorArgs == null ? new Object[0] : errorArgs.clone();
         }
 
         static NameValidationResult ok(String normalizedName) {
-            return new NameValidationResult(true, normalizedName, null);
+            return new NameValidationResult(true, normalizedName, null, null);
         }
 
-        static NameValidationResult fail(String errorMessage) {
-            return new NameValidationResult(false, null, errorMessage);
+        static NameValidationResult fail(String errorKey, Object... errorArgs) {
+            return new NameValidationResult(false, null, errorKey, errorArgs);
         }
 
         boolean isOk() {
@@ -148,8 +146,12 @@ final class NameValidation {
             return normalizedName;
         }
 
-        String getErrorMessage() {
-            return errorMessage;
+        String getErrorKey() {
+            return errorKey;
+        }
+
+        Object[] getErrorArgs() {
+            return errorArgs.clone();
         }
     }
 }

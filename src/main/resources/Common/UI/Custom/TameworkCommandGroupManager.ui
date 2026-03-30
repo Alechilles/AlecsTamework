@@ -8,7 +8,7 @@ $C.@PageOverlay {
 
     #Title {
       $C.@Title #TameworkGroupManagerTitle {
-        @Text = "Manage Groups";
+        @Text = %server.tamework.ui.groupManager.title;
       }
     }
 
@@ -18,7 +18,7 @@ $C.@PageOverlay {
 
       Label #TameworkGroupManagerSubtitle {
         Anchor: (Top: 4, Left: 10, Right: 10, Height: 18);
-        Text: "Create, edit, recolor, or delete groups.";
+        Text: %server.tamework.ui.groupManager.subtitle.default;
         Style: (
           FontSize: 13,
           TextColor: #bfd0e5,
@@ -37,7 +37,7 @@ $C.@PageOverlay {
           Background: $C.@InputBoxBackground;
           Anchor: (Width: 186, Height: 24);
           Padding: (Horizontal: 8);
-          PlaceholderText: "Group name";
+          PlaceholderText: %server.tamework.ui.shared.placeholder.groupName;
           MaxLength: 24;
         }
 
@@ -52,7 +52,7 @@ $C.@PageOverlay {
 
         TextButton #TameworkGroupCreateButton {
           Anchor: (Width: 72, Height: 24);
-          Text: "Create";
+          Text: %server.tamework.ui.shared.button.create;
           Style: (
             ...$C.@SmallSecondaryTextButtonStyle
           );
@@ -78,7 +78,7 @@ $C.@PageOverlay {
 
         Label #TameworkGroupManagerEmptyState {
           Anchor: (Top: 4, Left: 2, Right: 2, Height: 22);
-          Text: "No groups yet. Enter a name and color, then click Create.";
+          Text: %server.tamework.ui.groupManager.emptyState;
           Style: (
             FontSize: 13,
             TextColor: #b2c3d6,
@@ -94,7 +94,7 @@ $C.@PageOverlay {
 
         TextButton #TameworkGroupBackButton {
           Anchor: (Left: 0, Width: 100, Height: 24);
-          Text: "Back";
+          Text: %server.tamework.ui.shared.button.back;
           Style: (
             ...$C.@SmallSecondaryTextButtonStyle
           );
@@ -102,7 +102,7 @@ $C.@PageOverlay {
 
         TextButton #TameworkGroupCloseButton {
           Anchor: (Right: 0, Width: 100, Height: 24);
-          Text: "Close";
+          Text: %server.tamework.ui.shared.button.close;
           Style: (
             ...$C.@SmallSecondaryTextButtonStyle
           );
@@ -111,3 +111,4 @@ $C.@PageOverlay {
     }
   }
 }
+

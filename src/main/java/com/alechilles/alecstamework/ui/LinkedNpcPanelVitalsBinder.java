@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 
 /**
@@ -22,12 +23,16 @@ final class LinkedNpcPanelVitalsBinder {
     }
 
     static void bind(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry) {
-        bindHealth(commandBuilder, entrySelector, entry);
-        bindNeedRings(commandBuilder, entrySelector, entry);
-        bindBreedingCooldown(commandBuilder, entrySelector, entry);
+        bind(commandBuilder, entrySelector, entry, null);
     }
 
-    private static void bindHealth(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry) {
+    static void bind(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry, String language) {
+        bindHealth(commandBuilder, entrySelector, entry, language);
+        bindNeedRings(commandBuilder, entrySelector, entry, language);
+        bindBreedingCooldown(commandBuilder, entrySelector, entry, language);
+    }
+
+    private static void bindHealth(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry, String language) {
         String healthTextSelector = entrySelector + " #HealthText";
         String healthTextShadowSelector = entrySelector + " #HealthTextShadow";
         String healthFillSelector = entrySelector + " #HealthFill";
@@ -43,63 +48,74 @@ final class LinkedNpcPanelVitalsBinder {
             return;
         }
         if (entry.dead()) {
-            String deadText = LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry);
+            String deadText = LinkedNpcPanelStatusTextService.resolveDeadHealthText(entry, language);
             commandBuilder.set(healthTextSelector + ".Text", deadText);
             commandBuilder.set(healthTextShadowSelector + ".Text", deadText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
         if (entry.inCoop()) {
-            String coopText = "In Coop";
+            String coopText = LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.inCoop");
             commandBuilder.set(healthTextSelector + ".Text", coopText);
             commandBuilder.set(healthTextShadowSelector + ".Text", coopText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
         if (entry.lost()) {
-            String lostText = "Lost";
+            String lostText = LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.lost");
             commandBuilder.set(healthTextSelector + ".Text", lostText);
             commandBuilder.set(healthTextShadowSelector + ".Text", lostText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
         if (!entry.loaded()) {
-            String statusText = entry.captured() ? "Captured" : "Unloaded";
+            String statusText = entry.captured()
+                    ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.captured")
+                    : LocalizedText.resolve(language, "tamework.ui.linkedPanel.status.unloaded");
             commandBuilder.set(healthTextSelector + ".Text", statusText);
             commandBuilder.set(healthTextShadowSelector + ".Text", statusText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
             return;
         }
-        commandBuilder.set(healthTextSelector + ".Text", "N/A");
-        commandBuilder.set(healthTextShadowSelector + ".Text", "N/A");
+        String notAvailable = LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.notAvailable");
+        commandBuilder.set(healthTextSelector + ".Text", notAvailable);
+        commandBuilder.set(healthTextShadowSelector + ".Text", notAvailable);
         commandBuilder.set(healthFillSelector + ".Visible", false);
     }
 
-    private static void bindNeedRings(UICommandBuilder commandBuilder, String entrySelector, LinkedNpcEntry entry) {
+    private static void bindNeedRings(UICommandBuilder commandBuilder,
+                                      String entrySelector,
+                                      LinkedNpcEntry entry,
+                                      String language) {
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedHappiness",
-                new NeedIcon("M", ICON_NEED_HAPPINESS),
-                resolveHappinessNeed(entry)
+                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.happiness"), ICON_NEED_HAPPINESS),
+                resolveHappinessNeed(entry, language)
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedHunger",
-                new NeedIcon("F", ICON_NEED_HUNGER),
-                resolveHungerNeed(entry)
+                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.hunger"), ICON_NEED_HUNGER),
+                resolveHungerNeed(entry, language)
         );
         bindNeedRing(
                 commandBuilder,
                 entrySelector + " #NeedThirst",
-                new NeedIcon("W", ICON_NEED_THIRST),
-                resolveThirstNeed(entry)
+                new NeedIcon(LocalizedText.resolve(language, "tamework.ui.linkedPanel.needIcons.thirst"), ICON_NEED_THIRST),
+                resolveThirstNeed(entry, language)
         );
     }
 
-    private static NeedVisual resolveHappinessNeed(LinkedNpcEntry entry) {
+    private static NeedVisual resolveHappinessNeed(LinkedNpcEntry entry, String language) {
         if (entry.hasHappiness()) {
-            String tooltip = "Happiness: " + entry.currentHappiness() + "/" + entry.maxHappiness()
-                    + " (" + percent(entry.happinessRatio()) + "%)";
+            String tooltip = LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.happiness.tooltip",
+                    entry.currentHappiness(),
+                    entry.maxHappiness(),
+                    percent(entry.happinessRatio())
+            );
             if (entry.happinessModifierBreakdown() != null && !entry.happinessModifierBreakdown().isBlank()) {
                 tooltip = tooltip + "\n" + entry.happinessModifierBreakdown();
             }
@@ -110,73 +126,83 @@ final class LinkedNpcPanelVitalsBinder {
             );
         }
         if (entry.dead()) {
-            return new NeedVisual(0.0, LinkedNpcPanelStatusTextService.resolveDeadHappinessText(entry), false);
+            return new NeedVisual(0.0, LinkedNpcPanelStatusTextService.resolveDeadHappinessText(entry, language), false);
         }
         if (entry.lost()) {
-            return new NeedVisual(0.0, "Happiness: unavailable (lost).", false);
+            return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable.lost"), false);
         }
         if (!entry.loaded()) {
             return new NeedVisual(
                     0.0,
-                    LinkedNpcPanelStatusTextService.resolveUnavailableHappinessText(entry),
+                    LinkedNpcPanelStatusTextService.resolveUnavailableHappinessText(entry, language),
                     false
             );
         }
-        return new NeedVisual(0.0, "Happiness: unavailable", false);
+        return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.unavailable"), false);
     }
 
-    private static NeedVisual resolveHungerNeed(LinkedNpcEntry entry) {
+    private static NeedVisual resolveHungerNeed(LinkedNpcEntry entry, String language) {
         if (entry.hasHunger()) {
             return new NeedVisual(
                     entry.hungerRatio(),
-                    "Hunger: " + entry.currentHunger() + "/" + entry.maxHunger()
-                            + " (" + percent(entry.hungerRatio()) + "%)",
+                    LocalizedText.format(
+                            language,
+                            "tamework.ui.linkedPanel.hunger.tooltip",
+                            entry.currentHunger(),
+                            entry.maxHunger(),
+                            percent(entry.hungerRatio())
+                    ),
                     true
             );
         }
         if (entry.dead()) {
-            return new NeedVisual(0.0, "Hunger: unavailable (dead)", false);
+            return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.hunger.unavailable.dead"), false);
         }
         if (entry.lost()) {
-            return new NeedVisual(0.0, "Hunger: unavailable (lost)", false);
+            return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.hunger.unavailable.lost"), false);
         }
         if (!entry.loaded()) {
             if (entry.inCoop()) {
-                return new NeedVisual(0.0, "Hunger: unavailable (in coop)", false);
+                return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.hunger.unavailable.inCoop"), false);
             }
             if (entry.captured()) {
-                return new NeedVisual(0.0, "Hunger: unavailable (captured)", false);
+                return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.hunger.unavailable.captured"), false);
             }
-            return new NeedVisual(0.0, "Hunger: unavailable (unloaded)", false);
+            return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.hunger.unavailable.unloaded"), false);
         }
-        return new NeedVisual(0.0, "Hunger: unavailable", false);
+        return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.hunger.unavailable"), false);
     }
 
-    private static NeedVisual resolveThirstNeed(LinkedNpcEntry entry) {
+    private static NeedVisual resolveThirstNeed(LinkedNpcEntry entry, String language) {
         if (entry.hasThirst()) {
             return new NeedVisual(
                     entry.thirstRatio(),
-                    "Thirst: " + entry.currentThirst() + "/" + entry.maxThirst()
-                            + " (" + percent(entry.thirstRatio()) + "%)",
+                    LocalizedText.format(
+                            language,
+                            "tamework.ui.linkedPanel.thirst.tooltip",
+                            entry.currentThirst(),
+                            entry.maxThirst(),
+                            percent(entry.thirstRatio())
+                    ),
                     true
             );
         }
         if (entry.dead()) {
-            return new NeedVisual(0.0, "Thirst: unavailable (dead)", false);
+            return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.thirst.unavailable.dead"), false);
         }
         if (entry.lost()) {
-            return new NeedVisual(0.0, "Thirst: unavailable (lost)", false);
+            return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.thirst.unavailable.lost"), false);
         }
         if (!entry.loaded()) {
             if (entry.inCoop()) {
-                return new NeedVisual(0.0, "Thirst: unavailable (in coop)", false);
+                return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.thirst.unavailable.inCoop"), false);
             }
             if (entry.captured()) {
-                return new NeedVisual(0.0, "Thirst: unavailable (captured)", false);
+                return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.thirst.unavailable.captured"), false);
             }
-            return new NeedVisual(0.0, "Thirst: unavailable (unloaded)", false);
+            return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.thirst.unavailable.unloaded"), false);
         }
-        return new NeedVisual(0.0, "Thirst: unavailable", false);
+        return new NeedVisual(0.0, LocalizedText.resolve(language, "tamework.ui.linkedPanel.thirst.unavailable"), false);
     }
 
     private static void bindNeedRing(UICommandBuilder commandBuilder,
@@ -204,7 +230,8 @@ final class LinkedNpcPanelVitalsBinder {
 
     private static void bindBreedingCooldown(UICommandBuilder commandBuilder,
                                              String entrySelector,
-                                             LinkedNpcEntry entry) {
+                                             LinkedNpcEntry entry,
+                                             String language) {
         String slotSelector = entrySelector + " #BreedingCooldown";
         boolean cooldownRecharging = entry.breedingCooldownKnown() && entry.breedingCooldownActive();
         commandBuilder.set(slotSelector + ".Visible", cooldownRecharging);
@@ -213,7 +240,7 @@ final class LinkedNpcPanelVitalsBinder {
         }
         commandBuilder.set(
                 slotSelector + " #BreedingCooldownTooltip.TooltipText",
-                LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry)
+                LinkedNpcPanelStatusTextService.resolveBreedingCooldownTooltip(entry, language)
         );
         SegmentFill fill = resolveSegmentFill(entry.breedingCooldownRatio());
         commandBuilder.setObject(slotSelector + " #RingFillBar1.Anchor", LinkedNpcPanelAnchorFactory.buildNeedRingBar1Anchor(fill.bar1()));

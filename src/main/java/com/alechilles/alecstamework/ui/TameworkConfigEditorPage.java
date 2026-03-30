@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.overrides.TwConfigFamily;
 import com.alechilles.alecstamework.config.overrides.TwConfigJsonUtil;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.overrides.TwConfigSnapshot;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
@@ -69,15 +70,15 @@ public final class TameworkConfigEditorPage
     private static final String A_SET_VALUE = "SetValue";
     private static final String PARENT_NONE_VALUE = "__none__";
 
-    private static final SectionDef S_GENERAL = new SectionDef("general", "General", 0, null);
-    private static final SectionDef S_OWNERSHIP = new SectionDef("ownership", "Ownership Protection", 0, null);
-    private static final SectionDef S_INTERACTION = new SectionDef("interaction", "Interaction Defaults", 0, null);
-    private static final SectionDef S_COMMAND = new SectionDef("command", "Command", 0, null);
-    private static final SectionDef S_ASSET_SETS = new SectionDef("assetsets", "Asset Sets", 0, null);
-    private static final SectionDef S_POPULATION = new SectionDef("population", "Population", 0, null);
-    private static final SectionDef S_SIMPLE = new SectionDef("simpleclaims", "Simple Claims", 0, null);
-    private static final SectionDef S_SIMPLE_BREED = new SectionDef("simpleclaims-breeding", "Breeding", 1, S_SIMPLE.id);
-    private static final SectionDef S_SIMPLE_DAMAGE = new SectionDef("simpleclaims-damage", "Damage", 1, S_SIMPLE.id);
+    private static final SectionDef S_GENERAL = new SectionDef("general", "tamework.ui.configEditor.section.general", 0, null);
+    private static final SectionDef S_OWNERSHIP = new SectionDef("ownership", "tamework.ui.configEditor.section.ownership", 0, null);
+    private static final SectionDef S_INTERACTION = new SectionDef("interaction", "tamework.ui.configEditor.section.interaction", 0, null);
+    private static final SectionDef S_COMMAND = new SectionDef("command", "tamework.ui.configEditor.section.command", 0, null);
+    private static final SectionDef S_ASSET_SETS = new SectionDef("assetsets", "tamework.ui.configEditor.section.assetSets", 0, null);
+    private static final SectionDef S_POPULATION = new SectionDef("population", "tamework.ui.configEditor.section.population", 0, null);
+    private static final SectionDef S_SIMPLE = new SectionDef("simpleclaims", "tamework.ui.configEditor.section.simpleClaims", 0, null);
+    private static final SectionDef S_SIMPLE_BREED = new SectionDef("simpleclaims-breeding", "tamework.ui.configEditor.section.breeding", 1, S_SIMPLE.id);
+    private static final SectionDef S_SIMPLE_DAMAGE = new SectionDef("simpleclaims-damage", "tamework.ui.configEditor.section.damage", 1, S_SIMPLE.id);
 
     private static final List<RowDef> LAYOUT = buildLayout();
     private static final Map<String, FieldDef> FIELDS = buildFields();
@@ -138,7 +139,7 @@ public final class TameworkConfigEditorPage
                 case A_REFRESH -> {
                     reloadSnapshot(true);
                     applyConfirmVisible = false;
-                    statusLine = "Refreshed from disk. Draft changes were discarded.";
+                    statusLine = tr("tamework.ui.configEditor.status.refreshed");
                     warningLine = "";
                     refreshUi();
                 }
@@ -207,7 +208,7 @@ public final class TameworkConfigEditorPage
 
     private void onApplyRequest() {
         if (applyInProgress) {
-            warningLine = "Apply already in progress.";
+            warningLine = tr("tamework.ui.configEditor.warning.applyInProgress");
             statusLine = "";
             return;
         }
@@ -225,7 +226,7 @@ public final class TameworkConfigEditorPage
 
     private void onApplyConfirm() {
         if (applyInProgress) {
-            warningLine = "Apply already in progress.";
+            warningLine = tr("tamework.ui.configEditor.warning.applyInProgress");
             statusLine = "";
             return;
         }
@@ -245,7 +246,7 @@ public final class TameworkConfigEditorPage
         }
 
         applyInProgress = true;
-        statusLine = "Applying config overrides...";
+        statusLine = tr("tamework.ui.configEditor.status.applying");
         warningLine = "";
         refreshUi();
 
@@ -256,7 +257,7 @@ public final class TameworkConfigEditorPage
                     if (throwable != null || result == null) {
                         plugin.getLogger().at(Level.WARNING).withCause(throwable).log("TwConfig async apply failed.");
                         statusLine = "";
-                        warningLine = "Apply failed. See server log for details.";
+                        warningLine = tr("tamework.ui.configEditor.warning.applyFailed");
                         refreshUi();
                         return;
                     }
@@ -348,17 +349,17 @@ public final class TameworkConfigEditorPage
         commandBuilder.set("#TwConfigPropertyFilterInput.Value", propertyFilter);
         commandBuilder.set("#TwConfigAssetDropdown.Entries", assetDropdownEntries());
         commandBuilder.set("#TwConfigAssetDropdown.Value", selectedDescriptorKey == null ? "" : selectedDescriptorKey);
-        commandBuilder.set("#TwConfigAssetCount.Text", "Global assets: " + filteredDescriptors().size());
+        commandBuilder.set("#TwConfigAssetCount.Text", tr("tamework.ui.configEditor.assetCount", filteredDescriptors().size()));
         String resolvedWarning = resolvedWarningLine();
         String inlineNotice = resolvedWarning.isBlank() ? statusLine : resolvedWarning;
         commandBuilder.set("#TwConfigStatusLine.Text", inlineNotice);
         commandBuilder.set("#TwConfigInlineNotice.Text", inlineNotice);
         commandBuilder.set("#TwConfigWarningLine.Text", "");
         commandBuilder.set("#TwConfigApplyConfirmOverlay.Visible", applyConfirmVisible);
-        commandBuilder.set("#TwConfigApplyConfirmCount.Text", "Pending draft files: " + pendingDraftFileCount());
+        commandBuilder.set("#TwConfigApplyConfirmCount.Text", tr("tamework.ui.configEditor.pendingDraftCount", pendingDraftFileCount()));
 
         if (selected == null) {
-            commandBuilder.set("#TwConfigSelectedAssetTitle.Text", "No TwGlobal assets discovered");
+            commandBuilder.set("#TwConfigSelectedAssetTitle.Text", tr("tamework.ui.configEditor.noAssets"));
             commandBuilder.set("#TwConfigSelectedAssetMeta.Text", "");
             commandBuilder.set("#TwConfigSelectedAssetChain.Text", "");
             commandBuilder.set("#TwConfigOverridePath.Text", "");
@@ -368,7 +369,7 @@ public final class TameworkConfigEditorPage
         }
 
         commandBuilder.set("#TwConfigSelectedAssetTitle.Text", selected.assetId());
-        commandBuilder.set("#TwConfigSelectedAssetMeta.Text", "TwGlobalConfig | Pack: " + selected.sourcePackKey());
+        commandBuilder.set("#TwConfigSelectedAssetMeta.Text", tr("tamework.ui.configEditor.selectedAssetMeta", selected.sourcePackKey()));
         commandBuilder.set("#TwConfigSelectedAssetChain.Text", inheritanceChainText(selected));
         commandBuilder.set("#TwConfigOverridePath.Text", shortenedPathForUi(overrideManager.resolveOverridePath(world, selected)));
         commandBuilder.set("#TwConfigPropertyEmptyState.Visible", false);
@@ -394,7 +395,7 @@ public final class TameworkConfigEditorPage
                 commandBuilder.append("#TwConfigPropertyRows", UI_SECTION_ROW);
                 boolean collapsed = collapsedSections.getOrDefault(section.id, false);
                 int depthLevel = depthBucket(section.depth);
-                String toggleText = section.label;
+                String toggleText = tr(section.label);
                 String countText = formatFieldCount(sectionFieldCount(section.id));
                 boolean hasStagedEdits = sectionHasStagedOverrides(section.id, draft, disk);
                 boolean hasAppliedLocal = !hasStagedEdits && sectionHasAppliedOverrides(section.id, disk);
@@ -508,7 +509,7 @@ public final class TameworkConfigEditorPage
                 );
             } else if ((field.kind == FieldKind.STRING || field.kind == FieldKind.INTEGER || field.kind == FieldKind.DOUBLE) && !field.handoffOnly) {
                 String inputValue = (overridden || hasBufferedInput) ? textValue : "";
-                String placeholder = overridden ? "Value" : inheritedPlaceholderText(textValue);
+                String placeholder = overridden ? tr("tamework.ui.configEditor.valuePlaceholder") : inheritedPlaceholderText(textValue);
                 commandBuilder.set(host + " #FieldTextInput.Value", inputValue);
                 commandBuilder.set(host + " #FieldTextInput.PlaceholderText", placeholder);
                 eventBuilder.addEventBinding(
@@ -534,7 +535,7 @@ public final class TameworkConfigEditorPage
                         false
                 );
             } else {
-                commandBuilder.set(host + " #FieldHandoff.Text", "Complex field (handoff path): " + field.path);
+                commandBuilder.set(host + " #FieldHandoff.Text", tr("tamework.ui.configEditor.field.handoffPath", field.path));
             }
 
             if (!field.handoffOnly) {
@@ -665,7 +666,7 @@ public final class TameworkConfigEditorPage
         String key = descriptor.descriptorKey();
         TwConfigJsonUtil.removePath(draft(key), field.path);
         clearFieldInputState(key, field.path);
-        statusLine = "Reset " + labelForPath(field.path) + " to inherited.";
+        statusLine = tr("tamework.ui.configEditor.status.resetToInherited", labelForPath(field.path));
         warningLine = "";
     }
 
@@ -691,7 +692,7 @@ public final class TameworkConfigEditorPage
             if (parsed == null) {
                 TwConfigJsonUtil.removePath(draft(key), field.path);
                 errors.remove(field.path);
-                statusLine = "Set " + labelForPath(field.path) + " to inherited.";
+                statusLine = tr("tamework.ui.configEditor.status.setToInherited", labelForPath(field.path));
                 warningLine = "";
                 return;
             }
@@ -700,7 +701,7 @@ public final class TameworkConfigEditorPage
             if (field.kind != FieldKind.STRING) {
                 input.remove(field.path);
             }
-            statusLine = "Staged " + labelForPath(field.path) + ".";
+            statusLine = tr("tamework.ui.configEditor.status.staged", labelForPath(field.path));
             warningLine = "";
         } catch (IllegalArgumentException ex) {
             errors.put(field.path, ex.getMessage());
@@ -724,17 +725,17 @@ public final class TameworkConfigEditorPage
             case BOOLEAN -> new JsonPrimitive(parseBooleanStrict(trimmed));
             case INTEGER -> {
                 if (trimmed.isBlank()) {
-                    throw new IllegalArgumentException(labelForPath(field.path) + " must be an integer.");
+                    throw new IllegalArgumentException(tr("tamework.ui.configEditor.validation.mustBeInteger", labelForPath(field.path)));
                 }
                 try {
                     yield new JsonPrimitive(Integer.parseInt(trimmed));
                 } catch (NumberFormatException ex) {
-                    throw new IllegalArgumentException(labelForPath(field.path) + " must be an integer.");
+                    throw new IllegalArgumentException(tr("tamework.ui.configEditor.validation.mustBeInteger", labelForPath(field.path)));
                 }
             }
             case DOUBLE -> {
                 if (trimmed.isBlank()) {
-                    throw new IllegalArgumentException(labelForPath(field.path) + " must be a number.");
+                    throw new IllegalArgumentException(tr("tamework.ui.configEditor.validation.mustBeNumber", labelForPath(field.path)));
                 }
                 try {
                     double parsed = Double.parseDouble(trimmed);
@@ -743,7 +744,7 @@ public final class TameworkConfigEditorPage
                     }
                     yield new JsonPrimitive(parsed);
                 } catch (NumberFormatException ex) {
-                    throw new IllegalArgumentException(labelForPath(field.path) + " must be a number.");
+                    throw new IllegalArgumentException(tr("tamework.ui.configEditor.validation.mustBeNumber", labelForPath(field.path)));
                 }
             }
             case OPTION -> {
@@ -752,7 +753,7 @@ public final class TameworkConfigEditorPage
                     yield null;
                 }
                 if (trimmed.isBlank()) {
-                    throw new IllegalArgumentException(labelForPath(field.path) + " must be selected.");
+                    throw new IllegalArgumentException(tr("tamework.ui.configEditor.validation.mustBeSelected", labelForPath(field.path)));
                 }
                 yield new JsonPrimitive(normalizeOptionValue(trimmed, options));
             }
@@ -930,26 +931,44 @@ public final class TameworkConfigEditorPage
                                             @Nonnull JsonObject draft,
                                             @Nonnull JsonObject merged) {
         if (field.handoffOnly || field.kind == FieldKind.HANDOFF) {
-            return new SourceBadge("Handoff", "Complex field (path-only handoff): " + field.path);
+            return new SourceBadge(
+                    tr("tamework.ui.configEditor.source.handoff.label"),
+                    tr("tamework.ui.configEditor.source.handoff.tooltip", field.path)
+            );
         }
         if (TwConfigJsonUtil.hasPath(draft, field.path)) {
-            return new SourceBadge("Local", "Local override in " + descriptor.assetId() + ".");
+            return new SourceBadge(
+                    tr("tamework.ui.configEditor.source.local.label"),
+                    tr("tamework.ui.configEditor.source.local.tooltip", descriptor.assetId())
+            );
         }
         if ("Parent".equalsIgnoreCase(field.path)) {
             JsonElement explicitParent = TwConfigJsonUtil.getPath(merged, "Parent");
             if (explicitParent != null && explicitParent.isJsonPrimitive()) {
                 String value = explicitParent.getAsString();
                 if (value != null && !value.isBlank()) {
-                    return new SourceBadge("Asset", "Parent link defined on this asset: " + value.trim());
+                    return new SourceBadge(
+                            tr("tamework.ui.configEditor.source.asset.label"),
+                            tr("tamework.ui.configEditor.source.parentDefinedOnAsset", value.trim())
+                    );
                 }
             }
             if (descriptor.parentAssetId() != null && !descriptor.parentAssetId().isBlank()) {
-                return new SourceBadge("Asset", "Parent link from asset metadata: " + descriptor.parentAssetId().trim());
+                return new SourceBadge(
+                        tr("tamework.ui.configEditor.source.asset.label"),
+                        tr("tamework.ui.configEditor.source.parentFromMetadata", descriptor.parentAssetId().trim())
+                );
             }
-            return new SourceBadge("Default", "No parent configured.");
+            return new SourceBadge(
+                    tr("tamework.ui.configEditor.source.default.label"),
+                    tr("tamework.ui.configEditor.source.noParentConfigured")
+            );
         }
         if (TwConfigJsonUtil.hasPath(merged, field.path)) {
-            return new SourceBadge("Asset", "Defined on this asset: " + descriptor.assetId() + ".");
+            return new SourceBadge(
+                    tr("tamework.ui.configEditor.source.asset.label"),
+                    tr("tamework.ui.configEditor.source.definedOnAsset", descriptor.assetId())
+            );
         }
 
         HashSet<String> visited = new HashSet<>();
@@ -963,17 +982,24 @@ public final class TameworkConfigEditorPage
             }
             TwConfigAssetDescriptor parent = findParent(current, parentId);
             if (parent == null) {
-                String tier = ancestorDepth == 0 ? "Parent" : "Ancestor";
-                return new SourceBadge(tier, tier + " asset not found: " + parentId + ".");
+                String tier = ancestorDepth == 0
+                        ? tr("tamework.ui.configEditor.source.parent.label")
+                        : tr("tamework.ui.configEditor.source.ancestor.label");
+                return new SourceBadge(tier, tr("tamework.ui.configEditor.source.assetNotFound", tier, parentId));
             }
             if (!visited.add(parent.descriptorKey())) {
-                return new SourceBadge("Ancestor", "Inheritance loop detected at " + parent.assetId() + ".");
+                return new SourceBadge(
+                        tr("tamework.ui.configEditor.source.ancestor.label"),
+                        tr("tamework.ui.configEditor.source.inheritanceLoop", parent.assetId())
+                );
             }
             if (TwConfigJsonUtil.hasPath(mergedCurrentJson(parent.descriptorKey()), field.path)) {
-                String tier = ancestorDepth == 0 ? "Parent" : "Ancestor";
+                String tier = ancestorDepth == 0
+                        ? tr("tamework.ui.configEditor.source.parent.label")
+                        : tr("tamework.ui.configEditor.source.ancestor.label");
                 return new SourceBadge(
                         tier,
-                        tier + " source: " + parent.assetId() + " [" + shortPackLabel(parent.sourcePackKey()) + "]"
+                        tr("tamework.ui.configEditor.source.parentSource", tier, parent.assetId(), shortPackLabel(parent.sourcePackKey()))
                 );
             }
             current = parent;
@@ -981,9 +1007,15 @@ public final class TameworkConfigEditorPage
         }
 
         if (INHERITED_FALLBACK_VALUES.containsKey(field.path)) {
-            return new SourceBadge("Default", "Runtime default from TwGlobalConfig.");
+            return new SourceBadge(
+                    tr("tamework.ui.configEditor.source.default.label"),
+                    tr("tamework.ui.configEditor.source.runtimeDefault")
+            );
         }
-        return new SourceBadge("Default", "Source not explicitly set; using resolved default.");
+        return new SourceBadge(
+                tr("tamework.ui.configEditor.source.default.label"),
+                tr("tamework.ui.configEditor.source.resolvedDefault")
+        );
     }
 
     @Nonnull
@@ -1001,11 +1033,11 @@ public final class TameworkConfigEditorPage
             }
             TwConfigAssetDescriptor parent = findParent(current, parentId);
             if (parent == null) {
-                chain.add(parentId + " (?)");
+                chain.add(tr("tamework.ui.configEditor.chain.node.missing", parentId));
                 break;
             }
             if (!visited.add(parent.descriptorKey())) {
-                chain.add(parent.assetId() + " (loop)");
+                chain.add(tr("tamework.ui.configEditor.chain.node.loop", parent.assetId()));
                 break;
             }
             chain.add(parent.assetId());
@@ -1013,9 +1045,9 @@ public final class TameworkConfigEditorPage
         }
 
         if (chain.size() <= 1) {
-            return "Chain: (no parent)";
+            return tr("tamework.ui.configEditor.chain.noParent");
         }
-        return "Chain: " + String.join(" -> ", chain);
+        return tr("tamework.ui.configEditor.chain.value", String.join(" -> ", chain));
     }
 
     private int pendingDraftFileCount() {
@@ -1065,7 +1097,7 @@ public final class TameworkConfigEditorPage
             }
         }
         unknown.sort(String.CASE_INSENSITIVE_ORDER);
-        return unknown.isEmpty() ? "" : "Unknown override keys preserved: " + String.join(", ", unknown);
+        return unknown.isEmpty() ? "" : tr("tamework.ui.configEditor.warning.unknownOverrideKeys", String.join(", ", unknown));
     }
 
     @Nonnull
@@ -1135,6 +1167,11 @@ public final class TameworkConfigEditorPage
     }
 
     @Nonnull
+    private String tr(@Nonnull String key, Object... args) {
+        return LocalizedText.format(playerRef, key, args);
+    }
+
+    @Nonnull
     private static String labelForPath(@Nonnull String path) {
         String leaf = path;
         int dot = path.lastIndexOf('.');
@@ -1170,7 +1207,7 @@ public final class TameworkConfigEditorPage
     @Nonnull
     private static String shortPackLabel(@Nullable String sourcePackKey) {
         if (sourcePackKey == null || sourcePackKey.isBlank()) {
-            return "unknown";
+            return LocalizedText.resolve((String) null, "tamework.ui.configEditor.pack.unknown");
         }
         String normalized = sourcePackKey.replace('\\', '/');
         int slash = normalized.lastIndexOf('/');
@@ -1204,7 +1241,9 @@ public final class TameworkConfigEditorPage
         return switch (normalized) {
             case "1", "true", "yes", "on" -> true;
             case "0", "false", "no", "off", "" -> false;
-            default -> throw new IllegalArgumentException("Boolean fields must be true/false.");
+            default -> throw new IllegalArgumentException(
+                    LocalizedText.resolve((String) null, "tamework.ui.configEditor.validation.booleanTrueFalse")
+            );
         };
     }
 
@@ -1223,19 +1262,21 @@ public final class TameworkConfigEditorPage
     }
 
     @Nonnull
-    private static String inheritedPlaceholderText(@Nullable String value) {
+    private String inheritedPlaceholderText(@Nullable String value) {
         String raw = value == null ? "" : value;
-        return raw.isBlank() ? "Value" : raw;
+        return raw.isBlank() ? tr("tamework.ui.configEditor.valuePlaceholder") : raw;
     }
 
     @Nonnull
-    private static List<DropdownEntryInfo> toDropdownEntries(@Nonnull List<String> options) {
+    private List<DropdownEntryInfo> toDropdownEntries(@Nonnull List<String> options) {
         if (options.isEmpty()) {
             return List.of();
         }
         ArrayList<DropdownEntryInfo> out = new ArrayList<>(options.size());
         for (String option : options) {
-            String label = PARENT_NONE_VALUE.equals(option) ? "(Inherit)" : option;
+            String label = PARENT_NONE_VALUE.equals(option)
+                    ? tr("tamework.ui.configEditor.dropdown.inherit")
+                    : option;
             out.add(new DropdownEntryInfo(LocalizableString.fromString(label), option));
         }
         return List.copyOf(out);
@@ -1300,9 +1341,11 @@ public final class TameworkConfigEditorPage
     }
 
     @Nonnull
-    private static String formatFieldCount(int count) {
+    private String formatFieldCount(int count) {
         int clamped = Math.max(0, count);
-        return clamped + (clamped == 1 ? " field" : " fields");
+        return clamped == 1
+                ? tr("tamework.ui.configEditor.fieldCount.single", clamped)
+                : tr("tamework.ui.configEditor.fieldCount.plural", clamped);
     }
 
     @Nonnull

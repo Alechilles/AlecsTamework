@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -51,7 +52,7 @@ public final class TameworkCommandGroupManagerPage
     private static final String ACTION_COMPLETE_PREFIX = "__complete__:";
     private static final String ACTION_DELETE_PREFIX = "__delete__:";
     private static final String DEFAULT_GROUP_COLOR = "#4B657F";
-    private static final String DEFAULT_SUBTITLE = "Create, edit, recolor, or delete groups.";
+    private static final String DEFAULT_SUBTITLE_KEY = "tamework.ui.groupManager.subtitle.default";
     private static final Logger LOGGER = Logger.getLogger(TameworkCommandGroupManagerPage.class.getName());
 
     private final Supplier<List<GroupEntry>> groupsSupplier;
@@ -442,13 +443,13 @@ public final class TameworkCommandGroupManagerPage
 
     private String resolveSubtitleText() {
         if (editingGroupId == null || editingGroupId.isBlank()) {
-            return DEFAULT_SUBTITLE;
+            return LocalizedText.resolve(playerRef, DEFAULT_SUBTITLE_KEY);
         }
         GroupEntry entry = findEntry(editingGroupId);
         if (entry == null) {
-            return DEFAULT_SUBTITLE;
+            return LocalizedText.resolve(playerRef, DEFAULT_SUBTITLE_KEY);
         }
-        return "Editing \"" + entry.name + "\". Update fields, then click Done.";
+        return LocalizedText.format(playerRef, "tamework.ui.groupManager.subtitle.editing", entry.name);
     }
 
     private String resolveRowColorInput(String value, String fallbackColor) {

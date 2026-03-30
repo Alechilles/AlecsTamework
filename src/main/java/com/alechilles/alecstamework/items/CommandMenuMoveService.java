@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.codec.Codec;
@@ -80,21 +81,26 @@ final class CommandMenuMoveService {
         if (player == null || toolId == null || toolId.isBlank() || npcUuid == null) {
             return;
         }
-        String actionLabel = returnHome ? "send home" : "recall";
+        String actionLabel = LocalizedText.resolve(
+                player,
+                returnHome
+                        ? "tamework.ui.notifications.command.move.returnHome.actionLabel"
+                        : "tamework.ui.notifications.command.move.recall.actionLabel"
+        );
         Inventory inventory = player.getInventory();
         if (inventory == null || inventory.getHotbar() == null) {
-            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
             return;
         }
         World world = player.getWorld();
         if (world == null) {
-            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
             return;
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
         Ref<EntityStore> playerRef = player.getReference();
         if (store == null || playerRef == null || !playerRef.isValid()) {
-            feedbackService.showWarning(player, "Unable to " + actionLabel + " right now.");
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.unavailable", actionLabel);
             return;
         }
 
@@ -111,12 +117,12 @@ final class CommandMenuMoveService {
             }
             LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(linkMutationService.readLinkedNpcRecords(stack), npcUuid);
             if (record == null) {
-                feedbackService.showWarning(player, "That NPC is not linked to this tool.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.notLinkedToTool");
                 return;
             }
             if (deathService != null
                     && deathService.getDeadSnapshotForTool(npcUuid, toolId, player.getUuid()) != null) {
-                feedbackService.showWarning(player, "That companion is dead. Use Respawn when it is ready.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.dead");
                 return;
             }
             if (captureService != null
@@ -125,7 +131,7 @@ final class CommandMenuMoveService {
                     toolId,
                     player.getUuid()
             ) != null) {
-                feedbackService.showWarning(player, "That companion is captured in a soul lantern. Spawn it first.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.captured");
                 return;
             }
             if (coopService != null
@@ -134,27 +140,27 @@ final class CommandMenuMoveService {
                     toolId,
                     player.getUuid()
             ) != null) {
-                feedbackService.showWarning(player, "That companion is currently housed in a coop.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.inCoop");
                 return;
             }
             if (lostService != null && lostService.isLost(npcUuid)) {
-                feedbackService.showWarning(player, "That companion is lost. Use Respawn to recover it.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.lost");
                 return;
             }
             TwCommandItemConfig config = resolutionService.resolveConfig(stack.getItemId(), null);
             if (config == null || !config.isEnabled()) {
-                feedbackService.showWarning(player, "That command item is not configured.");
+                feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotConfigured");
                 return;
             }
             CommandEntry panelCommand = returnHome
                     ? resolutionService.resolvePanelReturnHomeCommand(config, stack)
                     : resolutionService.resolvePanelRecallCommand(config, stack);
             if (panelCommand == null) {
-                feedbackService.showWarning(
+                feedbackService.showWarningKey(
                         player,
                         returnHome
-                                ? "No return-home command is configured for this item."
-                                : "No recall command is configured for this item."
+                                ? "tamework.ui.notifications.command.move.returnHome.notConfigured"
+                                : "tamework.ui.notifications.command.move.recall.notConfigured"
                 );
                 return;
             }
@@ -201,7 +207,7 @@ final class CommandMenuMoveService {
                     hasHome = links != null && links.hasHome();
                 }
                 if (!hasHome) {
-                    feedbackService.showWarning(player, "No home is set for that companion.");
+                    feedbackService.showWarningKey(player, "tamework.ui.notifications.command.move.returnHome.noHome");
                     return;
                 }
             }
@@ -267,7 +273,12 @@ final class CommandMenuMoveService {
                 hotbar.setItemStackForSlot(slot, context.workingItem);
             }
             if (affected <= 0 && queued <= 0) {
-                feedbackService.showWarning(player, returnHome ? "No companions could return home." : "No NPCs could execute that command.");
+                feedbackService.showWarningKey(
+                        player,
+                        returnHome
+                                ? "tamework.ui.notifications.command.move.returnHome.noneMoved"
+                                : "tamework.ui.notifications.command.execution.none"
+                );
                 return;
             }
             feedbackService.emitCommandExecutionFeedback(
@@ -281,7 +292,7 @@ final class CommandMenuMoveService {
             );
             return;
         }
-        feedbackService.showWarning(player, "Unable to find that command item.");
+        feedbackService.showWarningKey(player, "tamework.ui.notifications.command.shared.itemNotFound");
     }
 
     private StepResult executeCommand(Context context, Candidate candidate) {

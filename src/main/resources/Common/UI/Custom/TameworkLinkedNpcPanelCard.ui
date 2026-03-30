@@ -30,20 +30,20 @@ Group {
             Anchor: (Top: 0, Left: 0, Width: 6, Height: 48);
             Style: @TraitTooltipButtonStyle;
             Text: "";
-            TooltipText: "Set Group";
+            TooltipText: %server.tamework.ui.linkedPanel.card.group.setTooltip;
             TextTooltipStyle: @LinkedActionTooltipStyle;
         }
     }
 
     Label #Name {
         Anchor: (Top: 0, Left: 18, Width: 188, Height: 22);
-        Text: "Companion";
+        Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName;
         Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
 
     Label #StatusUnloaded {
         Anchor: (Top: 2, Right: 34, Width: 76, Height: 18);
-        Text: "UNLOADED";
+        Text: %server.tamework.ui.linkedPanel.status.unloaded;
         Style: (FontSize: 10, RenderBold: true, TextColor: #ffe5b4, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
     }
@@ -132,7 +132,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Trait";
+                TooltipText: %server.tamework.ui.linkedPanel.card.trait.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -221,7 +221,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Trait";
+                TooltipText: %server.tamework.ui.linkedPanel.card.trait.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -310,7 +310,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Trait";
+                TooltipText: %server.tamework.ui.linkedPanel.card.trait.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -399,7 +399,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Trait";
+                TooltipText: %server.tamework.ui.linkedPanel.card.trait.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -407,14 +407,14 @@ Group {
 
     Label #StatusConfirm {
         Anchor: (Top: 30, Right: 18, Width: 118, Height: 18);
-        Text: "CONFIRM REMOVE";
+        Text: %server.tamework.ui.linkedPanel.card.confirmRemove;
         Style: (FontSize: 10, RenderBold: true, TextColor: #ffd3d3, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
     }
 
     Label #StatusInactive {
         Anchor: (Top: 30, Right: 34, Width: 74, Height: 18);
-        Text: "INACTIVE";
+        Text: %server.tamework.ui.linkedPanel.card.inactive;
         Style: (FontSize: 10, RenderBold: true, TextColor: #ffbd9a, HorizontalAlignment: Center, VerticalAlignment: Center);
         Visible: false;
     }
@@ -423,8 +423,8 @@ Group {
         Anchor: (Top: 56, Right: 0, Width: 64, Height: 22);
         Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
         Padding: (Horizontal: 8);
-        Text: "Link";
-        TooltipText: "Link companion";
+        Text: %server.tamework.ui.linkedPanel.card.button.link;
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.link;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -433,8 +433,8 @@ Group {
         Anchor: (Top: 56, Right: 66, Width: 72, Height: 22);
         Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
         Padding: (Horizontal: 4);
-        Text: "Release";
-        TooltipText: "Animal will be released to the wild and disappear permanently.";
+        Text: %server.tamework.ui.linkedPanel.card.button.release;
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.release;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -443,8 +443,8 @@ Group {
         Anchor: (Top: 56, Right: 0, Width: 62, Height: 22);
         Style: (...$C.@SmallSecondaryTextButtonStyle, Sounds: $C.@ButtonSounds);
         Padding: (Horizontal: 4);
-        Text: "Cull";
-        TooltipText: "Animal will be slaughtered and cannot be revived.";
+        Text: %server.tamework.ui.linkedPanel.card.button.cull;
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.cull;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -453,7 +453,7 @@ Group {
         Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
         Style: @LinkedActiveStateOnButtonStyle;
         Text: "";
-        TooltipText: "Active: receives bulk commands. Click to set inactive.";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeEnabled;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -462,7 +462,7 @@ Group {
         Anchor: (Top: 4, Left: 0, Width: 14, Height: 14);
         Style: @LinkedActiveStateOffButtonStyle;
         Text: "";
-        TooltipText: "Inactive: ignored by bulk commands. Click to set active.";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.activeDisabled;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -471,7 +471,7 @@ Group {
         Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
         Style: @LinkedBreedingStateOnButtonStyle;
         Text: "";
-        TooltipText: "Breeding: enabled. Click to disable.";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.breedingEnabled;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -480,7 +480,7 @@ Group {
         Anchor: (Top: 30, Left: 210, Width: 14, Height: 14);
         Style: @LinkedBreedingStateOffButtonStyle;
         Text: "";
-        TooltipText: "Breeding: disabled. Click to enable.";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.breedingDisabled;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -489,7 +489,7 @@ Group {
         Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
         Style: @LinkedActionRespawnButtonStyle;
         Text: "";
-        TooltipText: "Revive";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.respawn;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -498,7 +498,7 @@ Group {
         Anchor: (Top: 56, Right: 56, Width: 24, Height: 24);
         Style: @LinkedActionRecallButtonStyle;
         Text: "";
-        TooltipText: "Recall";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.recall;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -507,7 +507,7 @@ Group {
         Anchor: (Top: 56, Right: 0, Width: 24, Height: 24);
         Style: @LinkedActionSetHomeButtonStyle;
         Text: "";
-        TooltipText: "Set Home";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.setHome;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -516,7 +516,7 @@ Group {
         Anchor: (Top: 56, Right: 28, Width: 24, Height: 24);
         Style: @LinkedActionReturnHomeButtonStyle;
         Text: "";
-        TooltipText: "Return Home";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.returnHome;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }
@@ -525,7 +525,7 @@ Group {
         Anchor: (Top: 1, Right: 0, Width: 14, Height: 14);
         Style: @RemoveIconButtonStyle;
         Text: "";
-        TooltipText: "Unlink";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.unlink;
         TextTooltipStyle: @LinkedActionTooltipStyle;
     }
 
@@ -626,7 +626,7 @@ Group {
 
             Label #NeedIcon {
                 Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-                Text: "M";
+                Text: %server.tamework.ui.linkedPanel.needs.happiness.short;
                 Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
             }
 
@@ -634,7 +634,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Happiness";
+                TooltipText: %server.tamework.ui.linkedPanel.needs.happiness.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -714,7 +714,7 @@ Group {
 
             Label #NeedIcon {
                 Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-                Text: "F";
+                Text: %server.tamework.ui.linkedPanel.needs.hunger.short;
                 Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
             }
 
@@ -722,7 +722,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Hunger";
+                TooltipText: %server.tamework.ui.linkedPanel.needs.hunger.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -802,7 +802,7 @@ Group {
 
             Label #NeedIcon {
                 Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-                Text: "W";
+                Text: %server.tamework.ui.linkedPanel.needs.thirst.short;
                 Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
             }
 
@@ -810,7 +810,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Thirst";
+                TooltipText: %server.tamework.ui.linkedPanel.needs.thirst.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -885,7 +885,7 @@ Group {
 
             Label #BreedingCooldownIcon {
                 Anchor: (Top: 4, Left: 4, Width: 16, Height: 16);
-                Text: "B";
+                Text: %server.tamework.ui.linkedPanel.needs.breeding.short;
                 Style: (FontSize: 10, RenderBold: true, TextColor: #deebff, HorizontalAlignment: Center, VerticalAlignment: Center);
             }
 
@@ -893,7 +893,7 @@ Group {
                 Anchor: (Top: 0, Left: 0, Width: 24, Height: 24);
                 Style: @TraitTooltipButtonStyle;
                 Text: "";
-                TooltipText: "Breeding cooldown";
+                TooltipText: %server.tamework.ui.linkedPanel.needs.breeding.tooltip;
                 TextTooltipStyle: @LinkedActionTooltipStyle;
             }
         }
@@ -911,7 +911,7 @@ Group {
 
         Label #FutureStatAText {
             Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-            Text: "Stat A: ?/?";
+            Text: %server.tamework.ui.linkedPanel.futureStat.a.default;
             Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
     }
@@ -928,7 +928,7 @@ Group {
 
         Label #FutureStatBText {
             Anchor: (Top: -16, Left: 0, Width: 360, Height: 14);
-            Text: "Stat B: ?/?";
+            Text: %server.tamework.ui.linkedPanel.futureStat.b.default;
             Style: (FontSize: 10, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
         }
     }
@@ -940,14 +940,15 @@ Group {
 
         TextButton #TraitsButton {
             Anchor: (Left: 0, Width: 108, Height: 22);
-            Text: "Traits";
+            Text: %server.tamework.ui.linkedPanel.futureAction.traits;
             Visible: false;
         }
 
         TextButton #TalentsButton {
             Anchor: (Left: 6, Width: 108, Height: 22);
-            Text: "Talents";
+            Text: %server.tamework.ui.linkedPanel.futureAction.talents;
             Visible: false;
         }
     }
 }
+

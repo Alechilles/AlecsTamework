@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.hypixel.hytale.protocol.packets.interface_.NotificationStyle;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -12,6 +13,18 @@ import com.hypixel.hytale.server.core.util.NotificationUtil;
 public final class TameworkUiMessageService {
     public boolean show(Player player, String message) {
         return show(player, message, NotificationStyle.Default);
+    }
+
+    public boolean showKey(Player player, String messageKey) {
+        return show(player, LocalizedText.resolve(player, messageKey), NotificationStyle.Default);
+    }
+
+    public boolean showKey(Player player, NotificationStyle style, String messageKey) {
+        return show(player, LocalizedText.resolve(player, messageKey), style);
+    }
+
+    public boolean showKey(Player player, NotificationStyle style, String messageKey, Object... args) {
+        return show(player, LocalizedText.format(player, messageKey, args), style);
     }
 
     public boolean show(Player player, String message, NotificationStyle style) {

@@ -8,7 +8,7 @@ $C.@PageOverlay {
 
     #Title {
       $C.@Title #TameworkNameInputTitle {
-        @Text = "Name Companion";
+        @Text = %server.tamework.ui.nameInput.title.default;
       }
     }
 
@@ -17,7 +17,7 @@ $C.@PageOverlay {
 
       Label #TameworkNameInputSubtitle {
         Anchor: (Height: 26, Bottom: 16);
-        Text: "Enter a name and click Apply.";
+        Text: %server.tamework.ui.nameInput.subtitle;
         Style: (
           FontSize: 16,
           TextColor: #bfd0e5,
@@ -32,7 +32,7 @@ $C.@PageOverlay {
         Background: $C.@InputBoxBackground;
         Anchor: (Height: 44, Bottom: 20);
         Padding: (Horizontal: 10);
-        PlaceholderText: "Enter companion name";
+        PlaceholderText: %server.tamework.ui.nameInput.placeholder;
         MaxLength: 32;
       }
 
@@ -41,7 +41,7 @@ $C.@PageOverlay {
 
         $C.@SmallSecondaryTextButton #TameworkNameCancelButton {
           @Sounds = $C.@ButtonSounds;
-          @Text = "Cancel";
+          @Text = %server.tamework.ui.shared.button.cancel;
           @Anchor = (MinWidth: 128);
         }
 
@@ -51,10 +51,11 @@ $C.@PageOverlay {
 
         $C.@SmallSecondaryTextButton #TameworkNameApplyButton {
           @Sounds = $C.@ButtonSounds;
-          @Text = "Apply";
+          @Text = %server.tamework.ui.shared.button.apply;
           @Anchor = (Right: 10, MinWidth: 140);
         }
       }
     }
   }
 }
+

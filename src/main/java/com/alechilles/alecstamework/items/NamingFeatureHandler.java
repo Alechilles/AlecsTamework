@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
@@ -73,13 +74,13 @@ public final class NamingFeatureHandler {
 
         String roleId = npcInfoService.resolveRoleId(npc);
         if (!isRoleAllowed(roleId, config)) {
-            sendMessage(player, "That NPC cannot be named with this item.");
+            sendMessageKey(player, "tamework.ui.notifications.name.targetNotAllowed");
             return false;
         }
 
         if (rules.isRequireTamed() && !npcInfoService.isTamed(targetRef, store)) {
             String npcName = npcInfoService.resolveDisplayName(npc);
-            sendMessage(player, "You must tame that " + npcName + " before naming it.");
+            sendMessageKey(player, "tamework.ui.notifications.name.requireTamed", npcName);
             return false;
         }
 
@@ -87,7 +88,7 @@ public final class NamingFeatureHandler {
         UUID playerUuid = player.getUuid();
         if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
             if (ownerUuid == null) {
-                sendMessage(player, "That NPC does not have an owner.");
+                sendMessageKey(player, "tamework.ui.notifications.name.noOwner");
                 return false;
             }
             if (rules.isRequireOwner()) {
@@ -99,18 +100,18 @@ public final class NamingFeatureHandler {
         }
 
         if (isCooldownActive(itemStack, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs())) {
-            sendMessage(player, "That naming item is on cooldown.");
+            sendMessageKey(player, "tamework.ui.notifications.name.itemCooldown");
             return false;
         }
 
         boolean hasTameworkName = npcInfoService.hasTameworkName(targetRef, store);
         boolean hasAnyName = npcInfoService.hasAnyName(targetRef, store, npc);
         if (!rules.isAllowRename() && hasTameworkName) {
-            sendMessage(player, "This NPC has already been named.");
+            sendMessageKey(player, "tamework.ui.notifications.name.validation.alreadyNamed");
             return false;
         }
         if (!rules.isReplaceExisting() && hasAnyName) {
-            sendMessage(player, "This NPC already has a name.");
+            sendMessageKey(player, "tamework.ui.notifications.name.validation.alreadyHasName");
             return false;
         }
 
@@ -135,7 +136,7 @@ public final class NamingFeatureHandler {
         pendingByPlayer.remove(playerUuid, uiRequest);
         PendingNameRequest chatFallbackRequest = uiRequest.withInputMode(InputMode.ChatFallback);
         pendingByPlayer.put(playerUuid, chatFallbackRequest);
-        sendMessage(player, "Name UI unavailable. Type a name in chat to name this NPC. Type 'cancel' to cancel.");
+        sendMessageKey(player, "tamework.ui.notifications.name.uiUnavailableChatFallback", CANCEL_TOKEN);
         return true;
     }
 
@@ -166,7 +167,7 @@ public final class NamingFeatureHandler {
             return;
         }
         if (isCancelMessage(content)) {
-            sender.sendMessage(Message.raw("Naming cancelled."));
+            sendMessageKey(sender, "tamework.ui.notifications.name.cancelled");
             return;
         }
 
@@ -222,17 +223,17 @@ public final class NamingFeatureHandler {
         }
         String npcName = npcInfoService.resolveDisplayName(npc);
         if (npcName == null || npcName.isBlank()) {
-            npcName = "Companion";
+            npcName = LocalizedText.resolve(player, "tamework.ui.nameInput.defaultNpcName");
         }
-        String title = "Name " + npcName;
-        String subtitle = "Enter a name and click Apply.";
+        String title = LocalizedText.format(player, "tamework.ui.nameInput.titleForNpc", npcName);
+        String subtitle = LocalizedText.resolve(player, "tamework.ui.nameInput.subtitle");
         String existingName = npcInfoService.resolveAssignedName(request.npcRef, store, npc);
         int maxLength = rules.getMaxLength() > 0 ? rules.getMaxLength() : DEFAULT_UI_NAME_MAX_LENGTH;
         TameworkNameInputPage page = new TameworkNameInputPage(
                 uiPlayerRef,
                 title,
                 subtitle,
-                "Enter companion name",
+                LocalizedText.resolve(player, "tamework.ui.nameInput.placeholder"),
                 existingName,
                 maxLength,
                 () -> handleUiNameCancelled(player, request.playerUuid, request.requestId),
@@ -253,7 +254,7 @@ public final class NamingFeatureHandler {
         if (!pendingByPlayer.remove(playerUuid, request)) {
             return;
         }
-        sendMessage(player, "Naming cancelled.");
+        sendMessageKey(player, "tamework.ui.notifications.name.cancelled");
     }
 
     private void handleUiNameSubmitted(Player player,
@@ -284,7 +285,7 @@ public final class NamingFeatureHandler {
             return;
         }
         if (isRequestExpired(request)) {
-            sendMessage(player, "Naming request expired. Use the item again.");
+            sendMessageKey(player, "tamework.ui.notifications.name.requestExpired");
             return;
         }
         Ref<EntityStore> playerEntityRef = player.getReference();
@@ -296,23 +297,23 @@ public final class NamingFeatureHandler {
             return;
         }
         if (request.npcRef == null || !request.npcRef.isValid()) {
-            sendMessage(player, "That NPC is no longer available.");
+            sendMessageKey(player, "tamework.ui.notifications.name.targetUnavailable");
             return;
         }
         NPCEntity npc = store.getComponent(request.npcRef, NPCEntity.getComponentType());
         if (npc == null) {
-            sendMessage(player, "That NPC is no longer available.");
+            sendMessageKey(player, "tamework.ui.notifications.name.targetUnavailable");
             return;
         }
 
         ItemStack activeItem = getActiveItem(player);
         if (activeItem == null || activeItem.isEmpty()) {
-            sendMessage(player, "Hold the naming item to finish naming.");
+            sendMessageKey(player, "tamework.ui.notifications.name.holdItemToFinish");
             return;
         }
         String activeItemId = activeItem.getItemId();
         if (activeItemId == null || !activeItemId.equals(request.itemId)) {
-            sendMessage(player, "Hold the naming item to finish naming.");
+            sendMessageKey(player, "tamework.ui.notifications.name.holdItemToFinish");
             return;
         }
 
@@ -320,26 +321,26 @@ public final class NamingFeatureHandler {
         NamingRules rules = resolveRules(config, request.overrides);
 
         if (isCooldownActive(activeItem, TameworkMetadataKeys.NAME_COOLDOWN_UNTIL, rules.getCooldownMs())) {
-            sendMessage(player, "That naming item is on cooldown.");
+            sendMessageKey(player, "tamework.ui.notifications.name.itemCooldown");
             return;
         }
 
         String roleId = npcInfoService.resolveRoleId(npc);
         if (!isRoleAllowed(roleId, config)) {
-            sendMessage(player, "That NPC cannot be named with this item.");
+            sendMessageKey(player, "tamework.ui.notifications.name.targetNotAllowed");
             return;
         }
 
         if (rules.isRequireTamed() && !npcInfoService.isTamed(request.npcRef, store)) {
             String npcName = npcInfoService.resolveDisplayName(npc);
-            sendMessage(player, "You must tame that " + npcName + " before naming it.");
+            sendMessageKey(player, "tamework.ui.notifications.name.requireTamed", npcName);
             return;
         }
 
         UUID ownerUuid = npcInfoService.resolveOwnerUuid(request.npcRef, store);
         if (!NamingOwnershipPolicy.canName(playerUuid, ownerUuid, rules)) {
             if (ownerUuid == null) {
-                sendMessage(player, "That NPC does not have an owner.");
+                sendMessageKey(player, "tamework.ui.notifications.name.noOwner");
                 return;
             }
             if (rules.isRequireOwner()) {
@@ -359,14 +360,18 @@ public final class NamingFeatureHandler {
                 hasAnyName
         );
         if (!validation.isOk()) {
-            String message = validation.getErrorMessage();
-            sendMessage(player, message != null ? message : "That name is not allowed.");
+            String errorKey = validation.getErrorKey();
+            if (errorKey != null && !errorKey.isBlank()) {
+                sendMessageKey(player, errorKey, validation.getErrorArgs());
+            } else {
+                sendMessageKey(player, "tamework.ui.notifications.name.validation.notAllowed");
+            }
             return;
         }
 
         String finalName = validation.getNormalizedName();
         if (finalName == null || finalName.isBlank()) {
-            sendMessage(player, "That name is not allowed.");
+            sendMessageKey(player, "tamework.ui.notifications.name.validation.notAllowed");
             return;
         }
 
@@ -392,7 +397,7 @@ public final class NamingFeatureHandler {
                 rules.getParticleSystem(),
                 rules.getSoundEvent()
         );
-        sendMessage(player, "NPC named " + finalName + ".");
+        sendMessageKey(player, "tamework.ui.notifications.name.success", finalName);
     }
 
     private boolean isRequestExpired(PendingNameRequest request) {
@@ -591,6 +596,25 @@ public final class NamingFeatureHandler {
             return;
         }
         player.sendMessage(Message.raw(message));
+    }
+
+    private void sendMessageKey(Player player, String key, Object... args) {
+        if (player == null || key == null || key.isBlank()) {
+            return;
+        }
+        String message = LocalizedText.format(player, key, args);
+        sendMessage(player, message);
+    }
+
+    private void sendMessageKey(PlayerRef playerRef, String key, Object... args) {
+        if (playerRef == null || key == null || key.isBlank()) {
+            return;
+        }
+        String message = LocalizedText.format(playerRef, key, args);
+        if (message == null || message.isBlank()) {
+            return;
+        }
+        playerRef.sendMessage(Message.raw(message));
     }
 
     private enum InputMode {

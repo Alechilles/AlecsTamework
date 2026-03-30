@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandFeedback;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -40,9 +41,10 @@ final class CommandFeedbackService {
             return;
         }
         String commandLabel = resolveCommandLabel(command, commandLabelResolver);
-        String defaultMessage = resolveDefaultMessage(commandLabel, affected, queued);
+        String defaultMessage = resolveDefaultMessage(player, commandLabel, affected, queued);
         CommandFeedback feedback = command.getFeedback();
         String hudMessage = resolveFeedbackText(
+                player,
                 feedback != null ? feedback.getHudMessage() : null,
                 commandLabel,
                 affected,
@@ -61,43 +63,85 @@ final class CommandFeedbackService {
         show(player, text, NotificationStyle.Default);
     }
 
+    void showDefaultKey(Player player, String key, Object... args) {
+        show(player, LocalizedText.format(player, key, args), NotificationStyle.Default);
+    }
+
     void showSuccess(Player player, String text) {
         show(player, text, NotificationStyle.Success);
+    }
+
+    void showSuccessKey(Player player, String key, Object... args) {
+        show(player, LocalizedText.format(player, key, args), NotificationStyle.Success);
     }
 
     void showWarning(Player player, String text) {
         show(player, text, NotificationStyle.Warning);
     }
 
+    void showWarningKey(Player player, String key, Object... args) {
+        show(player, LocalizedText.format(player, key, args), NotificationStyle.Warning);
+    }
+
     private String resolveCommandLabel(CommandEntry command, Function<CommandEntry, String> commandLabelResolver) {
         if (commandLabelResolver == null) {
-            return command != null && command.getId() != null ? command.getId() : "Unknown";
+            return command != null && command.getId() != null
+                    ? command.getId()
+                    : LocalizedText.resolve((Player) null, "tamework.ui.notifications.command.unknown");
         }
         String label = commandLabelResolver.apply(command);
         if (label == null || label.isBlank()) {
-            return command != null && command.getId() != null ? command.getId() : "Unknown";
+            return command != null && command.getId() != null
+                    ? command.getId()
+                    : LocalizedText.resolve((Player) null, "tamework.ui.notifications.command.unknown");
         }
         return label;
     }
 
-    private String resolveDefaultMessage(String commandLabel, int affected, int queued) {
+    private String resolveDefaultMessage(Player player, String commandLabel, int affected, int queued) {
         if (affected > 0 && queued > 0) {
-            return "Command " + commandLabel + " applied to " + affected + " NPC(s), queued for " + queued + " unloaded NPC(s).";
+            return LocalizedText.format(
+                    player,
+                    "tamework.ui.notifications.command.execution.appliedAndQueued",
+                    commandLabel,
+                    affected,
+                    queued
+            );
         }
         if (affected > 0) {
-            return "Command " + commandLabel + " applied to " + affected + " NPC(s).";
+            return LocalizedText.format(
+                    player,
+                    "tamework.ui.notifications.command.execution.applied",
+                    commandLabel,
+                    affected
+            );
         }
         if (queued > 0) {
-            return "Command " + commandLabel + " queued for " + queued + " unloaded NPC(s).";
+            return LocalizedText.format(
+                    player,
+                    "tamework.ui.notifications.command.execution.queued",
+                    commandLabel,
+                    queued
+            );
         }
-        return "No NPCs could execute that command.";
+        return LocalizedText.resolve(player, "tamework.ui.notifications.command.execution.none");
     }
 
-    private String resolveFeedbackText(String template,
+    private String resolveFeedbackText(Player player,
+                                       String template,
                                        String commandLabel,
                                        int affected,
                                        String fallback) {
-        String value = (template != null && !template.isBlank()) ? template : fallback;
+        String value;
+        if (template != null && !template.isBlank()) {
+            if (looksLikeLanguageKey(template)) {
+                value = LocalizedText.resolve(player, template.trim());
+            } else {
+                value = template;
+            }
+        } else {
+            value = fallback;
+        }
         if (value == null || value.isBlank()) {
             return null;
         }
@@ -106,6 +150,14 @@ final class CommandFeedbackService {
                 .replace("%command%", commandLabel)
                 .replace("{count}", Integer.toString(affected))
                 .replace("{command}", commandLabel);
+    }
+
+    private static boolean looksLikeLanguageKey(String value) {
+        if (value == null) {
+            return false;
+        }
+        String trimmed = value.trim();
+        return trimmed.startsWith("server.") || trimmed.startsWith("tamework.ui.");
     }
 
     private void emitFeedbackSound(String soundEventId,

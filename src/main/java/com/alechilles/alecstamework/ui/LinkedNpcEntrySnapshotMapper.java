@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.localization.LocalizedText;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -11,9 +12,16 @@ final class LinkedNpcEntrySnapshotMapper {
     }
 
     static LinkedNpcEntry[] build(List<LinkedNpcEntry> entries) {
+        return build(entries, LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.subtitle.defaultNpcName"));
+    }
+
+    static LinkedNpcEntry[] build(List<LinkedNpcEntry> entries, String defaultName) {
         if (entries == null || entries.isEmpty()) {
             return new LinkedNpcEntry[0];
         }
+        String fallbackName = (defaultName == null || defaultName.isBlank())
+                ? LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.subtitle.defaultNpcName")
+                : defaultName;
         List<LinkedNpcEntry> out = new ArrayList<>(entries.size());
         for (LinkedNpcEntry entry : entries) {
             if (entry == null || entry.npcUuid() == null) {
@@ -21,7 +29,7 @@ final class LinkedNpcEntrySnapshotMapper {
             }
             String name = entry.displayName();
             if (name == null || name.isBlank()) {
-                name = "NPC";
+                name = fallbackName;
             }
             int current = Math.max(0, entry.currentHealth());
             int max = Math.max(0, entry.maxHealth());
