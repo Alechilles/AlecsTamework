@@ -18,7 +18,7 @@ Add Tamework as a dependency in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.5.3"
+  "Alechilles:Alec's Tamework!": "2.6.0"
 }
 ```
 

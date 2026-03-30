@@ -3,6 +3,22 @@
 ## Unreleased
 _No entries yet._
 
+## 2.6.0 - Public API Phase 2/3 + In-Game Self-Tests + UI Localization - 2026-03-30
+### Added
+- Added `ProgressionApi` reads and controlled mutation operations for happiness, needs, breeding, traits, lifecycle stage, and attachments with explicit mutation-status outcomes.
+- Added `InteractionExtensionsApi` registration lifecycle support for custom interaction requirements/effects/presets through the public API boundary.
+- Added an in-game `/tw api test` harness with fixture prep/reset commands and suites for core capabilities, config-resolution checks, progression behaviors, and interaction-extension contract smoke checks.
+- Added full `/tw api test` report logging to server output so long test runs are preserved outside in-game chat.
+- Added comprehensive localization keys and runtime translation fallback support for command notifications, naming flow, linked companion panel text, command menu/group UI, and the config editor.
+
+### Changed
+- Expanded and reorganized wiki/API documentation into nested section indexes, per-family public API references, and scenario-driven API recipe tutorials.
+- Updated command and linked-panel UI text resolution to be language-aware through centralized key-based lookups instead of hardcoded English strings.
+- Improved combat snapshot debug target/parameter resolution used by debugger and API-facing diagnostics flows.
+
+### Fixed
+- Fixed first-run instability in progression self-tests by tightening fixture/setup timing and capability-aware baseline checks so suites complete deterministically.
+
 ## 2.5.3 - Experimental Integration API - 2026-03-28
 ### Added
 - Added a public Tamework integration API with stable entrypoint access for downstream mods, including profile reads, command-link reads, policy checks, diagnostics, namespaced profile data, config views, and lifecycle/config events.
