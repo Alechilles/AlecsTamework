@@ -6,7 +6,7 @@ draft: false
 ---
 # API Recipes Index
 
-Parent: [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
+Parent: [Public API Index](/mod/alecs-tamework/public-api-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
 
 This subsection provides task-focused examples for common Tamework API integration workflows.
 

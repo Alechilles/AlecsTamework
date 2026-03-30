@@ -6,7 +6,7 @@ draft: false
 ---
 # Config Reads API Reference
 
-Parent: [Public API Index](/mod/alecs-tamework/public-api-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `configs()` contract in `TameworkApi`.
@@ -50,4 +50,3 @@ Item-scoped config families:
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
-

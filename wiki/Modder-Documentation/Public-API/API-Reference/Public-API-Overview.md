@@ -6,7 +6,7 @@ draft: false
 ---
 # Public API Overview
 
-Parent: [Public API Index](/mod/alecs-tamework/public-api-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
 
 Use this page to bootstrap against `TameworkApi`, verify capabilities, and choose the correct family reference page.
 

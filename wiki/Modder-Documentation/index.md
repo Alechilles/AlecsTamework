@@ -13,7 +13,6 @@ This section covers how to implement Tamework systems in another mod. It is orga
 ## Child Pages
 - [Start Here Index](/mod/alecs-tamework/start-here-index)
 - [Public API Index](/mod/alecs-tamework/public-api-index)
-- [API Recipes Index](/mod/alecs-tamework/api-recipes-index)
 - [System Integration Index](/mod/alecs-tamework/system-integration-index)
 - [Config Reference Index](/mod/alecs-tamework/config-reference-index)
 - [Testing and Diagnostics Index](/mod/alecs-tamework/testing-and-diagnostics-index)
@@ -22,9 +21,10 @@ This section covers how to implement Tamework systems in another mod. It is orga
 ## Suggested Reading Path
 1. [Start Here Index](/mod/alecs-tamework/start-here-index)
 2. [Public API Index](/mod/alecs-tamework/public-api-index)
-3. [API Recipes Index](/mod/alecs-tamework/api-recipes-index)
-4. [System Integration Index](/mod/alecs-tamework/system-integration-index)
-5. [Config Reference Index](/mod/alecs-tamework/config-reference-index)
+3. [API Reference Index](/mod/alecs-tamework/api-reference-index)
+4. [API Recipes Index](/mod/alecs-tamework/api-recipes-index)
+5. [System Integration Index](/mod/alecs-tamework/system-integration-index)
+6. [Config Reference Index](/mod/alecs-tamework/config-reference-index)
 
 ## Related Sections
 - [Player Guides Index](/mod/alecs-tamework/player-guides-index)

@@ -50,6 +50,7 @@ For many mods, that work can stay entirely in JSON and asset authoring. The full
 - [Start Here Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/start-here-index)
 - [Public API Overview](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-overview)
 - [Public API Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-index)
+- [API Reference Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-reference-index)
 - [API Recipes Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-recipes-index)
 - [System Integration Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/system-integration-index)
 - [Config Reference Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/config-reference-index)

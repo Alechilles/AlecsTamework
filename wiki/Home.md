@@ -21,6 +21,7 @@ Tamework does not add a full gameplay expansion by itself. Players usually exper
 - [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
 - [Start Here Index](/mod/alecs-tamework/start-here-index)
 - [Public API Index](/mod/alecs-tamework/public-api-index)
+- [API Reference Index](/mod/alecs-tamework/api-reference-index)
 - [API Recipes Index](/mod/alecs-tamework/api-recipes-index)
 - [System Integration Index](/mod/alecs-tamework/system-integration-index)
 - [Config Reference Index](/mod/alecs-tamework/config-reference-index)
