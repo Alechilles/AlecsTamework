@@ -46,4 +46,4 @@ Capability: `INTERACTION_EXTENSIONS`
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Interaction Extension Registration Recipe](/mod/alecs-tamework/interaction-extension-registration-recipe)
-
+- [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)

@@ -36,4 +36,5 @@ Capability: `POLICY`
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
-
+- [Enforce Ownership before Custom Command or Effect Recipe](/mod/alecs-tamework/enforce-ownership-before-custom-command-or-effect-recipe)
+- [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
