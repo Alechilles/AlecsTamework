@@ -6,7 +6,7 @@ draft: false
 ---
 # Integrations, Telemetry, and Build Workflow
 
-Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 ## Integrations
 - Tooltip bridge loading under `integration/tooltips/`
@@ -31,5 +31,6 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution-
 ## Related Pages
 - [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)
 - [Config Loading, Registries, Inheritance, and Overrides](/mod/alecs-tamework/config-loading-registries-inheritance-and-overrides)
+
 
 

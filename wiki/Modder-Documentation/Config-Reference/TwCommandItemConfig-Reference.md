@@ -6,7 +6,7 @@ draft: false
 ---
 # TwCommandItemConfig Reference
 
-Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
 `TwCommandItemConfig` binds command-tool behavior to one or more items. It controls recipient selection, linking rules, command cooldowns, role filtering, radial command definitions, linked-panel behavior, and the step sequence executed for each command.
@@ -290,5 +290,6 @@ Fields:
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+
 
 

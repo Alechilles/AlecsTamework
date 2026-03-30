@@ -6,7 +6,7 @@ draft: false
 ---
 # In-Game API Self-Test Smoke Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: run the built-in in-game API smoke flow against a live server.
 
@@ -31,4 +31,5 @@ Goal: run the built-in in-game API smoke flow against a live server.
 ## Related Pages
 - [In-Game API Self-Tests](/mod/alecs-tamework/in-game-api-self-tests)
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
+
 

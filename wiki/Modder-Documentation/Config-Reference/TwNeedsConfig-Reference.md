@@ -6,7 +6,7 @@ draft: false
 ---
 # TwNeedsConfig Reference
 
-Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
 `TwNeedsConfig` controls hunger and thirst progression. It defines decay, passive refill, manual refill, happiness penalties, tick timing, owner-offline behavior, and optional starvation or dehydration damage.
@@ -224,5 +224,6 @@ Accepted `DualNeedRule` values:
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
 - [Coop and Feed Trough Guide](/mod/alecs-tamework/coop-and-feed-trough-guide)
+
 
 

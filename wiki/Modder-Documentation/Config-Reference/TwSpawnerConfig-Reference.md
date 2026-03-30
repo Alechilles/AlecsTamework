@@ -6,7 +6,7 @@ draft: false
 ---
 # TwSpawnerConfig Reference
 
-Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
 `TwSpawnerConfig` binds a capture-and-spawn behavior set to a specific spawner item. It controls which roles can be captured, how capture and spawn ownership rules work, item cooldowns and effects, and filled-item icon and tooltip behavior.
@@ -168,5 +168,6 @@ Accepted values:
 - [Spawner System Guide](/mod/alecs-tamework/spawner-system-guide)
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
+
 
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # API Reference
 
-Parent: [Public API](/mod/alecs-tamework/public-api-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 This subsection contains the reference contract for each public API family.
 
@@ -24,5 +24,6 @@ This subsection contains the reference contract for each public API family.
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
+
 
 

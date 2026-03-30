@@ -6,7 +6,7 @@ draft: false
 ---
 # Event Subscription Lifecycle Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: subscribe to Tamework events and cleanly unsubscribe to avoid listener leaks.
 
@@ -42,4 +42,5 @@ public void stop() {
 
 ## Related Pages
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
+
 

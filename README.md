@@ -41,32 +41,32 @@ For many mods, that work can stay entirely in JSON and asset authoring. The full
 
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)
-- [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides-index)
-- [Getting Started](https://wiki.hytalemodding.dev/mod/alecs-tamework/getting-started-index)
-- [Companion Controls](https://wiki.hytalemodding.dev/mod/alecs-tamework/companion-controls-index)
-- [Systems](https://wiki.hytalemodding.dev/mod/alecs-tamework/systems-index)
-- [Troubleshooting and Glossary](https://wiki.hytalemodding.dev/mod/alecs-tamework/troubleshooting-and-glossary-index)
-- [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation-index)
-- [Start Here](https://wiki.hytalemodding.dev/mod/alecs-tamework/start-here-index)
+- [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides)
+- [Getting Started](https://wiki.hytalemodding.dev/mod/alecs-tamework/getting-started)
+- [Companion Controls](https://wiki.hytalemodding.dev/mod/alecs-tamework/companion-controls)
+- [Systems](https://wiki.hytalemodding.dev/mod/alecs-tamework/systems)
+- [Troubleshooting and Glossary](https://wiki.hytalemodding.dev/mod/alecs-tamework/troubleshooting-and-glossary)
+- [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation)
+- [Start Here](https://wiki.hytalemodding.dev/mod/alecs-tamework/start-here)
 - [Public API Overview](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-overview)
-- [Public API](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-index)
-- [API Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-reference-index)
-- [API Recipes](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-recipes-index)
-- [System Integration](https://wiki.hytalemodding.dev/mod/alecs-tamework/system-integration-index)
-- [Config Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/config-reference-index)
-- [Testing and Diagnostics](https://wiki.hytalemodding.dev/mod/alecs-tamework/testing-and-diagnostics-index)
-- [Optional Integrations](https://wiki.hytalemodding.dev/mod/alecs-tamework/optional-integrations-index)
-- [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation-index)
-- [Core Architecture](https://wiki.hytalemodding.dev/mod/alecs-tamework/core-architecture-index)
-- [Runtime Subsystems](https://wiki.hytalemodding.dev/mod/alecs-tamework/runtime-subsystems-index)
-- [Data and Persistence](https://wiki.hytalemodding.dev/mod/alecs-tamework/data-and-persistence-index)
-- [Tooling and Contribution](https://wiki.hytalemodding.dev/mod/alecs-tamework/tooling-and-contribution-index)
+- [Public API](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api)
+- [API Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-reference)
+- [API Recipes](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-recipes)
+- [System Integration](https://wiki.hytalemodding.dev/mod/alecs-tamework/system-integration)
+- [Config Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/config-reference)
+- [Testing and Diagnostics](https://wiki.hytalemodding.dev/mod/alecs-tamework/testing-and-diagnostics)
+- [Optional Integrations](https://wiki.hytalemodding.dev/mod/alecs-tamework/optional-integrations)
+- [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
+- [Core Architecture](https://wiki.hytalemodding.dev/mod/alecs-tamework/core-architecture)
+- [Runtime Subsystems](https://wiki.hytalemodding.dev/mod/alecs-tamework/runtime-subsystems)
+- [Data and Persistence](https://wiki.hytalemodding.dev/mod/alecs-tamework/data-and-persistence)
+- [Tooling and Contribution](https://wiki.hytalemodding.dev/mod/alecs-tamework/tooling-and-contribution)
 
 ## For Contributors
 - [Source Repository](https://github.com/Alechilles/AlecsTamework)
 - [Contributing Guide](https://github.com/Alechilles/AlecsTamework/blob/main/CONTRIBUTING.md)
 - [Architecture Doc](https://github.com/Alechilles/AlecsTamework/blob/main/docs/Architecture.md)
-- [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation-index)
+- [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
 
 ## Roadmap
 - [Tamework Roadmap](https://curious-bench-850.notion.site/32c1f4061f368026b735f19a8187a480?v=32c1f4061f3680ab877b000cdda43a23)
@@ -75,4 +75,5 @@ For many mods, that work can stay entirely in JSON and asset authoring. The full
 If you run into a bug, integration issue, or behavior problem, report it in the Discord server:
 
 https://discord.gg/E8n8RgTTdq
+
 

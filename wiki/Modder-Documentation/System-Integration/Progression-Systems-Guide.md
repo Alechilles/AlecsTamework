@@ -6,7 +6,7 @@ draft: false
 ---
 # Progression Systems Guide
 
-Parent: [System Integration](/mod/alecs-tamework/system-integration-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 This guide explains how the progression families fit together and how to roll them out in a sane order. Use the reference pages for exact field lists.
 
@@ -107,5 +107,6 @@ For breeding issues, also verify:
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
+
 
 

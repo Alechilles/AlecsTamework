@@ -6,7 +6,7 @@ draft: false
 ---
 # Troubleshooting for Players
 
-Parent: [Troubleshooting and Glossary](/mod/alecs-tamework/troubleshooting-and-glossary-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
+Parent: [Troubleshooting and Glossary](/mod/alecs-tamework/troubleshooting-and-glossary) | [Player Guides](/mod/alecs-tamework/player-guides)
 
 Use this page when a Tamework-powered feature seems inconsistent and the other mod's own wiki does not explain it.
 
@@ -50,5 +50,6 @@ Use this page when a Tamework-powered feature seems inconsistent and the other m
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
 - [Naming, Capture, and Command Items](/mod/alecs-tamework/naming-capture-and-command-items)
 - [Player Glossary](/mod/alecs-tamework/player-glossary)
+
 
 

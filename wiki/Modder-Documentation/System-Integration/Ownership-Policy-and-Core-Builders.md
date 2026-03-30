@@ -6,7 +6,7 @@ draft: false
 ---
 # Ownership Policy and Core Builders
 
-Parent: [System Integration](/mod/alecs-tamework/system-integration-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Use this page when you need the shared building blocks rather than one specific feature family.
 
@@ -58,5 +58,6 @@ Use this page when you need the shared building blocks rather than one specific 
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+
 
 

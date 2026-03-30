@@ -6,7 +6,7 @@ draft: false
 ---
 # Naming System Guide
 
-Parent: [System Integration](/mod/alecs-tamework/system-integration-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Naming items let you attach a reusable naming flow to any item without building a custom UI or validation pipeline from scratch.
 
@@ -36,5 +36,6 @@ Naming items let you attach a reusable naming flow to any item without building 
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
 - [Ownership Policy and Core Builders](/mod/alecs-tamework/ownership-policy-and-core-builders)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
+
 
 

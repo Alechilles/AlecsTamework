@@ -6,7 +6,7 @@ draft: false
 ---
 # Auto-Register Companion on Capture Event Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: when Tamework records a capture, automatically create your plugin-side companion record.
 
@@ -37,5 +37,6 @@ public void start(TameworkApi api) {
 
 ## Related Pages
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
+
 
 

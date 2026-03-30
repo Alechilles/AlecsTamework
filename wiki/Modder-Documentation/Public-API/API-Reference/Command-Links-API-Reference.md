@@ -6,7 +6,7 @@ draft: false
 ---
 # Command Links API Reference
 
-Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `commandLinks()` contract in `TameworkApi`.
@@ -48,4 +48,5 @@ Tamework resolves `homePosition` in this order:
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Read Saved Home Position and Show a Waypoint Recipe](/mod/alecs-tamework/read-saved-home-position-and-show-a-waypoint-recipe)
 - [Check Command Link State before Running Feature Recipe](/mod/alecs-tamework/check-command-link-state-before-running-feature-recipe)
+
 

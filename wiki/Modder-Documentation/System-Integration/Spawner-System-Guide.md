@@ -6,7 +6,7 @@ draft: false
 ---
 # Spawner System Guide
 
-Parent: [System Integration](/mod/alecs-tamework/system-integration-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Spawner items are the Tamework item family that captures an NPC into an item and restores that same NPC later.
 
@@ -46,5 +46,6 @@ Spawner configs participate in `/tw reloadconfig`.
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
+
 
 

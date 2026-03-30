@@ -6,7 +6,7 @@ draft: false
 ---
 # Command Runtime and Linked Panel Internals
 
-Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 ## Main orchestrator
 `CommandItemFeatureHandler`
@@ -37,5 +37,6 @@ Command tools persist linked NPC metadata, group metadata, panel preferences, an
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
 - [Command and Debug Internals](/mod/alecs-tamework/command-and-debug-internals)
+
 
 

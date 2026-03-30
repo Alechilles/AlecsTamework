@@ -6,7 +6,7 @@ draft: false
 ---
 # Config Loading, Registries, Inheritance, and Overrides
 
-Parent: [Core Architecture](/mod/alecs-tamework/core-architecture-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Core Architecture](/mod/alecs-tamework/core-architecture) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 ## Asset registration
 `Tamework.java` registers each config asset family during setup and tracks registration state with per-family booleans such as `globalAssetsRegistered`, `commandAssetsRegistered`, and `debugAssetsRegistered`.
@@ -39,5 +39,6 @@ These are the registries that `/tw reloadconfig` refreshes directly.
 ## Related Pages
 - [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)
 - [Optimized Interaction Pipeline Internals](/mod/alecs-tamework/optimized-interaction-pipeline-internals)
+
 
 

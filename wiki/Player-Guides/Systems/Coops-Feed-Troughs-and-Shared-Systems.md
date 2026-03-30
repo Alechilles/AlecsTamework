@@ -6,7 +6,7 @@ draft: false
 ---
 # Coops, Feed Troughs, and Shared Systems
 
-Parent: [Systems](/mod/alecs-tamework/systems-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
+Parent: [Systems](/mod/alecs-tamework/systems) | [Player Guides](/mod/alecs-tamework/player-guides)
 
 Some Tamework-powered mods use framework systems beyond basic taming and command tools. Two common examples are managed coops and feed trough support.
 
@@ -35,5 +35,6 @@ Some Tamework-powered mods use framework systems beyond basic taming and command
 - [Happiness, Needs, Breeding, and Traits](/mod/alecs-tamework/happiness-needs-breeding-and-traits)
 - [Command Radial and Controls](/mod/alecs-tamework/command-radial-and-controls)
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
+
 
 

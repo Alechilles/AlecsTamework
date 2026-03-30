@@ -6,7 +6,7 @@ draft: false
 ---
 # Check Command Link State before Running Feature Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: guard your feature so it only runs when the mob is command-linked the way your plugin expects.
 
@@ -35,5 +35,6 @@ runFeature(profileId, link.homePosition());
 
 ## Related Pages
 - [Command Links API Reference](/mod/alecs-tamework/command-links-api-reference)
+
 
 

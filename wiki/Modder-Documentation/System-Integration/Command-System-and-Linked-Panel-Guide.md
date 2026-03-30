@@ -6,7 +6,7 @@ draft: false
 ---
 # Command System and Linked Panel Guide
 
-Parent: [System Integration](/mod/alecs-tamework/system-integration-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [System Integration](/mod/alecs-tamework/system-integration) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 This guide covers how to ship a command tool successfully. Use it for wiring and decision-making. Use [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference) for the field-by-field schema.
 
@@ -130,5 +130,6 @@ Put shared infrastructure in [TwGlobalConfig Reference](/mod/alecs-tamework/twgl
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+
 
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Register Interaction Extensions in Plugin Lifecycle Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: register custom interaction requirement/effect handlers when your plugin starts and always clean them up on shutdown.
 
@@ -41,5 +41,6 @@ public void onDisable() {
 
 ## Related Pages
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
+
 
 

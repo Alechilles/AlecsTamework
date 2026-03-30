@@ -6,7 +6,7 @@ draft: false
 ---
 # API Bootstrap and Capability Checks Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: safely acquire `TameworkApi`, verify version/capabilities, and fail closed when unavailable.
 
@@ -41,4 +41,5 @@ if (!caps.contains(TameworkApiCapability.COMMAND_LINKS)) {
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
+
 

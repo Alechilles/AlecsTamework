@@ -6,7 +6,7 @@ draft: false
 ---
 # Naming Runtime Internals
 
-Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 ## Main orchestrator
 `NamingFeatureHandler`
@@ -28,5 +28,6 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems-index) | [De
 ## Related Pages
 - [Spawner Runtime Internals](/mod/alecs-tamework/spawner-runtime-internals)
 - [Ownership, Damage, and Progression Internals](/mod/alecs-tamework/ownership-damage-and-progression-internals)
+
 
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Build Companion Inspector UI Card Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: build one UI card by combining profile, command-link, and progression views.
 
@@ -50,5 +50,6 @@ CompanionInspectorCard card = new CompanionInspectorCard(
 - [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
 - [Command Links API Reference](/mod/alecs-tamework/command-links-api-reference)
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 
 

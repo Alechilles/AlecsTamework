@@ -6,7 +6,7 @@ draft: false
 ---
 # Command Radial and Controls
 
-Parent: [Companion Controls](/mod/alecs-tamework/companion-controls-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
+Parent: [Companion Controls](/mod/alecs-tamework/companion-controls) | [Player Guides](/mod/alecs-tamework/player-guides)
 
 Tamework command tools usually use a two-part control scheme: one input for using the selected command and one input for opening the command selection UI.
 
@@ -55,5 +55,6 @@ The exact list depends on the command item config and on the mod using Tamework.
 - [Coops, Feed Troughs, and Shared Systems](/mod/alecs-tamework/coops-feed-troughs-and-shared-systems)
 
 > [Screenshot Placeholder: Command radial menu with one command highlighted]
+
 
 

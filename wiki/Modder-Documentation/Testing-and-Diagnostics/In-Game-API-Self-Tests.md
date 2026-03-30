@@ -6,7 +6,7 @@ draft: false
 ---
 # In-Game API Self-Tests
 
-Parent: [Testing and Diagnostics](/mod/alecs-tamework/testing-and-diagnostics-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Testing and Diagnostics](/mod/alecs-tamework/testing-and-diagnostics) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Tamework includes an operator-facing self-test harness for the public integration API contract. It provisions its own bundled fixtures, runs live contract checks against `TameworkApi`, and tears the fixtures back down when you are done.
 
@@ -102,5 +102,6 @@ If you want to repro a clean setup, always run `reset` before `prepare` again.
 - `run` is read-only. Only `prepare` and `reset` mutate state.
 - The suite is intentionally narrow and is meant to validate the public API contract, not replace the Maven/JUnit test suite.
 - The fixture content is bundled with Tamework, so the self-tests do not depend on downstream mods like Animal Husbandry.
+
 
 

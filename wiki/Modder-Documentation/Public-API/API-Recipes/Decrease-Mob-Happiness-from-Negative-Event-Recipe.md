@@ -6,7 +6,7 @@ draft: false
 ---
 # Decrease Mob Happiness from Negative Event Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: your plugin detects a negative event (storm hit, punishment, failed task) and reduces companion happiness.
 
@@ -32,5 +32,6 @@ if (result.status() == ProgressionMutationStatus.NOT_LOADED) {
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 
 

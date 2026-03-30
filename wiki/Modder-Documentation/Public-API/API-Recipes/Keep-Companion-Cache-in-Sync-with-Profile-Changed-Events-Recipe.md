@@ -6,7 +6,7 @@ draft: false
 ---
 # Keep Companion Cache in Sync with Profile Changed Events Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: keep a plugin-side cache fresh without polling profile data.
 
@@ -35,5 +35,6 @@ public void start(TameworkApi api) {
 ## Related Pages
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
+
 
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Read Saved Home Position and Show a Waypoint Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: read a linked mob's saved home position and pass it into your own waypoint/minimap marker.
 
@@ -45,4 +45,5 @@ waypointService.showWaypoint(
 ## Related Pages
 - [Command Links API Reference](/mod/alecs-tamework/command-links-api-reference)
 - [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
+
 

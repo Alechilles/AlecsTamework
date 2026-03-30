@@ -6,7 +6,7 @@ draft: false
 ---
 # Command and Debug Internals
 
-Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 ## Command package
 The `commands/` package contains the public `/tw` command surface, with `TameworkCommandRoot` as the root and focused command classes for ownership, alarms, progression, traits, config reload, NPC lookup, and debug toggles.
@@ -38,5 +38,6 @@ The `commands/` package contains the public `/tw` command surface, with `Tamewor
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
 - [Command Runtime and Linked Panel Internals](/mod/alecs-tamework/command-runtime-and-linked-panel-internals)
+
 
 

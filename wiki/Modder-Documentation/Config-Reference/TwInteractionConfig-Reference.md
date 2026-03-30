@@ -6,7 +6,7 @@ draft: false
 ---
 # TwInteractionConfig Reference
 
-Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
 `TwInteractionConfig` is the optimized interaction family used by `TameworkInteract`. It replaces large authored instruction graphs with an ordered interaction list driven by presets, requirements, and effects.
@@ -494,5 +494,6 @@ Cooldown behavior:
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+
 
 

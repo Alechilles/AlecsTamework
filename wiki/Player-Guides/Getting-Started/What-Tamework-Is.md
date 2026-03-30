@@ -6,7 +6,7 @@ draft: false
 ---
 # What Tamework Is
 
-Parent: [Getting Started](/mod/alecs-tamework/getting-started-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
+Parent: [Getting Started](/mod/alecs-tamework/getting-started) | [Player Guides](/mod/alecs-tamework/player-guides)
 
 Tamework is a framework that other mods build on. It provides systems for tameable companions, reusable interaction flows, command tools, linked companion UI, naming, capture and respawn items, progression systems, and supporting utility features.
 
@@ -39,5 +39,6 @@ If a mod links here for an explanation of a feature, this wiki explains the fram
 - [Ownership, Taming, and Interaction Basics](/mod/alecs-tamework/ownership-taming-and-interaction-basics)
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
 - [Naming, Capture, and Command Items](/mod/alecs-tamework/naming-capture-and-command-items)
+
 
 

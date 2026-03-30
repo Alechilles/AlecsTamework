@@ -6,7 +6,7 @@ draft: false
 ---
 # Persistence, SQLite, and Data Paths
 
-Parent: [Data and Persistence](/mod/alecs-tamework/data-and-persistence-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Data and Persistence](/mod/alecs-tamework/data-and-persistence) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 ## Runtime root
 `TameworkDataPathService` resolves the runtime data directory, and `TameworkPersistenceRuntime` owns the SQLite lifecycle inside that directory.
@@ -48,5 +48,6 @@ Parent: [Data and Persistence](/mod/alecs-tamework/data-and-persistence-index) |
 ## Related Pages
 - [Command Runtime and Linked Panel Internals](/mod/alecs-tamework/command-runtime-and-linked-panel-internals)
 - [Command and Debug Internals](/mod/alecs-tamework/command-and-debug-internals)
+
 
 

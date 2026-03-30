@@ -6,7 +6,7 @@ draft: false
 ---
 # Progression Mutation Status Handling Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: call progression mutations and handle result statuses deterministically.
 
@@ -46,4 +46,5 @@ switch (result.status()) {
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # TwGlobalConfig Reference
 
-Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
 `TwGlobalConfig` is the shared server-wide config family for Tamework. Use it for defaults and infrastructure that should not be duplicated into every role or item config.
@@ -194,5 +194,6 @@ Nested `Damage`:
 - [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [Command System and Linked Panel Guide](/mod/alecs-tamework/command-system-and-linked-panel-guide)
+
 
 

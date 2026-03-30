@@ -6,7 +6,7 @@ draft: false
 ---
 # Apply Attachment Preset from Custom UI Recipe
 
-Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 Goal: let players pick a preset in your UI and apply it to Tamework companion attachments.
 
@@ -35,5 +35,6 @@ api.progression().syncStoredAttachments(profileId);
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 
 

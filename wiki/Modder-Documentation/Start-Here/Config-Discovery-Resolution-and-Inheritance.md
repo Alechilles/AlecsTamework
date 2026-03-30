@@ -6,7 +6,7 @@ draft: false
 ---
 # Config Discovery, Resolution, and Inheritance
 
-Parent: [Start Here](/mod/alecs-tamework/start-here-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Start Here](/mod/alecs-tamework/start-here) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 This page is the working mental model for how Tamework finds config assets, chooses the active one, and applies parent fallback.
 
@@ -124,5 +124,6 @@ Everything else refreshes through normal asset loaded and removed events:
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
+
 
 
