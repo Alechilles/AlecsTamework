@@ -45,5 +45,5 @@ Capability: `PROFILES`
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
-- [Read Saved Home Position Recipe](/mod/alecs-tamework/read-saved-home-position-recipe)
-
+- [Read Saved Home Position and Show a Waypoint Recipe](/mod/alecs-tamework/read-saved-home-position-and-show-a-waypoint-recipe)
+- [Build Companion Inspector UI Card Recipe](/mod/alecs-tamework/build-companion-inspector-ui-card-recipe)

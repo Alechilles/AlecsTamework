@@ -40,5 +40,4 @@ Use your plugin id (for example `example.plugin`) as the namespace.
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
-- [Profile Data JSON Storage Recipe](/mod/alecs-tamework/profile-data-json-storage-recipe)
-
+- [Store Per-Mob Plugin State JSON Recipe](/mod/alecs-tamework/store-per-mob-plugin-state-json-recipe)

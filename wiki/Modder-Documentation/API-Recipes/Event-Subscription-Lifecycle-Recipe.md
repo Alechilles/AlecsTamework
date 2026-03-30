@@ -1,6 +1,6 @@
 ---
 title: "Event Subscription Lifecycle Recipe"
-order: 5
+order: 21
 published: true
 draft: false
 ---
@@ -42,4 +42,3 @@ public void stop() {
 
 ## Related Pages
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
-

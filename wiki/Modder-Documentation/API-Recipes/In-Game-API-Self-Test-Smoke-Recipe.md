@@ -1,6 +1,6 @@
 ---
 title: "In-Game API Self-Test Smoke Recipe"
-order: 8
+order: 24
 published: true
 draft: false
 ---
@@ -31,4 +31,3 @@ Goal: run the built-in in-game API smoke flow against a live server.
 ## Related Pages
 - [In-Game API Self-Tests](/mod/alecs-tamework/in-game-api-self-tests)
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
-

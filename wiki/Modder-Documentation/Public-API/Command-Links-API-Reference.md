@@ -46,5 +46,5 @@ Tamework resolves `homePosition` in this order:
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
-- [Read Saved Home Position Recipe](/mod/alecs-tamework/read-saved-home-position-recipe)
-
+- [Read Saved Home Position and Show a Waypoint Recipe](/mod/alecs-tamework/read-saved-home-position-and-show-a-waypoint-recipe)
+- [Check Command Link State before Running Feature Recipe](/mod/alecs-tamework/check-command-link-state-before-running-feature-recipe)

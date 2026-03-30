@@ -1,14 +1,14 @@
 ---
-title: "Read Saved Home Position Recipe"
-order: 3
+title: "Read Saved Home Position and Show a Waypoint Recipe"
+order: 8
 published: true
 draft: false
 ---
-# Read Saved Home Position Recipe
+# Read Saved Home Position and Show a Waypoint Recipe
 
 Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
 
-Goal: read the stored home position for a linked NPC from its stable profile id.
+Goal: read a linked mob's saved home position and pass it into your own waypoint/minimap marker.
 
 ## Pattern
 ```java
@@ -29,9 +29,13 @@ if (home.isEmpty()) {
 }
 
 Vector3View position = home.get();
-double x = position.x();
-double y = position.y();
-double z = position.z();
+waypointService.showWaypoint(
+        playerUuid,
+        "Companion Home",
+        position.x(),
+        position.y(),
+        position.z()
+);
 ```
 
 ## Notes
@@ -41,4 +45,3 @@ double z = position.z();
 ## Related Pages
 - [Command Links API Reference](/mod/alecs-tamework/command-links-api-reference)
 - [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
-

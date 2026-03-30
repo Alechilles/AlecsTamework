@@ -14,9 +14,19 @@ This subsection provides task-focused examples for common Tamework API integrati
 > Recipe behavior should always be gated behind runtime capability checks.
 
 ## Child Pages
+- [Increase Mob Happiness from Custom Interaction Recipe](/mod/alecs-tamework/increase-mob-happiness-from-custom-interaction-recipe)
+- [Decrease Mob Happiness from Negative Event Recipe](/mod/alecs-tamework/decrease-mob-happiness-from-negative-event-recipe)
+- [Set Hunger and Thirst from Custom Feeding Recipe](/mod/alecs-tamework/set-hunger-and-thirst-from-custom-feeding-recipe)
+- [Force Breeding Ready from Custom Ritual Recipe](/mod/alecs-tamework/force-breeding-ready-from-custom-ritual-recipe)
+- [Reroll Traits and Show Values Recipe](/mod/alecs-tamework/reroll-traits-and-show-values-recipe)
+- [Apply Attachment Preset from Custom UI Recipe](/mod/alecs-tamework/apply-attachment-preset-from-custom-ui-recipe)
+- [Read Saved Home Position and Show a Waypoint Recipe](/mod/alecs-tamework/read-saved-home-position-and-show-a-waypoint-recipe)
+- [Check Command Link State before Running Feature Recipe](/mod/alecs-tamework/check-command-link-state-before-running-feature-recipe)
+- [Build Companion Inspector UI Card Recipe](/mod/alecs-tamework/build-companion-inspector-ui-card-recipe)
+- [Store Per-Mob Plugin State JSON Recipe](/mod/alecs-tamework/store-per-mob-plugin-state-json-recipe)
+
+## Additional Recipes
 - [API Bootstrap and Capability Checks Recipe](/mod/alecs-tamework/api-bootstrap-and-capability-checks-recipe)
-- [Read Saved Home Position Recipe](/mod/alecs-tamework/read-saved-home-position-recipe)
-- [Profile Data JSON Storage Recipe](/mod/alecs-tamework/profile-data-json-storage-recipe)
 - [Event Subscription Lifecycle Recipe](/mod/alecs-tamework/event-subscription-lifecycle-recipe)
 - [Progression Mutation Status Handling Recipe](/mod/alecs-tamework/progression-mutation-status-handling-recipe)
 - [Interaction Extension Registration Recipe](/mod/alecs-tamework/interaction-extension-registration-recipe)

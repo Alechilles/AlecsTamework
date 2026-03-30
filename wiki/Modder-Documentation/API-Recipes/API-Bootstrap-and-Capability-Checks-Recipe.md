@@ -1,6 +1,6 @@
 ---
 title: "API Bootstrap and Capability Checks Recipe"
-order: 2
+order: 20
 published: true
 draft: false
 ---
@@ -41,4 +41,3 @@ if (!caps.contains(TameworkApiCapability.COMMAND_LINKS)) {
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Profiles API Reference](/mod/alecs-tamework/profiles-api-reference)
-

@@ -53,5 +53,9 @@ Each subview is optional and only present when the target NPC has that system ac
 
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
-- [Progression Mutation Status Handling Recipe](/mod/alecs-tamework/progression-mutation-status-handling-recipe)
-
+- [Increase Mob Happiness from Custom Interaction Recipe](/mod/alecs-tamework/increase-mob-happiness-from-custom-interaction-recipe)
+- [Decrease Mob Happiness from Negative Event Recipe](/mod/alecs-tamework/decrease-mob-happiness-from-negative-event-recipe)
+- [Set Hunger and Thirst from Custom Feeding Recipe](/mod/alecs-tamework/set-hunger-and-thirst-from-custom-feeding-recipe)
+- [Force Breeding Ready from Custom Ritual Recipe](/mod/alecs-tamework/force-breeding-ready-from-custom-ritual-recipe)
+- [Reroll Traits and Show Values Recipe](/mod/alecs-tamework/reroll-traits-and-show-values-recipe)
+- [Apply Attachment Preset from Custom UI Recipe](/mod/alecs-tamework/apply-attachment-preset-from-custom-ui-recipe)

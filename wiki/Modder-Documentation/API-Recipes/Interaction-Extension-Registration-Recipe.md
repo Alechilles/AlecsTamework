@@ -1,6 +1,6 @@
 ---
 title: "Interaction Extension Registration Recipe"
-order: 7
+order: 23
 published: true
 draft: false
 ---
@@ -48,4 +48,3 @@ for (AutoCloseable handle : handles) {
 
 ## Related Pages
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
-

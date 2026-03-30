@@ -1,6 +1,6 @@
 ---
 title: "Progression Mutation Status Handling Recipe"
-order: 6
+order: 22
 published: true
 draft: false
 ---
@@ -46,4 +46,3 @@ switch (result.status()) {
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
-
