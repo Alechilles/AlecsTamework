@@ -6,7 +6,7 @@ draft: false
 ---
 # Interaction Extension Registration Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: register custom requirement/effect handlers and a preset, then unregister cleanly.
 
@@ -48,3 +48,4 @@ for (AutoCloseable handle : handles) {
 
 ## Related Pages
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
+

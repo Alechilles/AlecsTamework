@@ -6,7 +6,7 @@ draft: false
 ---
 # Check Population Cap before Spawning or Taming Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: query Tamework's effective ownership cap before your plugin allows a tame/spawn flow.
 
@@ -27,4 +27,5 @@ startSpawnOrTameFlow(ownerUuid);
 
 ## Related Pages
 - [Policies API Reference](/mod/alecs-tamework/policies-api-reference)
+
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Player Glossary
 
-Parent: [Troubleshooting and Glossary Index](/mod/alecs-tamework/troubleshooting-and-glossary-index) | [Player Guides Index](/mod/alecs-tamework/player-guides-index)
+Parent: [Troubleshooting and Glossary](/mod/alecs-tamework/troubleshooting-and-glossary-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
 
 ## Common terms
 - `Owner`: the player currently recognized as the companion's owner.
@@ -29,4 +29,5 @@ Parent: [Troubleshooting and Glossary Index](/mod/alecs-tamework/troubleshooting
 - [What Tamework Is](/mod/alecs-tamework/what-tamework-is)
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
 - [Happiness, Needs, Breeding, and Traits](/mod/alecs-tamework/happiness-needs-breeding-and-traits)
+
 

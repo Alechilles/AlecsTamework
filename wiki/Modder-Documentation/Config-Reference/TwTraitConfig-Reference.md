@@ -6,7 +6,7 @@ draft: false
 ---
 # TwTraitConfig Reference
 
-Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 ## What It Controls
 `TwTraitConfig` defines trait pools, how many traits an NPC can roll, how inheritance and mutation behave, and the numerical ranges each trait can contribute.
@@ -193,4 +193,5 @@ Authoring guidance:
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
+
 

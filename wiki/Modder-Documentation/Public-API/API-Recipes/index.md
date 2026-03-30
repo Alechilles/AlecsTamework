@@ -1,12 +1,12 @@
 ---
-title: "API Recipes Index"
+title: "API Recipes"
 order: 1
 published: true
 draft: false
 ---
-# API Recipes Index
+# API Recipes
 
-Parent: [Public API Index](/mod/alecs-tamework/public-api-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Public API](/mod/alecs-tamework/public-api-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 This subsection provides task-focused examples for common Tamework API integration workflows.
 
@@ -37,3 +37,4 @@ This subsection provides task-focused examples for common Tamework API integrati
 - [Progression Mutation Status Handling Recipe](/mod/alecs-tamework/progression-mutation-status-handling-recipe)
 - [Interaction Extension Registration Recipe](/mod/alecs-tamework/interaction-extension-registration-recipe)
 - [In-Game API Self-Test Smoke Recipe](/mod/alecs-tamework/in-game-api-self-test-smoke-recipe)
+

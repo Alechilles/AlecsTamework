@@ -6,7 +6,7 @@ draft: false
 ---
 # Happiness, Needs, Breeding, and Traits
 
-Parent: [Systems Index](/mod/alecs-tamework/systems-index) | [Player Guides Index](/mod/alecs-tamework/player-guides-index)
+Parent: [Systems](/mod/alecs-tamework/systems-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
 
 Many Tamework-powered mods share a cluster of long-term progression systems. The mod decides the exact numbers and compatible creatures, but the framework supplies the common behavior.
 
@@ -39,4 +39,5 @@ Many Tamework-powered mods share a cluster of long-term progression systems. The
 - [Coops, Feed Troughs, and Shared Systems](/mod/alecs-tamework/coops-feed-troughs-and-shared-systems)
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
 - [Player Glossary](/mod/alecs-tamework/player-glossary)
+
 

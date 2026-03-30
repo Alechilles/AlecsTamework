@@ -6,7 +6,7 @@ draft: false
 ---
 # TwDebugConfig Reference
 
-Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 ## What It Controls
 `TwDebugConfig` defines the default debug-toggle state for Tamework’s built-in debug commands. It is the config family you use when you want a dev or test environment to boot with specific debug channels already enabled.
@@ -94,4 +94,5 @@ Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
+
 

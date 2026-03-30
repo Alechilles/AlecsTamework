@@ -6,7 +6,7 @@ draft: false
 ---
 # Profiles API Reference
 
-Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `profiles()` contract in `TameworkApi`.
@@ -47,3 +47,4 @@ Capability: `PROFILES`
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Read Saved Home Position and Show a Waypoint Recipe](/mod/alecs-tamework/read-saved-home-position-and-show-a-waypoint-recipe)
 - [Build Companion Inspector UI Card Recipe](/mod/alecs-tamework/build-companion-inspector-ui-card-recipe)
+

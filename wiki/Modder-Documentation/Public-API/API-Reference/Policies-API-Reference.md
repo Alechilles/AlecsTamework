@@ -6,7 +6,7 @@ draft: false
 ---
 # Policies API Reference
 
-Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `policies()` contract in `TameworkApi`.
@@ -38,3 +38,4 @@ Capability: `POLICY`
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Enforce Ownership before Custom Command or Effect Recipe](/mod/alecs-tamework/enforce-ownership-before-custom-command-or-effect-recipe)
 - [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
+

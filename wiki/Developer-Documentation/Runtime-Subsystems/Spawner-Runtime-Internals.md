@@ -6,7 +6,7 @@ draft: false
 ---
 # Spawner Runtime Internals
 
-Parent: [Runtime Subsystems Index](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation Index](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
 
 ## Main orchestrator
 `SpawnerFeatureHandler`
@@ -29,4 +29,5 @@ Spawner behavior is not a single monolithic capture method. Each collaborator ow
 ## Related Pages
 - [Persistence, SQLite, and Data Paths](/mod/alecs-tamework/persistence-sqlite-and-data-paths)
 - [Command Runtime and Linked Panel Internals](/mod/alecs-tamework/command-runtime-and-linked-panel-internals)
+
 

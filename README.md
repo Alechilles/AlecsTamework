@@ -41,26 +41,26 @@ For many mods, that work can stay entirely in JSON and asset authoring. The full
 
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)
-- [Player Guides Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides-index)
-- [Getting Started Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/getting-started-index)
-- [Companion Controls Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/companion-controls-index)
-- [Systems Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/systems-index)
-- [Troubleshooting and Glossary Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/troubleshooting-and-glossary-index)
-- [Modder Documentation Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation-index)
-- [Start Here Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/start-here-index)
+- [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides-index)
+- [Getting Started](https://wiki.hytalemodding.dev/mod/alecs-tamework/getting-started-index)
+- [Companion Controls](https://wiki.hytalemodding.dev/mod/alecs-tamework/companion-controls-index)
+- [Systems](https://wiki.hytalemodding.dev/mod/alecs-tamework/systems-index)
+- [Troubleshooting and Glossary](https://wiki.hytalemodding.dev/mod/alecs-tamework/troubleshooting-and-glossary-index)
+- [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation-index)
+- [Start Here](https://wiki.hytalemodding.dev/mod/alecs-tamework/start-here-index)
 - [Public API Overview](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-overview)
-- [Public API Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-index)
-- [API Reference Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-reference-index)
-- [API Recipes Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-recipes-index)
-- [System Integration Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/system-integration-index)
-- [Config Reference Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/config-reference-index)
-- [Testing and Diagnostics Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/testing-and-diagnostics-index)
-- [Optional Integrations Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/optional-integrations-index)
-- [Developer Documentation Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation-index)
-- [Core Architecture Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/core-architecture-index)
-- [Runtime Subsystems Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/runtime-subsystems-index)
-- [Data and Persistence Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/data-and-persistence-index)
-- [Tooling and Contribution Index](https://wiki.hytalemodding.dev/mod/alecs-tamework/tooling-and-contribution-index)
+- [Public API](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-index)
+- [API Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-reference-index)
+- [API Recipes](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-recipes-index)
+- [System Integration](https://wiki.hytalemodding.dev/mod/alecs-tamework/system-integration-index)
+- [Config Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/config-reference-index)
+- [Testing and Diagnostics](https://wiki.hytalemodding.dev/mod/alecs-tamework/testing-and-diagnostics-index)
+- [Optional Integrations](https://wiki.hytalemodding.dev/mod/alecs-tamework/optional-integrations-index)
+- [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation-index)
+- [Core Architecture](https://wiki.hytalemodding.dev/mod/alecs-tamework/core-architecture-index)
+- [Runtime Subsystems](https://wiki.hytalemodding.dev/mod/alecs-tamework/runtime-subsystems-index)
+- [Data and Persistence](https://wiki.hytalemodding.dev/mod/alecs-tamework/data-and-persistence-index)
+- [Tooling and Contribution](https://wiki.hytalemodding.dev/mod/alecs-tamework/tooling-and-contribution-index)
 
 ## For Contributors
 - [Source Repository](https://github.com/Alechilles/AlecsTamework)
@@ -75,3 +75,4 @@ For many mods, that work can stay entirely in JSON and asset authoring. The full
 If you run into a bug, integration issue, or behavior problem, report it in the Discord server:
 
 https://discord.gg/E8n8RgTTdq
+

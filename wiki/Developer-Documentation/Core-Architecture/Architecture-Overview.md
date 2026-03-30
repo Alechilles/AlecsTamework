@@ -6,7 +6,7 @@ draft: false
 ---
 # Architecture Overview
 
-Parent: [Core Architecture Index](/mod/alecs-tamework/core-architecture-index) | [Developer Documentation Index](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Core Architecture](/mod/alecs-tamework/core-architecture-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
 
 Tamework is split into two broad layers:
 - asset layer: NPC templates, items, particle assets, bundled `Server/Tamework` configs, and translation content
@@ -35,4 +35,5 @@ The codebase prefers a thin orchestrator plus focused collaborator services. Tha
 ## Related Pages
 - [Bootstrap, Builder Registration, and Extension Points](/mod/alecs-tamework/bootstrap-builder-registration-and-extension-points)
 - [Config Loading, Registries, Inheritance, and Overrides](/mod/alecs-tamework/config-loading-registries-inheritance-and-overrides)
+
 

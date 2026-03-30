@@ -6,7 +6,7 @@ draft: false
 ---
 # Setup and Quick Start
 
-Parent: [Start Here Index](/mod/alecs-tamework/start-here-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Start Here](/mod/alecs-tamework/start-here-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Use this page when you want to add Alec's Tamework as a dependency and get a basic interactive NPC working quickly.
 
@@ -88,4 +88,5 @@ Add prompt, item, and UI keys in:
 - [Interaction Paths and Role Wiring](/mod/alecs-tamework/interaction-paths-and-role-wiring)
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
+
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Force Breeding Ready from Custom Ritual Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: your plugin consumes an item/ritual and marks a companion as breeding-ready.
 
@@ -32,4 +32,5 @@ if (result.status() == ProgressionMutationStatus.UNSUPPORTED) {
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 

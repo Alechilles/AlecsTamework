@@ -6,7 +6,7 @@ draft: false
 ---
 # TwHappinessConfig Reference
 
-Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 ## What It Controls
 `TwHappinessConfig` defines the shared wellbeing score used by Tamework progression systems. It controls baseline happiness, convergence, event-based gains and losses, and contextual modifiers from hunger, thirst, nearby population, and owner proximity.
@@ -186,4 +186,5 @@ Additional field:
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference)
+
 

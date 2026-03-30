@@ -6,7 +6,7 @@ draft: false
 ---
 # Ownership, Damage, and Progression Internals
 
-Parent: [Runtime Subsystems Index](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation Index](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
 
 ## Core components
 - `TameworkOwnerComponent`
@@ -43,4 +43,5 @@ Parent: [Runtime Subsystems Index](/mod/alecs-tamework/runtime-subsystems-index)
 ## Related Pages
 - [Optimized Interaction Pipeline Internals](/mod/alecs-tamework/optimized-interaction-pipeline-internals)
 - [Spawner Runtime Internals](/mod/alecs-tamework/spawner-runtime-internals)
+
 

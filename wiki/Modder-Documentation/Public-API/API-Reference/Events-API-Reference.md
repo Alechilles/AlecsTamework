@@ -6,7 +6,7 @@ draft: false
 ---
 # Events API Reference
 
-Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `events()` contract in `TameworkApi`.
@@ -60,3 +60,4 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - [Auto-Register Companion on Capture Event Recipe](/mod/alecs-tamework/auto-register-companion-on-capture-event-recipe)
 - [Pause Companion Jobs on Death or Lost Event Recipe](/mod/alecs-tamework/pause-companion-jobs-on-death-or-lost-event-recipe)
 - [Keep Companion Cache in Sync with Profile Changed Events Recipe](/mod/alecs-tamework/keep-companion-cache-in-sync-with-profile-changed-events-recipe)
+

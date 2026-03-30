@@ -1,12 +1,12 @@
 ---
-title: "API Reference Index"
+title: "API Reference"
 order: 1
 published: true
 draft: false
 ---
-# API Reference Index
+# API Reference
 
-Parent: [Public API Index](/mod/alecs-tamework/public-api-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Public API](/mod/alecs-tamework/public-api-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 This subsection contains the reference contract for each public API family.
 
@@ -24,4 +24,5 @@ This subsection contains the reference contract for each public API family.
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
+
 

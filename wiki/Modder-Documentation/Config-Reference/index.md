@@ -1,12 +1,12 @@
 ---
-title: "Config Reference Index"
+title: "Config Reference"
 order: 1
 published: true
 draft: false
 ---
-# Config Reference Index
+# Config Reference
 
-Parent: [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
+Parent: [Modder Documentation](/mod/alecs-tamework/modder-documentation-index) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
 
 This subsection contains one page per `Tw*Config` asset family. Structure is intentionally unchanged in this reorganization pass.
 
@@ -23,3 +23,4 @@ This subsection contains one page per `Tw*Config` asset family. Structure is int
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference)
 - [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference)
 - [TwDebugConfig Reference](/mod/alecs-tamework/twdebugconfig-reference)
+

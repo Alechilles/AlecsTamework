@@ -6,7 +6,7 @@ draft: false
 ---
 # TwBreedingConfig Reference
 
-Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 ## What It Controls
 `TwBreedingConfig` defines breeding readiness, partner eligibility, pairing rules, cooldowns, passive breeding scans, inheritance behavior, offspring lifecycle defaults, and role-specific breeding overrides.
@@ -277,4 +277,5 @@ Important behavior:
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
+
 

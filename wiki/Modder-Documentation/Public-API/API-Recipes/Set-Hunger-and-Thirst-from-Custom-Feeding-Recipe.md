@@ -6,7 +6,7 @@ draft: false
 ---
 # Set Hunger and Thirst from Custom Feeding Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: map your custom food/water mechanic into Tamework needs values.
 
@@ -35,4 +35,5 @@ if (result.status() != ProgressionMutationStatus.APPLIED) {
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 

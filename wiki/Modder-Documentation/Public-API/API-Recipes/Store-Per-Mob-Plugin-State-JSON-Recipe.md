@@ -6,7 +6,7 @@ draft: false
 ---
 # Store Per-Mob Plugin State JSON Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: keep plugin-specific state (cooldowns, affinity, quest flags, etc.) per companion profile.
 
@@ -46,3 +46,4 @@ boolean deleted = api.profileData().delete(profileId, "example.plugin", "compani
 
 ## Related Pages
 - [Profile Data API Reference](/mod/alecs-tamework/profile-data-api-reference)
+

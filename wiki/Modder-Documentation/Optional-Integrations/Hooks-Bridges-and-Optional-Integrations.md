@@ -6,7 +6,7 @@ draft: false
 ---
 # Hooks, Bridges, and Optional Integrations
 
-Parent: [Optional Integrations Index](/mod/alecs-tamework/optional-integrations-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 This page covers the boundary between config-driven authoring and custom behavior. Use hooks when you need custom logic without throwing away Tamework’s higher-level systems.
 
@@ -92,4 +92,5 @@ Use `AssetSets` when you want to enable optional bundled assets such as:
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
+
 

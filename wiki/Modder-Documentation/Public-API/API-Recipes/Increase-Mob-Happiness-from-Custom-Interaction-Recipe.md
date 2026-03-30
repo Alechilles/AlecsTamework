@@ -6,7 +6,7 @@ draft: false
 ---
 # Increase Mob Happiness from Custom Interaction Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: your plugin runs a custom interaction/event and rewards the companion with happiness.
 
@@ -32,4 +32,5 @@ if (result.status() == ProgressionMutationStatus.APPLIED) {
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 

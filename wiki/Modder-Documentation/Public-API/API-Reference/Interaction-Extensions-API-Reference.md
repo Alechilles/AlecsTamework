@@ -6,7 +6,7 @@ draft: false
 ---
 # Interaction Extensions API Reference
 
-Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `interactionExtensions()` contract in `TameworkApi`.
@@ -47,3 +47,4 @@ Capability: `INTERACTION_EXTENSIONS`
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Interaction Extension Registration Recipe](/mod/alecs-tamework/interaction-extension-registration-recipe)
 - [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)
+

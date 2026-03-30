@@ -6,7 +6,7 @@ draft: false
 ---
 # Profile Data API Reference
 
-Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `profileData()` contract in `TameworkApi`.
@@ -41,3 +41,4 @@ Use your plugin id (for example `example.plugin`) as the namespace.
 ## Related Pages
 - [Public API Overview](/mod/alecs-tamework/public-api-overview)
 - [Store Per-Mob Plugin State JSON Recipe](/mod/alecs-tamework/store-per-mob-plugin-state-json-recipe)
+

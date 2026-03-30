@@ -6,7 +6,7 @@ draft: false
 ---
 # Optimized Interaction Pipeline Internals
 
-Parent: [Runtime Subsystems Index](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation Index](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
 
 ## Core entry points
 - Action builder: `BuilderActionTameworkInteract`
@@ -36,4 +36,5 @@ It replaces very large vanilla instruction chains with a data-driven config surf
 ## Related Pages
 - [Config Loading, Registries, Inheritance, and Overrides](/mod/alecs-tamework/config-loading-registries-inheritance-and-overrides)
 - [Ownership, Damage, and Progression Internals](/mod/alecs-tamework/ownership-damage-and-progression-internals)
+
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Reroll Traits and Show Values Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: trigger a trait reroll from your own feature and show players the new values.
 
@@ -37,4 +37,5 @@ for (ProgressionView.TraitValueView value : traits.values()) {
 
 ## Related Pages
 - [Progression API Reference](/mod/alecs-tamework/progression-api-reference)
+
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Pause Companion Jobs on Death or Lost Event Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: pause your plugin's job/task system when companions die or become lost.
 
@@ -38,4 +38,5 @@ public void start(TameworkApi api) {
 
 ## Related Pages
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
+
 

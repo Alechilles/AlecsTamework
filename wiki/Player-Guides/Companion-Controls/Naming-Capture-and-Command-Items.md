@@ -6,7 +6,7 @@ draft: false
 ---
 # Naming, Capture, and Command Items
 
-Parent: [Companion Controls Index](/mod/alecs-tamework/companion-controls-index) | [Player Guides Index](/mod/alecs-tamework/player-guides-index)
+Parent: [Companion Controls](/mod/alecs-tamework/companion-controls-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
 
 Tamework-powered mods often use three reusable item families: naming items, spawner or capture items, and command items.
 
@@ -42,4 +42,5 @@ Tamework-powered mods often use three reusable item families: naming items, spaw
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
 - [Command Radial and Controls](/mod/alecs-tamework/command-radial-and-controls)
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
+
 

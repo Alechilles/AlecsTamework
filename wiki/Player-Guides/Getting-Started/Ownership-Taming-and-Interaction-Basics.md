@@ -6,7 +6,7 @@ draft: false
 ---
 # Ownership, Taming, and Interaction Basics
 
-Parent: [Getting Started Index](/mod/alecs-tamework/getting-started-index) | [Player Guides Index](/mod/alecs-tamework/player-guides-index)
+Parent: [Getting Started](/mod/alecs-tamework/getting-started-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
 
 Many Tamework-powered creatures use three core ideas: whether the NPC is tamed, whether it has an owner, and which interaction is currently valid.
 
@@ -42,4 +42,5 @@ Many Tamework-powered creatures use three core ideas: whether the NPC is tamed, 
 - [Command Radial and Controls](/mod/alecs-tamework/command-radial-and-controls)
 - [Linked Panel Guide](/mod/alecs-tamework/linked-panel-guide)
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
+
 

@@ -6,7 +6,7 @@ draft: false
 ---
 # Coop and Feed Trough Guide
 
-Parent: [System Integration Index](/mod/alecs-tamework/system-integration-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [System Integration](/mod/alecs-tamework/system-integration-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Tamework can manage certain coop behaviors and can also participate in feed-trough hydration or refill flows.
 
@@ -29,4 +29,5 @@ Tamework can manage certain coop behaviors and can also participate in feed-trou
 - [TwCoopConfig Reference](/mod/alecs-tamework/twcoopconfig-reference)
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
+
 

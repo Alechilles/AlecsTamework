@@ -6,7 +6,7 @@ draft: false
 ---
 # TwCompanionConfig Reference
 
-Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 ## What It Controls
 `TwCompanionConfig` is the role-scoped companion policy family. Use it when a specific set of NPC roles should share ownership rules, command behavior, revive policy, and cross-world travel handling.
@@ -174,4 +174,5 @@ Use `TwGlobalConfig.Command` for shared runtime infrastructure:
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 - [Command System and Linked Panel Guide](/mod/alecs-tamework/command-system-and-linked-panel-guide)
+
 

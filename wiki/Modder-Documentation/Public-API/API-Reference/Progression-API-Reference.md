@@ -6,7 +6,7 @@ draft: false
 ---
 # Progression API Reference
 
-Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
 
 > **Experimental API Contract (`0.4.0`)**
 > This reference tracks the current `progression()` contract in `TameworkApi`.
@@ -59,3 +59,4 @@ Each subview is optional and only present when the target NPC has that system ac
 - [Force Breeding Ready from Custom Ritual Recipe](/mod/alecs-tamework/force-breeding-ready-from-custom-ritual-recipe)
 - [Reroll Traits and Show Values Recipe](/mod/alecs-tamework/reroll-traits-and-show-values-recipe)
 - [Apply Attachment Preset from Custom UI Recipe](/mod/alecs-tamework/apply-attachment-preset-from-custom-ui-recipe)
+

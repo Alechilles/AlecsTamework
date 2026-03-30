@@ -6,7 +6,7 @@ draft: false
 ---
 # Debugging and Debug Commands
 
-Parent: [Testing and Diagnostics Index](/mod/alecs-tamework/testing-and-diagnostics-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Testing and Diagnostics](/mod/alecs-tamework/testing-and-diagnostics-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Use this page when a Tamework integration compiles but behaves incorrectly at runtime.
 
@@ -48,4 +48,5 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - [TwDebugConfig Reference](/mod/alecs-tamework/twdebugconfig-reference)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
+
 

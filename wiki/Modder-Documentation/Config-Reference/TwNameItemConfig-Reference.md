@@ -6,7 +6,7 @@ draft: false
 ---
 # TwNameItemConfig Reference
 
-Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 ## What It Controls
 `TwNameItemConfig` binds naming rules to a specific item. It decides which NPC roles can be named, what ownership and taming checks are required, what names are allowed, and what feedback happens on success.
@@ -137,4 +137,5 @@ Custom validation is also supported through:
 - [Naming System Guide](/mod/alecs-tamework/naming-system-guide)
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
+
 

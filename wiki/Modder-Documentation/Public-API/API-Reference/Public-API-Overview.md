@@ -6,7 +6,7 @@ draft: false
 ---
 # Public API Overview
 
-Parent: [API Reference Index](/mod/alecs-tamework/api-reference-index) | [Public API Index](/mod/alecs-tamework/public-api-index)
+Parent: [API Reference](/mod/alecs-tamework/api-reference-index) | [Public API](/mod/alecs-tamework/public-api-index)
 
 Use this page to bootstrap against `TameworkApi`, verify capabilities, and choose the correct family reference page.
 
@@ -114,4 +114,5 @@ See:
 - [In-Game API Self-Tests](/mod/alecs-tamework/in-game-api-self-tests)
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+
 

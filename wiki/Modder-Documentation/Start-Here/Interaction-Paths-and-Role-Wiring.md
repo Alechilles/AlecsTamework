@@ -6,7 +6,7 @@ draft: false
 ---
 # Interaction Paths and Role Wiring
 
-Parent: [Start Here Index](/mod/alecs-tamework/start-here-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Start Here](/mod/alecs-tamework/start-here-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 This page is about implementation flow. Use it to choose the right interaction path, wire the role correctly, and know which reference pages hold the exact schema.
 
@@ -103,4 +103,5 @@ This keeps the interaction authoring simple while preserving full custom behavio
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
+
 

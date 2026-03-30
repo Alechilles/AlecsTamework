@@ -1,12 +1,12 @@
 ---
-title: "Public API Index"
+title: "Public API"
 order: 1
 published: true
 draft: false
 ---
-# Public API Index
+# Public API
 
-Parent: [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
+Parent: [Modder Documentation](/mod/alecs-tamework/modder-documentation-index) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
 
 This subsection is the parent category for all public Java API docs.
 
@@ -14,5 +14,6 @@ This subsection is the parent category for all public Java API docs.
 > This is a public integration surface, but the contract is still experimental. Keep capability checks in downstream mods.
 
 ## Child Pages
-- [API Reference Index](/mod/alecs-tamework/api-reference-index)
-- [API Recipes Index](/mod/alecs-tamework/api-recipes-index)
+- [API Reference](/mod/alecs-tamework/api-reference-index)
+- [API Recipes](/mod/alecs-tamework/api-recipes-index)
+

@@ -6,7 +6,7 @@ draft: false
 ---
 # TwCoopConfig Reference
 
-Parent: [Config Reference Index](/mod/alecs-tamework/config-reference-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [Config Reference](/mod/alecs-tamework/config-reference-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 ## What It Controls
 `TwCoopConfig` defines Tamework-managed coop behavior for a specific `CoopId`. It controls who can be captured into the coop, what residents can live there, how produce is generated, and how identity is preserved during release.
@@ -155,4 +155,5 @@ Compatibility note:
 ## Related Pages
 - [Coop and Feed Trough Guide](/mod/alecs-tamework/coop-and-feed-trough-guide)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+
 

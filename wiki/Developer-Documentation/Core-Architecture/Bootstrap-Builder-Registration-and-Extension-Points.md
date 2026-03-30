@@ -6,7 +6,7 @@ draft: false
 ---
 # Bootstrap, Builder Registration, and Extension Points
 
-Parent: [Core Architecture Index](/mod/alecs-tamework/core-architecture-index) | [Developer Documentation Index](/mod/alecs-tamework/developer-documentation-index)
+Parent: [Core Architecture](/mod/alecs-tamework/core-architecture-index) | [Developer Documentation](/mod/alecs-tamework/developer-documentation-index)
 
 ## Entrypoint bootstrap
 `Tamework.java` owns setup. It initializes registries, the asset pack coordinator, override management, persistence, feature handlers, telemetry, item interactions, components, and the various gameplay systems.
@@ -34,4 +34,5 @@ During setup, Tamework registers:
 ## Related Pages
 - [Config Loading, Registries, Inheritance, and Overrides](/mod/alecs-tamework/config-loading-registries-inheritance-and-overrides)
 - [Command and Debug Internals](/mod/alecs-tamework/command-and-debug-internals)
+
 

@@ -1,12 +1,12 @@
 ---
-title: "Runtime Subsystems Index"
+title: "Runtime Subsystems"
 order: 1
 published: true
 draft: false
 ---
-# Runtime Subsystems Index
+# Runtime Subsystems
 
-Parent: [Developer Documentation Index](/mod/alecs-tamework/developer-documentation-index) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
+Parent: [Developer Documentation](/mod/alecs-tamework/developer-documentation-index) | [Alec's Tamework Wiki](/mod/alecs-tamework/alecs-tamework-wiki)
 
 This subsection groups subsystem-level runtime internals used by core Tamework features.
 
@@ -16,3 +16,4 @@ This subsection groups subsystem-level runtime internals used by core Tamework f
 - [Naming Runtime Internals](/mod/alecs-tamework/naming-runtime-internals)
 - [Command Runtime and Linked Panel Internals](/mod/alecs-tamework/command-runtime-and-linked-panel-internals)
 - [Ownership, Damage, and Progression Internals](/mod/alecs-tamework/ownership-damage-and-progression-internals)
+

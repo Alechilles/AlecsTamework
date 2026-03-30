@@ -6,7 +6,7 @@ draft: false
 ---
 # Enforce Ownership before Custom Command or Effect Recipe
 
-Parent: [API Recipes Index](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation Index](/mod/alecs-tamework/modder-documentation-index)
+Parent: [API Recipes](/mod/alecs-tamework/api-recipes-index) | [Modder Documentation](/mod/alecs-tamework/modder-documentation-index)
 
 Goal: block your plugin command/effect unless the player actually owns the companion.
 
@@ -32,4 +32,5 @@ runCustomEffect(profileId.get(), playerUuid);
 
 ## Related Pages
 - [Policies API Reference](/mod/alecs-tamework/policies-api-reference)
+
 

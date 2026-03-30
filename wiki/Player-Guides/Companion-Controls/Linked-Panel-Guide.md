@@ -6,7 +6,7 @@ draft: false
 ---
 # Linked Panel Guide
 
-Parent: [Companion Controls Index](/mod/alecs-tamework/companion-controls-index) | [Player Guides Index](/mod/alecs-tamework/player-guides-index)
+Parent: [Companion Controls](/mod/alecs-tamework/companion-controls-index) | [Player Guides](/mod/alecs-tamework/player-guides-index)
 
 The linked panel is the side panel that appears with Tamework command tools. It is the main place for inspecting and managing individual companions.
 
@@ -61,4 +61,5 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
 
 > [Screenshot Placeholder: Linked panel showing active, inactive, dead, and lost rows]
+
 
