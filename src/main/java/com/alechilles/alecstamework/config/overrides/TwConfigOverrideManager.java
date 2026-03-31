@@ -44,6 +44,7 @@ public final class TwConfigOverrideManager {
     private static final String STAGING_DIR_NAME = "_staging";
     private static final String OVERRIDE_PACK_PREFIX = "tamework-overrides::";
     private static final int BACKUP_RETENTION = 10;
+    private static final int STAGING_RELOAD_RETENTION = 10;
     private static final DateTimeFormatter SNAPSHOT_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT);
 
@@ -209,7 +210,8 @@ public final class TwConfigOverrideManager {
             }
             TwConfigSnapshot snapshot = createSnapshot(world);
             Path overrideRoot = resolveOverrideRoot(world);
-            Path stagingRoot = overrideRoot.resolve(STAGING_DIR_NAME)
+            Path stagingParent = overrideRoot.resolve(STAGING_DIR_NAME).normalize();
+            Path stagingRoot = stagingParent
                     .resolve("reload-" + UUID.randomUUID())
                     .normalize();
             ArrayList<String> errors = new ArrayList<>();
@@ -340,9 +342,9 @@ public final class TwConfigOverrideManager {
             loadedOverrideSourcePackKeys.clear();
             loadedOverrideSourcePackKeys.addAll(stagedPackKeys);
             try {
-                deleteRecursively(stagingRoot);
+                pruneReloadStagingDirectories(stagingParent, STAGING_RELOAD_RETENTION);
             } catch (IOException ex) {
-                plugin.getLogger().at(Level.WARNING).withCause(ex).log("Failed cleaning override staging root.");
+                plugin.getLogger().at(Level.WARNING).withCause(ex).log("Failed pruning override staging directories.");
             }
             plugin.getLogger().at(Level.INFO).log(
                     "TwConfig reload finished: loadedDirs=" + loadedDirectories
@@ -851,6 +853,36 @@ public final class TwConfigOverrideManager {
         directories.sort(Comparator.comparing(Path::getFileName, Comparator.nullsLast(Comparator.reverseOrder())));
         for (int i = keep; i < directories.size(); i++) {
             deleteRecursively(directories.get(i));
+        }
+    }
+
+    static void pruneReloadStagingDirectories(@Nullable Path stagingRoot, int retention) throws IOException {
+        if (stagingRoot == null || !Files.isDirectory(stagingRoot)) {
+            return;
+        }
+        int keep = Math.max(1, retention);
+        ArrayList<Path> directories = new ArrayList<>();
+        try (DirectoryStream<Path> stream = Files.newDirectoryStream(stagingRoot, "reload-*")) {
+            for (Path child : stream) {
+                if (Files.isDirectory(child)) {
+                    directories.add(child);
+                }
+            }
+        }
+        directories.sort(Comparator
+                .comparingLong(TwConfigOverrideManager::lastModifiedMillis)
+                .reversed()
+                .thenComparing(path -> path.getFileName().toString(), String.CASE_INSENSITIVE_ORDER));
+        for (int i = keep; i < directories.size(); i++) {
+            deleteRecursively(directories.get(i));
+        }
+    }
+
+    private static long lastModifiedMillis(@Nonnull Path path) {
+        try {
+            return Files.getLastModifiedTime(path).toMillis();
+        } catch (IOException ignored) {
+            return 0L;
         }
     }
 
