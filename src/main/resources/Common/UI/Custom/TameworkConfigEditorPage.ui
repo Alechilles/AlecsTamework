@@ -59,6 +59,32 @@ $C.@PageOverlay {
           Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
 
           Label {
+            Anchor: (Height: 18);
+            Text: %server.tamework.ui.configEditor.mod.label;
+            Style: (FontSize: 11, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, RenderUppercase: true);
+          }
+
+          DropdownBox #TwConfigModDropdown {
+            Anchor: (Top: 4, Height: 24);
+            Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+            MaxSelection: 1;
+            NoItemsText: %server.tamework.ui.configEditor.mod.none;
+          }
+
+          Label {
+            Anchor: (Height: 18);
+            Text: %server.tamework.ui.configEditor.family.label;
+            Style: (FontSize: 11, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center, RenderUppercase: true);
+          }
+
+          DropdownBox #TwConfigFamilyDropdown {
+            Anchor: (Top: 4, Height: 24);
+            Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+            MaxSelection: 1;
+            NoItemsText: %server.tamework.ui.configEditor.family.none;
+          }
+
+          Label #TwConfigAssetFamilyTitle {
             Anchor: (Height: 20);
             Text: %server.tamework.ui.configEditor.assets.title;
             Style: (FontSize: 14, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
@@ -74,17 +100,41 @@ $C.@PageOverlay {
             Padding: (Horizontal: 8);
           }
 
-          DropdownBox #TwConfigAssetDropdown {
-            Anchor: (Top: 6, Height: 24);
-            Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
-            MaxSelection: 1;
-            NoItemsText: %server.tamework.ui.configEditor.assets.none;
+          Group {
+            Anchor: (Top: 6, Height: 168);
+            Background: #10233a;
+
+            Group #TwConfigAssetListViewport {
+              Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+              LayoutMode: TopScrolling;
+              KeepScrollPosition: true;
+              ScrollbarStyle: $C.@DefaultScrollbarStyle;
+              Padding: (Left: 2, Right: 0, Top: 2, Bottom: 2);
+
+              Group #TwConfigAssetListRows {
+                LayoutMode: Top;
+                Anchor: (Left: 0, Right: 0, Bottom: 0);
+              }
+            }
+
+            Label #TwConfigAssetListEmpty {
+              Anchor: (Top: 8, Left: 8, Right: 8, Height: 20);
+              Text: %server.tamework.ui.configEditor.assets.list.empty;
+              Style: (FontSize: 11, TextColor: #9eb3ca, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+              Visible: false;
+            }
           }
 
           Label #TwConfigAssetCount {
             Anchor: (Top: 4, Height: 18);
             Text: %server.tamework.ui.configEditor.assetCount.initial;
             Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          Label #TwConfigAssetScopeText {
+            Anchor: (Top: 0, Height: 16);
+            Text: "";
+            Style: (FontSize: 10, TextColor: #9eb3ca, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: false);
           }
 
           Label {

@@ -1,13 +1,13 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.overrides.TwConfigAssetDescriptor;
 import com.alechilles.alecstamework.config.overrides.TwConfigFamily;
 import com.alechilles.alecstamework.config.overrides.TwConfigJsonUtil;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.overrides.TwConfigSnapshot;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
@@ -45,17 +45,21 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Global-only in-world config editor page (asset-editor style property grid).
+ * In-world TwConfig editor page (asset-editor style property grid).
  */
 public final class TameworkConfigEditorPage
         extends InteractiveCustomUIPage<TameworkConfigEditorPage.EventPayload> {
     public static final String UI_PATH = "TameworkConfigEditorPage.ui";
     private static final String UI_SECTION_ROW = "TameworkConfigEditorSectionRow.ui";
     private static final String UI_FIELD_ROW = "TameworkConfigEditorFieldRow.ui";
+    private static final String UI_ASSET_ROW = "TameworkConfigEditorAssetListRow.ui";
 
     private static final String K_ACTION = "Action";
     private static final String K_PATH = "Path";
     private static final String K_FIELD_VALUE = "@FieldValueInput";
+    private static final String K_FIELD_BOOL = "@FieldValueBool";
+    private static final String K_MOD_KEY = "@SelectedModKey";
+    private static final String K_FAMILY_KEY = "@SelectedFamilyKey";
     private static final String K_ASSET_KEY = "@SelectedAssetKey";
     private static final String K_ASSET_FILTER = "@AssetFilterInput";
     private static final String K_PROPERTY_FILTER = "@PropertyFilterInput";
@@ -65,26 +69,12 @@ public final class TameworkConfigEditorPage
     private static final String A_APPLY_CONFIRM = "ApplyConfirm";
     private static final String A_APPLY_CANCEL = "ApplyCancel";
     private static final String A_CLOSE = "Close";
+    private static final String A_SELECT_ASSET = "SelectAsset";
     private static final String A_TOGGLE_SECTION = "ToggleSection";
     private static final String A_RESET = "Reset";
     private static final String A_SET_VALUE = "SetValue";
     private static final String PARENT_NONE_VALUE = "__none__";
-
-    private static final SectionDef S_GENERAL = new SectionDef("general", "tamework.ui.configEditor.section.general", 0, null);
-    private static final SectionDef S_OWNERSHIP = new SectionDef("ownership", "tamework.ui.configEditor.section.ownership", 0, null);
-    private static final SectionDef S_INTERACTION = new SectionDef("interaction", "tamework.ui.configEditor.section.interaction", 0, null);
-    private static final SectionDef S_COMMAND = new SectionDef("command", "tamework.ui.configEditor.section.command", 0, null);
-    private static final SectionDef S_ASSET_SETS = new SectionDef("assetsets", "tamework.ui.configEditor.section.assetSets", 0, null);
-    private static final SectionDef S_POPULATION = new SectionDef("population", "tamework.ui.configEditor.section.population", 0, null);
-    private static final SectionDef S_SIMPLE = new SectionDef("simpleclaims", "tamework.ui.configEditor.section.simpleClaims", 0, null);
-    private static final SectionDef S_SIMPLE_BREED = new SectionDef("simpleclaims-breeding", "tamework.ui.configEditor.section.breeding", 1, S_SIMPLE.id);
-    private static final SectionDef S_SIMPLE_DAMAGE = new SectionDef("simpleclaims-damage", "tamework.ui.configEditor.section.damage", 1, S_SIMPLE.id);
-
-    private static final List<RowDef> LAYOUT = buildLayout();
-    private static final Map<String, FieldDef> FIELDS = buildFields();
-    private static final Map<String, SectionDef> SECTIONS = buildSections();
-    private static final Set<String> KNOWN_TOP_LEVEL_KEYS = buildKnownTopLevelKeys();
-    private static final Map<String, JsonElement> INHERITED_FALLBACK_VALUES = buildInheritedFallbackValues();
+    private static final String MOD_ALL_KEY = "__all_mods__";
 
     private final Tamework plugin;
     private final World world;
@@ -92,13 +82,17 @@ public final class TameworkConfigEditorPage
 
     private TwConfigSnapshot snapshot;
     private final LinkedHashMap<String, TwConfigAssetDescriptor> descriptorByKey = new LinkedHashMap<>();
+    private final LinkedHashMap<String, ModView> modByKey = new LinkedHashMap<>();
+    private final LinkedHashMap<String, TwConfigSnapshot.FamilyView> familyByKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, JsonObject> sourceByKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, JsonObject> diskByKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, JsonObject> draftByKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, LinkedHashMap<String, String>> inputByDescriptor = new LinkedHashMap<>();
     private final LinkedHashMap<String, LinkedHashMap<String, String>> validationByDescriptor = new LinkedHashMap<>();
-    private final LinkedHashMap<String, Boolean> collapsedSections = new LinkedHashMap<>();
+    private final LinkedHashMap<String, LinkedHashMap<String, Boolean>> collapsedSectionsByDescriptor = new LinkedHashMap<>();
 
+    private String selectedModKey;
+    private String selectedFamilyKey;
     private String selectedDescriptorKey;
     private String assetFilter = "";
     private String propertyFilter = "";
@@ -114,7 +108,6 @@ public final class TameworkConfigEditorPage
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.world = Objects.requireNonNull(world, "world");
         this.overrideManager = Objects.requireNonNull(plugin.getConfigOverrideManager(), "overrideManager");
-        initializeCollapsedState();
         reloadSnapshot(false);
     }
 
@@ -159,13 +152,26 @@ public final class TameworkConfigEditorPage
                     toggleSection(data.path);
                     refreshUi();
                 }
+                case A_SELECT_ASSET -> {
+                    String key = resolveDescriptorKey(trim(data.path));
+                    if (key != null && !Objects.equals(key, selectedDescriptorKey)) {
+                        selectedDescriptorKey = key;
+                        warningLine = "";
+                        statusLine = "";
+                    }
+                    refreshUi();
+                }
                 case A_RESET -> {
                     resetField(data.path);
                     refreshUi();
                 }
                 case A_SET_VALUE -> {
-                    FieldDef field = FIELDS.get(trim(data.path));
-                    stageValue(data.path, data.value);
+                    FieldDef field = fieldForSelectedPath(data.path);
+                    String incomingValue = data.value;
+                    if (incomingValue == null && data.boolValue != null) {
+                        incomingValue = data.boolValue ? "true" : "false";
+                    }
+                    stageValue(data.path, incomingValue);
                     if (shouldRefreshAfterSetValue(field)) {
                         refreshUi();
                     }
@@ -177,6 +183,28 @@ public final class TameworkConfigEditorPage
         }
 
         boolean shouldRefresh = false;
+        if (data.modKey != null) {
+            String key = resolveModKey(trim(data.modKey));
+            if (key != null && !Objects.equals(key, selectedModKey)) {
+                selectedModKey = key;
+                selectedDescriptorKey = null;
+                warningLine = "";
+                statusLine = "";
+                ensureSelectedDescriptor();
+                shouldRefresh = true;
+            }
+        }
+        if (data.familyKey != null) {
+            String key = resolveFamilyKey(trim(data.familyKey));
+            if (key != null && !Objects.equals(key, selectedFamilyKey)) {
+                selectedFamilyKey = key;
+                selectedDescriptorKey = null;
+                warningLine = "";
+                statusLine = "";
+                ensureSelectedDescriptor();
+                shouldRefresh = true;
+            }
+        }
         if (data.assetFilter != null && !looksLikeSelectorExpression(data.assetFilter)) {
             String nextAssetFilter = sanitizeFilter(data.assetFilter);
             if (!Objects.equals(nextAssetFilter, assetFilter)) {
@@ -277,25 +305,56 @@ public final class TameworkConfigEditorPage
     private void reloadSnapshot(boolean clearStatus) {
         snapshot = overrideManager.createSnapshot(world);
         descriptorByKey.clear();
+        modByKey.clear();
+        familyByKey.clear();
         sourceByKey.clear();
         diskByKey.clear();
         draftByKey.clear();
 
-        for (TwConfigAssetDescriptor descriptor : snapshot.getDescriptors()) {
-            if (descriptor.family() != TwConfigFamily.GLOBAL) {
+        for (TwConfigFamily family : TwConfigFamily.values()) {
+            if (family == TwConfigFamily.OTHER || !family.isKnownType()) {
                 continue;
             }
-            String key = descriptor.descriptorKey();
-            descriptorByKey.put(key, descriptor);
-            JsonObject source = overrideManager.readSourceJson(descriptor);
-            JsonObject disk = overrideManager.readOverrideJson(world, descriptor);
-            sourceByKey.put(key, source);
-            diskByKey.put(key, disk);
-            draftByKey.put(key, TwConfigJsonUtil.copyObject(disk));
+            TwConfigSnapshot.FamilyView view = snapshot.getFamilies().get(family.getId());
+            if (view == null) {
+                view = new TwConfigSnapshot.FamilyView(
+                        family.getId(),
+                        family.getDisplayName(),
+                        family.isEditableInV1(),
+                        family.isKnownType()
+                );
+            }
+            if (view.knownType()) {
+                familyByKey.put(view.key(), view);
+            }
         }
 
+        for (TwConfigAssetDescriptor descriptor : snapshot.getDescriptors()) {
+            if (descriptor == null || !descriptor.knownType() || descriptor.family() == TwConfigFamily.OTHER) {
+                continue;
+            }
+            if (!familyByKey.containsKey(descriptor.familyKey())) {
+                continue;
+            }
+            String descriptorKey = descriptor.descriptorKey();
+            descriptorByKey.put(descriptorKey, descriptor);
+            JsonObject source = overrideManager.readSourceJson(descriptor);
+            JsonObject disk = overrideManager.readOverrideJson(world, descriptor);
+            sourceByKey.put(descriptorKey, source);
+            diskByKey.put(descriptorKey, disk);
+            draftByKey.put(descriptorKey, TwConfigJsonUtil.copyObject(disk));
+        }
+
+        rebuildModViews();
         inputByDescriptor.keySet().retainAll(descriptorByKey.keySet());
         validationByDescriptor.keySet().retainAll(descriptorByKey.keySet());
+        collapsedSectionsByDescriptor.keySet().retainAll(descriptorByKey.keySet());
+        if (selectedModKey == null || !modByKey.containsKey(selectedModKey)) {
+            selectedModKey = firstModKey();
+        }
+        if (selectedFamilyKey == null || !familyByKey.containsKey(selectedFamilyKey)) {
+            selectedFamilyKey = firstFamilyKey();
+        }
         ensureSelectedDescriptor();
         if (clearStatus) {
             statusLine = "";
@@ -303,53 +362,87 @@ public final class TameworkConfigEditorPage
         }
     }
 
+    private void rebuildModViews() {
+        LinkedHashMap<String, ModView> discovered = new LinkedHashMap<>();
+        for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+            String packKey = descriptor.sourcePackKey();
+            if (packKey == null || packKey.isBlank()) {
+                continue;
+            }
+            discovered.putIfAbsent(packKey, new ModView(packKey, modLabelForPackKey(packKey)));
+        }
+
+        ArrayList<ModView> ordered = new ArrayList<>(discovered.values());
+        ordered.sort(Comparator.comparing(ModView::label, String.CASE_INSENSITIVE_ORDER));
+        modByKey.put(MOD_ALL_KEY, new ModView(MOD_ALL_KEY, tr("tamework.ui.configEditor.mod.all")));
+        for (ModView mod : ordered) {
+            modByKey.put(mod.key(), mod);
+        }
+    }
+
     private void ensureSelectedDescriptor() {
-        if (descriptorByKey.isEmpty()) {
+        if (descriptorByKey.isEmpty()
+                || selectedFamilyKey == null
+                || selectedFamilyKey.isBlank()
+                || selectedModKey == null
+                || selectedModKey.isBlank()) {
             selectedDescriptorKey = null;
             return;
         }
         if (selectedDescriptorKey != null && descriptorByKey.containsKey(selectedDescriptorKey)) {
-            return;
+            TwConfigAssetDescriptor selected = descriptorByKey.get(selectedDescriptorKey);
+            if (selected != null
+                    && selected.familyKey().equalsIgnoreCase(selectedFamilyKey)
+                    && modMatchesSelection(selected)) {
+                return;
+            }
         }
         List<TwConfigAssetDescriptor> filtered = filteredDescriptors();
-        selectedDescriptorKey = filtered.isEmpty()
-                ? descriptorByKey.values().iterator().next().descriptorKey()
-                : filtered.get(0).descriptorKey();
-    }
-
-    private void initializeCollapsedState() {
-        collapsedSections.clear();
-        collapsedSections.put(S_GENERAL.id, true);
-        collapsedSections.put(S_OWNERSHIP.id, true);
-        collapsedSections.put(S_INTERACTION.id, true);
-        collapsedSections.put(S_COMMAND.id, true);
-        collapsedSections.put(S_ASSET_SETS.id, true);
-        collapsedSections.put(S_POPULATION.id, true);
-        collapsedSections.put(S_SIMPLE.id, true);
-        collapsedSections.put(S_SIMPLE_BREED.id, true);
-        collapsedSections.put(S_SIMPLE_DAMAGE.id, true);
+        if (!filtered.isEmpty()) {
+            selectedDescriptorKey = filtered.get(0).descriptorKey();
+            return;
+        }
+        selectedDescriptorKey = null;
     }
 
     private void bindStaticEvents(@Nonnull UIEventBuilder eventBuilder) {
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwConfigRefreshButton", EventData.of(K_ACTION, A_REFRESH), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwConfigApplyButton", EventData.of(K_ACTION, A_APPLY_REQUEST), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwConfigCloseButton", EventData.of(K_ACTION, A_CLOSE), false);
+        eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, "#TwConfigModDropdown", EventData.of(K_MOD_KEY, "#TwConfigModDropdown.Value"), false);
+        eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, "#TwConfigFamilyDropdown", EventData.of(K_FAMILY_KEY, "#TwConfigFamilyDropdown.Value"), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, "#TwConfigAssetFilterInput", EventData.of(K_ASSET_FILTER, "#TwConfigAssetFilterInput.Value"), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, "#TwConfigPropertyFilterInput", EventData.of(K_PROPERTY_FILTER, "#TwConfigPropertyFilterInput.Value"), false);
-        eventBuilder.addEventBinding(CustomUIEventBindingType.ValueChanged, "#TwConfigAssetDropdown", EventData.of(K_ASSET_KEY, "#TwConfigAssetDropdown.Value"), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwConfigConfirmApplyButton", EventData.of(K_ACTION, A_APPLY_CONFIRM), false);
         eventBuilder.addEventBinding(CustomUIEventBindingType.Activating, "#TwConfigCancelApplyButton", EventData.of(K_ACTION, A_APPLY_CANCEL), false);
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder, @Nonnull UIEventBuilder eventBuilder) {
+        ensureSelectedMod();
+        ensureSelectedFamily();
         ensureSelectedDescriptor();
         TwConfigAssetDescriptor selected = selectedDescriptor();
+        ModView selectedMod = selectedMod();
+        TwConfigSnapshot.FamilyView selectedFamily = selectedFamily();
+        String modLabel = selectedMod == null
+                ? tr("tamework.ui.configEditor.mod.unknown")
+                : selectedMod.label();
+        String familyLabel = selectedFamily == null
+                ? tr("tamework.ui.configEditor.family.unknown")
+                : selectedFamily.label();
 
+        commandBuilder.set("#TwConfigTitle.Text", tr("tamework.ui.configEditor.title", familyLabel));
+        commandBuilder.set("#TwConfigModDropdown.Entries", modDropdownEntries());
+        commandBuilder.set("#TwConfigModDropdown.Value", selectedModKey == null ? "" : selectedModKey);
+        commandBuilder.set("#TwConfigFamilyDropdown.Entries", familyDropdownEntries());
+        commandBuilder.set("#TwConfigFamilyDropdown.Value", selectedFamilyKey == null ? "" : selectedFamilyKey);
         commandBuilder.set("#TwConfigAssetFilterInput.Value", assetFilter);
         commandBuilder.set("#TwConfigPropertyFilterInput.Value", propertyFilter);
-        commandBuilder.set("#TwConfigAssetDropdown.Entries", assetDropdownEntries());
-        commandBuilder.set("#TwConfigAssetDropdown.Value", selectedDescriptorKey == null ? "" : selectedDescriptorKey);
-        commandBuilder.set("#TwConfigAssetCount.Text", tr("tamework.ui.configEditor.assetCount", filteredDescriptors().size()));
+        List<TwConfigAssetDescriptor> filteredDescriptors = filteredDescriptors();
+        commandBuilder.set("#TwConfigAssetCount.Text", tr("tamework.ui.configEditor.assetCount", familyLabel, filteredDescriptors.size()));
+        commandBuilder.set("#TwConfigAssetFamilyTitle.Text", tr("tamework.ui.configEditor.assets.title", familyLabel));
+        commandBuilder.set("#TwConfigAssetScopeText.Text", tr("tamework.ui.configEditor.assets.scope", modLabel, familyLabel));
+        renderAssetList(filteredDescriptors, commandBuilder, eventBuilder);
         String resolvedWarning = resolvedWarningLine();
         String inlineNotice = resolvedWarning.isBlank() ? statusLine : resolvedWarning;
         commandBuilder.set("#TwConfigStatusLine.Text", inlineNotice);
@@ -369,14 +462,16 @@ public final class TameworkConfigEditorPage
         }
 
         commandBuilder.set("#TwConfigSelectedAssetTitle.Text", selected.assetId());
-        commandBuilder.set("#TwConfigSelectedAssetMeta.Text", tr("tamework.ui.configEditor.selectedAssetMeta", selected.sourcePackKey()));
+        commandBuilder.set("#TwConfigSelectedAssetMeta.Text", tr("tamework.ui.configEditor.selectedAssetMeta", selected.familyDisplayName(), selected.sourcePackKey()));
         commandBuilder.set("#TwConfigSelectedAssetChain.Text", inheritanceChainText(selected));
         commandBuilder.set("#TwConfigOverridePath.Text", shortenedPathForUi(overrideManager.resolveOverridePath(world, selected)));
         commandBuilder.set("#TwConfigPropertyEmptyState.Visible", false);
-        renderRows(selected, commandBuilder, eventBuilder);
+        DescriptorLayout layout = layoutFor(selected);
+        renderRows(selected, layout, commandBuilder, eventBuilder);
     }
 
     private void renderRows(@Nonnull TwConfigAssetDescriptor descriptor,
+                            @Nonnull DescriptorLayout layout,
                             @Nonnull UICommandBuilder commandBuilder,
                             @Nonnull UIEventBuilder eventBuilder) {
         commandBuilder.clear("#TwConfigPropertyRows");
@@ -385,7 +480,7 @@ public final class TameworkConfigEditorPage
         JsonObject merged = mergedCurrentJson(descriptorKey);
         JsonObject draft = draft(descriptorKey);
         JsonObject disk = disk(descriptorKey);
-        List<RowDef> visibleRows = visibleRows(descriptor);
+        List<RowDef> visibleRows = visibleRows(layout);
 
         for (int i = 0; i < visibleRows.size(); i++) {
             RowDef row = visibleRows.get(i);
@@ -393,12 +488,12 @@ public final class TameworkConfigEditorPage
             if (row.section != null) {
                 SectionDef section = row.section;
                 commandBuilder.append("#TwConfigPropertyRows", UI_SECTION_ROW);
-                boolean collapsed = collapsedSections.getOrDefault(section.id, false);
+                boolean collapsed = collapsedSectionState(descriptorKey).getOrDefault(section.id, true);
                 int depthLevel = depthBucket(section.depth);
-                String toggleText = tr(section.label);
-                String countText = formatFieldCount(sectionFieldCount(section.id));
-                boolean hasStagedEdits = sectionHasStagedOverrides(section.id, draft, disk);
-                boolean hasAppliedLocal = !hasStagedEdits && sectionHasAppliedOverrides(section.id, disk);
+                String toggleText = section.label;
+                String countText = formatFieldCount(sectionFieldCount(layout, section.id));
+                boolean hasStagedEdits = sectionHasStagedOverrides(layout, section.id, draft, disk);
+                boolean hasAppliedLocal = !hasStagedEdits && sectionHasAppliedOverrides(layout, section.id, disk);
                 boolean showBadge = hasStagedEdits || hasAppliedLocal;
 
                 commandBuilder.set(root + " #SectionRowBackground.Background", sectionBackgroundColor(section.depth));
@@ -495,7 +590,7 @@ public final class TameworkConfigEditorPage
             commandBuilder.set(root + " #FieldStateBadgeCheckIcon.Visible", fieldHasAppliedLocal);
             commandBuilder.set(root + " #FieldResetButton.Visible", !field.handoffOnly && overridden);
             commandBuilder.set(host + " #FieldCheckBox.Visible", field.kind == FieldKind.BOOLEAN && !field.handoffOnly);
-            commandBuilder.set(host + " #FieldTextInput.Visible", (field.kind == FieldKind.STRING || field.kind == FieldKind.INTEGER || field.kind == FieldKind.DOUBLE) && !field.handoffOnly);
+            commandBuilder.set(host + " #FieldTextInput.Visible", (field.kind == FieldKind.STRING || field.kind == FieldKind.INTEGER || field.kind == FieldKind.DOUBLE || field.kind == FieldKind.STRING_LIST) && !field.handoffOnly);
             commandBuilder.set(host + " #FieldDropdown.Visible", field.kind == FieldKind.OPTION && !field.handoffOnly);
             commandBuilder.set(host + " #FieldHandoff.Visible", field.handoffOnly || field.kind == FieldKind.HANDOFF);
 
@@ -504,10 +599,10 @@ public final class TameworkConfigEditorPage
                 eventBuilder.addEventBinding(
                         CustomUIEventBindingType.ValueChanged,
                         host + " #FieldCheckBox",
-                        EventData.of(K_ACTION, A_SET_VALUE).append(K_PATH, field.path).append(K_FIELD_VALUE, root + " #FieldCheckBox.Value"),
+                        EventData.of(K_ACTION, A_SET_VALUE).append(K_PATH, field.path).append(K_FIELD_BOOL, root + " #FieldCheckBox.Value"),
                         false
                 );
-            } else if ((field.kind == FieldKind.STRING || field.kind == FieldKind.INTEGER || field.kind == FieldKind.DOUBLE) && !field.handoffOnly) {
+            } else if ((field.kind == FieldKind.STRING || field.kind == FieldKind.INTEGER || field.kind == FieldKind.DOUBLE || field.kind == FieldKind.STRING_LIST) && !field.handoffOnly) {
                 String inputValue = (overridden || hasBufferedInput) ? textValue : "";
                 String placeholder = overridden ? tr("tamework.ui.configEditor.valuePlaceholder") : inheritedPlaceholderText(textValue);
                 commandBuilder.set(host + " #FieldTextInput.Value", inputValue);
@@ -525,7 +620,7 @@ public final class TameworkConfigEditorPage
                         false
                 );
             } else if (field.kind == FieldKind.OPTION && !field.handoffOnly) {
-                List<String> options = optionsFor(field, descriptor);
+                List<String> options = optionsFor(layout, field, descriptor);
                 commandBuilder.set(host + " #FieldDropdown.Entries", toDropdownEntries(options));
                 commandBuilder.set(host + " #FieldDropdown.Value", normalizeOptionValue(textValue, options));
                 eventBuilder.addEventBinding(
@@ -549,27 +644,269 @@ public final class TameworkConfigEditorPage
         }
     }
 
+    private void renderAssetList(@Nonnull List<TwConfigAssetDescriptor> descriptors,
+                                 @Nonnull UICommandBuilder commandBuilder,
+                                 @Nonnull UIEventBuilder eventBuilder) {
+        commandBuilder.clear("#TwConfigAssetListRows");
+        commandBuilder.set("#TwConfigAssetListEmpty.Visible", descriptors.isEmpty());
+        if (descriptors.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < descriptors.size(); i++) {
+            TwConfigAssetDescriptor descriptor = descriptors.get(i);
+            String root = "#TwConfigAssetListRows[" + i + "]";
+            boolean selected = descriptor.descriptorKey().equalsIgnoreCase(trim(selectedDescriptorKey));
+            String label = descriptor.assetId() + " [" + shortPackLabel(descriptor.sourcePackKey()) + "]";
+
+            commandBuilder.append("#TwConfigAssetListRows", UI_ASSET_ROW);
+            commandBuilder.set(root + " #AssetRowBackground.Background", selected ? "#284767" : "#152a44");
+            commandBuilder.set(root + " #AssetRowSelectedBar.Visible", selected);
+            commandBuilder.set(root + " #AssetRowLabel.Text", label);
+
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    root + " #AssetRowButton",
+                    EventData.of(K_ACTION, A_SELECT_ASSET).append(K_PATH, descriptor.descriptorKey()),
+                    false
+            );
+        }
+    }
+
+    private void ensureSelectedMod() {
+        if (selectedModKey != null && modByKey.containsKey(selectedModKey)) {
+            return;
+        }
+        selectedModKey = firstModKey();
+    }
+
+    @Nullable
+    private ModView selectedMod() {
+        if (selectedModKey == null || selectedModKey.isBlank()) {
+            return null;
+        }
+        return modByKey.get(selectedModKey);
+    }
+
+    @Nullable
+    private String firstModKey() {
+        if (modByKey.isEmpty()) {
+            return null;
+        }
+        return modByKey.keySet().iterator().next();
+    }
+
     @Nonnull
-    private List<RowDef> visibleRows(@Nonnull TwConfigAssetDescriptor descriptor) {
+    private List<DropdownEntryInfo> modDropdownEntries() {
+        if (modByKey.isEmpty()) {
+            return List.of();
+        }
+        ArrayList<DropdownEntryInfo> entries = new ArrayList<>(modByKey.size());
+        for (ModView mod : modByKey.values()) {
+            entries.add(new DropdownEntryInfo(LocalizableString.fromString(mod.label()), mod.key()));
+        }
+        return List.copyOf(entries);
+    }
+
+    @Nullable
+    private String resolveModKey(@Nullable String selectedValue) {
+        String raw = trim(selectedValue);
+        if (raw.isBlank() || looksLikeSelectorExpression(raw)) {
+            return null;
+        }
+        ModView direct = modByKey.get(raw);
+        if (direct != null) {
+            return direct.key();
+        }
+        for (ModView mod : modByKey.values()) {
+            if (mod.key().equalsIgnoreCase(raw) || mod.label().equalsIgnoreCase(raw)) {
+                return mod.key();
+            }
+        }
+        return null;
+    }
+
+    private void ensureSelectedFamily() {
+        if (selectedFamilyKey != null && familyByKey.containsKey(selectedFamilyKey)) {
+            return;
+        }
+        selectedFamilyKey = firstFamilyKey();
+    }
+
+    @Nullable
+    private TwConfigSnapshot.FamilyView selectedFamily() {
+        if (selectedFamilyKey == null || selectedFamilyKey.isBlank()) {
+            return null;
+        }
+        return familyByKey.get(selectedFamilyKey);
+    }
+
+    @Nullable
+    private String firstFamilyKey() {
+        if (familyByKey.isEmpty()) {
+            return null;
+        }
+        return familyByKey.keySet().iterator().next();
+    }
+
+    @Nonnull
+    private List<DropdownEntryInfo> familyDropdownEntries() {
+        if (familyByKey.isEmpty()) {
+            return List.of();
+        }
+        ArrayList<DropdownEntryInfo> entries = new ArrayList<>(familyByKey.size());
+        for (TwConfigSnapshot.FamilyView family : familyByKey.values()) {
+            entries.add(new DropdownEntryInfo(LocalizableString.fromString(family.label()), family.key()));
+        }
+        return List.copyOf(entries);
+    }
+
+    @Nullable
+    private String resolveFamilyKey(@Nullable String selectedValue) {
+        String raw = trim(selectedValue);
+        if (raw.isBlank() || looksLikeSelectorExpression(raw)) {
+            return null;
+        }
+        TwConfigSnapshot.FamilyView direct = familyByKey.get(raw);
+        if (direct != null) {
+            return direct.key();
+        }
+        for (TwConfigSnapshot.FamilyView family : familyByKey.values()) {
+            if (family.key().equalsIgnoreCase(raw) || family.label().equalsIgnoreCase(raw)) {
+                return family.key();
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private FieldDef fieldForSelectedPath(@Nullable String path) {
+        TwConfigAssetDescriptor descriptor = selectedDescriptor();
+        if (descriptor == null) {
+            return null;
+        }
+        return layoutFor(descriptor).fieldByPath.get(trim(path));
+    }
+
+    @Nonnull
+    private DescriptorLayout layoutFor(@Nonnull TwConfigAssetDescriptor descriptor) {
+        JsonObject effective = effectiveJson(descriptor.descriptorKey(), new HashSet<>());
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> specs =
+                TwConfigEditorFieldPolicy.fieldsFor(descriptor, snapshot, effective);
+
+        LinkedHashMap<String, SectionDef> sections = new LinkedHashMap<>();
+        LinkedHashMap<String, FieldDef> fields = new LinkedHashMap<>();
+        LinkedHashMap<String, TwConfigEditorFieldPolicy.EditorFieldSpec> specByPath = new LinkedHashMap<>();
+        LinkedHashSet<String> knownTopLevelKeys = new LinkedHashSet<>();
+        ArrayList<RowDef> rows = new ArrayList<>();
+
+        for (TwConfigEditorFieldPolicy.EditorFieldSpec spec : specs) {
+            if (spec == null || spec.path() == null || spec.path().isBlank()) {
+                continue;
+            }
+            String path = spec.path().trim();
+            String[] segments = path.split("\\.");
+            String sectionId = null;
+            if (segments.length > 1) {
+                StringBuilder prefix = new StringBuilder();
+                String parentSectionId = null;
+                for (int i = 0; i < segments.length - 1; i++) {
+                    String segment = trim(segments[i]);
+                    if (segment.isBlank()) {
+                        continue;
+                    }
+                    if (prefix.length() > 0) {
+                        prefix.append('.');
+                    }
+                    prefix.append(segment.toLowerCase(Locale.ROOT));
+                    String id = prefix.toString();
+                    if (!sections.containsKey(id)) {
+                        SectionDef section = new SectionDef(
+                                id,
+                                humanize(segment),
+                                i,
+                                parentSectionId
+                        );
+                        sections.put(id, section);
+                        rows.add(RowDef.section(section));
+                    }
+                    parentSectionId = id;
+                }
+                sectionId = parentSectionId;
+            }
+
+            FieldKind fieldKind = mapFieldKind(spec);
+            int depth = segments.length > 1 ? Math.max(spec.depth(), segments.length - 1) : Math.max(0, spec.depth());
+            FieldDef field = new FieldDef(
+                    path,
+                    fieldKind,
+                    sectionId,
+                    depth,
+                    spec.handoffOnly() || !spec.isEditableValue(),
+                    spec.options()
+            );
+            fields.put(path, field);
+            specByPath.put(path, spec);
+            rows.add(RowDef.field(field));
+            knownTopLevelKeys.add(segments[0]);
+        }
+
+        LinkedHashMap<String, Boolean> collapseState = collapsedSectionState(descriptor.descriptorKey());
+        for (SectionDef section : sections.values()) {
+            collapseState.putIfAbsent(section.id, true);
+        }
+
+        return new DescriptorLayout(
+                List.copyOf(rows),
+                Collections.unmodifiableMap(fields),
+                Collections.unmodifiableMap(sections),
+                Collections.unmodifiableSet(knownTopLevelKeys),
+                Collections.unmodifiableMap(specByPath)
+        );
+    }
+
+    @Nonnull
+    private static FieldKind mapFieldKind(@Nonnull TwConfigEditorFieldPolicy.EditorFieldSpec spec) {
+        return switch (spec.type()) {
+            case BOOLEAN -> FieldKind.BOOLEAN;
+            case INTEGER -> FieldKind.INTEGER;
+            case DOUBLE -> FieldKind.DOUBLE;
+            case OPTION -> FieldKind.OPTION;
+            case STRING_LIST -> FieldKind.STRING_LIST;
+            case HANDOFF -> FieldKind.HANDOFF;
+            case STRING -> FieldKind.STRING;
+        };
+    }
+
+    @Nonnull
+    private LinkedHashMap<String, Boolean> collapsedSectionState(@Nonnull String descriptorKey) {
+        return collapsedSectionsByDescriptor.computeIfAbsent(descriptorKey, key -> new LinkedHashMap<>());
+    }
+
+    @Nonnull
+    private List<RowDef> visibleRows(@Nonnull DescriptorLayout layout) {
         String search = trim(propertyFilter).toLowerCase(Locale.ROOT);
         boolean hasSearch = !search.isBlank();
         ArrayList<RowDef> out = new ArrayList<>();
-        for (RowDef row : LAYOUT) {
+        String descriptorKey = selectedDescriptorKey;
+        Map<String, Boolean> collapsed = descriptorKey == null
+                ? Collections.emptyMap()
+                : collapsedSectionState(descriptorKey);
+        for (RowDef row : layout.rows) {
             if (row.section != null) {
                 SectionDef section = row.section;
-                if (!hasSearch && isAnyAncestorCollapsed(section.parentId)) {
+                if (!hasSearch && isAnyAncestorCollapsed(layout, collapsed, section.parentId)) {
                     continue;
                 }
-                if (!hasSearch || section.label.toLowerCase(Locale.ROOT).contains(search) || sectionMatches(section.id, search)) {
+                if (!hasSearch || section.label.toLowerCase(Locale.ROOT).contains(search) || sectionMatches(layout, search, section.id)) {
                     out.add(row);
                 }
                 continue;
             }
             FieldDef field = row.field;
-            if (hasSearch && !matchesSearch(field, search)) {
+            if (hasSearch && !matchesSearch(layout, field, search)) {
                 continue;
             }
-            if (!hasSearch && isFieldCollapsed(field)) {
+            if (!hasSearch && isFieldCollapsed(layout, collapsed, field)) {
                 continue;
             }
             out.add(row);
@@ -577,22 +914,26 @@ public final class TameworkConfigEditorPage
         return out;
     }
 
-    private boolean sectionMatches(@Nonnull String sectionId, @Nonnull String search) {
-        for (FieldDef field : FIELDS.values()) {
+    private boolean sectionMatches(@Nonnull DescriptorLayout layout,
+                                   @Nonnull String search,
+                                   @Nonnull String sectionId) {
+        for (FieldDef field : layout.fieldByPath.values()) {
             if (field.sectionId == null) {
                 continue;
             }
-            if (!isSectionOrAncestor(field.sectionId, sectionId)) {
+            if (!isSectionOrAncestor(layout, field.sectionId, sectionId)) {
                 continue;
             }
-            if (matchesSearch(field, search)) {
+            if (matchesSearch(layout, field, search)) {
                 return true;
             }
         }
         return false;
     }
 
-    private boolean matchesSearch(@Nonnull FieldDef field, @Nonnull String search) {
+    private boolean matchesSearch(@Nonnull DescriptorLayout layout,
+                                  @Nonnull FieldDef field,
+                                  @Nonnull String search) {
         if (search.isBlank()) {
             return true;
         }
@@ -600,47 +941,53 @@ public final class TameworkConfigEditorPage
         if (label.contains(search) || field.path.toLowerCase(Locale.ROOT).contains(search)) {
             return true;
         }
-        SectionDef section = field.sectionId == null ? null : SECTIONS.get(field.sectionId);
+        SectionDef section = field.sectionId == null ? null : layout.sectionById.get(field.sectionId);
         while (section != null) {
             if (section.label.toLowerCase(Locale.ROOT).contains(search)) {
                 return true;
             }
-            section = section.parentId == null ? null : SECTIONS.get(section.parentId);
+            section = section.parentId == null ? null : layout.sectionById.get(section.parentId);
         }
         return false;
     }
 
-    private boolean isSectionOrAncestor(@Nonnull String sectionId, @Nonnull String targetSectionId) {
+    private boolean isSectionOrAncestor(@Nonnull DescriptorLayout layout,
+                                        @Nonnull String sectionId,
+                                        @Nonnull String targetSectionId) {
         String current = sectionId;
         while (current != null) {
             if (current.equalsIgnoreCase(targetSectionId)) {
                 return true;
             }
-            SectionDef section = SECTIONS.get(current);
+            SectionDef section = layout.sectionById.get(current);
             current = section == null ? null : section.parentId;
         }
         return false;
     }
 
-    private boolean isFieldCollapsed(@Nonnull FieldDef field) {
+    private boolean isFieldCollapsed(@Nonnull DescriptorLayout layout,
+                                     @Nonnull Map<String, Boolean> collapsed,
+                                     @Nonnull FieldDef field) {
         String current = field.sectionId;
         while (current != null) {
-            if (collapsedSections.getOrDefault(current, false)) {
+            if (collapsed.getOrDefault(current, true)) {
                 return true;
             }
-            SectionDef section = SECTIONS.get(current);
+            SectionDef section = layout.sectionById.get(current);
             current = section == null ? null : section.parentId;
         }
         return false;
     }
 
-    private boolean isAnyAncestorCollapsed(@Nullable String sectionId) {
+    private boolean isAnyAncestorCollapsed(@Nonnull DescriptorLayout layout,
+                                           @Nonnull Map<String, Boolean> collapsed,
+                                           @Nullable String sectionId) {
         String current = sectionId;
         while (current != null) {
-            if (collapsedSections.getOrDefault(current, false)) {
+            if (collapsed.getOrDefault(current, true)) {
                 return true;
             }
-            SectionDef section = SECTIONS.get(current);
+            SectionDef section = layout.sectionById.get(current);
             current = section == null ? null : section.parentId;
         }
         return false;
@@ -648,19 +995,26 @@ public final class TameworkConfigEditorPage
 
     private void toggleSection(@Nullable String sectionId) {
         String key = trim(sectionId);
-        if (!collapsedSections.containsKey(key)) {
+        TwConfigAssetDescriptor descriptor = selectedDescriptor();
+        if (descriptor == null) {
             return;
         }
-        collapsedSections.put(key, !collapsedSections.getOrDefault(key, false));
+        DescriptorLayout layout = layoutFor(descriptor);
+        if (!layout.sectionById.containsKey(key)) {
+            return;
+        }
+        Map<String, Boolean> collapsed = collapsedSectionState(descriptor.descriptorKey());
+        collapsed.put(key, !collapsed.getOrDefault(key, true));
     }
 
     private void resetField(@Nullable String path) {
-        FieldDef field = FIELDS.get(trim(path));
-        if (field == null || field.handoffOnly) {
-            return;
-        }
         TwConfigAssetDescriptor descriptor = selectedDescriptor();
         if (descriptor == null) {
+            return;
+        }
+        DescriptorLayout layout = layoutFor(descriptor);
+        FieldDef field = layout.fieldByPath.get(trim(path));
+        if (field == null || field.handoffOnly) {
             return;
         }
         String key = descriptor.descriptorKey();
@@ -671,15 +1025,16 @@ public final class TameworkConfigEditorPage
     }
 
     private void stageValue(@Nullable String path, @Nullable String rawValue) {
-        FieldDef field = FIELDS.get(trim(path));
+        TwConfigAssetDescriptor descriptor = selectedDescriptor();
+        if (descriptor == null) {
+            return;
+        }
+        DescriptorLayout layout = layoutFor(descriptor);
+        FieldDef field = layout.fieldByPath.get(trim(path));
         if (field == null || field.handoffOnly) {
             return;
         }
         if (looksLikeSelectorExpression(rawValue)) {
-            return;
-        }
-        TwConfigAssetDescriptor descriptor = selectedDescriptor();
-        if (descriptor == null) {
             return;
         }
         String key = descriptor.descriptorKey();
@@ -688,7 +1043,7 @@ public final class TameworkConfigEditorPage
         String raw = rawValue == null ? "" : rawValue;
         input.put(field.path, raw);
         try {
-            JsonElement parsed = parseInput(field, raw, optionsFor(field, descriptor));
+            JsonElement parsed = parseInput(field, raw, optionsFor(layout, field, descriptor));
             if (parsed == null) {
                 TwConfigJsonUtil.removePath(draft(key), field.path);
                 errors.remove(field.path);
@@ -722,6 +1077,19 @@ public final class TameworkConfigEditorPage
         String trimmed = raw.trim();
         return switch (field.kind) {
             case STRING -> new JsonPrimitive(raw);
+            case STRING_LIST -> {
+                JsonArray values = new JsonArray();
+                if (!trimmed.isBlank()) {
+                    String[] tokens = raw.split("[,\\n\\r]");
+                    for (String token : tokens) {
+                        String item = trim(token);
+                        if (!item.isBlank()) {
+                            values.add(item);
+                        }
+                    }
+                }
+                yield values;
+            }
             case BOOLEAN -> new JsonPrimitive(parseBooleanStrict(trimmed));
             case INTEGER -> {
                 if (trimmed.isBlank()) {
@@ -789,8 +1157,7 @@ public final class TameworkConfigEditorPage
         if (mergedValue != null) {
             return mergedValue;
         }
-        JsonElement fallback = INHERITED_FALLBACK_VALUES.get(field.path);
-        return fallback == null ? null : fallback.deepCopy();
+        return null;
     }
 
     @Nonnull
@@ -801,6 +1168,21 @@ public final class TameworkConfigEditorPage
         }
         if (value == null || value.isJsonNull()) {
             return "";
+        }
+        if (field.kind == FieldKind.STRING_LIST && value.isJsonArray()) {
+            ArrayList<String> items = new ArrayList<>();
+            value.getAsJsonArray().forEach(element -> {
+                if (element != null && element.isJsonPrimitive()) {
+                    JsonPrimitive primitive = element.getAsJsonPrimitive();
+                    if (primitive.isString()) {
+                        String item = primitive.getAsString();
+                        if (item != null && !item.isBlank()) {
+                            items.add(item);
+                        }
+                    }
+                }
+            });
+            return String.join(", ", items);
         }
         if (!value.isJsonPrimitive()) {
             return value.toString();
@@ -818,23 +1200,24 @@ public final class TameworkConfigEditorPage
     }
 
     @Nonnull
-    private List<String> optionsFor(@Nonnull FieldDef field, @Nonnull TwConfigAssetDescriptor descriptor) {
-        if ("Parent".equalsIgnoreCase(field.path)) {
-            LinkedHashSet<String> parentAssetIds = new LinkedHashSet<>();
-            for (TwConfigAssetDescriptor candidate : descriptorByKey.values()) {
-                if (candidate.assetId().equalsIgnoreCase(descriptor.assetId())) {
-                    continue;
-                }
-                parentAssetIds.add(candidate.assetId());
-            }
-            ArrayList<String> sorted = new ArrayList<>(parentAssetIds);
-            sorted.sort(String.CASE_INSENSITIVE_ORDER);
-            ArrayList<String> options = new ArrayList<>(sorted.size() + 1);
+    private List<String> optionsFor(@Nonnull DescriptorLayout layout,
+                                    @Nonnull FieldDef field,
+                                    @Nonnull TwConfigAssetDescriptor descriptor) {
+        TwConfigEditorFieldPolicy.EditorFieldSpec spec = layout.specByPath.get(field.path);
+        if (spec == null) {
+            return field.options;
+        }
+        List<String> resolved = TwConfigEditorFieldPolicy.optionsFor(spec, descriptor, snapshot);
+        if (resolved == null || resolved.isEmpty()) {
+            return field.options;
+        }
+        if (spec.parentSelector()) {
+            ArrayList<String> options = new ArrayList<>(resolved.size() + 1);
             options.add(PARENT_NONE_VALUE);
-            options.addAll(sorted);
+            options.addAll(resolved);
             return List.copyOf(options);
         }
-        return field.options;
+        return resolved;
     }
 
     @Nullable
@@ -844,15 +1227,18 @@ public final class TameworkConfigEditorPage
             return null;
         }
         TwConfigAssetDescriptor direct = descriptorByKey.get(raw);
-        if (direct != null) {
+        if (direct != null
+                && direct.familyKey().equalsIgnoreCase(selectedFamilyKey == null ? "" : selectedFamilyKey)
+                && modMatchesSelection(direct)) {
             return direct.descriptorKey();
         }
-        for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+        List<TwConfigAssetDescriptor> familyDescriptors = descriptorsForSelectedFamily();
+        for (TwConfigAssetDescriptor descriptor : familyDescriptors) {
             if (descriptor.descriptorKey().equalsIgnoreCase(raw)) {
                 return descriptor.descriptorKey();
             }
         }
-        for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+        for (TwConfigAssetDescriptor descriptor : familyDescriptors) {
             if (descriptor.assetId().equalsIgnoreCase(raw)) {
                 return descriptor.descriptorKey();
             }
@@ -860,7 +1246,7 @@ public final class TameworkConfigEditorPage
         int bracket = raw.indexOf('[');
         if (bracket > 0) {
             String assetId = raw.substring(0, bracket).trim();
-            for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+            for (TwConfigAssetDescriptor descriptor : familyDescriptors) {
                 if (descriptor.assetId().equalsIgnoreCase(assetId)) {
                     return descriptor.descriptorKey();
                 }
@@ -910,6 +1296,9 @@ public final class TameworkConfigEditorPage
     @Nullable
     private TwConfigAssetDescriptor findParent(@Nonnull TwConfigAssetDescriptor descriptor, @Nonnull String parentAssetId) {
         for (TwConfigAssetDescriptor candidate : descriptorByKey.values()) {
+            if (!candidate.familyKey().equalsIgnoreCase(descriptor.familyKey())) {
+                continue;
+            }
             if (!candidate.assetId().equalsIgnoreCase(parentAssetId)) {
                 continue;
             }
@@ -918,6 +1307,9 @@ public final class TameworkConfigEditorPage
             }
         }
         for (TwConfigAssetDescriptor candidate : descriptorByKey.values()) {
+            if (!candidate.familyKey().equalsIgnoreCase(descriptor.familyKey())) {
+                continue;
+            }
             if (candidate.assetId().equalsIgnoreCase(parentAssetId)) {
                 return candidate;
             }
@@ -1006,12 +1398,6 @@ public final class TameworkConfigEditorPage
             ancestorDepth++;
         }
 
-        if (INHERITED_FALLBACK_VALUES.containsKey(field.path)) {
-            return new SourceBadge(
-                    tr("tamework.ui.configEditor.source.default.label"),
-                    tr("tamework.ui.configEditor.source.runtimeDefault")
-            );
-        }
         return new SourceBadge(
                 tr("tamework.ui.configEditor.source.default.label"),
                 tr("tamework.ui.configEditor.source.resolvedDefault")
@@ -1090,9 +1476,10 @@ public final class TameworkConfigEditorPage
             return "";
         }
         ArrayList<String> unknown = new ArrayList<>();
+        DescriptorLayout layout = layoutFor(selected);
         JsonObject draft = draft(selected.descriptorKey());
         for (Map.Entry<String, JsonElement> entry : draft.entrySet()) {
-            if (!KNOWN_TOP_LEVEL_KEYS.contains(entry.getKey())) {
+            if (!layout.knownTopLevelKeys.contains(entry.getKey())) {
                 unknown.add(entry.getKey());
             }
         }
@@ -1119,7 +1506,7 @@ public final class TameworkConfigEditorPage
         String search = trim(assetFilter).toLowerCase(Locale.ROOT);
         boolean hasSearch = !search.isBlank();
         ArrayList<TwConfigAssetDescriptor> filtered = new ArrayList<>();
-        for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+        for (TwConfigAssetDescriptor descriptor : descriptorsForSelectedFamily()) {
             if (!hasSearch) {
                 filtered.add(descriptor);
                 continue;
@@ -1133,12 +1520,44 @@ public final class TameworkConfigEditorPage
         return filtered;
     }
 
+    private boolean modMatchesSelection(@Nonnull TwConfigAssetDescriptor descriptor) {
+        String selected = trim(selectedModKey);
+        if (selected.isBlank() || MOD_ALL_KEY.equalsIgnoreCase(selected)) {
+            return true;
+        }
+        return descriptor.sourcePackKey().equalsIgnoreCase(selected);
+    }
+
+    @Nonnull
+    private List<TwConfigAssetDescriptor> descriptorsForSelectedFamily() {
+        if (selectedFamilyKey == null || selectedFamilyKey.isBlank()) {
+            return List.of();
+        }
+        ArrayList<TwConfigAssetDescriptor> out = new ArrayList<>();
+        for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+            if (descriptor.familyKey().equalsIgnoreCase(selectedFamilyKey) && modMatchesSelection(descriptor)) {
+                out.add(descriptor);
+            }
+        }
+        return out;
+    }
+
     @Nullable
     private TwConfigAssetDescriptor selectedDescriptor() {
         if (selectedDescriptorKey == null || selectedDescriptorKey.isBlank()) {
             return null;
         }
-        return descriptorByKey.get(selectedDescriptorKey);
+        TwConfigAssetDescriptor descriptor = descriptorByKey.get(selectedDescriptorKey);
+        if (descriptor == null) {
+            return null;
+        }
+        if (selectedFamilyKey == null || selectedFamilyKey.isBlank()) {
+            return null;
+        }
+        if (!descriptor.familyKey().equalsIgnoreCase(selectedFamilyKey)) {
+            return null;
+        }
+        return modMatchesSelection(descriptor) ? descriptor : null;
     }
 
     @Nonnull
@@ -1214,6 +1633,23 @@ public final class TameworkConfigEditorPage
         return slash >= 0 && slash < normalized.length() - 1 ? normalized.substring(slash + 1) : normalized;
     }
 
+    @Nonnull
+    private static String modLabelForPackKey(@Nullable String sourcePackKey) {
+        if (sourcePackKey == null || sourcePackKey.isBlank()) {
+            return LocalizedText.resolve((String) null, "tamework.ui.configEditor.mod.unknown");
+        }
+        String key = sourcePackKey.trim();
+        int doubleColon = key.lastIndexOf("::");
+        if (doubleColon >= 0 && doubleColon + 2 < key.length()) {
+            key = key.substring(doubleColon + 2);
+        }
+        int colon = key.indexOf(':');
+        if (colon >= 0 && colon + 1 < key.length()) {
+            return key.substring(colon + 1).trim();
+        }
+        return shortPackLabel(key);
+    }
+
     private static boolean looksLikeSelectorExpression(@Nullable String value) {
         if (value == null) {
             return false;
@@ -1282,28 +1718,30 @@ public final class TameworkConfigEditorPage
         return List.copyOf(out);
     }
 
-    private int sectionFieldCount(@Nonnull String sectionId) {
+    private int sectionFieldCount(@Nonnull DescriptorLayout layout, @Nonnull String sectionId) {
         int count = 0;
-        for (FieldDef field : FIELDS.values()) {
+        for (FieldDef field : layout.fieldByPath.values()) {
             String current = field.sectionId;
             while (current != null) {
                 if (current.equalsIgnoreCase(sectionId)) {
                     count++;
                     break;
                 }
-                SectionDef section = SECTIONS.get(current);
+                SectionDef section = layout.sectionById.get(current);
                 current = section == null ? null : section.parentId;
             }
         }
         return count;
     }
 
-    private boolean sectionHasAppliedOverrides(@Nonnull String sectionId, @Nonnull JsonObject disk) {
-        for (FieldDef field : FIELDS.values()) {
+    private boolean sectionHasAppliedOverrides(@Nonnull DescriptorLayout layout,
+                                               @Nonnull String sectionId,
+                                               @Nonnull JsonObject disk) {
+        for (FieldDef field : layout.fieldByPath.values()) {
             if (field.sectionId == null) {
                 continue;
             }
-            if (!isSectionOrAncestor(field.sectionId, sectionId)) {
+            if (!isSectionOrAncestor(layout, field.sectionId, sectionId)) {
                 continue;
             }
             if (TwConfigJsonUtil.hasPath(disk, field.path)) {
@@ -1313,12 +1751,15 @@ public final class TameworkConfigEditorPage
         return false;
     }
 
-    private boolean sectionHasStagedOverrides(@Nonnull String sectionId, @Nonnull JsonObject draft, @Nonnull JsonObject disk) {
-        for (FieldDef field : FIELDS.values()) {
+    private boolean sectionHasStagedOverrides(@Nonnull DescriptorLayout layout,
+                                              @Nonnull String sectionId,
+                                              @Nonnull JsonObject draft,
+                                              @Nonnull JsonObject disk) {
+        for (FieldDef field : layout.fieldByPath.values()) {
             if (field.sectionId == null) {
                 continue;
             }
-            if (!isSectionOrAncestor(field.sectionId, sectionId)) {
+            if (!isSectionOrAncestor(layout, field.sectionId, sectionId)) {
                 continue;
             }
             JsonElement draftValue = TwConfigJsonUtil.getPath(draft, field.path);
@@ -1346,64 +1787,6 @@ public final class TameworkConfigEditorPage
         return clamped == 1
                 ? tr("tamework.ui.configEditor.fieldCount.single", clamped)
                 : tr("tamework.ui.configEditor.fieldCount.plural", clamped);
-    }
-
-    @Nonnull
-    private static Map<String, JsonElement> buildInheritedFallbackValues() {
-        TwGlobalConfig defaults = TwGlobalConfig.defaultConfig();
-        LinkedHashMap<String, JsonElement> out = new LinkedHashMap<>();
-
-        out.put("General.Enabled", new JsonPrimitive(defaults.isEnabled()));
-        out.put("General.Priority", new JsonPrimitive(defaults.getPriority()));
-
-        out.put("OwnershipProtection.BlockOwnerDamage", new JsonPrimitive(defaults.isBlockOwnerDamage()));
-        out.put("OwnershipProtection.BlockAllPlayerDamageIfOwned", new JsonPrimitive(defaults.isBlockAllPlayerDamageIfOwned()));
-        out.put("OwnershipProtection.InvulnerableIfOwned", new JsonPrimitive(defaults.isInvulnerableIfOwned()));
-
-        out.put("InteractionDefaults.InteractionConfigParam", new JsonPrimitive(defaults.getInteractionConfigParam()));
-        out.put("InteractionDefaults.LovedItemsParam", new JsonPrimitive(defaults.getLovedItemsParam()));
-        out.put("InteractionDefaults.IsHarvestableParam", new JsonPrimitive(defaults.getIsHarvestableParam()));
-        out.put("InteractionDefaults.IsMountableParam", new JsonPrimitive(defaults.getIsMountableParam()));
-        out.put("InteractionDefaults.HarvestContextParam", new JsonPrimitive(defaults.getHarvestContextParam()));
-        out.put("InteractionDefaults.HarvestAlarmName", new JsonPrimitive(defaults.getHarvestAlarmName()));
-        out.put("InteractionDefaults.InteractionCooldownAlarmPrefix", new JsonPrimitive(defaults.getInteractionCooldownAlarmPrefix()));
-
-        out.put("Command.ReturnHomeTeleportDistance", new JsonPrimitive(defaults.getCommandReturnHomeTeleportDistance()));
-        out.put("Command.ReturnHomePathDistanceBeforeTeleport", new JsonPrimitive(defaults.getCommandReturnHomePathDistanceBeforeTeleport()));
-        out.put("Command.ReturnHomeTeleportDelayMs", new JsonPrimitive(defaults.getCommandReturnHomeTeleportDelayMs()));
-        out.put("Command.RecallSafeSpawnDistance", new JsonPrimitive(defaults.getCommandRecallSafeSpawnDistance()));
-        out.put("Command.RecallForceRelocateDistance", new JsonPrimitive(defaults.getCommandRecallForceRelocateDistance()));
-        out.put("Command.RelocationRetryIntervalMs", new JsonPrimitive(defaults.getCommandRelocationRetryIntervalMs()));
-        out.put("Command.RelocationMaxWaitMs", new JsonPrimitive(defaults.getCommandRelocationMaxWaitMs()));
-        out.put("Command.RelocationMaxRetryAttempts", new JsonPrimitive(defaults.getCommandRelocationMaxRetryAttempts()));
-        out.put("Command.DeadRespawnEnabled", new JsonPrimitive(defaults.isCommandDeadRespawnEnabled()));
-        out.put("Command.DeadRespawnCooldownMs", new JsonPrimitive(defaults.getCommandDeadRespawnCooldownMs()));
-        out.put("Command.DeadRespawnCooldownMins", new JsonPrimitive(defaults.getCommandDeadRespawnCooldownMs() / 60000.0d));
-        out.put("Command.DeadRespawnFollowRetryDelayMs", new JsonPrimitive(defaults.getCommandDeadRespawnFollowRetryDelayMs()));
-        out.put("Command.DeadRespawnDistanceClose", new JsonPrimitive(defaults.getCommandDeadRespawnDistanceClose()));
-        out.put("Command.DeadRespawnDistanceNear", new JsonPrimitive(defaults.getCommandDeadRespawnDistanceNear()));
-        out.put("Command.DeadRespawnDistanceMid", new JsonPrimitive(defaults.getCommandDeadRespawnDistanceMid()));
-        out.put("Command.DeadRespawnDistanceFar", new JsonPrimitive(defaults.getCommandDeadRespawnDistanceFar()));
-        out.put("Command.PlacementMinRelativeY", new JsonPrimitive(defaults.getCommandPlacementMinRelativeY()));
-        out.put("Command.PlacementMaxRelativeY", new JsonPrimitive(defaults.getCommandPlacementMaxRelativeY()));
-        out.put("Command.LinkedPanelRequireUnlinkConfirm", new JsonPrimitive(defaults.isCommandLinkedPanelRequireUnlinkConfirm()));
-
-        out.put("AssetSets.TranquilizerShortbow", new JsonPrimitive(defaults.isTranquilizerShortbowAssetSetEnabled()));
-        out.put("AssetSets.TranquilizerArrow", new JsonPrimitive(defaults.isTranquilizerArrowAssetSetEnabled()));
-        out.put("AssetSets.TranquilizerPotion", new JsonPrimitive(defaults.isTranquilizerPotionAssetSetEnabled()));
-        out.put("AssetSets.FeedTrough", new JsonPrimitive(defaults.isFeedTroughAssetSetEnabled()));
-
-        out.put("Population.LimitPerPlayerOwnedTotal", new JsonPrimitive(defaults.getPopulationLimitPerPlayerOwnedTotal()));
-        out.put("Population.PerPlayerLimitScope", new JsonPrimitive(defaults.getPopulationPerPlayerLimitScope().configValue()));
-
-        out.put("SimpleClaims.SimpleClaimsEnabled", new JsonPrimitive(defaults.isSimpleClaimsEnabled()));
-        out.put("SimpleClaims.Breeding.LimitPerClaimChunk", new JsonPrimitive(defaults.getSimpleClaimsBreedingLimitPerClaimChunk()));
-        out.put("SimpleClaims.Breeding.LimitPerClaimTotal", new JsonPrimitive(defaults.getSimpleClaimsBreedingLimitPerClaimTotal()));
-        out.put("SimpleClaims.Breeding.BreedingRequiresClaim", new JsonPrimitive(defaults.isSimpleClaimsBreedingRequiresClaim()));
-        out.put("SimpleClaims.Damage.ProtectTamedFromNonMembers", new JsonPrimitive(defaults.isSimpleClaimsDamageProtectTamedFromNonMembers()));
-        out.put("SimpleClaims.Damage.AllowDamagePermissionKey", new JsonPrimitive(defaults.getSimpleClaimsDamageAllowDamagePermissionKey()));
-
-        return Collections.unmodifiableMap(out);
     }
 
     private static int depthBucket(int depth) {
@@ -1510,7 +1893,7 @@ public final class TameworkConfigEditorPage
     }
 
     private enum FieldKind {
-        STRING, INTEGER, DOUBLE, BOOLEAN, OPTION, HANDOFF
+        STRING, STRING_LIST, INTEGER, DOUBLE, BOOLEAN, OPTION, HANDOFF
     }
 
     private record SectionDef(@Nonnull String id, @Nonnull String label, int depth, @Nullable String parentId) {
@@ -1537,119 +1920,16 @@ public final class TameworkConfigEditorPage
     private record SourceBadge(@Nonnull String label, @Nonnull String tooltip) {
     }
 
-    @Nonnull
-    private static List<RowDef> buildLayout() {
-        ArrayList<RowDef> rows = new ArrayList<>();
-        rows.add(RowDef.field(new FieldDef("Parent", FieldKind.OPTION, null, 0, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("Comment", FieldKind.STRING, null, 0, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("Tags", FieldKind.HANDOFF, null, 0, true, List.of())));
-
-        rows.add(RowDef.section(S_GENERAL));
-        rows.add(RowDef.field(new FieldDef("General.Enabled", FieldKind.BOOLEAN, S_GENERAL.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("General.Priority", FieldKind.INTEGER, S_GENERAL.id, 1, false, List.of())));
-
-        rows.add(RowDef.section(S_OWNERSHIP));
-        rows.add(RowDef.field(new FieldDef("OwnershipProtection.BlockOwnerDamage", FieldKind.BOOLEAN, S_OWNERSHIP.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("OwnershipProtection.BlockAllPlayerDamageIfOwned", FieldKind.BOOLEAN, S_OWNERSHIP.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("OwnershipProtection.InvulnerableIfOwned", FieldKind.BOOLEAN, S_OWNERSHIP.id, 1, false, List.of())));
-
-        rows.add(RowDef.section(S_INTERACTION));
-        rows.add(RowDef.field(new FieldDef("InteractionDefaults.InteractionConfigParam", FieldKind.STRING, S_INTERACTION.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("InteractionDefaults.LovedItemsParam", FieldKind.STRING, S_INTERACTION.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("InteractionDefaults.IsHarvestableParam", FieldKind.STRING, S_INTERACTION.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("InteractionDefaults.IsMountableParam", FieldKind.STRING, S_INTERACTION.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("InteractionDefaults.HarvestContextParam", FieldKind.STRING, S_INTERACTION.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("InteractionDefaults.HarvestAlarmName", FieldKind.STRING, S_INTERACTION.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("InteractionDefaults.InteractionCooldownAlarmPrefix", FieldKind.STRING, S_INTERACTION.id, 1, false, List.of())));
-
-        rows.add(RowDef.section(S_COMMAND));
-        for (String path : List.of(
-                "Command.ReturnHomeTeleportDistance",
-                "Command.ReturnHomePathDistanceBeforeTeleport",
-                "Command.ReturnHomeTeleportDelayMs",
-                "Command.RecallSafeSpawnDistance",
-                "Command.RecallForceRelocateDistance",
-                "Command.RelocationRetryIntervalMs",
-                "Command.RelocationMaxWaitMs",
-                "Command.RelocationMaxRetryAttempts",
-                "Command.DeadRespawnEnabled",
-                "Command.DeadRespawnCooldownMs",
-                "Command.DeadRespawnCooldownMins",
-                "Command.DeadRespawnFollowRetryDelayMs",
-                "Command.DeadRespawnDistanceClose",
-                "Command.DeadRespawnDistanceNear",
-                "Command.DeadRespawnDistanceMid",
-                "Command.DeadRespawnDistanceFar",
-                "Command.PlacementMinRelativeY",
-                "Command.PlacementMaxRelativeY",
-                "Command.LinkedPanelRequireUnlinkConfirm")) {
-            rows.add(RowDef.field(new FieldDef(path, commandFieldKind(path), S_COMMAND.id, 1, false, List.of())));
-        }
-
-        rows.add(RowDef.section(S_ASSET_SETS));
-        rows.add(RowDef.field(new FieldDef("AssetSets.TranquilizerShortbow", FieldKind.BOOLEAN, S_ASSET_SETS.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("AssetSets.TranquilizerArrow", FieldKind.BOOLEAN, S_ASSET_SETS.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("AssetSets.TranquilizerPotion", FieldKind.BOOLEAN, S_ASSET_SETS.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("AssetSets.FeedTrough", FieldKind.BOOLEAN, S_ASSET_SETS.id, 1, false, List.of())));
-
-        rows.add(RowDef.section(S_POPULATION));
-        rows.add(RowDef.field(new FieldDef("Population.LimitPerPlayerOwnedTotal", FieldKind.INTEGER, S_POPULATION.id, 1, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("Population.PerPlayerLimitScope", FieldKind.OPTION, S_POPULATION.id, 1, false, List.of("PerWorld", "Global"))));
-
-        rows.add(RowDef.section(S_SIMPLE));
-        rows.add(RowDef.field(new FieldDef("SimpleClaims.SimpleClaimsEnabled", FieldKind.BOOLEAN, S_SIMPLE.id, 1, false, List.of())));
-        rows.add(RowDef.section(S_SIMPLE_BREED));
-        rows.add(RowDef.field(new FieldDef("SimpleClaims.Breeding.LimitPerClaimChunk", FieldKind.INTEGER, S_SIMPLE_BREED.id, 2, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("SimpleClaims.Breeding.LimitPerClaimTotal", FieldKind.INTEGER, S_SIMPLE_BREED.id, 2, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("SimpleClaims.Breeding.BreedingRequiresClaim", FieldKind.BOOLEAN, S_SIMPLE_BREED.id, 2, false, List.of())));
-        rows.add(RowDef.section(S_SIMPLE_DAMAGE));
-        rows.add(RowDef.field(new FieldDef("SimpleClaims.Damage.ProtectTamedFromNonMembers", FieldKind.BOOLEAN, S_SIMPLE_DAMAGE.id, 2, false, List.of())));
-        rows.add(RowDef.field(new FieldDef("SimpleClaims.Damage.AllowDamagePermissionKey", FieldKind.STRING, S_SIMPLE_DAMAGE.id, 2, false, List.of())));
-
-        return List.copyOf(rows);
+    private record ModView(@Nonnull String key, @Nonnull String label) {
     }
 
-    private static FieldKind commandFieldKind(String path) {
-        if (path.endsWith("Enabled") || path.endsWith("Confirm")) {
-            return FieldKind.BOOLEAN;
-        }
-        if (path.endsWith("Ms") || path.endsWith("Attempts")) {
-            return FieldKind.INTEGER;
-        }
-        return FieldKind.DOUBLE;
-    }
-
-    @Nonnull
-    private static Map<String, FieldDef> buildFields() {
-        LinkedHashMap<String, FieldDef> out = new LinkedHashMap<>();
-        for (RowDef row : LAYOUT) {
-            if (row.field != null) {
-                out.put(row.field.path, row.field);
-            }
-        }
-        return Collections.unmodifiableMap(out);
-    }
-
-    @Nonnull
-    private static Map<String, SectionDef> buildSections() {
-        LinkedHashMap<String, SectionDef> out = new LinkedHashMap<>();
-        for (RowDef row : LAYOUT) {
-            if (row.section != null) {
-                out.put(row.section.id, row.section);
-            }
-        }
-        return Collections.unmodifiableMap(out);
-    }
-
-    @Nonnull
-    private static Set<String> buildKnownTopLevelKeys() {
-        LinkedHashSet<String> out = new LinkedHashSet<>();
-        for (FieldDef field : FIELDS.values()) {
-            String path = field.path;
-            int dot = path.indexOf('.');
-            out.add(dot < 0 ? path : path.substring(0, dot));
-        }
-        return Collections.unmodifiableSet(out);
+    private record DescriptorLayout(
+            @Nonnull List<RowDef> rows,
+            @Nonnull Map<String, FieldDef> fieldByPath,
+            @Nonnull Map<String, SectionDef> sectionById,
+            @Nonnull Set<String> knownTopLevelKeys,
+            @Nonnull Map<String, TwConfigEditorFieldPolicy.EditorFieldSpec> specByPath
+    ) {
     }
 
     public static final class EventPayload {
@@ -1657,6 +1937,9 @@ public final class TameworkConfigEditorPage
                 .<String>append(new KeyedCodec<>(K_ACTION, Codec.STRING), (x, v) -> x.action = v, x -> x.action).add()
                 .<String>append(new KeyedCodec<>(K_PATH, Codec.STRING), (x, v) -> x.path = v, x -> x.path).add()
                 .<String>append(new KeyedCodec<>(K_FIELD_VALUE, Codec.STRING), (x, v) -> x.value = v, x -> x.value).add()
+                .<Boolean>append(new KeyedCodec<>(K_FIELD_BOOL, Codec.BOOLEAN), (x, v) -> x.boolValue = v, x -> x.boolValue).add()
+                .<String>append(new KeyedCodec<>(K_MOD_KEY, Codec.STRING), (x, v) -> x.modKey = v, x -> x.modKey).add()
+                .<String>append(new KeyedCodec<>(K_FAMILY_KEY, Codec.STRING), (x, v) -> x.familyKey = v, x -> x.familyKey).add()
                 .<String>append(new KeyedCodec<>(K_ASSET_KEY, Codec.STRING), (x, v) -> x.assetKey = v, x -> x.assetKey).add()
                 .<String>append(new KeyedCodec<>(K_ASSET_FILTER, Codec.STRING), (x, v) -> x.assetFilter = v, x -> x.assetFilter).add()
                 .<String>append(new KeyedCodec<>(K_PROPERTY_FILTER, Codec.STRING), (x, v) -> x.propertyFilter = v, x -> x.propertyFilter).add()
@@ -1665,6 +1948,9 @@ public final class TameworkConfigEditorPage
         private String action;
         private String path;
         private String value;
+        private Boolean boolValue;
+        private String modKey;
+        private String familyKey;
         private String assetKey;
         private String assetFilter;
         private String propertyFilter;

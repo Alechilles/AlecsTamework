@@ -2,6 +2,18 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.overrides.TwConfigAssetDescriptor;
 import com.alechilles.alecstamework.config.overrides.TwConfigFamily;
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.config.assets.TwCoopConfig;
+import com.alechilles.alecstamework.config.assets.TwDebugConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.hypixel.hytale.assetstore.AssetStore;
 import com.hypixel.hytale.assetstore.codec.AssetCodec;
 import com.hypixel.hytale.codec.schema.SchemaContext;
@@ -40,16 +52,17 @@ final class TwConfigSchemaAdapter {
         if (descriptor == null || !descriptor.knownType() || descriptor.family() == TwConfigFamily.OTHER) {
             return List.of();
         }
-        return FIELD_CACHE.computeIfAbsent(descriptor.family(), TwConfigSchemaAdapter::buildFieldsForFamily);
+        return FIELD_CACHE.compute(descriptor.family(), (family, existing) -> {
+            if (existing != null && !existing.isEmpty()) {
+                return existing;
+            }
+            return buildFieldsForFamily(family);
+        });
     }
 
     @Nonnull
     private static List<TwConfigEditorFieldPolicy.EditorFieldSpec> buildFieldsForFamily(@Nonnull TwConfigFamily family) {
-        AssetStore<String, ?, ?> store = family.getAssetStore();
-        if (store == null) {
-            return List.of();
-        }
-        AssetCodec<?, ?> codec = store.getCodec();
+        AssetCodec<?, ?> codec = resolveCodecForFamily(family);
         if (codec == null) {
             return List.of();
         }
@@ -67,10 +80,10 @@ final class TwConfigSchemaAdapter {
 
         LinkedHashMap<String, Schema> definitions = new LinkedHashMap<>();
         if (schema.getDefinitions() != null) {
-            definitions.putAll(schema.getDefinitions());
+            indexDefinitions(definitions, schema.getDefinitions());
         }
         if (context.getDefinitions() != null) {
-            definitions.putAll(context.getDefinitions());
+            indexDefinitions(definitions, context.getDefinitions());
         }
 
         Schema resolvedRoot = resolveSchema(schema, definitions, new HashSet<>());
@@ -94,6 +107,45 @@ final class TwConfigSchemaAdapter {
         return List.copyOf(out);
     }
 
+    private static void indexDefinitions(@Nonnull Map<String, Schema> out, @Nonnull Map<String, Schema> source) {
+        for (Map.Entry<String, Schema> entry : source.entrySet()) {
+            String key = entry.getKey();
+            Schema schema = entry.getValue();
+            if (schema == null || key == null || key.isBlank()) {
+                continue;
+            }
+            String trimmed = key.trim();
+            out.putIfAbsent(trimmed, schema);
+            String normalized = normalizeRef(trimmed);
+            if (!normalized.isBlank()) {
+                out.putIfAbsent(normalized, schema);
+            }
+        }
+    }
+
+    @Nullable
+    private static AssetCodec<?, ?> resolveCodecForFamily(@Nonnull TwConfigFamily family) {
+        AssetStore<String, ?, ?> store = family.getAssetStore();
+        if (store != null && store.getCodec() != null) {
+            return store.getCodec();
+        }
+        return switch (family) {
+            case GLOBAL -> TwGlobalConfig.CODEC;
+            case COMPANION -> TwCompanionConfig.CODEC;
+            case INTERACTION -> TwInteractionConfig.CODEC;
+            case SPAWNER -> TwSpawnerConfig.CODEC;
+            case NAME_ITEM -> TwNameItemConfig.CODEC;
+            case COMMAND_ITEM -> TwCommandItemConfig.CODEC;
+            case HAPPINESS -> TwHappinessConfig.CODEC;
+            case NEEDS -> TwNeedsConfig.CODEC;
+            case BREEDING -> TwBreedingConfig.CODEC;
+            case TRAIT -> TwTraitConfig.CODEC;
+            case COOP -> TwCoopConfig.CODEC;
+            case DEBUG -> TwDebugConfig.CODEC;
+            case OTHER -> null;
+        };
+    }
+
     private static void collectObjectFields(@Nonnull ObjectSchema objectSchema,
                                             @Nonnull String pathPrefix,
                                             @Nonnull String section,
@@ -113,8 +165,15 @@ final class TwConfigSchemaAdapter {
             if (key == null || key.isBlank()) {
                 continue;
             }
+            if (isInternalEditorMetadataKey(key)) {
+                continue;
+            }
             String path = pathPrefix.isBlank() ? key : (pathPrefix + "." + key);
-            Schema resolved = resolveSchema(entry.getValue(), definitions, new HashSet<>());
+            Schema resolved = unwrapCompositeSchema(
+                    resolveSchema(entry.getValue(), definitions, new HashSet<>()),
+                    definitions,
+                    new HashSet<>()
+            );
             String label = resolveLabel(key, resolved);
             String currentSection = section;
             if (currentSection.isBlank() && !pathPrefix.isBlank()) {
@@ -214,17 +273,23 @@ final class TwConfigSchemaAdapter {
                 ));
                 continue;
             }
-            if (isSimpleObjectSchema(resolved, definitions)) {
-                String nestedSection = pathPrefix.isBlank() ? label : currentSection;
-                collectObjectFields(
-                        (ObjectSchema) resolved,
-                        path,
-                        nestedSection,
-                        depth + 1,
-                        definitions,
-                        out
-                );
-                continue;
+            if (resolved instanceof ObjectSchema resolvedObjectSchema) {
+                Map<String, Schema> nestedProperties = resolvedObjectSchema.getProperties();
+                if (nestedProperties != null && !nestedProperties.isEmpty()) {
+                    int before = out.size();
+                    String nestedSection = pathPrefix.isBlank() ? label : currentSection;
+                    collectObjectFields(
+                            resolvedObjectSchema,
+                            path,
+                            nestedSection,
+                            depth + 1,
+                            definitions,
+                            out
+                    );
+                    if (out.size() > before) {
+                        continue;
+                    }
+                }
             }
 
             out.add(newField(
@@ -275,46 +340,6 @@ final class TwConfigSchemaAdapter {
         return isSimpleStringSchema(resolved);
     }
 
-    private static boolean isSimpleObjectSchema(@Nullable Schema schema, @Nonnull Map<String, Schema> definitions) {
-        if (!(schema instanceof ObjectSchema objectSchema)) {
-            return false;
-        }
-        if (hasCompositeSchema(objectSchema)) {
-            return false;
-        }
-        Object additionalProperties = objectSchema.getAdditionalProperties();
-        if (additionalProperties instanceof Boolean boolValue && boolValue) {
-            return false;
-        }
-        if (additionalProperties instanceof Schema) {
-            return false;
-        }
-        Map<String, Schema> properties = objectSchema.getProperties();
-        if (properties == null || properties.isEmpty()) {
-            return false;
-        }
-
-        for (Schema child : properties.values()) {
-            Schema resolved = resolveSchema(child, definitions, new HashSet<>());
-            if (isStringEnumSchema(resolved)
-                    || isSimpleStringSchema(resolved)
-                    || resolved instanceof BooleanSchema
-                    || resolved instanceof IntegerSchema
-                    || resolved instanceof NumberSchema
-                    || hasSchemaType(resolved, "boolean")
-                    || hasSchemaType(resolved, "integer")
-                    || hasSchemaType(resolved, "number")
-                    || isStringArraySchema(resolved, definitions)) {
-                continue;
-            }
-            if (resolved instanceof ObjectSchema && isSimpleObjectSchema(resolved, definitions)) {
-                continue;
-            }
-            return false;
-        }
-        return true;
-    }
-
     private static boolean hasCompositeSchema(@Nullable Schema schema) {
         if (schema == null) {
             return false;
@@ -324,6 +349,67 @@ final class TwConfigSchemaAdapter {
 
     private static boolean hasEntries(@Nullable Schema[] entries) {
         return entries != null && entries.length > 0;
+    }
+
+    @Nullable
+    private static Schema unwrapCompositeSchema(@Nullable Schema schema,
+                                                @Nonnull Map<String, Schema> definitions,
+                                                @Nonnull Set<Schema> visited) {
+        if (schema == null || !visited.add(schema)) {
+            return schema;
+        }
+        Schema resolved = resolveSchema(schema, definitions, new HashSet<>());
+        if (resolved == null) {
+            return resolved;
+        }
+        if (resolved != schema && !visited.add(resolved)) {
+            return resolved;
+        }
+
+        Schema unwrapped = unwrapFromEntries(resolved.getAnyOf(), definitions, visited);
+        if (unwrapped != null) {
+            return unwrapped;
+        }
+        unwrapped = unwrapFromEntries(resolved.getOneOf(), definitions, visited);
+        if (unwrapped != null) {
+            return unwrapped;
+        }
+        unwrapped = unwrapFromEntries(resolved.getAllOf(), definitions, visited);
+        if (unwrapped != null) {
+            return unwrapped;
+        }
+        return resolved;
+    }
+
+    @Nullable
+    private static Schema unwrapFromEntries(@Nullable Schema[] entries,
+                                            @Nonnull Map<String, Schema> definitions,
+                                            @Nonnull Set<Schema> visited) {
+        if (entries == null || entries.length == 0) {
+            return null;
+        }
+        ArrayList<Schema> candidates = new ArrayList<>();
+        for (Schema entry : entries) {
+            Schema resolved = resolveSchema(entry, definitions, new HashSet<>());
+            if (resolved == null || isNullTypeSchema(resolved)) {
+                continue;
+            }
+            candidates.add(resolved);
+        }
+        if (candidates.size() != 1) {
+            return null;
+        }
+        return unwrapCompositeSchema(candidates.get(0), definitions, visited);
+    }
+
+    private static boolean isNullTypeSchema(@Nullable Schema schema) {
+        if (schema == null) {
+            return true;
+        }
+        if ("NullSchema".equals(schema.getClass().getSimpleName())) {
+            return true;
+        }
+        return hasSchemaType(schema, "null");
     }
 
     @Nullable
@@ -352,11 +438,26 @@ final class TwConfigSchemaAdapter {
     @Nonnull
     private static String normalizeRef(@Nonnull String ref) {
         String value = ref.trim();
+        int definitionIndex = value.indexOf("#/definitions/");
+        if (definitionIndex >= 0) {
+            return value.substring(definitionIndex + "#/definitions/".length());
+        }
         if (value.startsWith("#/definitions/")) {
             return value.substring("#/definitions/".length());
         }
         if (value.startsWith("#")) {
             return value.substring(1);
+        }
+        int hashIndex = value.indexOf('#');
+        if (hashIndex >= 0 && hashIndex + 1 < value.length()) {
+            String fragment = value.substring(hashIndex + 1);
+            if (fragment.startsWith("/definitions/")) {
+                return fragment.substring("/definitions/".length());
+            }
+            if (fragment.startsWith("/")) {
+                return fragment.substring(1);
+            }
+            return fragment;
         }
         return value;
     }
@@ -424,5 +525,9 @@ final class TwConfigSchemaAdapter {
             return path;
         }
         return path.substring(0, dotIndex);
+    }
+
+    private static boolean isInternalEditorMetadataKey(@Nonnull String key) {
+        return key.startsWith("$");
     }
 }
