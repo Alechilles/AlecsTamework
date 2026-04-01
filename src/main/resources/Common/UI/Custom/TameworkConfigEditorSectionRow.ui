@@ -97,10 +97,10 @@ Group {
     }
 
     Group {
-      Anchor: (Width: 94, Height: 24);
+      Anchor: (Width: 300, Height: 24);
 
       Label #SectionToggleTopCount {
-        Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
+        Anchor: (Top: 0, Right: 6, Width: 294, Height: 24);
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
@@ -213,10 +213,10 @@ Group {
     }
 
     Group {
-      Anchor: (Width: 94, Height: 24);
+      Anchor: (Width: 300, Height: 24);
 
       Label #SectionToggleNestedCount {
-        Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
+        Anchor: (Top: 0, Right: 6, Width: 294, Height: 24);
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,
@@ -329,10 +329,10 @@ Group {
     }
 
     Group {
-      Anchor: (Width: 94, Height: 24);
+      Anchor: (Width: 300, Height: 24);
 
       Label #SectionToggleDeepCount {
-        Anchor: (Top: 0, Right: 6, Width: 88, Height: 24);
+        Anchor: (Top: 0, Right: 6, Width: 294, Height: 24);
         Text: %server.tamework.ui.configEditor.section.fieldCount.initial;
         Style: (
           FontSize: 11,

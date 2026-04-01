@@ -465,6 +465,7 @@ public final class TameworkConfigEditorPage
             commandBuilder.set("#TwConfigSelectedAssetTitle.Text", tr("tamework.ui.configEditor.noAssets"));
             commandBuilder.set("#TwConfigSelectedAssetMeta.Text", "");
             commandBuilder.set("#TwConfigSelectedAssetChain.Text", "");
+            commandBuilder.set("#TwConfigSelectedAssetFieldSummary.Text", "");
             commandBuilder.set("#TwConfigOverridePath.Text", "");
             commandBuilder.set("#TwConfigPropertyEmptyState.Visible", true);
             commandBuilder.clear("#TwConfigPropertyRows");
@@ -474,9 +475,22 @@ public final class TameworkConfigEditorPage
         commandBuilder.set("#TwConfigSelectedAssetTitle.Text", selected.assetId());
         commandBuilder.set("#TwConfigSelectedAssetMeta.Text", tr("tamework.ui.configEditor.selectedAssetMeta", selected.familyDisplayName(), selected.sourcePackKey()));
         commandBuilder.set("#TwConfigSelectedAssetChain.Text", inheritanceChainText(selected));
+        DescriptorLayout layout = layoutFor(selected);
+        JsonObject source = TwConfigJsonUtil.copyObject(sourceByKey.get(selected.descriptorKey()));
+        JsonObject draft = draft(selected.descriptorKey());
+        commandBuilder.set(
+                "#TwConfigSelectedAssetFieldSummary.Text",
+                tr(
+                        "tamework.ui.configEditor.fieldSummary",
+                        formatFieldCountSummary(
+                                localFieldCount(layout, null, draft),
+                                thisAssetFieldCount(layout, null, selected, source),
+                                fieldCount(layout, null)
+                        )
+                )
+        );
         commandBuilder.set("#TwConfigOverridePath.Text", shortenedPathForUi(overrideManager.resolveOverridePath(world, selected)));
         commandBuilder.set("#TwConfigPropertyEmptyState.Visible", false);
-        DescriptorLayout layout = layoutFor(selected);
         renderRows(selected, layout, commandBuilder, eventBuilder);
     }
 
@@ -490,6 +504,7 @@ public final class TameworkConfigEditorPage
         JsonObject merged = mergedCurrentJson(descriptorKey);
         JsonObject draft = draft(descriptorKey);
         JsonObject disk = disk(descriptorKey);
+        JsonObject source = TwConfigJsonUtil.copyObject(sourceByKey.get(descriptorKey));
         List<RowDef> visibleRows = visibleRows(layout);
 
         for (int i = 0; i < visibleRows.size(); i++) {
@@ -501,7 +516,11 @@ public final class TameworkConfigEditorPage
                 boolean collapsed = collapsedSectionState(descriptorKey).getOrDefault(section.id, true);
                 int depthLevel = depthBucket(section.depth);
                 String toggleText = section.label;
-                String countText = formatFieldCount(sectionFieldCount(layout, section.id));
+                String countText = formatFieldCountSummary(
+                        localFieldCount(layout, section.id, draft),
+                        thisAssetFieldCount(layout, section.id, descriptor, source),
+                        fieldCount(layout, section.id)
+                );
                 boolean hasStagedEdits = sectionHasStagedOverrides(layout, section.id, draft, disk);
                 boolean hasAppliedLocal = !hasStagedEdits && sectionHasAppliedOverrides(layout, section.id, disk);
                 boolean showBadge = hasStagedEdits || hasAppliedLocal;
@@ -1749,20 +1768,73 @@ public final class TameworkConfigEditorPage
         return List.copyOf(out);
     }
 
-    private int sectionFieldCount(@Nonnull DescriptorLayout layout, @Nonnull String sectionId) {
+    private int fieldCount(@Nonnull DescriptorLayout layout, @Nullable String sectionId) {
         int count = 0;
         for (FieldDef field : layout.fieldByPath.values()) {
-            String current = field.sectionId;
-            while (current != null) {
-                if (current.equalsIgnoreCase(sectionId)) {
-                    count++;
-                    break;
-                }
-                SectionDef section = layout.sectionById.get(current);
-                current = section == null ? null : section.parentId;
+            if (fieldMatchesSection(layout, field, sectionId)) {
+                count++;
             }
         }
         return count;
+    }
+
+    private int localFieldCount(@Nonnull DescriptorLayout layout,
+                                @Nullable String sectionId,
+                                @Nonnull JsonObject draft) {
+        int count = 0;
+        for (FieldDef field : layout.fieldByPath.values()) {
+            if (!fieldMatchesSection(layout, field, sectionId)) {
+                continue;
+            }
+            if (TwConfigJsonUtil.hasPath(draft, field.path)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private int thisAssetFieldCount(@Nonnull DescriptorLayout layout,
+                                    @Nullable String sectionId,
+                                    @Nonnull TwConfigAssetDescriptor descriptor,
+                                    @Nonnull JsonObject source) {
+        int count = 0;
+        for (FieldDef field : layout.fieldByPath.values()) {
+            if (!fieldMatchesSection(layout, field, sectionId)) {
+                continue;
+            }
+            if (fieldDefinedOnAsset(field, descriptor, source)) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    private boolean fieldMatchesSection(@Nonnull DescriptorLayout layout,
+                                        @Nonnull FieldDef field,
+                                        @Nullable String sectionId) {
+        if (sectionId == null || sectionId.isBlank()) {
+            return true;
+        }
+        if (field.sectionId == null) {
+            return false;
+        }
+        return isSectionOrAncestor(layout, field.sectionId, sectionId);
+    }
+
+    private boolean fieldDefinedOnAsset(@Nonnull FieldDef field,
+                                        @Nonnull TwConfigAssetDescriptor descriptor,
+                                        @Nonnull JsonObject source) {
+        if ("Parent".equalsIgnoreCase(field.path)) {
+            JsonElement explicitParent = TwConfigJsonUtil.getPath(source, "Parent");
+            if (explicitParent != null
+                    && explicitParent.isJsonPrimitive()
+                    && explicitParent.getAsJsonPrimitive().isString()
+                    && !trim(explicitParent.getAsString()).isBlank()) {
+                return true;
+            }
+            return descriptor.parentAssetId() != null && !descriptor.parentAssetId().isBlank();
+        }
+        return TwConfigJsonUtil.hasPath(source, field.path);
     }
 
     private boolean sectionHasAppliedOverrides(@Nonnull DescriptorLayout layout,
@@ -1813,11 +1885,22 @@ public final class TameworkConfigEditorPage
     }
 
     @Nonnull
-    private String formatFieldCount(int count) {
-        int clamped = Math.max(0, count);
-        return clamped == 1
-                ? tr("tamework.ui.configEditor.fieldCount.single", clamped)
-                : tr("tamework.ui.configEditor.fieldCount.plural", clamped);
+    private String formatFieldCountSummary(int localCount, int thisAssetCount, int totalCount) {
+        int local = Math.max(0, localCount);
+        int thisAsset = Math.max(0, thisAssetCount);
+        int total = Math.max(0, totalCount);
+        ArrayList<String> segments = new ArrayList<>(3);
+        if (local > 0) {
+            segments.add(tr("tamework.ui.configEditor.fieldCount.local", local));
+        }
+        if (thisAsset > 0) {
+            segments.add(tr("tamework.ui.configEditor.fieldCount.thisAsset", thisAsset));
+        }
+        String totalSegment = total == 1
+                ? tr("tamework.ui.configEditor.fieldCount.total.single")
+                : tr("tamework.ui.configEditor.fieldCount.total.plural", total);
+        segments.add(totalSegment);
+        return String.join(" > ", segments);
     }
 
     private static int depthBucket(int depth) {
