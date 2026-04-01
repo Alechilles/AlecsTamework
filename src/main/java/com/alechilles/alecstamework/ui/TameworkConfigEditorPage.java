@@ -666,7 +666,7 @@ public final class TameworkConfigEditorPage
             TwConfigAssetDescriptor descriptor = descriptors.get(i);
             String root = "#TwConfigAssetListRows[" + i + "]";
             boolean selected = descriptor.descriptorKey().equalsIgnoreCase(trim(selectedDescriptorKey));
-            String label = descriptor.assetId() + " [" + shortPackLabel(descriptor.sourcePackKey()) + "]";
+            String label = assetDisplayLabel(descriptor);
 
             commandBuilder.append("#TwConfigAssetListRows", UI_ASSET_ROW);
             commandBuilder.set(root + " #AssetRowBackground.Background", selected ? "#284767" : "#152a44");
@@ -1505,10 +1505,25 @@ public final class TameworkConfigEditorPage
         }
         ArrayList<DropdownEntryInfo> entries = new ArrayList<>(filtered.size());
         for (TwConfigAssetDescriptor descriptor : filtered) {
-            String label = descriptor.assetId() + " [" + shortPackLabel(descriptor.sourcePackKey()) + "]";
+            String label = assetDisplayLabel(descriptor);
             entries.add(new DropdownEntryInfo(LocalizableString.fromString(label), descriptor.descriptorKey()));
         }
         return List.copyOf(entries);
+    }
+
+    @Nonnull
+    private String assetDisplayLabel(@Nonnull TwConfigAssetDescriptor descriptor) {
+        if (!shouldShowPackContextInAssetLabel()) {
+            return descriptor.assetId();
+        }
+        return descriptor.assetId() + " [" + shortPackLabel(descriptor.sourcePackKey()) + "]";
+    }
+
+    private boolean shouldShowPackContextInAssetLabel() {
+        String selected = trim(selectedModKey);
+        return selected.isBlank()
+                || MOD_ALL_KEY.equalsIgnoreCase(selected)
+                || MOD_LOCAL_KEY.equalsIgnoreCase(selected);
     }
 
     @Nonnull
