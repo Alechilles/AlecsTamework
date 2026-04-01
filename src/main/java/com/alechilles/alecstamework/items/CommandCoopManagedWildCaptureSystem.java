@@ -98,6 +98,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private final CommandLinkedNpcLostService lostService;
     @Nullable
     private final CoopResidentStateSnapshotService stateSnapshotService;
+    private final CoopEffectService coopEffectService;
 
     private final HashMap<String, Long> nextCaptureAtByCoopKey = new HashMap<>();
     private final HashMap<String, Long> nextReleaseAtByCoopKey = new HashMap<>();
@@ -128,6 +129,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         this.relocationService = relocationService;
         this.lostService = lostService;
         this.stateSnapshotService = stateSnapshotService;
+        this.coopEffectService = new CoopEffectService();
     }
 
     @Override
@@ -195,7 +197,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 syncCoopInteractionState(world, coop);
                 continue;
             }
-            maybeCaptureOneResident(entityStore, coop, npcCandidates, consumedNpcs, nowMs);
+            maybeCaptureOneResident(world, entityStore, coop, npcCandidates, consumedNpcs, nowMs);
             syncCoopInteractionState(world, coop);
         }
         maybeLogStatus(
@@ -409,7 +411,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         return out;
     }
 
-    private void maybeCaptureOneResident(@Nonnull Store<EntityStore> entityStore,
+    private void maybeCaptureOneResident(@Nonnull World world,
+                                         @Nonnull Store<EntityStore> entityStore,
                                          @Nonnull ManagedCoopContext coop,
                                          @Nonnull ArrayList<NpcCandidate> candidates,
                                          @Nonnull Set<UUID> consumedNpcs,
@@ -457,6 +460,11 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 stateSnapshot
         );
         clearTransientState(candidate.npcUuid());
+        playCoopEffectsAtPosition(
+                world,
+                new Vector3d(candidate.x(), candidate.y(), candidate.z()),
+                coop.config()
+        );
         consumedNpcs.add(candidate.npcUuid());
 
         NPCEntity npcEntity = safeGetEntityComponent(entityStore, candidate.reference(), NPCEntity.getComponentType());
@@ -530,6 +538,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                         housedUuid,
                         roleId,
                         slotContext,
+                        coop.config(),
                         coop.config().getIdentityRules().isRequireSnapshotOnRelease()
                 );
             }
@@ -580,6 +589,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 currentUuid,
                 roleId,
                 slotContext,
+                coop.config(),
                 coop.config().getIdentityRules().isRequireSnapshotOnRelease()
         );
     }
@@ -591,6 +601,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                                              @Nonnull UUID currentUuid,
                                              @Nullable String roleId,
                                              @Nonnull CommandLinkedNpcCoopService.CoopSlotContext slotContext,
+                                             @Nonnull TwCoopConfig coopConfig,
                                              boolean requireSnapshotOnRelease) {
         CommandLinkedNpcCoopService.ReleaseResolution releaseResolution =
                 coopService.resolveRelease(currentUuid, roleId, slotContext, requireSnapshotOnRelease);
@@ -622,7 +633,35 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             clearTransientState(previousUuid);
         }
         clearTransientState(currentUuid);
+        playCoopEffectsAtEntity(world, entityStore, targetRef, coopConfig);
         return true;
+    }
+
+    private void playCoopEffectsAtEntity(@Nonnull World world,
+                                         @Nonnull Store<EntityStore> entityStore,
+                                         @Nonnull Ref<EntityStore> targetRef,
+                                         @Nullable TwCoopConfig coopConfig) {
+        if (coopConfig == null || !targetRef.isValid()) {
+            return;
+        }
+        TransformComponent transform = safeGetEntityComponent(
+                entityStore,
+                targetRef,
+                TransformComponent.getComponentType()
+        );
+        if (transform == null || transform.getPosition() == null) {
+            return;
+        }
+        playCoopEffectsAtPosition(world, new Vector3d(transform.getPosition()), coopConfig);
+    }
+
+    private void playCoopEffectsAtPosition(@Nullable World world,
+                                           @Nullable Vector3d position,
+                                           @Nullable TwCoopConfig coopConfig) {
+        if (coopConfig == null) {
+            return;
+        }
+        coopEffectService.playIntakeEffects(world, position, coopConfig.getCapturePolicy());
     }
 
     private void applySnapshotDirect(@Nonnull Ref<EntityStore> reference,
