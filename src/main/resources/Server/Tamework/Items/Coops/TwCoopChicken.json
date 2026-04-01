@@ -9,8 +9,8 @@
     "RequireTamed": false,
     "OwnerRestricted": false,
     "RequireOwner": false,
-    "ParticleSystem": "Entities/Basic/Particles/Love/Hearts",
-    "SoundEvent": "SFX_Pet_Interact_Success"
+    "ParticleSystem": "Poof_Small",
+    "SoundEvent": "SFX_Tamework_Poof"
   },
   "LifecycleRules": {
     "MaxResidents": 6,
@@ -29,7 +29,9 @@
       "skrill",
       "tamed_chicken",
       "tamed_chicken_desert",
-      "tamed_skrill"
+      "tamed_skrill",
+      "Turkey",
+      "Tamed_Turkey"
     ]
   },
   "ProduceRules": {
