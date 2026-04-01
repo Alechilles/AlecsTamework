@@ -135,7 +135,8 @@ class TwConfigEditorFieldPolicyTest {
                 Path.of("source", assetId + ".json"),
                 Path.of("Server", "Tamework", assetId + ".json"),
                 editable,
-                knownType
+                knownType,
+                false
         );
     }
 }

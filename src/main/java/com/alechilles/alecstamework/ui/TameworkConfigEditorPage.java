@@ -75,6 +75,7 @@ public final class TameworkConfigEditorPage
     private static final String A_SET_VALUE = "SetValue";
     private static final String PARENT_NONE_VALUE = "__none__";
     private static final String MOD_ALL_KEY = "__all_mods__";
+    private static final String MOD_LOCAL_KEY = "__local_overrides__";
 
     private final Tamework plugin;
     private final World world;
@@ -364,7 +365,12 @@ public final class TameworkConfigEditorPage
 
     private void rebuildModViews() {
         LinkedHashMap<String, ModView> discovered = new LinkedHashMap<>();
+        boolean hasLocalOnly = false;
         for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+            if (descriptor.localOnly()) {
+                hasLocalOnly = true;
+                continue;
+            }
             String packKey = descriptor.sourcePackKey();
             if (packKey == null || packKey.isBlank()) {
                 continue;
@@ -374,9 +380,13 @@ public final class TameworkConfigEditorPage
 
         ArrayList<ModView> ordered = new ArrayList<>(discovered.values());
         ordered.sort(Comparator.comparing(ModView::label, String.CASE_INSENSITIVE_ORDER));
+        modByKey.clear();
         modByKey.put(MOD_ALL_KEY, new ModView(MOD_ALL_KEY, tr("tamework.ui.configEditor.mod.all")));
         for (ModView mod : ordered) {
             modByKey.put(mod.key(), mod);
+        }
+        if (hasLocalOnly) {
+            modByKey.put(MOD_LOCAL_KEY, new ModView(MOD_LOCAL_KEY, tr("tamework.ui.configEditor.mod.local")));
         }
     }
 
@@ -1524,6 +1534,12 @@ public final class TameworkConfigEditorPage
         String selected = trim(selectedModKey);
         if (selected.isBlank() || MOD_ALL_KEY.equalsIgnoreCase(selected)) {
             return true;
+        }
+        if (MOD_LOCAL_KEY.equalsIgnoreCase(selected)) {
+            return descriptor.localOnly();
+        }
+        if (descriptor.localOnly()) {
+            return false;
         }
         return descriptor.sourcePackKey().equalsIgnoreCase(selected);
     }

@@ -51,8 +51,8 @@ class TwConfigSchemaAdapterTest {
                 Path.of("source", assetId + ".json"),
                 Path.of("Server", "Tamework", family.getStorePath(), assetId + ".json"),
                 true,
-                true
+                true,
+                false
         );
     }
 }
-

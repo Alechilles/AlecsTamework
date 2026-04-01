@@ -71,6 +71,7 @@ tamework.ui.configEditor.family.label=Type
 tamework.ui.configEditor.family.none=No types
 tamework.ui.configEditor.family.unknown=Unknown
 tamework.ui.configEditor.mod.all=All Mods
+tamework.ui.configEditor.mod.local=[Local]
 tamework.ui.configEditor.mod.label=Mod
 tamework.ui.configEditor.mod.none=No mods
 tamework.ui.configEditor.mod.unknown=Unknown mod

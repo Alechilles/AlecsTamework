@@ -179,7 +179,8 @@ public final class TwConfigOverrideManager {
     @Nonnull
     public TwConfigSnapshot createSnapshot(@Nonnull World world) {
         List<StoreBinding> bindings = discoverStoreBindings();
-        List<TwConfigAssetDescriptor> descriptors = discoverDescriptors(bindings);
+        List<TwConfigAssetDescriptor> discoveredDescriptors = discoverDescriptors(bindings);
+        List<TwConfigAssetDescriptor> descriptors = finalizeDescriptors(world, bindings, discoveredDescriptors);
         LinkedHashMap<String, TwConfigSnapshot.FamilyView> families = new LinkedHashMap<>();
         for (StoreBinding binding : bindings) {
             families.put(
@@ -598,15 +599,173 @@ public final class TwConfigOverrideManager {
                         sourcePath,
                         relativeServerPath,
                         binding.editable,
-                        binding.knownType
+                        binding.knownType,
+                        false
                 ));
             }
         }
-        descriptors.sort(Comparator
+        return List.copyOf(descriptors);
+    }
+
+    @Nonnull
+    private List<TwConfigAssetDescriptor> finalizeDescriptors(@Nonnull World world,
+                                                              @Nonnull List<StoreBinding> bindings,
+                                                              @Nonnull List<TwConfigAssetDescriptor> discovered) {
+        LinkedHashMap<String, TwConfigAssetDescriptor> consolidated = consolidateDiscoveredDescriptors(discovered);
+        ArrayList<TwConfigAssetDescriptor> visible = new ArrayList<>();
+        HashSet<String> knownDescriptorKeys = new HashSet<>();
+        HashSet<String> knownOverridePathKeys = new HashSet<>();
+
+        for (TwConfigAssetDescriptor descriptor : consolidated.values()) {
+            Path overridePath = resolveOverridePath(world, descriptor);
+            boolean hasOverrideFile = Files.isRegularFile(overridePath);
+            boolean sourceMissingOnDisk = isKnownMissingSourcePath(descriptor);
+            if (sourceMissingOnDisk && !hasOverrideFile) {
+                continue;
+            }
+            visible.add(descriptor);
+            knownDescriptorKeys.add(descriptor.descriptorKey());
+            knownOverridePathKeys.add(normalizePathKey(overridePath));
+        }
+
+        visible.addAll(discoverLocalOnlyOverrideDescriptors(world, bindings, knownDescriptorKeys, knownOverridePathKeys));
+        visible.sort(Comparator
                 .comparing(TwConfigAssetDescriptor::familyDisplayName, String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(TwConfigAssetDescriptor::assetId, String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(TwConfigAssetDescriptor::sourcePackKey, String.CASE_INSENSITIVE_ORDER));
-        return descriptors;
+        return List.copyOf(visible);
+    }
+
+    @Nonnull
+    private LinkedHashMap<String, TwConfigAssetDescriptor> consolidateDiscoveredDescriptors(
+            @Nonnull List<TwConfigAssetDescriptor> discovered) {
+        LinkedHashMap<String, TwConfigAssetDescriptor> consolidated = new LinkedHashMap<>();
+        for (TwConfigAssetDescriptor descriptor : discovered) {
+            if (descriptor == null) {
+                continue;
+            }
+            String key = descriptor.descriptorKey();
+            TwConfigAssetDescriptor existing = consolidated.get(key);
+            if (existing == null || shouldPreferDescriptor(descriptor, existing)) {
+                consolidated.put(key, descriptor);
+            }
+        }
+        return consolidated;
+    }
+
+    private boolean shouldPreferDescriptor(@Nonnull TwConfigAssetDescriptor candidate,
+                                           @Nonnull TwConfigAssetDescriptor existing) {
+        boolean candidateSourceExists = sourcePathExistsOnDisk(candidate.sourcePath());
+        boolean existingSourceExists = sourcePathExistsOnDisk(existing.sourcePath());
+        if (candidateSourceExists != existingSourceExists) {
+            return candidateSourceExists;
+        }
+        boolean candidateHasSourcePath = candidate.sourcePath() != null;
+        boolean existingHasSourcePath = existing.sourcePath() != null;
+        return candidateHasSourcePath && !existingHasSourcePath;
+    }
+
+    private boolean isKnownMissingSourcePath(@Nonnull TwConfigAssetDescriptor descriptor) {
+        Path sourcePath = descriptor.sourcePath();
+        return sourcePath != null && !Files.isRegularFile(sourcePath);
+    }
+
+    private boolean sourcePathExistsOnDisk(@Nullable Path sourcePath) {
+        return sourcePath != null && Files.isRegularFile(sourcePath);
+    }
+
+    @Nonnull
+    private List<TwConfigAssetDescriptor> discoverLocalOnlyOverrideDescriptors(
+            @Nonnull World world,
+            @Nonnull List<StoreBinding> bindings,
+            @Nonnull Set<String> knownDescriptorKeys,
+            @Nonnull Set<String> knownOverridePathKeys) {
+        Path overrideRoot = resolveOverrideRoot(world);
+        if (!Files.isDirectory(overrideRoot)) {
+            return List.of();
+        }
+        ArrayList<TwConfigAssetDescriptor> localOnly = new ArrayList<>();
+        List<Path> packDirectories = listPackDirectories(overrideRoot);
+        for (Path packDirectory : packDirectories) {
+            String packDirectoryName = packDirectory.getFileName() == null
+                    ? "<unknown-pack>"
+                    : packDirectory.getFileName().toString();
+            for (StoreBinding binding : bindings) {
+                if (!binding.knownType || binding.family == TwConfigFamily.OTHER) {
+                    continue;
+                }
+                Path familyRelative = tameworkRelativeStorePath(binding.storePath);
+                Path familyDirectory = familyRelative.toString().isBlank()
+                        ? packDirectory
+                        : resolvePortable(packDirectory, familyRelative);
+                if (!Files.isDirectory(familyDirectory)) {
+                    continue;
+                }
+                try (java.util.stream.Stream<Path> walk = Files.walk(familyDirectory)) {
+                    for (Path jsonPath : walk.filter(path -> Files.isRegularFile(path)
+                            && path.getFileName() != null
+                            && path.getFileName().toString().toLowerCase(Locale.ROOT).endsWith(".json")).toList()) {
+                        String overridePathKey = normalizePathKey(jsonPath);
+                        if (knownOverridePathKeys.contains(overridePathKey)) {
+                            continue;
+                        }
+                        Path relativeWithinFamily = familyDirectory.relativize(jsonPath);
+                        String assetId = assetIdFromJsonFile(relativeWithinFamily);
+                        if (assetId == null || assetId.isBlank()) {
+                            continue;
+                        }
+                        Path relativeServerPath = resolvePortable(
+                                Path.of("Server").resolve(binding.storePath),
+                                relativeWithinFamily
+                        );
+                        TwConfigAssetDescriptor descriptor = new TwConfigAssetDescriptor(
+                                binding.family,
+                                binding.familyKey,
+                                binding.familyLabel,
+                                binding.storePath,
+                                assetId,
+                                packDirectoryName,
+                                null,
+                                null,
+                                relativeServerPath,
+                                binding.editable,
+                                binding.knownType,
+                                true
+                        );
+                        if (knownDescriptorKeys.contains(descriptor.descriptorKey())) {
+                            continue;
+                        }
+                        knownDescriptorKeys.add(descriptor.descriptorKey());
+                        knownOverridePathKeys.add(overridePathKey);
+                        localOnly.add(descriptor);
+                    }
+                } catch (IOException ex) {
+                    plugin.getLogger().at(Level.WARNING).withCause(ex).log(
+                            "Failed scanning local-only overrides for family %s packDir=%s.",
+                            binding.familyLabel,
+                            packDirectoryName
+                    );
+                }
+            }
+        }
+        return localOnly;
+    }
+
+    @Nullable
+    private String assetIdFromJsonFile(@Nullable Path relativeJsonPath) {
+        if (relativeJsonPath == null || relativeJsonPath.getFileName() == null) {
+            return null;
+        }
+        String fileName = relativeJsonPath.getFileName().toString();
+        if (fileName.isBlank() || !fileName.toLowerCase(Locale.ROOT).endsWith(".json")) {
+            return null;
+        }
+        return fileName.substring(0, fileName.length() - ".json".length());
+    }
+
+    @Nonnull
+    private static String normalizePathKey(@Nonnull Path path) {
+        return path.toAbsolutePath().normalize().toString().toLowerCase(Locale.ROOT);
     }
 
     @Nonnull

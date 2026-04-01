@@ -19,7 +19,8 @@ public record TwConfigAssetDescriptor(
         @Nullable Path sourcePath,
         @Nonnull Path relativeServerPath,
         boolean editable,
-        boolean knownType
+        boolean knownType,
+        boolean localOnly
 ) {
     @Nonnull
     public String descriptorKey() {
