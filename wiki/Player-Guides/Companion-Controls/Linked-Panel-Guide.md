@@ -10,6 +10,8 @@ Parent: [Companion Controls](/mod/alecs-tamework/companion-controls) | [Player G
 
 The linked panel is the side panel that appears with Tamework command tools. It is the main place for inspecting and managing individual companions.
 
+![Tamework UI Showcase](https://wiki.hytalemodding.dev/storage/mods/019d3092-1857-713f-86a6-60f15c4e0a9e/files/9d39db03-a1d0-4805-8ded-d1a84d8278e8.jpg)
+
 ## What the panel shows
 - Linked companions for the current tool
 - Active and inactive status
