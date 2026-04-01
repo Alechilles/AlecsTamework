@@ -43,7 +43,6 @@ import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
 import com.alechilles.alecstamework.items.CommandCoopManagedWildCaptureSystem;
-import com.alechilles.alecstamework.items.CommandCoopResidentSyncSystem;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
@@ -51,7 +50,6 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
 import com.alechilles.alecstamework.items.CommandNpcRelocationService;
 import com.alechilles.alecstamework.items.CommandTeleportArrivalRelocationSystem;
-import com.alechilles.alecstamework.items.CoopFeatureHandler;
 import com.alechilles.alecstamework.items.CoopDebugLogger;
 import com.alechilles.alecstamework.items.CoopResidentStateSnapshotService;
 import com.alechilles.alecstamework.items.FeedTroughFoodStateSyncSystem;
@@ -103,7 +101,6 @@ import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
-import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
@@ -149,7 +146,6 @@ public class Tamework extends JavaPlugin {
     private SpawnerFeatureHandler spawnerFeatureHandler;
     private NamingFeatureHandler namingFeatureHandler;
     private CommandItemFeatureHandler commandItemFeatureHandler;
-    private CoopFeatureHandler coopFeatureHandler;
     private TranquilizerRecipeVisibilityService tranquilizerRecipeVisibilityService;
     private FeedTroughWaterChargeDroplistCompatService feedTroughWaterChargeDroplistCompatService;
     private CommandNpcRelocationService commandNpcRelocationService;
@@ -449,19 +445,6 @@ public class Tamework extends JavaPlugin {
                 persistenceRuntime.getHealthService()
         );
         coopResidentStateSnapshotService = new CoopResidentStateSnapshotService();
-        getEntityStoreRegistry().registerSystem(
-                new CommandCoopResidentSyncSystem(
-                        commandLinkedNpcCoopService,
-                        commandLinkedNpcCaptureService,
-                        commandNpcRelocationService,
-                        commandLinkedNpcLostService,
-                        coopResidentStateSnapshotService,
-                        commandLinksComponentType,
-                        CoopResidentComponent.getComponentType(),
-                        NPCEntity.getComponentType(),
-                        UUIDComponent.getComponentType()
-                )
-        );
         commandNpcRelocationService.setRelocationDropListener(commandLinkedNpcLostService::recordLostFromRelocationDrop);
         getEntityStoreRegistry().registerSystem(
                 new CommandNpcRelocationOnLoadSystem(
@@ -470,7 +453,7 @@ public class Tamework extends JavaPlugin {
                         commandLinkedNpcLostService,
                         commandLinkedNpcStateSnapshotService,
                         coopResidentStateSnapshotService,
-                        commandLinkedNpcCoopService
+                        null
                 )
         );
         getChunkStoreRegistry().registerSystem(
@@ -537,14 +520,6 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CommandTeleportArrivalRelocationSystem(commandItemFeatureHandler)
         );
-        // Core handler for coop intake policy overlays.
-        coopFeatureHandler = new CoopFeatureHandler(
-                getLogger(),
-                commandLinkedNpcCaptureService,
-                commandLinkedNpcCoopService,
-                commandNpcRelocationService,
-                commandLinkedNpcLostService
-        );
 
         // Register /tw commands if the server supports it.
         if (getCommandRegistry() != null) {
@@ -552,13 +527,6 @@ public class Tamework extends JavaPlugin {
         }
         applyDebugConfigDefaults();
 
-        // Global listener to enforce coop capture-intake policies where configured.
-        if (coopFeatureHandler != null) {
-            getEventRegistry().registerGlobal(
-                    PlayerInteractEvent.class,
-                    coopFeatureHandler::onPlayerInteract
-            );
-        }
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
                 new OwnerInteractionListener(translationRegistry, getLogger());

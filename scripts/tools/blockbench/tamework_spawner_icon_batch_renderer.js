@@ -160,16 +160,58 @@
     return result;
   }
 
+  function findAllPathSegmentIndexes(rawPath, marker) {
+    const normalizedPath = String(rawPath || "");
+    const normalizedMarker = String(marker || "");
+    if (!normalizedPath || !normalizedMarker) {
+      return [];
+    }
+    const pathLower = normalizedPath.toLowerCase();
+    const markerLower = normalizedMarker.toLowerCase();
+    const indexes = [];
+    let searchFrom = 0;
+    while (searchFrom < pathLower.length) {
+      const index = pathLower.indexOf(markerLower, searchFrom);
+      if (index === -1) {
+        break;
+      }
+      indexes.push(index);
+      searchFrom = index + markerLower.length;
+    }
+    return indexes;
+  }
+
+  function inferServerRootsFromPath(anyPath) {
+    const raw = String(anyPath || "");
+    if (!raw) {
+      return [];
+    }
+    const path = getPathModule();
+    const normalized = path.normalize(raw);
+    const marker = `${path.sep}Server${path.sep}`;
+    const roots = [];
+    const seen = new Set();
+    findAllPathSegmentIndexes(normalized, marker).forEach((index) => {
+      const candidate = normalized.slice(0, index);
+      const key = candidate.toLowerCase();
+      if (!candidate || seen.has(key)) {
+        return;
+      }
+      seen.add(key);
+      roots.push(candidate);
+    });
+    return roots;
+  }
+
   function inferModRootFromServerPath(serverPath) {
-    const normalized = String(serverPath || "");
     const marker = `${getPathModule().sep}Server${getPathModule().sep}`;
-    const index = normalized.toLowerCase().indexOf(marker.toLowerCase());
-    if (index === -1) {
+    const serverRoots = inferServerRootsFromPath(serverPath);
+    if (!serverRoots.length) {
       throw new Error(
         `Could not infer mod root from path (expected ...${marker}...): ${serverPath}`
       );
     }
-    return normalized.slice(0, index);
+    return serverRoots[serverRoots.length - 1];
   }
 
   function resolveCommonAssetFile(commonRoot, assetPath) {
@@ -223,12 +265,16 @@
     addRoot(path.join(modRoot, "Assets", "Common"));
 
     (sourcePaths || []).forEach((entry) => {
+      inferServerRootsFromPath(entry).forEach((serverRoot) => {
+        addRoot(path.join(serverRoot, "Common"));
+        addRoot(path.join(serverRoot, "Assets", "Common"));
+      });
+
       const gameRoot = inferGameRootFromPath(entry);
-      if (!gameRoot) {
-        return;
+      if (gameRoot) {
+        addRoot(path.join(gameRoot, "Common"));
+        addRoot(path.join(gameRoot, "Assets", "Common"));
       }
-      addRoot(path.join(gameRoot, "Common"));
-      addRoot(path.join(gameRoot, "Assets", "Common"));
     });
 
     return roots;

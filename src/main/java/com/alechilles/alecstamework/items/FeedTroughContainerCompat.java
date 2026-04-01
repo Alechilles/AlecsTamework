@@ -11,6 +11,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 
 /**
@@ -45,6 +46,10 @@ public final class FeedTroughContainerCompat {
         }
         Object container = invokeNoArg(state, "getItemContainer");
         if (container instanceof ItemContainer itemContainer) {
+            return itemContainer;
+        }
+        Object fieldContainer = readField(state, "itemContainer");
+        if (fieldContainer instanceof ItemContainer itemContainer) {
             return itemContainer;
         }
         return null;
@@ -122,6 +127,23 @@ public final class FeedTroughContainerCompat {
         } catch (ReflectiveOperationException ignored) {
             return null;
         }
+    }
+
+    @Nullable
+    private static Object readField(@Nonnull Object target, @Nonnull String fieldName) {
+        Class<?> type = target.getClass();
+        while (type != null) {
+            try {
+                Field field = type.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                return field.get(target);
+            } catch (NoSuchFieldException ignored) {
+                type = type.getSuperclass();
+            } catch (ReflectiveOperationException | SecurityException ignored) {
+                return null;
+            }
+        }
+        return null;
     }
 
     private static boolean invokeSingleArg(@Nullable Object target,

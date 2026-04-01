@@ -204,6 +204,13 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
             )
             .documentation("Farming coop asset id to bind this config to.")
             .add()
+            .<String[]>append(
+                    new KeyedCodec<>("BlockTypeIds", Codec.STRING_ARRAY),
+                    (asset, value) -> asset.blockTypeIds = value == null ? new String[0] : value,
+                    asset -> asset.blockTypeIds
+            )
+            .documentation("Block type ids this config should manage. Inheritance: explicit arrays replace parent value.")
+            .add()
             .<CapturePolicySettings>append(
                     new KeyedCodec<>("CapturePolicy", CAPTURE_POLICY_CODEC),
                     (asset, value) -> asset.capturePolicy = value == null ? new CapturePolicySettings() : value,
@@ -244,12 +251,16 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
     private static final Object COOP_CACHE_LOCK = new Object();
     private static volatile boolean COOP_CACHE_DIRTY = true;
     private static volatile Map<String, TwCoopConfig> COOP_CACHE = Map.of();
+    private static final Object BLOCK_TYPE_CACHE_LOCK = new Object();
+    private static volatile boolean BLOCK_TYPE_CACHE_DIRTY = true;
+    private static volatile Map<String, TwCoopConfig> BLOCK_TYPE_CACHE = Map.of();
 
     private AssetExtraInfo.Data data;
     private String id;
     private boolean enabled = true;
     private int priority;
     private String coopId;
+    private String[] blockTypeIds = new String[0];
     private CapturePolicySettings capturePolicy = new CapturePolicySettings();
     private LifecycleRules lifecycleRules = new LifecycleRules();
     private ProduceRules produceRules = new ProduceRules();
@@ -276,6 +287,7 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
     public static void clearCoopCache() {
         INHERITANCE_CACHE_DIRTY = true;
         COOP_CACHE_DIRTY = true;
+        BLOCK_TYPE_CACHE_DIRTY = true;
     }
 
     @Nullable
@@ -296,6 +308,29 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     COOP_CACHE_DIRTY = false;
                 }
                 cache = COOP_CACHE;
+            }
+        }
+        return cache.get(key);
+    }
+
+    @Nullable
+    public static TwCoopConfig resolveForBlockType(@Nullable String blockTypeId) {
+        String key = normalizeBlockTypeId(blockTypeId);
+        if (key == null) {
+            return null;
+        }
+        DefaultAssetMap<String, TwCoopConfig> assetMap = getAssetMap();
+        if (assetMap == null) {
+            return null;
+        }
+        Map<String, TwCoopConfig> cache = BLOCK_TYPE_CACHE;
+        if (BLOCK_TYPE_CACHE_DIRTY || cache == null) {
+            synchronized (BLOCK_TYPE_CACHE_LOCK) {
+                if (BLOCK_TYPE_CACHE_DIRTY || BLOCK_TYPE_CACHE == null) {
+                    BLOCK_TYPE_CACHE = buildBlockTypeCache(assetMap);
+                    BLOCK_TYPE_CACHE_DIRTY = false;
+                }
+                cache = BLOCK_TYPE_CACHE;
             }
         }
         return cache.get(key);
@@ -347,6 +382,50 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
         return cache;
     }
 
+    private static Map<String, TwCoopConfig> buildBlockTypeCache(DefaultAssetMap<String, TwCoopConfig> assetMap) {
+        Map<String, TwCoopConfig> cache = new HashMap<>();
+        if (assetMap == null || assetMap.getAssetMap() == null) {
+            return cache;
+        }
+        for (TwCoopConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate == null || !candidate.isEnabled()) {
+                continue;
+            }
+            registerBlockTypeCandidates(cache, candidate);
+        }
+        return cache;
+    }
+
+    private static void registerBlockTypeCandidates(@Nonnull Map<String, TwCoopConfig> cache,
+                                                    @Nonnull TwCoopConfig candidate) {
+        boolean resolvedAny = false;
+        String[] configuredBlockTypeIds = candidate.getBlockTypeIds();
+        if (configuredBlockTypeIds != null && configuredBlockTypeIds.length > 0) {
+            for (String rawBlockTypeId : configuredBlockTypeIds) {
+                String blockTypeId = normalizeBlockTypeId(rawBlockTypeId);
+                if (blockTypeId == null) {
+                    continue;
+                }
+                resolvedAny = true;
+                TwCoopConfig existing = cache.get(blockTypeId);
+                if (existing == null || shouldPreferCandidate(candidate, existing)) {
+                    cache.put(blockTypeId, candidate);
+                }
+            }
+        }
+        if (resolvedAny) {
+            return;
+        }
+        String fallbackBlockTypeId = normalizeBlockTypeId(candidate.getCoopId());
+        if (fallbackBlockTypeId == null) {
+            return;
+        }
+        TwCoopConfig existing = cache.get(fallbackBlockTypeId);
+        if (existing == null || shouldPreferCandidate(candidate, existing)) {
+            cache.put(fallbackBlockTypeId, candidate);
+        }
+    }
+
     private static boolean shouldPreferCandidate(@Nonnull TwCoopConfig candidate,
                                                  @Nonnull TwCoopConfig existing) {
         int candidatePriority = candidate.getPriority();
@@ -389,6 +468,18 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
         return value.trim().toLowerCase(Locale.ROOT);
     }
 
+    @Nullable
+    private static String normalizeBlockTypeId(@Nullable String value) {
+        String normalized = normalizeIdentifier(value);
+        if (normalized == null) {
+            return null;
+        }
+        while (normalized.startsWith("*")) {
+            normalized = normalized.substring(1);
+        }
+        return normalized.isBlank() ? null : normalized;
+    }
+
     protected TwCoopConfig() {
     }
 
@@ -419,6 +510,7 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
         if (!explicitTopLevelKeys.contains("Enabled")) enabled = parent.enabled;
         if (!explicitTopLevelKeys.contains("Priority")) priority = parent.priority;
         if (!explicitTopLevelKeys.contains("CoopId")) coopId = parent.coopId;
+        if (!explicitTopLevelKeys.contains("BlockTypeIds")) blockTypeIds = parent.blockTypeIds;
 
         if (!explicitTopLevelKeys.contains("CapturePolicy")) {
             capturePolicy = parent.capturePolicy;
@@ -542,6 +634,10 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
 
     public String getCoopId() {
         return coopId;
+    }
+
+    public String[] getBlockTypeIds() {
+        return blockTypeIds == null ? new String[0] : blockTypeIds;
     }
 
     public CapturePolicySettings getCapturePolicy() {

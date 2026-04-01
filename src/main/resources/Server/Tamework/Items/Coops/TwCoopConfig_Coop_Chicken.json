@@ -2,6 +2,9 @@
   "Enabled": true,
   "Priority": 100,
   "CoopId": "Coop_Chicken",
+  "BlockTypeIds": [
+    "Coop_Chicken"
+  ],
   "CapturePolicy": {
     "RequireTamed": false,
     "OwnerRestricted": false,
@@ -36,9 +39,11 @@
       "Skrill": "Drop_Chicken_Produce",
       "Tamed_Chicken": "Drop_Chicken_Produce",
       "Tamed_Chicken_Desert": "Drop_Chicken_Produce",
-      "Tamed_Skrill": "Drop_Chicken_Produce"
+      "Tamed_Skrill": "Drop_Chicken_Produce",
+      "Turkey": "Drop_Chicken_Produce",
+      "Tamed_Turkey": "Drop_Chicken_Produce"
     },
-    "IntervalGameHours": 1,
+    "IntervalGameHours": 24,
     "ItemsPerTick": 1
   },
   "IdentityRules": {

@@ -3,13 +3,21 @@ package com.alechilles.alecstamework.npc.progression;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.hypixel.hytale.component.Store;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 /** Protects starvation/dehydration damage behavior for needs progression. */
 class CompanionNeedsServiceDamageTest {
     private static final long ONE_MINUTE_MS = 60_000L;
+
+    @AfterEach
+    void tearDown() {
+        CompanionRuntimeClock.resetForTests();
+    }
 
     @Test
     void minOnlyDamageTriggersOnlyWhenNeedIsAtMin() throws Exception {
@@ -74,6 +82,18 @@ class CompanionNeedsServiceDamageTest {
         );
     }
 
+    @Test
+    void realTimeBasisUsesSessionRuntimeClock() throws Exception {
+        TwNeedsConfig config = createConfig();
+        TwNeedsConfig.TimingSettings timing = new TwNeedsConfig.TimingSettings();
+        setField(timing, "timerBasis", TwNeedsConfig.TimerBasis.REAL_TIME);
+        setField(config, "timing", timing);
+
+        assertEquals(0L, invokeResolveNowMs(config));
+        CompanionRuntimeClock.advanceByDeltaSeconds(1.5f);
+        assertEquals(1500L, invokeResolveNowMs(config));
+    }
+
     private TwNeedsConfig createConfigWithDamageEnabled() throws Exception {
         TwNeedsConfig config = createConfig();
         TwNeedsConfig.DamageSettings damage = new TwNeedsConfig.DamageSettings();
@@ -86,6 +106,12 @@ class CompanionNeedsServiceDamageTest {
         Constructor<TwNeedsConfig> constructor = TwNeedsConfig.class.getDeclaredConstructor();
         constructor.setAccessible(true);
         return constructor.newInstance();
+    }
+
+    private static long invokeResolveNowMs(TwNeedsConfig config) throws Exception {
+        Method method = CompanionNeedsService.class.getDeclaredMethod("resolveNowMs", TwNeedsConfig.class, Store.class);
+        method.setAccessible(true);
+        return (long) method.invoke(null, config, null);
     }
 
     private static void setField(Object target, String fieldName, Object value) throws Exception {

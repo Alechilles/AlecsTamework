@@ -12,9 +12,11 @@ import javax.annotation.Nonnull;
 public final class SqliteSchemaMigrator {
     public static final int SCHEMA_VERSION_V2 = 2;
     public static final int SCHEMA_VERSION_V3 = 3;
+    public static final int SCHEMA_VERSION_V4 = 4;
     public static final int MIGRATION_VERSION_LEGACY_DAT_IMPORT_V2 = 2001;
     public static final String MIGRATION_NAME_SCHEMA_V2 = "schema_v2";
     public static final String MIGRATION_NAME_SCHEMA_V3 = "schema_v3_api_profile_data";
+    public static final String MIGRATION_NAME_SCHEMA_V4 = "schema_v4_coop_state_snapshot";
     public static final String MIGRATION_NAME_LEGACY_DAT_IMPORT_V2 = "legacy_dat_import_v2";
 
     public void migrate(@Nonnull Connection connection) throws Exception {
@@ -26,6 +28,10 @@ public final class SqliteSchemaMigrator {
         if (!isVersionApplied(connection, SCHEMA_VERSION_V3)) {
             applySchemaV3(connection);
             recordMigration(connection, SCHEMA_VERSION_V3, MIGRATION_NAME_SCHEMA_V3);
+        }
+        if (!isVersionApplied(connection, SCHEMA_VERSION_V4)) {
+            applySchemaV4(connection);
+            recordMigration(connection, SCHEMA_VERSION_V4, MIGRATION_NAME_SCHEMA_V4);
         }
     }
 
@@ -187,5 +193,29 @@ public final class SqliteSchemaMigrator {
                     "CREATE INDEX IF NOT EXISTS idx_api_profile_data_profile_namespace ON api_profile_data(profile_id, namespace)"
             );
         }
+    }
+
+    private void applySchemaV4(@Nonnull Connection connection) throws Exception {
+        if (hasColumn(connection, "coop_slots", "state_snapshot_json")) {
+            return;
+        }
+        try (Statement statement = connection.createStatement()) {
+            statement.execute("ALTER TABLE coop_slots ADD COLUMN state_snapshot_json TEXT");
+        }
+    }
+
+    private boolean hasColumn(@Nonnull Connection connection,
+                              @Nonnull String tableName,
+                              @Nonnull String columnName) throws Exception {
+        try (PreparedStatement statement = connection.prepareStatement("PRAGMA table_info(" + tableName + ")");
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                String existing = resultSet.getString("name");
+                if (columnName.equalsIgnoreCase(existing)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

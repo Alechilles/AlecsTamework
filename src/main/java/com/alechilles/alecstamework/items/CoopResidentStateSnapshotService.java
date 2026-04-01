@@ -22,7 +22,9 @@ import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Vector3i;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
+import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -337,12 +339,26 @@ public final class CoopResidentStateSnapshotService {
         putIfPresent(commandBuffer, reference, TameworkOwnerComponent.getComponentType(), snapshot.owner());
         putIfPresent(commandBuffer, reference, TameworkTamedComponent.getComponentType(), snapshot.tamed());
         putIfPresent(commandBuffer, reference, TameworkNpcNameComponent.getComponentType(), snapshot.npcName());
+        applyDisplayNameIfPresent(reference, commandBuffer, snapshot.npcName());
         putIfPresent(commandBuffer, reference, TameworkHappinessComponent.getComponentType(), snapshot.happiness());
         putIfPresent(commandBuffer, reference, TameworkNeedsComponent.getComponentType(), snapshot.needs());
         putIfPresent(commandBuffer, reference, TameworkBreedingComponent.getComponentType(), snapshot.breeding());
         putIfPresent(commandBuffer, reference, TameworkTraitsComponent.getComponentType(), snapshot.traits());
         putIfPresent(commandBuffer, reference, TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
         putIfPresent(commandBuffer, reference, TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
+    }
+
+    private void applyDisplayNameIfPresent(@Nonnull Ref<EntityStore> reference,
+                                           @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                           @Nullable TameworkNpcNameComponent npcName) {
+        if (npcName == null || npcName.getName() == null || npcName.getName().isBlank()) {
+            return;
+        }
+        commandBuffer.putComponent(
+                reference,
+                DisplayNameComponent.getComponentType(),
+                new DisplayNameComponent(Message.raw(npcName.getName()))
+        );
     }
 
     @Nullable

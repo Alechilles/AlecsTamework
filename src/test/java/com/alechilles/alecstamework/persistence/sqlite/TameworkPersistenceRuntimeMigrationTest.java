@@ -75,6 +75,7 @@ class TameworkPersistenceRuntimeMigrationTest {
         }
 
         assertTrue(apiProfileDataTableExists());
+        assertTrue(coopStateSnapshotColumnExists());
 
         assertFalse(Files.exists(capturesDat));
         assertFalse(Files.exists(coopsDat));
@@ -95,6 +96,21 @@ class TameworkPersistenceRuntimeMigrationTest {
              );
              ResultSet resultSet = statement.executeQuery()) {
             return resultSet.next();
+        }
+    }
+
+    private boolean coopStateSnapshotColumnExists() throws Exception {
+        Path sqlitePath = tempDir.resolve(TameworkPersistenceRuntime.SQLITE_FILENAME);
+        try (Connection connection = DriverManager.getConnection("jdbc:sqlite:" + sqlitePath);
+             PreparedStatement statement = connection.prepareStatement("PRAGMA table_info(coop_slots)");
+             ResultSet resultSet = statement.executeQuery()) {
+            while (resultSet.next()) {
+                String columnName = resultSet.getString("name");
+                if ("state_snapshot_json".equalsIgnoreCase(columnName)) {
+                    return true;
+                }
+            }
+            return false;
         }
     }
 }

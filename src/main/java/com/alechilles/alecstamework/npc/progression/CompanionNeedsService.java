@@ -477,7 +477,7 @@ public final class CompanionNeedsService {
     private static long resolveNowMs(@Nonnull TwNeedsConfig config, @Nullable Store<EntityStore> store) {
         return switch (config.getTiming().getTimerBasis()) {
             case WORLD_TIME_SCALED -> BreedingTimeService.resolveCurrentTimeMs(store);
-            case REAL_TIME -> System.currentTimeMillis();
+            case REAL_TIME -> CompanionRuntimeClock.nowMs();
         };
     }
 

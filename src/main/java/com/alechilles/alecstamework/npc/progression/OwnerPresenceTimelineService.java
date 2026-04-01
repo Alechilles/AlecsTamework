@@ -37,7 +37,7 @@ public final class OwnerPresenceTimelineService {
         if (players == null || players.isEmpty()) {
             return;
         }
-        long nowMs = System.currentTimeMillis();
+        long nowMs = CompanionRuntimeClock.nowMs();
         for (PlayerRef playerRef : players) {
             if (playerRef == null || playerRef.getUuid() == null) {
                 continue;
@@ -54,7 +54,7 @@ public final class OwnerPresenceTimelineService {
         if (ownerId == null) {
             return;
         }
-        markOnline(ownerId, System.currentTimeMillis());
+        markOnline(ownerId, CompanionRuntimeClock.nowMs());
     }
 
     public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {
@@ -65,7 +65,7 @@ public final class OwnerPresenceTimelineService {
         if (ownerId == null) {
             return;
         }
-        markOffline(ownerId, System.currentTimeMillis());
+        markOffline(ownerId, CompanionRuntimeClock.nowMs());
     }
 
     public long resolveEffectiveElapsedMs(@Nullable UUID ownerId,
@@ -134,6 +134,7 @@ public final class OwnerPresenceTimelineService {
 
     void clearForTests() {
         presenceByOwner.clear();
+        CompanionRuntimeClock.resetForTests();
     }
 
     void markOnlineForTests(UUID ownerId, long atMs) {

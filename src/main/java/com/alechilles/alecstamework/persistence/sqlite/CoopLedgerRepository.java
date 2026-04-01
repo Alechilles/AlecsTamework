@@ -42,7 +42,7 @@ public final class CoopLedgerRepository {
                      """
                      SELECT c.world_name, c.coop_id, c.x, c.y, c.z, c.resident_slot,
                             c.profile_id, c.housed_npc_uuid, c.last_released_npc_uuid,
-                            c.captured_at_ms, c.released_at_ms,
+                            c.captured_at_ms, c.released_at_ms, c.state_snapshot_json,
                             p.owner_uuid, p.role_id, p.display_name
                      FROM coop_slots c
                      LEFT JOIN npc_profiles p ON p.profile_id = c.profile_id
@@ -77,7 +77,7 @@ public final class CoopLedgerRepository {
                         rs.getString("display_name"),
                         rs.getLong("captured_at_ms"),
                         rs.getLong("released_at_ms"),
-                        null
+                        rs.getString("state_snapshot_json")
                 ));
             }
         } catch (Exception ignored) {
@@ -252,14 +252,15 @@ public final class CoopLedgerRepository {
                 INSERT INTO coop_slots (
                     world_name, coop_id, x, y, z, resident_slot,
                     profile_id, housed_npc_uuid, last_released_npc_uuid,
-                    captured_at_ms, released_at_ms, updated_at_ms
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    captured_at_ms, released_at_ms, state_snapshot_json, updated_at_ms
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(world_name, coop_id, x, y, z, resident_slot) DO UPDATE SET
                     profile_id = excluded.profile_id,
                     housed_npc_uuid = excluded.housed_npc_uuid,
                     last_released_npc_uuid = excluded.last_released_npc_uuid,
                     captured_at_ms = excluded.captured_at_ms,
                     released_at_ms = excluded.released_at_ms,
+                    state_snapshot_json = excluded.state_snapshot_json,
                     updated_at_ms = excluded.updated_at_ms
                 """
         )) {
@@ -275,6 +276,7 @@ public final class CoopLedgerRepository {
             SqliteValueCodec.bindUuid(statement, i++, releasedNpcUuid);
             statement.setLong(i++, row.housedAtMs() > 0L ? row.housedAtMs() : nowMs);
             statement.setLong(i++, Math.max(0L, row.releasedAtMs()));
+            statement.setString(i++, row.stateSnapshotJson());
             statement.setLong(i, nowMs);
             statement.executeUpdate();
         }

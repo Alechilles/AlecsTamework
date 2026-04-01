@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -26,6 +27,7 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        CompanionRuntimeClock.advanceByDeltaSeconds(dt);
         long nowMs = System.currentTimeMillis();
         if (nowMs < nextSweepAtMs) {
             return;
