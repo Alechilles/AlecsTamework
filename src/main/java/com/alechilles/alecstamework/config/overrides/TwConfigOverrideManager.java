@@ -554,6 +554,7 @@ public final class TwConfigOverrideManager {
 
     @Nonnull
     private List<TwConfigAssetDescriptor> discoverDescriptors(@Nonnull List<StoreBinding> bindings) {
+        canonicalSourcePathsByDescriptorKey.clear();
         ArrayList<TwConfigAssetDescriptor> descriptors = new ArrayList<>();
         for (StoreBinding binding : bindings) {
             if (binding.store == null) {
@@ -563,6 +564,8 @@ public final class TwConfigOverrideManager {
             if (assetMap == null || assetMap.getAssetMap() == null || assetMap.getAssetMap().isEmpty()) {
                 continue;
             }
+
+            // Prime canonical source caches from non-override entries first.
             for (Map.Entry<?, ?> entry : assetMap.getAssetMap().entrySet()) {
                 Object key = entry.getKey();
                 if (key == null) {
@@ -572,18 +575,38 @@ public final class TwConfigOverrideManager {
                 if (assetId.isBlank()) {
                     continue;
                 }
-                String rawSourcePackKey = resolveSourcePackKey(assetMap, key);
-                String sourcePackKey = normalizeSourcePackKey(rawSourcePackKey);
                 Path discoveredSourcePath = resolveSourcePath(assetMap, key);
+                String rawSourcePackKey = resolveSourcePackKey(assetMap, key, discoveredSourcePath);
+                if (isOverridePackKey(rawSourcePackKey)) {
+                    continue;
+                }
+                String sourcePackKey = normalizeSourcePackKey(rawSourcePackKey);
+                String descriptorKey = descriptorKey(binding.familyKey, sourcePackKey, assetId);
+                if (sourcePathExistsOnDisk(discoveredSourcePath)) {
+                    canonicalSourcePathsByDescriptorKey.put(descriptorKey, discoveredSourcePath);
+                }
+            }
+
+            for (Map.Entry<?, ?> entry : assetMap.getAssetMap().entrySet()) {
+                Object key = entry.getKey();
+                if (key == null) {
+                    continue;
+                }
+                String assetId = String.valueOf(key);
+                if (assetId.isBlank()) {
+                    continue;
+                }
+                Path discoveredSourcePath = resolveSourcePath(assetMap, key);
+                String rawSourcePackKey = resolveSourcePackKey(assetMap, key, discoveredSourcePath);
+                String sourcePackKey = normalizeSourcePackKey(rawSourcePackKey);
                 String descriptorKey = descriptorKey(binding.familyKey, sourcePackKey, assetId);
                 Path sourcePath = discoveredSourcePath;
                 if (isOverridePackKey(rawSourcePackKey)) {
-                    Path cachedSourcePath = canonicalSourcePathsByDescriptorKey.get(descriptorKey);
-                    if (cachedSourcePath != null) {
-                        sourcePath = cachedSourcePath;
+                    sourcePath = canonicalSourcePathsByDescriptorKey.get(descriptorKey);
+                } else {
+                    if (sourcePathExistsOnDisk(discoveredSourcePath)) {
+                        canonicalSourcePathsByDescriptorKey.put(descriptorKey, discoveredSourcePath);
                     }
-                } else if (discoveredSourcePath != null) {
-                    canonicalSourcePathsByDescriptorKey.put(descriptorKey, discoveredSourcePath);
                 }
                 Object asset = entry.getValue();
                 String parentAssetId = resolveParentAssetId(asset);
@@ -623,7 +646,10 @@ public final class TwConfigOverrideManager {
             if (sourceMissingOnDisk && !hasOverrideFile) {
                 continue;
             }
-            visible.add(descriptor);
+            TwConfigAssetDescriptor visibleDescriptor = sourceMissingOnDisk && hasOverrideFile
+                    ? markLocalOnly(descriptor)
+                    : descriptor;
+            visible.add(visibleDescriptor);
             knownDescriptorKeys.add(descriptor.descriptorKey());
             knownOverridePathKeys.add(normalizePathKey(overridePath));
         }
@@ -667,11 +693,50 @@ public final class TwConfigOverrideManager {
 
     private boolean isKnownMissingSourcePath(@Nonnull TwConfigAssetDescriptor descriptor) {
         Path sourcePath = descriptor.sourcePath();
-        return sourcePath != null && !Files.isRegularFile(sourcePath);
+        if (sourcePath == null) {
+            return true;
+        }
+        if (isPathInStaging(sourcePath)) {
+            return true;
+        }
+        return !Files.isRegularFile(sourcePath);
     }
 
     private boolean sourcePathExistsOnDisk(@Nullable Path sourcePath) {
-        return sourcePath != null && Files.isRegularFile(sourcePath);
+        return sourcePath != null && Files.isRegularFile(sourcePath) && !isPathInStaging(sourcePath);
+    }
+
+    private boolean isPathInStaging(@Nullable Path sourcePath) {
+        if (sourcePath == null) {
+            return false;
+        }
+        for (Path segment : sourcePath) {
+            if (segment != null && STAGING_DIR_NAME.equalsIgnoreCase(segment.toString())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Nonnull
+    private TwConfigAssetDescriptor markLocalOnly(@Nonnull TwConfigAssetDescriptor descriptor) {
+        if (descriptor.localOnly()) {
+            return descriptor;
+        }
+        return new TwConfigAssetDescriptor(
+                descriptor.family(),
+                descriptor.familyKey(),
+                descriptor.familyDisplayName(),
+                descriptor.storePath(),
+                descriptor.assetId(),
+                descriptor.sourcePackKey(),
+                descriptor.parentAssetId(),
+                descriptor.sourcePath(),
+                descriptor.relativeServerPath(),
+                descriptor.editable(),
+                descriptor.knownType(),
+                true
+        );
     }
 
     @Nonnull
@@ -769,15 +834,27 @@ public final class TwConfigOverrideManager {
     }
 
     @Nonnull
-    private String resolveSourcePackKey(@Nonnull AssetMap<?, ?> assetMap, @Nonnull Object key) {
+    private String resolveSourcePackKey(@Nonnull AssetMap<?, ?> assetMap,
+                                        @Nonnull Object key,
+                                        @Nullable Path sourcePath) {
         try {
             @SuppressWarnings({"rawtypes", "unchecked"})
             AssetMap rawMap = assetMap;
             String packKey = String.valueOf(rawMap.getAssetPack(key));
             if (packKey != null && !packKey.isBlank() && !"null".equalsIgnoreCase(packKey)) {
+                if (isOverridePackKey(packKey)) {
+                    String fromStagingPath = sourcePackKeyFromStagingPath(sourcePath);
+                    if (fromStagingPath != null && !fromStagingPath.isBlank()) {
+                        return fromStagingPath;
+                    }
+                }
                 return packKey;
             }
         } catch (Exception ignored) {
+        }
+        String fromStagingPath = sourcePackKeyFromStagingPath(sourcePath);
+        if (fromStagingPath != null && !fromStagingPath.isBlank()) {
+            return fromStagingPath;
         }
         return "<unknown-pack>";
     }
@@ -797,6 +874,33 @@ public final class TwConfigOverrideManager {
 
     private static boolean isOverridePackKey(@Nullable String sourcePackKey) {
         return sourcePackKey != null && sourcePackKey.startsWith(OVERRIDE_PACK_PREFIX);
+    }
+
+    @Nullable
+    private String sourcePackKeyFromStagingPath(@Nullable Path sourcePath) {
+        if (sourcePath == null || sourcePath.getNameCount() < 3) {
+            return null;
+        }
+        for (int i = 0; i < sourcePath.getNameCount() - 2; i++) {
+            String segment = sourcePath.getName(i).toString();
+            if (!STAGING_DIR_NAME.equalsIgnoreCase(segment)) {
+                continue;
+            }
+            String reloadSegment = sourcePath.getName(i + 1).toString();
+            if (reloadSegment == null || !reloadSegment.toLowerCase(Locale.ROOT).startsWith("reload-")) {
+                continue;
+            }
+            String encodedPackKey = sourcePath.getName(i + 2).toString();
+            if (encodedPackKey == null || encodedPackKey.isBlank()) {
+                return null;
+            }
+            String decoded = decodePackKey(encodedPackKey);
+            if (decoded == null || decoded.isBlank()) {
+                return null;
+            }
+            return decoded;
+        }
+        return null;
     }
 
     @Nonnull
