@@ -7,17 +7,20 @@ _No entries yet._
 ### Added
 - Expanded `/tw config` from Global-only to multi-family browsing and editing with mod/type/asset navigation, Local/All mod scoping, and per-section field count summaries.
 - Added schema-driven tooltip coverage for Tw config fields and surfaced those tooltips in the in-game config editor.
+- Added `TwNamesConfig` support with configurable random-name pools and wired naming-item UI randomize flow.
 - Added managed-coop resident role support updates for chicks in coop accepted role lists.
 
 ### Changed
 - Reworked the config editor property grid to preserve inline asset-editor-style editing while improving section state behavior, source chips, and field staging visibility.
 - Updated override-path display and config-editor asset selection UX for clearer per-mod/per-family context.
+- Moved default chicken coop config ownership to Alec's Coops content and removed the legacy farming coop config asset.
 
 ### Fixed
 - Fixed multiple config-editor event/binding issues that caused bad selector payloads, non-updating controls, and unstable apply interactions.
 - Fixed config reload/apply reliability issues around staged override loading and stale descriptor resolution.
 - Fixed managed coop behavior to eject residents when blocking coop blocks are removed.
 - Improved offspring spawn placement safety checks to reduce invalid/unsafe spawn attempts.
+- Fixed false coop-removal ejections during login/relog by hardening capture sync checks, missing-block handling, and block-state type normalization.
 
 ## 2.6.0 - Public API Phase 2/3 + In-Game Self-Tests + UI Localization - 2026-03-30
 ### Added
