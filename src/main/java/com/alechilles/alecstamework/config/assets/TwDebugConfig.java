@@ -29,54 +29,63 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
                     (section, value) -> section.hook = value,
                     section -> section.hook
             )
+            .documentation("Config field: Hook.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Spawner", Codec.BOOLEAN),
                     (section, value) -> section.spawner = value,
                     section -> section.spawner
             )
+            .documentation("Config field: Spawner.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Prompt", Codec.BOOLEAN),
                     (section, value) -> section.prompt = value,
                     section -> section.prompt
             )
+            .documentation("Config field: Prompt.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Despawn", Codec.BOOLEAN),
                     (section, value) -> section.despawn = value,
                     section -> section.despawn
             )
+            .documentation("Config field: Despawn.")
             .add()
             .<String>append(
                     new KeyedCodec<>("DespawnRoleFilter", Codec.STRING),
                     (section, value) -> section.despawnRoleFilter = value,
                     section -> section.despawnRoleFilter
             )
+            .documentation("Config field: DespawnRoleFilter.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Lag", Codec.BOOLEAN),
                     (section, value) -> section.lag = value,
                     section -> section.lag
             )
+            .documentation("Config field: Lag.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Coop", Codec.BOOLEAN),
                     (section, value) -> section.coop = value,
                     section -> section.coop
             )
+            .documentation("Config field: Coop.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Breeding", Codec.BOOLEAN),
                     (section, value) -> section.breeding = value,
                     section -> section.breeding
             )
+            .documentation("Config field: Breeding.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("NeedsConsume", Codec.BOOLEAN),
                     (section, value) -> section.needsConsumeDiagnostics = value,
                     section -> section.needsConsumeDiagnostics
             )
+            .documentation("Config field: NeedsConsume.")
             .add()
             .build();
 
@@ -377,3 +386,4 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 }
+

@@ -54,18 +54,21 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (settings, value) -> settings.blockOwnerDamage = value,
                     settings -> settings.blockOwnerDamage
             )
+            .documentation("Config field: BlockOwnerDamage.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("BlockAllPlayerDamageIfOwned", Codec.BOOLEAN),
                     (settings, value) -> settings.blockAllPlayerDamageIfOwned = value,
                     settings -> settings.blockAllPlayerDamageIfOwned
             )
+            .documentation("Config field: BlockAllPlayerDamageIfOwned.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
                     (settings, value) -> settings.invulnerableIfOwned = value,
                     settings -> settings.invulnerableIfOwned
             )
+            .documentation("Config field: InvulnerableIfOwned.")
             .add()
             .build();
 
@@ -78,6 +81,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (settings, value) -> settings.crossWorldRecallEnabled = value != null && value,
                     settings -> settings.crossWorldRecallEnabled
             )
+            .documentation("Config field: CrossWorldRecallEnabled.")
             .add()
             .<String>append(
                     new KeyedCodec<>("OnTransferFailure", Codec.STRING),
@@ -85,18 +89,21 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                             TransferFailurePolicy.parse(value, settings.onTransferFailure),
                     settings -> settings.onTransferFailure.name()
             )
+            .documentation("Config field: OnTransferFailure.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("FollowMasterOnWorldChange", Codec.BOOLEAN),
                     (settings, value) -> settings.followMasterOnWorldChange = value != null && value,
                     settings -> settings.followMasterOnWorldChange
             )
+            .documentation("Config field: FollowMasterOnWorldChange.")
             .add()
             .<String[]>append(
                     new KeyedCodec<>("FollowMasterOnWorldChangeStateFilter", Codec.STRING_ARRAY),
                     (settings, value) -> settings.followMasterOnWorldChangeStateFilter = normalizeStateFilter(value),
                     settings -> settings.followMasterOnWorldChangeStateFilter
             )
+            .documentation("Config field: FollowMasterOnWorldChangeStateFilter.")
             .add()
             .build();
 
@@ -109,42 +116,49 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (settings, value) -> settings.returnHomeTeleportDistance = value,
                     settings -> settings.returnHomeTeleportDistance
             )
+            .documentation("Config field: ReturnHomeTeleportDistance.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("ReturnHomePathDistanceBeforeTeleport", Codec.DOUBLE),
                     (settings, value) -> settings.returnHomePathDistanceBeforeTeleport = value,
                     settings -> settings.returnHomePathDistanceBeforeTeleport
             )
+            .documentation("Config field: ReturnHomePathDistanceBeforeTeleport.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("ReturnHomeTeleportDelayMs", Codec.INTEGER),
                     (settings, value) -> settings.returnHomeTeleportDelayMs = value,
                     settings -> settings.returnHomeTeleportDelayMs
             )
+            .documentation("Config field: ReturnHomeTeleportDelayMs.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("RecallSafeSpawnDistance", Codec.DOUBLE),
                     (settings, value) -> settings.recallSafeSpawnDistance = value,
                     settings -> settings.recallSafeSpawnDistance
             )
+            .documentation("Config field: RecallSafeSpawnDistance.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("RecallForceRelocateDistance", Codec.DOUBLE),
                     (settings, value) -> settings.recallForceRelocateDistance = value,
                     settings -> settings.recallForceRelocateDistance
             )
+            .documentation("Config field: RecallForceRelocateDistance.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("DeadRespawnEnabled", Codec.BOOLEAN),
                     (settings, value) -> settings.deadRespawnEnabled = value,
                     settings -> settings.deadRespawnEnabled
             )
+            .documentation("Config field: DeadRespawnEnabled.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
                     (settings, value) -> settings.deadRespawnCooldownMs = value,
                     settings -> settings.deadRespawnCooldownMs
             )
+            .documentation("Config field: DeadRespawnCooldownMs.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnCooldownMins", Codec.DOUBLE),
@@ -155,54 +169,63 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     },
                     settings -> null
             )
+            .documentation("Config field: DeadRespawnCooldownMins.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("DeadRespawnFollowRetryDelayMs", Codec.INTEGER),
                     (settings, value) -> settings.deadRespawnFollowRetryDelayMs = value,
                     settings -> settings.deadRespawnFollowRetryDelayMs
             )
+            .documentation("Config field: DeadRespawnFollowRetryDelayMs.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceClose", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceClose = value,
                     settings -> settings.deadRespawnDistanceClose
             )
+            .documentation("Config field: DeadRespawnDistanceClose.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceNear", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceNear = value,
                     settings -> settings.deadRespawnDistanceNear
             )
+            .documentation("Config field: DeadRespawnDistanceNear.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceMid", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceMid = value,
                     settings -> settings.deadRespawnDistanceMid
             )
+            .documentation("Config field: DeadRespawnDistanceMid.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceFar", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceFar = value,
                     settings -> settings.deadRespawnDistanceFar
             )
+            .documentation("Config field: DeadRespawnDistanceFar.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("PlacementMinRelativeY", Codec.DOUBLE),
                     (settings, value) -> settings.placementMinRelativeY = value,
                     settings -> settings.placementMinRelativeY
             )
+            .documentation("Config field: PlacementMinRelativeY.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("PlacementMaxRelativeY", Codec.DOUBLE),
                     (settings, value) -> settings.placementMaxRelativeY = value,
                     settings -> settings.placementMaxRelativeY
             )
+            .documentation("Config field: PlacementMaxRelativeY.")
             .add()
             .<TravelSettings>append(
                     new KeyedCodec<>("Travel", TRAVEL_CODEC),
                     (settings, value) -> settings.travel = value == null ? new TravelSettings() : value,
                     settings -> settings.travel
             )
+            .documentation("Config field: Travel.")
             .add()
             .build();
 
@@ -221,12 +244,14 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (asset, value) -> asset.enabled = value == null || value,
                     asset -> asset.enabled
             )
+            .documentation("Config field: Enabled.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("Priority", Codec.INTEGER),
                     (asset, value) -> asset.priority = value == null ? 0 : value,
                     asset -> asset.priority
             )
+            .documentation("Config field: Priority.")
             .add()
             .<String[]>append(
                     new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
@@ -1128,3 +1153,4 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
     }
 }
+

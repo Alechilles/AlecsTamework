@@ -36,18 +36,21 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.currentDefault = value,
             settings -> settings.currentDefault
         )
+        .documentation("Config field: CurrentDefault.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Min", Codec.DOUBLE),
             (settings, value) -> settings.min = value,
             settings -> settings.min
         )
+        .documentation("Config field: Min.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Max", Codec.DOUBLE),
             (settings, value) -> settings.max = value,
             settings -> settings.max
         )
+        .documentation("Config field: Max.")
         .add()
         .build();
 
@@ -60,12 +63,14 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.baseSetpoint = value,
             settings -> settings.baseSetpoint
         )
+        .documentation("Config field: BaseSetpoint.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ConvergencePerMinute", Codec.DOUBLE),
             (settings, value) -> settings.convergencePerMinute = value,
             settings -> settings.convergencePerMinute
         )
+        .documentation("Config field: ConvergencePerMinute.")
         .add()
         .build();
 
@@ -78,18 +83,21 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.gainOnFeed = value,
             settings -> settings.gainOnFeed
         )
+        .documentation("Config field: GainOnFeed.")
         .add()
         .<Double>append(
             new KeyedCodec<>("GainOnPet", Codec.DOUBLE),
             (settings, value) -> settings.gainOnPet = value,
             settings -> settings.gainOnPet
         )
+        .documentation("Config field: GainOnPet.")
         .add()
         .<Double>append(
             new KeyedCodec<>("LoseOnDamage", Codec.DOUBLE),
             (settings, value) -> settings.loseOnDamage = value,
             settings -> settings.loseOnDamage
         )
+        .documentation("Config field: LoseOnDamage.")
         .add()
         .build();
 
@@ -102,30 +110,35 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.id = value,
             settings -> settings.id
         )
+        .documentation("Config field: Id.")
         .add()
         .<String>append(
             new KeyedCodec<>("Label", Codec.STRING),
             (settings, value) -> settings.label = value,
             settings -> settings.label
         )
+        .documentation("Config field: Label.")
         .add()
         .<Double>append(
             new KeyedCodec<>("MinPercent", Codec.DOUBLE),
             (settings, value) -> settings.minPercent = value,
             settings -> settings.minPercent
         )
+        .documentation("Config field: MinPercent.")
         .add()
         .<Double>append(
             new KeyedCodec<>("MaxPercent", Codec.DOUBLE),
             (settings, value) -> settings.maxPercent = value,
             settings -> settings.maxPercent
         )
+        .documentation("Config field: MaxPercent.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Offset", Codec.DOUBLE),
             (settings, value) -> settings.offset = value,
             settings -> settings.offset
         )
+        .documentation("Config field: Offset.")
         .add()
         .build();
 
@@ -141,12 +154,14 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.enabled = value == null || value,
             settings -> settings.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<NeedBandSettings[]>append(
             new KeyedCodec<>("Bands", NEED_BAND_ARRAY_CODEC),
             (settings, value) -> settings.bands = value == null ? EMPTY_BANDS : value,
             settings -> settings.bands
         )
+        .documentation("Config field: Bands.")
         .add()
         .build();
 
@@ -159,30 +174,35 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.id = value,
             settings -> settings.id
         )
+        .documentation("Config field: Id.")
         .add()
         .<String>append(
             new KeyedCodec<>("Label", Codec.STRING),
             (settings, value) -> settings.label = value,
             settings -> settings.label
         )
+        .documentation("Config field: Label.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MinCount", Codec.INTEGER),
             (settings, value) -> settings.minCount = value,
             settings -> settings.minCount
         )
+        .documentation("Config field: MinCount.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxCount", Codec.INTEGER),
             (settings, value) -> settings.maxCount = value,
             settings -> settings.maxCount
         )
+        .documentation("Config field: MaxCount.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Offset", Codec.DOUBLE),
             (settings, value) -> settings.offset = value,
             settings -> settings.offset
         )
+        .documentation("Config field: Offset.")
         .add()
         .build();
 
@@ -198,18 +218,21 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.enabled = value == null || value,
             settings -> settings.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Radius", Codec.DOUBLE),
             (settings, value) -> settings.radius = value,
             settings -> settings.radius
         )
+        .documentation("Config field: Radius.")
         .add()
         .<PopulationBandSettings[]>append(
             new KeyedCodec<>("Bands", POPULATION_BAND_ARRAY_CODEC),
             (settings, value) -> settings.bands = value == null ? EMPTY_POPULATION_BANDS : value,
             settings -> settings.bands
         )
+        .documentation("Config field: Bands.")
         .add()
         .build();
 
@@ -222,24 +245,28 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.hunger = value == null ? new NeedModifierSettings() : value,
             settings -> settings.hunger
         )
+        .documentation("Config field: Hunger.")
         .add()
         .<NeedModifierSettings>append(
             new KeyedCodec<>("Thirst", NEED_MODIFIER_CODEC),
             (settings, value) -> settings.thirst = value == null ? new NeedModifierSettings() : value,
             settings -> settings.thirst
         )
+        .documentation("Config field: Thirst.")
         .add()
         .<PopulationModifierSettings>append(
             new KeyedCodec<>("Population", POPULATION_MODIFIER_CODEC),
             (settings, value) -> settings.population = value == null ? new PopulationModifierSettings() : value,
             settings -> settings.population
         )
+        .documentation("Config field: Population.")
         .add()
         .<Double>append(
             new KeyedCodec<>("OwnerNearbyOffset", Codec.DOUBLE),
             (settings, value) -> settings.ownerNearbyOffset = value,
             settings -> settings.ownerNearbyOffset
         )
+        .documentation("Config field: OwnerNearbyOffset.")
         .add()
         .build();
 
@@ -258,12 +285,14 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (asset, value) -> asset.enabled = value == null || value,
             asset -> asset.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("Priority", Codec.INTEGER),
             (asset, value) -> asset.priority = value == null ? 0 : value,
             asset -> asset.priority
         )
+        .documentation("Config field: Priority.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
@@ -903,3 +932,4 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         return value;
     }
 }
+

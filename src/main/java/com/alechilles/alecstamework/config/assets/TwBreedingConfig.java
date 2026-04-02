@@ -41,6 +41,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.threshold = value,
             settings -> settings.threshold
         )
+        .documentation("Config field: Threshold.")
         .add()
         .build();
 
@@ -53,24 +54,28 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.requireTamed = value,
             settings -> settings.requireTamed
         )
+        .documentation("Config field: RequireTamed.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireAdult", Codec.BOOLEAN),
             (settings, value) -> settings.requireAdult = value,
             settings -> settings.requireAdult
         )
+        .documentation("Config field: RequireAdult.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireNotInCombat", Codec.BOOLEAN),
             (settings, value) -> settings.requireNotInCombat = value,
             settings -> settings.requireNotInCombat
         )
+        .documentation("Config field: RequireNotInCombat.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireNotSleeping", Codec.BOOLEAN),
             (settings, value) -> settings.requireNotSleeping = value,
             settings -> settings.requireNotSleeping
         )
+        .documentation("Config field: RequireNotSleeping.")
         .add()
         .build();
 
@@ -84,12 +89,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     (override, value) -> override.roleId = value,
                     override -> override.roleId
                 )
+                .documentation("Config field: RoleId.")
                 .add()
                 .<Integer>append(
                     new KeyedCodec<>("MaxNearbySameType", Codec.INTEGER),
                     (override, value) -> override.maxNearbySameType = value,
                     override -> override.maxNearbySameType
                 )
+                .documentation("Config field: MaxNearbySameType.")
                 .add()
                 .build();
 
@@ -105,30 +112,35 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.breedRadius = value,
             settings -> settings.breedRadius
         )
+        .documentation("Config field: BreedRadius.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireWanderMode", Codec.BOOLEAN),
             (settings, value) -> settings.requireWanderMode = value,
             settings -> settings.requireWanderMode
         )
+        .documentation("Config field: RequireWanderMode.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireSameOwner", Codec.BOOLEAN),
             (settings, value) -> settings.requireSameOwner = value,
             settings -> settings.requireSameOwner
         )
+        .documentation("Config field: RequireSameOwner.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxNearbySameType", Codec.INTEGER),
             (settings, value) -> settings.maxNearbySameType = value,
             settings -> settings.maxNearbySameType
         )
+        .documentation("Config field: MaxNearbySameType.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireSameRoleId", Codec.BOOLEAN),
             (settings, value) -> settings.requireSameRoleId = value,
             settings -> settings.requireSameRoleId
         )
+        .documentation("Config field: RequireSameRoleId.")
         .add()
         .<RoleMaxNearbySameTypeOverride[]>append(
             new KeyedCodec<>("RoleMaxNearbySameType", ROLE_MAX_NEARBY_OVERRIDE_ARRAY_CODEC),
@@ -137,6 +149,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     : value,
             settings -> settings.roleMaxNearbySameType
         )
+        .documentation("Config field: RoleMaxNearbySameType.")
         .add()
         .build();
 
@@ -149,6 +162,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.baseCooldownSeconds = value,
             settings -> settings.baseCooldownSeconds
         )
+        .documentation("Config field: BaseCooldownSeconds.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("BaseCooldownMinutes", Codec.INTEGER),
@@ -159,18 +173,21 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             },
             settings -> null
         )
+        .documentation("Config field: BaseCooldownMinutes.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MinDelaySeconds", Codec.INTEGER),
             (settings, value) -> settings.minDelaySeconds = value,
             settings -> settings.minDelaySeconds
         )
+        .documentation("Config field: MinDelaySeconds.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxDelaySeconds", Codec.INTEGER),
             (settings, value) -> settings.maxDelaySeconds = value,
             settings -> settings.maxDelaySeconds
         )
+        .documentation("Config field: MaxDelaySeconds.")
         .add()
         .build();
 
@@ -183,18 +200,21 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.parentWeight = value,
             settings -> settings.parentWeight
         )
+        .documentation("Config field: ParentWeight.")
         .add()
         .<Double>append(
             new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
             (settings, value) -> settings.randomWeight = value,
             settings -> settings.randomWeight
         )
+        .documentation("Config field: RandomWeight.")
         .add()
         .<Double>append(
             new KeyedCodec<>("MutationChance", Codec.DOUBLE),
             (settings, value) -> settings.mutationChance = value,
             settings -> settings.mutationChance
         )
+        .documentation("Config field: MutationChance.")
         .add()
         .build();
 
@@ -207,24 +227,28 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.inheritOwner = value,
             settings -> settings.inheritOwner
         )
+        .documentation("Config field: InheritOwner.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("InheritTamed", Codec.BOOLEAN),
             (settings, value) -> settings.inheritTamed = value,
             settings -> settings.inheritTamed
         )
+        .documentation("Config field: InheritTamed.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("InheritAttachments", Codec.BOOLEAN),
             (settings, value) -> settings.inheritAttachments = value,
             settings -> settings.inheritAttachments
         )
+        .documentation("Config field: InheritAttachments.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("InheritTraits", Codec.BOOLEAN),
             (settings, value) -> settings.inheritTraits = value,
             settings -> settings.inheritTraits
         )
+        .documentation("Config field: InheritTraits.")
         .add()
         .<AttachmentInheritanceSettings>append(
             new KeyedCodec<>("AttachmentInheritance", ATTACHMENT_INHERITANCE_CODEC),
@@ -232,6 +256,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     value == null ? new AttachmentInheritanceSettings() : value,
             settings -> settings.attachmentInheritance
         )
+        .documentation("Config field: AttachmentInheritance.")
         .add()
         .build();
 
@@ -244,18 +269,21 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.enabled = value != null && value,
             settings -> settings.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("SweepIntervalSeconds", Codec.INTEGER),
             (settings, value) -> settings.sweepIntervalSeconds = value == null ? 30 : value,
             settings -> settings.getSweepIntervalSeconds()
         )
+        .documentation("Config field: SweepIntervalSeconds.")
         .add()
         .<String>append(
             new KeyedCodec<>("Basis", Codec.STRING),
             (settings, value) -> settings.timerBasis = TimerBasis.fromConfigValue(value),
             settings -> settings.getTimerBasis().toConfigValue()
         )
+        .documentation("Config field: Basis.")
         .add()
         .build();
 
@@ -268,6 +296,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.timerBasis = TimerBasis.fromConfigValue(value),
             settings -> settings.getTimerBasis().toConfigValue()
         )
+        .documentation("Config field: Basis.")
         .add()
         .build();
 
@@ -280,24 +309,28 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (family, value) -> family.adultRoleId = value,
             family -> family.adultRoleId
         )
+        .documentation("Config field: AdultRoleId.")
         .add()
         .<String>append(
             new KeyedCodec<>("BabyRoleId", Codec.STRING),
             (family, value) -> family.babyRoleId = value,
             family -> family.babyRoleId
         )
+        .documentation("Config field: BabyRoleId.")
         .add()
         .<String>append(
             new KeyedCodec<>("AdolescentRoleId", Codec.STRING),
             (family, value) -> family.adolescentRoleId = value,
             family -> family.adolescentRoleId
         )
+        .documentation("Config field: AdolescentRoleId.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("TimeToFullGrownSeconds", Codec.INTEGER),
             (family, value) -> family.timeToFullGrownSeconds = value,
             family -> family.timeToFullGrownSeconds
         )
+        .documentation("Config field: TimeToFullGrownSeconds.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("TimeToFullGrownMinutes", Codec.INTEGER),
@@ -308,36 +341,42 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             },
             family -> null
         )
+        .documentation("Config field: TimeToFullGrownMinutes.")
         .add()
         .<Double>append(
             new KeyedCodec<>("BabyStartScale", Codec.DOUBLE),
             (family, value) -> family.babyStartScale = value,
             family -> family.babyStartScale
         )
+        .documentation("Config field: BabyStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdolescentStartScale", Codec.DOUBLE),
             (family, value) -> family.adolescentStartScale = value,
             family -> family.adolescentStartScale
         )
+        .documentation("Config field: AdolescentStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdultStartScale", Codec.DOUBLE),
             (family, value) -> family.adultStartScale = value,
             family -> family.adultStartScale
         )
+        .documentation("Config field: AdultStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdolescentSwitchScale", Codec.DOUBLE),
             (family, value) -> family.adolescentSwitchScale = value,
             family -> family.adolescentSwitchScale
         )
+        .documentation("Config field: AdolescentSwitchScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdultSwitchScale", Codec.DOUBLE),
             (family, value) -> family.adultSwitchScale = value,
             family -> family.adultSwitchScale
         )
+        .documentation("Config field: AdultSwitchScale.")
         .add()
         .build();
 
@@ -353,12 +392,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.enabled = value == null || value,
             settings -> settings.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("DefaultTimeToFullGrownSeconds", Codec.INTEGER),
             (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
             settings -> null
         )
+        .documentation("Config field: DefaultTimeToFullGrownSeconds.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("DefaultTimeToFullGrownMinutes", Codec.INTEGER),
@@ -370,12 +411,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             },
             settings -> null
         )
+        .documentation("Config field: DefaultTimeToFullGrownMinutes.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("TimeToFullGrownSeconds", Codec.INTEGER),
             (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
             settings -> settings.defaultTimeToFullGrownSeconds
         )
+        .documentation("Config field: TimeToFullGrownSeconds.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("TimeToFullGrownMinutes", Codec.INTEGER),
@@ -387,72 +430,84 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             },
             settings -> null
         )
+        .documentation("Config field: TimeToFullGrownMinutes.")
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultBabyStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultBabyStartScale = value,
             settings -> null
         )
+        .documentation("Config field: DefaultBabyStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("BabyStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultBabyStartScale = value,
             settings -> settings.defaultBabyStartScale
         )
+        .documentation("Config field: BabyStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultAdolescentStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdolescentStartScale = value,
             settings -> null
         )
+        .documentation("Config field: DefaultAdolescentStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdolescentStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdolescentStartScale = value,
             settings -> settings.defaultAdolescentStartScale
         )
+        .documentation("Config field: AdolescentStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultAdultStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdultStartScale = value,
             settings -> null
         )
+        .documentation("Config field: DefaultAdultStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdultStartScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdultStartScale = value,
             settings -> settings.defaultAdultStartScale
         )
+        .documentation("Config field: AdultStartScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultAdolescentSwitchScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdolescentSwitchScale = value,
             settings -> null
         )
+        .documentation("Config field: DefaultAdolescentSwitchScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdolescentSwitchScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdolescentSwitchScale = value,
             settings -> settings.defaultAdolescentSwitchScale
         )
+        .documentation("Config field: AdolescentSwitchScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("DefaultAdultSwitchScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdultSwitchScale = value,
             settings -> null
         )
+        .documentation("Config field: DefaultAdultSwitchScale.")
         .add()
         .<Double>append(
             new KeyedCodec<>("AdultSwitchScale", Codec.DOUBLE),
             (settings, value) -> settings.defaultAdultSwitchScale = value,
             settings -> settings.defaultAdultSwitchScale
         )
+        .documentation("Config field: AdultSwitchScale.")
         .add()
         .<RoleFamily[]>append(
             new KeyedCodec<>("Families", ROLE_FAMILY_ARRAY_CODEC),
             (settings, value) -> settings.families = value == null ? EMPTY_ROLE_FAMILIES : value,
             settings -> settings.families
         )
+        .documentation("Config field: Families.")
         .add()
         .build();
 
@@ -465,6 +520,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.threshold = value,
             settings -> settings.threshold
         )
+        .documentation("Config field: Threshold.")
         .add()
         .build();
 
@@ -477,24 +533,28 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.requireTamed = value,
             settings -> settings.requireTamed
         )
+        .documentation("Config field: RequireTamed.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireAdult", Codec.BOOLEAN),
             (settings, value) -> settings.requireAdult = value,
             settings -> settings.requireAdult
         )
+        .documentation("Config field: RequireAdult.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireNotInCombat", Codec.BOOLEAN),
             (settings, value) -> settings.requireNotInCombat = value,
             settings -> settings.requireNotInCombat
         )
+        .documentation("Config field: RequireNotInCombat.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireNotSleeping", Codec.BOOLEAN),
             (settings, value) -> settings.requireNotSleeping = value,
             settings -> settings.requireNotSleeping
         )
+        .documentation("Config field: RequireNotSleeping.")
         .add()
         .build();
 
@@ -507,36 +567,42 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.breedRadius = value,
             settings -> settings.breedRadius
         )
+        .documentation("Config field: BreedRadius.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireWanderMode", Codec.BOOLEAN),
             (settings, value) -> settings.requireWanderMode = value,
             settings -> settings.requireWanderMode
         )
+        .documentation("Config field: RequireWanderMode.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireSameOwner", Codec.BOOLEAN),
             (settings, value) -> settings.requireSameOwner = value,
             settings -> settings.requireSameOwner
         )
+        .documentation("Config field: RequireSameOwner.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxNearbySameType", Codec.INTEGER),
             (settings, value) -> settings.maxNearbySameType = value,
             settings -> settings.maxNearbySameType
         )
+        .documentation("Config field: MaxNearbySameType.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireSameRoleId", Codec.BOOLEAN),
             (settings, value) -> settings.requireSameRoleId = value,
             settings -> settings.requireSameRoleId
         )
+        .documentation("Config field: RequireSameRoleId.")
         .add()
         .<RoleMaxNearbySameTypeOverride[]>append(
             new KeyedCodec<>("RoleMaxNearbySameType", ROLE_MAX_NEARBY_OVERRIDE_ARRAY_CODEC),
             (settings, value) -> settings.roleMaxNearbySameType = value,
             settings -> settings.roleMaxNearbySameType
         )
+        .documentation("Config field: RoleMaxNearbySameType.")
         .add()
         .build();
 
@@ -549,6 +615,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.baseCooldownSeconds = value,
             settings -> settings.baseCooldownSeconds
         )
+        .documentation("Config field: BaseCooldownSeconds.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("BaseCooldownMinutes", Codec.INTEGER),
@@ -559,18 +626,21 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             },
             settings -> null
         )
+        .documentation("Config field: BaseCooldownMinutes.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MinDelaySeconds", Codec.INTEGER),
             (settings, value) -> settings.minDelaySeconds = value,
             settings -> settings.minDelaySeconds
         )
+        .documentation("Config field: MinDelaySeconds.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxDelaySeconds", Codec.INTEGER),
             (settings, value) -> settings.maxDelaySeconds = value,
             settings -> settings.maxDelaySeconds
         )
+        .documentation("Config field: MaxDelaySeconds.")
         .add()
         .build();
 
@@ -584,12 +654,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     (settings, value) -> settings.enabled = value,
                     settings -> settings.enabled
                 )
+                .documentation("Config field: Enabled.")
                 .add()
                 .<Integer>append(
                     new KeyedCodec<>("SweepIntervalSeconds", Codec.INTEGER),
                     (settings, value) -> settings.sweepIntervalSeconds = value,
                     settings -> settings.sweepIntervalSeconds
                 )
+                .documentation("Config field: SweepIntervalSeconds.")
                 .add()
                 .<String>append(
                     new KeyedCodec<>("Basis", Codec.STRING),
@@ -600,6 +672,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                             ? null
                             : settings.timerBasis.toConfigValue()
                 )
+                .documentation("Config field: Basis.")
                 .add()
                 .build();
 
@@ -614,6 +687,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     : TimerBasis.fromConfigValue(value),
             settings -> settings.timerBasis == null ? null : settings.timerBasis.toConfigValue()
         )
+        .documentation("Config field: Basis.")
         .add()
         .build();
 
@@ -627,18 +701,21 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     (settings, value) -> settings.parentWeight = value,
                     settings -> settings.parentWeight
                 )
+                .documentation("Config field: ParentWeight.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("RandomWeight", Codec.DOUBLE),
                     (settings, value) -> settings.randomWeight = value,
                     settings -> settings.randomWeight
                 )
+                .documentation("Config field: RandomWeight.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("MutationChance", Codec.DOUBLE),
                     (settings, value) -> settings.mutationChance = value,
                     settings -> settings.mutationChance
                 )
+                .documentation("Config field: MutationChance.")
                 .add()
                 .build();
 
@@ -651,30 +728,35 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.inheritOwner = value,
             settings -> settings.inheritOwner
         )
+        .documentation("Config field: InheritOwner.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("InheritTamed", Codec.BOOLEAN),
             (settings, value) -> settings.inheritTamed = value,
             settings -> settings.inheritTamed
         )
+        .documentation("Config field: InheritTamed.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("InheritAttachments", Codec.BOOLEAN),
             (settings, value) -> settings.inheritAttachments = value,
             settings -> settings.inheritAttachments
         )
+        .documentation("Config field: InheritAttachments.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("InheritTraits", Codec.BOOLEAN),
             (settings, value) -> settings.inheritTraits = value,
             settings -> settings.inheritTraits
         )
+        .documentation("Config field: InheritTraits.")
         .add()
         .<AttachmentInheritanceSettingsOverride>append(
             new KeyedCodec<>("AttachmentInheritance", ATTACHMENT_INHERITANCE_OVERRIDE_CODEC),
             (settings, value) -> settings.attachmentInheritance = value,
             settings -> settings.attachmentInheritance
         )
+        .documentation("Config field: AttachmentInheritance.")
         .add()
         .build();
 
@@ -688,12 +770,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     (settings, value) -> settings.enabled = value,
                     settings -> settings.enabled
                 )
+                .documentation("Config field: Enabled.")
                 .add()
                 .<Integer>append(
                     new KeyedCodec<>("DefaultTimeToFullGrownSeconds", Codec.INTEGER),
                     (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
                     settings -> null
                 )
+                .documentation("Config field: DefaultTimeToFullGrownSeconds.")
                 .add()
                 .<Integer>append(
                     new KeyedCodec<>("DefaultTimeToFullGrownMinutes", Codec.INTEGER),
@@ -705,12 +789,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     },
                     settings -> null
                 )
+                .documentation("Config field: DefaultTimeToFullGrownMinutes.")
                 .add()
                 .<Integer>append(
                     new KeyedCodec<>("TimeToFullGrownSeconds", Codec.INTEGER),
                     (settings, value) -> settings.defaultTimeToFullGrownSeconds = value,
                     settings -> settings.defaultTimeToFullGrownSeconds
                 )
+                .documentation("Config field: TimeToFullGrownSeconds.")
                 .add()
                 .<Integer>append(
                     new KeyedCodec<>("TimeToFullGrownMinutes", Codec.INTEGER),
@@ -722,72 +808,84 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                     },
                     settings -> null
                 )
+                .documentation("Config field: TimeToFullGrownMinutes.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("DefaultBabyStartScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultBabyStartScale = value,
                     settings -> null
                 )
+                .documentation("Config field: DefaultBabyStartScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("BabyStartScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultBabyStartScale = value,
                     settings -> settings.defaultBabyStartScale
                 )
+                .documentation("Config field: BabyStartScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("DefaultAdolescentStartScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdolescentStartScale = value,
                     settings -> null
                 )
+                .documentation("Config field: DefaultAdolescentStartScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("AdolescentStartScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdolescentStartScale = value,
                     settings -> settings.defaultAdolescentStartScale
                 )
+                .documentation("Config field: AdolescentStartScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("DefaultAdultStartScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdultStartScale = value,
                     settings -> null
                 )
+                .documentation("Config field: DefaultAdultStartScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("AdultStartScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdultStartScale = value,
                     settings -> settings.defaultAdultStartScale
                 )
+                .documentation("Config field: AdultStartScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("DefaultAdolescentSwitchScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdolescentSwitchScale = value,
                     settings -> null
                 )
+                .documentation("Config field: DefaultAdolescentSwitchScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("AdolescentSwitchScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdolescentSwitchScale = value,
                     settings -> settings.defaultAdolescentSwitchScale
                 )
+                .documentation("Config field: AdolescentSwitchScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("DefaultAdultSwitchScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdultSwitchScale = value,
                     settings -> null
                 )
+                .documentation("Config field: DefaultAdultSwitchScale.")
                 .add()
                 .<Double>append(
                     new KeyedCodec<>("AdultSwitchScale", Codec.DOUBLE),
                     (settings, value) -> settings.defaultAdultSwitchScale = value,
                     settings -> settings.defaultAdultSwitchScale
                 )
+                .documentation("Config field: AdultSwitchScale.")
                 .add()
                 .<RoleFamily[]>append(
                     new KeyedCodec<>("Families", ROLE_FAMILY_ARRAY_CODEC),
                     (settings, value) -> settings.families = value,
                     settings -> settings.families
                 )
+                .documentation("Config field: Families.")
                 .add()
                 .build();
 
@@ -800,48 +898,56 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.happiness = value,
             settings -> settings.happiness
         )
+        .documentation("Config field: Happiness.")
         .add()
         .<EligibilitySettingsOverride>append(
             new KeyedCodec<>("Eligibility", ELIGIBILITY_OVERRIDE_CODEC),
             (settings, value) -> settings.eligibility = value,
             settings -> settings.eligibility
         )
+        .documentation("Config field: Eligibility.")
         .add()
         .<PairingSettingsOverride>append(
             new KeyedCodec<>("Pairing", PAIRING_OVERRIDE_CODEC),
             (settings, value) -> settings.pairing = value,
             settings -> settings.pairing
         )
+        .documentation("Config field: Pairing.")
         .add()
         .<CooldownSettingsOverride>append(
             new KeyedCodec<>("Cooldowns", COOLDOWN_OVERRIDE_CODEC),
             (settings, value) -> settings.cooldowns = value,
             settings -> settings.cooldowns
         )
+        .documentation("Config field: Cooldowns.")
         .add()
         .<PassiveBreedingSettingsOverride>append(
             new KeyedCodec<>("PassiveBreeding", PASSIVE_BREEDING_OVERRIDE_CODEC),
             (settings, value) -> settings.passiveBreeding = value,
             settings -> settings.passiveBreeding
         )
+        .documentation("Config field: PassiveBreeding.")
         .add()
         .<TimingSettingsOverride>append(
             new KeyedCodec<>("Timing", TIMING_OVERRIDE_CODEC),
             (settings, value) -> settings.timing = value,
             settings -> settings.timing
         )
+        .documentation("Config field: Timing.")
         .add()
         .<InheritanceSettingsOverride>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_OVERRIDE_CODEC),
             (settings, value) -> settings.inheritance = value,
             settings -> settings.inheritance
         )
+        .documentation("Config field: Inheritance.")
         .add()
         .<OffspringLifecycleSettingsOverride>append(
             new KeyedCodec<>("OffspringLifecycle", OFFSPRING_LIFECYCLE_OVERRIDE_CODEC),
             (settings, value) -> settings.offspringLifecycle = value,
             settings -> settings.offspringLifecycle
         )
+        .documentation("Config field: OffspringLifecycle.")
         .add()
         .build();
 
@@ -863,12 +969,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (asset, value) -> asset.enabled = value == null || value,
             asset -> asset.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("Priority", Codec.INTEGER),
             (asset, value) -> asset.priority = value == null ? 0 : value,
             asset -> asset.priority
         )
+        .documentation("Config field: Priority.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
@@ -2423,3 +2531,4 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
     }
 }
+

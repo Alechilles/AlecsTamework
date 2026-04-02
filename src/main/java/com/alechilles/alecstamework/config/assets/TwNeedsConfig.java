@@ -32,36 +32,42 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.hungerDefault = value,
             settings -> settings.hungerDefault
         )
+        .documentation("Config field: HungerDefault.")
         .add()
         .<Double>append(
             new KeyedCodec<>("HungerMin", Codec.DOUBLE),
             (settings, value) -> settings.hungerMin = value,
             settings -> settings.hungerMin
         )
+        .documentation("Config field: HungerMin.")
         .add()
         .<Double>append(
             new KeyedCodec<>("HungerMax", Codec.DOUBLE),
             (settings, value) -> settings.hungerMax = value,
             settings -> settings.hungerMax
         )
+        .documentation("Config field: HungerMax.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ThirstDefault", Codec.DOUBLE),
             (settings, value) -> settings.thirstDefault = value,
             settings -> settings.thirstDefault
         )
+        .documentation("Config field: ThirstDefault.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ThirstMin", Codec.DOUBLE),
             (settings, value) -> settings.thirstMin = value,
             settings -> settings.thirstMin
         )
+        .documentation("Config field: ThirstMin.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ThirstMax", Codec.DOUBLE),
             (settings, value) -> settings.thirstMax = value,
             settings -> settings.thirstMax
         )
+        .documentation("Config field: ThirstMax.")
         .add()
         .build();
 
@@ -74,12 +80,14 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.hungerPerMinute = value,
             settings -> settings.hungerPerMinute
         )
+        .documentation("Config field: HungerPerMinute.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ThirstPerMinute", Codec.DOUBLE),
             (settings, value) -> settings.thirstPerMinute = value,
             settings -> settings.thirstPerMinute
         )
+        .documentation("Config field: ThirstPerMinute.")
         .add()
         .build();
 
@@ -92,18 +100,21 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.hungerPenaltyAtMin = value,
             settings -> settings.hungerPenaltyAtMin
         )
+        .documentation("Config field: HungerPenaltyAtMin.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ThirstPenaltyAtMin", Codec.DOUBLE),
             (settings, value) -> settings.thirstPenaltyAtMin = value,
             settings -> settings.thirstPenaltyAtMin
         )
+        .documentation("Config field: ThirstPenaltyAtMin.")
         .add()
         .<Double>append(
             new KeyedCodec<>("PenaltyCurvePower", Codec.DOUBLE),
             (settings, value) -> settings.penaltyCurvePower = value,
             settings -> settings.penaltyCurvePower
         )
+        .documentation("Config field: PenaltyCurvePower.")
         .add()
         .build();
 
@@ -116,78 +127,91 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.sweepIntervalSeconds = value,
             settings -> settings.sweepIntervalSeconds
         )
+        .documentation("Config field: SweepIntervalSeconds.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("NearbyContainerFeedEnabled", Codec.BOOLEAN),
             (settings, value) -> settings.nearbyContainerFeedEnabled = value,
             settings -> settings.nearbyContainerFeedEnabled
         )
+        .documentation("Config field: NearbyContainerFeedEnabled.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ContainerSearchRadius", Codec.DOUBLE),
             (settings, value) -> settings.containerSearchRadius = value,
             settings -> settings.containerSearchRadius
         )
+        .documentation("Config field: ContainerSearchRadius.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("ContainerVerticalScanRadius", Codec.INTEGER),
             (settings, value) -> settings.containerVerticalScanRadius = value,
             settings -> settings.containerVerticalScanRadius
         )
+        .documentation("Config field: ContainerVerticalScanRadius.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ContainerConsumeRadius", Codec.DOUBLE),
             (settings, value) -> settings.containerConsumeRadius = value,
             settings -> settings.containerConsumeRadius
         )
+        .documentation("Config field: ContainerConsumeRadius.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("ContainerFoodItemIds", Codec.STRING_ARRAY),
             (settings, value) -> settings.containerFoodItemIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.containerFoodItemIds
         )
+        .documentation("Config field: ContainerFoodItemIds.")
         .add()
         .<Double>append(
             new KeyedCodec<>("HungerGainPerConsumedItem", Codec.DOUBLE),
             (settings, value) -> settings.hungerGainPerConsumedItem = value,
             settings -> settings.hungerGainPerConsumedItem
         )
+        .documentation("Config field: HungerGainPerConsumedItem.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxContainerItemsConsumedPerSweep", Codec.INTEGER),
             (settings, value) -> settings.maxContainerItemsConsumedPerSweep = value,
             settings -> settings.maxContainerItemsConsumedPerSweep
         )
+        .documentation("Config field: MaxContainerItemsConsumedPerSweep.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("NearbyWaterDrinkEnabled", Codec.BOOLEAN),
             (settings, value) -> settings.nearbyWaterDrinkEnabled = value,
             settings -> settings.nearbyWaterDrinkEnabled
         )
+        .documentation("Config field: NearbyWaterDrinkEnabled.")
         .add()
         .<Double>append(
             new KeyedCodec<>("WaterSearchRadius", Codec.DOUBLE),
             (settings, value) -> settings.waterSearchRadius = value,
             settings -> settings.waterSearchRadius
         )
+        .documentation("Config field: WaterSearchRadius.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("WaterVerticalScanRadius", Codec.INTEGER),
             (settings, value) -> settings.waterVerticalScanRadius = value,
             settings -> settings.waterVerticalScanRadius
         )
+        .documentation("Config field: WaterVerticalScanRadius.")
         .add()
         .<Double>append(
             new KeyedCodec<>("WaterConsumeRadius", Codec.DOUBLE),
             (settings, value) -> settings.waterConsumeRadius = value,
             settings -> settings.waterConsumeRadius
         )
+        .documentation("Config field: WaterConsumeRadius.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ThirstGainPerSweepNearWater", Codec.DOUBLE),
             (settings, value) -> settings.thirstGainPerSweepNearWater = value,
             settings -> settings.thirstGainPerSweepNearWater
         )
+        .documentation("Config field: ThirstGainPerSweepNearWater.")
         .add()
         .build();
 
@@ -200,18 +224,21 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.hungerGainOnFeedInteraction = value,
             settings -> settings.hungerGainOnFeedInteraction
         )
+        .documentation("Config field: HungerGainOnFeedInteraction.")
         .add()
         .<Double>append(
             new KeyedCodec<>("ThirstGainOnWaterBucket", Codec.DOUBLE),
             (settings, value) -> settings.thirstGainOnWaterBucket = value,
             settings -> settings.thirstGainOnWaterBucket
         )
+        .documentation("Config field: ThirstGainOnWaterBucket.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("WaterBucketItemIds", Codec.STRING_ARRAY),
             (settings, value) -> settings.waterBucketItemIds = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             settings -> settings.waterBucketItemIds
         )
+        .documentation("Config field: WaterBucketItemIds.")
         .add()
         .build();
 
@@ -224,6 +251,7 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.timerBasis = TimerBasis.fromConfigValue(value),
             settings -> settings.getTimerBasis().toConfigValue()
         )
+        .documentation("Config field: Basis.")
         .add()
         .build();
 
@@ -236,18 +264,21 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.mode = TickPolicyMode.fromConfigValue(value),
             settings -> settings.getMode().toConfigValue()
         )
+        .documentation("Config field: Mode.")
         .add()
         .<Double>append(
             new KeyedCodec<>("OwnerOfflineGraceHours", Codec.DOUBLE),
             (settings, value) -> settings.ownerOfflineGraceHours = value,
             settings -> settings.ownerOfflineGraceHours
         )
+        .documentation("Config field: OwnerOfflineGraceHours.")
         .add()
         .<Double>append(
             new KeyedCodec<>("OwnerOfflineDecayMultiplier", Codec.DOUBLE),
             (settings, value) -> settings.ownerOfflineDecayMultiplier = value,
             settings -> settings.ownerOfflineDecayMultiplier
         )
+        .documentation("Config field: OwnerOfflineDecayMultiplier.")
         .add()
         .build();
 
@@ -260,36 +291,42 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.enabled = value != null && value,
             settings -> settings.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<String>append(
             new KeyedCodec<>("Model", Codec.STRING),
             (settings, value) -> settings.model = DamageModel.fromConfigValue(value),
             settings -> settings.getModel().toConfigValue()
         )
+        .documentation("Config field: Model.")
         .add()
         .<String>append(
             new KeyedCodec<>("DualNeedRule", Codec.STRING),
             (settings, value) -> settings.dualNeedRule = DualNeedRule.fromConfigValue(value),
             settings -> settings.getDualNeedRule().toConfigValue()
         )
+        .documentation("Config field: DualNeedRule.")
         .add()
         .<Double>append(
             new KeyedCodec<>("StarvationDamagePerMinute", Codec.DOUBLE),
             (settings, value) -> settings.starvationDamagePerMinute = value,
             settings -> settings.starvationDamagePerMinute
         )
+        .documentation("Config field: StarvationDamagePerMinute.")
         .add()
         .<Double>append(
             new KeyedCodec<>("DehydrationDamagePerMinute", Codec.DOUBLE),
             (settings, value) -> settings.dehydrationDamagePerMinute = value,
             settings -> settings.dehydrationDamagePerMinute
         )
+        .documentation("Config field: DehydrationDamagePerMinute.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("Lethal", Codec.BOOLEAN),
             (settings, value) -> settings.lethal = value == null || value,
             settings -> settings.lethal
         )
+        .documentation("Config field: Lethal.")
         .add()
         .build();
 
@@ -308,12 +345,14 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.enabled = value == null || value,
             asset -> asset.enabled
         )
+        .documentation("Config field: Enabled.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("Priority", Codec.INTEGER),
             (asset, value) -> asset.priority = value == null ? 0 : value,
             asset -> asset.priority
         )
+        .documentation("Config field: Priority.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
@@ -1207,3 +1246,4 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         return value;
     }
 }
+
