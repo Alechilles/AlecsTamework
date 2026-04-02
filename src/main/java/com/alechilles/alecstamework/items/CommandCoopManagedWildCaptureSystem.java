@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -359,6 +360,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 TameworkNpcNameComponent.getComponentType();
         ComponentType<EntityStore, TameworkTamedComponent> tamedType =
                 TameworkTamedComponent.getComponentType();
+        ComponentType<EntityStore, CoopResidentComponent> coopResidentType =
+                CoopResidentComponent.getComponentType();
 
         entityStore.forEachChunk(
                 Query.and(npcType, transformType),
@@ -372,6 +375,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                         NPCEntity npc = chunk.getComponent(i, npcType);
                         TransformComponent transform = chunk.getComponent(i, transformType);
                         if (npc == null || transform == null) {
+                            continue;
+                        }
+                        if (coopResidentType != null && chunk.getComponent(i, coopResidentType) != null) {
+                            // Ignore vanilla coop-resident projections; managed coop runtime is ledger-authoritative.
                             continue;
                         }
                         UUID npcUuid = npc.getUuid();
@@ -545,6 +552,11 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             try {
                 TwCoopConfig config = resolveCoopConfigByIdentifier(coopId);
                 if (!releaseResident(world, entityStore, slotContext, coopBlock, config)) {
+                    debugCoop(
+                            "removed check release failed coop=" + coopId
+                                    + " slot=" + slotContext.residentSlot()
+                                    + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                    );
                     continue;
                 }
                 released++;
@@ -573,22 +585,50 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         WorldChunk worldChunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(coopBlock.x, coopBlock.z));
         if (worldChunk == null) {
             // Coop chunk is unloaded; do not treat as removal.
+            debugCoop(
+                    "removed check deferred chunk_unloaded coop=" + coopId
+                            + " slot=" + slotContext.residentSlot()
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+            );
             return false;
         }
         Ref<ChunkStore> blockRef = worldChunk.getBlockComponentEntity(coopBlock.x, coopBlock.y, coopBlock.z);
         if (blockRef == null) {
+            debugCoop(
+                    "removed check confirmed missing_block_ref coop=" + coopId
+                            + " slot=" + slotContext.residentSlot()
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+            );
             return true;
         }
         if (!blockRef.isValid()) {
+            debugCoop(
+                    "removed check deferred invalid_block_ref coop=" + coopId
+                            + " slot=" + slotContext.residentSlot()
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+            );
             return false;
         }
         ComponentType<ChunkStore, ?> coopType = resolveCoopBlockComponentType();
         if (coopType == null) {
             // Without coop type introspection, fail closed to avoid accidental duplicate spawns.
+            debugCoop(
+                    "removed check deferred coop_type_unavailable coop=" + coopId
+                            + " slot=" + slotContext.residentSlot()
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+            );
             return false;
         }
         Object coopState = safeGetChunkComponent(chunkStore, blockRef, castComponentType(coopType));
-        return coopState == null;
+        boolean removed = coopState == null;
+        if (removed) {
+            debugCoop(
+                    "removed check confirmed missing_coop_component coop=" + coopId
+                            + " slot=" + slotContext.residentSlot()
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+            );
+        }
+        return removed;
     }
 
     private boolean releaseResident(@Nonnull World world,
@@ -1652,6 +1692,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return;
         }
         nextDebugStatusAtMs = nowMs + DEBUG_STATUS_INTERVAL_MS;
+        CoopDebugLogger.log(message);
+    }
+
+    private void debugCoop(@Nonnull String message) {
         CoopDebugLogger.log(message);
     }
 

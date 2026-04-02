@@ -122,6 +122,9 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
             if (context == null) {
                 continue;
             }
+            if (isManagedCoop(context)) {
+                continue;
+            }
             int residentSlot = context.resolveResidentSlot(currentUuid, resolveUuidComponent(reference, store));
 
             if (coopResident.getMarkedForDespawn()) {
@@ -552,6 +555,15 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
 
     private void debugCoop(@Nonnull String message) {
         CoopDebugLogger.log(message);
+    }
+
+    private boolean isManagedCoop(@Nonnull CoopResidentContext context) {
+        String coopId = context.coopId();
+        if (coopId == null || coopId.isBlank()) {
+            return false;
+        }
+        TwCoopConfig config = TwCoopConfig.resolveForCoop(coopId);
+        return config != null && config.isEnabled();
     }
 
     private record CoopResidentContext(@Nullable String worldName,
