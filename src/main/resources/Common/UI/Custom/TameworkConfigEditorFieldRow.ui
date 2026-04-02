@@ -44,10 +44,11 @@ Group {
     Anchor: (Top: 3, Left: 8, Width: 304, Height: 24);
     Text: "";
     TooltipText: "";
-    Style: ButtonStyle(
-      Default: (Background: (Color: #00000000), TextStyle: (TextColor: #00000000)),
-      Hovered: (Background: (Color: #00000000), TextStyle: (TextColor: #00000000)),
-      Pressed: (Background: (Color: #00000000), TextStyle: (TextColor: #00000000))
+    Style: TextButtonStyle(
+      Default: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),
+      Hovered: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),
+      Pressed: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000)),
+      Disabled: (Background: (Color: #00000000), LabelStyle: (FontSize: 1, TextColor: #00000000))
     );
     Visible: false;
   }
