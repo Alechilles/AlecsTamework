@@ -175,7 +175,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         pruneRuntimeState(activeCoopKeys);
         int removedCoopReleased = scanDiagnostics.containerTypeMissing
                 ? 0
-                : releaseResidentsFromRemovedCoops(world, entityStore, activeCoopKeys);
+                : releaseResidentsFromRemovedCoops(world, chunkStore, entityStore, activeCoopKeys);
         if (managedCoops.isEmpty()) {
             maybeLogStatus(
                     nowMs,
@@ -516,6 +516,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private int releaseResidentsFromRemovedCoops(@Nonnull World world,
+                                                  @Nonnull Store<ChunkStore> chunkStore,
                                                   @Nonnull Store<EntityStore> entityStore,
                                                   @Nonnull Set<String> activeCoopKeys) {
         List<CommandLinkedNpcCoopService.CoopSlotContext> housedSlots =
@@ -533,7 +534,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 continue;
             }
             Vector3i coopBlock = new Vector3i(slotContext.x(), slotContext.y(), slotContext.z());
-            if (!isCoopConfirmedRemoved(world, slotContext, coopId, activeCoopKeys)) {
+            if (!isCoopConfirmedRemoved(world, chunkStore, slotContext, coopId, activeCoopKeys)) {
                 continue;
             }
             String coopKey = buildCoopKey(world.getName(), coopBlock, coopId);
@@ -560,6 +561,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private boolean isCoopConfirmedRemoved(@Nonnull World world,
+                                           @Nonnull Store<ChunkStore> chunkStore,
                                            @Nonnull CommandLinkedNpcCoopService.CoopSlotContext slotContext,
                                            @Nonnull String coopId,
                                            @Nonnull Set<String> activeCoopKeys) {
@@ -573,14 +575,20 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             // Coop chunk is unloaded; do not treat as removal.
             return false;
         }
-        BlockType blockType = worldChunk.getBlockType(coopBlock.x, coopBlock.y, coopBlock.z);
-        String blockTypeId = normalizeBlockTypeId(blockType != null ? blockType.getId() : null);
-        TwCoopConfig configAtBlock = resolveCoopConfig(blockTypeId, null);
-        if (configAtBlock == null || !configAtBlock.isEnabled()) {
+        Ref<ChunkStore> blockRef = worldChunk.getBlockComponentEntity(coopBlock.x, coopBlock.y, coopBlock.z);
+        if (blockRef == null) {
             return true;
         }
-        String locatedCoopId = normalizeIdentifier(configAtBlock.getCoopId());
-        return locatedCoopId == null || !locatedCoopId.equals(coopId);
+        if (!blockRef.isValid()) {
+            return false;
+        }
+        ComponentType<ChunkStore, ?> coopType = resolveCoopBlockComponentType();
+        if (coopType == null) {
+            // Without coop type introspection, fail closed to avoid accidental duplicate spawns.
+            return false;
+        }
+        Object coopState = safeGetChunkComponent(chunkStore, blockRef, castComponentType(coopType));
+        return coopState == null;
     }
 
     private boolean releaseResident(@Nonnull World world,
