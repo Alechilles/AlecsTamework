@@ -61,6 +61,23 @@ class TwConfigSchemaAdapterTest {
         assertFalse(emptyItemId.tooltip().isBlank());
     }
 
+    @Test
+    void namesSchemaIncludesExpectedNamePoolSections() {
+        TwConfigAssetDescriptor descriptor = descriptor(TwConfigFamily.NAMES, "TwNames_Default");
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields = TwConfigSchemaAdapter.fieldsFor(descriptor);
+
+        assertFalse(fields.isEmpty());
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "NorthAmericaMale"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "NorthAmericaFemale"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "GermanMale"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "GermanFemale"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "SpanishMale"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "SpanishFemale"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "BrazilianPortugueseMale"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "BrazilianPortugueseFemale"));
+    }
+
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family, String assetId) {
         return new TwConfigAssetDescriptor(
                 family,

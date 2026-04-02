@@ -11,6 +11,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
+import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
@@ -136,6 +137,7 @@ final class TwConfigSchemaAdapter {
             case INTERACTION -> TwInteractionConfig.CODEC;
             case SPAWNER -> TwSpawnerConfig.CODEC;
             case NAME_ITEM -> TwNameItemConfig.CODEC;
+            case NAMES -> TwNamesConfig.CODEC;
             case COMMAND_ITEM -> TwCommandItemConfig.CODEC;
             case HAPPINESS -> TwHappinessConfig.CODEC;
             case NEEDS -> TwNeedsConfig.CODEC;

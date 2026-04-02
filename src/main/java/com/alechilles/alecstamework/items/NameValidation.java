@@ -87,15 +87,15 @@ final class NameValidation {
         String normalized = key.trim().toLowerCase(Locale.ROOT);
         switch (normalized) {
             case "lettersnumbersspaces":
-                return Pattern.compile("^[A-Za-z0-9 ]+$");
+                return Pattern.compile("^[\\p{L}\\p{N} ]+$");
             case "lettersnumbers":
-                return Pattern.compile("^[A-Za-z0-9]+$");
+                return Pattern.compile("^[\\p{L}\\p{N}]+$");
             case "lettersspaces":
-                return Pattern.compile("^[A-Za-z ]+$");
+                return Pattern.compile("^[\\p{L} ]+$");
             case "letters":
-                return Pattern.compile("^[A-Za-z]+$");
+                return Pattern.compile("^[\\p{L}]+$");
             case "numbers":
-                return Pattern.compile("^[0-9]+$");
+                return Pattern.compile("^[\\p{N}]+$");
             case "ascii":
                 return Pattern.compile("^[\\x20-\\x7E]+$");
             default:

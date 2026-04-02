@@ -30,6 +30,7 @@ import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
+import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
@@ -168,6 +169,7 @@ public class Tamework extends JavaPlugin {
     private boolean companionAssetsRegistered;
     private boolean spawnerAssetsRegistered;
     private boolean namingAssetsRegistered;
+    private boolean namesAssetsRegistered;
     private boolean commandAssetsRegistered;
     private boolean interactionAssetsRegistered;
     private boolean coopAssetsRegistered;
@@ -242,6 +244,7 @@ public class Tamework extends JavaPlugin {
         registerCoopAssets();
         registerSpawnerItemAssets();
         registerNamingItemAssets();
+        registerNamesAssets();
         registerCommandItemAssets();
         registerInteractionAssets();
         registerHappinessAssets();
@@ -830,6 +833,7 @@ public class Tamework extends JavaPlugin {
         itemFeatureRegistry.clear();
         itemFeatureRegistry.registerDefaults();
         registerSpawnerItemAssets();
+        registerNamesAssets();
         registerCommandItemAssets();
         int loadedSpawner = 0;
         int loadedNaming = 0;
@@ -892,6 +896,22 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwNameItemConfig.class, this::onNamingAssetsRemoved);
         namingAssetsRegistered = true;
+    }
+
+    private void registerNamesAssets() {
+        if (namesAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwNamesConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Names")
+                        .setCodec(TwNamesConfig.CODEC)
+                        .setKeyFunction(TwNamesConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwNamesConfig.class, this::onNamesAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwNamesConfig.class, this::onNamesAssetsRemoved);
+        namesAssetsRegistered = true;
     }
 
     private void registerCommandItemAssets() {
@@ -1084,6 +1104,20 @@ public class Tamework extends JavaPlugin {
         TwNameItemConfig.clearInheritanceFallbackCache();
         emitExperimentalConfigReload(TameworkConfigFamily.NAME_ITEM, event.getRemovedAssets());
         requestItemFeatureConfigReloadFromAssetEvent();
+    }
+
+    private void onNamesAssetsLoaded(
+            LoadedAssetsEvent<String, TwNamesConfig, DefaultAssetMap<String, TwNamesConfig>> event) {
+        TwNamesConfig.clearInheritanceFallbackCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.NAMES, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onNamesAssetsRemoved(
+            RemovedAssetsEvent<String, TwNamesConfig, DefaultAssetMap<String, TwNamesConfig>> event) {
+        TwNamesConfig.clearInheritanceFallbackCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.NAMES, event.getRemovedAssets());
     }
 
     private void onCommandAssetsLoaded(

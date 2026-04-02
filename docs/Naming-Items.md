@@ -49,6 +49,7 @@ Fields:
 - `MinLength` (default 1). Minimum name length.
 - `MaxLength` (default 24). Maximum name length.
 - `AllowedChars` (default `LettersNumbersSpaces`). Preset or regex string.
+- `RandomNamesId` (optional). References a `TwNames` asset id for in-UI random name suggestions.
 - `TrimWhitespace` (default true). Trims leading/trailing whitespace.
 - `ConsumeItem` (default false). Consumes one item on successful naming.
 - `CooldownMs` (optional). Cooldown applied to the held naming item after success.
@@ -67,6 +68,8 @@ Custom regex is supported via `AllowedChars: "Regex:<pattern>"`.
 
 ## Name input flow
 When the interaction succeeds, the player gets a naming UI with a text field and `Apply` / `Cancel` buttons.
+- If `RandomNamesId` resolves to a valid `TwNames` pool, a `Random` button is shown.
+- Clicking `Random` replaces the text in the input field only (it does not apply the name).
 - Enter the desired name and click `Apply` to submit.
 - Click `Cancel` to cancel the request.
 - If the page cannot be opened, naming automatically falls back to chat input (`cancel` still cancels).
@@ -93,6 +96,7 @@ Spawner capture preserves the Tamework name and restores it on spawn.
     "MinLength": 1,
     "MaxLength": 24,
     "AllowedChars": "LettersNumbersSpaces",
+    "RandomNamesId": "TwNames_Default",
     "TrimWhitespace": true,
     "ReplaceExisting": true,
     "ConsumeItem": false,
@@ -106,6 +110,7 @@ Spawner capture preserves the Tamework name and restores it on spawn.
 ## Example assets
 Example assets included in the mod:
 - `Server/Tamework/Items/Naming/NameItem_Tamework_Example.json`
+- `Server/Tamework/Names/TwNames_Default.json`
 - `Server/Item/Items/Naming/Tamework_Nametag_Example.json`
 
 Translations used by the example item:

@@ -51,6 +51,14 @@ class NameValidationTest {
     }
 
     @Test
+    void allowsAccentedLettersWithDefaultPreset() {
+        NamingRules rules = NamingRules.builder().build();
+        assertTrue(NameValidation.validate("José", rules, false, false).isOk());
+        assertTrue(NameValidation.validate("João", rules, false, false).isOk());
+        assertTrue(NameValidation.validate("Luís", rules, false, false).isOk());
+    }
+
+    @Test
     void enforcesLengthLimits() {
         NamingRules rules = NamingRules.builder()
                 .minLength(2)

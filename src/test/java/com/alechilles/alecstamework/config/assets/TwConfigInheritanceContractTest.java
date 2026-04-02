@@ -95,8 +95,10 @@ class TwConfigInheritanceContractTest {
         TwNameItemConfig.NamingSettings childNaming = new TwNameItemConfig.NamingSettings();
         setField(parentNaming, "minLength", 4);
         setField(parentNaming, "maxLength", 30);
+        setField(parentNaming, "randomNamesId", "TwNames_Default");
         setField(childNaming, "minLength", 2);
         setField(childNaming, "maxLength", 10);
+        setField(childNaming, "randomNamesId", "TwNames_Custom");
 
         setField(parent, "naming", parentNaming);
         setField(child, "naming", childNaming);
@@ -107,6 +109,7 @@ class TwConfigInheritanceContractTest {
 
         assertEquals(2, child.getNaming().getMinLength());
         assertEquals(30, child.getNaming().getMaxLength());
+        assertEquals("TwNames_Default", child.getNaming().getRandomNamesId());
     }
 
     @Test

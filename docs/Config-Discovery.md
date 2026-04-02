@@ -8,6 +8,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwInteractionConfig`: `<ModRoot>/Server/Tamework/Interactions/*.json`
 - `TwSpawnerConfig`: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - `TwNameItemConfig`: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
+- `TwNamesConfig`: `<ModRoot>/Server/Tamework/Names/*.json`
 - `TwCommandItemConfig`: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
 - `TwHappinessConfig`: `<ModRoot>/Server/Tamework/Happiness/*.json`
 - `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
@@ -31,8 +32,11 @@ Resolved by role id + `Priority`:
 ### Item-scoped families
 Resolved by bound item ids:
 - `TwSpawnerConfig` (`EmptyItemId`)
-- `TwNameItemConfig` (`ItemId` / `ItemIds`)
+- `TwNameItemConfig` (`ItemId`)
 - `TwCommandItemConfig` (`ItemIds`)
+
+### Name-pool family
+- `TwNamesConfig` resolves by asset id (for example from `TwNameItemConfig.Naming.RandomNamesId`).
 
 ### Coop-scoped family
 - `TwCoopConfig` by `CoopId`

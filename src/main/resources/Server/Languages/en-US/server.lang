@@ -32,6 +32,7 @@ items.Potion_Tranquilizer.description=Used to craft tranquilizer arrows and equi
 tamework.ui.shared.button.apply=Apply
 tamework.ui.shared.button.back=Back
 tamework.ui.shared.button.cancel=Cancel
+tamework.ui.shared.button.random=Random
 tamework.ui.shared.button.close=Close
 tamework.ui.shared.button.confirm=Confirm
 tamework.ui.shared.button.create=Create

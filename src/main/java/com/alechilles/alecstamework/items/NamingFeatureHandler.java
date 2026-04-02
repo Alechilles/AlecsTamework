@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
+import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -26,14 +27,18 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ThreadLocalRandom;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Handles naming item interactions and name submission flow (UI first, chat fallback).
  */
 public final class NamingFeatureHandler {
-    private static final long REQUEST_TIMEOUT_MS = 30000L;
+    private static final long REQUEST_TIMEOUT_MS = 300000L;
     private static final String CANCEL_TOKEN = "cancel";
     private static final int DEFAULT_UI_NAME_MAX_LENGTH = 32;
+    private static final String[] EMPTY_RANDOM_NAME_POOL = new String[0];
 
     private final NameItemRegistry registry;
     private final NamingEffectService effectService;
@@ -118,12 +123,14 @@ public final class NamingFeatureHandler {
         if (playerUuid == null) {
             return false;
         }
+        String[] randomNamePool = resolveRandomNamePool(config);
         PendingNameRequest uiRequest = new PendingNameRequest(
                 playerUuid,
                 targetRef,
                 itemId,
                 configIdOverride,
                 overrides,
+                randomNamePool,
                 System.currentTimeMillis(),
                 InputMode.Ui,
                 UUID.randomUUID()
@@ -237,7 +244,10 @@ public final class NamingFeatureHandler {
                 existingName,
                 maxLength,
                 () -> handleUiNameCancelled(player, request.playerUuid, request.requestId),
-                input -> handleUiNameSubmitted(player, request.playerUuid, request.requestId, input)
+                input -> handleUiNameSubmitted(player, request.playerUuid, request.requestId, input),
+                request.randomNamePool != null && request.randomNamePool.length > 0
+                        ? () -> handleUiRandomRequested(player, request.playerUuid, request.requestId)
+                        : null
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
         return true;
@@ -272,6 +282,27 @@ public final class NamingFeatureHandler {
             return;
         }
         applyNameFromInput(player, request, rawName);
+    }
+
+    @Nullable
+    private String handleUiRandomRequested(Player player, UUID playerUuid, UUID requestId) {
+        if (player == null || playerUuid == null || requestId == null) {
+            return null;
+        }
+        PendingNameRequest request = pendingByPlayer.get(playerUuid);
+        if (request == null || request.inputMode != InputMode.Ui || !requestId.equals(request.requestId)) {
+            return null;
+        }
+        if (isRequestExpired(request)) {
+            pendingByPlayer.remove(playerUuid, request);
+            sendMessageKey(player, "tamework.ui.notifications.name.requestExpired");
+            return null;
+        }
+        if (request.randomNamePool == null || request.randomNamePool.length == 0) {
+            return null;
+        }
+        int index = ThreadLocalRandom.current().nextInt(request.randomNamePool.length);
+        return request.randomNamePool[index];
     }
 
     private void applyNameFromInput(Player player,
@@ -479,6 +510,22 @@ public final class NamingFeatureHandler {
         return registry.get(itemId);
     }
 
+    @Nonnull
+    private String[] resolveRandomNamePool(@Nullable TwNameItemConfig config) {
+        if (config == null || config.getNaming() == null) {
+            return EMPTY_RANDOM_NAME_POOL;
+        }
+        String randomNamesId = config.getNaming().getRandomNamesId();
+        if (randomNamesId == null || randomNamesId.isBlank()) {
+            return EMPTY_RANDOM_NAME_POOL;
+        }
+        String[] resolved = TwNamesConfig.resolveMergedPoolById(randomNamesId);
+        if (resolved.length == 0) {
+            return EMPTY_RANDOM_NAME_POOL;
+        }
+        return resolved;
+    }
+
     private boolean isRoleAllowed(String roleId, TwNameItemConfig config) {
         if (config == null) {
             return true;
@@ -628,6 +675,7 @@ public final class NamingFeatureHandler {
         private final String itemId;
         private final String configIdOverride;
         private final NamingOverrides overrides;
+        private final String[] randomNamePool;
         private final long createdMs;
         private final InputMode inputMode;
         private final UUID requestId;
@@ -637,6 +685,7 @@ public final class NamingFeatureHandler {
                                    String itemId,
                                    String configIdOverride,
                                    NamingOverrides overrides,
+                                   String[] randomNamePool,
                                    long createdMs,
                                    InputMode inputMode,
                                    UUID requestId) {
@@ -645,6 +694,7 @@ public final class NamingFeatureHandler {
             this.itemId = itemId;
             this.configIdOverride = configIdOverride;
             this.overrides = overrides;
+            this.randomNamePool = randomNamePool == null ? EMPTY_RANDOM_NAME_POOL : randomNamePool;
             this.createdMs = createdMs;
             this.inputMode = inputMode;
             this.requestId = requestId;
@@ -657,6 +707,7 @@ public final class NamingFeatureHandler {
                     itemId,
                     configIdOverride,
                     overrides,
+                    randomNamePool,
                     createdMs,
                     mode,
                     requestId

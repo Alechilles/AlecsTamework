@@ -45,8 +45,20 @@ $C.@PageOverlay {
           @Anchor = (MinWidth: 128);
         }
 
-        Group #TameworkNameButtonSpacer {
+        Group #TameworkNameButtonSpacerBeforeRandom {
           Anchor: (Width: 12);
+        }
+
+        $C.@SmallSecondaryTextButton #TameworkNameRandomButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = %server.tamework.ui.shared.button.random;
+          @Anchor = (MinWidth: 128);
+          Visible: false;
+        }
+
+        Group #TameworkNameButtonSpacerBeforeApply {
+          Anchor: (Width: 12);
+          Visible: false;
         }
 
         $C.@SmallSecondaryTextButton #TameworkNameApplyButton {

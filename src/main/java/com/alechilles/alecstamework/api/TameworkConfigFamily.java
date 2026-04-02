@@ -6,6 +6,7 @@ public enum TameworkConfigFamily {
     COMPANION,
     SPAWNER,
     NAME_ITEM,
+    NAMES,
     COMMAND_ITEM,
     COOP,
     HAPPINESS,

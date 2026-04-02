@@ -18,6 +18,7 @@
     "MinLength": 1,
     "MaxLength": 24,
     "AllowedChars": "LettersNumbersSpaces",
+    "RandomNamesId": "TwNamesDefault",
     "TrimWhitespace": true,
     "ReplaceExisting": true,
     "ConsumeItem": true,

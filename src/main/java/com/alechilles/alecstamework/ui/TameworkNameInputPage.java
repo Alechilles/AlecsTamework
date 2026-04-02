@@ -14,6 +14,7 @@ import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
 import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.function.Supplier;
 import java.util.function.Consumer;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -26,6 +27,7 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
     private static final String KEY_ACTION = "Action";
     private static final String KEY_NAME_INPUT = "@NpcNameInput";
     private static final String ACTION_CANCEL = "Cancel";
+    private static final String ACTION_RANDOM = "Random";
     private static final String DEFAULT_TITLE_KEY = "tamework.ui.nameInput.title";
     private static final String DEFAULT_SUBTITLE_KEY = "tamework.ui.nameInput.subtitle";
     private static final String DEFAULT_PLACEHOLDER_KEY = "tamework.ui.nameInput.placeholder";
@@ -37,6 +39,8 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
     private final int maxLength;
     private final Runnable cancelCallback;
     private final Consumer<String> submitCallback;
+    private final Supplier<String> randomNameSupplier;
+    private final boolean randomEnabled;
     private boolean handled;
 
     public TameworkNameInputPage(@Nonnull PlayerRef playerRef,
@@ -46,7 +50,8 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
                                  @Nullable String initialValue,
                                  int maxLength,
                                  @Nonnull Runnable cancelCallback,
-                                 @Nonnull Consumer<String> submitCallback) {
+                                 @Nonnull Consumer<String> submitCallback,
+                                 @Nullable Supplier<String> randomNameSupplier) {
         super(playerRef, CustomPageLifetime.CanDismiss, NameInputEventData.CODEC);
         this.title = normalizeText(title, LocalizedText.resolve(playerRef, DEFAULT_TITLE_KEY));
         this.subtitle = normalizeText(subtitle, LocalizedText.resolve(playerRef, DEFAULT_SUBTITLE_KEY));
@@ -55,6 +60,8 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
         this.maxLength = Math.max(1, maxLength);
         this.cancelCallback = cancelCallback;
         this.submitCallback = submitCallback;
+        this.randomNameSupplier = randomNameSupplier;
+        this.randomEnabled = randomNameSupplier != null;
         this.handled = false;
     }
 
@@ -69,19 +76,10 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
         commandBuilder.set("#TameworkNameInputField.PlaceholderText", placeholder);
         commandBuilder.set("#TameworkNameInputField.Value", initialValue);
         commandBuilder.set("#TameworkNameInputField.MaxLength", maxLength);
+        commandBuilder.set("#TameworkNameRandomButton.Visible", randomEnabled);
+        commandBuilder.set("#TameworkNameButtonSpacerBeforeApply.Visible", randomEnabled);
 
-        eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TameworkNameApplyButton",
-                EventData.of(KEY_NAME_INPUT, "#TameworkNameInputField.Value"),
-                false
-        );
-        eventBuilder.addEventBinding(
-                CustomUIEventBindingType.Activating,
-                "#TameworkNameCancelButton",
-                EventData.of(KEY_ACTION, ACTION_CANCEL),
-                false
-        );
+        bindEvents(eventBuilder);
     }
 
     @Override
@@ -99,6 +97,17 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
             if (cancelCallback != null) {
                 cancelCallback.run();
             }
+            return;
+        }
+        if (ACTION_RANDOM.equalsIgnoreCase(data.action)) {
+            if (randomNameSupplier == null) {
+                return;
+            }
+            String randomName = randomNameSupplier.get();
+            if (randomName == null || randomName.isBlank()) {
+                return;
+            }
+            updateNameInputValue(randomName);
             return;
         }
         if (data.nameInput != null) {
@@ -132,6 +141,37 @@ public final class TameworkNameInputPage extends InteractiveCustomUIPage<Tamewor
             return fallback;
         }
         return value;
+    }
+
+    private void bindEvents(@Nonnull UIEventBuilder eventBuilder) {
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkNameApplyButton",
+                EventData.of(KEY_NAME_INPUT, "#TameworkNameInputField.Value"),
+                false
+        );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TameworkNameCancelButton",
+                EventData.of(KEY_ACTION, ACTION_CANCEL),
+                false
+        );
+        if (randomEnabled) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    "#TameworkNameRandomButton",
+                    EventData.of(KEY_ACTION, ACTION_RANDOM),
+                    false
+            );
+        }
+    }
+
+    private void updateNameInputValue(@Nonnull String value) {
+        UICommandBuilder commandBuilder = new UICommandBuilder();
+        UIEventBuilder eventBuilder = new UIEventBuilder();
+        commandBuilder.set("#TameworkNameInputField.Value", value);
+        bindEvents(eventBuilder);
+        sendUpdate(commandBuilder, eventBuilder, false);
     }
 
     /** Event payload for the name input page. */

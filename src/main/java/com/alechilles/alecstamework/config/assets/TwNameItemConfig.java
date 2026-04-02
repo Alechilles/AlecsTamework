@@ -155,6 +155,13 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         )
         .documentation("Allowed character preset or regex.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("RandomNamesId", Codec.STRING),
+            (settings, value) -> settings.randomNamesId = value,
+            settings -> settings.randomNamesId
+        )
+        .documentation("Optional TwNames asset id used to populate the naming UI Random button.")
+        .add()
         .<Boolean>append(
             new KeyedCodec<>("TrimWhitespace", Codec.BOOLEAN),
             (settings, value) -> settings.trimWhitespace = value,
@@ -363,6 +370,7 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         if (!nestedExplicitKeys.contains("MinLength")) naming.minLength = parent.naming.minLength;
         if (!nestedExplicitKeys.contains("MaxLength")) naming.maxLength = parent.naming.maxLength;
         if (!nestedExplicitKeys.contains("AllowedChars")) naming.allowedChars = parent.naming.allowedChars;
+        if (!nestedExplicitKeys.contains("RandomNamesId")) naming.randomNamesId = parent.naming.randomNamesId;
         if (!nestedExplicitKeys.contains("TrimWhitespace")) naming.trimWhitespace = parent.naming.trimWhitespace;
         if (!nestedExplicitKeys.contains("ReplaceExisting")) naming.replaceExisting = parent.naming.replaceExisting;
         if (!nestedExplicitKeys.contains("ConsumeItem")) naming.consumeItem = parent.naming.consumeItem;
@@ -451,6 +459,7 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
         private int minLength = 1;
         private int maxLength = 24;
         private String allowedChars = "LettersNumbersSpaces";
+        private String randomNamesId;
         private boolean trimWhitespace = true;
         private boolean replaceExisting = true;
         private boolean consumeItem;
@@ -484,6 +493,11 @@ public class TwNameItemConfig implements JsonAssetWithMap<String, DefaultAssetMa
 
         public String getAllowedChars() {
             return allowedChars;
+        }
+
+        @Nullable
+        public String getRandomNamesId() {
+            return randomNamesId;
         }
 
         public boolean isTrimWhitespace() {
