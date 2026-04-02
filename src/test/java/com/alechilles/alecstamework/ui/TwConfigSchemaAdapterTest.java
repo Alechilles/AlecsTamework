@@ -23,6 +23,15 @@ class TwConfigSchemaAdapterTest {
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "General.Enabled"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "OwnershipProtection.BlockOwnerDamage"));
         assertNotNull(TwConfigEditorFieldPolicy.findField(fields, "SimpleClaims.Breeding.LimitPerClaimChunk"));
+
+        TwConfigEditorFieldPolicy.EditorFieldSpec parent = TwConfigEditorFieldPolicy.findField(fields, "Parent");
+        assertNotNull(parent);
+        assertFalse(parent.tooltip().isBlank());
+
+        TwConfigEditorFieldPolicy.EditorFieldSpec tags =
+                TwConfigEditorFieldPolicy.findField(fields, "Tags");
+        assertNotNull(tags);
+        assertFalse(tags.tooltip().isBlank());
     }
 
     @Test
@@ -37,6 +46,19 @@ class TwConfigSchemaAdapterTest {
                 TwConfigEditorFieldPolicy.findField(fields, "RoleOverrides");
         assertNotNull(roleOverrides);
         assertTrue(roleOverrides.handoffOnly());
+    }
+
+    @Test
+    void spawnerSchemaExposesTopLevelFieldTooltips() {
+        TwConfigAssetDescriptor descriptor = descriptor(TwConfigFamily.SPAWNER, "TwSpawnerConfig_Default");
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields = TwConfigSchemaAdapter.fieldsFor(descriptor);
+
+        assertFalse(fields.isEmpty());
+        TwConfigEditorFieldPolicy.EditorFieldSpec emptyItemId =
+                TwConfigEditorFieldPolicy.findField(fields, "EmptyItemId");
+        assertNotNull(emptyItemId);
+        assertFalse(emptyItemId.tooltip().isBlank());
     }
 
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family, String assetId) {
