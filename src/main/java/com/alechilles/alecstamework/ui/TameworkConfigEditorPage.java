@@ -534,6 +534,9 @@ public final class TameworkConfigEditorPage
                 commandBuilder.set(root + " #SectionToggleTopLabel.Text", toggleText);
                 commandBuilder.set(root + " #SectionToggleNestedLabel.Text", toggleText);
                 commandBuilder.set(root + " #SectionToggleDeepLabel.Text", toggleText);
+                commandBuilder.set(root + " #SectionToggleTopButton.TooltipText", section.tooltip());
+                commandBuilder.set(root + " #SectionToggleNestedButton.TooltipText", section.tooltip());
+                commandBuilder.set(root + " #SectionToggleDeepButton.TooltipText", section.tooltip());
                 commandBuilder.set(root + " #SectionToggleTopCount.Text", countText);
                 commandBuilder.set(root + " #SectionToggleNestedCount.Text", countText);
                 commandBuilder.set(root + " #SectionToggleDeepCount.Text", countText);
@@ -905,14 +908,38 @@ public final class TameworkConfigEditorPage
     @Nonnull
     private DescriptorLayout layoutFor(@Nonnull TwConfigAssetDescriptor descriptor) {
         JsonObject effective = effectiveJson(descriptor.descriptorKey(), new HashSet<>());
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> schemaSpecs = TwConfigSchemaAdapter.fieldsFor(descriptor);
         List<TwConfigEditorFieldPolicy.EditorFieldSpec> specs =
                 TwConfigEditorFieldPolicy.fieldsFor(descriptor, snapshot, effective);
 
         LinkedHashMap<String, SectionDef> sections = new LinkedHashMap<>();
         LinkedHashMap<String, FieldDef> fields = new LinkedHashMap<>();
         LinkedHashMap<String, TwConfigEditorFieldPolicy.EditorFieldSpec> specByPath = new LinkedHashMap<>();
+        LinkedHashMap<String, String> tooltipByPath = new LinkedHashMap<>();
         LinkedHashSet<String> knownTopLevelKeys = new LinkedHashSet<>();
         ArrayList<RowDef> rows = new ArrayList<>();
+
+        for (TwConfigEditorFieldPolicy.EditorFieldSpec spec : schemaSpecs) {
+            if (spec == null || spec.path() == null) {
+                continue;
+            }
+            String tooltip = trim(spec.tooltip());
+            if (tooltip.isBlank()) {
+                continue;
+            }
+            tooltipByPath.putIfAbsent(spec.path().toLowerCase(Locale.ROOT), tooltip);
+        }
+
+        for (TwConfigEditorFieldPolicy.EditorFieldSpec spec : specs) {
+            if (spec == null || spec.path() == null) {
+                continue;
+            }
+            String tooltip = trim(spec.tooltip());
+            if (tooltip.isBlank()) {
+                continue;
+            }
+            tooltipByPath.put(spec.path().toLowerCase(Locale.ROOT), tooltip);
+        }
 
         for (TwConfigEditorFieldPolicy.EditorFieldSpec spec : specs) {
             if (spec == null || spec.path() == null || spec.path().isBlank()) {
@@ -939,7 +966,8 @@ public final class TameworkConfigEditorPage
                                 id,
                                 humanize(segment),
                                 i,
-                                parentSectionId
+                                parentSectionId,
+                                tooltipByPath.getOrDefault(id, "")
                         );
                         sections.put(id, section);
                         rows.add(RowDef.section(section));
@@ -2100,7 +2128,11 @@ public final class TameworkConfigEditorPage
         STRING, STRING_LIST, INTEGER, DOUBLE, BOOLEAN, OPTION, HANDOFF
     }
 
-    private record SectionDef(@Nonnull String id, @Nonnull String label, int depth, @Nullable String parentId) {
+    private record SectionDef(@Nonnull String id,
+                              @Nonnull String label,
+                              int depth,
+                              @Nullable String parentId,
+                              @Nonnull String tooltip) {
     }
 
     private record FieldDef(@Nonnull String path,

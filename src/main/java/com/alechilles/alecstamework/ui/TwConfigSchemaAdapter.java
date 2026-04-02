@@ -170,13 +170,17 @@ final class TwConfigSchemaAdapter {
                 continue;
             }
             String path = pathPrefix.isBlank() ? key : (pathPrefix + "." + key);
+            Schema raw = entry.getValue();
             Schema resolved = unwrapCompositeSchema(
                     resolveSchema(entry.getValue(), definitions, new HashSet<>()),
                     definitions,
                     new HashSet<>()
             );
             String label = resolveLabel(key, resolved);
-            String tooltip = resolveTooltip(resolved);
+            String tooltip = resolveTooltip(raw);
+            if (tooltip.isBlank()) {
+                tooltip = resolveTooltip(resolved);
+            }
             String currentSection = section;
             if (currentSection.isBlank() && !pathPrefix.isBlank()) {
                 currentSection = firstPathSegment(pathPrefix);
@@ -186,7 +190,7 @@ final class TwConfigSchemaAdapter {
             }
 
             if ("Parent".equalsIgnoreCase(path)) {
-                out.add(TwConfigEditorFieldPolicy.parentField(depth));
+                out.add(newParentField(path, label, tooltip, depth));
                 continue;
             }
 
@@ -510,11 +514,37 @@ final class TwConfigSchemaAdapter {
     }
 
     @Nonnull
+    private static TwConfigEditorFieldPolicy.EditorFieldSpec newParentField(@Nonnull String path,
+                                                                             @Nonnull String label,
+                                                                             @Nonnull String tooltip,
+                                                                             int depth) {
+        return new TwConfigEditorFieldPolicy.EditorFieldSpec(
+                path.toLowerCase(Locale.ROOT),
+                label,
+                path,
+                "General",
+                TwConfigEditorFieldPolicy.EditorFieldType.OPTION,
+                true,
+                false,
+                true,
+                List.of(),
+                tooltip,
+                depth
+        );
+    }
+
+    @Nonnull
     private static String resolveTooltip(@Nullable Schema schema) {
         if (schema == null) {
             return "";
         }
-        for (String methodName : List.of("getTooltip", "getDescription", "getDocumentation", "getComment")) {
+        for (String methodName : List.of(
+                "getTooltip",
+                "getDescription",
+                "getMarkdownDescription",
+                "getDocumentation",
+                "getComment"
+        )) {
             String value = invokeStringGetter(schema, methodName);
             if (value != null && !value.isBlank()) {
                 return value.trim();
