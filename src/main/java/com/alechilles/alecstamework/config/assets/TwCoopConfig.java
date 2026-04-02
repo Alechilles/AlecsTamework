@@ -32,35 +32,35 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     (settings, value) -> settings.requireTamed = value,
                     settings -> settings.requireTamed
             )
-            .documentation("Config field: RequireTamed.")
+            .documentation("Requires the target NPC to be tamed.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("OwnerRestricted", Codec.BOOLEAN),
                     (settings, value) -> settings.ownerRestricted = value,
                     settings -> settings.ownerRestricted
             )
-            .documentation("Config field: OwnerRestricted.")
+            .documentation("If true, only owners may use this coop interaction.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
                     (settings, value) -> settings.requireOwner = value,
                     settings -> settings.requireOwner
             )
-            .documentation("Config field: RequireOwner.")
+            .documentation("Requires the acting player to be the owner.")
             .add()
             .<String>append(
                     new KeyedCodec<>("ParticleSystem", Codec.STRING),
                     (settings, value) -> settings.particleSystem = value,
                     settings -> settings.particleSystem
             )
-            .documentation("Config field: ParticleSystem.")
+            .documentation("Particle system spawned when this step executes.")
             .add()
             .<String>append(
                     new KeyedCodec<>("SoundEvent", Codec.STRING),
                     (settings, value) -> settings.soundEvent = value,
                     settings -> settings.soundEvent
             )
-            .documentation("Config field: SoundEvent.")
+            .documentation("Sound event played when this step executes.")
             .add()
             .build();
 
@@ -73,21 +73,21 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     (settings, value) -> settings.x = value,
                     settings -> settings.x
             )
-            .documentation("Config field: X.")
+            .documentation("X axis offset/value for this vector setting.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("Y", Codec.DOUBLE),
                     (settings, value) -> settings.y = value,
                     settings -> settings.y
             )
-            .documentation("Config field: Y.")
+            .documentation("Y axis offset/value for this vector setting.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("Z", Codec.DOUBLE),
                     (settings, value) -> settings.z = value,
                     settings -> settings.z
             )
-            .documentation("Config field: Z.")
+            .documentation("Z axis offset/value for this vector setting.")
             .add()
             .build();
 
@@ -100,49 +100,49 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     (rules, value) -> rules.maxResidents = value,
                     rules -> rules.maxResidents
             )
-            .documentation("Config field: MaxResidents.")
+            .documentation("Maximum number of residents this coop can hold.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("ResidentRoamStartHour", Codec.INTEGER),
                     (rules, value) -> rules.residentRoamStartHour = value,
                     rules -> rules.residentRoamStartHour
             )
-            .documentation("Config field: ResidentRoamStartHour.")
+            .documentation("Game hour when coop residents may start roaming.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("ResidentRoamEndHour", Codec.INTEGER),
                     (rules, value) -> rules.residentRoamEndHour = value,
                     rules -> rules.residentRoamEndHour
             )
-            .documentation("Config field: ResidentRoamEndHour.")
+            .documentation("Game hour when roaming ends and residents should return.")
             .add()
             .<SpawnOffsetSettings>append(
                     new KeyedCodec<>("ResidentSpawnOffset", SPAWN_OFFSET_CODEC),
                     (rules, value) -> rules.residentSpawnOffset = value == null ? new SpawnOffsetSettings() : value,
                     rules -> rules.residentSpawnOffset
             )
-            .documentation("Config field: ResidentSpawnOffset.")
+            .documentation("Spawn offset applied when residents are placed from the coop.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("CaptureWildNPCsInRange", Codec.BOOLEAN),
                     (rules, value) -> rules.captureWildNPCsInRange = value,
                     rules -> rules.captureWildNPCsInRange
             )
-            .documentation("Config field: CaptureWildNPCsInRange.")
+            .documentation("If true, eligible wild NPCs in range are captured into this coop.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("WildCaptureRadius", Codec.DOUBLE),
                     (rules, value) -> rules.wildCaptureRadius = value,
                     rules -> rules.wildCaptureRadius
             )
-            .documentation("Config field: WildCaptureRadius.")
+            .documentation("Capture scan radius in blocks for nearby wild NPCs.")
             .add()
             .<String[]>append(
                     new KeyedCodec<>("AcceptedRoleIds", Codec.STRING_ARRAY),
                     (rules, value) -> rules.acceptedRoleIds = value == null ? new String[0] : value,
                     rules -> rules.acceptedRoleIds
             )
-            .documentation("Config field: AcceptedRoleIds.")
+            .documentation("Roles that are valid residents for this coop.")
             .add()
             .build();
 
@@ -155,21 +155,21 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     (rules, value) -> rules.dropsByRole = value == null ? Map.of() : value,
                     rules -> rules.dropsByRole
             )
-            .documentation("Config field: DropsByRole.")
+            .documentation("Per-role drop table used when the coop generates items.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("IntervalGameHours", Codec.INTEGER),
                     (rules, value) -> rules.intervalGameHours = value,
                     rules -> rules.intervalGameHours
             )
-            .documentation("Config field: IntervalGameHours.")
+            .documentation("Game-hour interval between coop production ticks.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("ItemsPerTick", Codec.INTEGER),
                     (rules, value) -> rules.itemsPerTick = value,
                     rules -> rules.itemsPerTick
             )
-            .documentation("Config field: ItemsPerTick.")
+            .documentation("Number of items produced each coop production tick.")
             .add()
             .build();
 
@@ -182,14 +182,14 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
                     (rules, value) -> rules.requireSnapshotOnRelease = value,
                     rules -> rules.requireSnapshotOnRelease
             )
-            .documentation("Config field: RequireSnapshotOnRelease.")
+            .documentation("Requires a stored resident snapshot before release is allowed.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("PreserveUUID", Codec.BOOLEAN),
                     (rules, value) -> rules.preserveUUID = value,
                     rules -> rules.preserveUUID
             )
-            .documentation("Config field: PreserveUUID.")
+            .documentation("If true, released residents keep their original UUID when possible.")
             .add()
             .build();
 
@@ -806,4 +806,5 @@ public final class TwCoopConfig implements JsonAssetWithMap<String, DefaultAsset
         return value;
     }
 }
+
 

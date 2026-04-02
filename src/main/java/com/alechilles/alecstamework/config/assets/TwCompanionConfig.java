@@ -54,21 +54,21 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (settings, value) -> settings.blockOwnerDamage = value,
                     settings -> settings.blockOwnerDamage
             )
-            .documentation("Config field: BlockOwnerDamage.")
+            .documentation("Blocks owner damage when enabled.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("BlockAllPlayerDamageIfOwned", Codec.BOOLEAN),
                     (settings, value) -> settings.blockAllPlayerDamageIfOwned = value,
                     settings -> settings.blockAllPlayerDamageIfOwned
             )
-            .documentation("Config field: BlockAllPlayerDamageIfOwned.")
+            .documentation("Blocks all player damage if owned when enabled.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
                     (settings, value) -> settings.invulnerableIfOwned = value,
                     settings -> settings.invulnerableIfOwned
             )
-            .documentation("Config field: InvulnerableIfOwned.")
+            .documentation("If true, owned NPCs cannot take damage from normal sources.")
             .add()
             .build();
 
@@ -81,7 +81,7 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (settings, value) -> settings.crossWorldRecallEnabled = value != null && value,
                     settings -> settings.crossWorldRecallEnabled
             )
-            .documentation("Config field: CrossWorldRecallEnabled.")
+            .documentation("Allows companion recall to work across world boundaries.")
             .add()
             .<String>append(
                     new KeyedCodec<>("OnTransferFailure", Codec.STRING),
@@ -89,21 +89,21 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                             TransferFailurePolicy.parse(value, settings.onTransferFailure),
                     settings -> settings.onTransferFailure.name()
             )
-            .documentation("Config field: OnTransferFailure.")
+            .documentation("Fallback behavior to use when world transfer fails.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("FollowMasterOnWorldChange", Codec.BOOLEAN),
                     (settings, value) -> settings.followMasterOnWorldChange = value != null && value,
                     settings -> settings.followMasterOnWorldChange
             )
-            .documentation("Config field: FollowMasterOnWorldChange.")
+            .documentation("If true, companion follows owner during world changes.")
             .add()
             .<String[]>append(
                     new KeyedCodec<>("FollowMasterOnWorldChangeStateFilter", Codec.STRING_ARRAY),
                     (settings, value) -> settings.followMasterOnWorldChangeStateFilter = normalizeStateFilter(value),
                     settings -> settings.followMasterOnWorldChangeStateFilter
             )
-            .documentation("Config field: FollowMasterOnWorldChangeStateFilter.")
+            .documentation("State filter for cross-world follow behavior.")
             .add()
             .build();
 
@@ -116,49 +116,49 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (settings, value) -> settings.returnHomeTeleportDistance = value,
                     settings -> settings.returnHomeTeleportDistance
             )
-            .documentation("Config field: ReturnHomeTeleportDistance.")
+            .documentation("Distance threshold before return-home teleport is attempted.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("ReturnHomePathDistanceBeforeTeleport", Codec.DOUBLE),
                     (settings, value) -> settings.returnHomePathDistanceBeforeTeleport = value,
                     settings -> settings.returnHomePathDistanceBeforeTeleport
             )
-            .documentation("Config field: ReturnHomePathDistanceBeforeTeleport.")
+            .documentation("Path distance threshold before teleport fallback is used.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("ReturnHomeTeleportDelayMs", Codec.INTEGER),
                     (settings, value) -> settings.returnHomeTeleportDelayMs = value,
                     settings -> settings.returnHomeTeleportDelayMs
             )
-            .documentation("Config field: ReturnHomeTeleportDelayMs.")
+            .documentation("Delay in milliseconds before return-home teleport occurs.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("RecallSafeSpawnDistance", Codec.DOUBLE),
                     (settings, value) -> settings.recallSafeSpawnDistance = value,
                     settings -> settings.recallSafeSpawnDistance
             )
-            .documentation("Config field: RecallSafeSpawnDistance.")
+            .documentation("Distance used when searching a safe recall spawn position.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("RecallForceRelocateDistance", Codec.DOUBLE),
                     (settings, value) -> settings.recallForceRelocateDistance = value,
                     settings -> settings.recallForceRelocateDistance
             )
-            .documentation("Config field: RecallForceRelocateDistance.")
+            .documentation("Distance threshold that forces relocation during recall.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("DeadRespawnEnabled", Codec.BOOLEAN),
                     (settings, value) -> settings.deadRespawnEnabled = value,
                     settings -> settings.deadRespawnEnabled
             )
-            .documentation("Config field: DeadRespawnEnabled.")
+            .documentation("If true, dead linked NPCs can be respawned by command systems.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
                     (settings, value) -> settings.deadRespawnCooldownMs = value,
                     settings -> settings.deadRespawnCooldownMs
             )
-            .documentation("Config field: DeadRespawnCooldownMs.")
+            .documentation("Cooldown in milliseconds before dead respawn becomes available.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnCooldownMins", Codec.DOUBLE),
@@ -169,63 +169,63 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     },
                     settings -> null
             )
-            .documentation("Config field: DeadRespawnCooldownMins.")
+            .documentation("Legacy minute-based respawn cooldown; converted to milliseconds when provided.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("DeadRespawnFollowRetryDelayMs", Codec.INTEGER),
                     (settings, value) -> settings.deadRespawnFollowRetryDelayMs = value,
                     settings -> settings.deadRespawnFollowRetryDelayMs
             )
-            .documentation("Config field: DeadRespawnFollowRetryDelayMs.")
+            .documentation("Retry delay in milliseconds for dead-respawn follow attempts.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceClose", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceClose = value,
                     settings -> settings.deadRespawnDistanceClose
             )
-            .documentation("Config field: DeadRespawnDistanceClose.")
+            .documentation("Distance threshold for the close respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceNear", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceNear = value,
                     settings -> settings.deadRespawnDistanceNear
             )
-            .documentation("Config field: DeadRespawnDistanceNear.")
+            .documentation("Distance threshold for the near respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceMid", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceMid = value,
                     settings -> settings.deadRespawnDistanceMid
             )
-            .documentation("Config field: DeadRespawnDistanceMid.")
+            .documentation("Distance threshold for the mid respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceFar", Codec.DOUBLE),
                     (settings, value) -> settings.deadRespawnDistanceFar = value,
                     settings -> settings.deadRespawnDistanceFar
             )
-            .documentation("Config field: DeadRespawnDistanceFar.")
+            .documentation("Distance threshold for the far respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("PlacementMinRelativeY", Codec.DOUBLE),
                     (settings, value) -> settings.placementMinRelativeY = value,
                     settings -> settings.placementMinRelativeY
             )
-            .documentation("Config field: PlacementMinRelativeY.")
+            .documentation("Minimum relative Y offset allowed for placement checks.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("PlacementMaxRelativeY", Codec.DOUBLE),
                     (settings, value) -> settings.placementMaxRelativeY = value,
                     settings -> settings.placementMaxRelativeY
             )
-            .documentation("Config field: PlacementMaxRelativeY.")
+            .documentation("Maximum relative Y offset allowed for placement checks.")
             .add()
             .<TravelSettings>append(
                     new KeyedCodec<>("Travel", TRAVEL_CODEC),
                     (settings, value) -> settings.travel = value == null ? new TravelSettings() : value,
                     settings -> settings.travel
             )
-            .documentation("Config field: Travel.")
+            .documentation("Travel/recall behavior settings for companions.")
             .add()
             .build();
 
@@ -244,14 +244,14 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                     (asset, value) -> asset.enabled = value == null || value,
                     asset -> asset.enabled
             )
-            .documentation("Config field: Enabled.")
+            .documentation("Turns this section on or off.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("Priority", Codec.INTEGER),
                     (asset, value) -> asset.priority = value == null ? 0 : value,
                     asset -> asset.priority
             )
-            .documentation("Config field: Priority.")
+            .documentation("Priority used when multiple configs apply; higher values take precedence.")
             .add()
             .<String[]>append(
                     new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
@@ -1153,4 +1153,6 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
         }
     }
 }
+
+
 

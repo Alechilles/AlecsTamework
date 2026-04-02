@@ -76,6 +76,7 @@ public final class TameworkConfigEditorPage
     private static final String PARENT_NONE_VALUE = "__none__";
     private static final String MOD_ALL_KEY = "__all_mods__";
     private static final String MOD_LOCAL_KEY = "__local_overrides__";
+    private static final int TOOLTIP_WRAP_COLUMNS = 88;
 
     private final Tamework plugin;
     private final World world;
@@ -534,9 +535,10 @@ public final class TameworkConfigEditorPage
                 commandBuilder.set(root + " #SectionToggleTopLabel.Text", toggleText);
                 commandBuilder.set(root + " #SectionToggleNestedLabel.Text", toggleText);
                 commandBuilder.set(root + " #SectionToggleDeepLabel.Text", toggleText);
-                commandBuilder.set(root + " #SectionToggleTopButton.TooltipText", section.tooltip());
-                commandBuilder.set(root + " #SectionToggleNestedButton.TooltipText", section.tooltip());
-                commandBuilder.set(root + " #SectionToggleDeepButton.TooltipText", section.tooltip());
+                String sectionTooltip = tooltipForUi(section.tooltip());
+                commandBuilder.set(root + " #SectionToggleTopButton.TooltipText", sectionTooltip);
+                commandBuilder.set(root + " #SectionToggleNestedButton.TooltipText", sectionTooltip);
+                commandBuilder.set(root + " #SectionToggleDeepButton.TooltipText", sectionTooltip);
                 commandBuilder.set(root + " #SectionToggleTopCount.Text", countText);
                 commandBuilder.set(root + " #SectionToggleNestedCount.Text", countText);
                 commandBuilder.set(root + " #SectionToggleDeepCount.Text", countText);
@@ -602,7 +604,7 @@ public final class TameworkConfigEditorPage
             boolean hasBufferedInput = inputs(descriptorKey).containsKey(field.path);
             SourceBadge sourceBadge = sourceBadgeForField(field, descriptor, draft, merged);
             TwConfigEditorFieldPolicy.EditorFieldSpec fieldSpec = layout.specByPath.get(field.path);
-            String fieldTooltip = fieldSpec == null ? "" : trim(fieldSpec.tooltip());
+            String fieldTooltip = fieldSpec == null ? "" : tooltipForUi(fieldSpec.tooltip());
             boolean hasFieldTooltip = !fieldTooltip.isBlank();
             String host = root + " #FieldValueHost";
             int fieldDepthLevel = depthBucket(field.depth);
@@ -624,7 +626,7 @@ public final class TameworkConfigEditorPage
                 commandBuilder.set(root + " #FieldTooltipButton.TooltipText", "");
             }
             commandBuilder.set(root + " #FieldSourceChip.Text", sourceBadge.label());
-            commandBuilder.set(root + " #FieldSourceChip.TooltipText", sourceBadge.tooltip());
+            commandBuilder.set(root + " #FieldSourceChip.TooltipText", tooltipForUi(sourceBadge.tooltip()));
             commandBuilder.set(root + " #FieldSourceChip.Visible", true);
             commandBuilder.set(root + " #FieldStateBadge.Visible", fieldShowBadge);
             commandBuilder.set(root + " #FieldStateBadgeCautionIcon.Visible", fieldHasStagedEdits);
@@ -1789,6 +1791,65 @@ public final class TameworkConfigEditorPage
     @Nonnull
     private static String trim(@Nullable String value) {
         return value == null ? "" : value.trim();
+    }
+
+    @Nonnull
+    private static String tooltipForUi(@Nullable String value) {
+        String trimmed = trim(value);
+        if (trimmed.isBlank()) {
+            return "";
+        }
+        String cleaned = trimmed
+                .replace("\r\n", "\n")
+                .replace('\r', '\n')
+                .replace("**", "")
+                .replace("__", "")
+                .replace("`", "")
+                .replaceAll("[ \\t]+", " ")
+                .trim();
+        if (cleaned.isBlank()) {
+            return "";
+        }
+        return wrapTooltip(cleaned, TOOLTIP_WRAP_COLUMNS);
+    }
+
+    @Nonnull
+    private static String wrapTooltip(@Nonnull String text, int columns) {
+        if (columns < 20 || text.length() <= columns) {
+            return text;
+        }
+        String[] paragraphs = text.split("\\n");
+        StringBuilder out = new StringBuilder(text.length() + (text.length() / columns) + 8);
+        for (int p = 0; p < paragraphs.length; p++) {
+            String paragraph = paragraphs[p].trim();
+            if (paragraph.isBlank()) {
+                if (out.length() > 0) {
+                    out.append('\n');
+                }
+            } else {
+                int index = 0;
+                while (index < paragraph.length()) {
+                    int remaining = paragraph.length() - index;
+                    if (remaining <= columns) {
+                        out.append(paragraph, index, paragraph.length());
+                        break;
+                    }
+                    int breakAt = paragraph.lastIndexOf(' ', index + columns);
+                    if (breakAt <= index) {
+                        breakAt = index + columns;
+                    }
+                    out.append(paragraph, index, breakAt).append('\n');
+                    while (breakAt < paragraph.length() && paragraph.charAt(breakAt) == ' ') {
+                        breakAt++;
+                    }
+                    index = breakAt;
+                }
+            }
+            if (p < paragraphs.length - 1) {
+                out.append('\n');
+            }
+        }
+        return out.toString().trim();
     }
 
     @Nonnull

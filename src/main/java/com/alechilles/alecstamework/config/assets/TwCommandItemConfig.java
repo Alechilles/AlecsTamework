@@ -237,21 +237,21 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (mapping, value) -> mapping.state = value,
             mapping -> mapping.state
         )
-        .documentation("Config field: State.")
+        .documentation("State value to apply for this step.")
         .add()
         .<String>append(
             new KeyedCodec<>("SubState", Codec.STRING),
             (mapping, value) -> mapping.subState = value,
             mapping -> mapping.subState
         )
-        .documentation("Config field: SubState.")
+        .documentation("Sub-state value to apply for this step.")
         .add()
         .<String>append(
             new KeyedCodec<>("Message", Codec.STRING),
             (mapping, value) -> mapping.message = value,
             mapping -> mapping.message
         )
-        .documentation("Config field: Message.")
+        .documentation("Message text shown when this step executes.")
         .add()
         .build();
 
@@ -282,14 +282,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (step, value) -> step.state = value,
             step -> step.state
         )
-        .documentation("Config field: State.")
+        .documentation("State value to apply for this step.")
         .add()
         .<String>append(
             new KeyedCodec<>("SubState", Codec.STRING),
             (step, value) -> step.subState = value,
             step -> step.subState
         )
-        .documentation("Config field: SubState.")
+        .documentation("Sub-state value to apply for this step.")
         .add()
         .build();
 
@@ -301,14 +301,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (step, value) -> step.targetSlot = value,
             step -> step.targetSlot
         )
-        .documentation("Config field: TargetSlot.")
+        .documentation("Target slot index used by this step.")
         .add()
         .<String>append(
             new KeyedCodec<>("Source", Codec.STRING),
             (step, value) -> step.source = TargetSource.fromString(value),
             step -> step.source.name()
         )
-        .documentation("Config field: Source.")
+        .documentation("Source channel used by this operation.")
         .add()
         .build();
 
@@ -320,7 +320,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (step, value) -> step.targetSlot = value,
             step -> step.targetSlot
         )
-        .documentation("Config field: TargetSlot.")
+        .documentation("Target slot index used by this step.")
         .add()
         .build();
 
@@ -332,28 +332,28 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (step, value) -> step.state = value,
             step -> step.state
         )
-        .documentation("Config field: State.")
+        .documentation("State value to apply for this step.")
         .add()
         .<String>append(
             new KeyedCodec<>("SubState", Codec.STRING),
             (step, value) -> step.subState = value,
             step -> step.subState
         )
-        .documentation("Config field: SubState.")
+        .documentation("Sub-state value to apply for this step.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("TargetSlots", Codec.STRING_ARRAY),
             (step, value) -> step.targetSlots = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             step -> step.targetSlots
         )
-        .documentation("Config field: TargetSlots.")
+        .documentation("Target slot indexes used by this step.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("AssignOwnerAsMasterTarget", Codec.BOOLEAN),
             (step, value) -> step.assignOwnerAsMasterTarget = value == null || value,
             step -> step.assignOwnerAsMasterTarget
         )
-        .documentation("Config field: AssignOwnerAsMasterTarget.")
+        .documentation("Assigns the owner as master target when executing this step.")
         .add()
         .build();
 
@@ -365,7 +365,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (step, value) -> step.source = MoveSource.fromString(value),
             step -> step.source.name()
         )
-        .documentation("Config field: Source.")
+        .documentation("Source channel used by this operation.")
         .add()
         .build();
 
@@ -377,7 +377,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (step, value) -> step.source = StoreSource.fromString(value),
             step -> step.source.name()
         )
-        .documentation("Config field: Source.")
+        .documentation("Source channel used by this operation.")
         .add()
         .build();
 
@@ -389,14 +389,14 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (step, value) -> step.hookId = value,
             step -> step.hookId
         )
-        .documentation("Config field: HookId.")
+        .documentation("Hook identifier invoked by this step.")
         .add()
         .<Map<String, String>>append(
             new KeyedCodec<>("Payload", MapCodec.STRING_HASH_MAP_CODEC),
             (step, value) -> step.payload = value == null ? Collections.emptyMap() : value,
             step -> step.payload
         )
-        .documentation("Config field: Payload.")
+        .documentation("Custom payload value passed into this operation.")
         .add()
         .build();
 
@@ -427,35 +427,35 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (feedback, value) -> feedback.chatMessage = value,
             feedback -> feedback.chatMessage
         )
-        .documentation("Config field: ChatMessage.")
+        .documentation("Chat message sent when this step executes.")
         .add()
         .<String>append(
             new KeyedCodec<>("HudMessage", Codec.STRING),
             (feedback, value) -> feedback.hudMessage = value,
             feedback -> feedback.hudMessage
         )
-        .documentation("Config field: HudMessage.")
+        .documentation("HUD message shown when this step executes.")
         .add()
         .<String>append(
             new KeyedCodec<>("SoundEvent", SOUND_EVENT_CODEC),
             (feedback, value) -> feedback.soundEvent = value,
             feedback -> feedback.soundEvent
         )
-        .documentation("Config field: SoundEvent.")
+        .documentation("Sound event played when this step executes.")
         .add()
         .<String>append(
             new KeyedCodec<>("ParticleSystem", PARTICLE_SYSTEM_CODEC),
             (feedback, value) -> feedback.particleSystem = value,
             feedback -> feedback.particleSystem
         )
-        .documentation("Config field: ParticleSystem.")
+        .documentation("Particle system spawned when this step executes.")
         .add()
         .<Vector3d>append(
             new KeyedCodec<>("ParticleOffset", VECTOR3D_CODEC),
             (feedback, value) -> feedback.particleOffset = value,
             feedback -> feedback.particleOffset
         )
-        .documentation("Config field: ParticleOffset.")
+        .documentation("Offset applied to spawned particle effects.")
         .add()
         .build();
 
@@ -467,49 +467,49 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (entry, value) -> entry.id = value,
             entry -> entry.id
         )
-        .documentation("Config field: Id.")
+        .documentation("Unique identifier for this entry.")
         .add()
         .<String>append(
             new KeyedCodec<>("DisplayName", Codec.STRING),
             (entry, value) -> entry.displayName = value,
             entry -> entry.displayName
         )
-        .documentation("Config field: DisplayName.")
+        .documentation("Display name shown to players.")
         .add()
         .<String>append(
             new KeyedCodec<>("Icon", Codec.STRING),
             (entry, value) -> entry.icon = value,
             entry -> entry.icon
         )
-        .documentation("Config field: Icon.")
+        .documentation("Icon asset path shown for this entry.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("Default", Codec.BOOLEAN),
             (entry, value) -> entry.defaultCommand = value != null && value,
             entry -> entry.defaultCommand
         )
-        .documentation("Config field: Default.")
+        .documentation("Default setting when no override is set.")
         .add()
         .<CommandFeedback>append(
             new KeyedCodec<>("Feedback", COMMAND_FEEDBACK_CODEC),
             (entry, value) -> entry.feedback = value,
             entry -> entry.feedback
         )
-        .documentation("Config field: Feedback.")
+        .documentation("User feedback settings for this command interaction.")
         .add()
         .<ModeMapping>append(
             new KeyedCodec<>("ModeMapping", MODE_MAPPING_CODEC),
             (entry, value) -> entry.modeMapping = value,
             entry -> entry.modeMapping
         )
-        .documentation("Config field: ModeMapping.")
+        .documentation("Maps command modes to behavior modes.")
         .add()
         .<CommandStep[]>append(
             new KeyedCodec<>("Steps", COMMAND_STEP_ARRAY_CODEC),
             (entry, value) -> entry.steps = value == null ? EMPTY_STEPS : value,
             entry -> entry.steps
         )
-        .documentation("Config field: Steps.")
+        .documentation("Ordered list of command step definitions.")
         .add()
         .build();
 
@@ -532,7 +532,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.enabled = value == null || value,
             asset -> asset.enabled
         )
-        .documentation("Config field: Enabled.")
+        .documentation("Turns this section on or off.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("ItemIds", Codec.STRING_ARRAY),
@@ -547,70 +547,70 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.radius = value == null ? -1.0 : value,
             asset -> asset.radius
         )
-        .documentation("Config field: Radius.")
+        .documentation("Search radius in blocks used by this system.")
         .add()
         .<String>append(
             new KeyedCodec<>("MembershipMode", Codec.STRING),
             (asset, value) -> asset.membershipMode = MembershipMode.fromString(value),
             asset -> asset.membershipMode.name()
         )
-        .documentation("Config field: MembershipMode.")
+        .documentation("Controls how command membership is interpreted when selecting targets.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("LinkEnabled", Codec.BOOLEAN),
             (asset, value) -> asset.linkEnabled = value == null || value,
             asset -> asset.linkEnabled
         )
-        .documentation("Config field: LinkEnabled.")
+        .documentation("If true, this command can create and use persistent links.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("LinkUseTogglesMembership", Codec.BOOLEAN),
             (asset, value) -> asset.linkUseTogglesMembership = value == null || value,
             asset -> asset.linkUseTogglesMembership
         )
-        .documentation("Config field: LinkUseTogglesMembership.")
+        .documentation("If true, using link mode toggles membership for selected targets.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireTamed", Codec.BOOLEAN),
             (asset, value) -> asset.requireTamed = value == null || value,
             asset -> asset.requireTamed
         )
-        .documentation("Config field: RequireTamed.")
+        .documentation("Requires the target NPC to be tamed.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
             (asset, value) -> asset.requireOwner = value == null || value,
             asset -> asset.requireOwner
         )
-        .documentation("Config field: RequireOwner.")
+        .documentation("Requires the acting player to be the owner.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxTargets", Codec.INTEGER),
             (asset, value) -> asset.maxTargets = value == null ? 25 : Math.max(1, value),
             asset -> asset.maxTargets
         )
-        .documentation("Config field: MaxTargets.")
+        .documentation("Maximum number of targets this command can affect at once.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxActive", Codec.INTEGER),
             (asset, value) -> asset.maxActive = value == null ? 0 : Math.max(0, value),
             asset -> asset.maxActive
         )
-        .documentation("Config field: MaxActive.")
+        .documentation("Maximum number of active linked NPCs allowed for this command item.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("CooldownSeconds", Codec.INTEGER),
             (asset, value) -> asset.cooldownSeconds = value == null ? 2 : Math.max(0, value),
             asset -> asset.cooldownSeconds
         )
-        .documentation("Config field: CooldownSeconds.")
+        .documentation("Cooldown duration in seconds before this can be used again.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireLineOfSight", Codec.BOOLEAN),
             (asset, value) -> asset.requireLineOfSight = value != null && value,
             asset -> asset.requireLineOfSight
         )
-        .documentation("Config field: RequireLineOfSight.")
+        .documentation("Requires line of sight to target before command can run.")
         .add()
         .<AllowedRoles>append(
             new KeyedCodec<>("AllowedRoles", ALLOWED_ROLES_CODEC),
@@ -1156,4 +1156,5 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 }
+
 

@@ -34,14 +34,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.enabled = value,
                     section -> section.enabled
             )
-            .documentation("Config field: Enabled.")
+            .documentation("Turns this section on or off.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("Priority", Codec.INTEGER),
                     (section, value) -> section.priority = value,
                     section -> section.priority
             )
-            .documentation("Config field: Priority.")
+            .documentation("Priority used when multiple configs apply; higher values take precedence.")
             .add()
             .build();
 
@@ -53,21 +53,21 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.blockOwnerDamage = value,
                     section -> section.blockOwnerDamage
             )
-            .documentation("Config field: BlockOwnerDamage.")
+            .documentation("Blocks owner damage when enabled.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("BlockAllPlayerDamageIfOwned", Codec.BOOLEAN),
                     (section, value) -> section.blockAllPlayerDamageIfOwned = value,
                     section -> section.blockAllPlayerDamageIfOwned
             )
-            .documentation("Config field: BlockAllPlayerDamageIfOwned.")
+            .documentation("Blocks all player damage if owned when enabled.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("InvulnerableIfOwned", Codec.BOOLEAN),
                     (section, value) -> section.invulnerableIfOwned = value,
                     section -> section.invulnerableIfOwned
             )
-            .documentation("Config field: InvulnerableIfOwned.")
+            .documentation("If true, owned NPCs cannot take damage from normal sources.")
             .add()
             .build();
 
@@ -79,49 +79,49 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.interactionConfigParam = value,
                     section -> section.interactionConfigParam
             )
-            .documentation("Config field: InteractionConfigParam.")
+            .documentation("NPC parameter key used to resolve interaction config ID.")
             .add()
             .<String>append(
                     new KeyedCodec<>("LovedItemsParam", Codec.STRING),
                     (section, value) -> section.lovedItemsParam = value,
                     section -> section.lovedItemsParam
             )
-            .documentation("Config field: LovedItemsParam.")
+            .documentation("NPC parameter key used to resolve loved item set.")
             .add()
             .<String>append(
                     new KeyedCodec<>("IsHarvestableParam", Codec.STRING),
                     (section, value) -> section.isHarvestableParam = value,
                     section -> section.isHarvestableParam
             )
-            .documentation("Config field: IsHarvestableParam.")
+            .documentation("NPC parameter key that marks whether harvesting is allowed.")
             .add()
             .<String>append(
                     new KeyedCodec<>("IsMountableParam", Codec.STRING),
                     (section, value) -> section.isMountableParam = value,
                     section -> section.isMountableParam
             )
-            .documentation("Config field: IsMountableParam.")
+            .documentation("NPC parameter key that marks whether mounting is allowed.")
             .add()
             .<String>append(
                     new KeyedCodec<>("HarvestContextParam", Codec.STRING),
                     (section, value) -> section.harvestContextParam = value,
                     section -> section.harvestContextParam
             )
-            .documentation("Config field: HarvestContextParam.")
+            .documentation("NPC parameter key used for harvest interaction context.")
             .add()
             .<String>append(
                     new KeyedCodec<>("HarvestAlarmName", Codec.STRING),
                     (section, value) -> section.harvestAlarmName = value,
                     section -> section.harvestAlarmName
             )
-            .documentation("Config field: HarvestAlarmName.")
+            .documentation("Alarm name used for harvest-ready timing.")
             .add()
             .<String>append(
                     new KeyedCodec<>("InteractionCooldownAlarmPrefix", Codec.STRING),
                     (section, value) -> section.interactionCooldownAlarmPrefix = value,
                     section -> section.interactionCooldownAlarmPrefix
             )
-            .documentation("Config field: InteractionCooldownAlarmPrefix.")
+            .documentation("Prefix used when creating interaction cooldown alarm IDs.")
             .add()
             .build();
 
@@ -133,133 +133,133 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.returnHomeTeleportDistance = value,
                     section -> section.returnHomeTeleportDistance
             )
-            .documentation("Config field: ReturnHomeTeleportDistance.")
+            .documentation("Distance threshold before return-home teleport is attempted.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("ReturnHomePathDistanceBeforeTeleport", Codec.DOUBLE),
                     (section, value) -> section.returnHomePathDistanceBeforeTeleport = value,
                     section -> section.returnHomePathDistanceBeforeTeleport
             )
-            .documentation("Config field: ReturnHomePathDistanceBeforeTeleport.")
+            .documentation("Path distance threshold before teleport fallback is used.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("ReturnHomeTeleportDelayMs", Codec.INTEGER),
                     (section, value) -> section.returnHomeTeleportDelayMs = value,
                     section -> section.returnHomeTeleportDelayMs
             )
-            .documentation("Config field: ReturnHomeTeleportDelayMs.")
+            .documentation("Delay in milliseconds before return-home teleport occurs.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("RecallSafeSpawnDistance", Codec.DOUBLE),
                     (section, value) -> section.recallSafeSpawnDistance = value,
                     section -> section.recallSafeSpawnDistance
             )
-            .documentation("Config field: RecallSafeSpawnDistance.")
+            .documentation("Distance used when searching a safe recall spawn position.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("RecallForceRelocateDistance", Codec.DOUBLE),
                     (section, value) -> section.recallForceRelocateDistance = value,
                     section -> section.recallForceRelocateDistance
             )
-            .documentation("Config field: RecallForceRelocateDistance.")
+            .documentation("Distance threshold that forces relocation during recall.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("RelocationRetryIntervalMs", Codec.INTEGER),
                     (section, value) -> section.relocationRetryIntervalMs = value,
                     section -> section.relocationRetryIntervalMs
             )
-            .documentation("Config field: RelocationRetryIntervalMs.")
+            .documentation("Value in milliseconds for relocation retry interval.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("RelocationMaxWaitMs", Codec.INTEGER),
                     (section, value) -> section.relocationMaxWaitMs = value,
                     section -> section.relocationMaxWaitMs
             )
-            .documentation("Config field: RelocationMaxWaitMs.")
+            .documentation("Value in milliseconds for relocation max wait.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("RelocationMaxRetryAttempts", Codec.INTEGER),
                     (section, value) -> section.relocationMaxRetryAttempts = value,
                     section -> section.relocationMaxRetryAttempts
             )
-            .documentation("Config field: RelocationMaxRetryAttempts.")
+            .documentation("Maximum relocation retry attempts before command recovery gives up.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("DeadRespawnEnabled", Codec.BOOLEAN),
                     (section, value) -> section.deadRespawnEnabled = value,
                     section -> section.deadRespawnEnabled
             )
-            .documentation("Config field: DeadRespawnEnabled.")
+            .documentation("If true, dead linked NPCs can be respawned by command systems.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("DeadRespawnCooldownMs", Codec.INTEGER),
                     (section, value) -> section.deadRespawnCooldownMs = value,
                     section -> section.deadRespawnCooldownMs
             )
-            .documentation("Config field: DeadRespawnCooldownMs.")
+            .documentation("Cooldown in milliseconds before dead respawn becomes available.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnCooldownMins", Codec.DOUBLE),
                     (section, value) -> section.deadRespawnCooldownMins = value,
                     section -> section.deadRespawnCooldownMins
             )
-            .documentation("Config field: DeadRespawnCooldownMins.")
+            .documentation("Legacy minute-based respawn cooldown; converted to milliseconds when provided.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("DeadRespawnFollowRetryDelayMs", Codec.INTEGER),
                     (section, value) -> section.deadRespawnFollowRetryDelayMs = value,
                     section -> section.deadRespawnFollowRetryDelayMs
             )
-            .documentation("Config field: DeadRespawnFollowRetryDelayMs.")
+            .documentation("Retry delay in milliseconds for dead-respawn follow attempts.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceClose", Codec.DOUBLE),
                     (section, value) -> section.deadRespawnDistanceClose = value,
                     section -> section.deadRespawnDistanceClose
             )
-            .documentation("Config field: DeadRespawnDistanceClose.")
+            .documentation("Distance threshold for the close respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceNear", Codec.DOUBLE),
                     (section, value) -> section.deadRespawnDistanceNear = value,
                     section -> section.deadRespawnDistanceNear
             )
-            .documentation("Config field: DeadRespawnDistanceNear.")
+            .documentation("Distance threshold for the near respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceMid", Codec.DOUBLE),
                     (section, value) -> section.deadRespawnDistanceMid = value,
                     section -> section.deadRespawnDistanceMid
             )
-            .documentation("Config field: DeadRespawnDistanceMid.")
+            .documentation("Distance threshold for the mid respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("DeadRespawnDistanceFar", Codec.DOUBLE),
                     (section, value) -> section.deadRespawnDistanceFar = value,
                     section -> section.deadRespawnDistanceFar
             )
-            .documentation("Config field: DeadRespawnDistanceFar.")
+            .documentation("Distance threshold for the far respawn range.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("PlacementMinRelativeY", Codec.DOUBLE),
                     (section, value) -> section.placementMinRelativeY = value,
                     section -> section.placementMinRelativeY
             )
-            .documentation("Config field: PlacementMinRelativeY.")
+            .documentation("Minimum relative Y offset allowed for placement checks.")
             .add()
             .<Double>append(
                     new KeyedCodec<>("PlacementMaxRelativeY", Codec.DOUBLE),
                     (section, value) -> section.placementMaxRelativeY = value,
                     section -> section.placementMaxRelativeY
             )
-            .documentation("Config field: PlacementMaxRelativeY.")
+            .documentation("Maximum relative Y offset allowed for placement checks.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("LinkedPanelRequireUnlinkConfirm", Codec.BOOLEAN),
                     (section, value) -> section.linkedPanelRequireUnlinkConfirm = value,
                     section -> section.linkedPanelRequireUnlinkConfirm
             )
-            .documentation("Config field: LinkedPanelRequireUnlinkConfirm.")
+            .documentation("Requires confirmation before unlinking via linked panel UI.")
             .add()
             .build();
 
@@ -271,28 +271,28 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.tranquilizerShortbow = value,
                     section -> section.tranquilizerShortbow
             )
-            .documentation("Config field: TranquilizerShortbow.")
+            .documentation("Enables the tranquilizer shortbow asset set.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("TranquilizerArrow", Codec.BOOLEAN),
                     (section, value) -> section.tranquilizerArrow = value,
                     section -> section.tranquilizerArrow
             )
-            .documentation("Config field: TranquilizerArrow.")
+            .documentation("Enables the tranquilizer arrow asset set.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("TranquilizerPotion", Codec.BOOLEAN),
                     (section, value) -> section.tranquilizerPotion = value,
                     section -> section.tranquilizerPotion
             )
-            .documentation("Config field: TranquilizerPotion.")
+            .documentation("Enables the tranquilizer potion asset set.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("FeedTrough", Codec.BOOLEAN),
                     (section, value) -> section.feedTrough = value,
                     section -> section.feedTrough
             )
-            .documentation("Config field: FeedTrough.")
+            .documentation("Enables the feed trough asset set.")
             .add()
             .build();
     private static final BuilderCodec<PopulationSection> POPULATION_SECTION_CODEC = BuilderCodec.builder(
@@ -303,14 +303,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.limitPerPlayerOwnedTotal = value,
                     section -> section.limitPerPlayerOwnedTotal
             )
-            .documentation("Config field: LimitPerPlayerOwnedTotal.")
+            .documentation("Maximum tamed NPCs a player can own within the selected scope.")
             .add()
             .<String>append(
                     new KeyedCodec<>("PerPlayerLimitScope", Codec.STRING),
                     (section, value) -> section.perPlayerLimitScope = value,
                     section -> section.perPlayerLimitScope
             )
-            .documentation("Config field: PerPlayerLimitScope.")
+            .documentation("Scope used when counting per-player ownership limits.")
             .add()
             .build();
     private static final BuilderCodec<SimpleClaimsBreedingSection> SIMPLE_CLAIMS_BREEDING_SECTION_CODEC = BuilderCodec.builder(
@@ -321,21 +321,21 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.limitPerClaimChunk = value,
                     section -> section.limitPerClaimChunk
             )
-            .documentation("Config field: LimitPerClaimChunk.")
+            .documentation("Maximum breedable tames allowed per claim chunk.")
             .add()
             .<Integer>append(
                     new KeyedCodec<>("LimitPerClaimTotal", Codec.INTEGER),
                     (section, value) -> section.limitPerClaimTotal = value,
                     section -> section.limitPerClaimTotal
             )
-            .documentation("Config field: LimitPerClaimTotal.")
+            .documentation("Maximum breedable tames allowed per claim.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("BreedingRequiresClaim", Codec.BOOLEAN),
                     (section, value) -> section.breedingRequiresClaim = value,
                     section -> section.breedingRequiresClaim
             )
-            .documentation("Config field: BreedingRequiresClaim.")
+            .documentation("Requires breeding to happen inside a valid claim.")
             .add()
             .build();
     private static final BuilderCodec<SimpleClaimsDamageSection> SIMPLE_CLAIMS_DAMAGE_SECTION_CODEC = BuilderCodec.builder(
@@ -346,14 +346,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.protectTamedFromNonMembers = value,
                     section -> section.protectTamedFromNonMembers
             )
-            .documentation("Config field: ProtectTamedFromNonMembers.")
+            .documentation("Prevents non-members from damaging protected tamed NPCs.")
             .add()
             .<String>append(
                     new KeyedCodec<>("AllowDamagePermissionKey", Codec.STRING),
                     (section, value) -> section.allowDamagePermissionKey = value,
                     section -> section.allowDamagePermissionKey
             )
-            .documentation("Config field: AllowDamagePermissionKey.")
+            .documentation("Permission key that allows non-members to damage protected tames.")
             .add()
             .build();
     private static final BuilderCodec<SimpleClaimsSection> SIMPLE_CLAIMS_SECTION_CODEC = BuilderCodec.builder(
@@ -364,21 +364,21 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     (section, value) -> section.simpleClaimsEnabled = value,
                     section -> section.simpleClaimsEnabled
             )
-            .documentation("Config field: SimpleClaimsEnabled.")
+            .documentation("Enables Simple Claims integration for tame protection and limits.")
             .add()
             .<SimpleClaimsBreedingSection>append(
                     new KeyedCodec<>("Breeding", SIMPLE_CLAIMS_BREEDING_SECTION_CODEC),
                     (section, value) -> section.breeding = value,
                     section -> section.breeding
             )
-            .documentation("Config field: Breeding.")
+            .documentation("Breeding-related settings for this config.")
             .add()
             .<SimpleClaimsDamageSection>append(
                     new KeyedCodec<>("Damage", SIMPLE_CLAIMS_DAMAGE_SECTION_CODEC),
                     (section, value) -> section.damage = value,
                     section -> section.damage
             )
-            .documentation("Config field: Damage.")
+            .documentation("Simple Claims damage-protection settings for tamed NPCs.")
             .add()
             .build();
 
@@ -1662,4 +1662,6 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
     }
 }
+
+
 

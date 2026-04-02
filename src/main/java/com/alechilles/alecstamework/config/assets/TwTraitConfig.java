@@ -35,35 +35,35 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             (weights, value) -> weights.count0 = value,
             weights -> weights.count0
         )
-        .documentation("Config field: Count0.")
+        .documentation("Weight used when rolling this trait count outcome.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Count1", Codec.DOUBLE),
             (weights, value) -> weights.count1 = value,
             weights -> weights.count1
         )
-        .documentation("Config field: Count1.")
+        .documentation("Weight used when rolling this trait count outcome.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Count2", Codec.DOUBLE),
             (weights, value) -> weights.count2 = value,
             weights -> weights.count2
         )
-        .documentation("Config field: Count2.")
+        .documentation("Weight used when rolling this trait count outcome.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Count3", Codec.DOUBLE),
             (weights, value) -> weights.count3 = value,
             weights -> weights.count3
         )
-        .documentation("Config field: Count3.")
+        .documentation("Weight used when rolling this trait count outcome.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Count4", Codec.DOUBLE),
             (weights, value) -> weights.count4 = value,
             weights -> weights.count4
         )
-        .documentation("Config field: Count4.")
+        .documentation("Weight used when rolling this trait count outcome.")
         .add()
         .build();
 
@@ -76,28 +76,28 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.maxTraitsPerNpc = value,
             settings -> settings.maxTraitsPerNpc
         )
-        .documentation("Config field: MaxTraitsPerNpc.")
+        .documentation("Maximum number of traits that can be assigned to one NPC.")
         .add()
         .<RollCountWeights>append(
             new KeyedCodec<>("RollCountWeights", ROLL_COUNT_WEIGHTS_CODEC),
             (settings, value) -> settings.rollCountWeights = value == null ? new RollCountWeights() : value,
             settings -> settings.rollCountWeights
         )
-        .documentation("Config field: RollCountWeights.")
+        .documentation("Trait-count roll weights used when generating random traits.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("AllowDuplicateTraits", Codec.BOOLEAN),
             (settings, value) -> settings.allowDuplicateTraits = value,
             settings -> settings.allowDuplicateTraits
         )
-        .documentation("Config field: AllowDuplicateTraits.")
+        .documentation("If true, duplicate trait IDs may be rolled on the same NPC.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("UseSeededRandom", Codec.BOOLEAN),
             (settings, value) -> settings.useSeededRandom = value,
             settings -> settings.useSeededRandom
         )
-        .documentation("Config field: UseSeededRandom.")
+        .documentation("If true, trait rolling uses deterministic seeded randomness.")
         .add()
         .build();
 
@@ -110,35 +110,35 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.allowInheritance = value,
             settings -> settings.allowInheritance
         )
-        .documentation("Config field: AllowInheritance.")
+        .documentation("If true, offspring may inherit traits from parents.")
         .add()
         .<Double>append(
             new KeyedCodec<>("InheritanceChance", Codec.DOUBLE),
             (settings, value) -> settings.inheritanceChance = value,
             settings -> settings.inheritanceChance
         )
-        .documentation("Config field: InheritanceChance.")
+        .documentation("Chance that a rolled trait comes from parent inheritance.")
         .add()
         .<Double>append(
             new KeyedCodec<>("MutationChance", Codec.DOUBLE),
             (settings, value) -> settings.mutationChance = value,
             settings -> settings.mutationChance
         )
-        .documentation("Config field: MutationChance.")
+        .documentation("Chance for mutation when generating inherited data.")
         .add()
         .<Double>append(
             new KeyedCodec<>("PairAlignmentRangeInfluence", Codec.DOUBLE),
             (settings, value) -> settings.pairAlignmentRangeInfluence = value,
             settings -> settings.pairAlignmentRangeInfluence
         )
-        .documentation("Config field: PairAlignmentRangeInfluence.")
+        .documentation("Influence of parent trait alignment range on breeding trait rolls.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("PreferParentTraits", Codec.BOOLEAN),
             (settings, value) -> settings.preferParentTraits = value,
             settings -> settings.preferParentTraits
         )
-        .documentation("Config field: PreferParentTraits.")
+        .documentation("If true, parent traits are favored during inheritance rolls.")
         .add()
         .build();
 
@@ -151,91 +151,91 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             (definition, value) -> definition.id = value,
             definition -> definition.id
         )
-        .documentation("Config field: Id.")
+        .documentation("Unique identifier for this entry.")
         .add()
         .<String>append(
             new KeyedCodec<>("DisplayName", Codec.STRING),
             (definition, value) -> definition.displayName = value,
             definition -> definition.displayName
         )
-        .documentation("Config field: DisplayName.")
+        .documentation("Display name shown to players.")
         .add()
         .<String>append(
             new KeyedCodec<>("EffectKey", Codec.STRING),
             (definition, value) -> definition.effectKey = value,
             definition -> definition.effectKey
         )
-        .documentation("Config field: EffectKey.")
+        .documentation("Effect key applied by this trait.")
         .add()
         .<String>append(
             new KeyedCodec<>("IconPath", Codec.STRING),
             (definition, value) -> definition.iconPath = value,
             definition -> definition.iconPath
         )
-        .documentation("Config field: IconPath.")
+        .documentation("Icon asset path used for this trait in UI.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Weight", Codec.DOUBLE),
             (definition, value) -> definition.weight = value,
             definition -> definition.weight
         )
-        .documentation("Config field: Weight.")
+        .documentation("Base roll weight for this trait.")
         .add()
         .<Double>append(
             new KeyedCodec<>("InheritanceWeight", Codec.DOUBLE),
             (definition, value) -> definition.inheritanceWeight = value,
             definition -> definition.inheritanceWeight
         )
-        .documentation("Config field: InheritanceWeight.")
+        .documentation("Inheritance roll weight for this trait when breeding.")
         .add()
         .<Double>append(
             new KeyedCodec<>("NaturalMin", Codec.DOUBLE),
             (definition, value) -> definition.naturalMin = value,
             definition -> definition.naturalMin
         )
-        .documentation("Config field: NaturalMin.")
+        .documentation("Minimum natural roll value for this trait.")
         .add()
         .<Double>append(
             new KeyedCodec<>("NaturalMax", Codec.DOUBLE),
             (definition, value) -> definition.naturalMax = value,
             definition -> definition.naturalMax
         )
-        .documentation("Config field: NaturalMax.")
+        .documentation("Maximum natural roll value for this trait.")
         .add()
         .<Double>append(
             new KeyedCodec<>("BreedingMin", Codec.DOUBLE),
             (definition, value) -> definition.breedingMin = value,
             definition -> definition.breedingMin
         )
-        .documentation("Config field: BreedingMin.")
+        .documentation("Minimum inherited roll value for this trait during breeding.")
         .add()
         .<Double>append(
             new KeyedCodec<>("BreedingMax", Codec.DOUBLE),
             (definition, value) -> definition.breedingMax = value,
             definition -> definition.breedingMax
         )
-        .documentation("Config field: BreedingMax.")
+        .documentation("Maximum inherited roll value for this trait during breeding.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Default", Codec.DOUBLE),
             (definition, value) -> definition.defaultValue = value,
             definition -> definition.defaultValue
         )
-        .documentation("Config field: Default.")
+        .documentation("Default setting when no override is set.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("Flags", Codec.STRING_ARRAY),
             (definition, value) -> definition.flags = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             definition -> definition.flags
         )
-        .documentation("Config field: Flags.")
+        .documentation("Behavior flags associated with this trait.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("ConflictsWith", Codec.STRING_ARRAY),
             (definition, value) -> definition.conflictsWith = value == null ? ArrayUtil.EMPTY_STRING_ARRAY : value,
             definition -> definition.conflictsWith
         )
-        .documentation("Config field: ConflictsWith.")
+        .documentation("Trait IDs that cannot coexist with this trait.")
         .add()
         .build();
 
@@ -257,14 +257,14 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             (asset, value) -> asset.enabled = value == null || value,
             asset -> asset.enabled
         )
-        .documentation("Config field: Enabled.")
+        .documentation("Turns this section on or off.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("Priority", Codec.INTEGER),
             (asset, value) -> asset.priority = value == null ? 0 : value,
             asset -> asset.priority
         )
-        .documentation("Config field: Priority.")
+        .documentation("Priority used when multiple configs apply; higher values take precedence.")
         .add()
         .<String[]>append(
             new KeyedCodec<>("RoleIds", Codec.STRING_ARRAY),
@@ -763,4 +763,5 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 }
+
 

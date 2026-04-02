@@ -29,63 +29,63 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
                     (section, value) -> section.hook = value,
                     section -> section.hook
             )
-            .documentation("Config field: Hook.")
+            .documentation("Debug setting for interaction hook diagnostics.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Spawner", Codec.BOOLEAN),
                     (section, value) -> section.spawner = value,
                     section -> section.spawner
             )
-            .documentation("Config field: Spawner.")
+            .documentation("Debug setting for spawner diagnostics.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Prompt", Codec.BOOLEAN),
                     (section, value) -> section.prompt = value,
                     section -> section.prompt
             )
-            .documentation("Config field: Prompt.")
+            .documentation("Debug setting for prompt diagnostics.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Despawn", Codec.BOOLEAN),
                     (section, value) -> section.despawn = value,
                     section -> section.despawn
             )
-            .documentation("Config field: Despawn.")
+            .documentation("Debug setting for despawn diagnostics.")
             .add()
             .<String>append(
                     new KeyedCodec<>("DespawnRoleFilter", Codec.STRING),
                     (section, value) -> section.despawnRoleFilter = value,
                     section -> section.despawnRoleFilter
             )
-            .documentation("Config field: DespawnRoleFilter.")
+            .documentation("Optional role filter used by despawn debug tools.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Lag", Codec.BOOLEAN),
                     (section, value) -> section.lag = value,
                     section -> section.lag
             )
-            .documentation("Config field: Lag.")
+            .documentation("Debug setting for lag instrumentation.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Coop", Codec.BOOLEAN),
                     (section, value) -> section.coop = value,
                     section -> section.coop
             )
-            .documentation("Config field: Coop.")
+            .documentation("Debug setting for coop diagnostics.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("Breeding", Codec.BOOLEAN),
                     (section, value) -> section.breeding = value,
                     section -> section.breeding
             )
-            .documentation("Config field: Breeding.")
+            .documentation("Breeding-related settings for this config.")
             .add()
             .<Boolean>append(
                     new KeyedCodec<>("NeedsConsume", Codec.BOOLEAN),
                     (section, value) -> section.needsConsumeDiagnostics = value,
                     section -> section.needsConsumeDiagnostics
             )
-            .documentation("Config field: NeedsConsume.")
+            .documentation("Debug setting for needs consume diagnostics.")
             .add()
             .build();
 
@@ -386,4 +386,5 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         }
     }
 }
+
 
