@@ -3,6 +3,22 @@
 ## Unreleased
 _No entries yet._
 
+## 2.7.0 - Config Editor Expansion + Managed Coop Reliability - 2026-04-02
+### Added
+- Expanded `/tw config` from Global-only to multi-family browsing and editing with mod/type/asset navigation, Local/All mod scoping, and per-section field count summaries.
+- Added schema-driven tooltip coverage for Tw config fields and surfaced those tooltips in the in-game config editor.
+- Added managed-coop resident role support updates for chicks in coop accepted role lists.
+
+### Changed
+- Reworked the config editor property grid to preserve inline asset-editor-style editing while improving section state behavior, source chips, and field staging visibility.
+- Updated override-path display and config-editor asset selection UX for clearer per-mod/per-family context.
+
+### Fixed
+- Fixed multiple config-editor event/binding issues that caused bad selector payloads, non-updating controls, and unstable apply interactions.
+- Fixed config reload/apply reliability issues around staged override loading and stale descriptor resolution.
+- Fixed managed coop behavior to eject residents when blocking coop blocks are removed.
+- Improved offspring spawn placement safety checks to reduce invalid/unsafe spawn attempts.
+
 ## 2.6.0 - Public API Phase 2/3 + In-Game Self-Tests + UI Localization - 2026-03-30
 ### Added
 - Added `ProgressionApi` reads and controlled mutation operations for happiness, needs, breeding, traits, lifecycle stage, and attachments with explicit mutation-status outcomes.
