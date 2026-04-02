@@ -112,6 +112,34 @@ class TwConfigEditorFieldPolicyTest {
         assertTrue(found.parentSelector());
     }
 
+    @Test
+    void breedingBasisFieldsUseOptionDropdownFallbackWhenSchemaIsStringBacked() {
+        JsonObject effective = new JsonObject();
+        JsonObject passiveBreeding = new JsonObject();
+        passiveBreeding.addProperty("Basis", "REAL_TIME");
+        effective.add("PassiveBreeding", passiveBreeding);
+        JsonObject timing = new JsonObject();
+        timing.addProperty("Basis", "WORLD_TIME_SCALED");
+        effective.add("Timing", timing);
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.BREEDING, true, true),
+                null,
+                effective
+        );
+
+        TwConfigEditorFieldPolicy.EditorFieldSpec passiveBasis =
+                TwConfigEditorFieldPolicy.findField(fields, "PassiveBreeding.Basis");
+        TwConfigEditorFieldPolicy.EditorFieldSpec timingBasis =
+                TwConfigEditorFieldPolicy.findField(fields, "Timing.Basis");
+        assertNotNull(passiveBasis);
+        assertNotNull(timingBasis);
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, passiveBasis.type());
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, timingBasis.type());
+        assertTrue(passiveBasis.options().contains("REAL_TIME"));
+        assertTrue(passiveBasis.options().contains("WORLD_TIME_SCALED"));
+    }
+
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family,
                                                       boolean knownType,
                                                       boolean editable) {

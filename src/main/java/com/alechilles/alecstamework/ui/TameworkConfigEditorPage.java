@@ -84,6 +84,7 @@ public final class TameworkConfigEditorPage
     private TwConfigSnapshot snapshot;
     private final LinkedHashMap<String, TwConfigAssetDescriptor> descriptorByKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, ModView> modByKey = new LinkedHashMap<>();
+    private final LinkedHashMap<String, ModView> modByDescriptorKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, TwConfigSnapshot.FamilyView> familyByKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, JsonObject> sourceByKey = new LinkedHashMap<>();
     private final LinkedHashMap<String, JsonObject> diskByKey = new LinkedHashMap<>();
@@ -191,6 +192,7 @@ public final class TameworkConfigEditorPage
                 selectedDescriptorKey = null;
                 warningLine = "";
                 statusLine = "";
+                ensureSelectedFamily();
                 ensureSelectedDescriptor();
                 shouldRefresh = true;
             }
@@ -307,6 +309,7 @@ public final class TameworkConfigEditorPage
         snapshot = overrideManager.createSnapshot(world);
         descriptorByKey.clear();
         modByKey.clear();
+        modByDescriptorKey.clear();
         familyByKey.clear();
         sourceByKey.clear();
         diskByKey.clear();
@@ -339,6 +342,7 @@ public final class TameworkConfigEditorPage
             }
             String descriptorKey = descriptor.descriptorKey();
             descriptorByKey.put(descriptorKey, descriptor);
+            modByDescriptorKey.put(descriptorKey, resolveModView(descriptor));
             JsonObject source = overrideManager.readSourceJson(descriptor);
             JsonObject disk = overrideManager.readOverrideJson(world, descriptor);
             sourceByKey.put(descriptorKey, source);
@@ -350,12 +354,8 @@ public final class TameworkConfigEditorPage
         inputByDescriptor.keySet().retainAll(descriptorByKey.keySet());
         validationByDescriptor.keySet().retainAll(descriptorByKey.keySet());
         collapsedSectionsByDescriptor.keySet().retainAll(descriptorByKey.keySet());
-        if (selectedModKey == null || !modByKey.containsKey(selectedModKey)) {
-            selectedModKey = firstModKey();
-        }
-        if (selectedFamilyKey == null || !familyByKey.containsKey(selectedFamilyKey)) {
-            selectedFamilyKey = firstFamilyKey();
-        }
+        ensureSelectedMod();
+        ensureSelectedFamily();
         ensureSelectedDescriptor();
         if (clearStatus) {
             statusLine = "";
@@ -371,11 +371,8 @@ public final class TameworkConfigEditorPage
                 hasLocalOnly = true;
                 continue;
             }
-            String packKey = descriptor.sourcePackKey();
-            if (packKey == null || packKey.isBlank()) {
-                continue;
-            }
-            discovered.putIfAbsent(packKey, new ModView(packKey, modLabelForPackKey(packKey)));
+            ModView view = modForDescriptor(descriptor);
+            discovered.putIfAbsent(view.key(), view);
         }
 
         ArrayList<ModView> ordered = new ArrayList<>(discovered.values());
@@ -473,7 +470,10 @@ public final class TameworkConfigEditorPage
         }
 
         commandBuilder.set("#TwConfigSelectedAssetTitle.Text", selected.assetId());
-        commandBuilder.set("#TwConfigSelectedAssetMeta.Text", tr("tamework.ui.configEditor.selectedAssetMeta", selected.familyDisplayName(), selected.sourcePackKey()));
+        commandBuilder.set(
+                "#TwConfigSelectedAssetMeta.Text",
+                tr("tamework.ui.configEditor.selectedAssetMeta", selected.familyDisplayName(), modForDescriptor(selected).label())
+        );
         commandBuilder.set("#TwConfigSelectedAssetChain.Text", inheritanceChainText(selected));
         DescriptorLayout layout = layoutFor(selected);
         JsonObject source = TwConfigJsonUtil.copyObject(sourceByKey.get(selected.descriptorKey()));
@@ -754,11 +754,85 @@ public final class TameworkConfigEditorPage
         return null;
     }
 
+    @Nonnull
+    private ModView modForDescriptor(@Nonnull TwConfigAssetDescriptor descriptor) {
+        String descriptorKey = descriptor.descriptorKey();
+        ModView existing = modByDescriptorKey.get(descriptorKey);
+        if (existing != null) {
+            return existing;
+        }
+        ModView resolved = resolveModView(descriptor);
+        modByDescriptorKey.put(descriptorKey, resolved);
+        return resolved;
+    }
+
+    @Nonnull
+    private ModView resolveModView(@Nonnull TwConfigAssetDescriptor descriptor) {
+        if (descriptor.localOnly()) {
+            return new ModView(MOD_LOCAL_KEY, tr("tamework.ui.configEditor.mod.local"));
+        }
+        String fromPath = modLabelFromSourcePath(descriptor.sourcePath());
+        if (fromPath != null && !fromPath.isBlank()) {
+            return new ModView("mod-path::" + fromPath.toLowerCase(Locale.ROOT), fromPath);
+        }
+        String packKey = trim(descriptor.sourcePackKey());
+        if (packKey.isBlank()) {
+            packKey = "<unknown-pack>";
+        }
+        return new ModView(packKey, modLabelForPackKey(packKey));
+    }
+
+    @Nullable
+    private static String modLabelFromSourcePath(@Nullable Path sourcePath) {
+        if (sourcePath == null || sourcePath.getNameCount() < 2) {
+            return null;
+        }
+        for (int i = 0; i < sourcePath.getNameCount() - 1; i++) {
+            String segment = sourcePath.getName(i).toString();
+            if (!"mods".equalsIgnoreCase(segment)) {
+                continue;
+            }
+            String modName = trim(sourcePath.getName(i + 1).toString());
+            if (!modName.isBlank()) {
+                return modName;
+            }
+            break;
+        }
+        return null;
+    }
+
+    @Nonnull
+    private LinkedHashMap<String, TwConfigSnapshot.FamilyView> visibleFamilyByKey() {
+        LinkedHashMap<String, TwConfigSnapshot.FamilyView> visible = new LinkedHashMap<>();
+        if (familyByKey.isEmpty()) {
+            return visible;
+        }
+        String selected = trim(selectedModKey);
+        if (MOD_LOCAL_KEY.equalsIgnoreCase(selected)) {
+            visible.putAll(familyByKey);
+            return visible;
+        }
+        LinkedHashSet<String> availableFamilyKeys = new LinkedHashSet<>();
+        for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
+            if (!modMatchesSelection(descriptor)) {
+                continue;
+            }
+            availableFamilyKeys.add(descriptor.familyKey().toLowerCase(Locale.ROOT));
+        }
+        for (Map.Entry<String, TwConfigSnapshot.FamilyView> entry : familyByKey.entrySet()) {
+            if (availableFamilyKeys.contains(entry.getKey().toLowerCase(Locale.ROOT))) {
+                visible.put(entry.getKey(), entry.getValue());
+            }
+        }
+        return visible;
+    }
+
     private void ensureSelectedFamily() {
-        if (selectedFamilyKey != null && familyByKey.containsKey(selectedFamilyKey)) {
+        LinkedHashMap<String, TwConfigSnapshot.FamilyView> visible = visibleFamilyByKey();
+        if (selectedFamilyKey != null && visible.containsKey(selectedFamilyKey)) {
             return;
         }
-        selectedFamilyKey = firstFamilyKey();
+        selectedFamilyKey = visible.isEmpty() ? null : visible.keySet().iterator().next();
     }
 
     @Nullable
@@ -766,24 +840,26 @@ public final class TameworkConfigEditorPage
         if (selectedFamilyKey == null || selectedFamilyKey.isBlank()) {
             return null;
         }
-        return familyByKey.get(selectedFamilyKey);
+        return visibleFamilyByKey().get(selectedFamilyKey);
     }
 
     @Nullable
     private String firstFamilyKey() {
-        if (familyByKey.isEmpty()) {
+        LinkedHashMap<String, TwConfigSnapshot.FamilyView> visible = visibleFamilyByKey();
+        if (visible.isEmpty()) {
             return null;
         }
-        return familyByKey.keySet().iterator().next();
+        return visible.keySet().iterator().next();
     }
 
     @Nonnull
     private List<DropdownEntryInfo> familyDropdownEntries() {
-        if (familyByKey.isEmpty()) {
+        LinkedHashMap<String, TwConfigSnapshot.FamilyView> visible = visibleFamilyByKey();
+        if (visible.isEmpty()) {
             return List.of();
         }
-        ArrayList<DropdownEntryInfo> entries = new ArrayList<>(familyByKey.size());
-        for (TwConfigSnapshot.FamilyView family : familyByKey.values()) {
+        ArrayList<DropdownEntryInfo> entries = new ArrayList<>(visible.size());
+        for (TwConfigSnapshot.FamilyView family : visible.values()) {
             entries.add(new DropdownEntryInfo(LocalizableString.fromString(family.label()), family.key()));
         }
         return List.copyOf(entries);
@@ -795,11 +871,12 @@ public final class TameworkConfigEditorPage
         if (raw.isBlank() || looksLikeSelectorExpression(raw)) {
             return null;
         }
-        TwConfigSnapshot.FamilyView direct = familyByKey.get(raw);
+        LinkedHashMap<String, TwConfigSnapshot.FamilyView> visible = visibleFamilyByKey();
+        TwConfigSnapshot.FamilyView direct = visible.get(raw);
         if (direct != null) {
             return direct.key();
         }
-        for (TwConfigSnapshot.FamilyView family : familyByKey.values()) {
+        for (TwConfigSnapshot.FamilyView family : visible.values()) {
             if (family.key().equalsIgnoreCase(raw) || family.label().equalsIgnoreCase(raw)) {
                 return family.key();
             }
@@ -1535,7 +1612,7 @@ public final class TameworkConfigEditorPage
         if (!shouldShowPackContextInAssetLabel()) {
             return descriptor.assetId();
         }
-        return descriptor.assetId() + " [" + shortPackLabel(descriptor.sourcePackKey()) + "]";
+        return descriptor.assetId() + " [" + modForDescriptor(descriptor).label() + "]";
     }
 
     private boolean shouldShowPackContextInAssetLabel() {
@@ -1575,12 +1652,16 @@ public final class TameworkConfigEditorPage
         if (descriptor.localOnly()) {
             return false;
         }
-        return descriptor.sourcePackKey().equalsIgnoreCase(selected);
+        return modForDescriptor(descriptor).key().equalsIgnoreCase(selected);
     }
 
     @Nonnull
     private List<TwConfigAssetDescriptor> descriptorsForSelectedFamily() {
         if (selectedFamilyKey == null || selectedFamilyKey.isBlank()) {
+            return List.of();
+        }
+        LinkedHashMap<String, TwConfigSnapshot.FamilyView> visibleFamilies = visibleFamilyByKey();
+        if (!visibleFamilies.containsKey(selectedFamilyKey)) {
             return List.of();
         }
         ArrayList<TwConfigAssetDescriptor> out = new ArrayList<>();

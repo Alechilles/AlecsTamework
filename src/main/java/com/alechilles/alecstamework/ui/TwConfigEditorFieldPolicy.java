@@ -1,7 +1,11 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.overrides.TwConfigAssetDescriptor;
+import com.alechilles.alecstamework.config.overrides.TwConfigFamily;
 import com.alechilles.alecstamework.config.overrides.TwConfigSnapshot;
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -22,6 +26,16 @@ final class TwConfigEditorFieldPolicy {
     private static final String FIELD_PARENT = "Parent";
     private static final String DEFAULT_SECTION = "General";
     private static final int MAX_FALLBACK_DEPTH = 8;
+    private static final Set<String> BREEDING_TIMER_BASIS_PATHS = Set.of(
+            "timing.basis",
+            "passivebreeding.basis"
+    );
+    private static final Set<String> NEEDS_TIMER_BASIS_PATHS = Set.of("timing.basis");
+    private static final Set<String> NEEDS_TICK_POLICY_MODE_PATHS = Set.of("tickpolicy.mode");
+    private static final Set<String> NEEDS_DAMAGE_MODEL_PATHS = Set.of("damage.model");
+    private static final Set<String> NEEDS_DUAL_NEED_RULE_PATHS = Set.of("damage.dualneedrule");
+    private static final Set<String> GLOBAL_PER_PLAYER_SCOPE_PATHS = Set.of("population.perplayerlimitscope");
+    private static final Set<String> SPAWNER_TOOLTIP_MODE_PATHS = Set.of("tooltipmode");
 
     private TwConfigEditorFieldPolicy() {
     }
@@ -39,13 +53,15 @@ final class TwConfigEditorFieldPolicy {
         }
         List<EditorFieldSpec> schemaFields = TwConfigSchemaAdapter.fieldsFor(descriptor);
         List<EditorFieldSpec> fallbackFields = buildFallbackFieldsFromJson(effectiveJson);
+        List<EditorFieldSpec> resolved;
         if (schemaFields.isEmpty()) {
-            return fallbackFields;
+            resolved = fallbackFields;
+        } else if (fallbackFields.isEmpty()) {
+            resolved = schemaFields;
+        } else {
+            resolved = mergeSchemaAndFallbackFields(schemaFields, fallbackFields);
         }
-        if (fallbackFields.isEmpty()) {
-            return schemaFields;
-        }
-        return mergeSchemaAndFallbackFields(schemaFields, fallbackFields);
+        return applyKnownOptionInference(descriptor.family(), resolved);
     }
 
     @Nonnull
@@ -110,7 +126,7 @@ final class TwConfigEditorFieldPolicy {
 
     @Nonnull
     private static List<EditorFieldSpec> mergeSchemaAndFallbackFields(@Nonnull List<EditorFieldSpec> schemaFields,
-                                                                      @Nonnull List<EditorFieldSpec> fallbackFields) {
+                                                                       @Nonnull List<EditorFieldSpec> fallbackFields) {
         LinkedHashSet<String> fallbackPaths = new LinkedHashSet<>();
         for (EditorFieldSpec fallback : fallbackFields) {
             String path = normalizePath(fallback.path());
@@ -145,6 +161,97 @@ final class TwConfigEditorFieldPolicy {
         }
         ordered.addAll(merged.values());
         return List.copyOf(ordered);
+    }
+
+    @Nonnull
+    private static List<EditorFieldSpec> applyKnownOptionInference(@Nonnull TwConfigFamily family,
+                                                                   @Nonnull List<EditorFieldSpec> fields) {
+        if (fields.isEmpty()) {
+            return fields;
+        }
+        ArrayList<EditorFieldSpec> out = new ArrayList<>(fields.size());
+        boolean changed = false;
+        for (EditorFieldSpec field : fields) {
+            if (field == null || field.handoffOnly()) {
+                out.add(field);
+                continue;
+            }
+            List<String> inferredOptions = inferKnownOptions(family, field.path());
+            if (inferredOptions.isEmpty()) {
+                out.add(field);
+                continue;
+            }
+            boolean canUpgradeToOption = field.type() == EditorFieldType.STRING
+                    || (field.type() == EditorFieldType.OPTION && field.options().isEmpty());
+            if (!canUpgradeToOption) {
+                out.add(field);
+                continue;
+            }
+            changed = true;
+            out.add(new EditorFieldSpec(
+                    field.id(),
+                    field.label(),
+                    field.path(),
+                    field.section(),
+                    EditorFieldType.OPTION,
+                    field.editable(),
+                    false,
+                    field.parentSelector(),
+                    inferredOptions,
+                    field.depth()
+            ));
+        }
+        return changed ? List.copyOf(out) : fields;
+    }
+
+    @Nonnull
+    private static List<String> inferKnownOptions(@Nonnull TwConfigFamily family, @Nullable String path) {
+        String normalized = normalizePath(path);
+        if (normalized.isBlank()) {
+            return List.of();
+        }
+        return switch (family) {
+            case BREEDING -> BREEDING_TIMER_BASIS_PATHS.contains(normalized)
+                    ? enumValues(TwBreedingConfig.TimerBasis.values(), TwBreedingConfig.TimerBasis::toConfigValue)
+                    : List.of();
+            case NEEDS -> {
+                if (NEEDS_TIMER_BASIS_PATHS.contains(normalized)) {
+                    yield enumValues(TwNeedsConfig.TimerBasis.values(), TwNeedsConfig.TimerBasis::toConfigValue);
+                }
+                if (NEEDS_TICK_POLICY_MODE_PATHS.contains(normalized)) {
+                    yield enumValues(TwNeedsConfig.TickPolicyMode.values(), TwNeedsConfig.TickPolicyMode::toConfigValue);
+                }
+                if (NEEDS_DAMAGE_MODEL_PATHS.contains(normalized)) {
+                    yield enumValues(TwNeedsConfig.DamageModel.values(), TwNeedsConfig.DamageModel::toConfigValue);
+                }
+                if (NEEDS_DUAL_NEED_RULE_PATHS.contains(normalized)) {
+                    yield enumValues(TwNeedsConfig.DualNeedRule.values(), TwNeedsConfig.DualNeedRule::toConfigValue);
+                }
+                yield List.of();
+            }
+            case GLOBAL -> GLOBAL_PER_PLAYER_SCOPE_PATHS.contains(normalized)
+                    ? enumValues(TwGlobalConfig.PerPlayerLimitScope.values(), TwGlobalConfig.PerPlayerLimitScope::configValue)
+                    : List.of();
+            case SPAWNER -> SPAWNER_TOOLTIP_MODE_PATHS.contains(normalized)
+                    ? List.of("Additive", "Replace")
+                    : List.of();
+            default -> List.of();
+        };
+    }
+
+    @Nonnull
+    private static <T> List<String> enumValues(@Nonnull T[] values, @Nonnull java.util.function.Function<T, String> mapper) {
+        ArrayList<String> out = new ArrayList<>(values.length);
+        for (T value : values) {
+            if (value == null) {
+                continue;
+            }
+            String mapped = mapper.apply(value);
+            if (mapped != null && !mapped.isBlank()) {
+                out.add(mapped);
+            }
+        }
+        return List.copyOf(out);
     }
 
     private static boolean shouldSuppressSchemaGroupRow(@Nonnull EditorFieldSpec schemaField,
