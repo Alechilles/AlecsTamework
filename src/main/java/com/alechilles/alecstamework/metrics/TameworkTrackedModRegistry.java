@@ -13,7 +13,9 @@ public final class TameworkTrackedModRegistry {
             "Alechilles:Alec's Animal Husbandry!",
             "56926736-9f0c-4d23-a671-a3f46a16b621",
             "Alechilles:Alec's Nametags!",
-            "4f1d847d-57fe-4aef-8042-2e77690e2a4a"
+            "4f1d847d-57fe-4aef-8042-2e77690e2a4a",
+            "Alechilles:Alec's Coops!",
+            "3ce09431-552e-4279-90ca-e0735bd9763b"
     );
 
     private TameworkTrackedModRegistry() {

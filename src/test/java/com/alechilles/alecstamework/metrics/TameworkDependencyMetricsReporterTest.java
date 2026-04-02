@@ -27,6 +27,7 @@ class TameworkDependencyMetricsReporterTest {
         List<InstalledModManifest> manifests = List.of(
                 manifest("Alechilles", "Alec's Cats!", "1.5.6", true),
                 manifest("Alechilles", "Alec's Nametags!", "1.1.2", true),
+                manifest("Alechilles", "Alec's Coops!", "1.0.0", true),
                 manifest("Alechilles", "Alec's Animal Husbandry!", "1.0.3", false),
                 manifest("Example", "Other Mod", "1.0.0", true)
         );
@@ -36,9 +37,10 @@ class TameworkDependencyMetricsReporterTest {
 
         reporter.reportTrackedDependencies(manifests, serverUuidFile);
 
-        assertEquals(2, client.calls.size());
+        assertEquals(3, client.calls.size());
         assertEquals("fba66910-eab2-4721-b8e5-a90b6f493887", client.calls.get(0).pluginUuid);
         assertEquals("4f1d847d-57fe-4aef-8042-2e77690e2a4a", client.calls.get(1).pluginUuid);
+        assertEquals("3ce09431-552e-4279-90ca-e0735bd9763b", client.calls.get(2).pluginUuid);
     }
 
     @Test
