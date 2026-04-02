@@ -588,16 +588,30 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             debugCoop(
                     "removed check deferred chunk_unloaded coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
-                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                    + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
             );
             return false;
         }
+        BlockType blockType = worldChunk.getBlockType(coopBlock.x, coopBlock.y, coopBlock.z);
+        String blockTypeId = normalizeBlockTypeId(blockType != null ? blockType.getId() : null);
+        TwCoopConfig blockTypeConfig = resolveCoopConfig(blockTypeId, null);
+        String blockTypeCoopId = normalizeIdentifier(blockTypeConfig != null ? blockTypeConfig.getCoopId() : null);
         Ref<ChunkStore> blockRef = worldChunk.getBlockComponentEntity(coopBlock.x, coopBlock.y, coopBlock.z);
         if (blockRef == null) {
+            if (blockTypeCoopId != null && blockTypeCoopId.equals(coopId)) {
+                debugCoop(
+                        "removed check deferred missing_block_ref_matching_block_type coop=" + coopId
+                                + " slot=" + slotContext.residentSlot()
+                                + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                                + " blockType=" + firstNonBlank(blockTypeId, "<unknown>")
+                );
+                return false;
+            }
             debugCoop(
                     "removed check confirmed missing_block_ref coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                             + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                            + " blockType=" + firstNonBlank(blockTypeId, "<unknown>")
             );
             return true;
         }
@@ -621,11 +635,21 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         }
         Object coopState = safeGetChunkComponent(chunkStore, blockRef, castComponentType(coopType));
         boolean removed = coopState == null;
+        if (removed && blockTypeCoopId != null && blockTypeCoopId.equals(coopId)) {
+            debugCoop(
+                    "removed check deferred missing_component_matching_block_type coop=" + coopId
+                            + " slot=" + slotContext.residentSlot()
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                            + " blockType=" + firstNonBlank(blockTypeId, "<unknown>")
+            );
+            return false;
+        }
         if (removed) {
             debugCoop(
                     "removed check confirmed missing_coop_component coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                             + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                            + " blockType=" + firstNonBlank(blockTypeId, "<unknown>")
             );
         }
         return removed;
