@@ -238,6 +238,35 @@ public final class CommandLinkedNpcCoopService {
         );
     }
 
+    @Nonnull
+    public List<CoopSlotContext> listHousedSlotsForWorld(@Nullable String worldName) {
+        String normalizedWorldName = normalizeIdentifier(worldName);
+        if (normalizedWorldName == null) {
+            return List.of();
+        }
+        ArrayList<CoopSlotContext> slots = new ArrayList<>();
+        for (CoopLedgerEntry entry : ledgerBySlot.values()) {
+            if (entry == null || entry.housedNpcUuid == null || entry.coopId == null || entry.residentSlot < 0) {
+                continue;
+            }
+            if (entry.worldName == null || !normalizedWorldName.equals(entry.worldName)) {
+                continue;
+            }
+            if (!hasKnownCoordinates(entry.x, entry.y, entry.z)) {
+                continue;
+            }
+            slots.add(CoopSlotContext.of(
+                    entry.worldName,
+                    entry.coopId,
+                    entry.x,
+                    entry.y,
+                    entry.z,
+                    entry.residentSlot
+            ));
+        }
+        return slots.isEmpty() ? List.of() : List.copyOf(slots);
+    }
+
     public void clearAllLedgerEntries() {
         if (!canMutate()) {
             return;
@@ -1052,6 +1081,12 @@ public final class CommandLinkedNpcCoopService {
         return context.x() != UNKNOWN_COORDINATE
                 && context.y() != UNKNOWN_COORDINATE
                 && context.z() != UNKNOWN_COORDINATE;
+    }
+
+    private static boolean hasKnownCoordinates(int x, int y, int z) {
+        return x != UNKNOWN_COORDINATE
+                && y != UNKNOWN_COORDINATE
+                && z != UNKNOWN_COORDINATE;
     }
 
     private String encodeNullableUuid(@Nullable UUID uuid) {

@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -24,6 +25,53 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CommandLinkedNpcCoopServicePersistenceTest {
     @TempDir
     Path tempDir;
+
+    @Test
+    void listsOnlyKnownHousedSlotsForWorld() {
+        CommandLinkedNpcCoopService service = new CommandLinkedNpcCoopService();
+        UUID defaultWorldNpc = UUID.randomUUID();
+        UUID otherWorldNpc = UUID.randomUUID();
+        UUID legacyNpc = UUID.randomUUID();
+
+        service.captureResident(
+                defaultWorldNpc,
+                "tamed_chicken",
+                CommandLinkedNpcCoopService.CoopSlotContext.of("default", "coop_chicken", 10, 64, 10, 0),
+                null,
+                null,
+                null,
+                null
+        );
+        service.captureResident(
+                otherWorldNpc,
+                "tamed_chicken",
+                CommandLinkedNpcCoopService.CoopSlotContext.of("other", "coop_chicken", 20, 64, 20, 1),
+                null,
+                null,
+                null,
+                null
+        );
+        service.captureResident(
+                legacyNpc,
+                "tamed_chicken",
+                CommandLinkedNpcCoopService.CoopSlotContext.legacy("coop_chicken", 2),
+                null,
+                null,
+                null,
+                null
+        );
+
+        List<CommandLinkedNpcCoopService.CoopSlotContext> defaultWorldSlots =
+                service.listHousedSlotsForWorld("default");
+
+        assertEquals(1, defaultWorldSlots.size());
+        CommandLinkedNpcCoopService.CoopSlotContext slot = defaultWorldSlots.get(0);
+        assertEquals("coop_chicken", slot.coopId());
+        assertEquals(10, slot.x());
+        assertEquals(64, slot.y());
+        assertEquals(10, slot.z());
+        assertEquals(0, slot.residentSlot());
+    }
 
     @Test
     void persistsAndReloadsStateSnapshotJson() throws Exception {
