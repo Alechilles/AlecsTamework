@@ -1688,7 +1688,29 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         while (normalized.startsWith("*")) {
             normalized = normalized.substring(1);
         }
+        int bracketIndex = normalized.indexOf('[');
+        if (bracketIndex > 0) {
+            normalized = normalized.substring(0, bracketIndex);
+        }
+        normalized = stripStateVariantSuffix(normalized);
         return normalized.isBlank() ? null : normalized;
+    }
+
+    @Nonnull
+    private String stripStateVariantSuffix(@Nonnull String normalizedBlockTypeId) {
+        int stateDefinitions = normalizedBlockTypeId.indexOf("_state_definitions_");
+        if (stateDefinitions > 0) {
+            return normalizedBlockTypeId.substring(0, stateDefinitions);
+        }
+        int dottedStateDefinitions = normalizedBlockTypeId.indexOf(".state_definitions.");
+        if (dottedStateDefinitions > 0) {
+            return normalizedBlockTypeId.substring(0, dottedStateDefinitions);
+        }
+        int hashStateDefinitions = normalizedBlockTypeId.indexOf("#state_definitions.");
+        if (hashStateDefinitions > 0) {
+            return normalizedBlockTypeId.substring(0, hashStateDefinitions);
+        }
+        return normalizedBlockTypeId;
     }
 
     @Nullable
