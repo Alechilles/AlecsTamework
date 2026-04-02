@@ -598,6 +598,9 @@ public final class TameworkConfigEditorPage
             String textValue = fieldDisplayValue(field, value, descriptorKey);
             boolean hasBufferedInput = inputs(descriptorKey).containsKey(field.path);
             SourceBadge sourceBadge = sourceBadgeForField(field, descriptor, draft, merged);
+            TwConfigEditorFieldPolicy.EditorFieldSpec fieldSpec = layout.specByPath.get(field.path);
+            String fieldTooltip = fieldSpec == null ? "" : trim(fieldSpec.tooltip());
+            boolean hasFieldTooltip = !fieldTooltip.isBlank();
             String host = root + " #FieldValueHost";
             int fieldDepthLevel = depthBucket(field.depth);
             String fieldLabel = labelForPath(field.path);
@@ -611,6 +614,12 @@ public final class TameworkConfigEditorPage
             commandBuilder.set(root + " #FieldNameTop.Text", fieldLabel);
             commandBuilder.set(root + " #FieldNameNested.Text", fieldLabel);
             commandBuilder.set(root + " #FieldNameDeep.Text", fieldLabel);
+            commandBuilder.set(root + " #FieldTooltipButton.Visible", hasFieldTooltip);
+            if (hasFieldTooltip) {
+                commandBuilder.set(root + " #FieldTooltipButton.TooltipText", fieldTooltip);
+            } else {
+                commandBuilder.set(root + " #FieldTooltipButton.TooltipText", "");
+            }
             commandBuilder.set(root + " #FieldSourceChip.Text", sourceBadge.label());
             commandBuilder.set(root + " #FieldSourceChip.TooltipText", sourceBadge.tooltip());
             commandBuilder.set(root + " #FieldSourceChip.Visible", true);

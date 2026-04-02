@@ -40,6 +40,18 @@ Group {
     Visible: false;
   }
 
+  TextButton #FieldTooltipButton {
+    Anchor: (Top: 3, Left: 8, Width: 304, Height: 24);
+    Text: "";
+    TooltipText: "";
+    Style: ButtonStyle(
+      Default: (Background: (Color: #00000000), TextStyle: (TextColor: #00000000)),
+      Hovered: (Background: (Color: #00000000), TextStyle: (TextColor: #00000000)),
+      Pressed: (Background: (Color: #00000000), TextStyle: (TextColor: #00000000))
+    );
+    Visible: false;
+  }
+
   Label #FieldModeChip {
     Anchor: (Top: 3, Left: 374, Width: 74, Height: 24);
     Text: %server.tamework.ui.configEditor.field.mode.noLocal;

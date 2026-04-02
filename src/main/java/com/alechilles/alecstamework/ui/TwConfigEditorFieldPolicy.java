@@ -198,6 +198,7 @@ final class TwConfigEditorFieldPolicy {
                     false,
                     field.parentSelector(),
                     inferredOptions,
+                    field.tooltip(),
                     field.depth()
             ));
         }
@@ -307,6 +308,7 @@ final class TwConfigEditorFieldPolicy {
                         false,
                         false,
                         List.of(),
+                        "",
                         depth
                 ));
                 continue;
@@ -325,6 +327,7 @@ final class TwConfigEditorFieldPolicy {
                             true,
                             false,
                             List.of(),
+                            "",
                             depth
                     ));
                     continue;
@@ -349,6 +352,7 @@ final class TwConfigEditorFieldPolicy {
                         !editable,
                         false,
                         List.of(),
+                        "",
                         depth
                 ));
                 continue;
@@ -376,6 +380,7 @@ final class TwConfigEditorFieldPolicy {
                         false,
                         false,
                         List.of(),
+                        "",
                         depth
                 ));
                 continue;
@@ -391,6 +396,7 @@ final class TwConfigEditorFieldPolicy {
                     true,
                     false,
                     List.of(),
+                    "",
                     depth
             ));
         }
@@ -434,6 +440,7 @@ final class TwConfigEditorFieldPolicy {
             boolean handoffOnly,
             boolean parentSelector,
             @Nonnull List<String> options,
+            @Nonnull String tooltip,
             int depth
     ) {
         boolean usesOptions() {
@@ -469,6 +476,7 @@ final class TwConfigEditorFieldPolicy {
                 false,
                 true,
                 List.of(),
+                "",
                 depth
         );
     }

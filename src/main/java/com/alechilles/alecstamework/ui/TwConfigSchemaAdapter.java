@@ -33,6 +33,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.lang.reflect.Method;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -175,6 +176,7 @@ final class TwConfigSchemaAdapter {
                     new HashSet<>()
             );
             String label = resolveLabel(key, resolved);
+            String tooltip = resolveTooltip(resolved);
             String currentSection = section;
             if (currentSection.isBlank() && !pathPrefix.isBlank()) {
                 currentSection = firstPathSegment(pathPrefix);
@@ -199,6 +201,7 @@ final class TwConfigSchemaAdapter {
                         false,
                         false,
                         Arrays.asList(stringSchema.getEnum()),
+                        tooltip,
                         depth
                 ));
                 continue;
@@ -213,6 +216,7 @@ final class TwConfigSchemaAdapter {
                         false,
                         false,
                         List.of("true", "false"),
+                        tooltip,
                         depth
                 ));
                 continue;
@@ -227,6 +231,7 @@ final class TwConfigSchemaAdapter {
                         false,
                         false,
                         List.of(),
+                        tooltip,
                         depth
                 ));
                 continue;
@@ -241,6 +246,7 @@ final class TwConfigSchemaAdapter {
                         false,
                         false,
                         List.of(),
+                        tooltip,
                         depth
                 ));
                 continue;
@@ -255,6 +261,7 @@ final class TwConfigSchemaAdapter {
                         false,
                         false,
                         List.of(),
+                        tooltip,
                         depth
                 ));
                 continue;
@@ -269,6 +276,7 @@ final class TwConfigSchemaAdapter {
                         false,
                         false,
                         List.of(),
+                        tooltip,
                         depth
                 ));
                 continue;
@@ -301,6 +309,7 @@ final class TwConfigSchemaAdapter {
                     true,
                     false,
                     List.of(),
+                    tooltip,
                     depth
             ));
         }
@@ -476,14 +485,15 @@ final class TwConfigSchemaAdapter {
 
     @Nonnull
     private static TwConfigEditorFieldPolicy.EditorFieldSpec newField(@Nonnull String path,
-                                                                      @Nonnull String label,
-                                                                      @Nonnull String section,
-                                                                      @Nonnull TwConfigEditorFieldPolicy.EditorFieldType type,
-                                                                      boolean editable,
-                                                                      boolean handoffOnly,
-                                                                      boolean parentSelector,
-                                                                      @Nonnull List<String> options,
-                                                                      int depth) {
+                                                                       @Nonnull String label,
+                                                                       @Nonnull String section,
+                                                                       @Nonnull TwConfigEditorFieldPolicy.EditorFieldType type,
+                                                                       boolean editable,
+                                                                       boolean handoffOnly,
+                                                                       boolean parentSelector,
+                                                                       @Nonnull List<String> options,
+                                                                       @Nonnull String tooltip,
+                                                                       int depth) {
         return new TwConfigEditorFieldPolicy.EditorFieldSpec(
                 path.toLowerCase(Locale.ROOT),
                 label,
@@ -494,8 +504,36 @@ final class TwConfigSchemaAdapter {
                 handoffOnly,
                 parentSelector,
                 List.copyOf(options),
+                tooltip,
                 depth
         );
+    }
+
+    @Nonnull
+    private static String resolveTooltip(@Nullable Schema schema) {
+        if (schema == null) {
+            return "";
+        }
+        for (String methodName : List.of("getTooltip", "getDescription", "getDocumentation", "getComment")) {
+            String value = invokeStringGetter(schema, methodName);
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return "";
+    }
+
+    @Nullable
+    private static String invokeStringGetter(@Nonnull Object target, @Nonnull String methodName) {
+        try {
+            Method method = target.getClass().getMethod(methodName);
+            Object value = method.invoke(target);
+            if (value instanceof String text) {
+                return text;
+            }
+        } catch (Exception ignored) {
+        }
+        return null;
     }
 
     @Nonnull
