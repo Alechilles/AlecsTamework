@@ -3,12 +3,20 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
+import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import it.unimi.dsi.fastutil.Pair;
+import java.util.HashMap;
+import java.util.Map;
 import javax.annotation.Nullable;
 
 /**
@@ -31,6 +39,8 @@ final class BreedingOffspringSpawnService {
             { 0.00, 0.00 }
     };
     private static final double[] SPAWN_VERTICAL_OFFSETS = new double[] { 0.35, 0.75, 1.15, 0.00 };
+    private static final int SAFE_VERTICAL_SCAN_STEPS = 4;
+    private static final double SAFE_STAND_HEIGHT_OFFSET = 0.05;
 
     private final BreedingOffspringRoleResolver roleResolver;
 
@@ -73,11 +83,15 @@ final class BreedingOffspringSpawnService {
                         spawnPosition.y + yOffset,
                         spawnPosition.z + offset[1]
                 );
+                Vector3d safeCandidate = resolveSafeSpawnCandidate(candidate, store);
+                if (safeCandidate == null) {
+                    continue;
+                }
                 Pair<Ref<EntityStore>, NPCEntity> spawned = trySpawnAtPosition(
                         npcPlugin,
                         store,
                         roleIndex,
-                        candidate,
+                        safeCandidate,
                         spawnRotation
                 );
                 if (spawned != null) {
@@ -128,6 +142,110 @@ final class BreedingOffspringSpawnService {
             return null;
         }
         return spawned;
+    }
+
+    @Nullable
+    private Vector3d resolveSafeSpawnCandidate(@Nullable Vector3d candidate,
+                                               @Nullable Store<EntityStore> store) {
+        if (candidate == null || store == null) {
+            return candidate;
+        }
+        World world = resolveWorld(store);
+        if (world == null || world.getChunkStore() == null) {
+            return candidate;
+        }
+        ChunkStore chunkStore = world.getChunkStore();
+        Store<ChunkStore> chunkStoreStore = chunkStore != null ? chunkStore.getStore() : null;
+        if (chunkStoreStore == null) {
+            return candidate;
+        }
+
+        int blockX = (int) Math.floor(candidate.x);
+        int blockY = (int) Math.floor(candidate.y);
+        int blockZ = (int) Math.floor(candidate.z);
+        Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        for (int step = 0; step <= SAFE_VERTICAL_SCAN_STEPS; step++) {
+            int upY = blockY + step;
+            if (canStandAt(chunkStore, chunkStoreStore, blockX, upY, blockZ, chunkCache)) {
+                return new Vector3d(candidate.x, upY + SAFE_STAND_HEIGHT_OFFSET, candidate.z);
+            }
+            if (step == 0) {
+                continue;
+            }
+            int downY = blockY - step;
+            if (canStandAt(chunkStore, chunkStoreStore, blockX, downY, blockZ, chunkCache)) {
+                return new Vector3d(candidate.x, downY + SAFE_STAND_HEIGHT_OFFSET, candidate.z);
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private World resolveWorld(@Nullable Store<EntityStore> store) {
+        if (store == null || store.getExternalData() == null) {
+            return null;
+        }
+        return store.getExternalData().getWorld();
+    }
+
+    private boolean canStandAt(ChunkStore chunkStore,
+                               Store<ChunkStore> chunkStoreStore,
+                               int blockX,
+                               int blockY,
+                               int blockZ,
+                               Map<Long, WorldChunk> chunkCache) {
+        WorldChunk feetChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        WorldChunk headChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        WorldChunk groundChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        if (feetChunk == null || headChunk == null || groundChunk == null) {
+            return false;
+        }
+
+        int feetFluid = feetChunk.getFluidId(blockX, blockY, blockZ);
+        int headFluid = headChunk.getFluidId(blockX, blockY + 1, blockZ);
+        int groundFluid = groundChunk.getFluidId(blockX, blockY - 1, blockZ);
+        if (feetFluid != 0 || headFluid != 0) {
+            return false;
+        }
+
+        int feetBlockId = feetChunk.getBlock(blockX, blockY, blockZ);
+        int headBlockId = headChunk.getBlock(blockX, blockY + 1, blockZ);
+        int groundBlockId = groundChunk.getBlock(blockX, blockY - 1, blockZ);
+        if (isSolidBlock(feetBlockId, feetFluid) || isSolidBlock(headBlockId, headFluid)) {
+            return false;
+        }
+        return isSolidBlock(groundBlockId, groundFluid);
+    }
+
+    @Nullable
+    private WorldChunk resolveWorldChunk(ChunkStore chunkStore,
+                                         Store<ChunkStore> chunkStoreStore,
+                                         int blockX,
+                                         int blockZ,
+                                         Map<Long, WorldChunk> chunkCache) {
+        long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
+        if (chunkCache.containsKey(chunkIndex)) {
+            return chunkCache.get(chunkIndex);
+        }
+        Ref<ChunkStore> chunkRef = chunkStore.getChunkReference(chunkIndex);
+        if (chunkRef == null || !chunkRef.isValid()) {
+            chunkCache.put(chunkIndex, null);
+            return null;
+        }
+        WorldChunk worldChunk = chunkStoreStore.getComponent(chunkRef, WorldChunk.getComponentType());
+        chunkCache.put(chunkIndex, worldChunk);
+        return worldChunk;
+    }
+
+    private boolean isSolidBlock(int blockId, int fluidId) {
+        if (blockId == 0) {
+            return false;
+        }
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
+        if (blockType == null || blockType == BlockType.UNKNOWN) {
+            return false;
+        }
+        return WorldUtil.isSolidOnlyBlock(blockType, fluidId);
     }
 
     @Nullable
