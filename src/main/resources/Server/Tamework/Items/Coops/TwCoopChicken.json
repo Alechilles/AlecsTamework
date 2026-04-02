@@ -25,11 +25,17 @@
     "WildCaptureRadius": 10.0,
     "AcceptedRoleIds": [
       "chicken",
+      "Chicken_Chick",
       "chicken_desert",
+      "Chicken_Desert_Chick",
       "skrill",
+      "Skrill_Chick",
       "tamed_chicken",
+      "Tamed_Chicken_Chick",
       "tamed_chicken_desert",
+      "Tamed_Chicken_Desert_Chick",
       "tamed_skrill",
+      "Tamed_Skrill_Chick",
       "Turkey",
       "Tamed_Turkey"
     ]
