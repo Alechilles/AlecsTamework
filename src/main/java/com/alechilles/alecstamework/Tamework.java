@@ -2,7 +2,6 @@ package com.alechilles.alecstamework;
 
 import java.util.Set;
 import java.util.List;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.nio.file.Path;
@@ -117,7 +116,6 @@ import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
-import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
@@ -151,7 +149,6 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 public class Tamework extends JavaPlugin {
     private static final String ANIMAL_HUSBANDRY_MOD_ID = "Alechilles:Alec's Animal Husbandry!";
     private static final String COOPS_MOD_ID = "Alechilles:Alec's Coops!";
-    private static final String COOPS_FALLBACK_WARNING_MESSAGE = "Warning: Alec's Coops is not enabled! Alec's Animal Husbandry requires Alec's Coops for coop functionality to work properly. Fallbacks are temporarily included in Animal Husbandry to prevent issues, but they will be removed in the near future.";
 
     private static Tamework instance;
 
@@ -161,7 +158,6 @@ public class Tamework extends JavaPlugin {
     private TameworkAssetPackCoordinator assetPackCoordinator;
     private TwConfigOverrideManager configOverrideManager;
     private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
-    private final Set<UUID> coopsFallbackWarningSentPlayers = ConcurrentHashMap.newKeySet();
 
     private TranslationRegistry translationRegistry;
     private SpawnerFeatureHandler spawnerFeatureHandler;
@@ -231,7 +227,6 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugCoopLogs;
     private volatile boolean debugBreedingLogs;
     private volatile boolean debugNeedsConsumeDiagnosticsLogs;
-    private volatile boolean coopsFallbackWarningActive;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -622,10 +617,6 @@ public class Tamework extends JavaPlugin {
                 PlayerDisconnectEvent.class,
                 ownerPresenceTimelineService::onPlayerDisconnect
         );
-        getEventRegistry().registerGlobal(
-                PlayerDisconnectEvent.class,
-                this::onPlayerDisconnectForCoopsWarning
-        );
         if (namingFeatureHandler != null) {
             getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
             getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
@@ -661,7 +652,7 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void start() {
-        refreshCoopsFallbackWarningState();
+        enforceCoopsRequirementForAnimalHusbandry();
         OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
         initializeOverridesForLoadedWorlds();
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
@@ -673,11 +664,20 @@ public class Tamework extends JavaPlugin {
         }
     }
 
-    private void refreshCoopsFallbackWarningState() {
+    private void enforceCoopsRequirementForAnimalHusbandry() {
         InstalledModManifestDiscovery discovery = new InstalledModManifestDiscovery(getLogger());
         List<InstalledModManifest> loadedManifests = discovery.discoverLoadedWorldManifests(getDataDirectory());
-        coopsFallbackWarningActive = hasLoadedMod(loadedManifests, ANIMAL_HUSBANDRY_MOD_ID)
-                && !hasLoadedMod(loadedManifests, COOPS_MOD_ID);
+        if (!hasLoadedMod(loadedManifests, ANIMAL_HUSBANDRY_MOD_ID)) {
+            return;
+        }
+        if (hasLoadedMod(loadedManifests, COOPS_MOD_ID)) {
+            return;
+        }
+
+        String message = "Startup blocked: Alec's Animal Husbandry! is enabled, but Alec's Coops! is not enabled for this world. "
+                + "Enable Alec's Coops! in the world mod list (or disable Animal Husbandry) and restart.";
+        getLogger().at(Level.SEVERE).log(message);
+        throw new IllegalStateException(message);
     }
 
     private boolean hasLoadedMod(@Nullable List<InstalledModManifest> manifests, @Nonnull String modId) {
@@ -723,29 +723,6 @@ public class Tamework extends JavaPlugin {
             return;
         }
         initializeOverridesForWorld(event.getWorld());
-        warnPlayerIfCoopsFallbackActive(event);
-    }
-
-    private void warnPlayerIfCoopsFallbackActive(@Nullable AddPlayerToWorldEvent event) {
-        if (!coopsFallbackWarningActive || event == null || event.getHolder() == null) {
-            return;
-        }
-        Player player = event.getHolder().getComponent(Player.getComponentType());
-        if (player == null || player.getUuid() == null) {
-            return;
-        }
-        if (!coopsFallbackWarningSentPlayers.add(player.getUuid())) {
-            return;
-        }
-        player.sendMessage(Message.raw("\u00A7c" + COOPS_FALLBACK_WARNING_MESSAGE + "\u00A7r"));
-        getLogger().at(Level.SEVERE).log(COOPS_FALLBACK_WARNING_MESSAGE);
-    }
-
-    private void onPlayerDisconnectForCoopsWarning(@Nullable PlayerDisconnectEvent event) {
-        if (event == null || event.getPlayerRef() == null || event.getPlayerRef().getUuid() == null) {
-            return;
-        }
-        coopsFallbackWarningSentPlayers.remove(event.getPlayerRef().getUuid());
     }
 
     private void initializeOverridesForLoadedWorlds() {
