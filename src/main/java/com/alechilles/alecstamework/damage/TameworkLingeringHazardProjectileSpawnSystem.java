@@ -69,6 +69,7 @@ public final class TameworkLingeringHazardProjectileSpawnSystem extends RefSyste
                         lingeringProjectile.getDamagePerTick(),
                         lingeringProjectile.isExcludeSource(),
                         lingeringProjectile.getSourceTypeId(),
+                        lingeringProjectile.getEffectId(),
                         lingeringProjectile.getSourceEntityUuid()
                 )
         );

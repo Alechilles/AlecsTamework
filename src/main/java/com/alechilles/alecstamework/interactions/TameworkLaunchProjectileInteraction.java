@@ -1,9 +1,11 @@
 package com.alechilles.alecstamework.interactions;
 
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
+import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.codec.codecs.EnumCodec;
 import com.hypixel.hytale.codec.validation.Validators;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -93,6 +95,13 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                     (interaction, parent) -> interaction.failIfNoSolution = parent.failIfNoSolution
             )
             .add()
+            .<TrajectoryMode>appendInherited(
+                    new KeyedCodec<>("TrajectoryMode", new EnumCodec<>(TrajectoryMode.class)),
+                    (interaction, value) -> interaction.trajectoryMode = value,
+                    interaction -> interaction.trajectoryMode,
+                    (interaction, parent) -> interaction.trajectoryMode = parent.trajectoryMode
+            )
+            .add()
             .<Double>appendInherited(
                     new KeyedCodec<>("RandomAroundSourceMinRadius", Codec.DOUBLE),
                     (interaction, value) -> interaction.randomAroundSourceMinRadius = value,
@@ -114,6 +123,13 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                     (interaction, parent) -> interaction.randomAroundSourceVerticalOffset = parent.randomAroundSourceVerticalOffset
             )
             .add()
+            .<ImpactEffectSettings>appendInherited(
+                    new KeyedCodec<>("ImpactEffect", ImpactEffectSettings.CODEC),
+                    (interaction, value) -> interaction.impactEffect = value,
+                    interaction -> interaction.impactEffect,
+                    (interaction, parent) -> interaction.impactEffect = parent.impactEffect
+            )
+            .add()
             .<LingeringHazardSettings>appendInherited(
                     new KeyedCodec<>("LingeringHazard", LingeringHazardSettings.CODEC),
                     (interaction, value) -> interaction.lingeringHazard = value,
@@ -130,9 +146,12 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     private double yawSpreadDegrees = 0.0;
     private double pitchSpreadDegrees = 0.0;
     private boolean failIfNoSolution = true;
+    private TrajectoryMode trajectoryMode = TrajectoryMode.HIGH_ANGLE;
     private double randomAroundSourceMinRadius = 0.0;
     private double randomAroundSourceMaxRadius = 0.0;
     private double randomAroundSourceVerticalOffset = 0.0;
+    @Nullable
+    private ImpactEffectSettings impactEffect;
     @Nullable
     private LingeringHazardSettings lingeringHazard;
 
@@ -185,7 +204,9 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                 targetPosition.getX() - sourceLook.getPosition().getX(),
                 targetPosition.getZ() - sourceLook.getPosition().getZ()
         );
-        Float pitch = solveHighAnglePitch(sourceLook.getPosition(), targetPosition, muzzleVelocity, gravity);
+        Float pitch = this.trajectoryMode == TrajectoryMode.DIRECT
+                ? solveDirectPitch(sourceLook.getPosition(), targetPosition)
+                : solveHighAnglePitch(sourceLook.getPosition(), targetPosition, muzzleVelocity, gravity);
         if (pitch == null) {
             fail(context);
             return;
@@ -228,6 +249,10 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                 yaw,
                 pitch
         );
+        TameworkProjectileImpactEffectComponent impactEffectComponent = buildImpactEffectComponent(sourceUuid);
+        if (impactEffectComponent != null && TameworkProjectileImpactEffectComponent.getComponentType() != null) {
+            holder.putComponent(TameworkProjectileImpactEffectComponent.getComponentType(), impactEffectComponent);
+        }
         TameworkLingeringHazardProjectileComponent lingeringHazardComponent = buildLingeringHazardComponent(sourceUuid);
         if (lingeringHazardComponent != null && TameworkLingeringHazardProjectileComponent.getComponentType() != null) {
             holder.putComponent(TameworkLingeringHazardProjectileComponent.getComponentType(), lingeringHazardComponent);
@@ -356,12 +381,38 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         return Float.isFinite(pitch) ? pitch : null;
     }
 
+    @Nullable
+    private Float solveDirectPitch(@Nonnull Vector3d sourcePosition, @Nonnull Vector3d targetPosition) {
+        double dx = targetPosition.getX() - sourcePosition.getX();
+        double dz = targetPosition.getZ() - sourcePosition.getZ();
+        double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+        double verticalDelta = targetPosition.getY() - sourcePosition.getY();
+        if (horizontalDistance <= MIN_HORIZONTAL_DISTANCE && Math.abs(verticalDelta) <= MIN_POSITIVE_VALUE) {
+            return 0.0F;
+        }
+        float pitch = (float) Math.atan2(verticalDelta, Math.max(horizontalDistance, MIN_HORIZONTAL_DISTANCE));
+        return Float.isFinite(pitch) ? pitch : null;
+    }
+
     private float randomSpreadRadians(double spreadDegrees) {
         if (spreadDegrees <= 0.0) {
             return 0.0F;
         }
         double spreadRadians = Math.toRadians(spreadDegrees);
         return (float) ThreadLocalRandom.current().nextDouble(-spreadRadians, spreadRadians);
+    }
+
+    @Nullable
+    private TameworkProjectileImpactEffectComponent buildImpactEffectComponent(@Nonnull UUID sourceUuid) {
+        if (this.impactEffect == null || !this.impactEffect.isEnabled()) {
+            return null;
+        }
+        return new TameworkProjectileImpactEffectComponent(
+                this.impactEffect.getRadius(),
+                this.impactEffect.getEffectId(),
+                this.impactEffect.isExcludeSource(),
+                sourceUuid.toString()
+        );
     }
 
     @Nullable
@@ -376,6 +427,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                 this.lingeringHazard.getDamagePerTick(),
                 this.lingeringHazard.isExcludeSource(),
                 this.lingeringHazard.getSourceTypeId(),
+                this.lingeringHazard.getEffectId(),
                 sourceUuid.toString()
         );
     }
@@ -383,6 +435,67 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     private void fail(@Nonnull InteractionContext context) {
         if (this.failIfNoSolution) {
             context.getState().state = InteractionState.Failed;
+        }
+    }
+
+    public enum TrajectoryMode {
+        DIRECT,
+        HIGH_ANGLE
+    }
+
+    public static final class ImpactEffectSettings {
+        public static final BuilderCodec<ImpactEffectSettings> CODEC = BuilderCodec.builder(
+                ImpactEffectSettings.class,
+                ImpactEffectSettings::new
+        )
+                .<String>append(
+                        new KeyedCodec<>("EffectId", Codec.STRING),
+                        (settings, value) -> settings.effectId = value,
+                        settings -> settings.effectId
+                )
+                .add()
+                .<Double>append(
+                        new KeyedCodec<>("Radius", Codec.DOUBLE),
+                        (settings, value) -> settings.radius = value == null ? 0.0 : value,
+                        settings -> settings.radius
+                )
+                .add()
+                .<Boolean>append(
+                        new KeyedCodec<>("ExcludeSource", Codec.BOOLEAN),
+                        (settings, value) -> settings.excludeSource = value == null || value,
+                        settings -> settings.excludeSource
+                )
+                .add()
+                .build();
+
+        private String effectId;
+        private double radius;
+        private boolean excludeSource = true;
+
+        public ImpactEffectSettings() {
+        }
+
+        public boolean isEnabled() {
+            return effectId != null && !effectId.isBlank() && getRadius() > 0.0;
+        }
+
+        public String getEffectId() {
+            return effectId;
+        }
+
+        public double getRadius() {
+            return sanitizePositive(radius, 0.0);
+        }
+
+        public boolean isExcludeSource() {
+            return excludeSource;
+        }
+
+        private static double sanitizePositive(double value, double fallback) {
+            if (!Double.isFinite(value) || value <= 0.0) {
+                return fallback;
+            }
+            return value;
         }
     }
 
@@ -427,6 +540,12 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                         settings -> settings.sourceTypeId
                 )
                 .add()
+                .<String>append(
+                        new KeyedCodec<>("EffectId", Codec.STRING),
+                        (settings, value) -> settings.effectId = value,
+                        settings -> settings.effectId
+                )
+                .add()
                 .build();
 
         private double radius;
@@ -435,6 +554,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         private double damagePerTick;
         private boolean excludeSource = true;
         private String sourceTypeId = "tamework.lingering_hazard";
+        private String effectId;
 
         public LingeringHazardSettings() {
         }
@@ -465,6 +585,10 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
 
         public String getSourceTypeId() {
             return sourceTypeId == null || sourceTypeId.isBlank() ? "tamework.lingering_hazard" : sourceTypeId;
+        }
+
+        public String getEffectId() {
+            return effectId;
         }
 
         private static double sanitizePositive(double value, double fallback) {

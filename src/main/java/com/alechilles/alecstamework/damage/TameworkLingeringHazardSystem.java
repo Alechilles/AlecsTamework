@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.effects.TameworkEntityEffectService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -102,6 +103,7 @@ public final class TameworkLingeringHazardSystem extends TickingSystem<EntitySto
                                 commandBuffer,
                                 new Damage(resolveDamageSource(hazard, store), resolveDamageCause(), (float) hazard.getDamagePerTick())
                         );
+                        TameworkEntityEffectService.applyEffect(targetRef, hazard.getEffectId(), commandBuffer);
                     }
                 }
         );

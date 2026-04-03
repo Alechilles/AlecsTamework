@@ -50,6 +50,12 @@ public final class TameworkLingeringHazardProjectileComponent implements Compone
             )
             .add()
             .<String>append(
+                    new KeyedCodec<>("EffectId", Codec.STRING),
+                    (component, value) -> component.effectId = value,
+                    component -> component.effectId
+            )
+            .add()
+            .<String>append(
                     new KeyedCodec<>("SourceEntityUuid", Codec.STRING),
                     (component, value) -> component.sourceEntityUuid = value,
                     component -> component.sourceEntityUuid
@@ -63,6 +69,7 @@ public final class TameworkLingeringHazardProjectileComponent implements Compone
     private double damagePerTick;
     private boolean excludeSource = true;
     private String sourceTypeId = "tamework.lingering_hazard";
+    private String effectId;
     private String sourceEntityUuid;
 
     public TameworkLingeringHazardProjectileComponent() {
@@ -74,6 +81,7 @@ public final class TameworkLingeringHazardProjectileComponent implements Compone
                                                       double damagePerTick,
                                                       boolean excludeSource,
                                                       String sourceTypeId,
+                                                      String effectId,
                                                       String sourceEntityUuid) {
         this.radius = radius;
         this.durationSeconds = durationSeconds;
@@ -81,6 +89,7 @@ public final class TameworkLingeringHazardProjectileComponent implements Compone
         this.damagePerTick = damagePerTick;
         this.excludeSource = excludeSource;
         this.sourceTypeId = sourceTypeId;
+        this.effectId = effectId;
         this.sourceEntityUuid = sourceEntityUuid;
     }
 
@@ -117,6 +126,10 @@ public final class TameworkLingeringHazardProjectileComponent implements Compone
         return sourceTypeId == null || sourceTypeId.isBlank() ? "tamework.lingering_hazard" : sourceTypeId;
     }
 
+    public String getEffectId() {
+        return effectId;
+    }
+
     public String getSourceEntityUuid() {
         return sourceEntityUuid;
     }
@@ -130,6 +143,7 @@ public final class TameworkLingeringHazardProjectileComponent implements Compone
                 damagePerTick,
                 excludeSource,
                 sourceTypeId,
+                effectId,
                 sourceEntityUuid
         );
     }
