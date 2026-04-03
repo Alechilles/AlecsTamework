@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework;
 
 import java.util.Set;
+import java.util.List;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.nio.file.Path;
@@ -70,6 +71,8 @@ import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.metrics.InstalledModManifest;
+import com.alechilles.alecstamework.metrics.InstalledModManifestDiscovery;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
@@ -144,6 +147,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
  * Main entry point for the Alec's Tamework! plugin.
  */
 public class Tamework extends JavaPlugin {
+    private static final String ANIMAL_HUSBANDRY_MOD_ID = "Alechilles:Alec's Animal Husbandry!";
+    private static final String COOPS_MOD_ID = "Alechilles:Alec's Coops!";
 
     private static Tamework instance;
 
@@ -647,6 +652,7 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void start() {
+        enforceCoopsRequirementForAnimalHusbandry();
         OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
         initializeOverridesForLoadedWorlds();
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
@@ -656,6 +662,37 @@ public class Tamework extends JavaPlugin {
         if (assetPackCoordinator != null) {
             assetPackCoordinator.ensureAssetEditorPackVisible();
         }
+    }
+
+    private void enforceCoopsRequirementForAnimalHusbandry() {
+        InstalledModManifestDiscovery discovery = new InstalledModManifestDiscovery(getLogger());
+        List<InstalledModManifest> loadedManifests = discovery.discoverLoadedWorldManifests(getDataDirectory());
+        if (!hasLoadedMod(loadedManifests, ANIMAL_HUSBANDRY_MOD_ID)) {
+            return;
+        }
+        if (hasLoadedMod(loadedManifests, COOPS_MOD_ID)) {
+            return;
+        }
+
+        String message = "Startup blocked: Alec's Animal Husbandry! is enabled, but Alec's Coops! is not enabled for this world. "
+                + "Enable Alec's Coops! in the world mod list (or disable Animal Husbandry) and restart.";
+        getLogger().at(Level.SEVERE).log(message);
+        throw new IllegalStateException(message);
+    }
+
+    private boolean hasLoadedMod(@Nullable List<InstalledModManifest> manifests, @Nonnull String modId) {
+        if (manifests == null || manifests.isEmpty()) {
+            return false;
+        }
+        for (InstalledModManifest manifest : manifests) {
+            if (manifest == null || manifest.modId() == null) {
+                continue;
+            }
+            if (modId.equalsIgnoreCase(manifest.modId())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

@@ -38,6 +38,28 @@ public final class InstalledModManifestDiscovery {
 
     public List<InstalledModManifest> discover(Path dataDirectory) {
         List<Path> modsDirs = resolveModsDirectories(dataDirectory);
+        return discoverFromDirectories(modsDirs);
+    }
+
+    /**
+     * Discovers manifests from the currently loaded world mods directory when available.
+     *
+     * <p>This intentionally avoids the global mods folder when world-scoped mods exist so
+     * startup guards can reason about what is actually enabled for the running world.
+     */
+    public List<InstalledModManifest> discoverLoadedWorldManifests(Path dataDirectory) {
+        Path saveModsDir = resolveSaveModsDirectory(dataDirectory);
+        if (saveModsDir != null) {
+            return discoverFromDirectories(List.of(saveModsDir));
+        }
+        Path globalModsDir = resolveGlobalModsDirectory(dataDirectory);
+        if (globalModsDir != null) {
+            return discoverFromDirectories(List.of(globalModsDir));
+        }
+        return List.of();
+    }
+
+    private List<InstalledModManifest> discoverFromDirectories(List<Path> modsDirs) {
         Map<String, InstalledModManifest> manifestsByModId = new LinkedHashMap<>();
         for (Path modsDir : modsDirs) {
             loadFromModsDirectory(modsDir, manifestsByModId);
