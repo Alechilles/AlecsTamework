@@ -38,6 +38,7 @@ import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
+import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
@@ -237,6 +238,12 @@ public class Tamework extends JavaPlugin {
                 "TameworkClearFeedTroughWater",
                 TameworkClearFeedTroughWaterInteraction.class,
                 TameworkClearFeedTroughWaterInteraction.CODEC
+        );
+        // Register the custom projectile interaction used for solved lobbed shots.
+        Interaction.CODEC.register(
+                "TameworkLaunchProjectile",
+                TameworkLaunchProjectileInteraction.class,
+                TameworkLaunchProjectileInteraction.CODEC
         );
         itemFeatureRegistry.registerDefaults();
         registerGlobalConfigAssets();

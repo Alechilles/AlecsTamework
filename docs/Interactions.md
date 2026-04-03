@@ -136,6 +136,33 @@ Example:
 }
 ```
 
+### `TameworkLaunchProjectile`
+Launches a projectile using a solved high-angle ballistic arc instead of the source entity's current look pitch.
+
+Fields:
+- `ProjectileId` required projectile asset id.
+- `Target` optional enum: `USER`, `OWNER`, `TARGET`. Defaults to `TARGET`.
+- `TargetSlot` optional NPC marked target slot. When present, Tamework first tries the source NPC's marked target in that slot and falls back to `Target` resolution if none is present.
+- `YawSpreadDegrees` optional symmetric yaw spread applied after the arc is solved.
+- `PitchSpreadDegrees` optional symmetric pitch spread applied after the arc is solved.
+- `FailIfNoSolution` optional bool. Defaults to `true`.
+
+Behavior:
+- Uses the projectile's `MuzzleVelocity` and `Gravity` to solve the high-angle lob.
+- Uses the normal projectile spawn path after solving, so projectile asset offsets such as `VerticalCenterShot`, `HorizontalCenterShot`, `DepthShot`, and `PitchAdjustShot` still apply.
+- If no valid arc exists and `FailIfNoSolution` is `true`, the interaction fails cleanly.
+
+Example:
+```json
+{
+  "Type": "TameworkLaunchProjectile",
+  "ProjectileId": "Hydra_Rain_Ice_Ball",
+  "TargetSlot": "CAETargetSlot",
+  "YawSpreadDegrees": 4.0,
+  "PitchSpreadDegrees": 2.0
+}
+```
+
 ## Requirements
 `Requires` has two buckets:
 - `All`: every listed requirement set must pass.
