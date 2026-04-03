@@ -92,6 +92,27 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                     (interaction, parent) -> interaction.failIfNoSolution = parent.failIfNoSolution
             )
             .add()
+            .<Double>appendInherited(
+                    new KeyedCodec<>("RandomAroundSourceMinRadius", Codec.DOUBLE),
+                    (interaction, value) -> interaction.randomAroundSourceMinRadius = value,
+                    interaction -> interaction.randomAroundSourceMinRadius,
+                    (interaction, parent) -> interaction.randomAroundSourceMinRadius = parent.randomAroundSourceMinRadius
+            )
+            .add()
+            .<Double>appendInherited(
+                    new KeyedCodec<>("RandomAroundSourceMaxRadius", Codec.DOUBLE),
+                    (interaction, value) -> interaction.randomAroundSourceMaxRadius = value,
+                    interaction -> interaction.randomAroundSourceMaxRadius,
+                    (interaction, parent) -> interaction.randomAroundSourceMaxRadius = parent.randomAroundSourceMaxRadius
+            )
+            .add()
+            .<Double>appendInherited(
+                    new KeyedCodec<>("RandomAroundSourceVerticalOffset", Codec.DOUBLE),
+                    (interaction, value) -> interaction.randomAroundSourceVerticalOffset = value,
+                    interaction -> interaction.randomAroundSourceVerticalOffset,
+                    (interaction, parent) -> interaction.randomAroundSourceVerticalOffset = parent.randomAroundSourceVerticalOffset
+            )
+            .add()
             .build();
 
     private String projectileId;
@@ -101,6 +122,9 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     private double yawSpreadDegrees = 0.0;
     private double pitchSpreadDegrees = 0.0;
     private boolean failIfNoSolution = true;
+    private double randomAroundSourceMinRadius = 0.0;
+    private double randomAroundSourceMaxRadius = 0.0;
+    private double randomAroundSourceVerticalOffset = 0.0;
 
     protected TameworkLaunchProjectileInteraction() {
         super();
@@ -141,13 +165,7 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         }
 
         Transform sourceLook = TargetUtil.getLook(sourceRef, commandBuffer);
-        Ref<EntityStore> targetRef = resolveTargetRef(context, sourceRef, commandBuffer);
-        if (targetRef == null || !targetRef.isValid()) {
-            fail(context);
-            return;
-        }
-
-        Vector3d targetPosition = resolveAimPosition(targetRef, commandBuffer);
+        Vector3d targetPosition = resolveTargetPosition(context, sourceRef, commandBuffer, sourceLook);
         if (targetPosition == null) {
             fail(context);
             return;
@@ -210,6 +228,22 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     }
 
     @Nullable
+    private Vector3d resolveTargetPosition(@Nonnull InteractionContext context,
+                                           @Nonnull Ref<EntityStore> sourceRef,
+                                           @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                           @Nonnull Transform sourceLook) {
+        if (this.randomAroundSourceMaxRadius > 0.0) {
+            return resolveRandomAroundSourceTarget(sourceRef, commandBuffer, sourceLook);
+        }
+
+        Ref<EntityStore> targetRef = resolveTargetRef(context, sourceRef, commandBuffer);
+        if (targetRef == null || !targetRef.isValid()) {
+            return null;
+        }
+        return resolveAimPosition(targetRef, commandBuffer);
+    }
+
+    @Nullable
     private Ref<EntityStore> resolveTargetRef(@Nonnull InteractionContext context,
                                               @Nonnull Ref<EntityStore> sourceRef,
                                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
@@ -225,6 +259,35 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         InteractionTarget effectiveTarget = this.target != null ? this.target : InteractionTarget.TARGET;
         Ref<EntityStore> targetRef = effectiveTarget.getEntity(context, sourceRef);
         return targetRef != null && targetRef.isValid() ? targetRef : null;
+    }
+
+    @Nullable
+    private Vector3d resolveRandomAroundSourceTarget(@Nonnull Ref<EntityStore> sourceRef,
+                                                     @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                                     @Nonnull Transform sourceLook) {
+        TransformComponent transformComponent = commandBuffer.getComponent(sourceRef, TransformComponent.getComponentType());
+        Vector3d center = transformComponent != null ? transformComponent.getPosition() : sourceLook.getPosition();
+
+        double maxRadius = this.randomAroundSourceMaxRadius;
+        if (maxRadius <= 0.0) {
+            return null;
+        }
+
+        double minRadius = Math.max(0.0, this.randomAroundSourceMinRadius);
+        if (minRadius > maxRadius) {
+            return null;
+        }
+
+        ThreadLocalRandom random = ThreadLocalRandom.current();
+        double angle = random.nextDouble(0.0, Math.PI * 2.0);
+        double minRadiusSquared = minRadius * minRadius;
+        double maxRadiusSquared = maxRadius * maxRadius;
+        double radius = Math.sqrt(random.nextDouble(minRadiusSquared, maxRadiusSquared));
+        return new Vector3d(
+                center.getX() + Math.cos(angle) * radius,
+                center.getY() + this.randomAroundSourceVerticalOffset,
+                center.getZ() + Math.sin(angle) * radius
+        );
     }
 
     @Nullable
