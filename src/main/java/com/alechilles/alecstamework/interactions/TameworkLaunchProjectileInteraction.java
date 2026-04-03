@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.interactions;
 
+import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -113,6 +114,13 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                     (interaction, parent) -> interaction.randomAroundSourceVerticalOffset = parent.randomAroundSourceVerticalOffset
             )
             .add()
+            .<LingeringHazardSettings>appendInherited(
+                    new KeyedCodec<>("LingeringHazard", LingeringHazardSettings.CODEC),
+                    (interaction, value) -> interaction.lingeringHazard = value,
+                    interaction -> interaction.lingeringHazard,
+                    (interaction, parent) -> interaction.lingeringHazard = parent.lingeringHazard
+            )
+            .add()
             .build();
 
     private String projectileId;
@@ -125,6 +133,8 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
     private double randomAroundSourceMinRadius = 0.0;
     private double randomAroundSourceMaxRadius = 0.0;
     private double randomAroundSourceVerticalOffset = 0.0;
+    @Nullable
+    private LingeringHazardSettings lingeringHazard;
 
     protected TameworkLaunchProjectileInteraction() {
         super();
@@ -218,6 +228,10 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
                 yaw,
                 pitch
         );
+        TameworkLingeringHazardProjectileComponent lingeringHazardComponent = buildLingeringHazardComponent(sourceUuid);
+        if (lingeringHazardComponent != null && TameworkLingeringHazardProjectileComponent.getComponentType() != null) {
+            holder.putComponent(TameworkLingeringHazardProjectileComponent.getComponentType(), lingeringHazardComponent);
+        }
         commandBuffer.addEntity(holder, AddReason.SPAWN);
     }
 
@@ -350,9 +364,114 @@ public class TameworkLaunchProjectileInteraction extends SimpleInstantInteractio
         return (float) ThreadLocalRandom.current().nextDouble(-spreadRadians, spreadRadians);
     }
 
+    @Nullable
+    private TameworkLingeringHazardProjectileComponent buildLingeringHazardComponent(@Nonnull UUID sourceUuid) {
+        if (this.lingeringHazard == null || !this.lingeringHazard.isEnabled()) {
+            return null;
+        }
+        return new TameworkLingeringHazardProjectileComponent(
+                this.lingeringHazard.getRadius(),
+                this.lingeringHazard.getDurationSeconds(),
+                this.lingeringHazard.getTickIntervalSeconds(),
+                this.lingeringHazard.getDamagePerTick(),
+                this.lingeringHazard.isExcludeSource(),
+                this.lingeringHazard.getSourceTypeId(),
+                sourceUuid.toString()
+        );
+    }
+
     private void fail(@Nonnull InteractionContext context) {
         if (this.failIfNoSolution) {
             context.getState().state = InteractionState.Failed;
+        }
+    }
+
+    public static final class LingeringHazardSettings {
+        public static final BuilderCodec<LingeringHazardSettings> CODEC = BuilderCodec.builder(
+                LingeringHazardSettings.class,
+                LingeringHazardSettings::new
+        )
+                .<Double>append(
+                        new KeyedCodec<>("Radius", Codec.DOUBLE),
+                        (settings, value) -> settings.radius = value == null ? 0.0 : value,
+                        settings -> settings.radius
+                )
+                .add()
+                .<Double>append(
+                        new KeyedCodec<>("DurationSeconds", Codec.DOUBLE),
+                        (settings, value) -> settings.durationSeconds = value == null ? 0.0 : value,
+                        settings -> settings.durationSeconds
+                )
+                .add()
+                .<Double>append(
+                        new KeyedCodec<>("TickIntervalSeconds", Codec.DOUBLE),
+                        (settings, value) -> settings.tickIntervalSeconds = value == null ? 0.0 : value,
+                        settings -> settings.tickIntervalSeconds
+                )
+                .add()
+                .<Double>append(
+                        new KeyedCodec<>("DamagePerTick", Codec.DOUBLE),
+                        (settings, value) -> settings.damagePerTick = value == null ? 0.0 : value,
+                        settings -> settings.damagePerTick
+                )
+                .add()
+                .<Boolean>append(
+                        new KeyedCodec<>("ExcludeSource", Codec.BOOLEAN),
+                        (settings, value) -> settings.excludeSource = value == null || value,
+                        settings -> settings.excludeSource
+                )
+                .add()
+                .<String>append(
+                        new KeyedCodec<>("SourceTypeId", Codec.STRING),
+                        (settings, value) -> settings.sourceTypeId = value,
+                        settings -> settings.sourceTypeId
+                )
+                .add()
+                .build();
+
+        private double radius;
+        private double durationSeconds;
+        private double tickIntervalSeconds;
+        private double damagePerTick;
+        private boolean excludeSource = true;
+        private String sourceTypeId = "tamework.lingering_hazard";
+
+        public LingeringHazardSettings() {
+        }
+
+        public boolean isEnabled() {
+            return getRadius() > 0.0 && getDurationSeconds() > 0.0 && getTickIntervalSeconds() > 0.0 && getDamagePerTick() > 0.0;
+        }
+
+        public double getRadius() {
+            return sanitizePositive(radius, 0.0);
+        }
+
+        public double getDurationSeconds() {
+            return sanitizePositive(durationSeconds, 0.0);
+        }
+
+        public double getTickIntervalSeconds() {
+            return sanitizePositive(tickIntervalSeconds, 0.0);
+        }
+
+        public double getDamagePerTick() {
+            return sanitizePositive(damagePerTick, 0.0);
+        }
+
+        public boolean isExcludeSource() {
+            return excludeSource;
+        }
+
+        public String getSourceTypeId() {
+            return sourceTypeId == null || sourceTypeId.isBlank() ? "tamework.lingering_hazard" : sourceTypeId;
+        }
+
+        private static double sanitizePositive(double value, double fallback) {
+            if (!Double.isFinite(value) || value <= 0.0) {
+                return fallback;
+            }
+            return value;
         }
     }
 }

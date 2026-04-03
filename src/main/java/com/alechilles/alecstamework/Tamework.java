@@ -35,6 +35,10 @@ import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
+import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
+import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
+import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
+import com.alechilles.alecstamework.damage.TameworkLingeringHazardSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
@@ -198,6 +202,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
+    private ComponentType<EntityStore, TameworkLingeringHazardProjectileComponent> lingeringHazardProjectileComponentType;
+    private ComponentType<EntityStore, TameworkLingeringHazardComponent> lingeringHazardComponentType;
     private ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> apiSelfTestFixtureMarkerComponentType;
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
@@ -335,6 +341,18 @@ public class Tamework extends JavaPlugin {
                 TameworkLifeStageComponent.class,
                 "TameworkLifeStage",
                 TameworkLifeStageComponent.CODEC
+        );
+
+        lingeringHazardProjectileComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkLingeringHazardProjectileComponent.class,
+                "TameworkLingeringHazardProjectile",
+                TameworkLingeringHazardProjectileComponent.CODEC
+        );
+
+        lingeringHazardComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkLingeringHazardComponent.class,
+                "TameworkLingeringHazard",
+                TameworkLingeringHazardComponent.CODEC
         );
 
         apiSelfTestFixtureMarkerComponentType = getEntityStoreRegistry().registerComponent(
@@ -490,6 +508,20 @@ public class Tamework extends JavaPlugin {
                 new OwnerDamageFilterSystem(getLogger())
         );
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
+        getEntityStoreRegistry().registerSystem(
+                new TameworkLingeringHazardProjectileSpawnSystem(
+                        lingeringHazardProjectileComponentType,
+                        lingeringHazardComponentType,
+                        com.hypixel.hytale.server.core.entity.entities.ProjectileComponent.getComponentType(),
+                        com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new TameworkLingeringHazardSystem(
+                        lingeringHazardComponentType,
+                        com.hypixel.hytale.server.core.modules.entity.component.TransformComponent.getComponentType()
+                )
+        );
 
         // Load item feature configs from bundled defaults and mod overrides.
         int loadedSpawner = loadSpawnerItemAssets();
@@ -1470,6 +1502,14 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkLifeStageComponent> getLifeStageComponentType() {
         return lifeStageComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkLingeringHazardProjectileComponent> getLingeringHazardProjectileComponentType() {
+        return lingeringHazardProjectileComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkLingeringHazardComponent> getLingeringHazardComponentType() {
+        return lingeringHazardComponentType;
     }
 
     public ComponentType<EntityStore, ApiSelfTestFixtureMarkerComponent> getApiSelfTestFixtureMarkerComponentType() {
