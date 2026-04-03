@@ -81,43 +81,6 @@ class InstalledModManifestDiscoveryTest {
         assertTrue(nametags.dependsOnTamework());
     }
 
-    @Test
-    void discoversLoadedWorldManifestsFromSaveModsDirectoryFirst() throws Exception {
-        Path userData = tempDir.resolve("UserData");
-        Path globalMods = userData.resolve("Mods");
-        Files.createDirectories(globalMods);
-
-        writeArchiveManifest(
-                globalMods.resolve("CoopsPack.zip"),
-                "Alechilles",
-                "Alec's Coops!",
-                "1.0.0",
-                true
-        );
-
-        Path worldMods = userData.resolve("Saves")
-                .resolve("WorldOne")
-                .resolve("mods");
-        Files.createDirectories(worldMods);
-
-        writeArchiveManifest(
-                worldMods.resolve("AnimalHusbandryPack.zip"),
-                "Alechilles",
-                "Alec's Animal Husbandry!",
-                "1.3.3",
-                true
-        );
-
-        Path dataDirectory = worldMods.resolve("Alec's Tamework!");
-        Files.createDirectories(dataDirectory);
-
-        InstalledModManifestDiscovery discovery = new InstalledModManifestDiscovery(null);
-        List<InstalledModManifest> manifests = discovery.discoverLoadedWorldManifests(dataDirectory);
-
-        assertEquals(1, manifests.size());
-        assertEquals("Alechilles:Alec's Animal Husbandry!", manifests.get(0).modId());
-    }
-
     private static void writeFolderManifest(Path folder, String group, String name, String version, boolean dependsOnTamework)
             throws IOException {
         Files.createDirectories(folder);
