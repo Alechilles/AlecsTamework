@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
+import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
@@ -83,6 +84,9 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
+        if (!hasEnabledManagedCoopConfigs()) {
+            return;
+        }
         long nowMs = System.currentTimeMillis();
         if (nowMs < nextSweepAtMs) {
             return;
@@ -564,6 +568,19 @@ public final class CommandCoopResidentSyncSystem extends TickingSystem<EntitySto
         }
         TwCoopConfig config = TwCoopConfig.resolveForCoop(coopId);
         return config != null && config.isEnabled();
+    }
+
+    private boolean hasEnabledManagedCoopConfigs() {
+        DefaultAssetMap<String, TwCoopConfig> assetMap = TwCoopConfig.getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null || assetMap.getAssetMap().isEmpty()) {
+            return false;
+        }
+        for (TwCoopConfig config : assetMap.getAssetMap().values()) {
+            if (config != null && config.isEnabled()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private record CoopResidentContext(@Nullable String worldName,
