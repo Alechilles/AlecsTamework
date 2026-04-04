@@ -605,12 +605,17 @@ public final class TwConfigOverrideManager {
                 String sourcePackKey = normalizeSourcePackKey(rawSourcePackKey);
                 String descriptorKey = descriptorKey(binding.familyKey, sourcePackKey, assetId);
                 Path sourcePath = discoveredSourcePath;
-                if (isOverridePackKey(rawSourcePackKey)) {
-                    sourcePath = canonicalSourcePathsByDescriptorKey.get(descriptorKey);
-                } else {
-                    if (sourcePathExistsOnDisk(discoveredSourcePath)) {
-                        canonicalSourcePathsByDescriptorKey.put(descriptorKey, discoveredSourcePath);
-                    }
+                Path canonicalSourcePath = canonicalSourcePathsByDescriptorKey.get(descriptorKey);
+                // Some runtime reload paths can report non-override pack keys while still pointing to
+                // staging files. Prefer canonical non-staging source paths whenever discovery points
+                // to staging/missing files so descriptors remain visible under their source mod.
+                if ((sourcePath == null || isPathInStaging(sourcePath) || !sourcePathExistsOnDisk(sourcePath))
+                        && canonicalSourcePath != null
+                        && sourcePathExistsOnDisk(canonicalSourcePath)) {
+                    sourcePath = canonicalSourcePath;
+                }
+                if (sourcePathExistsOnDisk(discoveredSourcePath)) {
+                    canonicalSourcePathsByDescriptorKey.put(descriptorKey, discoveredSourcePath);
                 }
                 Object asset = entry.getValue();
                 String parentAssetId = resolveParentAssetId(asset);
