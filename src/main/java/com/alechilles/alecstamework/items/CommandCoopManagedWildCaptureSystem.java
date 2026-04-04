@@ -73,6 +73,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private static final Logger LOGGER = Logger.getLogger("Alec's Tamework!");
     private static final long SWEEP_INTERVAL_MS = 250L;
     private static final long DEBUG_STATUS_INTERVAL_MS = 2_000L;
+    private static final long DEBUG_STATUS_UNCHANGED_HEARTBEAT_MS = 30_000L;
     private static final long CAPTURE_INTERVAL_MS = 350L;
     private static final long RELEASE_INTERVAL_MS = 350L;
     private static final long PRODUCE_CHECK_INTERVAL_MS = 2_000L;
@@ -114,6 +115,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
     private long nextSweepAtMs;
     private long nextDebugStatusAtMs;
+    @Nullable
+    private String lastDebugStatusMessage;
+    private long lastDebugStatusLoggedAtMs;
+    private int suppressedUnchangedStatusCount;
 
     @Nullable
     private volatile ComponentType<ChunkStore, ?> itemContainerComponentType;
@@ -1754,6 +1759,24 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return;
         }
         nextDebugStatusAtMs = nowMs + DEBUG_STATUS_INTERVAL_MS;
+        if (message.equals(lastDebugStatusMessage)) {
+            suppressedUnchangedStatusCount++;
+            long unchangedDurationMs = nowMs - lastDebugStatusLoggedAtMs;
+            if (unchangedDurationMs < DEBUG_STATUS_UNCHANGED_HEARTBEAT_MS) {
+                return;
+            }
+            CoopDebugLogger.log(
+                    message
+                            + " unchangedRepeats=" + suppressedUnchangedStatusCount
+                            + " unchangedForMs=" + unchangedDurationMs
+            );
+            suppressedUnchangedStatusCount = 0;
+            lastDebugStatusLoggedAtMs = nowMs;
+            return;
+        }
+        suppressedUnchangedStatusCount = 0;
+        lastDebugStatusMessage = message;
+        lastDebugStatusLoggedAtMs = nowMs;
         CoopDebugLogger.log(message);
     }
 
