@@ -554,7 +554,10 @@ public final class TwConfigOverrideManager {
 
     @Nonnull
     private List<TwConfigAssetDescriptor> discoverDescriptors(@Nonnull List<StoreBinding> bindings) {
-        canonicalSourcePathsByDescriptorKey.clear();
+        // Keep canonical source-path entries across snapshots/reloads.
+        // After an override reload, AssetMap paths can point to staging files only.
+        // If we clear this cache each snapshot, unchanged assets from that pack look source-missing
+        // and get filtered out of the editor/global list.
         ArrayList<TwConfigAssetDescriptor> descriptors = new ArrayList<>();
         for (StoreBinding binding : bindings) {
             if (binding.store == null) {
