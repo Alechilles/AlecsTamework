@@ -74,6 +74,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private static final long SWEEP_INTERVAL_MS = 250L;
     private static final long DEBUG_STATUS_INTERVAL_MS = 2_000L;
     private static final long DEBUG_STATUS_UNCHANGED_HEARTBEAT_MS = 30_000L;
+    private static final long DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS = 30_000L;
+    private static final long DEBUG_THROTTLE_STATE_RETENTION_MS = 300_000L;
     private static final long CAPTURE_INTERVAL_MS = 350L;
     private static final long RELEASE_INTERVAL_MS = 350L;
     private static final long PRODUCE_CHECK_INTERVAL_MS = 2_000L;
@@ -111,6 +113,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private final HashMap<String, Long> nextProduceCheckAtByCoopKey = new HashMap<>();
     private final HashMap<String, Long> lastProduceAtGameMsBySlotKey = new HashMap<>();
     private final HashMap<String, Boolean> lastRoamingStateByCoopKey = new HashMap<>();
+    private final HashMap<String, Long> debugThrottleNextLogAtByKey = new HashMap<>();
+    private final HashMap<String, Integer> debugThrottleSuppressedCountByKey = new HashMap<>();
     private final HashSet<String> inFlightSlots = new HashSet<>();
 
     private long nextSweepAtMs;
@@ -152,6 +156,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return;
         }
         nextSweepAtMs = nowMs + SWEEP_INTERVAL_MS;
+        pruneDebugThrottleState(nowMs);
 
         World world = chunkStore.getExternalData() != null ? chunkStore.getExternalData().getWorld() : null;
         if (world == null || world.getEntityStore() == null || world.getChunkStore() == null) {
@@ -184,7 +189,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         pruneRuntimeState(activeCoopKeys);
         int removedCoopReleased = scanDiagnostics.containerTypeMissing
                 ? 0
-                : releaseResidentsFromRemovedCoops(world, chunkStore, entityStore, activeCoopKeys);
+                : releaseResidentsFromRemovedCoops(world, chunkStore, entityStore, activeCoopKeys, nowMs);
         if (managedCoops.isEmpty()) {
             maybeLogStatus(
                     nowMs,
@@ -546,7 +551,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private int releaseResidentsFromRemovedCoops(@Nonnull World world,
                                                   @Nonnull Store<ChunkStore> chunkStore,
                                                   @Nonnull Store<EntityStore> entityStore,
-                                                  @Nonnull Set<String> activeCoopKeys) {
+                                                  @Nonnull Set<String> activeCoopKeys,
+                                                  long nowMs) {
         List<CommandLinkedNpcCoopService.CoopSlotContext> housedSlots =
                 coopService.listHousedSlotsForWorld(world.getName());
         if (housedSlots.isEmpty()) {
@@ -562,7 +568,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 continue;
             }
             Vector3i coopBlock = new Vector3i(slotContext.x(), slotContext.y(), slotContext.z());
-            if (!isCoopConfirmedRemoved(world, chunkStore, slotContext, coopId, activeCoopKeys)) {
+            if (!isCoopConfirmedRemoved(world, chunkStore, slotContext, coopId, activeCoopKeys, nowMs)) {
                 continue;
             }
             String coopKey = buildCoopKey(world.getName(), coopBlock, coopId);
@@ -573,7 +579,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             try {
                 TwCoopConfig config = resolveCoopConfigByIdentifier(coopId);
                 if (!releaseResident(world, entityStore, slotContext, coopBlock, config)) {
-                    debugCoop(
+                    debugCoopThrottled(
+                            coopKey + "|reason=release_failed",
+                            nowMs,
+                            DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                             "removed check release failed coop=" + coopId
                                     + " slot=" + slotContext.residentSlot()
                                     + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -597,7 +606,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                                            @Nonnull Store<ChunkStore> chunkStore,
                                            @Nonnull CommandLinkedNpcCoopService.CoopSlotContext slotContext,
                                            @Nonnull String coopId,
-                                           @Nonnull Set<String> activeCoopKeys) {
+                                           @Nonnull Set<String> activeCoopKeys,
+                                           long nowMs) {
         Vector3i coopBlock = new Vector3i(slotContext.x(), slotContext.y(), slotContext.z());
         String coopKey = buildCoopKey(world.getName(), coopBlock, coopId);
         if (activeCoopKeys.contains(coopKey)) {
@@ -606,7 +616,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         WorldChunk worldChunk = world.getChunkIfInMemory(ChunkUtil.indexChunkFromBlock(coopBlock.x, coopBlock.z));
         if (worldChunk == null) {
             // Coop chunk is unloaded; do not treat as removal.
-            debugCoop(
+            debugCoopThrottled(
+                    coopKey + "|reason=chunk_unloaded",
+                    nowMs,
+                    DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check deferred chunk_unloaded coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                     + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -620,7 +633,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         Ref<ChunkStore> blockRef = worldChunk.getBlockComponentEntity(coopBlock.x, coopBlock.y, coopBlock.z);
         if (blockRef == null) {
             if (blockTypeCoopId != null && blockTypeCoopId.equals(coopId)) {
-                debugCoop(
+                debugCoopThrottled(
+                        coopKey + "|reason=missing_block_ref_matching_block_type",
+                        nowMs,
+                        DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                         "removed check deferred missing_block_ref_matching_block_type coop=" + coopId
                                 + " slot=" + slotContext.residentSlot()
                                 + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -628,7 +644,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 );
                 return false;
             }
-            debugCoop(
+            debugCoopThrottled(
+                    coopKey + "|reason=missing_block_ref",
+                    nowMs,
+                    DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check confirmed missing_block_ref coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                             + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -637,7 +656,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return true;
         }
         if (!blockRef.isValid()) {
-            debugCoop(
+            debugCoopThrottled(
+                    coopKey + "|reason=invalid_block_ref",
+                    nowMs,
+                    DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check deferred invalid_block_ref coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                             + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -647,7 +669,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         ComponentType<ChunkStore, ?> coopType = resolveCoopBlockComponentType();
         if (coopType == null) {
             // Without coop type introspection, fail closed to avoid accidental duplicate spawns.
-            debugCoop(
+            debugCoopThrottled(
+                    coopKey + "|reason=coop_type_unavailable",
+                    nowMs,
+                    DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check deferred coop_type_unavailable coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                             + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -657,7 +682,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         Object coopState = safeGetChunkComponent(chunkStore, blockRef, castComponentType(coopType));
         boolean removed = coopState == null;
         if (removed && blockTypeCoopId != null && blockTypeCoopId.equals(coopId)) {
-            debugCoop(
+            debugCoopThrottled(
+                    coopKey + "|reason=missing_component_matching_block_type",
+                    nowMs,
+                    DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check deferred missing_component_matching_block_type coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                             + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -666,7 +694,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return false;
         }
         if (removed) {
-            debugCoop(
+            debugCoopThrottled(
+                    coopKey + "|reason=missing_coop_component",
+                    nowMs,
+                    DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check confirmed missing_coop_component coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
                             + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
@@ -1778,6 +1809,37 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         lastDebugStatusMessage = message;
         lastDebugStatusLoggedAtMs = nowMs;
         CoopDebugLogger.log(message);
+    }
+
+    private void debugCoopThrottled(@Nonnull String throttleKey,
+                                    long nowMs,
+                                    long intervalMs,
+                                    @Nonnull String message) {
+        if (!CoopDebugLogger.isEnabled()) {
+            return;
+        }
+        long nextLogAt = debugThrottleNextLogAtByKey.getOrDefault(throttleKey, 0L);
+        if (nowMs < nextLogAt) {
+            debugThrottleSuppressedCountByKey.merge(throttleKey, 1, Integer::sum);
+            return;
+        }
+        int suppressed = debugThrottleSuppressedCountByKey.getOrDefault(throttleKey, 0);
+        debugThrottleSuppressedCountByKey.remove(throttleKey);
+        debugThrottleNextLogAtByKey.put(throttleKey, nowMs + intervalMs);
+        if (suppressed > 0) {
+            CoopDebugLogger.log(message + " suppressedRepeats=" + suppressed);
+            return;
+        }
+        CoopDebugLogger.log(message);
+    }
+
+    private void pruneDebugThrottleState(long nowMs) {
+        debugThrottleNextLogAtByKey.entrySet().removeIf(
+                entry -> entry.getValue() + DEBUG_THROTTLE_STATE_RETENTION_MS < nowMs
+        );
+        debugThrottleSuppressedCountByKey.keySet().removeIf(
+                key -> !debugThrottleNextLogAtByKey.containsKey(key)
+        );
     }
 
     private void debugCoop(@Nonnull String message) {
