@@ -3,6 +3,11 @@
 ## Unreleased
 _No entries yet._
 
+## 2.7.1 - Coop Runtime Gating Hotfix - 2026-04-03
+### Fixed
+- Fixed a coop disable regression where worlds that previously used Alec's Coops could spawn large numbers of chickens around vanilla coops after Alec's Coops was disabled.
+- Managed coop capture/release/sync systems now fully short-circuit when no enabled `TwCoopConfig` assets are loaded, preventing stale coop-ledger releases when managed coops are unavailable.
+
 ## 2.7.0 - Config Editor Expansion + Managed Coop Reliability - 2026-04-02
 ### Added
 - Expanded `/tw config` from Global-only to multi-family browsing and editing with mod/type/asset navigation, Local/All mod scoping, and per-section field count summaries.
