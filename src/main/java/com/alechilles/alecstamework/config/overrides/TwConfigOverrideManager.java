@@ -12,6 +12,7 @@ import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.DirectoryStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
@@ -702,11 +703,20 @@ public final class TwConfigOverrideManager {
         if (isPathInStaging(sourcePath)) {
             return true;
         }
+        if (!isDefaultFileSystemPath(sourcePath)) {
+            return false;
+        }
         return !Files.isRegularFile(sourcePath);
     }
 
     private boolean sourcePathExistsOnDisk(@Nullable Path sourcePath) {
-        return sourcePath != null && Files.isRegularFile(sourcePath) && !isPathInStaging(sourcePath);
+        if (sourcePath == null || isPathInStaging(sourcePath)) {
+            return false;
+        }
+        if (!isDefaultFileSystemPath(sourcePath)) {
+            return true;
+        }
+        return Files.isRegularFile(sourcePath);
     }
 
     private boolean isPathInStaging(@Nullable Path sourcePath) {
@@ -719,6 +729,10 @@ public final class TwConfigOverrideManager {
             }
         }
         return false;
+    }
+
+    private boolean isDefaultFileSystemPath(@Nullable Path sourcePath) {
+        return sourcePath != null && sourcePath.getFileSystem().equals(FileSystems.getDefault());
     }
 
     @Nonnull
