@@ -3,6 +3,15 @@
 ## Unreleased
 _No entries yet._
 
+## 2.7.2 - Config Override Discovery + Breeding Editor Reliability - 2026-04-04
+### Added
+- Added `/tw npcclean` for role-scoped NPC cleanup in-world.
+
+### Fixed
+- Fixed override discovery and reload path handling so configs no longer disappear from mod/global views after apply/reload, including canonical-source and jar-backed source resolution across staging reloads.
+- Fixed a coop runtime threading issue by serializing coop tick processing to prevent world-thread concurrent modification failures.
+- Fixed breeding config editor behavior for nested role overrides by supporting indexed array-object paths and expanding `RoleOverrides.*.OffspringLifecycle.Families[0].*` fields consistently for staging/reset.
+
 ## 2.7.1 - Coop Runtime Gating Hotfix - 2026-04-03
 ### Fixed
 - Fixed a coop disable regression where worlds that previously used Alec's Coops could spawn large numbers of chickens around vanilla coops after Alec's Coops was disabled.
