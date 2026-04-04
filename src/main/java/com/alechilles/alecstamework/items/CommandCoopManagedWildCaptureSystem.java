@@ -147,7 +147,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     @Override
-    public void tick(float dt, int systemIndex, @Nonnull Store<ChunkStore> chunkStore) {
+    public synchronized void tick(float dt, int systemIndex, @Nonnull Store<ChunkStore> chunkStore) {
         if (!hasEnabledManagedCoopConfigs()) {
             return;
         }
