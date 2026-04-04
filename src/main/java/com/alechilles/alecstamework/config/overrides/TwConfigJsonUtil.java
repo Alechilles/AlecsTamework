@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.config.overrides;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -137,27 +138,40 @@ public final class TwConfigJsonUtil {
         if (root == null || dottedPath == null || dottedPath.isBlank()) {
             return null;
         }
-        String[] parts = splitPath(dottedPath);
-        if (parts.length == 0) {
+        List<PathToken> parts = parsePath(dottedPath);
+        if (parts.isEmpty()) {
             return null;
         }
-        JsonObject cursor = root;
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i];
-            JsonElement value = cursor.get(part);
+        JsonElement cursor = root;
+        for (PathToken part : parts) {
+            JsonElement value;
+            if (part.objectKey()) {
+                if (!cursor.isJsonObject()) {
+                    return null;
+                }
+                value = cursor.getAsJsonObject().get(part.key());
+            } else if (part.arrayIndex()) {
+                if (!cursor.isJsonArray()) {
+                    return null;
+                }
+                JsonArray array = cursor.getAsJsonArray();
+                int index = part.index();
+                if (index < 0 || index >= array.size()) {
+                    return null;
+                }
+                value = array.get(index);
+            } else {
+                return null;
+            }
             if (value == null) {
                 return null;
             }
-            boolean last = i == parts.length - 1;
-            if (last) {
-                return value.deepCopy();
-            }
-            if (!value.isJsonObject()) {
+            if (value.isJsonNull()) {
                 return null;
             }
-            cursor = value.getAsJsonObject();
+            cursor = value;
         }
-        return null;
+        return cursor.deepCopy();
     }
 
     public static boolean hasPath(@Nullable JsonObject root, @Nullable String dottedPath) {
@@ -168,56 +182,149 @@ public final class TwConfigJsonUtil {
                                @Nonnull String dottedPath,
                                @Nullable JsonElement value) {
         Objects.requireNonNull(root, "root");
-        String[] parts = splitPath(dottedPath);
-        if (parts.length == 0) {
+        List<PathToken> parts = parsePath(dottedPath);
+        if (parts.isEmpty()) {
             return;
         }
-        JsonObject cursor = root;
-        for (int i = 0; i < parts.length - 1; i++) {
-            String part = parts[i];
-            JsonElement next = cursor.get(part);
-            if (next == null || !next.isJsonObject()) {
-                JsonObject created = new JsonObject();
-                cursor.add(part, created);
-                cursor = created;
+        JsonElement cursor = root;
+        for (int i = 0; i < parts.size() - 1; i++) {
+            PathToken part = parts.get(i);
+            PathToken nextPart = parts.get(i + 1);
+            if (part.objectKey()) {
+                if (!cursor.isJsonObject()) {
+                    return;
+                }
+                JsonObject object = cursor.getAsJsonObject();
+                JsonElement next = object.get(part.key());
+                if (!isContainerCompatible(next, nextPart)) {
+                    next = createContainerFor(nextPart);
+                    object.add(part.key(), next);
+                }
+                cursor = next;
                 continue;
             }
-            cursor = next.getAsJsonObject();
+            if (!part.arrayIndex() || !cursor.isJsonArray()) {
+                return;
+            }
+            JsonArray array = cursor.getAsJsonArray();
+            int index = part.index();
+            ensureArrayIndex(array, index);
+            JsonElement next = array.get(index);
+            if (!isContainerCompatible(next, nextPart)) {
+                next = createContainerFor(nextPart);
+                array.set(index, next);
+            }
+            cursor = next;
         }
-        cursor.add(parts[parts.length - 1], value == null ? null : value.deepCopy());
+        PathToken leaf = parts.get(parts.size() - 1);
+        JsonElement payload = value == null ? null : value.deepCopy();
+        if (leaf.objectKey()) {
+            if (!cursor.isJsonObject()) {
+                return;
+            }
+            cursor.getAsJsonObject().add(leaf.key(), payload);
+            return;
+        }
+        if (!leaf.arrayIndex() || !cursor.isJsonArray()) {
+            return;
+        }
+        JsonArray array = cursor.getAsJsonArray();
+        int index = leaf.index();
+        ensureArrayIndex(array, index);
+        array.set(index, payload);
     }
 
     public static boolean removePath(@Nonnull JsonObject root, @Nonnull String dottedPath) {
         Objects.requireNonNull(root, "root");
-        String[] parts = splitPath(dottedPath);
-        if (parts.length == 0) {
+        List<PathToken> parts = parsePath(dottedPath);
+        if (parts.isEmpty()) {
             return false;
         }
-        Deque<JsonObject> stack = new ArrayDeque<>();
-        JsonObject cursor = root;
-        stack.push(root);
-        for (int i = 0; i < parts.length - 1; i++) {
-            JsonElement next = cursor.get(parts[i]);
-            if (next == null || !next.isJsonObject()) {
+        Deque<ParentRef> stack = new ArrayDeque<>();
+        JsonElement cursor = root;
+        for (int i = 0; i < parts.size() - 1; i++) {
+            PathToken token = parts.get(i);
+            JsonElement next;
+            if (token.objectKey()) {
+                if (!cursor.isJsonObject()) {
+                    return false;
+                }
+                next = cursor.getAsJsonObject().get(token.key());
+            } else if (token.arrayIndex()) {
+                if (!cursor.isJsonArray()) {
+                    return false;
+                }
+                JsonArray array = cursor.getAsJsonArray();
+                int index = token.index();
+                if (index < 0 || index >= array.size()) {
+                    return false;
+                }
+                next = array.get(index);
+            } else {
                 return false;
             }
-            cursor = next.getAsJsonObject();
-            stack.push(cursor);
+            if (next == null || next.isJsonNull()) {
+                return false;
+            }
+            stack.push(new ParentRef(cursor, token));
+            cursor = next;
         }
-        String leaf = parts[parts.length - 1];
-        if (!cursor.has(leaf)) {
+        PathToken leaf = parts.get(parts.size() - 1);
+        boolean removed;
+        if (leaf.objectKey()) {
+            if (!cursor.isJsonObject()) {
+                return false;
+            }
+            JsonObject object = cursor.getAsJsonObject();
+            if (!object.has(leaf.key())) {
+                return false;
+            }
+            object.remove(leaf.key());
+            removed = true;
+        } else if (leaf.arrayIndex()) {
+            if (!cursor.isJsonArray()) {
+                return false;
+            }
+            JsonArray array = cursor.getAsJsonArray();
+            int index = leaf.index();
+            if (index < 0 || index >= array.size()) {
+                return false;
+            }
+            array.remove(index);
+            trimTrailingNulls(array);
+            removed = true;
+        } else {
             return false;
         }
-        cursor.remove(leaf);
+        if (!removed) {
+            return false;
+        }
 
-        // Prune now-empty parent containers after inherit/reset.
-        for (int i = parts.length - 2; i >= 0; i--) {
-            JsonObject child = stack.pop();
-            JsonObject parent = stack.peek();
-            if (parent == null || !child.entrySet().isEmpty()) {
+        JsonElement current = cursor;
+        while (!stack.isEmpty()) {
+            if (!isContainerEmpty(current)) {
                 break;
             }
-            parent.remove(parts[i]);
+            ParentRef parentRef = stack.pop();
+            JsonElement parentContainer = parentRef.container();
+            PathToken token = parentRef.token();
+            if (token.objectKey()) {
+                if (!parentContainer.isJsonObject()) {
+                    break;
+                }
+                parentContainer.getAsJsonObject().remove(token.key());
+            } else if (token.arrayIndex()) {
+                if (!parentContainer.isJsonArray()) {
+                    break;
+                }
+                JsonArray parentArray = parentContainer.getAsJsonArray();
+                int index = token.index();
+                if (index >= 0 && index < parentArray.size()) {
+                    parentArray.remove(index);
+                    trimTrailingNulls(parentArray);
+                }
+            }
+            current = parentContainer;
         }
         return true;
     }
@@ -242,18 +349,122 @@ public final class TwConfigJsonUtil {
     }
 
     @Nonnull
-    private static String[] splitPath(@Nullable String dottedPath) {
+    private static List<PathToken> parsePath(@Nullable String dottedPath) {
         if (dottedPath == null || dottedPath.isBlank()) {
-            return new String[0];
+            return List.of();
         }
         String[] raw = dottedPath.split("\\.");
-        ArrayList<String> parts = new ArrayList<>(raw.length);
-        for (String part : raw) {
-            if (part == null || part.isBlank()) {
+        ArrayList<PathToken> parts = new ArrayList<>(raw.length);
+        for (String segment : raw) {
+            if (segment == null || segment.isBlank()) {
                 continue;
             }
-            parts.add(part.trim());
+            String part = segment.trim();
+            int position = 0;
+            while (position < part.length()) {
+                int open = part.indexOf('[', position);
+                if (open < 0) {
+                    String key = part.substring(position).trim();
+                    if (!key.isBlank()) {
+                        parts.add(PathToken.forKey(key));
+                    }
+                    break;
+                }
+                String key = part.substring(position, open).trim();
+                if (!key.isBlank()) {
+                    parts.add(PathToken.forKey(key));
+                }
+                int close = part.indexOf(']', open + 1);
+                if (close <= open + 1) {
+                    return List.of();
+                }
+                String indexText = part.substring(open + 1, close).trim();
+                if (!indexText.matches("\\d+")) {
+                    return List.of();
+                }
+                parts.add(PathToken.forIndex(Integer.parseInt(indexText)));
+                position = close + 1;
+            }
         }
-        return parts.toArray(new String[0]);
+        return parts.isEmpty() ? List.of() : List.copyOf(parts);
+    }
+
+    @Nonnull
+    private static JsonElement createContainerFor(@Nullable PathToken nextPart) {
+        if (nextPart != null && nextPart.arrayIndex()) {
+            return new JsonArray();
+        }
+        return new JsonObject();
+    }
+
+    private static boolean isContainerCompatible(@Nullable JsonElement value, @Nullable PathToken nextPart) {
+        if (value == null || value.isJsonNull()) {
+            return false;
+        }
+        if (nextPart == null) {
+            return true;
+        }
+        if (nextPart.objectKey()) {
+            return value.isJsonObject();
+        }
+        if (nextPart.arrayIndex()) {
+            return value.isJsonArray();
+        }
+        return false;
+    }
+
+    private static void ensureArrayIndex(@Nonnull JsonArray array, int index) {
+        if (index < 0) {
+            return;
+        }
+        while (array.size() <= index) {
+            array.add((JsonElement) null);
+        }
+    }
+
+    private static boolean isContainerEmpty(@Nullable JsonElement value) {
+        if (value == null || value.isJsonNull()) {
+            return true;
+        }
+        if (value.isJsonObject()) {
+            return value.getAsJsonObject().entrySet().isEmpty();
+        }
+        if (value.isJsonArray()) {
+            JsonArray array = value.getAsJsonArray();
+            trimTrailingNulls(array);
+            return array.isEmpty();
+        }
+        return false;
+    }
+
+    private static void trimTrailingNulls(@Nonnull JsonArray array) {
+        for (int i = array.size() - 1; i >= 0; i--) {
+            JsonElement element = array.get(i);
+            if (element != null && !element.isJsonNull()) {
+                break;
+            }
+            array.remove(i);
+        }
+    }
+
+    private record ParentRef(@Nonnull JsonElement container, @Nonnull PathToken token) {
+    }
+
+    private record PathToken(@Nullable String key, @Nullable Integer index) {
+        static PathToken forKey(@Nonnull String key) {
+            return new PathToken(key, null);
+        }
+
+        static PathToken forIndex(int index) {
+            return new PathToken(null, index);
+        }
+
+        boolean objectKey() {
+            return key != null && !key.isBlank();
+        }
+
+        boolean arrayIndex() {
+            return index != null && index >= 0;
+        }
     }
 }

@@ -262,8 +262,9 @@ final class TwConfigEditorFieldPolicy {
             return false;
         }
         String childPrefix = normalizedPath + ".";
+        String indexedChildPrefix = normalizedPath + "[";
         for (String fallbackPath : fallbackPaths) {
-            if (fallbackPath.startsWith(childPrefix)) {
+            if (fallbackPath.startsWith(childPrefix) || fallbackPath.startsWith(indexedChildPrefix)) {
                 return true;
             }
         }
@@ -338,18 +339,40 @@ final class TwConfigEditorFieldPolicy {
 
             if (value.isJsonArray()) {
                 JsonArray array = value.getAsJsonArray();
-                EditorFieldType type = isStringArray(array)
-                        ? EditorFieldType.STRING_LIST
-                        : EditorFieldType.HANDOFF;
-                boolean editable = type != EditorFieldType.HANDOFF;
+                if (isStringArray(array)) {
+                    out.add(new EditorFieldSpec(
+                            path.toLowerCase(Locale.ROOT),
+                            key,
+                            path,
+                            sectionForPath(path),
+                            EditorFieldType.STRING_LIST,
+                            true,
+                            false,
+                            false,
+                            List.of(),
+                            "",
+                            depth
+                    ));
+                    continue;
+                }
+
+                JsonObject firstObjectEntry = firstObjectEntry(array);
+                if (firstObjectEntry != null) {
+                    int before = out.size();
+                    collectFallbackFields(firstObjectEntry, path + "[0]", depth + 1, out);
+                    if (out.size() > before) {
+                        continue;
+                    }
+                }
+
                 out.add(new EditorFieldSpec(
                         path.toLowerCase(Locale.ROOT),
                         key,
                         path,
                         sectionForPath(path),
-                        type,
-                        editable,
-                        !editable,
+                        EditorFieldType.HANDOFF,
+                        false,
+                        true,
                         false,
                         List.of(),
                         "",
@@ -412,6 +435,20 @@ final class TwConfigEditorFieldPolicy {
             }
         }
         return true;
+    }
+
+    @Nullable
+    private static JsonObject firstObjectEntry(@Nonnull JsonArray array) {
+        for (JsonElement element : array) {
+            if (element == null || element.isJsonNull()) {
+                continue;
+            }
+            if (!element.isJsonObject()) {
+                return null;
+            }
+            return element.getAsJsonObject();
+        }
+        return null;
     }
 
     @Nonnull

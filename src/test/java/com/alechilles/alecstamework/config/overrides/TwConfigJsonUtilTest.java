@@ -63,4 +63,43 @@ class TwConfigJsonUtilTest {
 
         assertEquals(9, TwConfigJsonUtil.getPath(root, "A.B.C").getAsInt());
     }
+
+    @Test
+    void setGetAndRemovePathSupportArrayObjectIndexSegments() {
+        JsonObject root = new JsonObject();
+
+        TwConfigJsonUtil.setPath(
+                root,
+                "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].AdultRoleId",
+                JsonParser.parseString("\"Tamed_Bison\"")
+        );
+        TwConfigJsonUtil.setPath(
+                root,
+                "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].BabyRoleId",
+                JsonParser.parseString("\"Tamed_Bison_Calf\"")
+        );
+
+        assertEquals(
+                "Tamed_Bison",
+                TwConfigJsonUtil.getPath(
+                        root,
+                        "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].AdultRoleId"
+                ).getAsString()
+        );
+        assertEquals(
+                "Tamed_Bison_Calf",
+                TwConfigJsonUtil.getPath(
+                        root,
+                        "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].BabyRoleId"
+                ).getAsString()
+        );
+
+        assertTrue(TwConfigJsonUtil.removePath(root, "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].AdultRoleId"));
+        assertFalse(TwConfigJsonUtil.hasPath(root, "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].AdultRoleId"));
+        assertTrue(TwConfigJsonUtil.hasPath(root, "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].BabyRoleId"));
+
+        assertTrue(TwConfigJsonUtil.removePath(root, "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].BabyRoleId"));
+        assertFalse(TwConfigJsonUtil.hasPath(root, "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].BabyRoleId"));
+        assertTrue(root.entrySet().isEmpty());
+    }
 }

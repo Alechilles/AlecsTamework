@@ -140,6 +140,53 @@ class TwConfigEditorFieldPolicyTest {
         assertTrue(passiveBasis.options().contains("WORLD_TIME_SCALED"));
     }
 
+    @Test
+    void roleOverrideFamiliesArrayExpandsIndexedNestedFields() {
+        JsonObject effective = new JsonObject();
+        JsonObject roleOverrides = new JsonObject();
+        JsonObject bisonOverride = new JsonObject();
+        JsonObject offspringLifecycle = new JsonObject();
+        JsonArray families = new JsonArray();
+        JsonObject firstFamily = new JsonObject();
+        firstFamily.addProperty("AdultRoleId", "Tamed_Bison");
+        firstFamily.addProperty("BabyRoleId", "Tamed_Bison_Calf");
+        firstFamily.addProperty("TimeToFullGrownMinutes", 150);
+        families.add(firstFamily);
+        offspringLifecycle.add("Families", families);
+        bisonOverride.add("OffspringLifecycle", offspringLifecycle);
+        roleOverrides.add("Tamed_Bison", bisonOverride);
+        effective.add("RoleOverrides", roleOverrides);
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.BREEDING, true, true),
+                null,
+                effective
+        );
+
+        TwConfigEditorFieldPolicy.EditorFieldSpec adultRoleId =
+                TwConfigEditorFieldPolicy.findField(
+                        fields,
+                        "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].AdultRoleId"
+                );
+        TwConfigEditorFieldPolicy.EditorFieldSpec babyRoleId =
+                TwConfigEditorFieldPolicy.findField(
+                        fields,
+                        "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].BabyRoleId"
+                );
+        TwConfigEditorFieldPolicy.EditorFieldSpec minutes =
+                TwConfigEditorFieldPolicy.findField(
+                        fields,
+                        "RoleOverrides.Tamed_Bison.OffspringLifecycle.Families[0].TimeToFullGrownMinutes"
+                );
+
+        assertNotNull(adultRoleId);
+        assertNotNull(babyRoleId);
+        assertNotNull(minutes);
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.STRING, adultRoleId.type());
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.STRING, babyRoleId.type());
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.INTEGER, minutes.type());
+    }
+
     private static TwConfigAssetDescriptor descriptor(TwConfigFamily family,
                                                       boolean knownType,
                                                       boolean editable) {
