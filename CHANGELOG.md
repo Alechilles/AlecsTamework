@@ -3,6 +3,12 @@
 ## Unreleased
 _No entries yet._
 
+## 2.7.3 - Coop Thread-Affinity Hotfixes - 2026-04-05
+### Fixed
+- Fixed coop resident release/remap flows that could perform async player component access (`PlayerRef.getComponent(Player)`) from world-tick execution paths.
+- Fixed command-linked coop remap fallback behavior by removing global online-player scans from runtime remap logic and limiting remaps to world-safe owner resolution.
+- Fixed delayed world-change relocation scheduling to pass player UUIDs across async delay boundaries and resolve live player components only on the world thread.
+
 ## 2.7.2 - Config Override Discovery + Breeding Editor Reliability - 2026-04-04
 ### Added
 - Added `/tw npcclean` for role-scoped NPC cleanup in-world.
