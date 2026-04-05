@@ -31,8 +31,6 @@ import com.hypixel.hytale.server.core.inventory.transaction.ItemStackTransaction
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -840,7 +838,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             UUID ownerId = resolveOwnerIdForRemap(releaseResolution.linkedSnapshot(), stateSnapshot);
             TameworkCommandLinksComponent links =
                     stateSnapshot != null ? stateSnapshot.commandLinks() : null;
-            remapLinkedRecords(previousUuid, currentUuid, ownerId, links);
+            remapLinkedRecords(world, entityStore, previousUuid, currentUuid, ownerId, links);
             clearTransientState(previousUuid);
         }
         clearTransientState(currentUuid);
@@ -1357,22 +1355,22 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     @Nullable
-    private Player resolveOnlineOwner(@Nullable UUID ownerId) {
+    private Player resolveOnlineOwner(@Nonnull World world,
+                                      @Nonnull Store<EntityStore> entityStore,
+                                      @Nullable UUID ownerId) {
         if (ownerId == null) {
             return null;
         }
-        Universe universe = Universe.get();
-        if (universe == null) {
+        Ref<EntityStore> playerRef = world.getEntityRef(ownerId);
+        if (playerRef == null || !playerRef.isValid()) {
             return null;
         }
-        PlayerRef playerRef = universe.getPlayer(ownerId);
-        if (playerRef == null) {
-            return null;
-        }
-        return playerRef.getComponent(Player.getComponentType());
+        return safeGetEntityComponent(entityStore, playerRef, Player.getComponentType());
     }
 
-    private void remapLinkedRecords(@Nullable UUID previousUuid,
+    private void remapLinkedRecords(@Nonnull World world,
+                                    @Nonnull Store<EntityStore> entityStore,
+                                    @Nullable UUID previousUuid,
                                     @Nullable UUID currentUuid,
                                     @Nullable UUID ownerId,
                                     @Nullable TameworkCommandLinksComponent links) {
@@ -1380,18 +1378,15 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return;
         }
         boolean remapped = false;
-        Player ownerPlayer = resolveOnlineOwner(ownerId);
+        Player ownerPlayer = resolveOnlineOwner(world, entityStore, ownerId);
         if (ownerPlayer != null) {
             remapped = CommandLinkedNpcRecordRemapService.remapLinkedNpcRecordsInHotbar(ownerPlayer, previousUuid, currentUuid);
         }
         if (!remapped && links != null && links.getOwnerId() != null) {
-            Player linkedOwner = resolveOnlineOwner(links.getOwnerId());
+            Player linkedOwner = resolveOnlineOwner(world, entityStore, links.getOwnerId());
             if (linkedOwner != null) {
                 remapped = CommandLinkedNpcRecordRemapService.remapLinkedNpcRecordsInHotbar(linkedOwner, previousUuid, currentUuid);
             }
-        }
-        if (!remapped) {
-            CommandLinkedNpcRecordRemapService.remapLinkedNpcRecordsForOnlinePlayers(previousUuid, currentUuid);
         }
     }
 
