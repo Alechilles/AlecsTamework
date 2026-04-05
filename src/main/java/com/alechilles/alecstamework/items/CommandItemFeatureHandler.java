@@ -249,11 +249,12 @@ public final class CommandItemFeatureHandler {
         }
         World world = event.getWorld();
         UUID playerUuid = player.getUuid();
-        if (playerUuid != null) {
-            world.execute(() -> dismountPlayerAfterWorldJoin(world, playerUuid));
+        if (playerUuid == null) {
+            return;
         }
+        world.execute(() -> dismountPlayerAfterWorldJoin(world, playerUuid));
         CompletableFuture.runAsync(
-                () -> world.execute(() -> queueWorldChangeTravelRelocations(player, world)),
+                () -> world.execute(() -> queueWorldChangeTravelRelocationsForPlayerUuid(world, playerUuid)),
                 CompletableFuture.delayedExecutor(250L, TimeUnit.MILLISECONDS)
         );
     }

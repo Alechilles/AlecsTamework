@@ -3,8 +3,6 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
@@ -56,29 +54,6 @@ final class CommandLinkedNpcRecordRemapService {
                     slotStack.withMetadata(TameworkMetadataKeys.COMMAND_LINKED_NPCS, Codec.STRING, rewritten)
             );
             changedAny = true;
-        }
-        return changedAny;
-    }
-
-    static boolean remapLinkedNpcRecordsForOnlinePlayers(@Nullable UUID oldNpcUuid,
-                                                         @Nullable UUID newNpcUuid) {
-        if (oldNpcUuid == null || newNpcUuid == null || oldNpcUuid.equals(newNpcUuid)) {
-            return false;
-        }
-        Universe universe = Universe.get();
-        if (universe == null) {
-            return false;
-        }
-        boolean changedAny = false;
-        for (PlayerRef playerRef : universe.getPlayers()) {
-            if (playerRef == null) {
-                continue;
-            }
-            Player player = playerRef.getComponent(Player.getComponentType());
-            if (player == null) {
-                continue;
-            }
-            changedAny |= remapLinkedNpcRecordsInHotbar(player, oldNpcUuid, newNpcUuid);
         }
         return changedAny;
     }
