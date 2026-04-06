@@ -72,10 +72,10 @@
   "HorizontalSpeedMultiplier": 0.67,
   "Next": {
     "0.1": {
-      "Type": "ModifyInventory",
-      "ItemToRemove": {
-        "Id": "Weapon_Arrow_Tranquilizer",
-        "Quantity": 1
+      "Type": "ChangeStat",
+      "Behaviour": "Set",
+      "StatModifiers": {
+        "Ammo": 0
       },
       "Next": {
         "Type": "Replace",
@@ -85,22 +85,13 @@
             "Weapon_Shortbow_Primary_Shoot_Strength_0"
           ]
         }
-      },
-      "Failed": {
-        "Type": "Replace",
-        "Var": "No_Ammo_Effects",
-        "DefaultValue": {
-          "Interactions": [
-            "Common_Bow_No_Ammo"
-          ]
-        }
       }
     },
     "0.3": {
-      "Type": "ModifyInventory",
-      "ItemToRemove": {
-        "Id": "Weapon_Arrow_Tranquilizer",
-        "Quantity": 1
+      "Type": "ChangeStat",
+      "Behaviour": "Set",
+      "StatModifiers": {
+        "Ammo": 0
       },
       "Next": {
         "Type": "Replace",
@@ -110,22 +101,13 @@
             "Weapon_Shortbow_Primary_Shoot_Strength_1"
           ]
         }
-      },
-      "Failed": {
-        "Type": "Replace",
-        "Var": "No_Ammo_Effects",
-        "DefaultValue": {
-          "Interactions": [
-            "Common_Bow_No_Ammo"
-          ]
-        }
       }
     },
     "0.6": {
-      "Type": "ModifyInventory",
-      "ItemToRemove": {
-        "Id": "Weapon_Arrow_Tranquilizer",
-        "Quantity": 1
+      "Type": "ChangeStat",
+      "Behaviour": "Set",
+      "StatModifiers": {
+        "Ammo": 0
       },
       "Next": {
         "Type": "Replace",
@@ -135,22 +117,13 @@
             "Weapon_Shortbow_Primary_Shoot_Strength_2"
           ]
         }
-      },
-      "Failed": {
-        "Type": "Replace",
-        "Var": "No_Ammo_Effects",
-        "DefaultValue": {
-          "Interactions": [
-            "Common_Bow_No_Ammo"
-          ]
-        }
       }
     },
     "0.9": {
-      "Type": "ModifyInventory",
-      "ItemToRemove": {
-        "Id": "Weapon_Arrow_Tranquilizer",
-        "Quantity": 1
+      "Type": "ChangeStat",
+      "Behaviour": "Set",
+      "StatModifiers": {
+        "Ammo": 0
       },
       "Next": {
         "Type": "Replace",
@@ -160,22 +133,13 @@
             "Weapon_Shortbow_Primary_Shoot_Strength_3"
           ]
         }
-      },
-      "Failed": {
-        "Type": "Replace",
-        "Var": "No_Ammo_Effects",
-        "DefaultValue": {
-          "Interactions": [
-            "Common_Bow_No_Ammo"
-          ]
-        }
       }
     },
     "1.2": {
-      "Type": "ModifyInventory",
-      "ItemToRemove": {
-        "Id": "Weapon_Arrow_Tranquilizer",
-        "Quantity": 1
+      "Type": "ChangeStat",
+      "Behaviour": "Set",
+      "StatModifiers": {
+        "Ammo": 0
       },
       "Next": {
         "Type": "Replace",
@@ -183,15 +147,6 @@
         "DefaultValue": {
           "Interactions": [
             "Weapon_Shortbow_Primary_Shoot_Strength_4"
-          ]
-        }
-      },
-      "Failed": {
-        "Type": "Replace",
-        "Var": "No_Ammo_Effects",
-        "DefaultValue": {
-          "Interactions": [
-            "Common_Bow_No_Ammo"
           ]
         }
       }

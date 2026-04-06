@@ -1,0 +1,89 @@
+{
+  "Type": "StatsCondition",
+  "Costs": {
+    "SignatureCharges": 1
+  },
+  "Next": {
+    "Type": "ChangeStat",
+    "Behaviour": "Set",
+    "StatModifiers": {
+      "StaminaRegenDelay": -10
+    },
+    "Next": {
+      "Type": "Replace",
+      "Var": "Signature_Volley_Charge",
+      "DefaultValue": {
+        "Interactions": [
+          "Weapon_Shortbow_Signature_Volley_Charge"
+        ]
+      }
+    }
+  },
+  "Failed": {
+    "Type": "ChangeStat",
+    "Behaviour": "Set",
+    "StatModifiers": {
+      "StaminaRegenDelay": -10
+    },
+    "Next": {
+      "Type": "Serial",
+      "Interactions": [
+        {
+          "Type": "ModifyInventory",
+          "RequiredGameMode": "Adventure",
+          "ItemToRemove": {
+            "Id": "Weapon_Arrow_Tranquilizer",
+            "Quantity": 1
+          },
+          "Next": {
+            "Type": "ChangeStat",
+            "Behaviour": "Set",
+            "RunTime": 0.1,
+            "StatModifiers": {
+              "Ammo": 1
+            },
+            "Next": {
+              "Type": "Replace",
+              "Var": "Primary_Shoot_Charge",
+              "DefaultValue": {
+                "Interactions": [
+                  "Weapon_Shortbow_Primary_Shoot_Charge"
+                ]
+              }
+            }
+          },
+          "Failed": {
+            "Type": "Replace",
+            "Var": "No_Ammo_Effects",
+            "DefaultValue": {
+              "Interactions": [
+                "Common_Bow_No_Ammo"
+              ]
+            }
+          }
+        },
+        {
+          "Type": "StatsCondition",
+          "Costs": {
+            "Ammo": 1
+          },
+          "Next": {
+            "Type": "ChangeStat",
+            "Behaviour": "Set",
+            "StatModifiers": {
+              "Ammo": 0
+            },
+            "Next": {
+              "Type": "ModifyInventory",
+              "RequiredGameMode": "Adventure",
+              "ItemToAdd": {
+                "Id": "Weapon_Arrow_Tranquilizer",
+                "Quantity": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

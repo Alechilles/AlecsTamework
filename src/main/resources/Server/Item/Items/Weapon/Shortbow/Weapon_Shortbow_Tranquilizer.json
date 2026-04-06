@@ -50,11 +50,44 @@
     ],
     "TimeSeconds": 4
   },
+  "Interactions": {
+    "Primary": "Root_Weapon_Shortbow_Tranquilizer_Primary_Shoot",
+    "Secondary": "Root_Weapon_Shortbow_Secondary_Guard",
+    "Ability1": "Root_Weapon_Shortbow_Signature_Volley",
+    "SwapFrom": {
+      "Interactions": [
+        {
+          "Type": "StatsCondition",
+          "Costs": {
+            "Ammo": 1
+          },
+          "Next": {
+            "Type": "ModifyInventory",
+            "RequiredGameMode": "Adventure",
+            "ItemToAdd": {
+              "Id": "Weapon_Arrow_Tranquilizer",
+              "Quantity": 1
+            }
+          }
+        },
+        {
+          "Type": "ChangeActiveSlot"
+        }
+      ]
+    }
+  },
   "InteractionVars": {
     "Primary_Shoot_Charge": {
       "Interactions": [
         {
           "Parent": "Weapon_Shortbow_Tranquilizer_Primary_Shoot_Charge"
+        }
+      ]
+    },
+    "No_Ammo_Effects": {
+      "Interactions": [
+        {
+          "Parent": "Common_Bow_No_Ammo"
         }
       ]
     },
