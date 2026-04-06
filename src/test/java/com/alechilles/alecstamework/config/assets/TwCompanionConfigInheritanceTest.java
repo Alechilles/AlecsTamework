@@ -71,6 +71,25 @@ class TwCompanionConfigInheritanceTest {
         assertTrue(child.getCommand().getTravel().isCrossWorldRecallEnabled());
     }
 
+    @Test
+    void effectiveSettingsUseGlobalOwnershipProtectionWhenScopedConfigExists() throws Exception {
+        TwCompanionConfig scoped = new TwCompanionConfig();
+        setNestedBooleanField(scoped, "ownershipProtection", "blockOwnerDamage", false);
+        setNestedBooleanField(scoped, "ownershipProtection", "blockAllPlayerDamageIfOwned", false);
+        setNestedBooleanField(scoped, "ownershipProtection", "invulnerableIfOwned", false);
+
+        TwGlobalConfig global = TwGlobalConfig.defaultConfig();
+        setBooleanField(global, "blockOwnerDamage", true);
+        setBooleanField(global, "blockAllPlayerDamageIfOwned", true);
+        setBooleanField(global, "invulnerableIfOwned", true);
+
+        TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.EffectiveSettings.from(scoped, global);
+
+        assertTrue(settings.isBlockOwnerDamage());
+        assertTrue(settings.isBlockAllPlayerDamageIfOwned());
+        assertTrue(settings.isInvulnerableIfOwned());
+    }
+
     private void setNestedIntField(Object target, String nestedFieldName, String fieldName, int value)
             throws Exception {
         Field nestedField = target.getClass().getDeclaredField(nestedFieldName);
@@ -86,6 +105,17 @@ class TwCompanionConfigInheritanceTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.setBoolean(target, value);
+    }
+
+    private void setNestedBooleanField(Object target, String nestedFieldName, String fieldName, boolean value)
+            throws Exception {
+        Field nestedField = target.getClass().getDeclaredField(nestedFieldName);
+        nestedField.setAccessible(true);
+        Object nested = nestedField.get(target);
+
+        Field field = nested.getClass().getDeclaredField(fieldName);
+        field.setAccessible(true);
+        field.setBoolean(nested, value);
     }
 
     private void setEnumField(Object target, String fieldName, Object enumValue) throws Exception {

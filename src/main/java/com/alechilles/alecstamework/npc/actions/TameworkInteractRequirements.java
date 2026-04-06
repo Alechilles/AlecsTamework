@@ -1,9 +1,11 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
 import com.alechilles.alecstamework.api.InteractionRequirementContext;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
@@ -36,6 +38,7 @@ final class TameworkInteractRequirements {
     private final InteractionFeedHelper feedHelper;
     private final InteractionAlarmHelper alarmHelper;
     private final String harvestAlarmName;
+    private final boolean interactionRequireOwnerDefault;
     @Nullable
     private final InteractionExtensionRuntime extensionRuntime;
 
@@ -44,11 +47,13 @@ final class TameworkInteractRequirements {
                                  InteractionFeedHelper feedHelper,
                                  InteractionAlarmHelper alarmHelper,
                                  String harvestAlarmName,
+                                 boolean interactionRequireOwnerDefault,
                                  @Nullable InteractionExtensionRuntime extensionRuntime) {
         this.owner = owner;
         this.feedHelper = feedHelper;
         this.alarmHelper = alarmHelper;
         this.harvestAlarmName = harvestAlarmName;
+        this.interactionRequireOwnerDefault = interactionRequireOwnerDefault;
         this.extensionRuntime = extensionRuntime;
     }
 
@@ -531,7 +536,7 @@ final class TameworkInteractRequirements {
                                            Player player,
                                            InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
-        boolean requireOwner = optionOrDefault(interaction.getRequireOwner(), true);
+        boolean requireOwner = resolveInteractionRequireOwner(interaction.getRequireOwner(), interactionRequireOwnerDefault);
         boolean requireMountable = optionOrDefault(interaction.getRequireMountable(), true);
         boolean requireCrouching = optionOrDefault(interaction.getRequireCrouching(), true);
         if (requireTamed && !owner.isTamed(npcRef, store)) {
@@ -557,7 +562,7 @@ final class TameworkInteractRequirements {
                                                Player player,
                                                InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
-        boolean requireOwner = optionOrDefault(interaction.getRequireOwner(), true);
+        boolean requireOwner = resolveInteractionRequireOwner(interaction.getRequireOwner(), interactionRequireOwnerDefault);
         if (requireTamed && !owner.isTamed(npcRef, store)) {
             return false;
         }
@@ -792,6 +797,21 @@ final class TameworkInteractRequirements {
 
     private boolean optionOrDefault(Boolean value, boolean defaultValue) {
         return value == null ? defaultValue : value;
+    }
+
+    static boolean resolveInteractionRequireOwner(@Nullable Boolean ignoredEntryRequireOwner, boolean globalRequireOwner) {
+        // /tw settings global ownership requirement always wins for interaction checks.
+        try {
+            if (Tamework.getInstance() != null) {
+                TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+                if (globalConfig != null) {
+                    return globalConfig.isOwnershipInteractionRequiresOwner();
+                }
+            }
+        } catch (Throwable ignored) {
+            // Fall back to constructor snapshot if runtime/plugin context is unavailable.
+        }
+        return globalRequireOwner;
     }
 
     private boolean matchesHarvestContext(Role role,

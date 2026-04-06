@@ -336,6 +336,12 @@ final class ApiMapper {
                         config.isBlockAllPlayerDamageIfOwned(),
                         config.isInvulnerableIfOwned()
                 ),
+                new GlobalConfigView.OwnershipRequirementsView(
+                        config.isOwnershipCaptureRequiresOwner(),
+                        config.isOwnershipSpawnRequiresOwner(),
+                        config.isOwnershipInteractionRequiresOwner(),
+                        config.isOwnershipLinkingRequiresOwner()
+                ),
                 new GlobalConfigView.InteractionDefaultsView(
                         config.getInteractionConfigParam(),
                         config.getLovedItemsParam(),

@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 /** Protects starvation/dehydration damage behavior for needs progression. */
 class CompanionNeedsServiceDamageTest {
     private static final long ONE_MINUTE_MS = 60_000L;
+    private static final double MAX_HEALTH = 250.0;
 
     @AfterEach
     void tearDown() {
@@ -20,19 +21,33 @@ class CompanionNeedsServiceDamageTest {
     }
 
     @Test
-    void minOnlyDamageTriggersOnlyWhenNeedIsAtMin() throws Exception {
+    void minOnlyPercentDamageTriggersOnlyWhenNeedIsAtMin() throws Exception {
         TwNeedsConfig config = createConfigWithDamageEnabled();
         TwNeedsConfig.ValueSettings values = new TwNeedsConfig.ValueSettings();
 
-        double noMinDamage = CompanionNeedsService.resolveNeedsDamageAmount(config, values, 10.0, 10.0, ONE_MINUTE_MS);
-        double hungerMinDamage = CompanionNeedsService.resolveNeedsDamageAmount(config, values, 0.0, 10.0, ONE_MINUTE_MS);
+        double noMinDamage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                10.0,
+                10.0,
+                ONE_MINUTE_MS,
+                MAX_HEALTH
+        );
+        double hungerMinDamage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                0.0,
+                10.0,
+                ONE_MINUTE_MS,
+                MAX_HEALTH
+        );
 
         assertEquals(0.0, noMinDamage, 0.000001);
-        assertEquals(2.0, hungerMinDamage, 0.000001);
+        assertEquals(5.0, hungerMinDamage, 0.000001);
     }
 
     @Test
-    void dualMinUsesHigherOnlyByDefault() throws Exception {
+    void minOnlyPercentDualMinUsesHigherOnlyByDefault() throws Exception {
         TwNeedsConfig config = createConfigWithDamageEnabled();
         TwNeedsConfig.ValueSettings values = new TwNeedsConfig.ValueSettings();
 
@@ -41,10 +56,160 @@ class CompanionNeedsServiceDamageTest {
                 values,
                 0.0,
                 0.0,
-                2L * ONE_MINUTE_MS
+                2L * ONE_MINUTE_MS,
+                MAX_HEALTH
         );
 
-        assertEquals(6.0, dualMinDamage, 0.000001);
+        assertEquals(15.0, dualMinDamage, 0.000001);
+    }
+
+    @Test
+    void minOnlyPercentDualMinSupportsSumBothRule() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled();
+        TwNeedsConfig.ValueSettings values = new TwNeedsConfig.ValueSettings();
+        TwNeedsConfig.DamageSettings damage = config.getDamage();
+        setField(damage, "dualNeedRule", TwNeedsConfig.DualNeedRule.SUM_BOTH);
+
+        double dualMinDamage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                0.0,
+                0.0,
+                2L * ONE_MINUTE_MS,
+                MAX_HEALTH
+        );
+
+        assertEquals(25.0, dualMinDamage, 0.000001);
+    }
+
+    @Test
+    void minOnlyPercentRequiresValidMaxHealth() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled();
+        TwNeedsConfig.ValueSettings values = new TwNeedsConfig.ValueSettings();
+
+        double noMaxDamage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                0.0,
+                10.0,
+                ONE_MINUTE_MS,
+                0.0
+        );
+        double nanMaxDamage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                0.0,
+                10.0,
+                ONE_MINUTE_MS,
+                Double.NaN
+        );
+
+        assertEquals(0.0, noMaxDamage, 0.000001);
+        assertEquals(0.0, nanMaxDamage, 0.000001);
+    }
+
+    @Test
+    void minOnlyFlatModelRemainsAvailable() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled(TwNeedsConfig.DamageModel.MIN_ONLY_FLAT);
+        TwNeedsConfig.ValueSettings values = new TwNeedsConfig.ValueSettings();
+
+        double hungerMinDamage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                0.0,
+                10.0,
+                ONE_MINUTE_MS,
+                MAX_HEALTH
+        );
+
+        assertEquals(2.0, hungerMinDamage, 0.000001);
+    }
+
+    @Test
+    void minOnlyPercentPoolsFractionalDamageForLowMaxHealth() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled(TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT);
+        TwNeedsConfig.ValueSettings values = new TwNeedsConfig.ValueSettings();
+        double maxHealth = 20.0;
+        double perTickDamage = CompanionNeedsService.resolveNeedsDamageAmount(
+                config,
+                values,
+                0.0,
+                10.0,
+                ONE_MINUTE_MS,
+                maxHealth
+        );
+        assertEquals(0.4, perTickDamage, 0.000001);
+
+        CompanionNeedsService.NeedsDamagePoolResolution tickOne = CompanionNeedsService.resolveNeedsDamagePooling(perTickDamage, 0.0);
+        assertEquals(0.0, tickOne.getDamageToApply(), 0.000001);
+        assertEquals(0.4, tickOne.getPendingDamageRemainder(), 0.000001);
+
+        CompanionNeedsService.NeedsDamagePoolResolution tickTwo = CompanionNeedsService.resolveNeedsDamagePooling(
+                perTickDamage,
+                tickOne.getPendingDamageRemainder()
+        );
+        assertEquals(0.0, tickTwo.getDamageToApply(), 0.000001);
+        assertEquals(0.8, tickTwo.getPendingDamageRemainder(), 0.000001);
+
+        CompanionNeedsService.NeedsDamagePoolResolution tickThree = CompanionNeedsService.resolveNeedsDamagePooling(
+                perTickDamage,
+                tickTwo.getPendingDamageRemainder()
+        );
+        assertEquals(1.0, tickThree.getDamageToApply(), 0.000001);
+        assertEquals(0.2, tickThree.getPendingDamageRemainder(), 0.000001);
+    }
+
+    @Test
+    void needsDamagePoolingNormalizesUnsafeCarryValues() {
+        CompanionNeedsService.NeedsDamagePoolResolution nanCarry =
+                CompanionNeedsService.resolveNeedsDamagePooling(0.25, Double.NaN);
+        assertEquals(0.0, nanCarry.getDamageToApply(), 0.000001);
+        assertEquals(0.25, nanCarry.getPendingDamageRemainder(), 0.000001);
+
+        CompanionNeedsService.NeedsDamagePoolResolution oversizedCarry =
+                CompanionNeedsService.resolveNeedsDamagePooling(0.0, 1.75);
+        assertEquals(0.0, oversizedCarry.getDamageToApply(), 0.000001);
+        assertEquals(0.75, oversizedCarry.getPendingDamageRemainder(), 0.000001);
+    }
+
+    @Test
+    void regenSuppressionBlocksNaturalRegenWithoutAllowedHealBudget() {
+        CompanionNeedsService.NaturalRegenSuppressionResolution resolution =
+                CompanionNeedsService.resolveNaturalRegenSuppression(
+                        true,
+                        12.0,
+                        10.0,
+                        0.0
+                );
+
+        assertEquals(10.0, resolution.getNextBaselineHealth(), 0.000001);
+        assertEquals(0.0, resolution.getNextAllowedExternalHeal(), 0.000001);
+        assertEquals(2.0, resolution.getHealthOverflowToRemove(), 0.000001);
+    }
+
+    @Test
+    void regenSuppressionAllowsExternalHealBudgetButStillBlocksOverflow() {
+        CompanionNeedsService.NaturalRegenSuppressionResolution withinBudget =
+                CompanionNeedsService.resolveNaturalRegenSuppression(
+                        true,
+                        14.0,
+                        10.0,
+                        5.0
+                );
+        assertEquals(14.0, withinBudget.getNextBaselineHealth(), 0.000001);
+        assertEquals(1.0, withinBudget.getNextAllowedExternalHeal(), 0.000001);
+        assertEquals(0.0, withinBudget.getHealthOverflowToRemove(), 0.000001);
+
+        CompanionNeedsService.NaturalRegenSuppressionResolution overflow =
+                CompanionNeedsService.resolveNaturalRegenSuppression(
+                        true,
+                        16.0,
+                        10.0,
+                        5.0
+                );
+        assertEquals(15.0, overflow.getNextBaselineHealth(), 0.000001);
+        assertEquals(0.0, overflow.getNextAllowedExternalHeal(), 0.000001);
+        assertEquals(1.0, overflow.getHealthOverflowToRemove(), 0.000001);
     }
 
     @Test
@@ -57,7 +222,8 @@ class CompanionNeedsServiceDamageTest {
                 values,
                 0.0,
                 0.0,
-                ONE_MINUTE_MS
+                ONE_MINUTE_MS,
+                MAX_HEALTH
         );
 
         assertEquals(0.0, damage, 0.000001);
@@ -95,9 +261,14 @@ class CompanionNeedsServiceDamageTest {
     }
 
     private TwNeedsConfig createConfigWithDamageEnabled() throws Exception {
+        return createConfigWithDamageEnabled(TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT);
+    }
+
+    private TwNeedsConfig createConfigWithDamageEnabled(TwNeedsConfig.DamageModel model) throws Exception {
         TwNeedsConfig config = createConfig();
         TwNeedsConfig.DamageSettings damage = new TwNeedsConfig.DamageSettings();
         setField(damage, "enabled", true);
+        setField(damage, "model", model);
         setField(config, "damage", damage);
         return config;
     }

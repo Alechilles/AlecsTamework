@@ -1,0 +1,522 @@
+package com.alechilles.alecstamework.persistence;
+
+import com.alechilles.alecstamework.Tamework;
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.google.gson.JsonSyntaxException;
+import com.google.gson.annotations.SerializedName;
+import com.hypixel.hytale.logger.HytaleLogger;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Objects;
+import java.util.logging.Level;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * JSON-backed curated universe settings used by /tw settings.
+ */
+public final class TameworkSettingsStore {
+    public static final String SETTINGS_DIRECTORY_NAME = "Settings";
+    public static final String GLOBAL_SETTINGS_FILE_NAME = "tamework-settings.json";
+
+    private static final int CURRENT_VERSION = 1;
+    private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
+    private static final Object GLOBAL_CACHE_LOCK = new Object();
+
+    @Nullable
+    private static volatile CachedGlobalDocument cachedGlobalDocument;
+
+    private TameworkSettingsStore() {
+    }
+
+    @Nonnull
+    public static Path resolveSettingsDirectory(@Nonnull Tamework plugin) {
+        Objects.requireNonNull(plugin, "plugin");
+        return resolveTameworkUniverseRoot(plugin).resolve(SETTINGS_DIRECTORY_NAME).normalize();
+    }
+
+    @Nonnull
+    public static Path resolveGlobalSettingsFile(@Nonnull Tamework plugin) {
+        return resolveSettingsDirectory(plugin).resolve(GLOBAL_SETTINGS_FILE_NAME).normalize();
+    }
+
+    @Nonnull
+    public static Path resolveGlobalSettingsFile(@Nonnull Path tameworkUniverseRoot) {
+        return tameworkUniverseRoot
+                .resolve(SETTINGS_DIRECTORY_NAME)
+                .resolve(GLOBAL_SETTINGS_FILE_NAME)
+                .normalize();
+    }
+
+    @Nullable
+    public static GlobalOverrides loadRuntimeGlobalOverrides() {
+        final Tamework plugin;
+        try {
+            plugin = Tamework.getInstance();
+        } catch (Throwable ignored) {
+            return null;
+        }
+        if (plugin == null) {
+            return null;
+        }
+        return loadGlobalOverrides(resolveGlobalSettingsFile(plugin), plugin.getLogger());
+    }
+
+    @Nullable
+    public static GlobalOverrides loadGlobalOverrides(@Nonnull Path globalSettingsFile, @Nullable HytaleLogger logger) {
+        ensureGlobalTemplateExists(globalSettingsFile, logger);
+        GlobalSettingsDocument document = loadGlobalDocument(globalSettingsFile, logger);
+        if (document == null) {
+            return null;
+        }
+        return toOverrides(document);
+    }
+
+    public static boolean saveGlobalSettings(@Nonnull Path globalSettingsFile,
+                                             @Nonnull GlobalSettingsSnapshot snapshot,
+                                             @Nullable HytaleLogger logger) {
+        Objects.requireNonNull(globalSettingsFile, "globalSettingsFile");
+        Objects.requireNonNull(snapshot, "snapshot");
+
+        GlobalSettingsDocument document = new GlobalSettingsDocument();
+        document.version = CURRENT_VERSION;
+
+        document.population = new PopulationSection();
+        document.population.limitPerPlayerOwnedTotal = Math.max(0, snapshot.populationLimitPerPlayerOwnedTotal());
+        document.population.perPlayerLimitScope = normalizeScope(snapshot.populationPerPlayerLimitScope());
+
+        document.simpleClaims = new SimpleClaimsSection();
+        document.simpleClaims.simpleClaimsEnabled = snapshot.simpleClaimsEnabled();
+        document.simpleClaims.limitPerClaimChunk = Math.max(0, snapshot.simpleClaimsLimitPerClaimChunk());
+        document.simpleClaims.limitPerClaimTotal = Math.max(0, snapshot.simpleClaimsLimitPerClaimTotal());
+        document.simpleClaims.breedingRequiresClaim = snapshot.simpleClaimsBreedingRequiresClaim();
+        document.simpleClaims.protectTamedFromNonMembers = snapshot.simpleClaimsProtectTamedFromNonMembers();
+
+        document.ownership = new OwnershipSection();
+        document.ownership.damageProtection = new OwnershipDamageProtectionSection();
+        document.ownership.damageProtection.blockOwnerDamage = snapshot.blockOwnerDamage();
+        document.ownership.damageProtection.blockAllPlayerDamageIfOwned = snapshot.blockAllPlayerDamageIfOwned();
+        document.ownership.damageProtection.invulnerableIfOwned = snapshot.invulnerableIfOwned();
+        document.ownership.capture = new OwnershipCaptureSection();
+        document.ownership.capture.captureRequiresOwner = snapshot.captureRequiresOwner();
+        document.ownership.capture.spawnRequiresOwner = snapshot.spawnRequiresOwner();
+        document.ownership.capture.captureClearsOwner = snapshot.captureClearsOwner();
+        document.ownership.capture.spawnSetsOwner = snapshot.spawnSetsOwner();
+        document.ownership.interactionRequiresOwner = snapshot.interactionRequiresOwner();
+        document.ownership.linkingRequiresOwner = snapshot.linkingRequiresOwner();
+
+        document.needs = new NeedsSection();
+        document.needs.tickPolicy = new NeedsTickPolicySection();
+        document.needs.tickPolicy.mode = trimToNull(snapshot.needsTickPolicyMode());
+        document.needs.tickPolicy.ownerOfflineGraceHours = Math.max(0.0, snapshot.needsOwnerOfflineGraceHours());
+        document.needs.tickPolicy.ownerOfflineDecayMultiplier = Math.max(0.0, snapshot.needsOwnerOfflineDecayMultiplier());
+        document.needs.damage = new NeedsDamageSection();
+        document.needs.damage.enabled = snapshot.needsDamageEnabled();
+        document.needs.damage.model = trimToNull(snapshot.needsDamageModel());
+        document.needs.damage.dualNeedRule = trimToNull(snapshot.needsDamageDualNeedRule());
+        document.needs.damage.starvationDamagePerMinute = Math.max(0.0, snapshot.needsStarvationDamagePerMinute());
+        document.needs.damage.dehydrationDamagePerMinute = Math.max(0.0, snapshot.needsDehydrationDamagePerMinute());
+        document.needs.damage.lethal = snapshot.needsDamageLethal();
+
+        document.revive = new ReviveSection();
+        document.revive.enabled = snapshot.reviveSystemEnabled();
+
+        if (!writeDocument(globalSettingsFile, document, logger)) {
+            return false;
+        }
+        updateGlobalCache(globalSettingsFile, document);
+        return true;
+    }
+
+    @Nonnull
+    public static Path resolveTameworkUniverseRoot(@Nonnull Tamework plugin) {
+        Objects.requireNonNull(plugin, "plugin");
+        Path runtimeDataDirectory = plugin.getRuntimeDataDirectory();
+        Path resolvedDataDirectory = runtimeDataDirectory;
+        if (resolvedDataDirectory == null) {
+            resolvedDataDirectory = new TameworkDataPathService(plugin.getLogger())
+                    .resolveAndMigrateDataDirectory(plugin.getDataDirectory());
+        }
+        Path normalized = resolvedDataDirectory.toAbsolutePath().normalize();
+        Path parent = normalized.getParent();
+        return parent == null ? normalized : parent;
+    }
+
+    @Nullable
+    private static GlobalSettingsDocument loadGlobalDocument(@Nonnull Path globalSettingsFile,
+                                                             @Nullable HytaleLogger logger) {
+        long modifiedMillis = lastModifiedMillis(globalSettingsFile);
+        CachedGlobalDocument cached = cachedGlobalDocument;
+        if (cached != null
+                && cached.path().equals(globalSettingsFile)
+                && cached.lastModifiedMillis() == modifiedMillis) {
+            return cached.document();
+        }
+
+        synchronized (GLOBAL_CACHE_LOCK) {
+            cached = cachedGlobalDocument;
+            if (cached != null
+                    && cached.path().equals(globalSettingsFile)
+                    && cached.lastModifiedMillis() == modifiedMillis) {
+                return cached.document();
+            }
+            GlobalSettingsDocument loaded = readDocument(globalSettingsFile, logger);
+            cachedGlobalDocument = new CachedGlobalDocument(globalSettingsFile, modifiedMillis, loaded);
+            return loaded;
+        }
+    }
+
+    private static void updateGlobalCache(@Nonnull Path globalSettingsFile,
+                                          @Nonnull GlobalSettingsDocument document) {
+        synchronized (GLOBAL_CACHE_LOCK) {
+            cachedGlobalDocument = new CachedGlobalDocument(
+                    globalSettingsFile,
+                    lastModifiedMillis(globalSettingsFile),
+                    document
+            );
+        }
+    }
+
+    private static void ensureGlobalTemplateExists(@Nonnull Path globalSettingsFile, @Nullable HytaleLogger logger) {
+        if (Files.isRegularFile(globalSettingsFile)) {
+            return;
+        }
+        writeDocument(globalSettingsFile, createDefaultGlobalSettingsDocument(), logger);
+    }
+
+    @Nonnull
+    private static GlobalSettingsDocument createDefaultGlobalSettingsDocument() {
+        GlobalSettingsDocument document = new GlobalSettingsDocument();
+        document.version = CURRENT_VERSION;
+
+        document.population = new PopulationSection();
+        document.population.limitPerPlayerOwnedTotal = 0;
+        document.population.perPlayerLimitScope = "PerWorld";
+
+        document.simpleClaims = new SimpleClaimsSection();
+        document.simpleClaims.simpleClaimsEnabled = false;
+        document.simpleClaims.limitPerClaimChunk = 0;
+        document.simpleClaims.limitPerClaimTotal = 0;
+        document.simpleClaims.breedingRequiresClaim = false;
+        document.simpleClaims.protectTamedFromNonMembers = false;
+
+        document.ownership = new OwnershipSection();
+        document.ownership.damageProtection = new OwnershipDamageProtectionSection();
+        document.ownership.damageProtection.blockOwnerDamage = false;
+        document.ownership.damageProtection.blockAllPlayerDamageIfOwned = false;
+        document.ownership.damageProtection.invulnerableIfOwned = false;
+        document.ownership.capture = new OwnershipCaptureSection();
+        document.ownership.capture.captureRequiresOwner = true;
+        document.ownership.capture.spawnRequiresOwner = true;
+        document.ownership.capture.captureClearsOwner = true;
+        document.ownership.capture.spawnSetsOwner = true;
+        document.ownership.interactionRequiresOwner = true;
+        document.ownership.linkingRequiresOwner = true;
+
+        document.needs = new NeedsSection();
+        document.needs.tickPolicy = new NeedsTickPolicySection();
+        document.needs.tickPolicy.mode = "OWNER_ONLINE_GRACE_THEN_DECAY";
+        document.needs.tickPolicy.ownerOfflineGraceHours = 72.0;
+        document.needs.tickPolicy.ownerOfflineDecayMultiplier = 1.0;
+        document.needs.damage = new NeedsDamageSection();
+        document.needs.damage.enabled = true;
+        document.needs.damage.model = "MIN_ONLY_PERCENT";
+        document.needs.damage.dualNeedRule = "USE_HIGHER_ONLY";
+        document.needs.damage.starvationDamagePerMinute = 2.0;
+        document.needs.damage.dehydrationDamagePerMinute = 3.0;
+        document.needs.damage.lethal = true;
+
+        document.revive = new ReviveSection();
+        document.revive.enabled = true;
+        return document;
+    }
+
+    @Nullable
+    private static GlobalSettingsDocument readDocument(@Nonnull Path globalSettingsFile, @Nullable HytaleLogger logger) {
+        if (!Files.isRegularFile(globalSettingsFile)) {
+            return null;
+        }
+        try {
+            String raw = Files.readString(globalSettingsFile, StandardCharsets.UTF_8);
+            if (raw == null || raw.isBlank()) {
+                return null;
+            }
+            GlobalSettingsDocument parsed = GSON.fromJson(raw, GlobalSettingsDocument.class);
+            if (parsed == null) {
+                return null;
+            }
+            return parsed;
+        } catch (JsonSyntaxException syntaxException) {
+            if (logger != null) {
+                logger.at(Level.WARNING).withCause(syntaxException).log(
+                        "Invalid Tamework settings JSON; ignoring file " + globalSettingsFile + "."
+                );
+            }
+            return null;
+        } catch (Exception ex) {
+            if (logger != null) {
+                logger.at(Level.WARNING).withCause(ex).log(
+                        "Unable to read Tamework settings file " + globalSettingsFile + "."
+                );
+            }
+            return null;
+        }
+    }
+
+    private static boolean writeDocument(@Nonnull Path globalSettingsFile,
+                                         @Nonnull GlobalSettingsDocument document,
+                                         @Nullable HytaleLogger logger) {
+        try {
+            Path parent = globalSettingsFile.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            String serialized = GSON.toJson(document) + System.lineSeparator();
+            Path tmp = globalSettingsFile.resolveSibling(globalSettingsFile.getFileName() + ".tmp");
+            Files.writeString(tmp, serialized, StandardCharsets.UTF_8);
+            try {
+                Files.move(tmp, globalSettingsFile, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (Exception ignored) {
+                Files.move(tmp, globalSettingsFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+            return true;
+        } catch (Exception ex) {
+            if (logger != null) {
+                logger.at(Level.WARNING).withCause(ex).log(
+                        "Unable to save Tamework settings file " + globalSettingsFile + "."
+                );
+            }
+            return false;
+        }
+    }
+
+    private static long lastModifiedMillis(@Nonnull Path path) {
+        try {
+            if (!Files.isRegularFile(path)) {
+                return -1L;
+            }
+            return Files.getLastModifiedTime(path).toMillis();
+        } catch (Exception ignored) {
+            return -1L;
+        }
+    }
+
+    @Nullable
+    private static String trimToNull(@Nullable String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isBlank() ? null : trimmed;
+    }
+
+    @Nonnull
+    private static String normalizeScope(@Nullable String scope) {
+        if (scope == null || scope.isBlank()) {
+            return "PerWorld";
+        }
+        String normalized = scope.trim();
+        if ("global".equalsIgnoreCase(normalized)) {
+            return "Global";
+        }
+        return "PerWorld";
+    }
+
+    @Nonnull
+    private static GlobalOverrides toOverrides(@Nonnull GlobalSettingsDocument document) {
+        PopulationSection population = document.population;
+        SimpleClaimsSection simpleClaims = document.simpleClaims;
+        OwnershipSection ownership = document.ownership;
+        OwnershipDamageProtectionSection ownershipDamageProtection =
+                ownership != null ? ownership.damageProtection : null;
+        OwnershipCaptureSection ownershipCapture = ownership != null ? ownership.capture : null;
+        NeedsSection needs = document.needs;
+        NeedsTickPolicySection needsTickPolicy = needs != null ? needs.tickPolicy : null;
+        NeedsDamageSection needsDamage = needs != null ? needs.damage : null;
+        ReviveSection revive = document.revive;
+
+        return new GlobalOverrides(
+                population != null ? population.limitPerPlayerOwnedTotal : null,
+                population != null ? trimToNull(population.perPlayerLimitScope) : null,
+                simpleClaims != null ? simpleClaims.simpleClaimsEnabled : null,
+                simpleClaims != null ? simpleClaims.limitPerClaimChunk : null,
+                simpleClaims != null ? simpleClaims.limitPerClaimTotal : null,
+                simpleClaims != null ? simpleClaims.breedingRequiresClaim : null,
+                simpleClaims != null ? simpleClaims.protectTamedFromNonMembers : null,
+                ownershipDamageProtection != null
+                        ? ownershipDamageProtection.blockOwnerDamage
+                        : null,
+                ownershipDamageProtection != null
+                        ? ownershipDamageProtection.blockAllPlayerDamageIfOwned
+                        : null,
+                ownershipDamageProtection != null
+                        ? ownershipDamageProtection.invulnerableIfOwned
+                        : null,
+                ownershipCapture != null
+                        ? ownershipCapture.captureClearsOwner
+                        : null,
+                ownershipCapture != null
+                        ? ownershipCapture.spawnSetsOwner
+                        : null,
+                ownershipCapture != null
+                        ? ownershipCapture.captureRequiresOwner
+                        : null,
+                ownershipCapture != null
+                        ? ownershipCapture.spawnRequiresOwner
+                        : null,
+                ownership != null
+                        ? ownership.interactionRequiresOwner
+                        : null,
+                ownership != null
+                        ? ownership.linkingRequiresOwner
+                        : null,
+                needsTickPolicy != null ? trimToNull(needsTickPolicy.mode) : null,
+                needsTickPolicy != null ? needsTickPolicy.ownerOfflineGraceHours : null,
+                needsTickPolicy != null ? needsTickPolicy.ownerOfflineDecayMultiplier : null,
+                needsDamage != null ? needsDamage.enabled : null,
+                needsDamage != null ? trimToNull(needsDamage.model) : null,
+                needsDamage != null ? trimToNull(needsDamage.dualNeedRule) : null,
+                needsDamage != null ? needsDamage.starvationDamagePerMinute : null,
+                needsDamage != null ? needsDamage.dehydrationDamagePerMinute : null,
+                needsDamage != null ? needsDamage.lethal : null,
+                revive != null ? revive.enabled : null
+        );
+    }
+
+    /**
+     * Fully-specified curated /tw settings snapshot used for persistence.
+     */
+    public record GlobalSettingsSnapshot(int populationLimitPerPlayerOwnedTotal,
+                                         @Nonnull String populationPerPlayerLimitScope,
+                                         boolean simpleClaimsEnabled,
+                                         int simpleClaimsLimitPerClaimChunk,
+                                         int simpleClaimsLimitPerClaimTotal,
+                                         boolean simpleClaimsBreedingRequiresClaim,
+                                         boolean simpleClaimsProtectTamedFromNonMembers,
+                                         boolean blockOwnerDamage,
+                                         boolean blockAllPlayerDamageIfOwned,
+                                         boolean invulnerableIfOwned,
+                                         boolean captureClearsOwner,
+                                         boolean spawnSetsOwner,
+                                         boolean captureRequiresOwner,
+                                         boolean spawnRequiresOwner,
+                                         boolean interactionRequiresOwner,
+                                         boolean linkingRequiresOwner,
+                                         @Nonnull String needsTickPolicyMode,
+                                         double needsOwnerOfflineGraceHours,
+                                         double needsOwnerOfflineDecayMultiplier,
+                                         boolean needsDamageEnabled,
+                                         @Nonnull String needsDamageModel,
+                                         @Nonnull String needsDamageDualNeedRule,
+                                         double needsStarvationDamagePerMinute,
+                                         double needsDehydrationDamagePerMinute,
+                                         boolean needsDamageLethal,
+                                         boolean reviveSystemEnabled) {
+    }
+
+    /**
+     * Optional override values loaded from the JSON settings document.
+     */
+    public record GlobalOverrides(@Nullable Integer populationLimitPerPlayerOwnedTotal,
+                                  @Nullable String populationPerPlayerLimitScope,
+                                  @Nullable Boolean simpleClaimsEnabled,
+                                  @Nullable Integer simpleClaimsLimitPerClaimChunk,
+                                  @Nullable Integer simpleClaimsLimitPerClaimTotal,
+                                  @Nullable Boolean simpleClaimsBreedingRequiresClaim,
+                                  @Nullable Boolean simpleClaimsProtectTamedFromNonMembers,
+                                  @Nullable Boolean blockOwnerDamage,
+                                  @Nullable Boolean blockAllPlayerDamageIfOwned,
+                                  @Nullable Boolean invulnerableIfOwned,
+                                  @Nullable Boolean captureClearsOwner,
+                                  @Nullable Boolean spawnSetsOwner,
+                                  @Nullable Boolean captureRequiresOwner,
+                                  @Nullable Boolean spawnRequiresOwner,
+                                  @Nullable Boolean interactionRequiresOwner,
+                                  @Nullable Boolean linkingRequiresOwner,
+                                  @Nullable String needsTickPolicyMode,
+                                  @Nullable Double needsOwnerOfflineGraceHours,
+                                  @Nullable Double needsOwnerOfflineDecayMultiplier,
+                                  @Nullable Boolean needsDamageEnabled,
+                                  @Nullable String needsDamageModel,
+                                  @Nullable String needsDamageDualNeedRule,
+                                  @Nullable Double needsStarvationDamagePerMinute,
+                                  @Nullable Double needsDehydrationDamagePerMinute,
+                                  @Nullable Boolean needsDamageLethal,
+                                  @Nullable Boolean reviveSystemEnabled) {
+    }
+
+    private record CachedGlobalDocument(@Nonnull Path path,
+                                        long lastModifiedMillis,
+                                        @Nullable GlobalSettingsDocument document) {
+    }
+
+    private static final class GlobalSettingsDocument {
+        private Integer version;
+        private PopulationSection population;
+        private SimpleClaimsSection simpleClaims;
+        private OwnershipSection ownership;
+        private NeedsSection needs;
+        private ReviveSection revive;
+    }
+
+    private static final class PopulationSection {
+        private Integer limitPerPlayerOwnedTotal;
+        private String perPlayerLimitScope;
+    }
+
+    private static final class SimpleClaimsSection {
+        private Boolean simpleClaimsEnabled;
+        private Integer limitPerClaimChunk;
+        private Integer limitPerClaimTotal;
+        private Boolean breedingRequiresClaim;
+        private Boolean protectTamedFromNonMembers;
+    }
+
+    private static final class OwnershipSection {
+        private OwnershipDamageProtectionSection damageProtection;
+        private OwnershipCaptureSection capture;
+        private Boolean interactionRequiresOwner;
+        private Boolean linkingRequiresOwner;
+    }
+
+    private static final class OwnershipDamageProtectionSection {
+        private Boolean blockOwnerDamage;
+        private Boolean blockAllPlayerDamageIfOwned;
+        private Boolean invulnerableIfOwned;
+    }
+
+    private static final class OwnershipCaptureSection {
+        private Boolean captureRequiresOwner;
+        private Boolean spawnRequiresOwner;
+        private Boolean captureClearsOwner;
+        @SerializedName(value = "SpawnSetsOwner", alternate = {"spawnSetsOwner"})
+        private Boolean spawnSetsOwner;
+    }
+
+    private static final class NeedsSection {
+        private NeedsTickPolicySection tickPolicy;
+        private NeedsDamageSection damage;
+    }
+
+    private static final class NeedsTickPolicySection {
+        private String mode;
+        private Double ownerOfflineGraceHours;
+        private Double ownerOfflineDecayMultiplier;
+    }
+
+    private static final class NeedsDamageSection {
+        private Boolean enabled;
+        private String model;
+        private String dualNeedRule;
+        private Double starvationDamagePerMinute;
+        private Double dehydrationDamagePerMinute;
+        private Boolean lethal;
+    }
+
+    private static final class ReviveSection {
+        private Boolean enabled;
+    }
+}

@@ -68,6 +68,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
         this.harvestContextParamName = globalConfig.getHarvestContextParam();
         this.harvestAlarmName = globalConfig.getHarvestAlarmName();
         this.cooldownAlarmPrefix = globalConfig.getInteractionCooldownAlarmPrefix();
+        boolean interactionRequireOwnerDefault = globalConfig.isOwnershipInteractionRequiresOwner();
         StdScope globalSnapshot = null;
         StdScope execSnapshot = null;
         StdScope sensorSnapshot = null;
@@ -127,6 +128,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
                         feedHelper,
                         alarmHelper,
                         harvestAlarmName,
+                        interactionRequireOwnerDefault,
                         interactionExtensionRuntime
                 );
         InteractionSelector selector =

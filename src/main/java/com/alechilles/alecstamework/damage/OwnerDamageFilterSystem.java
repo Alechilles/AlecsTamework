@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.damage;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -38,12 +40,16 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
     }
 
     private final ComponentType<EntityStore, TameworkOwnerComponent> ownerType;
+    private final ComponentType<EntityStore, TameworkCommandLinksComponent> linksType;
+    private final ComponentType<EntityStore, TameworkNpcNameComponent> npcNameType;
     private final ComponentType<EntityStore, TransformComponent> transformType;
     private final HytaleLogger logger;
     private final SimpleClaimsTamedDamagePolicyService claimDamagePolicyService;
 
     public OwnerDamageFilterSystem(HytaleLogger logger) {
         this.ownerType = TameworkOwnerComponent.getComponentType();
+        this.linksType = TameworkCommandLinksComponent.getComponentType();
+        this.npcNameType = TameworkNpcNameComponent.getComponentType();
         this.transformType = TransformComponent.getComponentType();
         this.logger = logger;
         this.claimDamagePolicyService = new SimpleClaimsTamedDamagePolicyService();
@@ -100,14 +106,8 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
                                           Store<EntityStore> store,
                                           Ref<EntityStore> targetRef,
                                           @Nullable UUID attackerPlayerUuid) {
-        ComponentType<EntityStore, TameworkOwnerComponent> type = ownerType != null
-                ? ownerType
-                : TameworkOwnerComponent.getComponentType();
-        if (type == null) {
-            return false;
-        }
-        TameworkOwnerComponent owner = chunk.getComponent(index, type);
-        if (owner == null || owner.getOwnerId() == null) {
+        UUID ownerId = resolveOwnerId(index, chunk, store, targetRef);
+        if (ownerId == null) {
             return false;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
@@ -127,7 +127,51 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         if (blockAllPlayerDamageIfOwned) {
             return true;
         }
-        return blockOwnerDamage && owner.getOwnerId().equals(attackerPlayerUuid);
+        return blockOwnerDamage && ownerId.equals(attackerPlayerUuid);
+    }
+
+    @Nullable
+    private UUID resolveOwnerId(int index,
+                                @Nonnull ArchetypeChunk<EntityStore> chunk,
+                                @Nonnull Store<EntityStore> store,
+                                @Nonnull Ref<EntityStore> targetRef) {
+        ComponentType<EntityStore, TameworkOwnerComponent> resolvedOwnerType = ownerType != null
+                ? ownerType
+                : TameworkOwnerComponent.getComponentType();
+        if (resolvedOwnerType != null) {
+            TameworkOwnerComponent owner = chunk.getComponent(index, resolvedOwnerType);
+            if (owner == null) {
+                owner = store.getComponent(targetRef, resolvedOwnerType);
+            }
+            if (owner != null && owner.getOwnerId() != null) {
+                return owner.getOwnerId();
+            }
+        }
+
+        ComponentType<EntityStore, TameworkCommandLinksComponent> resolvedLinksType = linksType != null
+                ? linksType
+                : TameworkCommandLinksComponent.getComponentType();
+        if (resolvedLinksType != null) {
+            TameworkCommandLinksComponent links = chunk.getComponent(index, resolvedLinksType);
+            if (links == null) {
+                links = store.getComponent(targetRef, resolvedLinksType);
+            }
+            if (links != null && links.getOwnerId() != null) {
+                return links.getOwnerId();
+            }
+        }
+
+        ComponentType<EntityStore, TameworkNpcNameComponent> resolvedNpcNameType = npcNameType != null
+                ? npcNameType
+                : TameworkNpcNameComponent.getComponentType();
+        if (resolvedNpcNameType == null) {
+            return null;
+        }
+        TameworkNpcNameComponent npcName = chunk.getComponent(index, resolvedNpcNameType);
+        if (npcName == null) {
+            npcName = store.getComponent(targetRef, resolvedNpcNameType);
+        }
+        return npcName != null ? npcName.getOwnerId() : null;
     }
 
     @Nullable

@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -288,6 +289,10 @@ public final class SpawnerFeatureHandler {
         if (player == null || itemStack == null || config == null) {
             return false;
         }
+        config = buildSpawnerConfigForInteraction(config, null);
+        if (config == null) {
+            return false;
+        }
         if (!config.isSpawnerEnabled()) {
             return false;
         }
@@ -448,13 +453,20 @@ public final class SpawnerFeatureHandler {
         if (baseConfig == null) {
             return null;
         }
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
+        boolean captureClearsOwner = overrides != null && overrides.captureClearsOwner() != null
+                ? overrides.captureClearsOwner()
+                : baseConfig.isCaptureClearsOwner();
         boolean spawnAssignsOwner = spawnAssignsOwnerOverride != null
                 ? spawnAssignsOwnerOverride
                 : baseConfig.isSpawnAssignsOwner();
+        if (overrides != null && overrides.spawnSetsOwner() != null) {
+            spawnAssignsOwner = overrides.spawnSetsOwner();
+        }
         return ItemFeatureConfig.builder()
                 .spawnerEnabled(baseConfig.isSpawnerEnabled())
                 .whistleEnabled(baseConfig.isWhistleEnabled())
-                .captureClearsOwner(baseConfig.isCaptureClearsOwner())
+                .captureClearsOwner(captureClearsOwner)
                 .captureRequireTamed(baseConfig.isCaptureRequireTamed())
                 .captureOwnerRestricted(baseConfig.isCaptureOwnerRestricted())
                 .spawnAssignsOwner(spawnAssignsOwner)
@@ -484,6 +496,10 @@ public final class SpawnerFeatureHandler {
     // Called by NPC action chains to capture an NPC into the held spawner item.
     public boolean captureFromNpcAction(Player player, Ref<EntityStore> targetRef, ItemStack itemStack, ItemFeatureConfig config) {
         if (player == null || targetRef == null || itemStack == null || config == null) {
+            return false;
+        }
+        config = buildSpawnerConfigForInteraction(config, null);
+        if (config == null) {
             return false;
         }
         if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {

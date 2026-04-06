@@ -24,7 +24,7 @@ class TwNeedsConfigTickPolicyDamageSettingsTest {
         assertEquals(1.0, tickPolicy.getOwnerOfflineDecayMultiplier(), 0.000001);
 
         assertFalse(damage.isEnabled());
-        assertEquals(TwNeedsConfig.DamageModel.MIN_ONLY_FLAT, damage.getModel());
+        assertEquals(TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT, damage.getModel());
         assertEquals(TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY, damage.getDualNeedRule());
         assertEquals(2.0, damage.getStarvationDamagePerMinute(), 0.000001);
         assertEquals(3.0, damage.getDehydrationDamagePerMinute(), 0.000001);
@@ -45,7 +45,7 @@ class TwNeedsConfigTickPolicyDamageSettingsTest {
 
         assertEquals(72.0, tickPolicy.getOwnerOfflineGraceHours(), 0.000001);
         assertEquals(1.0, tickPolicy.getOwnerOfflineDecayMultiplier(), 0.000001);
-        assertEquals(TwNeedsConfig.DamageModel.MIN_ONLY_FLAT, damage.getModel());
+        assertEquals(TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT, damage.getModel());
         assertEquals(TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY, damage.getDualNeedRule());
         assertEquals(2.0, damage.getStarvationDamagePerMinute(), 0.000001);
         assertEquals(3.0, damage.getDehydrationDamagePerMinute(), 0.000001);
@@ -68,6 +68,26 @@ class TwNeedsConfigTickPolicyDamageSettingsTest {
 
         assertSame(parentTickPolicy, child.getTickPolicy());
         assertSame(parentDamage, child.getDamage());
+    }
+
+    @Test
+    void damageModelParsingSupportsPercentAndFlat() {
+        assertEquals(
+                TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT,
+                TwNeedsConfig.DamageModel.fromConfigValue("MIN_ONLY_PERCENT")
+        );
+        assertEquals(
+                TwNeedsConfig.DamageModel.MIN_ONLY_FLAT,
+                TwNeedsConfig.DamageModel.fromConfigValue("MIN_ONLY_FLAT")
+        );
+        assertEquals(
+                TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT,
+                TwNeedsConfig.DamageModel.fromConfigValue(null)
+        );
+        assertEquals(
+                TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT,
+                TwNeedsConfig.DamageModel.fromConfigValue("invalid-model")
+        );
     }
 
     @Test

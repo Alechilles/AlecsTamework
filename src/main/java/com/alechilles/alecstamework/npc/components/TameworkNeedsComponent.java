@@ -43,6 +43,12 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
         )
         .add()
         .append(
+            new KeyedCodec<>("PendingNeedsDamage", Codec.DOUBLE),
+            TameworkNeedsComponent::setPendingNeedsDamage,
+            TameworkNeedsComponent::getPendingNeedsDamage
+        )
+        .add()
+        .append(
             new KeyedCodec<>("LastUpdateMs", Codec.LONG),
             TameworkNeedsComponent::setLastUpdateMs,
             TameworkNeedsComponent::getLastUpdateMs
@@ -54,14 +60,29 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
             TameworkNeedsComponent::getLastPassiveSweepMs
         )
         .add()
+        .append(
+            new KeyedCodec<>("RegenSuppressionBaselineHealth", Codec.DOUBLE),
+            TameworkNeedsComponent::setRegenSuppressionBaselineHealth,
+            TameworkNeedsComponent::getRegenSuppressionBaselineHealth
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("RegenSuppressionAllowedHeal", Codec.DOUBLE),
+            TameworkNeedsComponent::setRegenSuppressionAllowedHeal,
+            TameworkNeedsComponent::getRegenSuppressionAllowedHeal
+        )
+        .add()
         .build();
 
     private String configId;
     private double hunger;
     private double thirst;
     private double appliedHappinessPenalty;
+    private double pendingNeedsDamage;
     private long lastUpdateMs;
     private long lastPassiveSweepMs;
+    private double regenSuppressionBaselineHealth;
+    private double regenSuppressionAllowedHeal;
 
     public TameworkNeedsComponent() {
     }
@@ -72,12 +93,25 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
                                   double appliedHappinessPenalty,
                                   long lastUpdateMs,
                                   long lastPassiveSweepMs) {
+        this(configId, hunger, thirst, appliedHappinessPenalty, 0.0, lastUpdateMs, lastPassiveSweepMs);
+    }
+
+    public TameworkNeedsComponent(String configId,
+                                  double hunger,
+                                  double thirst,
+                                  double appliedHappinessPenalty,
+                                  double pendingNeedsDamage,
+                                  long lastUpdateMs,
+                                  long lastPassiveSweepMs) {
         this.configId = configId;
         this.hunger = hunger;
         this.thirst = thirst;
         this.appliedHappinessPenalty = appliedHappinessPenalty;
+        this.pendingNeedsDamage = pendingNeedsDamage;
         this.lastUpdateMs = lastUpdateMs;
         this.lastPassiveSweepMs = lastPassiveSweepMs;
+        this.regenSuppressionBaselineHealth = -1.0;
+        this.regenSuppressionAllowedHeal = 0.0;
     }
 
     public static ComponentType<EntityStore, TameworkNeedsComponent> getComponentType() {
@@ -117,6 +151,14 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
         this.appliedHappinessPenalty = appliedHappinessPenalty;
     }
 
+    public double getPendingNeedsDamage() {
+        return pendingNeedsDamage;
+    }
+
+    public void setPendingNeedsDamage(double pendingNeedsDamage) {
+        this.pendingNeedsDamage = pendingNeedsDamage;
+    }
+
     public long getLastUpdateMs() {
         return lastUpdateMs;
     }
@@ -133,15 +175,35 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
         this.lastPassiveSweepMs = lastPassiveSweepMs;
     }
 
+    public double getRegenSuppressionBaselineHealth() {
+        return regenSuppressionBaselineHealth;
+    }
+
+    public void setRegenSuppressionBaselineHealth(double regenSuppressionBaselineHealth) {
+        this.regenSuppressionBaselineHealth = regenSuppressionBaselineHealth;
+    }
+
+    public double getRegenSuppressionAllowedHeal() {
+        return regenSuppressionAllowedHeal;
+    }
+
+    public void setRegenSuppressionAllowedHeal(double regenSuppressionAllowedHeal) {
+        this.regenSuppressionAllowedHeal = regenSuppressionAllowedHeal;
+    }
+
     @Override
     public TameworkNeedsComponent clone() {
-        return new TameworkNeedsComponent(
+        TameworkNeedsComponent copy = new TameworkNeedsComponent(
                 configId,
                 hunger,
                 thirst,
                 appliedHappinessPenalty,
+                pendingNeedsDamage,
                 lastUpdateMs,
                 lastPassiveSweepMs
         );
+        copy.setRegenSuppressionBaselineHealth(regenSuppressionBaselineHealth);
+        copy.setRegenSuppressionAllowedHeal(regenSuppressionAllowedHeal);
+        return copy;
     }
 }

@@ -942,7 +942,20 @@ public final class CommandItemFeatureHandler {
             return false;
         }
         boolean requireTamed = config != null && config.isRequireTamed();
-        return linkPolicyService.passesOwnerAndTamed(true, requireTamed, npcRef, ownerUuid, store);
+        return linkPolicyService.passesOwnerAndTamed(
+                resolveLinkingRequireOwner(),
+                requireTamed,
+                npcRef,
+                ownerUuid,
+                store
+        );
+    }
+
+    private boolean resolveLinkingRequireOwner() {
+        TwGlobalConfig global = TwGlobalConfig.resolveActive();
+        return global != null
+                ? global.isOwnershipLinkingRequiresOwner()
+                : TwGlobalConfig.defaultConfig().isOwnershipLinkingRequiresOwner();
     }
 
     private void clearNpcTamedOwnershipAndLinks(Ref<EntityStore> npcRef, Store<EntityStore> store) {

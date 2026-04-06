@@ -40,6 +40,7 @@ final class CommandLinkPolicyService {
     }
 
     boolean matchesMembership(MembershipMode membershipMode,
+                              boolean requireOwner,
                               Ref<EntityStore> npcRef,
                               NPCEntity npc,
                               Ref<EntityStore> playerRef,
@@ -47,7 +48,7 @@ final class CommandLinkPolicyService {
                               String toolId,
                               Store<EntityStore> store) {
         MembershipMode mode = membershipMode != null ? membershipMode : MembershipMode.LinkedOnly;
-        boolean linked = isLinked(npcRef, playerUuid, toolId, store);
+        boolean linked = isLinked(npcRef, playerUuid, toolId, store, requireOwner);
         boolean owner = isOwnedByPlayer(npcRef, playerUuid, store);
         boolean master = isMasterTargetedToPlayer(npc, playerRef);
         return switch (mode) {
@@ -113,13 +114,17 @@ final class CommandLinkPolicyService {
         };
     }
 
-    private boolean isLinked(Ref<EntityStore> npcRef, UUID playerUuid, String toolId, Store<EntityStore> store) {
+    private boolean isLinked(Ref<EntityStore> npcRef,
+                             UUID playerUuid,
+                             String toolId,
+                             Store<EntityStore> store,
+                             boolean requireOwner) {
         TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
         if (links == null || toolId == null || toolId.isBlank()) {
             return false;
         }
         UUID ownerId = links.getOwnerId();
-        if (ownerId != null && !ownerId.equals(playerUuid)) {
+        if (requireOwner && ownerId != null && !ownerId.equals(playerUuid)) {
             return false;
         }
         return links.containsToolId(toolId);

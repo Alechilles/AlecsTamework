@@ -119,6 +119,49 @@ class TwGlobalConfigInheritanceTest {
     }
 
     @Test
+    void ownershipRequirementsDefaultsPreserveLegacyBehavior() {
+        TwGlobalConfig config = new TwGlobalConfig();
+
+        assertFalse(config.isOwnershipCaptureRequiresOwner());
+        assertFalse(config.isOwnershipSpawnRequiresOwner());
+        assertTrue(config.isOwnershipInteractionRequiresOwner());
+        assertTrue(config.isOwnershipLinkingRequiresOwner());
+    }
+
+    @Test
+    void ownershipRequirementsInheritanceSupportsPartialNestedOverrides() throws Exception {
+        TwGlobalConfig parent = new TwGlobalConfig();
+        TwGlobalConfig child = new TwGlobalConfig();
+
+        setField(parent, "ownershipCaptureRequiresOwner", true);
+        setField(parent, "ownershipSpawnRequiresOwner", true);
+        setField(parent, "ownershipInteractionRequiresOwner", false);
+        setField(parent, "ownershipLinkingRequiresOwner", false);
+
+        setField(child, "ownershipCaptureRequiresOwner", false);
+        setField(child, "ownershipSpawnRequiresOwner", false);
+        setField(child, "ownershipInteractionRequiresOwner", true);
+        setField(child, "ownershipLinkingRequiresOwner", true);
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put(
+                "OwnershipRequirements",
+                Set.of("CaptureRequiresOwner", "InteractionRequiresOwner")
+        );
+
+        child.inheritMissingTopLevelFrom(
+                parent,
+                Set.of("OwnershipRequirements"),
+                explicitNestedKeysByTopLevel
+        );
+
+        assertFalse(child.isOwnershipCaptureRequiresOwner());
+        assertTrue(child.isOwnershipSpawnRequiresOwner());
+        assertTrue(child.isOwnershipInteractionRequiresOwner());
+        assertFalse(child.isOwnershipLinkingRequiresOwner());
+    }
+
+    @Test
     void populationSectionInheritanceSupportsPartialNestedOverrides() throws Exception {
         TwGlobalConfig parent = new TwGlobalConfig();
         TwGlobalConfig child = new TwGlobalConfig();

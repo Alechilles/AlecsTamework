@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MembershipMode;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -55,6 +56,7 @@ final class CommandRecipientService {
         int maxTargets = Math.max(1, context.config.getMaxTargets());
         int maxActive = Math.max(0, context.config.getMaxActive());
         UUID playerUuid = context.player.getUuid();
+        boolean requireOwner = resolveLinkingRequireOwner();
         List<LinkedNpcRecord> linkedRecords = linkedNpcRecordStore.read(context.workingItem);
         Map<UUID, LinkedNpcRecord> linkedRecordByUuid = mapLinkedRecordsByUuid(linkedRecords);
         Set<UUID> cappedActiveLinkedNpcUuids = resolveCappedActiveLinkedNpcUuids(linkedRecords, maxActive);
@@ -71,6 +73,7 @@ final class CommandRecipientService {
                 }
                 if (!linkPolicyService.matchesMembership(
                         recipientMembershipMode,
+                        requireOwner,
                         npcRef,
                         npc,
                         context.playerRef,
@@ -81,7 +84,7 @@ final class CommandRecipientService {
                     continue;
                 }
                 if (!linkPolicyService.passesOwnerAndTamed(
-                        context.config.isRequireOwner(),
+                        requireOwner,
                         context.config.isRequireTamed(),
                         npcRef,
                         playerUuid,
@@ -261,5 +264,14 @@ final class CommandRecipientService {
             }
         }
         return count;
+    }
+
+    private boolean resolveLinkingRequireOwner() {
+        return resolveLinkingRequireOwner(TwGlobalConfig.resolveActive());
+    }
+
+    static boolean resolveLinkingRequireOwner(TwGlobalConfig globalConfig) {
+        TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
+        return resolved.isOwnershipLinkingRequiresOwner();
     }
 }

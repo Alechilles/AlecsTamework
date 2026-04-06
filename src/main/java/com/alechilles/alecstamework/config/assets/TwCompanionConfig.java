@@ -1001,16 +1001,25 @@ public final class TwCompanionConfig implements JsonAssetWithMap<String, Default
                 OwnershipProtectionSettings ownership = scoped.getOwnershipProtection();
                 CommandSettings command = scoped.getCommand();
                 TravelSettings travel = command.getTravel();
+                boolean blockOwnerDamage = global != null
+                        ? global.isBlockOwnerDamage()
+                        : ownership.isBlockOwnerDamage();
+                boolean blockAllPlayerDamageIfOwned = global != null
+                        ? global.isBlockAllPlayerDamageIfOwned()
+                        : ownership.isBlockAllPlayerDamageIfOwned();
+                boolean invulnerableIfOwned = global != null
+                        ? global.isInvulnerableIfOwned()
+                        : ownership.isInvulnerableIfOwned();
                 return new EffectiveSettings(
-                        ownership.isBlockOwnerDamage(),
-                        ownership.isBlockAllPlayerDamageIfOwned(),
-                        ownership.isInvulnerableIfOwned(),
+                        blockOwnerDamage,
+                        blockAllPlayerDamageIfOwned,
+                        invulnerableIfOwned,
                         command.getReturnHomeTeleportDistance(),
                         command.getReturnHomePathDistanceBeforeTeleport(),
                         command.getReturnHomeTeleportDelayMs(),
                         command.getRecallSafeSpawnDistance(),
                         command.getRecallForceRelocateDistance(),
-                        command.isDeadRespawnEnabled(),
+                        global != null ? global.isCommandDeadRespawnEnabled() : command.isDeadRespawnEnabled(),
                         command.getDeadRespawnCooldownMs(),
                         command.getDeadRespawnFollowRetryDelayMs(),
                         command.getDeadRespawnDistanceClose(),

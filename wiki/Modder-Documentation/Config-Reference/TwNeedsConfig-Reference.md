@@ -114,11 +114,12 @@ Accepted `Mode` values:
 - `Enabled`: master gate for need-driven damage.
 - `Model`: damage calculation model.
 - `DualNeedRule`: how hunger and thirst combine when both are critical.
-- `StarvationDamagePerMinute`
-- `DehydrationDamagePerMinute`
+- `StarvationDamagePerMinute` (flat damage per minute in `MIN_ONLY_FLAT`, percent of max health per minute in `MIN_ONLY_PERCENT`)
+- `DehydrationDamagePerMinute` (flat damage per minute in `MIN_ONLY_FLAT`, percent of max health per minute in `MIN_ONLY_PERCENT`)
 - `Lethal`: whether the damage is allowed to kill the NPC
 
 Accepted `Model` values:
+- `MIN_ONLY_PERCENT`
 - `MIN_ONLY_FLAT`
 
 Accepted `DualNeedRule` values:
@@ -205,7 +206,7 @@ Accepted `DualNeedRule` values:
   },
   "Damage": {
     "Enabled": false,
-    "Model": "MIN_ONLY_FLAT",
+    "Model": "MIN_ONLY_PERCENT",
     "DualNeedRule": "USE_HIGHER_ONLY",
     "StarvationDamagePerMinute": 2.0,
     "DehydrationDamagePerMinute": 3.0,

@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.assetstore.map.IndexedLookupTableAssetMap;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -379,6 +380,9 @@ final class InteractionStateEffects {
             return false;
         }
         statMap.addStatValue(statIndex, (float) delta);
+        if (HEALTH_STAT_ID.equals(statId) && delta > 0.0) {
+            CompanionNeedsService.allowExternalHeal(npcRef, store, delta);
+        }
         return true;
     }
 

@@ -1,0 +1,638 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer #TwSettingsRoot {
+    Anchor: (Width: 590, Height: 700);
+
+    #Title {
+      $C.@Title #TwSettingsTitle {
+        @Alignment = Start;
+        @Text = "Tamework Settings";
+      }
+
+      Group {
+        Anchor: (Top: 5, Right: 10, Width: 304, Height: 24);
+
+        TextButton #TwSettingsRefreshButton {
+          Anchor: (Left: 0, Width: 94, Height: 24);
+          Text: "Refresh";
+          Style: (...$C.@SmallSecondaryTextButtonStyle);
+        }
+
+        TextButton #TwSettingsApplyButton {
+          Anchor: (Left: 102, Width: 94, Height: 24);
+          Text: "Apply";
+          Style: (...$C.@SmallSecondaryTextButtonStyle);
+        }
+
+        TextButton #TwSettingsCloseButton {
+          Anchor: (Right: 0, Width: 94, Height: 24);
+          Text: "Close";
+          Style: (...$C.@SmallSecondaryTextButtonStyle);
+        }
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Left: 10, Right: 10, Top: 6, Bottom: 8);
+
+      Label #TwSettingsStatusLine {
+        Anchor: (Top: 0, Height: 20);
+        Text: "";
+        Style: (FontSize: 12, TextColor: #c6d7ea, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+      }
+
+      Group {
+        Anchor: (Top: 6);
+        FlexWeight: 1;
+        Background: #13243a;
+        Padding: (Left: 8, Right: 8, Top: 8, Bottom: 8);
+
+        Group #TwSettingsViewport {
+          Anchor: (Top: 0, Left: 0, Right: 0, Bottom: 0);
+          LayoutMode: TopScrolling;
+          KeepScrollPosition: true;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+          Padding: (Left: 4, Right: 0, Top: 2, Bottom: 2);
+
+          Group #TwSettingsRows {
+            LayoutMode: Top;
+            Anchor: (Left: 0, Right: 0, Bottom: 0);
+
+            Label {
+              Anchor: (Height: 24);
+              Text: "Population";
+              Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Limit Per Player Owned Total";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextField #TwSettingsPopulationLimitInput {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: $C.@DefaultInputFieldStyle;
+                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "0";
+                MaxLength: 8;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Per Player Limit Scope";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              DropdownBox #TwSettingsPopulationScopeDropdown {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: "No scope";
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Label {
+              Anchor: (Height: 24);
+              Text: "Simple Claims";
+              Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Simple Claims Integration";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsSimpleClaimsEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Breeding Limit Per Claim Chunk";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextField #TwSettingsClaimLimitChunkInput {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: $C.@DefaultInputFieldStyle;
+                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "0";
+                MaxLength: 8;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Breeding Limit Per Claim Total";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextField #TwSettingsClaimLimitTotalInput {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: $C.@DefaultInputFieldStyle;
+                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "0";
+                MaxLength: 8;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Breeding Requires Claim";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsBreedingRequiresClaimCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Protect Tamed From Non-Members";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsSimpleClaimsProtectCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Label {
+              Anchor: (Height: 24);
+              Text: "Ownership";
+              Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Label {
+              Anchor: (Height: 18);
+              Text: "Damage Protection";
+              Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Block Owner Damage";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsBlockOwnerDamageCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Block All Player Damage If Owned";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsBlockAllDamageIfOwnedCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Invulnerable If Owned";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsInvulnerableIfOwnedCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Label {
+              Anchor: (Top: 4, Height: 18);
+              Text: "Capture";
+              Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Capture Requires Owner";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsCaptureRequiresOwnerCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Spawn Requires Owner";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsSpawnRequiresOwnerCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Capture Clears Owner";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsCaptureClearsOwnerCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Spawn Sets Owner";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsSpawnSetsOwnerCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Label {
+              Anchor: (Height: 18);
+              Text: "Note: Enabling both allows trading captured mobs between players.";
+              Style: (FontSize: 11, TextColor: #9fb5ce, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Label {
+              Anchor: (Top: 4, Height: 18);
+              Text: "General";
+              Style: (FontSize: 12, RenderBold: true, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Interaction Requires Owner";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsInteractionRequiresOwnerCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Linking Requires Owner";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsLinkingRequiresOwnerCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Label {
+              Anchor: (Height: 24);
+              Text: "Needs (Hunger/Thirst)";
+              Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Hunger/Thirst Damage";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsNeedsDamageEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Needs Tick Policy";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              DropdownBox #TwSettingsNeedsTickPolicyModeDropdown {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: "No policy";
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Owner Offline Grace Hours";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextField #TwSettingsNeedsOwnerOfflineGraceHoursInput {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: $C.@DefaultInputFieldStyle;
+                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "72";
+                MaxLength: 12;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Owner Offline Decay Multiplier";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextField #TwSettingsNeedsOwnerOfflineDecayMultiplierInput {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: $C.@DefaultInputFieldStyle;
+                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "1";
+                MaxLength: 12;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Needs Damage Model";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              DropdownBox #TwSettingsNeedsDamageModelDropdown {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: "No model";
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Dual Need Rule";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              DropdownBox #TwSettingsNeedsDamageDualNeedRuleDropdown {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: (...$C.@DefaultDropdownBoxStyle, HorizontalPadding: 8);
+                MaxSelection: 1;
+                NoItemsText: "No rule";
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Starvation Damage Per Minute";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextField #TwSettingsNeedsStarvationDamagePerMinuteInput {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: $C.@DefaultInputFieldStyle;
+                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "2";
+                MaxLength: 12;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Dehydration Damage Per Minute";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextField #TwSettingsNeedsDehydrationDamagePerMinuteInput {
+                Anchor: (Left: 256, Width: 250, Height: 24);
+                Style: $C.@DefaultInputFieldStyle;
+                PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+                Background: $C.@InputBoxBackground;
+                Padding: (Horizontal: 8);
+                PlaceholderText: "3";
+                MaxLength: 12;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Needs Damage Is Lethal";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsNeedsDamageLethalCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Label {
+              Anchor: (Height: 24);
+              Text: "Revive System";
+              Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Revive System";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsReviveSystemEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Label {
+              Anchor: (Height: 24);
+              Text: "Crash Telemetry (Server)";
+              Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Crash Telemetry Uploads";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsTelemetryEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Crash Telemetry Breadcrumbs";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              CheckBox #TwSettingsTelemetryBreadcrumbsEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+

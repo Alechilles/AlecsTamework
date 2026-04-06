@@ -29,6 +29,8 @@ public final class CompanionNeedsService {
     private static final String HEALTH_STAT_ID = "Health";
     private static final double NON_LETHAL_MIN_REMAINING_HEALTH = 1.0;
     private static final double MIN_DAMAGE_AMOUNT = 0.0001;
+    private static final double REGEN_SUPPRESSION_BASELINE_UNSET = -1.0;
+    private static final double MAX_REGEN_SUPPRESSION_ALLOWED_HEAL = 10_000.0;
     public static final String NEEDS_DAMAGE_SOURCE_TYPE = "tamework.needs";
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
 
@@ -95,6 +97,28 @@ public final class CompanionNeedsService {
             existing.setAppliedHappinessPenalty(appliedPenalty);
             changed = true;
         }
+        double pendingNeedsDamage = normalizePendingNeedsDamage(existing.getPendingNeedsDamage());
+        if (Math.abs(existing.getPendingNeedsDamage() - pendingNeedsDamage) > EPSILON
+                || !Double.isFinite(existing.getPendingNeedsDamage())) {
+            existing.setPendingNeedsDamage(pendingNeedsDamage);
+            changed = true;
+        }
+        double regenSuppressionBaseline = normalizeRegenSuppressionBaselineHealth(
+                existing.getRegenSuppressionBaselineHealth()
+        );
+        if (Math.abs(existing.getRegenSuppressionBaselineHealth() - regenSuppressionBaseline) > EPSILON
+                || !Double.isFinite(existing.getRegenSuppressionBaselineHealth())) {
+            existing.setRegenSuppressionBaselineHealth(regenSuppressionBaseline);
+            changed = true;
+        }
+        double regenSuppressionAllowedHeal = normalizeRegenSuppressionAllowedHeal(
+                existing.getRegenSuppressionAllowedHeal()
+        );
+        if (Math.abs(existing.getRegenSuppressionAllowedHeal() - regenSuppressionAllowedHeal) > EPSILON
+                || !Double.isFinite(existing.getRegenSuppressionAllowedHeal())) {
+            existing.setRegenSuppressionAllowedHeal(regenSuppressionAllowedHeal);
+            changed = true;
+        }
         if (existing.getLastUpdateMs() <= 0L) {
             existing.setLastUpdateMs(nowMs);
             changed = true;
@@ -116,6 +140,58 @@ public final class CompanionNeedsService {
                                     @Nullable Store<EntityStore> store,
                                     @Nullable String roleId) {
         return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, null);
+    }
+
+    /**
+     * Registers externally-applied healing (for example feed interaction healing) so starvation/dehydration
+     * regen suppression can allow that exact heal amount without allowing natural regeneration drift.
+     */
+    public static void allowExternalHeal(@Nullable Ref<EntityStore> npcRef,
+                                         @Nullable Store<EntityStore> store,
+                                         double healAmount) {
+        if (npcRef == null || store == null || !npcRef.isValid() || !Double.isFinite(healAmount) || healAmount <= 0.0) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
+        if (needsType == null) {
+            return;
+        }
+        TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
+        if (component == null) {
+            return;
+        }
+        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, null, component);
+        if (config == null || !config.isEnabled()) {
+            return;
+        }
+        TwNeedsConfig.ValueSettings values = config.getValues();
+        double hunger = sanitizeAndClamp(
+                component.getHunger(),
+                values.getHungerDefault(),
+                values.getHungerMin(),
+                values.getHungerMax()
+        );
+        double thirst = sanitizeAndClamp(
+                component.getThirst(),
+                values.getThirstDefault(),
+                values.getThirstMin(),
+                values.getThirstMax()
+        );
+        if (!shouldSuppressNaturalRegen(config, values, hunger, thirst)) {
+            return;
+        }
+        double allowance = normalizeRegenSuppressionAllowedHeal(component.getRegenSuppressionAllowedHeal());
+        allowance = Math.min(MAX_REGEN_SUPPRESSION_ALLOWED_HEAL, allowance + healAmount);
+        double baseline = normalizeRegenSuppressionBaselineHealth(component.getRegenSuppressionBaselineHealth());
+        if (baseline == REGEN_SUPPRESSION_BASELINE_UNSET) {
+            EntityStatValue health = resolveHealthStat(npcRef, store);
+            if (health != null && Double.isFinite(health.get())) {
+                baseline = health.get();
+            }
+        }
+        component.setRegenSuppressionAllowedHeal(allowance);
+        component.setRegenSuppressionBaselineHealth(baseline);
+        store.putComponent(npcRef, needsType, component);
     }
 
     /**
@@ -261,10 +337,38 @@ public final class CompanionNeedsService {
             componentChanged = true;
         }
 
-        double needsDamageAmount = resolveNeedsDamageAmount(config, values, hunger, thirst, effectiveElapsedMs);
+        double healthMax = resolveHealthMax(npcRef, store);
+        double needsDamageAmount = resolveNeedsDamageAmount(
+                config,
+                values,
+                hunger,
+                thirst,
+                effectiveElapsedMs,
+                healthMax
+        );
+        NeedsDamagePoolResolution needsDamagePool = resolveNeedsDamagePooling(
+                needsDamageAmount,
+                component.getPendingNeedsDamage()
+        );
+        double pendingNeedsDamage = needsDamagePool.getPendingDamageRemainder();
+        if (Math.abs(component.getPendingNeedsDamage() - pendingNeedsDamage) > EPSILON
+                || !Double.isFinite(component.getPendingNeedsDamage())) {
+            component.setPendingNeedsDamage(pendingNeedsDamage);
+            componentChanged = true;
+        }
         boolean damageApplied = false;
-        if (needsDamageAmount > MIN_DAMAGE_AMOUNT) {
-            damageApplied = applyNeedsDamage(npcRef, store, needsDamageAmount, config.getDamage().isLethal());
+        double pooledDamageAmount = needsDamagePool.getDamageToApply();
+        if (pooledDamageAmount > MIN_DAMAGE_AMOUNT) {
+            damageApplied = applyNeedsDamage(npcRef, store, pooledDamageAmount, config.getDamage().isLethal());
+        }
+        boolean regenSuppressionChanged = applyNaturalRegenSuppression(
+                npcRef,
+                store,
+                component,
+                shouldSuppressNaturalRegen(config, values, hunger, thirst)
+        );
+        if (regenSuppressionChanged) {
+            componentChanged = true;
         }
 
         if (!Double.isFinite(component.getAppliedHappinessPenalty())
@@ -353,11 +457,25 @@ public final class CompanionNeedsService {
         return links != null ? links.getOwnerId() : null;
     }
 
+    static boolean shouldSuppressNaturalRegen(@Nonnull TwNeedsConfig config,
+                                              @Nonnull TwNeedsConfig.ValueSettings values,
+                                              double hunger,
+                                              double thirst) {
+        TwNeedsConfig.DamageSettings damageSettings = config.getDamage();
+        if (damageSettings == null || !damageSettings.isEnabled()) {
+            return false;
+        }
+        boolean atHungerMin = hunger <= values.getHungerMin() + EPSILON;
+        boolean atThirstMin = thirst <= values.getThirstMin() + EPSILON;
+        return atHungerMin || atThirstMin;
+    }
+
     static double resolveNeedsDamageAmount(@Nullable TwNeedsConfig config,
                                            @Nullable TwNeedsConfig.ValueSettings values,
                                            double hunger,
                                            double thirst,
-                                           long effectiveElapsedMs) {
+                                           long effectiveElapsedMs,
+                                           double healthMax) {
         if (config == null || values == null || effectiveElapsedMs <= 0L) {
             return 0.0;
         }
@@ -387,10 +505,47 @@ public final class CompanionNeedsService {
         if (!Double.isFinite(dehydrationDamage) || dehydrationDamage < 0.0) {
             dehydrationDamage = 0.0;
         }
-        return switch (damageSettings.getDualNeedRule()) {
+        double combined = switch (damageSettings.getDualNeedRule()) {
             case SUM_BOTH -> starvationDamage + dehydrationDamage;
             case USE_HIGHER_ONLY -> Math.max(starvationDamage, dehydrationDamage);
         };
+        if (!Double.isFinite(combined) || combined <= 0.0) {
+            return 0.0;
+        }
+        return switch (damageSettings.getModel()) {
+            case MIN_ONLY_FLAT -> combined;
+            case MIN_ONLY_PERCENT -> {
+                if (!Double.isFinite(healthMax) || healthMax <= 0.0) {
+                    yield 0.0;
+                }
+                yield healthMax * (combined / 100.0);
+            }
+        };
+    }
+
+    static NeedsDamagePoolResolution resolveNeedsDamagePooling(double calculatedDamageAmount,
+                                                               double existingPendingNeedsDamage) {
+        double safeDamageAmount = Double.isFinite(calculatedDamageAmount) && calculatedDamageAmount > 0.0
+                ? calculatedDamageAmount
+                : 0.0;
+        double pendingCarry = normalizePendingNeedsDamage(existingPendingNeedsDamage);
+        double totalDamage = safeDamageAmount + pendingCarry;
+        if (!Double.isFinite(totalDamage) || totalDamage <= 0.0) {
+            return new NeedsDamagePoolResolution(0.0, 0.0);
+        }
+        if (totalDamage < 1.0) {
+            return new NeedsDamagePoolResolution(0.0, totalDamage);
+        }
+        double damageToApply = Math.floor(totalDamage);
+        double pendingRemainder = totalDamage - damageToApply;
+        return new NeedsDamagePoolResolution(damageToApply, normalizePendingNeedsDamage(pendingRemainder));
+    }
+
+    static double normalizePendingNeedsDamage(double pendingNeedsDamage) {
+        if (!Double.isFinite(pendingNeedsDamage) || pendingNeedsDamage <= 0.0) {
+            return 0.0;
+        }
+        return pendingNeedsDamage - Math.floor(pendingNeedsDamage);
     }
 
     private static boolean applyNeedsDamage(@Nonnull Ref<EntityStore> npcRef,
@@ -431,6 +586,138 @@ public final class CompanionNeedsService {
         return resolveAppliedDamageAmountFromHealth(requestedDamageAmount, lethal, currentHealth);
     }
 
+    private static double resolveHealthMax(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return Double.NaN;
+        }
+        EntityStatValue health = resolveHealthStat(npcRef, store);
+        if (health == null) {
+            return Double.NaN;
+        }
+        return health.getMax();
+    }
+
+    private static boolean applyNaturalRegenSuppression(@Nonnull Ref<EntityStore> npcRef,
+                                                        @Nonnull Store<EntityStore> store,
+                                                        @Nonnull TameworkNeedsComponent component,
+                                                        boolean suppressNaturalRegen) {
+        EntityStatContext healthContext = resolveHealthStatContext(npcRef, store);
+        if (healthContext == null || healthContext.value == null) {
+            if (!suppressNaturalRegen) {
+                return resetNaturalRegenSuppression(component);
+            }
+            return false;
+        }
+
+        double currentHealth = healthContext.value.get();
+        if (!Double.isFinite(currentHealth)) {
+            if (!suppressNaturalRegen) {
+                return resetNaturalRegenSuppression(component);
+            }
+            return false;
+        }
+
+        NaturalRegenSuppressionResolution resolution = resolveNaturalRegenSuppression(
+                suppressNaturalRegen,
+                currentHealth,
+                component.getRegenSuppressionBaselineHealth(),
+                component.getRegenSuppressionAllowedHeal()
+        );
+
+        boolean changed = false;
+        if (resolution.healthOverflowToRemove > EPSILON) {
+            healthContext.statMap.addStatValue(healthContext.healthIndex, (float) (-resolution.healthOverflowToRemove));
+            currentHealth = healthContext.value.get();
+            changed = true;
+        }
+
+        double targetBaseline = Double.isFinite(currentHealth)
+                ? currentHealth
+                : REGEN_SUPPRESSION_BASELINE_UNSET;
+        double targetAllowedHeal = suppressNaturalRegen ? resolution.nextAllowedExternalHeal : 0.0;
+
+        if (Math.abs(component.getRegenSuppressionBaselineHealth() - targetBaseline) > EPSILON
+                || !Double.isFinite(component.getRegenSuppressionBaselineHealth())) {
+            component.setRegenSuppressionBaselineHealth(targetBaseline);
+            changed = true;
+        }
+        if (Math.abs(component.getRegenSuppressionAllowedHeal() - targetAllowedHeal) > EPSILON
+                || !Double.isFinite(component.getRegenSuppressionAllowedHeal())) {
+            component.setRegenSuppressionAllowedHeal(targetAllowedHeal);
+            changed = true;
+        }
+        return changed;
+    }
+
+    private static boolean resetNaturalRegenSuppression(@Nonnull TameworkNeedsComponent component) {
+        boolean changed = false;
+        if (Math.abs(component.getRegenSuppressionBaselineHealth() - REGEN_SUPPRESSION_BASELINE_UNSET) > EPSILON
+                || !Double.isFinite(component.getRegenSuppressionBaselineHealth())) {
+            component.setRegenSuppressionBaselineHealth(REGEN_SUPPRESSION_BASELINE_UNSET);
+            changed = true;
+        }
+        if (Math.abs(component.getRegenSuppressionAllowedHeal()) > EPSILON
+                || !Double.isFinite(component.getRegenSuppressionAllowedHeal())) {
+            component.setRegenSuppressionAllowedHeal(0.0);
+            changed = true;
+        }
+        return changed;
+    }
+
+    static NaturalRegenSuppressionResolution resolveNaturalRegenSuppression(boolean suppressNaturalRegen,
+                                                                            double currentHealth,
+                                                                            double baselineHealth,
+                                                                            double allowedExternalHeal) {
+        if (!Double.isFinite(currentHealth)) {
+            return new NaturalRegenSuppressionResolution(
+                    REGEN_SUPPRESSION_BASELINE_UNSET,
+                    0.0,
+                    0.0
+            );
+        }
+        if (!suppressNaturalRegen) {
+            return new NaturalRegenSuppressionResolution(
+                    REGEN_SUPPRESSION_BASELINE_UNSET,
+                    0.0,
+                    0.0
+            );
+        }
+
+        double baseline = normalizeRegenSuppressionBaselineHealth(baselineHealth);
+        if (baseline == REGEN_SUPPRESSION_BASELINE_UNSET) {
+            baseline = currentHealth;
+        }
+        double allowance = normalizeRegenSuppressionAllowedHeal(allowedExternalHeal);
+        double maxAllowedHealth = baseline + allowance;
+        double clampedHealth = Math.min(currentHealth, maxAllowedHealth);
+        double healthOverflowToRemove = Math.max(0.0, currentHealth - clampedHealth);
+
+        double gainedHealth = Math.max(0.0, clampedHealth - baseline);
+        double consumedAllowance = Math.min(allowance, gainedHealth);
+        double remainingAllowance = allowance - consumedAllowance;
+
+        return new NaturalRegenSuppressionResolution(
+                clampedHealth,
+                normalizeRegenSuppressionAllowedHeal(remainingAllowance),
+                healthOverflowToRemove
+        );
+    }
+
+    private static double normalizeRegenSuppressionBaselineHealth(double baselineHealth) {
+        if (!Double.isFinite(baselineHealth) || baselineHealth < 0.0) {
+            return REGEN_SUPPRESSION_BASELINE_UNSET;
+        }
+        return baselineHealth;
+    }
+
+    private static double normalizeRegenSuppressionAllowedHeal(double allowedExternalHeal) {
+        if (!Double.isFinite(allowedExternalHeal) || allowedExternalHeal <= 0.0) {
+            return 0.0;
+        }
+        return Math.min(MAX_REGEN_SUPPRESSION_ALLOWED_HEAL, allowedExternalHeal);
+    }
+
     static float resolveAppliedDamageAmountFromHealth(double requestedDamageAmount,
                                                       boolean lethal,
                                                       double currentHealth) {
@@ -445,6 +732,13 @@ public final class CompanionNeedsService {
     @Nullable
     private static EntityStatValue resolveHealthStat(@Nonnull Ref<EntityStore> npcRef,
                                                      @Nonnull Store<EntityStore> store) {
+        EntityStatContext context = resolveHealthStatContext(npcRef, store);
+        return context == null ? null : context.value;
+    }
+
+    @Nullable
+    private static EntityStatContext resolveHealthStatContext(@Nonnull Ref<EntityStore> npcRef,
+                                                              @Nonnull Store<EntityStore> store) {
         ComponentType<EntityStore, EntityStatMap> statMapType = EntityStatMap.getComponentType();
         if (statMapType == null) {
             return null;
@@ -460,7 +754,11 @@ public final class CompanionNeedsService {
         if (healthIndex < 0) {
             return null;
         }
-        return statMap.get(healthIndex);
+        EntityStatValue healthValue = statMap.get(healthIndex);
+        if (healthValue == null) {
+            return null;
+        }
+        return new EntityStatContext(statMap, healthIndex, healthValue);
     }
 
     @Nullable
@@ -497,6 +795,64 @@ public final class CompanionNeedsService {
             return max;
         }
         return value;
+    }
+
+    static final class NeedsDamagePoolResolution {
+        private final double damageToApply;
+        private final double pendingDamageRemainder;
+
+        private NeedsDamagePoolResolution(double damageToApply, double pendingDamageRemainder) {
+            this.damageToApply = damageToApply;
+            this.pendingDamageRemainder = pendingDamageRemainder;
+        }
+
+        double getDamageToApply() {
+            return damageToApply;
+        }
+
+        double getPendingDamageRemainder() {
+            return pendingDamageRemainder;
+        }
+    }
+
+    static final class NaturalRegenSuppressionResolution {
+        private final double nextBaselineHealth;
+        private final double nextAllowedExternalHeal;
+        private final double healthOverflowToRemove;
+
+        private NaturalRegenSuppressionResolution(double nextBaselineHealth,
+                                                  double nextAllowedExternalHeal,
+                                                  double healthOverflowToRemove) {
+            this.nextBaselineHealth = nextBaselineHealth;
+            this.nextAllowedExternalHeal = nextAllowedExternalHeal;
+            this.healthOverflowToRemove = healthOverflowToRemove;
+        }
+
+        double getNextBaselineHealth() {
+            return nextBaselineHealth;
+        }
+
+        double getNextAllowedExternalHeal() {
+            return nextAllowedExternalHeal;
+        }
+
+        double getHealthOverflowToRemove() {
+            return healthOverflowToRemove;
+        }
+    }
+
+    private static final class EntityStatContext {
+        private final EntityStatMap statMap;
+        private final int healthIndex;
+        private final EntityStatValue value;
+
+        private EntityStatContext(@Nonnull EntityStatMap statMap,
+                                  int healthIndex,
+                                  @Nonnull EntityStatValue value) {
+            this.statMap = statMap;
+            this.healthIndex = healthIndex;
+            this.value = value;
+        }
     }
 
 }
