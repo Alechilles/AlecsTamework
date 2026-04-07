@@ -112,9 +112,8 @@ final class LinkedNpcPanelVitalsBinder {
             String tooltip = LocalizedText.format(
                     language,
                     "tamework.ui.linkedPanel.happiness.tooltip",
-                    entry.currentHappiness(),
-                    entry.maxHappiness(),
-                    percent(entry.happinessRatio())
+                    percent(entry.happinessRatio()),
+                    entry.targetHappinessPercent()
             );
             if (entry.happinessModifierBreakdown() != null && !entry.happinessModifierBreakdown().isBlank()) {
                 tooltip = tooltip + "\n" + entry.happinessModifierBreakdown();
@@ -148,8 +147,6 @@ final class LinkedNpcPanelVitalsBinder {
                     LocalizedText.format(
                             language,
                             "tamework.ui.linkedPanel.hunger.tooltip",
-                            entry.currentHunger(),
-                            entry.maxHunger(),
                             percent(entry.hungerRatio())
                     ),
                     true
@@ -180,8 +177,6 @@ final class LinkedNpcPanelVitalsBinder {
                     LocalizedText.format(
                             language,
                             "tamework.ui.linkedPanel.thirst.tooltip",
-                            entry.currentThirst(),
-                            entry.maxThirst(),
                             percent(entry.thirstRatio())
                     ),
                     true

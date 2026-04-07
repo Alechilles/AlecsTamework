@@ -3,6 +3,26 @@
 ## Unreleased
 _No entries yet._
 
+## 2.8.0 - Multi-Food Happiness Impulses + Tooltip Overhaul - 2026-04-07
+### Added
+- Added timed active happiness impulses for petting and taking damage, including runtime snapshot exposure for linked-panel/UI rendering.
+- Added a dedicated damage event bridge that applies configured happiness loss impulses when companions take real incoming damage.
+- Added linked-panel happiness target-percent support to entry snapshots so tooltip headers can show current-to-target direction.
+
+### Changed
+- Reworked feed impulse application so active feed impulses are time-bound, refresh-on-reapply, and non-stacking by impulse key.
+- Updated feed impulse item tracking to preserve canonical item ids for language-key item-name resolution in tooltips.
+- Updated linked-panel tooltip wording and formatting:
+  - Happiness header now shows `Happiness - <current%> -> <target%>`.
+  - Hunger/Thirst headers now show percentage-based labels.
+  - Breakdown now groups modifier entries first and active impulses together at the bottom.
+- Localized impulse labels (`Hand-fed`, `Ate {Item}`, `Petted`, `Attacked`) and owner/modifier label normalization for cleaner lines.
+
+### Fixed
+- Fixed `GainOnPet`/`LoseOnDamage` config values not being applied by wiring pet-hook and damage-event happiness impulse flows.
+- Fixed feed tooltip item naming to use item language keys instead of prettified internal ids.
+- Fixed feed impulse display persistence by rendering only currently active impulses (expired impulses are omitted).
+
 ## 2.7.4 - Tranquilizer Shortbow Adventure Ammo Fix - 2026-04-06
 ### Fixed
 - Fixed `Weapon_Shortbow_Tranquilizer` failing to fire in `Adventure` mode by replacing inherited crude-arrow primary-shoot ammo handling with tranquilizer-arrow specific primary interactions.

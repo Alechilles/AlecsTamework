@@ -13,6 +13,7 @@ public final class LinkedNpcEntry {
     private final int maxHealth;
     private final int currentHappiness;
     private final int maxHappiness;
+    private final int targetHappinessPercent;
     private final String happinessModifierBreakdown;
     private final int currentHunger;
     private final int maxHunger;
@@ -71,6 +72,7 @@ public final class LinkedNpcEntry {
                 maxHealth,
                 currentHappiness,
                 maxHappiness,
+                computePercent(currentHappiness, maxHappiness),
                 happinessModifierBreakdown,
                 currentHunger,
                 maxHunger,
@@ -137,6 +139,7 @@ public final class LinkedNpcEntry {
                 maxHealth,
                 currentHappiness,
                 maxHappiness,
+                computePercent(currentHappiness, maxHappiness),
                 happinessModifierBreakdown,
                 currentHunger,
                 maxHunger,
@@ -177,6 +180,7 @@ public final class LinkedNpcEntry {
                           int maxHealth,
                           int currentHappiness,
                           int maxHappiness,
+                          int targetHappinessPercent,
                           String happinessModifierBreakdown,
                           int currentHunger,
                           int maxHunger,
@@ -214,6 +218,7 @@ public final class LinkedNpcEntry {
         this.maxHealth = maxHealth;
         this.currentHappiness = currentHappiness;
         this.maxHappiness = maxHappiness;
+        this.targetHappinessPercent = Math.max(0, Math.min(100, targetHappinessPercent));
         this.happinessModifierBreakdown = happinessModifierBreakdown;
         this.currentHunger = currentHunger;
         this.maxHunger = maxHunger;
@@ -273,6 +278,10 @@ public final class LinkedNpcEntry {
 
     public int maxHappiness() {
         return maxHappiness;
+    }
+
+    public int targetHappinessPercent() {
+        return targetHappinessPercent;
     }
 
     public String happinessModifierBreakdown() {
@@ -473,6 +482,14 @@ public final class LinkedNpcEntry {
             return 0.0;
         }
         return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    private static int computePercent(int current, int max) {
+        if (max <= 0) {
+            return 0;
+        }
+        double ratio = Math.max(0.0, Math.min(1.0, ((double) current) / (double) max));
+        return Math.max(0, Math.min(100, Math.round((float) (ratio * 100.0))));
     }
 
     /**

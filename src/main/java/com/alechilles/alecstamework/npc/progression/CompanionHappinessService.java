@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -40,6 +41,10 @@ public final class CompanionHappinessService {
     private static final String IMPULSE_KEY_FEED_ITEM_PREFIX = "feed:item:";
     private static final String IMPULSE_KEY_FEED_PARAM_PREFIX = "feed:param:";
     private static final String IMPULSE_LABEL_ATE = "Ate";
+    private static final String IMPULSE_KEY_PET = "pet";
+    private static final String IMPULSE_LABEL_PET = "Petted";
+    private static final String IMPULSE_KEY_DAMAGE = "damage";
+    private static final String IMPULSE_LABEL_DAMAGE = "Attacked";
     private static final double SECONDS_PER_MINUTE = 60.0;
 
     private CompanionHappinessService() {
@@ -106,6 +111,39 @@ public final class CompanionHappinessService {
                     consumedEntry.getKey()
             );
         }
+        return applyTimedImpulses(npcRef, store, activations);
+    }
+
+    public static boolean applyPetGain(@Nullable Ref<EntityStore> npcRef,
+                                       @Nullable Store<EntityStore> store) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
+        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        ArrayList<TimedImpulseActivation> activations = new ArrayList<>(1);
+        addPetActivation(activations, happinessConfig);
+        return applyTimedImpulses(npcRef, store, activations);
+    }
+
+    public static boolean applyDamageLoss(@Nullable Ref<EntityStore> npcRef,
+                                          @Nullable Store<EntityStore> store,
+                                          @Nullable Damage damage) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        if (damage != null
+                && damage.getSource() instanceof Damage.EnvironmentSource environmentSource
+                && environmentSource.getType() != null
+                && environmentSource.getType().equalsIgnoreCase(CompanionNeedsService.NEEDS_DAMAGE_SOURCE_TYPE)) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
+        TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
+        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
+        ArrayList<TimedImpulseActivation> activations = new ArrayList<>(1);
+        addDamageActivation(activations, happinessConfig);
         return applyTimedImpulses(npcRef, store, activations);
     }
 
@@ -412,6 +450,55 @@ public final class CompanionHappinessService {
         );
     }
 
+    private static void addPetActivation(@Nonnull List<TimedImpulseActivation> activations,
+                                         @Nullable TwHappinessConfig happinessConfig) {
+        if (happinessConfig == null || !happinessConfig.isEnabled()) {
+            return;
+        }
+        double gain = happinessConfig.getImpulses().getGainOnPet();
+        if (!Double.isFinite(gain) || Math.abs(gain) <= EPSILON) {
+            return;
+        }
+        long durationMs = toDurationMs(happinessConfig.getImpulses().getFeedImpulseDurationMinutes());
+        if (durationMs <= 0L) {
+            return;
+        }
+        activations.add(
+                new TimedImpulseActivation(
+                        IMPULSE_KEY_PET,
+                        IMPULSE_LABEL_PET,
+                        gain,
+                        System.currentTimeMillis() + durationMs,
+                        null
+                )
+        );
+    }
+
+    private static void addDamageActivation(@Nonnull List<TimedImpulseActivation> activations,
+                                            @Nullable TwHappinessConfig happinessConfig) {
+        if (happinessConfig == null || !happinessConfig.isEnabled()) {
+            return;
+        }
+        double configuredLoss = happinessConfig.getImpulses().getLoseOnDamage();
+        if (!Double.isFinite(configuredLoss) || Math.abs(configuredLoss) <= EPSILON) {
+            return;
+        }
+        double loss = configuredLoss > 0.0 ? -configuredLoss : configuredLoss;
+        long durationMs = toDurationMs(happinessConfig.getImpulses().getFeedImpulseDurationMinutes());
+        if (durationMs <= 0L) {
+            return;
+        }
+        activations.add(
+                new TimedImpulseActivation(
+                        IMPULSE_KEY_DAMAGE,
+                        IMPULSE_LABEL_DAMAGE,
+                        loss,
+                        System.currentTimeMillis() + durationMs,
+                        null
+                )
+        );
+    }
+
     @Nullable
     private static ResolvedFeedImpulse resolveFeedConsumptionImpulse(@Nullable Ref<EntityStore> npcRef,
                                                                      @Nullable Store<EntityStore> store,
@@ -423,7 +510,11 @@ public final class CompanionHappinessService {
         if (consumedItemId == null || consumedItemId.isBlank()) {
             return null;
         }
-        String normalizedItemId = consumedItemId.trim().toLowerCase(Locale.ROOT);
+        String normalizedItemId = normalizeFoodItemId(consumedItemId);
+        if (normalizedItemId == null || normalizedItemId.isBlank()) {
+            return null;
+        }
+        String displayItemId = resolveDisplayItemId(consumedItemId);
         TwHappinessConfig.ImpulseSettings impulses = happinessConfig.getImpulses();
         long durationMs = toDurationMs(impulses.getFeedImpulseDurationMinutes());
         if (durationMs <= 0L) {
@@ -436,7 +527,7 @@ public final class CompanionHappinessService {
                     IMPULSE_LABEL_ATE,
                     explicitItemImpulse,
                     System.currentTimeMillis() + durationMs,
-                    normalizedItemId
+                    displayItemId
             );
         }
         Map<String, Double> feedParamImpulses = impulses.getFeedParamImpulses();
@@ -463,7 +554,7 @@ public final class CompanionHappinessService {
                     IMPULSE_LABEL_ATE,
                     rawValue,
                     System.currentTimeMillis() + durationMs,
-                    normalizedItemId
+                    displayItemId
             );
         }
         return null;
@@ -521,10 +612,10 @@ public final class CompanionHappinessService {
             return false;
         }
         for (String value : values) {
-            if (value == null || value.isBlank()) {
+            String normalizedValue = normalizeFoodItemId(value);
+            if (normalizedValue == null || normalizedValue.isBlank()) {
                 continue;
             }
-            String normalizedValue = value.trim().toLowerCase(Locale.ROOT);
             if (normalizedItemId.equals(normalizedValue)) {
                 return true;
             }
@@ -723,6 +814,41 @@ public final class CompanionHappinessService {
             return 0L;
         }
         return Math.max(1L, Math.round(durationMs));
+    }
+
+    @Nullable
+    private static String normalizeFoodItemId(@Nullable String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        String normalized = itemId.trim();
+        if (normalized.startsWith("*")) {
+            normalized = normalized.substring(1);
+        }
+        int stateIndex = normalized.indexOf("_State_");
+        if (stateIndex > 0) {
+            normalized = normalized.substring(0, stateIndex);
+        }
+        if (normalized.isBlank()) {
+            return null;
+        }
+        return normalized.toLowerCase(Locale.ROOT);
+    }
+
+    @Nullable
+    private static String resolveDisplayItemId(@Nullable String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return null;
+        }
+        String resolved = itemId.trim();
+        if (resolved.startsWith("*")) {
+            resolved = resolved.substring(1);
+        }
+        int stateIndex = resolved.indexOf("_State_");
+        if (stateIndex > 0) {
+            resolved = resolved.substring(0, stateIndex);
+        }
+        return resolved.isBlank() ? null : resolved;
     }
 
     private static boolean stringEquals(@Nullable String left, @Nullable String right) {

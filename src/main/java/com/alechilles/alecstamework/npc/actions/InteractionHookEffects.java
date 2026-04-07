@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HookEffect;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -67,6 +68,9 @@ final class InteractionHookEffects {
                 hookEffect.isConsume()
         );
         store.putComponent(npcRef, type, component);
+        if ("TwHook_Pet".equalsIgnoreCase(hookId)) {
+            CompanionHappinessService.applyPetGain(npcRef, store);
+        }
         logHookEvent(
                 "applyTriggerNpcHook",
                 npcRef,

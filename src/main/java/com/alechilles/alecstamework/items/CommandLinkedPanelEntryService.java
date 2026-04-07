@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
@@ -24,6 +25,7 @@ import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatValue;
 import com.hypixel.hytale.server.core.modules.entitystats.asset.EntityStatType;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -32,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.StringJoiner;
 import java.util.UUID;
 
 /**
@@ -84,6 +85,7 @@ final class CommandLinkedPanelEntryService {
         }
         Map<String, CommandGroupService.GroupRecord> groupById = buildGroupLookup(stack);
         World world = player.getWorld();
+        String playerLanguage = player.getPlayerRef() != null ? player.getPlayerRef().getLanguage() : null;
         ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
         ComponentType<EntityStore, TameworkTraitsComponent> traitType = TameworkTraitsComponent.getComponentType();
         ArrayList<LinkedNpcEntry> entries = new ArrayList<>(records.size());
@@ -117,6 +119,7 @@ final class CommandLinkedPanelEntryService {
             int maxHealth = 0;
             int happiness = 0;
             int maxHappiness = 0;
+            int targetHappinessPercent = 0;
             String happinessModifierBreakdown = null;
             int hunger = 0;
             int maxHunger = 0;
@@ -152,11 +155,13 @@ final class CommandLinkedPanelEntryService {
                         }
                         HappinessSnapshot happinessSnapshot = readNpcHappinessSnapshot(
                                 npcRef,
-                                store
+                                store,
+                                playerLanguage
                         );
                         if (happinessSnapshot != null) {
                             happiness = happinessSnapshot.current;
                             maxHappiness = happinessSnapshot.max;
+                            targetHappinessPercent = happinessSnapshot.targetPercent;
                             happinessModifierBreakdown = happinessSnapshot.modifierBreakdown;
                         }
                         NeedsSnapshot needsSnapshot = readNpcNeedsSnapshot(npcRef, store, needsType);
@@ -244,6 +249,7 @@ final class CommandLinkedPanelEntryService {
                     maxHealth,
                     happiness,
                     maxHappiness,
+                    targetHappinessPercent,
                     happinessModifierBreakdown,
                     hunger,
                     maxHunger,
@@ -372,7 +378,8 @@ final class CommandLinkedPanelEntryService {
 
     private HappinessSnapshot readNpcHappinessSnapshot(
             Ref<EntityStore> npcRef,
-            Store<EntityStore> store) {
+            Store<EntityStore> store,
+            String language) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
@@ -384,34 +391,21 @@ final class CommandLinkedPanelEntryService {
         double max = Math.max(1.0, snapshot.max());
         int roundedMax = Math.max(1, Math.round((float) max));
         int roundedValue = Math.max(0, Math.min(roundedMax, Math.round((float) value)));
-        String modifierBreakdown = buildHappinessModifierBreakdown(snapshot);
-        return new HappinessSnapshot(roundedValue, roundedMax, modifierBreakdown);
+        int targetPercent = computePercent(snapshot.target(), snapshot.min(), snapshot.max());
+        String modifierBreakdown = buildHappinessModifierBreakdown(snapshot, language);
+        return new HappinessSnapshot(roundedValue, roundedMax, targetPercent, modifierBreakdown);
     }
 
     private String buildHappinessModifierBreakdown(CompanionHappinessService.HappinessSnapshot snapshot) {
+        return buildHappinessModifierBreakdown(snapshot, null);
+    }
+
+    private String buildHappinessModifierBreakdown(CompanionHappinessService.HappinessSnapshot snapshot,
+                                                   String language) {
         if (snapshot == null) {
             return null;
         }
-        StringJoiner joiner = new StringJoiner("\n");
-        joiner.add("Base: " + format(snapshot.baseSetpoint()));
-        for (CompanionHappinessService.ActiveImpulseSnapshot activeImpulse : snapshot.activeImpulses()) {
-            if (activeImpulse == null || !Double.isFinite(activeImpulse.value())) {
-                continue;
-            }
-            if (Math.abs(activeImpulse.value()) <= 0.000001) {
-                continue;
-            }
-            String label = activeImpulse.label();
-            if (label == null || label.isBlank()) {
-                label = "Impulse";
-            }
-            String itemId = activeImpulse.itemId();
-            if (itemId != null && !itemId.isBlank()) {
-                label = label + " " + formatImpulseItemLabel(itemId);
-            }
-            joiner.add(label + ": " + formatSigned(activeImpulse.value()));
-        }
-        boolean hasModifiers = false;
+        ArrayList<String> modifierLines = new ArrayList<>();
         for (CompanionHappinessModifierService.ModifierEntry modifier : snapshot.modifiers()) {
             if (modifier == null || !Double.isFinite(modifier.value())) {
                 continue;
@@ -419,29 +413,137 @@ final class CommandLinkedPanelEntryService {
             if (Math.abs(modifier.value()) <= 0.000001) {
                 continue;
             }
-            hasModifiers = true;
-            joiner.add(modifier.label() + ": " + formatSigned(modifier.value()));
+            String label = resolveModifierLabel(modifier, language);
+            modifierLines.add(label + ": " + formatSigned(modifier.value()));
         }
-        if (!hasModifiers) {
-            joiner.add("Modifiers: none");
+
+        ArrayList<String> impulseLines = new ArrayList<>();
+        for (CompanionHappinessService.ActiveImpulseSnapshot activeImpulse : snapshot.activeImpulses()) {
+            if (activeImpulse == null || !Double.isFinite(activeImpulse.value())) {
+                continue;
+            }
+            if (Math.abs(activeImpulse.value()) <= 0.000001) {
+                continue;
+            }
+            String label = resolveImpulseLabel(activeImpulse, language);
+            impulseLines.add(label + ": " + formatSigned(activeImpulse.value()));
         }
-        joiner.add("Target: " + format(snapshot.target()));
-        return joiner.toString();
+
+        if (modifierLines.isEmpty() && impulseLines.isEmpty()) {
+            return null;
+        }
+        ArrayList<String> lines = new ArrayList<>(modifierLines.size() + impulseLines.size());
+        lines.addAll(modifierLines);
+        lines.addAll(impulseLines);
+        return String.join("\n", lines);
     }
 
-    private String formatImpulseItemLabel(String itemId) {
+    private String resolveModifierLabel(CompanionHappinessModifierService.ModifierEntry modifier,
+                                        String language) {
+        if (modifier == null) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.modifier.generic");
+        }
+        String modifierId = normalize(modifier.id());
+        if ("owner_nearby".equals(modifierId)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.modifier.ownerNearby");
+        }
+        String label = modifier.label();
+        if (label == null || label.isBlank()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.modifier.generic");
+        }
+        return stripModifierPrefix(label);
+    }
+
+    private String resolveImpulseLabel(CompanionHappinessService.ActiveImpulseSnapshot activeImpulse,
+                                       String language) {
+        String key = normalize(activeImpulse.key());
+        if ("feed:hand".equals(key)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.handFed");
+        }
+        if (key != null && key.startsWith("feed:")) {
+            String itemName = resolveItemDisplayName(language, activeImpulse.itemId());
+            return LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.happiness.impulse.ate",
+                    itemName
+            );
+        }
+        if ("pet".equals(key)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.petted");
+        }
+        if ("damage".equals(key)) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.attacked");
+        }
+        String label = activeImpulse.label();
+        if (label == null || label.isBlank()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.impulse.generic");
+        }
+        String itemId = activeImpulse.itemId();
+        if (itemId != null && !itemId.isBlank()) {
+            return label + " " + resolveItemDisplayName(language, itemId);
+        }
+        return label;
+    }
+
+    private String resolveItemDisplayName(String language, String itemId) {
+        String canonicalItemId = sanitizeItemId(itemId);
+        if (canonicalItemId == null || canonicalItemId.isBlank()) {
+            return LocalizedText.resolve(language, "tamework.ui.linkedPanel.happiness.food.unknown");
+        }
+        String itemNameKey = "items." + canonicalItemId + ".name";
+        String localizedFromKey = LocalizedText.resolve(language, itemNameKey);
+        if (localizedFromKey != null
+                && !localizedFromKey.isBlank()
+                && !itemNameKey.equals(localizedFromKey)) {
+            return localizedFromKey;
+        }
+        Item itemAsset = Item.getAssetMap().getAsset(canonicalItemId);
+        if (itemAsset != null && itemAsset.getTranslationKey() != null && !itemAsset.getTranslationKey().isBlank()) {
+            String translated = LocalizedText.resolve(language, itemAsset.getTranslationKey());
+            if (translated != null && !translated.isBlank() && !translated.equals(itemAsset.getTranslationKey())) {
+                return translated;
+            }
+        }
+        return canonicalItemId;
+    }
+
+    private String stripModifierPrefix(String label) {
+        if (label == null || label.isBlank()) {
+            return LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.happiness.modifier.generic");
+        }
+        if (label.regionMatches(true, 0, "Hunger:", 0, "Hunger:".length())) {
+            return label.substring("Hunger:".length()).trim();
+        }
+        if (label.regionMatches(true, 0, "Thirst:", 0, "Thirst:".length())) {
+            return label.substring("Thirst:".length()).trim();
+        }
+        if (label.regionMatches(true, 0, "Population:", 0, "Population:".length())) {
+            return label.substring("Population:".length()).trim();
+        }
+        return label.trim();
+    }
+
+    private String sanitizeItemId(String itemId) {
         if (itemId == null || itemId.isBlank()) {
-            return "";
+            return null;
         }
-        String trimmed = itemId.trim();
-        if (trimmed.startsWith("*")) {
-            trimmed = trimmed.substring(1);
+        String sanitized = itemId.trim();
+        if (sanitized.startsWith("*")) {
+            sanitized = sanitized.substring(1);
         }
-        int stateIndex = trimmed.indexOf("_State_");
+        int stateIndex = sanitized.indexOf("_State_");
         if (stateIndex > 0) {
-            trimmed = trimmed.substring(0, stateIndex);
+            sanitized = sanitized.substring(0, stateIndex);
         }
-        return trimmed.replace('_', ' ');
+        return sanitized.isBlank() ? null : sanitized;
+    }
+
+    private int computePercent(double value, double min, double max) {
+        if (!Double.isFinite(value) || !Double.isFinite(min) || !Double.isFinite(max) || max <= min) {
+            return 0;
+        }
+        double ratio = (clamp(value, min, max) - min) / (max - min);
+        return Math.max(0, Math.min(100, Math.round((float) (ratio * 100.0))));
     }
 
     private NeedsSnapshot readNpcNeedsSnapshot(Ref<EntityStore> npcRef,
@@ -836,11 +938,13 @@ final class CommandLinkedPanelEntryService {
     private static final class HappinessSnapshot {
         private final int current;
         private final int max;
+        private final int targetPercent;
         private final String modifierBreakdown;
 
-        private HappinessSnapshot(int current, int max, String modifierBreakdown) {
+        private HappinessSnapshot(int current, int max, int targetPercent, String modifierBreakdown) {
             this.current = current;
             this.max = max;
+            this.targetPercent = Math.max(0, Math.min(100, targetPercent));
             this.modifierBreakdown = modifierBreakdown;
         }
     }

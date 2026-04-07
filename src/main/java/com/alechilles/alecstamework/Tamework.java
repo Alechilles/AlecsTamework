@@ -35,6 +35,7 @@ import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
+import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -543,6 +544,7 @@ public class Tamework extends JavaPlugin {
                 new OwnerDamageFilterSystem(getLogger())
         );
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
+        getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());
         getEntityStoreRegistry().registerSystem(
                 new PlayerEffectMovementSystem(
                         PlayerRef.getComponentType(),

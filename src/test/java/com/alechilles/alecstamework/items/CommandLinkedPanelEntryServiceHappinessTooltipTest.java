@@ -34,9 +34,11 @@ class CommandLinkedPanelEntryServiceHappinessTooltipTest {
 
         String breakdown = invokeBuildHappinessModifierBreakdown(service, snapshot);
 
-        assertTrue(breakdown.contains("Ate Tw Feed Herbivore: -10.00"));
-        assertTrue(breakdown.contains("Owner Nearby: +5.00"));
+        assertTrue(breakdown.contains("Owner nearby: +5.00"));
+        assertTrue(breakdown.contains("Ate Herbivore Feed: -10.00"));
         assertFalse(breakdown.contains("Feed (default):"));
+        assertFalse(breakdown.contains("Base:"));
+        assertFalse(breakdown.contains("Target:"));
     }
 
     @Test
@@ -53,9 +55,8 @@ class CommandLinkedPanelEntryServiceHappinessTooltipTest {
 
         String breakdown = invokeBuildHappinessModifierBreakdown(service, snapshot);
 
-        assertFalse(breakdown.contains("Ate "));
-        assertTrue(breakdown.contains("Base: 50.00"));
-        assertTrue(breakdown.contains("Target: 50.00"));
+        assertFalse(breakdown != null && breakdown.contains("Ate "));
+        assertTrue(breakdown == null || breakdown.isBlank());
     }
 
     private static CommandLinkedPanelEntryService newService() {
