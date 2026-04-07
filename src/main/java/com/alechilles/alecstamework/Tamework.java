@@ -397,32 +397,39 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new NpcNamePersistenceSystem(npcNameComponentType, NPCEntity.getComponentType())
         );
-        getEntityStoreRegistry().registerSystem(
-                new MountedOwnerReferenceSanitySystem(
-                        NPCEntity.getComponentType(),
-                        NPCMountComponent.getComponentType(),
-                        Player.getComponentType(),
-                        Interactable.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new MountedNpcTeleportSafetySystem(
-                        NPCEntity.getComponentType(),
-                        NPCMountComponent.getComponentType(),
-                        Teleport.getComponentType(),
-                        Player.getComponentType(),
-                        Interactable.getComponentType()
-                )
-        );
-        getEntityStoreRegistry().registerSystem(
-                new NpcMountedNameplateVisibilitySystem(
-                        NPCEntity.getComponentType(),
-                        NPCMountComponent.getComponentType(),
-                        mountedNameplateComponentType,
-                        npcNameComponentType
-                )
-        );
-        getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
+        ComponentType<EntityStore, NPCMountComponent> npcMountComponentType = resolveNpcMountComponentTypeOrNull();
+        if (npcMountComponentType == null) {
+            getLogger().at(Level.WARNING).log(
+                    "Mount plugin component type unavailable during setup; skipping mount-dependent Tamework systems."
+            );
+        } else {
+            getEntityStoreRegistry().registerSystem(
+                    new MountedOwnerReferenceSanitySystem(
+                            NPCEntity.getComponentType(),
+                            npcMountComponentType,
+                            Player.getComponentType(),
+                            Interactable.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedNpcTeleportSafetySystem(
+                            NPCEntity.getComponentType(),
+                            npcMountComponentType,
+                            Teleport.getComponentType(),
+                            Player.getComponentType(),
+                            Interactable.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new NpcMountedNameplateVisibilitySystem(
+                            NPCEntity.getComponentType(),
+                            npcMountComponentType,
+                            mountedNameplateComponentType,
+                            npcNameComponentType
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
+        }
         getEntityStoreRegistry().registerSystem(
                 new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType())
         );
@@ -1810,6 +1817,15 @@ public class Tamework extends JavaPlugin {
                 "TwGlobalConfig '" + configId + "' is missing required fields: "
                         + String.join(", ", missing)
         );
+    }
+
+    @Nullable
+    private ComponentType<EntityStore, NPCMountComponent> resolveNpcMountComponentTypeOrNull() {
+        try {
+            return NPCMountComponent.getComponentType();
+        } catch (Throwable throwable) {
+            return null;
+        }
     }
 
 }

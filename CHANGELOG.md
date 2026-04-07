@@ -3,6 +3,11 @@
 ## Unreleased
 _No entries yet._
 
+## 2.7.4 - Tranquilizer Shortbow Adventure Ammo Fix - 2026-04-06
+### Fixed
+- Fixed `Weapon_Shortbow_Tranquilizer` failing to fire in `Adventure` mode by replacing inherited crude-arrow primary-shoot ammo handling with tranquilizer-arrow specific primary interactions.
+- Fixed tranquilizer shortbow charge-stage ammo flow to match vanilla shortbow stat-driven charge behavior, preventing charge/fail branch desync in adventure combat.
+
 ## 2.7.3 - Coop Thread-Affinity Hotfixes - 2026-04-05
 ### Fixed
 - Fixed coop resident release/remap flows that could perform async player component access (`PlayerRef.getComponent(Player)`) from world-tick execution paths.

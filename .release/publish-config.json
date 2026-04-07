@@ -13,7 +13,10 @@
   "curseforge": {
     "projectId": "1447962",
     "releaseType": "release",
-    "gameVersionTypeIds": [65437]
+    "gameVersionTypeIds": [65437],
+    "requiredProjects": [
+      { "id": 1459711, "slug": "dynamictooltipslib", "type": "optionalDependency" }
+    ]
   },
   "modtale": {
     "projectId": "3145c0f3-a890-49b3-bc87-0648b8bd736c",

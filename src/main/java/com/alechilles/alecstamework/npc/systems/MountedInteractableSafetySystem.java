@@ -22,7 +22,7 @@ import javax.annotation.Nonnull;
 public final class MountedInteractableSafetySystem extends TickingSystem<EntityStore> {
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        ComponentType<EntityStore, NPCMountComponent> mountType = NPCMountComponent.getComponentType();
+        ComponentType<EntityStore, NPCMountComponent> mountType = resolveMountTypeOrNull();
         ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, Interactable> interactableType = Interactable.getComponentType();
         if (mountType == null || npcType == null || interactableType == null) {
@@ -83,5 +83,13 @@ public final class MountedInteractableSafetySystem extends TickingSystem<EntityS
             return true;
         }
         return ownerRef.getStore() != store;
+    }
+
+    private ComponentType<EntityStore, NPCMountComponent> resolveMountTypeOrNull() {
+        try {
+            return NPCMountComponent.getComponentType();
+        } catch (Throwable throwable) {
+            return null;
+        }
     }
 }
