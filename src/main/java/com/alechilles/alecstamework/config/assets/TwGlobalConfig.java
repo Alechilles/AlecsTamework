@@ -328,6 +328,20 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .documentation("Enables the feed trough asset set.")
             .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("HerbivoreFeed", Codec.BOOLEAN),
+                    (section, value) -> section.herbivoreFeed = value,
+                    section -> section.herbivoreFeed
+            )
+            .documentation("Enables the herbivore feed asset set.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("CarnivoreFeed", Codec.BOOLEAN),
+                    (section, value) -> section.carnivoreFeed = value,
+                    section -> section.carnivoreFeed
+            )
+            .documentation("Enables the carnivore feed asset set.")
+            .add()
             .build();
     private static final BuilderCodec<PopulationSection> POPULATION_SECTION_CODEC = BuilderCodec.builder(
                     PopulationSection.class, PopulationSection::new
@@ -542,6 +556,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private boolean tranquilizerArrowAssetSetEnabled;
     private boolean tranquilizerPotionAssetSetEnabled;
     private boolean feedTroughAssetSetEnabled;
+    private boolean herbivoreFeedAssetSetEnabled;
+    private boolean carnivoreFeedAssetSetEnabled;
     private int populationLimitPerPlayerOwnedTotal;
     private PerPlayerLimitScope populationPerPlayerLimitScope = PerPlayerLimitScope.PER_WORLD;
     private boolean simpleClaimsEnabled;
@@ -627,6 +643,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         boolean tranquilizerArrowEnabled = false;
         boolean tranquilizerPotionEnabled = false;
         boolean feedTroughEnabled = false;
+        boolean herbivoreFeedEnabled = false;
+        boolean carnivoreFeedEnabled = false;
         for (TwGlobalConfig candidate : assetMap.getAssetMap().values()) {
             if (candidate == null || !candidate.isEnabled()) {
                 continue;
@@ -643,10 +661,18 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             if (candidate.isFeedTroughAssetSetEnabled()) {
                 feedTroughEnabled = true;
             }
+            if (candidate.isHerbivoreFeedAssetSetEnabled()) {
+                herbivoreFeedEnabled = true;
+            }
+            if (candidate.isCarnivoreFeedAssetSetEnabled()) {
+                carnivoreFeedEnabled = true;
+            }
             if (tranquilizerShortbowEnabled
                     && tranquilizerArrowEnabled
                     && tranquilizerPotionEnabled
-                    && feedTroughEnabled) {
+                    && feedTroughEnabled
+                    && herbivoreFeedEnabled
+                    && carnivoreFeedEnabled) {
                 break;
             }
         }
@@ -654,7 +680,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                 tranquilizerShortbowEnabled,
                 tranquilizerArrowEnabled,
                 tranquilizerPotionEnabled,
-                feedTroughEnabled
+                feedTroughEnabled,
+                herbivoreFeedEnabled,
+                carnivoreFeedEnabled
         );
     }
 
@@ -970,6 +998,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return feedTroughAssetSetEnabled;
     }
 
+    public boolean isHerbivoreFeedAssetSetEnabled() {
+        return herbivoreFeedAssetSetEnabled;
+    }
+
+    public boolean isCarnivoreFeedAssetSetEnabled() {
+        return carnivoreFeedAssetSetEnabled;
+    }
+
     public int getPopulationLimitPerPlayerOwnedTotal() {
         TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
         if (overrides != null && overrides.populationLimitPerPlayerOwnedTotal() != null) {
@@ -1277,6 +1313,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.feedTrough != null) {
             feedTroughAssetSetEnabled = section.feedTrough;
         }
+        if (section.herbivoreFeed != null) {
+            herbivoreFeedAssetSetEnabled = section.herbivoreFeed;
+        }
+        if (section.carnivoreFeed != null) {
+            carnivoreFeedAssetSetEnabled = section.carnivoreFeed;
+        }
     }
 
     private AssetSetsSection toAssetSetsSection() {
@@ -1285,6 +1327,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.tranquilizerArrow = tranquilizerArrowAssetSetEnabled;
         section.tranquilizerPotion = tranquilizerPotionAssetSetEnabled;
         section.feedTrough = feedTroughAssetSetEnabled;
+        section.herbivoreFeed = herbivoreFeedAssetSetEnabled;
+        section.carnivoreFeed = carnivoreFeedAssetSetEnabled;
         return section;
     }
 
@@ -1584,6 +1628,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             tranquilizerArrowAssetSetEnabled = parent.tranquilizerArrowAssetSetEnabled;
             tranquilizerPotionAssetSetEnabled = parent.tranquilizerPotionAssetSetEnabled;
             feedTroughAssetSetEnabled = parent.feedTroughAssetSetEnabled;
+            herbivoreFeedAssetSetEnabled = parent.herbivoreFeedAssetSetEnabled;
+            carnivoreFeedAssetSetEnabled = parent.carnivoreFeedAssetSetEnabled;
             return;
         }
         Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
@@ -1603,6 +1649,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("FeedTrough")) {
             feedTroughAssetSetEnabled = parent.feedTroughAssetSetEnabled;
+        }
+        if (!nestedExplicit.contains("HerbivoreFeed")) {
+            herbivoreFeedAssetSetEnabled = parent.herbivoreFeedAssetSetEnabled;
+        }
+        if (!nestedExplicit.contains("CarnivoreFeed")) {
+            carnivoreFeedAssetSetEnabled = parent.carnivoreFeedAssetSetEnabled;
         }
     }
 
@@ -1768,6 +1820,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Boolean tranquilizerArrow;
         private Boolean tranquilizerPotion;
         private Boolean feedTrough;
+        private Boolean herbivoreFeed;
+        private Boolean carnivoreFeed;
     }
 
     private static final class PopulationSection {
@@ -1826,21 +1880,27 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public static final class AssetSetToggles {
-        private static final AssetSetToggles DISABLED = new AssetSetToggles(false, false, false, false);
+        private static final AssetSetToggles DISABLED = new AssetSetToggles(false, false, false, false, false, false);
 
         private final boolean tranquilizerShortbowEnabled;
         private final boolean tranquilizerArrowEnabled;
         private final boolean tranquilizerPotionEnabled;
         private final boolean feedTroughEnabled;
+        private final boolean herbivoreFeedEnabled;
+        private final boolean carnivoreFeedEnabled;
 
         public AssetSetToggles(boolean tranquilizerShortbowEnabled,
                                boolean tranquilizerArrowEnabled,
                                boolean tranquilizerPotionEnabled,
-                               boolean feedTroughEnabled) {
+                               boolean feedTroughEnabled,
+                               boolean herbivoreFeedEnabled,
+                               boolean carnivoreFeedEnabled) {
             this.tranquilizerShortbowEnabled = tranquilizerShortbowEnabled;
             this.tranquilizerArrowEnabled = tranquilizerArrowEnabled;
             this.tranquilizerPotionEnabled = tranquilizerPotionEnabled;
             this.feedTroughEnabled = feedTroughEnabled;
+            this.herbivoreFeedEnabled = herbivoreFeedEnabled;
+            this.carnivoreFeedEnabled = carnivoreFeedEnabled;
         }
 
         public static AssetSetToggles disabled() {
@@ -1861,6 +1921,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
         public boolean isFeedTroughEnabled() {
             return feedTroughEnabled;
+        }
+
+        public boolean isHerbivoreFeedEnabled() {
+            return herbivoreFeedEnabled;
+        }
+
+        public boolean isCarnivoreFeedEnabled() {
+            return carnivoreFeedEnabled;
         }
     }
 }

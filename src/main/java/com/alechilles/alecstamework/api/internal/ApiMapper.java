@@ -375,7 +375,9 @@ final class ApiMapper {
                         config.isTranquilizerShortbowAssetSetEnabled(),
                         config.isTranquilizerArrowAssetSetEnabled(),
                         config.isTranquilizerPotionAssetSetEnabled(),
-                        config.isFeedTroughAssetSetEnabled()
+                        config.isFeedTroughAssetSetEnabled(),
+                        config.isHerbivoreFeedAssetSetEnabled(),
+                        config.isCarnivoreFeedAssetSetEnabled()
                 ),
                 new GlobalConfigView.PopulationView(
                         config.getPopulationLimitPerPlayerOwnedTotal(),

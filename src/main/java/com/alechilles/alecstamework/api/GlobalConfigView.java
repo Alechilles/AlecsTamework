@@ -57,7 +57,9 @@ public record GlobalConfigView(@Nullable String id,
     public record AssetSetsView(boolean tranquilizerShortbow,
                                 boolean tranquilizerArrow,
                                 boolean tranquilizerPotion,
-                                boolean feedTrough) {
+                                boolean feedTrough,
+                                boolean herbivoreFeed,
+                                boolean carnivoreFeed) {
     }
 
     public record PopulationView(int limitPerPlayerOwnedTotal,

@@ -105,6 +105,25 @@ class TwGlobalConfigInheritanceTest {
     }
 
     @Test
+    void assetSetsInheritanceIncludesFeedFamilies() throws Exception {
+        TwGlobalConfig parent = new TwGlobalConfig();
+        TwGlobalConfig child = new TwGlobalConfig();
+
+        setField(parent, "herbivoreFeedAssetSetEnabled", true);
+        setField(parent, "carnivoreFeedAssetSetEnabled", true);
+        setField(child, "herbivoreFeedAssetSetEnabled", false);
+        setField(child, "carnivoreFeedAssetSetEnabled", false);
+
+        Map<String, Set<String>> explicitNestedKeysByTopLevel = new HashMap<>();
+        explicitNestedKeysByTopLevel.put("AssetSets", Set.of("HerbivoreFeed"));
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("AssetSets"), explicitNestedKeysByTopLevel);
+
+        assertFalse(child.isHerbivoreFeedAssetSetEnabled());
+        assertTrue(child.isCarnivoreFeedAssetSetEnabled());
+    }
+
+    @Test
     void simpleClaimsBreedingDefaultsAreDisabledAndSafe() {
         TwGlobalConfig config = new TwGlobalConfig();
 

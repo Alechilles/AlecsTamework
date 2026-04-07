@@ -28,7 +28,9 @@
     "TranquilizerShortbow": false,
     "TranquilizerArrow": false,
     "TranquilizerPotion": false,
-    "FeedTrough": false
+    "FeedTrough": false,
+    "HerbivoreFeed": true,
+    "CarnivoreFeed": true
   },
   "Population": {
     "LimitPerPlayerOwnedTotal": 0,

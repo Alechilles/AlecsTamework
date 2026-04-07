@@ -28,6 +28,14 @@ items.Weapon_Arrow_Tranquilizer.name=Tranquilizer Arrow
 items.Potion_Tranquilizer.name=Tranquilizer Potion
 items.Potion_Tranquilizer.description=Used to craft tranquilizer arrows and equipment.
 
+# === Tamework Feed Items ===
+items.Tw_Feed_Trough.name=Feed Trough
+items.Tw_Feed_Trough.description=A trough for feeding and watering your animals.\n- Insert food to feed nearby animals.\n- Right-click with water bucket to water nearby animals.
+items.Tw_Feed_Herbivore.name=Herbivore Feed
+items.Tw_Feed_Herbivore.description=Budget herbivore feed that restores hunger but isn't very appetizing.
+items.Tw_Feed_Carnivore.name=Carnivore Kibble
+items.Tw_Feed_Carnivore.description=Budget carnivore kibble that restores hunger but isn't very appetizing.
+
 # ===== Tamework UI: Shared =====
 tamework.ui.shared.button.apply=Apply
 tamework.ui.shared.button.back=Back

@@ -22,6 +22,8 @@ public final class TranquilizerRecipeVisibilityService {
     private static final String ITEM_TRANQUILIZER_ARROW = "Weapon_Arrow_Tranquilizer";
     private static final String ITEM_TRANQUILIZER_POTION = "Potion_Tranquilizer";
     private static final String ITEM_FEED_TROUGH = "Tw_Feed_Trough";
+    private static final String ITEM_FEED_HERBIVORE = "Tw_Feed_Herbivore";
+    private static final String ITEM_FEED_CARNIVORE = "Tw_Feed_Carnivore";
 
     private boolean reconciling;
 
@@ -86,6 +88,20 @@ public final class TranquilizerRecipeVisibilityService {
                     recipeMap,
                     recipesToRestore
             );
+            addMissingGeneratedRecipesIfEnabled(
+                    ITEM_FEED_HERBIVORE,
+                    toggles.isHerbivoreFeedEnabled(),
+                    itemMap,
+                    recipeMap,
+                    recipesToRestore
+            );
+            addMissingGeneratedRecipesIfEnabled(
+                    ITEM_FEED_CARNIVORE,
+                    toggles.isCarnivoreFeedEnabled(),
+                    itemMap,
+                    recipeMap,
+                    recipesToRestore
+            );
             if (!recipesToRestore.isEmpty()) {
                 recipeStore.loadAssets(ASSET_SOURCE_ID, recipesToRestore);
             }
@@ -145,6 +161,12 @@ public final class TranquilizerRecipeVisibilityService {
         }
         if (ITEM_FEED_TROUGH.equals(itemId)) {
             return toggles.isFeedTroughEnabled();
+        }
+        if (ITEM_FEED_HERBIVORE.equals(itemId)) {
+            return toggles.isHerbivoreFeedEnabled();
+        }
+        if (ITEM_FEED_CARNIVORE.equals(itemId)) {
+            return toggles.isCarnivoreFeedEnabled();
         }
         return true;
     }
