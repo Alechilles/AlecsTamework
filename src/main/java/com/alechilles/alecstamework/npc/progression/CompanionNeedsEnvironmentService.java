@@ -56,6 +56,8 @@ public final class CompanionNeedsEnvironmentService {
 
     static final class ContainerConsumeResult {
         private final int consumedItems;
+        @Nonnull
+        private final Map<String, Integer> consumedItemCountsByItemId;
         private final int scannedContainers;
         private final int containersWithAllowedFood;
         private final int matchingStacksSeen;
@@ -95,7 +97,54 @@ public final class CompanionNeedsEnvironmentService {
                                double nearestContainerDistance,
                                double nearestAllowedContainerDistance,
                                @Nonnull ContainerConsumeStatus status) {
+            this(
+                    consumedItems,
+                    Map.of(),
+                    scannedContainers,
+                    containersWithAllowedFood,
+                    matchingStacksSeen,
+                    removalAttempts,
+                    removalFailures,
+                    maxItems,
+                    radius,
+                    verticalScanRadius,
+                    scanBlockX,
+                    scanBlockY,
+                    scanBlockZ,
+                    npcBlockX,
+                    npcBlockY,
+                    npcBlockZ,
+                    scanFromOverride,
+                    nearestContainerDistance,
+                    nearestAllowedContainerDistance,
+                    status
+            );
+        }
+
+        ContainerConsumeResult(int consumedItems,
+                               @Nullable Map<String, Integer> consumedItemCountsByItemId,
+                               int scannedContainers,
+                               int containersWithAllowedFood,
+                               int matchingStacksSeen,
+                               int removalAttempts,
+                               int removalFailures,
+                               int maxItems,
+                               double radius,
+                               int verticalScanRadius,
+                               int scanBlockX,
+                               int scanBlockY,
+                               int scanBlockZ,
+                               int npcBlockX,
+                               int npcBlockY,
+                               int npcBlockZ,
+                               boolean scanFromOverride,
+                               double nearestContainerDistance,
+                               double nearestAllowedContainerDistance,
+                               @Nonnull ContainerConsumeStatus status) {
             this.consumedItems = consumedItems;
+            this.consumedItemCountsByItemId = consumedItemCountsByItemId == null || consumedItemCountsByItemId.isEmpty()
+                    ? Map.of()
+                    : Map.copyOf(consumedItemCountsByItemId);
             this.scannedContainers = scannedContainers;
             this.containersWithAllowedFood = containersWithAllowedFood;
             this.matchingStacksSeen = matchingStacksSeen;
@@ -121,6 +170,11 @@ public final class CompanionNeedsEnvironmentService {
         }
 
         @Nonnull
+        Map<String, Integer> getConsumedItemCountsByItemId() {
+            return consumedItemCountsByItemId;
+        }
+
+        @Nonnull
         ContainerConsumeStatus getStatus() {
             return status;
         }
@@ -140,7 +194,8 @@ public final class CompanionNeedsEnvironmentService {
                     + ",scanBlock=[" + scanBlockX + "," + scanBlockY + "," + scanBlockZ + "]"
                     + ",npcBlock=[" + npcBlockX + "," + npcBlockY + "," + npcBlockZ + "]"
                     + ",nearestContainerDist=" + formatDistance(nearestContainerDistance)
-                    + ",nearestAllowedContainerDist=" + formatDistance(nearestAllowedContainerDistance);
+                    + ",nearestAllowedContainerDist=" + formatDistance(nearestAllowedContainerDistance)
+                    + ",consumedByItem=" + consumedItemCountsByItemId;
         }
 
         @Nonnull
@@ -154,12 +209,25 @@ public final class CompanionNeedsEnvironmentService {
 
     private static final class SlotConsumeResult {
         private final int consumed;
+        @Nonnull
+        private final Map<String, Integer> consumedItemCountsByItemId;
         private final int matchingStacksSeen;
         private final int removalAttempts;
         private final int removalFailures;
 
         private SlotConsumeResult(int consumed, int matchingStacksSeen, int removalAttempts, int removalFailures) {
+            this(consumed, Map.of(), matchingStacksSeen, removalAttempts, removalFailures);
+        }
+
+        private SlotConsumeResult(int consumed,
+                                  @Nullable Map<String, Integer> consumedItemCountsByItemId,
+                                  int matchingStacksSeen,
+                                  int removalAttempts,
+                                  int removalFailures) {
             this.consumed = consumed;
+            this.consumedItemCountsByItemId = consumedItemCountsByItemId == null || consumedItemCountsByItemId.isEmpty()
+                    ? Map.of()
+                    : Map.copyOf(consumedItemCountsByItemId);
             this.matchingStacksSeen = matchingStacksSeen;
             this.removalAttempts = removalAttempts;
             this.removalFailures = removalFailures;
@@ -581,9 +649,7 @@ public final class CompanionNeedsEnvironmentService {
             );
         }
         Set<String> allowedFoods = normalizeItemIds(preferredFoodItemIds);
-        if (allowedFoods.isEmpty()) {
-            allowedFoods = normalizeItemIds(passiveRefill.getContainerFoodItemIds());
-        }
+        allowedFoods.addAll(normalizeItemIds(passiveRefill.getContainerFoodItemIds()));
         if (allowedFoods.isEmpty()) {
             return new ContainerConsumeResult(
                     0, 0, 0, 0, 0, 0, maxItems, 0.0, verticalScanRadius,
@@ -633,6 +699,7 @@ public final class CompanionNeedsEnvironmentService {
             );
         }
         int consumed = 0;
+        Map<String, Integer> consumedByItemId = new HashMap<>();
         int scannedContainers = 0;
         int containersWithAllowedFood = 0;
         int matchingStacksSeen = 0;
@@ -696,12 +763,14 @@ public final class CompanionNeedsEnvironmentService {
                             maxItems - consumed
                     );
                     consumed += slotResult.consumed;
+                    mergeConsumedItemCounts(consumedByItemId, slotResult.consumedItemCountsByItemId);
                     matchingStacksSeen += slotResult.matchingStacksSeen;
                     removalAttempts += slotResult.removalAttempts;
                     removalFailures += slotResult.removalFailures;
                     if (consumed >= maxItems) {
                         return new ContainerConsumeResult(
                                 consumed,
+                                consumedByItemId,
                                 scannedContainers,
                                 containersWithAllowedFood,
                                 matchingStacksSeen,
@@ -739,6 +808,7 @@ public final class CompanionNeedsEnvironmentService {
         }
         return new ContainerConsumeResult(
                 consumed,
+                consumedByItemId,
                 scannedContainers,
                 containersWithAllowedFood,
                 matchingStacksSeen,
@@ -944,9 +1014,10 @@ public final class CompanionNeedsEnvironmentService {
                                                                       @Nonnull Set<String> allowedFoods,
                                                                       int maxItems) {
         if (container == null || maxItems <= 0 || allowedFoods.isEmpty()) {
-            return new SlotConsumeResult(0, 0, 0, 0);
+            return new SlotConsumeResult(0, Map.of(), 0, 0, 0);
         }
         int consumed = 0;
+        Map<String, Integer> consumedByItemId = new HashMap<>();
         int matchingStacksSeen = 0;
         int removalAttempts = 0;
         int removalFailures = 0;
@@ -960,7 +1031,8 @@ public final class CompanionNeedsEnvironmentService {
             if (itemId == null || itemId.isBlank()) {
                 continue;
             }
-            if (!allowedFoods.contains(itemId.trim().toLowerCase(Locale.ROOT))) {
+            String normalizedItemId = itemId.trim().toLowerCase(Locale.ROOT);
+            if (!allowedFoods.contains(normalizedItemId)) {
                 continue;
             }
             matchingStacksSeen++;
@@ -972,13 +1044,14 @@ public final class CompanionNeedsEnvironmentService {
                     break;
                 }
                 consumed++;
+                consumedByItemId.merge(normalizedItemId, 1, Integer::sum);
                 ItemStack remaining = container.getItemStack(slot);
                 if (ItemStack.isEmpty(remaining)) {
                     break;
                 }
             }
         }
-        return new SlotConsumeResult(consumed, matchingStacksSeen, removalAttempts, removalFailures);
+        return new SlotConsumeResult(consumed, consumedByItemId, matchingStacksSeen, removalAttempts, removalFailures);
     }
 
     private static Set<String> normalizeItemIds(@Nullable String[] itemIds) {
@@ -993,6 +1066,22 @@ public final class CompanionNeedsEnvironmentService {
             normalized.add(itemId.trim().toLowerCase(Locale.ROOT));
         }
         return normalized;
+    }
+
+    private static void mergeConsumedItemCounts(@Nonnull Map<String, Integer> aggregate,
+                                                @Nonnull Map<String, Integer> additions) {
+        if (additions.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, Integer> entry : additions.entrySet()) {
+            if (entry == null || entry.getKey() == null || entry.getKey().isBlank()) {
+                continue;
+            }
+            if (entry.getValue() == null || entry.getValue() <= 0) {
+                continue;
+            }
+            aggregate.merge(entry.getKey(), entry.getValue(), Integer::sum);
+        }
     }
 
     private static double distanceSquared(@Nonnull Vector3d left, @Nonnull Vector3d right) {

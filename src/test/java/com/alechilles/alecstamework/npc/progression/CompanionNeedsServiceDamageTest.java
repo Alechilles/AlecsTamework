@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.Store;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.time.Instant;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -179,7 +180,8 @@ class CompanionNeedsServiceDamageTest {
                         true,
                         12.0,
                         10.0,
-                        0.0
+                        0.0,
+                        -1.0
                 );
 
         assertEquals(10.0, resolution.getNextBaselineHealth(), 0.000001);
@@ -194,7 +196,8 @@ class CompanionNeedsServiceDamageTest {
                         true,
                         14.0,
                         10.0,
-                        5.0
+                        5.0,
+                        -1.0
                 );
         assertEquals(14.0, withinBudget.getNextBaselineHealth(), 0.000001);
         assertEquals(1.0, withinBudget.getNextAllowedExternalHeal(), 0.000001);
@@ -205,11 +208,83 @@ class CompanionNeedsServiceDamageTest {
                         true,
                         16.0,
                         10.0,
-                        5.0
+                        5.0,
+                        -1.0
                 );
         assertEquals(15.0, overflow.getNextBaselineHealth(), 0.000001);
         assertEquals(0.0, overflow.getNextAllowedExternalHeal(), 0.000001);
         assertEquals(1.0, overflow.getHealthOverflowToRemove(), 0.000001);
+    }
+
+    @Test
+    void regenSuppressionTreatsZeroBaselineAsUnsetForLegacyComponents() {
+        CompanionNeedsService.NaturalRegenSuppressionResolution resolution =
+                CompanionNeedsService.resolveNaturalRegenSuppression(
+                        true,
+                        50.0,
+                        0.0,
+                        0.0,
+                        -1.0
+                );
+
+        assertEquals(50.0, resolution.getNextBaselineHealth(), 0.000001);
+        assertEquals(0.0, resolution.getNextAllowedExternalHeal(), 0.000001);
+        assertEquals(0.0, resolution.getHealthOverflowToRemove(), 0.000001);
+    }
+
+    @Test
+    void regenSuppressionUsesManagedHealthAnchorWhenBaselineUnset() {
+        CompanionNeedsService.NaturalRegenSuppressionResolution resolution =
+                CompanionNeedsService.resolveNaturalRegenSuppression(
+                        true,
+                        50.0,
+                        -1.0,
+                        0.0,
+                        30.0
+                );
+
+        assertEquals(30.0, resolution.getNextBaselineHealth(), 0.000001);
+        assertEquals(0.0, resolution.getNextAllowedExternalHeal(), 0.000001);
+        assertEquals(20.0, resolution.getHealthOverflowToRemove(), 0.000001);
+    }
+
+    @Test
+    void hardRegenBlockPushesLastDamageTimeIntoFutureWhileSuppressed() {
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        Instant updated = CompanionNeedsService.resolveHardRegenBlockLastDamageTime(
+                true,
+                now,
+                now
+        );
+        assertEquals(Instant.parse("2026-01-01T00:02:00Z"), updated);
+
+        Instant alreadyBlocked = Instant.parse("2026-01-01T00:00:45Z");
+        Instant unchanged = CompanionNeedsService.resolveHardRegenBlockLastDamageTime(
+                true,
+                alreadyBlocked,
+                now
+        );
+        assertEquals(alreadyBlocked, unchanged);
+    }
+
+    @Test
+    void hardRegenBlockRestoresFutureDamageTimeWhenSuppressionStops() {
+        Instant now = Instant.parse("2026-01-01T00:00:00Z");
+        Instant future = Instant.parse("2026-01-01T00:01:00Z");
+        Instant restored = CompanionNeedsService.resolveHardRegenBlockLastDamageTime(
+                false,
+                future,
+                now
+        );
+        assertEquals(now, restored);
+
+        Instant past = Instant.parse("2025-12-31T23:59:00Z");
+        Instant unchangedPast = CompanionNeedsService.resolveHardRegenBlockLastDamageTime(
+                false,
+                past,
+                now
+        );
+        assertEquals(past, unchangedPast);
     }
 
     @Test

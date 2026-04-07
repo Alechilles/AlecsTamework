@@ -72,6 +72,12 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
             TameworkNeedsComponent::getRegenSuppressionAllowedHeal
         )
         .add()
+        .append(
+            new KeyedCodec<>("LastManagedHealth", Codec.DOUBLE),
+            TameworkNeedsComponent::setLastManagedHealth,
+            TameworkNeedsComponent::getLastManagedHealth
+        )
+        .add()
         .build();
 
     private String configId;
@@ -81,8 +87,9 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
     private double pendingNeedsDamage;
     private long lastUpdateMs;
     private long lastPassiveSweepMs;
-    private double regenSuppressionBaselineHealth;
-    private double regenSuppressionAllowedHeal;
+    private double regenSuppressionBaselineHealth = -1.0;
+    private double regenSuppressionAllowedHeal = 0.0;
+    private double lastManagedHealth = -1.0;
 
     public TameworkNeedsComponent() {
     }
@@ -112,6 +119,7 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
         this.lastPassiveSweepMs = lastPassiveSweepMs;
         this.regenSuppressionBaselineHealth = -1.0;
         this.regenSuppressionAllowedHeal = 0.0;
+        this.lastManagedHealth = -1.0;
     }
 
     public static ComponentType<EntityStore, TameworkNeedsComponent> getComponentType() {
@@ -191,6 +199,14 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
         this.regenSuppressionAllowedHeal = regenSuppressionAllowedHeal;
     }
 
+    public double getLastManagedHealth() {
+        return lastManagedHealth;
+    }
+
+    public void setLastManagedHealth(double lastManagedHealth) {
+        this.lastManagedHealth = lastManagedHealth;
+    }
+
     @Override
     public TameworkNeedsComponent clone() {
         TameworkNeedsComponent copy = new TameworkNeedsComponent(
@@ -204,6 +220,7 @@ public final class TameworkNeedsComponent implements Component<EntityStore> {
         );
         copy.setRegenSuppressionBaselineHealth(regenSuppressionBaselineHealth);
         copy.setRegenSuppressionAllowedHeal(regenSuppressionAllowedHeal);
+        copy.setLastManagedHealth(lastManagedHealth);
         return copy;
     }
 }

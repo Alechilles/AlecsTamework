@@ -15,6 +15,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -141,13 +142,10 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
 
     @Nullable
     private String[] resolveFoodItemIds(@Nullable TwNeedsConfig needsConfig) {
-        if (hasAnyItemId(itemIds)) {
-            return itemIds;
-        }
         if (needsConfig == null) {
             return itemIds;
         }
-        return needsConfig.getPassiveRefill().getContainerFoodItemIds();
+        return mergeItemIds(itemIds, needsConfig.getPassiveRefill().getContainerFoodItemIds());
     }
 
     private static boolean hasAnyItemId(@Nullable String[] ids) {
@@ -160,6 +158,33 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             }
         }
         return false;
+    }
+
+    @Nonnull
+    private static String[] mergeItemIds(@Nullable String[] primary, @Nullable String[] secondary) {
+        if (!hasAnyItemId(primary)) {
+            return hasAnyItemId(secondary) ? secondary : new String[0];
+        }
+        if (!hasAnyItemId(secondary)) {
+            return primary;
+        }
+        LinkedHashMap<String, String> merged = new LinkedHashMap<>();
+        appendItemIds(merged, primary);
+        appendItemIds(merged, secondary);
+        return merged.values().toArray(new String[0]);
+    }
+
+    private static void appendItemIds(@Nonnull LinkedHashMap<String, String> merged, @Nullable String[] itemIds) {
+        if (itemIds == null || itemIds.length == 0) {
+            return;
+        }
+        for (String itemId : itemIds) {
+            if (itemId == null || itemId.isBlank()) {
+                continue;
+            }
+            String normalized = itemId.trim().toLowerCase(Locale.ROOT);
+            merged.putIfAbsent(normalized, itemId.trim());
+        }
     }
 
     @Nullable

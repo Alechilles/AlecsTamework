@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
@@ -174,33 +175,34 @@ public final class CompanionNeedsConsumeService {
                 if (effectiveFoodIds == null || effectiveFoodIds.length == 0) {
                     effectiveFoodIds = resolveRoleFoodItemIds(npcRef, store);
                 }
-                if (effectiveFoodIds == null || effectiveFoodIds.length == 0) {
-                    NeedsConsumeDiagnostics.appendFailureReason(failureReasons, "food_item_ids_empty");
-                } else {
-                    // Seek flow targets an adjacent stand position, so allow a small floor to
-                    // account for stop-position variance around the intended container.
-                    double consumeRadius = Math.max(
-                            passiveRefill.getContainerConsumeRadius(),
-                            ACTION_FOOD_CONSUME_RADIUS_FLOOR
-                    );
-                    CompanionNeedsEnvironmentService.ContainerConsumeResult containerResult =
-                            ENVIRONMENT_SERVICE.consumeNearbyContainerFoodDetailed(
+                // Seek flow targets an adjacent stand position, so allow a small floor to
+                // account for stop-position variance around the intended container.
+                double consumeRadius = Math.max(
+                        passiveRefill.getContainerConsumeRadius(),
+                        ACTION_FOOD_CONSUME_RADIUS_FLOOR
+                );
+                CompanionNeedsEnvironmentService.ContainerConsumeResult containerResult =
+                        ENVIRONMENT_SERVICE.consumeNearbyContainerFoodDetailed(
+                        npcRef,
+                        store,
+                        config,
+                        effectiveFoodIds,
+                        consumeRadius,
+                        consumeOriginOverride
+                );
+                consumedItems = containerResult.getConsumedItems();
+                if (consumedItems > 0) {
+                    hungerGain = consumedItems * passiveRefill.getHungerGainPerConsumedItem();
+                    CompanionHappinessService.applyFeedImpulses(
                             npcRef,
                             store,
-                            config,
-                            effectiveFoodIds,
-                            consumeRadius,
-                            consumeOriginOverride
+                            containerResult.getConsumedItemCountsByItemId()
                     );
-                    consumedItems = containerResult.getConsumedItems();
-                    if (consumedItems > 0) {
-                        hungerGain = consumedItems * passiveRefill.getHungerGainPerConsumedItem();
-                    } else {
-                        NeedsConsumeDiagnostics.appendFailureReason(
-                                failureReasons,
-                                "no_container_food_consumed(" + containerResult.toSummary() + ")"
-                        );
-                    }
+                } else {
+                    NeedsConsumeDiagnostics.appendFailureReason(
+                            failureReasons,
+                            "no_container_food_consumed(" + containerResult.toSummary() + ")"
+                    );
                 }
             }
         }
@@ -307,8 +309,28 @@ public final class CompanionNeedsConsumeService {
         if (sensorScope == null) {
             return new String[0];
         }
+        LinkedHashSet<String> merged = new LinkedHashSet<>();
+        for (String itemId : resolveScopeItemIds(sensorScope, "FoodItemIDs")) {
+            if (itemId != null && !itemId.isBlank()) {
+                merged.add(itemId.trim());
+            }
+        }
+        for (String itemId : resolveScopeItemIds(sensorScope, "AttractiveItemSet")) {
+            if (itemId != null && !itemId.isBlank()) {
+                merged.add(itemId.trim());
+            }
+        }
+        if (merged.isEmpty()) {
+            return new String[0];
+        }
+        return merged.toArray(new String[0]);
+    }
+
+    @Nonnull
+    private static String[] resolveScopeItemIds(@Nonnull StdScope sensorScope,
+                                                @Nonnull String paramName) {
         try {
-            Supplier<String[]> arraySupplier = sensorScope.getStringArraySupplier("FoodItemIDs");
+            Supplier<String[]> arraySupplier = sensorScope.getStringArraySupplier(paramName);
             if (arraySupplier != null) {
                 String[] values = sanitizeItemIds(arraySupplier.get());
                 if (values.length > 0) {
@@ -319,7 +341,7 @@ public final class CompanionNeedsConsumeService {
             // Fall through to string-param fallback.
         }
         try {
-            Supplier<String> stringSupplier = sensorScope.getStringSupplier("FoodItemIDs");
+            Supplier<String> stringSupplier = sensorScope.getStringSupplier(paramName);
             if (stringSupplier == null) {
                 return new String[0];
             }

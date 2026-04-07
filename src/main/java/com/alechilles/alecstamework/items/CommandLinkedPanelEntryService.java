@@ -394,6 +394,23 @@ final class CommandLinkedPanelEntryService {
         }
         StringJoiner joiner = new StringJoiner("\n");
         joiner.add("Base: " + format(snapshot.baseSetpoint()));
+        for (CompanionHappinessService.ActiveImpulseSnapshot activeImpulse : snapshot.activeImpulses()) {
+            if (activeImpulse == null || !Double.isFinite(activeImpulse.value())) {
+                continue;
+            }
+            if (Math.abs(activeImpulse.value()) <= 0.000001) {
+                continue;
+            }
+            String label = activeImpulse.label();
+            if (label == null || label.isBlank()) {
+                label = "Impulse";
+            }
+            String itemId = activeImpulse.itemId();
+            if (itemId != null && !itemId.isBlank()) {
+                label = label + " " + formatImpulseItemLabel(itemId);
+            }
+            joiner.add(label + ": " + formatSigned(activeImpulse.value()));
+        }
         boolean hasModifiers = false;
         for (CompanionHappinessModifierService.ModifierEntry modifier : snapshot.modifiers()) {
             if (modifier == null || !Double.isFinite(modifier.value())) {
@@ -410,6 +427,21 @@ final class CommandLinkedPanelEntryService {
         }
         joiner.add("Target: " + format(snapshot.target()));
         return joiner.toString();
+    }
+
+    private String formatImpulseItemLabel(String itemId) {
+        if (itemId == null || itemId.isBlank()) {
+            return "";
+        }
+        String trimmed = itemId.trim();
+        if (trimmed.startsWith("*")) {
+            trimmed = trimmed.substring(1);
+        }
+        int stateIndex = trimmed.indexOf("_State_");
+        if (stateIndex > 0) {
+            trimmed = trimmed.substring(0, stateIndex);
+        }
+        return trimmed.replace('_', ' ');
     }
 
     private NeedsSnapshot readNpcNeedsSnapshot(Ref<EntityStore> npcRef,
