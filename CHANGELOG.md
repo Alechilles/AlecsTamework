@@ -3,25 +3,28 @@
 ## Unreleased
 _No entries yet._
 
-## 2.8.0 - Multi-Food Happiness Impulses + Tooltip Overhaul - 2026-04-07
+## 2.8.0 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-07
 ### Added
-- Added timed active happiness impulses for petting and taking damage, including runtime snapshot exposure for linked-panel/UI rendering.
-- Added a dedicated damage event bridge that applies configured happiness loss impulses when companions take real incoming damage.
-- Added linked-panel happiness target-percent support to entry snapshots so tooltip headers can show current-to-target direction.
+- Added `/tw settings` UI (`TameworkSettingsPage`) and command wiring with persisted world-level settings storage (`TameworkSettingsStore`).
+- Added crash telemetry runtime services (`CrashTelemetryService`, local crash envelope/store, optional HTTP reporting client) with diagnostics/debug command coverage.
+- Added base feed-family assets in Tamework: `Tw_Feed_Herbivore` and `Tw_Feed_Carnivore`, including icons/lang keys and global asset-set toggles.
+- Added feed impulse mapping support for both item ids and role parameter families (`FeedItemImpulses`, `FeedParamImpulses`) with active-impulse snapshots for linked panel rendering.
+- Added needs-damage diagnostics command/toggle coverage (`/tw debugneedsdamage`) for troubleshooting hunger/thirst damage behavior.
 
 ### Changed
-- Reworked feed impulse application so active feed impulses are time-bound, refresh-on-reapply, and non-stacking by impulse key.
-- Updated feed impulse item tracking to preserve canonical item ids for language-key item-name resolution in tooltips.
-- Updated linked-panel tooltip wording and formatting:
-  - Happiness header now shows `Happiness - <current%> -> <target%>`.
-  - Hunger/Thirst headers now show percentage-based labels.
-  - Breakdown now groups modifier entries first and active impulses together at the bottom.
-- Localized impulse labels (`Hand-fed`, `Ate {Item}`, `Petted`, `Attacked`) and owner/modifier label normalization for cleaner lines.
+- Reworked companion happiness impulse handling so feed/pet/damage impulses are time-bound, refresh on re-apply, and do not stack as duplicate active buffs.
+- Split hand-feed happiness handling from consumed-food impulses (`GainOnFeed` stays hand-feed specific; consumed food uses item/param impulse resolution).
+- Updated linked companion tooltip layout and wording to show `Happiness - <current%> -> <target%>`, simplified need modifier labels, and grouped active impulses at the bottom.
+- Needs damage is now enabled by default via persisted settings for new worlds/saves and can be toggled in `/tw settings`.
+- Updated recipe visibility gating + global config projection to include feed-family toggles and keep toggle-controlled outputs deterministic.
+- Added DynamicTooltipsLib to publish metadata optional dependencies.
+- Tranquilizer shortbow adventure-mode fixes were shipped in `2.7.4`; this `2.8.0` section captures the remaining post-`2.7.3` feature set.
 
 ### Fixed
-- Fixed `GainOnPet`/`LoseOnDamage` config values not being applied by wiring pet-hook and damage-event happiness impulse flows.
-- Fixed feed tooltip item naming to use item language keys instead of prettified internal ids.
-- Fixed feed impulse display persistence by rendering only currently active impulses (expired impulses are omitted).
+- Fixed `GainOnPet` and `LoseOnDamage` not being applied by wiring pet-hook and incoming-damage impulse bridges.
+- Fixed feed tooltip naming to resolve language keys from canonical consumed item ids (instead of prettified ids).
+- Fixed feed impulse tooltip persistence so expired impulses are removed from active display.
+- Fixed startup exceptions when duplicate plugin packs are loaded by hardening pack discovery/filtering.
 
 ## 2.7.4 - Tranquilizer Shortbow Adventure Ammo Fix - 2026-04-06
 ### Fixed
