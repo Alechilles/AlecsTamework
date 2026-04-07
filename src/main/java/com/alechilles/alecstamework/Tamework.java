@@ -226,6 +226,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugCoopLogs;
     private volatile boolean debugBreedingLogs;
     private volatile boolean debugNeedsConsumeDiagnosticsLogs;
+    private volatile boolean debugNeedsDamageDiagnosticsLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -957,6 +958,7 @@ public class Tamework extends JavaPlugin {
         setDebugCoopEnabled(commands.isCoop());
         setDebugBreedingEnabled(commands.isBreeding());
         setDebugNeedsConsumeDiagnosticsEnabled(commands.isNeedsConsumeDiagnostics());
+        setDebugNeedsDamageDiagnosticsEnabled(commands.isNeedsDamageDiagnostics());
         String roleFilter = commands.getDespawnRoleFilter();
         if (roleFilter == null || roleFilter.isBlank()) {
             clearDebugDespawnRoleFilter();
@@ -974,6 +976,7 @@ public class Tamework extends JavaPlugin {
                         + ", coop=" + isDebugCoopEnabled()
                         + ", breeding=" + isDebugBreedingEnabled()
                         + ", needsConsumeDiagnostics=" + isDebugNeedsConsumeDiagnosticsEnabled()
+                        + ", needsDamageDiagnostics=" + isDebugNeedsDamageDiagnosticsEnabled()
                         + ", despawnRoleFilter="
                         + (getDebugDespawnRoleFilter() == null ? "<none>" : getDebugDespawnRoleFilter())
         );
@@ -1792,6 +1795,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugNeedsConsumeDiagnosticsEnabled() {
         debugNeedsConsumeDiagnosticsLogs = !debugNeedsConsumeDiagnosticsLogs;
         return debugNeedsConsumeDiagnosticsLogs;
+    }
+
+    public boolean isDebugNeedsDamageDiagnosticsEnabled() {
+        return debugNeedsDamageDiagnosticsLogs;
+    }
+
+    public boolean setDebugNeedsDamageDiagnosticsEnabled(boolean enabled) {
+        debugNeedsDamageDiagnosticsLogs = enabled;
+        return debugNeedsDamageDiagnosticsLogs;
+    }
+
+    public boolean toggleDebugNeedsDamageDiagnosticsEnabled() {
+        debugNeedsDamageDiagnosticsLogs = !debugNeedsDamageDiagnosticsLogs;
+        return debugNeedsDamageDiagnosticsLogs;
     }
 
     // Logs a warning if required global config fields are missing.

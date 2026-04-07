@@ -87,6 +87,13 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             )
             .documentation("Debug setting for needs consume diagnostics.")
             .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("NeedsDamage", Codec.BOOLEAN),
+                    (section, value) -> section.needsDamageDiagnostics = value,
+                    section -> section.needsDamageDiagnostics
+            )
+            .documentation("Debug setting for needs damage and regen suppression diagnostics.")
+            .add()
             .build();
 
     public static final AssetBuilderCodec<String, TwDebugConfig> CODEC = AssetBuilderCodec.builder(
@@ -312,6 +319,9 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!nestedExplicitKeys.contains("NeedsConsume")) {
             debugCommands.needsConsumeDiagnostics = parent.debugCommands.needsConsumeDiagnostics;
         }
+        if (!nestedExplicitKeys.contains("NeedsDamage")) {
+            debugCommands.needsDamageDiagnostics = parent.debugCommands.needsDamageDiagnostics;
+        }
     }
 
     @Nullable
@@ -347,6 +357,7 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean coop;
         private boolean breeding;
         private boolean needsConsumeDiagnostics;
+        private boolean needsDamageDiagnostics;
 
         public boolean isHook() {
             return hook;
@@ -383,6 +394,10 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isNeedsConsumeDiagnostics() {
             return needsConsumeDiagnostics;
+        }
+
+        public boolean isNeedsDamageDiagnostics() {
+            return needsDamageDiagnostics;
         }
     }
 }
