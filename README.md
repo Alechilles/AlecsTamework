@@ -4,9 +4,10 @@
 [![Animal Husbandry](https://img.shields.io/curseforge/dt/1480275?label=Animal%20Husbandry&style=for-the-badge&logo=curseforge&color=rgb(241%2C100%2C54))](https://www.curseforge.com/hytale/mods/alecs-animal-husbandry)
 
 [![Discord](https://img.shields.io/discord/1468261809739005996?style=for-the-badge&logo=discord&logoColor=white&label=Join%20Discord&color=rgb(88,101,242))](https://discord.gg/E8n8RgTTdq)
-[![Buy me a coffee](https://img.shields.io/badge/ko--fi-Support%20Me-ff5f5f?logo=ko-fi&style=for-the-badge)](https://ko-fi.com/alechilles)
+[![Buy me a coffee](https://img.shields.io/badge/ko--fi-Support%20Me-ff5f5f?logo=ko-fi&style=for-the-badge)](https://ko-fi.com/alechilles) [![Creator Code](https://img.shields.io/badge/Creator%20Code-Alec-00AEEF?style=for-the-badge)](https://hytale.com/)
 
-[![Creator Code](https://img.shields.io/badge/Creator%20Code-Alec-00AEEF?style=for-the-badge)](https://hytale.com/)
+[![Sponsored By HytaleModding Grant Program](https://github.com/user-attachments/assets/a03709e3-445a-4e58-8ec5-591688490c5d)](https://hytalemodding.dev/en/grants)
+
 
 # Alec's Tamework!
 Alec's Tamework is a modular taming framework for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It is designed to empower artists, designers, and less technical modders who want advanced companion behavior without first building their own framework.
