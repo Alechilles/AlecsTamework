@@ -5,6 +5,8 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -53,6 +55,14 @@ public final class CompanionNeedsService {
     public static TameworkNeedsComponent ensureNeedsComponent(@Nullable Ref<EntityStore> npcRef,
                                                               @Nullable Store<EntityStore> store,
                                                               @Nullable String roleId) {
+        return ensureNeedsComponent(npcRef, store, null, roleId);
+    }
+
+    @Nullable
+    public static TameworkNeedsComponent ensureNeedsComponent(@Nullable Ref<EntityStore> npcRef,
+                                                              @Nullable Store<EntityStore> store,
+                                                              @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                              @Nullable String roleId) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return null;
         }
@@ -76,7 +86,7 @@ public final class CompanionNeedsService {
                     nowMs,
                     nowMs
             );
-            store.putComponent(npcRef, needsType, created);
+            putComponent(npcRef, store, commandBuffer, needsType, created);
             return created;
         }
         boolean changed = false;
@@ -150,7 +160,7 @@ public final class CompanionNeedsService {
             changed = true;
         }
         if (changed) {
-            store.putComponent(npcRef, needsType, existing);
+            putComponent(npcRef, store, commandBuffer, needsType, existing);
         }
         return existing;
     }
@@ -161,7 +171,14 @@ public final class CompanionNeedsService {
     public static boolean tickNeeds(@Nullable Ref<EntityStore> npcRef,
                                     @Nullable Store<EntityStore> store,
                                     @Nullable String roleId) {
-        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, null);
+        return tickNeeds(npcRef, store, null, roleId);
+    }
+
+    public static boolean tickNeeds(@Nullable Ref<EntityStore> npcRef,
+                                    @Nullable Store<EntityStore> store,
+                                    @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                    @Nullable String roleId) {
+        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, commandBuffer, null);
     }
 
     /**
@@ -170,6 +187,13 @@ public final class CompanionNeedsService {
      */
     public static boolean tickNaturalRegenSuppressionOnly(@Nullable Ref<EntityStore> npcRef,
                                                           @Nullable Store<EntityStore> store,
+                                                          @Nullable String roleId) {
+        return tickNaturalRegenSuppressionOnly(npcRef, store, null, roleId);
+    }
+
+    public static boolean tickNaturalRegenSuppressionOnly(@Nullable Ref<EntityStore> npcRef,
+                                                          @Nullable Store<EntityStore> store,
+                                                          @Nullable CommandBuffer<EntityStore> commandBuffer,
                                                           @Nullable String roleId) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
@@ -215,6 +239,7 @@ public final class CompanionNeedsService {
         boolean suppressionChanged = applyNaturalRegenSuppression(
                 npcRef,
                 store,
+                commandBuffer,
                 component,
                 suppressNaturalRegen,
                 !config.getDamage().isLethal()
@@ -224,7 +249,7 @@ public final class CompanionNeedsService {
             changed = true;
         }
         if (changed) {
-            store.putComponent(npcRef, needsType, component);
+            putComponent(npcRef, store, commandBuffer, needsType, component);
         }
         if (diagnosticsEnabled) {
             double suppressionDelta = resolveHealthDelta(healthBeforeSuppression, healthAfterSuppression);
@@ -434,6 +459,26 @@ public final class CompanionNeedsService {
                                   double explicitThirstGain,
                                   boolean includeConfiguredManualGains,
                                   @Nullable String heldItemId) {
+        return runNeedsUpdate(
+                npcRef,
+                store,
+                roleId,
+                explicitHungerGain,
+                explicitThirstGain,
+                includeConfiguredManualGains,
+                null,
+                heldItemId
+        );
+    }
+
+    static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,
+                                  @Nullable Store<EntityStore> store,
+                                  @Nullable String roleId,
+                                  double explicitHungerGain,
+                                  double explicitThirstGain,
+                                  boolean includeConfiguredManualGains,
+                                  @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                  @Nullable String heldItemId) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -446,7 +491,7 @@ public final class CompanionNeedsService {
         if (config == null || !config.isEnabled()) {
             return false;
         }
-        component = ensureNeedsComponent(npcRef, store, roleId);
+        component = ensureNeedsComponent(npcRef, store, commandBuffer, roleId);
         if (component == null) {
             return false;
         }
@@ -519,6 +564,7 @@ public final class CompanionNeedsService {
         boolean regenSuppressionChanged = applyNaturalRegenSuppression(
                 npcRef,
                 store,
+                commandBuffer,
                 component,
                 suppressNaturalRegen,
                 !config.getDamage().isLethal()
@@ -558,9 +604,9 @@ public final class CompanionNeedsService {
             componentChanged = true;
         }
         if (componentChanged) {
-            store.putComponent(npcRef, needsType, component);
+            putComponent(npcRef, store, commandBuffer, needsType, component);
         }
-        boolean happinessChanged = CompanionHappinessService.reconcile(npcRef, store);
+        boolean happinessChanged = CompanionHappinessService.reconcile(npcRef, store, commandBuffer);
         if (diagnosticsEnabled) {
             logNeedsDamageDiagnostics(
                     npcId,
@@ -822,10 +868,16 @@ public final class CompanionNeedsService {
 
     private static boolean applyNaturalRegenSuppression(@Nonnull Ref<EntityStore> npcRef,
                                                         @Nonnull Store<EntityStore> store,
+                                                        @Nullable CommandBuffer<EntityStore> commandBuffer,
                                                         @Nonnull TameworkNeedsComponent component,
                                                         boolean suppressNaturalRegen,
                                                         boolean enforceNonLethalFloor) {
-        boolean changed = syncNaturalRegenHardBlockDamageTimestamp(npcRef, store, suppressNaturalRegen);
+        boolean changed = syncNaturalRegenHardBlockDamageTimestamp(
+                npcRef,
+                store,
+                commandBuffer,
+                suppressNaturalRegen
+        );
         EntityStatContext healthContext = resolveHealthStatContext(npcRef, store);
         if (healthContext == null || healthContext.value == null) {
             if (!suppressNaturalRegen) {
@@ -898,6 +950,7 @@ public final class CompanionNeedsService {
 
     private static boolean syncNaturalRegenHardBlockDamageTimestamp(@Nonnull Ref<EntityStore> npcRef,
                                                                     @Nonnull Store<EntityStore> store,
+                                                                    @Nullable CommandBuffer<EntityStore> commandBuffer,
                                                                     boolean suppressNaturalRegen) {
         ComponentType<EntityStore, DamageDataComponent> damageDataType = DamageDataComponent.getComponentType();
         if (damageDataType == null) {
@@ -918,7 +971,7 @@ public final class CompanionNeedsService {
             return false;
         }
         damageData.setLastDamageTime(nextLastDamageTime);
-        store.putComponent(npcRef, damageDataType, damageData);
+        putComponent(npcRef, store, commandBuffer, damageDataType, damageData);
         return true;
     }
 
@@ -1017,6 +1070,18 @@ public final class CompanionNeedsService {
             return REGEN_SUPPRESSION_BASELINE_UNSET;
         }
         return managedHealth;
+    }
+
+    private static <T extends Component<EntityStore>> void putComponent(@Nonnull Ref<EntityStore> npcRef,
+                                                                         @Nonnull Store<EntityStore> store,
+                                                                         @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                                         @Nonnull ComponentType<EntityStore, T> componentType,
+                                                                         @Nonnull T component) {
+        if (commandBuffer != null) {
+            commandBuffer.putComponent(npcRef, componentType, component);
+            return;
+        }
+        store.putComponent(npcRef, componentType, component);
     }
 
     @Nonnull

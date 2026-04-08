@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -130,6 +132,13 @@ public final class CompanionHappinessService {
     public static boolean applyDamageLoss(@Nullable Ref<EntityStore> npcRef,
                                           @Nullable Store<EntityStore> store,
                                           @Nullable Damage damage) {
+        return applyDamageLoss(npcRef, store, null, damage);
+    }
+
+    public static boolean applyDamageLoss(@Nullable Ref<EntityStore> npcRef,
+                                          @Nullable Store<EntityStore> store,
+                                          @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                          @Nullable Damage damage) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -144,12 +153,18 @@ public final class CompanionHappinessService {
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
         ArrayList<TimedImpulseActivation> activations = new ArrayList<>(1);
         addDamageActivation(activations, happinessConfig);
-        return applyTimedImpulses(npcRef, store, activations);
+        return applyTimedImpulses(npcRef, store, commandBuffer, activations);
     }
 
     public static boolean reconcile(@Nullable Ref<EntityStore> npcRef,
                                     @Nullable Store<EntityStore> store) {
-        return updateHappiness(npcRef, store, 0.0);
+        return reconcile(npcRef, store, null);
+    }
+
+    public static boolean reconcile(@Nullable Ref<EntityStore> npcRef,
+                                    @Nullable Store<EntityStore> store,
+                                    @Nullable CommandBuffer<EntityStore> commandBuffer) {
+        return updateHappiness(npcRef, store, commandBuffer, 0.0);
     }
 
     public static boolean applyImpulse(@Nullable Ref<EntityStore> npcRef,
@@ -199,20 +214,35 @@ public final class CompanionHappinessService {
     private static boolean applyTimedImpulses(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store,
                                               @Nullable List<TimedImpulseActivation> timedActivations) {
+        return applyTimedImpulses(npcRef, store, null, timedActivations);
+    }
+
+    private static boolean applyTimedImpulses(@Nullable Ref<EntityStore> npcRef,
+                                              @Nullable Store<EntityStore> store,
+                                              @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                              @Nullable List<TimedImpulseActivation> timedActivations) {
         if (timedActivations == null || timedActivations.isEmpty()) {
             return false;
         }
-        return updateHappiness(npcRef, store, 0.0, false, timedActivations);
+        return updateHappiness(npcRef, store, commandBuffer, 0.0, false, timedActivations);
     }
 
     private static boolean updateHappiness(@Nullable Ref<EntityStore> npcRef,
                                            @Nullable Store<EntityStore> store,
                                            double impulseDelta) {
-        return updateHappiness(npcRef, store, impulseDelta, true, List.of());
+        return updateHappiness(npcRef, store, null, impulseDelta, true, List.of());
     }
 
     private static boolean updateHappiness(@Nullable Ref<EntityStore> npcRef,
                                            @Nullable Store<EntityStore> store,
+                                           @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                           double impulseDelta) {
+        return updateHappiness(npcRef, store, commandBuffer, impulseDelta, true, List.of());
+    }
+
+    private static boolean updateHappiness(@Nullable Ref<EntityStore> npcRef,
+                                           @Nullable Store<EntityStore> store,
+                                           @Nullable CommandBuffer<EntityStore> commandBuffer,
                                            double immediateImpulseDelta,
                                            boolean applyDispositionToImmediateImpulse,
                                            @Nullable List<TimedImpulseActivation> timedActivations) {
@@ -293,7 +323,7 @@ public final class CompanionHappinessService {
             happinessChanged = true;
         }
         if (happinessChanged) {
-            store.putComponent(npcRef, happinessType, happiness);
+            putComponent(npcRef, store, commandBuffer, happinessType, happiness);
         }
 
         boolean breedingChanged = false;
@@ -325,10 +355,22 @@ public final class CompanionHappinessService {
                 }
             }
             if (breedingChanged) {
-                store.putComponent(npcRef, breedingType, breeding);
+                putComponent(npcRef, store, commandBuffer, breedingType, breeding);
             }
         }
         return happinessChanged || breedingChanged;
+    }
+
+    private static <T extends Component<EntityStore>> void putComponent(@Nonnull Ref<EntityStore> npcRef,
+                                                                        @Nonnull Store<EntityStore> store,
+                                                                        @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                                        @Nonnull ComponentType<EntityStore, T> componentType,
+                                                                        @Nonnull T component) {
+        if (commandBuffer != null) {
+            commandBuffer.putComponent(npcRef, componentType, component);
+            return;
+        }
+        store.putComponent(npcRef, componentType, component);
     }
 
     public static double resolveCurrentValue(@Nullable Ref<EntityStore> npcRef,

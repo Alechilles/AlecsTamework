@@ -1541,10 +1541,46 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         if (type == null || component == null || !reference.isValid()) {
             return;
         }
+        T componentCopy = copyComponent(component);
+        if (componentCopy == null) {
+            return;
+        }
         try {
-            store.putComponent(reference, type, copyComponent(component));
+            store.putComponent(reference, type, componentCopy);
         } catch (IllegalStateException ignored) {
-            // Skip noisy failures so coop runtime cannot crash world ticks.
+            queueDeferredComponentPut(store, reference, type, componentCopy);
+        }
+    }
+
+    private <T extends Component<EntityStore>> void queueDeferredComponentPut(@Nonnull Store<EntityStore> store,
+                                                                               @Nonnull Ref<EntityStore> reference,
+                                                                               @Nonnull ComponentType<EntityStore, T> type,
+                                                                               @Nonnull T component) {
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        if (world == null) {
+            return;
+        }
+        T deferredCopy = copyComponent(component);
+        if (deferredCopy == null) {
+            return;
+        }
+        try {
+            world.execute(() -> {
+                if (!reference.isValid()) {
+                    return;
+                }
+                Store<EntityStore> deferredStore = world.getEntityStore() != null ? world.getEntityStore().getStore() : null;
+                if (deferredStore == null) {
+                    return;
+                }
+                try {
+                    deferredStore.putComponent(reference, type, deferredCopy);
+                } catch (IllegalStateException ignored) {
+                    // Skip noisy failures so coop runtime cannot crash world ticks.
+                }
+            });
+        } catch (RuntimeException ignored) {
+            // World may be shutting down; ignore deferred retry.
         }
     }
 

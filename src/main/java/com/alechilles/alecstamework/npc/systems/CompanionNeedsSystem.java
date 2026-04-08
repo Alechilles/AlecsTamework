@@ -24,9 +24,7 @@ import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -69,7 +67,6 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
         if (npcType == null || tamedType == null) {
             return;
         }
-        List<NeedsCandidate> candidates = new ArrayList<>();
         Map<UUID, Integer> starvingLinkedByOwner = runNeedsSweep ? new HashMap<>() : null;
         ComponentType<EntityStore, TameworkCommandLinksComponent> commandLinksType =
                 TameworkCommandLinksComponent.getComponentType();
@@ -94,25 +91,19 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
                                 linkedOwnerId = links.getOwnerId();
                             }
                         }
-                        candidates.add(new NeedsCandidate(ref, roleId, linkedOwnerId));
+                        if (runNeedsSweep) {
+                            CompanionNeedsService.tickNeeds(ref, store, commandBuffer, roleId);
+                            if (linkedOwnerId != null
+                                    && starvingLinkedByOwner != null
+                                    && CompanionNeedsService.isNeedsDamageActive(ref, store, roleId)) {
+                                starvingLinkedByOwner.merge(linkedOwnerId, 1, Integer::sum);
+                            }
+                        } else {
+                            CompanionNeedsService.tickNaturalRegenSuppressionOnly(ref, store, commandBuffer, roleId);
+                        }
                     }
                 }
         );
-        for (NeedsCandidate candidate : candidates) {
-            if (candidate == null || candidate.ref == null || !candidate.ref.isValid()) {
-                continue;
-            }
-            if (runNeedsSweep) {
-                CompanionNeedsService.tickNeeds(candidate.ref, store, candidate.roleId);
-                if (candidate.linkedOwnerId != null
-                        && starvingLinkedByOwner != null
-                        && CompanionNeedsService.isNeedsDamageActive(candidate.ref, store, candidate.roleId)) {
-                    starvingLinkedByOwner.merge(candidate.linkedOwnerId, 1, Integer::sum);
-                }
-            } else {
-                CompanionNeedsService.tickNaturalRegenSuppressionOnly(candidate.ref, store, candidate.roleId);
-            }
-        }
         if (runNeedsSweep && starvingLinkedByOwner != null && !starvingLinkedByOwner.isEmpty()) {
             notifyOwnersOfMalnourishedLinkedNpcs(store, starvingLinkedByOwner, nowMs);
         }
@@ -179,15 +170,4 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
         }
     }
 
-    private static final class NeedsCandidate {
-        private final Ref<EntityStore> ref;
-        private final String roleId;
-        private final UUID linkedOwnerId;
-
-        private NeedsCandidate(Ref<EntityStore> ref, String roleId, UUID linkedOwnerId) {
-            this.ref = ref;
-            this.roleId = roleId;
-            this.linkedOwnerId = linkedOwnerId;
-        }
-    }
 }

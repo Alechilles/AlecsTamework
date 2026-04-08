@@ -43,6 +43,6 @@ public final class CompanionHappinessDamageImpulseSystem extends DamageEventSyst
         if (targetRef == null || !targetRef.isValid()) {
             return;
         }
-        CompanionHappinessService.applyDamageLoss(targetRef, store, damage);
+        CompanionHappinessService.applyDamageLoss(targetRef, store, commandBuffer, damage);
     }
 }

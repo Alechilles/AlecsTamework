@@ -9,6 +9,8 @@ import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -89,6 +91,24 @@ final class BreedingOffspringService {
                                @Nullable TwBreedingConfig config,
                                @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations,
                                @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> pendingPlayerReservations) {
+        return tryCompletePairing(
+                sourceRef,
+                store,
+                sourceBreeding,
+                config,
+                pendingClaimReservations,
+                pendingPlayerReservations,
+                null
+        );
+    }
+
+    boolean tryCompletePairing(Ref<EntityStore> sourceRef,
+                               Store<EntityStore> store,
+                               TameworkBreedingComponent sourceBreeding,
+                               @Nullable TwBreedingConfig config,
+                               @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations,
+                               @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> pendingPlayerReservations,
+                               @Nullable CommandBuffer<EntityStore> commandBuffer) {
         if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
             return false;
         }
@@ -145,7 +165,8 @@ final class BreedingOffspringService {
                 partnerNpc.getUuid(),
                 sourceCooldown.durationMs(),
                 now,
-                store
+                store,
+                commandBuffer
         );
         applyParentCooldown(
                 partner.ref,
@@ -154,11 +175,12 @@ final class BreedingOffspringService {
                 sourceNpc.getUuid(),
                 partnerCooldown.durationMs(),
                 now,
-                store
+                store,
+                commandBuffer
         );
         logCooldownApplied(sourceNpc, parentAOwner, sourceCooldown);
         logCooldownApplied(partnerNpc, parentBOwner, partnerCooldown);
-        moveParentsToPairingPosition(sourceRef, sourceNpc, partner.ref, partnerNpc, store);
+        moveParentsToPairingPosition(sourceRef, sourceNpc, partner.ref, partnerNpc, store, commandBuffer);
 
         OffspringSpawnContext context = new OffspringSpawnContext(
                 sourceNpc.getUuid(),
@@ -216,7 +238,8 @@ final class BreedingOffspringService {
                                      UUID partnerUuid,
                                      long cooldownMs,
                                      long now,
-                                     Store<EntityStore> store) {
+                                     Store<EntityStore> store,
+                                     @Nullable CommandBuffer<EntityStore> commandBuffer) {
         if (npcRef == null || !npcRef.isValid() || breeding == null || store == null) {
             return;
         }
@@ -230,7 +253,7 @@ final class BreedingOffspringService {
         breeding.setLastHappinessUpdateMs(now);
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
         if (type != null) {
-            store.putComponent(npcRef, type, breeding);
+            putComponent(npcRef, store, commandBuffer, type, breeding);
         }
         if (npc != null) {
             applyCooldownAlarm(npcRef, npc, until, store);
@@ -259,7 +282,8 @@ final class BreedingOffspringService {
                                               NPCEntity parentANpc,
                                               Ref<EntityStore> parentBRef,
                                               NPCEntity parentBNpc,
-                                              Store<EntityStore> store) {
+                                              Store<EntityStore> store,
+                                              @Nullable CommandBuffer<EntityStore> commandBuffer) {
         setPairLookTarget(parentARef, parentANpc, parentBRef, store);
         setPairLookTarget(parentBRef, parentBNpc, parentARef, store);
         TransformComponent parentATransform = getTransform(parentARef, store);
@@ -268,8 +292,8 @@ final class BreedingOffspringService {
             return;
         }
         PairingTargets targets = resolvePairingTargets(parentATransform, parentBTransform);
-        moveNpcToPairingTarget(parentANpc, parentARef, targets.parentATarget(), store);
-        moveNpcToPairingTarget(parentBNpc, parentBRef, targets.parentBTarget(), store);
+        moveNpcToPairingTarget(parentANpc, parentARef, targets.parentATarget(), store, commandBuffer);
+        moveNpcToPairingTarget(parentBNpc, parentBRef, targets.parentBTarget(), store, commandBuffer);
     }
 
     private void setPairLookTarget(@Nullable Ref<EntityStore> sourceRef,
@@ -295,11 +319,12 @@ final class BreedingOffspringService {
     private void moveNpcToPairingTarget(@Nullable NPCEntity npc,
                                         @Nullable Ref<EntityStore> npcRef,
                                         @Nullable Vector3d target,
-                                        @Nullable Store<EntityStore> store) {
+                                        @Nullable Store<EntityStore> store,
+                                        @Nullable CommandBuffer<EntityStore> commandBuffer) {
         if (npc == null || npcRef == null || !npcRef.isValid() || store == null || target == null) {
             return;
         }
-        if (applyBreedingPairHook(npc, npcRef, target, store)) {
+        if (applyBreedingPairHook(npc, npcRef, target, store, commandBuffer)) {
             return;
         }
         moveNpcToTarget(npc, npcRef, target, store);
@@ -318,7 +343,8 @@ final class BreedingOffspringService {
     private boolean applyBreedingPairHook(@Nullable NPCEntity npc,
                                           @Nullable Ref<EntityStore> npcRef,
                                           @Nullable Vector3d target,
-                                          @Nullable Store<EntityStore> store) {
+                                          @Nullable Store<EntityStore> store,
+                                          @Nullable CommandBuffer<EntityStore> commandBuffer) {
         if (npc == null || npcRef == null || !npcRef.isValid() || target == null || store == null) {
             return false;
         }
@@ -329,7 +355,7 @@ final class BreedingOffspringService {
         if (hookType == null) {
             return false;
         }
-        store.putComponent(npcRef, hookType, new TameworkHookComponent(
+        putComponent(npcRef, store, commandBuffer, hookType, new TameworkHookComponent(
                 BREEDING_PAIR_HOOK_ID,
                 null,
                 null,
@@ -339,6 +365,18 @@ final class BreedingOffspringService {
                 target
         ));
         return true;
+    }
+
+    private <T extends Component<EntityStore>> void putComponent(@Nonnull Ref<EntityStore> npcRef,
+                                                                 @Nonnull Store<EntityStore> store,
+                                                                 @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                                 @Nonnull ComponentType<EntityStore, T> componentType,
+                                                                 @Nonnull T component) {
+        if (commandBuffer != null) {
+            commandBuffer.putComponent(npcRef, componentType, component);
+            return;
+        }
+        store.putComponent(npcRef, componentType, component);
     }
 
     private boolean supportsBreedingPairState(@Nullable NPCEntity npc) {

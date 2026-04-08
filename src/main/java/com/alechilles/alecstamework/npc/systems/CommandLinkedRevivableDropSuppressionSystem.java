@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.dependency.Dependency;
 import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
@@ -27,10 +28,12 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
     @Nonnull
     @Override
     public Query<EntityStore> getQuery() {
-        return Query.and(
-                NPCEntity.getComponentType(),
-                TameworkCommandLinksComponent.getComponentType()
-        );
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
+                TameworkCommandLinksComponent.getComponentType();
+        if (linksType == null) {
+            return Query.and(NPCEntity.getComponentType());
+        }
+        return Query.and(NPCEntity.getComponentType(), linksType);
     }
 
     @Nonnull
@@ -44,7 +47,12 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
                                  @Nonnull DeathComponent component,
                                  @Nonnull Store<EntityStore> store,
                                  @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        TameworkCommandLinksComponent links = commandBuffer.getComponent(ref, TameworkCommandLinksComponent.getComponentType());
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
+                TameworkCommandLinksComponent.getComponentType();
+        if (linksType == null) {
+            return;
+        }
+        TameworkCommandLinksComponent links = commandBuffer.getComponent(ref, linksType);
         String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
         boolean deadRespawnEnabled = TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled();
         if (!shouldSuppressDrops(links, deadRespawnEnabled)) {
