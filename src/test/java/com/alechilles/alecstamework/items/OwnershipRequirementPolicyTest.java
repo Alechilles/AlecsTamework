@@ -43,9 +43,21 @@ class OwnershipRequirementPolicyTest {
 
         assertTrue(SpawnerOwnershipPolicyService.isOwnerRequirementSatisfied(false, player, null));
         assertTrue(SpawnerOwnershipPolicyService.isOwnerRequirementSatisfied(false, player, other));
-        assertFalse(SpawnerOwnershipPolicyService.isOwnerRequirementSatisfied(true, player, null));
+        assertTrue(SpawnerOwnershipPolicyService.isOwnerRequirementSatisfied(true, player, null));
         assertFalse(SpawnerOwnershipPolicyService.isOwnerRequirementSatisfied(true, player, other));
         assertTrue(SpawnerOwnershipPolicyService.isOwnerRequirementSatisfied(true, player, player));
+    }
+
+    @Test
+    void spawnerOwnerRestrictionRespectsRequireOwnerAndOwnerRestrictedSeparately() {
+        UUID player = UUID.randomUUID();
+        UUID other = UUID.randomUUID();
+
+        assertTrue(SpawnerOwnershipPolicyService.isOwnershipAllowed(true, false, player, null));
+        assertFalse(SpawnerOwnershipPolicyService.isOwnershipAllowed(true, false, player, other));
+        assertTrue(SpawnerOwnershipPolicyService.isOwnershipAllowed(false, true, player, null));
+        assertFalse(SpawnerOwnershipPolicyService.isOwnershipAllowed(false, true, player, other));
+        assertTrue(SpawnerOwnershipPolicyService.isOwnershipAllowed(false, true, player, player));
     }
 
     @Test

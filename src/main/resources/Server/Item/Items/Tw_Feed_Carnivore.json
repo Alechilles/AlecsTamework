@@ -12,14 +12,10 @@
     "Input": [
       {
         "ResourceTypeId": "Meats",
-        "Quantity": 5
-      },
-      {
-        "ResourceTypeId": "Fish",
-        "Quantity": 5
+        "Quantity": 10
       }
     ],
-    "OutputQuantity": 8,
+    "OutputQuantity": 10,
     "BenchRequirement": [
       {
         "Type": "Crafting",

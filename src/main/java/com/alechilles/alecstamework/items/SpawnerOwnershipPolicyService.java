@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import java.util.UUID;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -13,24 +14,28 @@ final class SpawnerOwnershipPolicyService {
         if (config == null) {
             return false;
         }
-        boolean requireOwner = resolveCaptureRequireOwner();
-        return isOwnerRequirementSatisfied(requireOwner, playerUuid, ownerUuid);
+        boolean requireOwner = resolveCaptureRequireOwner(config);
+        return isOwnershipAllowed(requireOwner, config.isCaptureOwnerRestricted(), playerUuid, ownerUuid);
     }
 
     boolean isSpawnAllowed(@Nullable UUID playerUuid, @Nullable UUID ownerUuid, @Nullable ItemFeatureConfig config) {
         if (config == null) {
             return false;
         }
-        boolean requireOwner = resolveSpawnRequireOwner();
-        return isOwnerRequirementSatisfied(requireOwner, playerUuid, ownerUuid);
+        boolean requireOwner = resolveSpawnRequireOwner(config);
+        return isOwnershipAllowed(requireOwner, config.isSpawnOwnerRestricted(), playerUuid, ownerUuid);
     }
 
-    private boolean resolveCaptureRequireOwner() {
-        return resolveCaptureRequireOwnerDefault(TwGlobalConfig.resolveActive());
+    private boolean resolveCaptureRequireOwner(@Nonnull ItemFeatureConfig config) {
+        return config.getCaptureRequireOwnerOverride() != null
+                ? config.getCaptureRequireOwnerOverride()
+                : resolveCaptureRequireOwnerDefault(TwGlobalConfig.resolveActive());
     }
 
-    private boolean resolveSpawnRequireOwner() {
-        return resolveSpawnRequireOwnerDefault(TwGlobalConfig.resolveActive());
+    private boolean resolveSpawnRequireOwner(@Nonnull ItemFeatureConfig config) {
+        return config.getSpawnRequireOwnerOverride() != null
+                ? config.getSpawnRequireOwnerOverride()
+                : resolveSpawnRequireOwnerDefault(TwGlobalConfig.resolveActive());
     }
 
     static boolean resolveCaptureRequireOwnerDefault(@Nullable TwGlobalConfig globalConfig) {
@@ -47,6 +52,25 @@ final class SpawnerOwnershipPolicyService {
                                                @Nullable UUID playerUuid,
                                                @Nullable UUID ownerUuid) {
         if (!requireOwner) {
+            return true;
+        }
+        if (ownerUuid == null) {
+            return true;
+        }
+        return playerUuid != null && ownerUuid.equals(playerUuid);
+    }
+
+    static boolean isOwnershipAllowed(boolean requireOwner,
+                                      boolean ownerRestricted,
+                                      @Nullable UUID playerUuid,
+                                      @Nullable UUID ownerUuid) {
+        if (!isOwnerRequirementSatisfied(requireOwner, playerUuid, ownerUuid)) {
+            return false;
+        }
+        if (!ownerRestricted) {
+            return true;
+        }
+        if (ownerUuid == null) {
             return true;
         }
         return playerUuid != null && ownerUuid != null && ownerUuid.equals(playerUuid);

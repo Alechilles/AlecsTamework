@@ -28,12 +28,19 @@ public final class CommandLinkedRevivableDropSuppressionSystem extends DeathSyst
     @Nonnull
     @Override
     public Query<EntityStore> getQuery() {
+        ComponentType<EntityStore, NPCEntity> npcType = NPCEntity.getComponentType();
         ComponentType<EntityStore, TameworkCommandLinksComponent> linksType =
                 TameworkCommandLinksComponent.getComponentType();
-        if (linksType == null) {
-            return Query.and(NPCEntity.getComponentType());
+        if (npcType != null && linksType != null) {
+            return Query.and(npcType, linksType);
         }
-        return Query.and(NPCEntity.getComponentType(), linksType);
+        if (npcType != null) {
+            return Query.and(npcType);
+        }
+        if (linksType != null) {
+            return Query.and(linksType);
+        }
+        return Query.any();
     }
 
     @Nonnull

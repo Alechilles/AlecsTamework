@@ -220,6 +220,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
+    private volatile boolean debugSpawnerLocationLogs;
     private volatile boolean debugPromptLogs;
     private volatile boolean debugDespawnLogs;
     private volatile String debugDespawnRoleFilter;
@@ -954,6 +955,7 @@ public class Tamework extends JavaPlugin {
         TwDebugConfig.DebugCommandsSection commands = config.getDebugCommands();
         setDebugHookEnabled(commands.isHook());
         setDebugSpawnerEnabled(commands.isSpawner());
+        setDebugSpawnerLocationEnabled(commands.isSpawner());
         setDebugPromptEnabled(commands.isPrompt());
         setDebugDespawnEnabled(commands.isDespawn());
         setDebugLagEnabled(commands.isLag());
@@ -972,6 +974,7 @@ public class Tamework extends JavaPlugin {
                         + (config.getId() == null ? "<default>" : config.getId())
                         + ": hook=" + isDebugHookEnabled()
                         + ", spawner=" + isDebugSpawnerEnabled()
+                        + ", spawnerLocation=" + isDebugSpawnerLocationEnabled()
                         + ", prompt=" + isDebugPromptEnabled()
                         + ", despawn=" + isDebugDespawnEnabled()
                         + ", lag=" + isDebugLagEnabled()
@@ -1673,6 +1676,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugSpawnerEnabled() {
         debugSpawnerLogs = !debugSpawnerLogs;
         return debugSpawnerLogs;
+    }
+
+    public boolean isDebugSpawnerLocationEnabled() {
+        return debugSpawnerLocationLogs;
+    }
+
+    public boolean setDebugSpawnerLocationEnabled(boolean enabled) {
+        debugSpawnerLocationLogs = enabled;
+        return debugSpawnerLocationLogs;
+    }
+
+    public boolean toggleDebugSpawnerLocationEnabled() {
+        debugSpawnerLocationLogs = !debugSpawnerLocationLogs;
+        return debugSpawnerLocationLogs;
     }
 
     public boolean isDebugPromptEnabled() {

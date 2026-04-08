@@ -19,7 +19,7 @@
         "Quantity": 5
       }
     ],
-    "OutputQuantity": 8,
+    "OutputQuantity": 10,
     "BenchRequirement": [
       {
         "Type": "Crafting",

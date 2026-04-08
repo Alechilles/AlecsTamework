@@ -211,7 +211,7 @@ final class SpawnerSpawnPositionService {
                                int blockY,
                                int blockZ) {
         Tamework instance = Tamework.getInstance();
-        if (instance == null || !instance.isDebugSpawnerEnabled()) {
+        if (instance == null || !instance.isDebugSpawnerLocationEnabled()) {
             return;
         }
         StringBuilder message = new StringBuilder(200);

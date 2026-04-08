@@ -32,6 +32,7 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw debughook [on|off]`
 - `/tw debugprompt [on|off]`
 - `/tw debugspawner [on|off]`
+- `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debuglag [on|off]`
 

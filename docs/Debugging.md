@@ -62,6 +62,7 @@
 - `/tw debughook [on|off]`
 - `/tw debugprompt [on|off]`
 - `/tw debugspawner [on|off]`
+- `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debuglag [on|off]`
 
