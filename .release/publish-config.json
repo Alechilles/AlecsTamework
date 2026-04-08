@@ -13,6 +13,7 @@
   "curseforge": {
     "projectId": "1447962",
     "releaseType": "beta",
+    "changelogType": "html",
     "gameVersionTypeIds": [65437],
     "requiredProjects": [
       { "id": 1459711, "slug": "dynamictooltipslib", "type": "optionalDependency" }
