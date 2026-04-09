@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 2.8.0 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-07
+## 2.8.1 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-09
 ### Added
 - Added `/tw settings` UI (`TameworkSettingsPage`) and command wiring with persisted world-level settings storage (`TameworkSettingsStore`).
 - Added crash telemetry runtime services (`CrashTelemetryService`, local crash envelope/store, optional HTTP reporting client) with diagnostics/debug command coverage.
@@ -26,7 +26,7 @@
 - Added DynamicTooltipsLib to publish metadata optional dependencies.
 - Hardened runtime ECS mutation paths so needs/happiness/breeding/mounted-nameplate flows route writes through command-buffer-safe paths during system processing.
 - Added architecture safety guard tests and contributor gates to prevent future ECS write-phase and async player-thread-affinity regressions.
-- Tranquilizer shortbow adventure-mode fixes were shipped in `2.7.4`; this `2.8.0` section captures the remaining post-`2.7.3` feature set.
+- Tranquilizer shortbow adventure-mode fixes were shipped in `2.7.4`; this `2.8.1` section captures the remaining post-`2.7.3` feature set.
 - `/tw debugspawner` now focuses on capture/spawn flow diagnostics and logs explicit deny reasons when policy or runtime checks block a request.
 - Needs-driven container food consumption now prioritizes higher-value food candidates based on feed impulse preferences instead of consuming the first matching slot.
 
