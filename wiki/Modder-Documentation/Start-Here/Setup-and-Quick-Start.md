@@ -15,7 +15,7 @@ Add Tamework in your `manifest.json`:
 
 ```json
 "Dependencies": {
-  "Alechilles:Alec's Tamework!": "2.5.2"
+  "Alechilles:Alec's Tamework!": "2.8.0"
 },
 "IncludesAssetPack": true
 ```
@@ -69,6 +69,7 @@ Optional prompt updater:
 ## 5. Add optional item systems
 - Spawner items: create `TwSpawnerConfig` and wire `TameworkSpawn`
 - Naming items: create `TwNameItemConfig` and wire `TameworkNameNpc`
+- Name pools: create `TwNamesConfig` and point naming items at `Naming.RandomNamesId`
 - Command items: create `TwCommandItemConfig` and wire `TameworkCommand`
 - Managed coops: create `TwCoopConfig` for the target `CoopId`
 

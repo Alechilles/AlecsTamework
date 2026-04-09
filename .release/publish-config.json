@@ -2,7 +2,7 @@
   "modName": "Alec's Tamework!",
   "repository": "Alechilles/AlecsTamework",
   "github": {
-    "prerelease": true
+    "prerelease": false
   },
   "packaging": "jar",
   "artifactNameTemplate": "Alec's Tamework! v{version}.jar",
@@ -12,7 +12,8 @@
   "zipIncludes": [],
   "curseforge": {
     "projectId": "1447962",
-    "releaseType": "beta",
+    "releaseType": "release",
+    "changelogType": "html",
     "gameVersionTypeIds": [65437],
     "requiredProjects": [
       { "id": 1459711, "slug": "dynamictooltipslib", "type": "optionalDependency" }
@@ -20,7 +21,7 @@
   },
   "modtale": {
     "projectId": "3145c0f3-a890-49b3-bc87-0648b8bd736c",
-    "releaseChannel": "beta",
+    "releaseChannel": "stable",
     "gameVersions": ["2026.03.26-89796e57b"],
     "versionFieldName": "versionNumber",
     "changelogFieldName": "changelog",

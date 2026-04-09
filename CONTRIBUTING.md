@@ -42,9 +42,14 @@ If you’re unsure where to start, open an issue describing what you want to wor
 - In runtime system/tick paths, avoid immediate `DamageSystems.executeDamage(..., store, ...)` calls; defer via `commandBuffer.run(...)` when running inside chunk/system processing.
 - If work is deferred (`CompletableFuture`, delayed executors, schedulers), capture stable IDs (`UUID`) and resolve live refs/components inside `world.execute(...)`.
 - Do not access player-affine APIs (`PlayerRef.getComponent(Player)`, `Universe.getPlayers()` scans for live player mutation) from async/deferred code.
+- In system/tick/event processing paths, use `DamageSystems.executeDamage(..., commandBuffer, ...)` instead of the store overload.
+- Startup registration for optional integrations/dependencies must degrade gracefully (warn + skip) instead of crashing plugin setup.
 - Guard tests must pass for system/runtime changes:
   - `EcsWriteSafetyGuardTest`
   - `AsyncThreadSafetyGuardTest`
+  - `NeedsDamageDispatchGuardTest`
+  - `DamageExecutionWriteSafetyGuardTest`
+  - `StartupResilienceGuardTest`
   - `NeedsDamageDispatchGuardTest`
 
 ## Compatibility goals

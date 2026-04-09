@@ -59,6 +59,8 @@ Then tighten the target set with:
 - `Radius`
 - `RequireLineOfSight`
 
+If `RequireOwner` is omitted, command linking/recipient ownership checks fall back to `TwGlobalConfig.OwnershipRequirements.LinkingRequiresOwner`.
+
 ## Authoring Commands
 Keep each command focused on one gameplay intent:
 - follow

@@ -837,7 +837,11 @@ public final class CompanionNeedsService {
                 cause,
                 appliedDamage
         );
-        DamageSystems.executeDamage(npcRef, store, damage);
+        if (commandBuffer != null) {
+            DamageSystems.executeDamage(npcRef, commandBuffer, damage);
+        } else {
+            DamageSystems.executeDamage(npcRef, store, damage);
+        }
         boolean cancelled = damage.isCancelled();
         float finalDamageAmount = damage.getAmount();
         boolean applied = !cancelled && finalDamageAmount > 0.0f;

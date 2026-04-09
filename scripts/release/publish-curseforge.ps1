@@ -12,6 +12,55 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+function Convert-ChangelogForCurseForge {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Changelog,
+        [string]$PreferredType = "html"
+    )
+
+    $normalizedType = if ([string]::IsNullOrWhiteSpace($PreferredType)) {
+        "html"
+    } else {
+        $PreferredType.Trim().ToLowerInvariant()
+    }
+
+    if ($normalizedType -eq "markdown" -or $normalizedType -eq "text") {
+        return @{
+            Type = $normalizedType
+            Body = $Changelog
+        }
+    }
+
+    $convertFromMarkdown = Get-Command -Name "ConvertFrom-Markdown" -ErrorAction SilentlyContinue
+    if ($null -eq $convertFromMarkdown) {
+        Write-Warning "ConvertFrom-Markdown is unavailable; falling back to plain text changelog for CurseForge."
+        return @{
+            Type = "text"
+            Body = $Changelog
+        }
+    }
+
+    try {
+        $converted = ConvertFrom-Markdown -InputObject $Changelog
+        $html = if ($null -ne $converted) { [string]$converted.Html } else { "" }
+        if ([string]::IsNullOrWhiteSpace($html)) {
+            throw "Converted HTML changelog was empty."
+        }
+
+        return @{
+            Type = "html"
+            Body = $html
+        }
+    } catch {
+        Write-Warning "Failed to convert markdown changelog to HTML for CurseForge; falling back to plain text. Error: $($_.Exception.Message)"
+        return @{
+            Type = "text"
+            Body = $Changelog
+        }
+    }
+}
+
 function Resolve-CurseForgeProjectSlug {
     param(
         [string]$ApiBaseUrl,
@@ -103,12 +152,20 @@ $endpoint = if ([string]::IsNullOrWhiteSpace($projectId)) {
 } else {
     "$apiBaseUrl/projects/$projectId/upload-file"
 }
-$changelog = Get-Content -Path $ChangelogPath -Raw
+$changelogRaw = Get-Content -Path $ChangelogPath -Raw
+$configuredChangelogType = "html"
+$configuredChangelogTypeProperty = $curseforgeConfig.PSObject.Properties["changelogType"]
+if ($null -ne $configuredChangelogTypeProperty -and -not [string]::IsNullOrWhiteSpace("$($configuredChangelogTypeProperty.Value)")) {
+    $configuredChangelogType = "$($configuredChangelogTypeProperty.Value)"
+}
+$changelogPrepared = Convert-ChangelogForCurseForge -Changelog $changelogRaw -PreferredType $configuredChangelogType
+$changelog = $changelogPrepared.Body
+$changelogType = $changelogPrepared.Type
 $displayName = "$($config.modName) v$normalizedVersion"
 
 $metadataObject = @{
     changelog = $changelog
-    changelogType = "markdown"
+    changelogType = $changelogType
     displayName = $displayName
     releaseType = $curseforgeConfig.releaseType
     gameVersionTypeIds = $gameVersionTypeIds
@@ -182,6 +239,7 @@ if ($DryRun) {
     Write-Host "Dry-run: would publish '$ArtifactPath' to CurseForge project '$projectId'."
     Write-Host "Endpoint: $endpoint"
     Write-Host "Display name: $displayName"
+    Write-Host "Changelog type: $changelogType"
     if ([string]::IsNullOrWhiteSpace($projectId)) {
         Write-Host "Note: curseforge.projectId is empty in $ConfigPath."
     }

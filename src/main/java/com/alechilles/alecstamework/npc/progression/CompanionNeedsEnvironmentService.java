@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.items.FeedTroughContainerCompat;
 import com.alechilles.alecstamework.items.FeedTroughWaterStateService;
 import com.hypixel.hytale.component.Ref;
@@ -39,6 +40,7 @@ public final class CompanionNeedsEnvironmentService {
     };
     private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
+    private static final double SCORE_EPSILON = 0.000001;
 
     enum ContainerConsumeStatus {
         SUCCESS,
@@ -612,6 +614,7 @@ public final class CompanionNeedsEnvironmentService {
                 npcRef,
                 store,
                 config,
+                null,
                 preferredFoodItemIds,
                 consumeRadiusOverride,
                 null
@@ -622,6 +625,7 @@ public final class CompanionNeedsEnvironmentService {
     ContainerConsumeResult consumeNearbyContainerFoodDetailed(@Nullable Ref<EntityStore> npcRef,
                                                               @Nullable Store<EntityStore> store,
                                                               @Nonnull TwNeedsConfig config,
+                                                              @Nullable String roleId,
                                                               @Nullable String[] preferredFoodItemIds,
                                                               double consumeRadiusOverride,
                                                               @Nullable Vector3d scanCenterOverride) {
@@ -699,6 +703,7 @@ public final class CompanionNeedsEnvironmentService {
             );
         }
         int consumed = 0;
+        FeedItemPreferenceResolver preferenceResolver = FeedItemPreferenceResolver.create(npcRef, store, roleId);
         Map<String, Integer> consumedByItemId = new HashMap<>();
         int scannedContainers = 0;
         int containersWithAllowedFood = 0;
@@ -760,7 +765,8 @@ public final class CompanionNeedsEnvironmentService {
                     SlotConsumeResult slotResult = consumeFoodFromContainerDetailed(
                             container,
                             allowedFoods,
-                            maxItems - consumed
+                            maxItems - consumed,
+                            preferenceResolver
                     );
                     consumed += slotResult.consumed;
                     mergeConsumedItemCounts(consumedByItemId, slotResult.consumedItemCountsByItemId);
@@ -1006,23 +1012,70 @@ public final class CompanionNeedsEnvironmentService {
     private static int consumeFoodFromContainer(@Nullable ItemContainer container,
                                                 @Nonnull Set<String> allowedFoods,
                                                 int maxItems) {
-        return consumeFoodFromContainerDetailed(container, allowedFoods, maxItems).consumed;
+        return consumeFoodFromContainerDetailed(
+                container,
+                allowedFoods,
+                maxItems,
+                FeedItemPreferenceResolver.create((TwHappinessConfig) null)
+        ).consumed;
     }
 
     @Nonnull
     private static SlotConsumeResult consumeFoodFromContainerDetailed(@Nullable ItemContainer container,
                                                                       @Nonnull Set<String> allowedFoods,
-                                                                      int maxItems) {
+                                                                      int maxItems,
+                                                                      @Nonnull FeedItemPreferenceResolver preferenceResolver) {
         if (container == null || maxItems <= 0 || allowedFoods.isEmpty()) {
             return new SlotConsumeResult(0, Map.of(), 0, 0, 0);
         }
         int consumed = 0;
         Map<String, Integer> consumedByItemId = new HashMap<>();
-        int matchingStacksSeen = 0;
+        Set<Short> matchingSlotsSeen = new HashSet<>();
         int removalAttempts = 0;
         int removalFailures = 0;
+        Set<Short> failedSlots = new HashSet<>();
+        while (consumed < maxItems) {
+            BestFoodSlotCandidate bestCandidate = findBestFoodSlotCandidate(
+                    container,
+                    allowedFoods,
+                    preferenceResolver,
+                    matchingSlotsSeen,
+                    failedSlots
+            );
+            if (bestCandidate == null) {
+                break;
+            }
+            removalAttempts++;
+            ItemStackSlotTransaction transaction = container.removeItemStackFromSlot(bestCandidate.slot, 1, false, true);
+            if (transaction == null || !transaction.succeeded()) {
+                removalFailures++;
+                failedSlots.add(bestCandidate.slot);
+                continue;
+            }
+            consumed++;
+            consumedByItemId.merge(bestCandidate.normalizedItemId, 1, Integer::sum);
+        }
+        return new SlotConsumeResult(
+                consumed,
+                consumedByItemId,
+                matchingSlotsSeen.size(),
+                removalAttempts,
+                removalFailures
+        );
+    }
+
+    @Nullable
+    private static BestFoodSlotCandidate findBestFoodSlotCandidate(@Nonnull ItemContainer container,
+                                                                    @Nonnull Set<String> allowedFoods,
+                                                                    @Nonnull FeedItemPreferenceResolver preferenceResolver,
+                                                                    @Nonnull Set<Short> matchingSlotsSeen,
+                                                                    @Nonnull Set<Short> failedSlots) {
         short capacity = container.getCapacity();
-        for (short slot = 0; slot < capacity && consumed < maxItems; slot++) {
+        BestFoodSlotCandidate best = null;
+        for (short slot = 0; slot < capacity; slot++) {
+            if (failedSlots.contains(slot)) {
+                continue;
+            }
             ItemStack stack = container.getItemStack(slot);
             if (ItemStack.isEmpty(stack)) {
                 continue;
@@ -1035,23 +1088,15 @@ public final class CompanionNeedsEnvironmentService {
             if (!allowedFoods.contains(normalizedItemId)) {
                 continue;
             }
-            matchingStacksSeen++;
-            while (consumed < maxItems) {
-                removalAttempts++;
-                ItemStackSlotTransaction transaction = container.removeItemStackFromSlot(slot, 1, false, true);
-                if (transaction == null || !transaction.succeeded()) {
-                    removalFailures++;
-                    break;
-                }
-                consumed++;
-                consumedByItemId.merge(normalizedItemId, 1, Integer::sum);
-                ItemStack remaining = container.getItemStack(slot);
-                if (ItemStack.isEmpty(remaining)) {
-                    break;
-                }
+            matchingSlotsSeen.add(slot);
+            double score = preferenceResolver.score(normalizedItemId);
+            if (best == null
+                    || score > best.score + SCORE_EPSILON
+                    || (Math.abs(score - best.score) <= SCORE_EPSILON && slot < best.slot)) {
+                best = new BestFoodSlotCandidate(slot, normalizedItemId, score);
             }
         }
-        return new SlotConsumeResult(consumed, consumedByItemId, matchingStacksSeen, removalAttempts, removalFailures);
+        return best;
     }
 
     private static Set<String> normalizeItemIds(@Nullable String[] itemIds) {
@@ -1081,6 +1126,19 @@ public final class CompanionNeedsEnvironmentService {
                 continue;
             }
             aggregate.merge(entry.getKey(), entry.getValue(), Integer::sum);
+        }
+    }
+
+    private static final class BestFoodSlotCandidate {
+        private final short slot;
+        @Nonnull
+        private final String normalizedItemId;
+        private final double score;
+
+        private BestFoodSlotCandidate(short slot, @Nonnull String normalizedItemId, double score) {
+            this.slot = slot;
+            this.normalizedItemId = normalizedItemId;
+            this.score = score;
         }
     }
 

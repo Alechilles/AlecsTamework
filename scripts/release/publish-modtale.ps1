@@ -60,6 +60,106 @@ function Invoke-ModtaleJsonRequest {
     }
 }
 
+function Get-ModtalePropertyValue {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Object,
+        [Parameter(Mandatory = $true)]
+        [string]$PropertyName
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$PropertyName]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
+function Resolve-ModtaleVersionId {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectId,
+        [Parameter(Mandatory = $true)]
+        [string]$VersionNumber,
+        [Parameter(Mandatory = $true)]
+        [string]$ApiKey
+    )
+
+    $discoveryEndpoints = @(
+        "https://api.modtale.net/api/v1/projects/$ProjectId",
+        "https://api.modtale.net/api/v1/projects/$ProjectId/versions"
+    )
+
+    foreach ($discoveryEndpoint in $discoveryEndpoints) {
+        $discoveryResult = $null
+        try {
+            $discoveryResult = Invoke-ModtaleJsonRequest -Method "GET" -Url $discoveryEndpoint -ApiKey $ApiKey
+        } catch {
+            continue
+        }
+
+        if ($discoveryResult.StatusCode -lt 200 -or $discoveryResult.StatusCode -ge 300) {
+            continue
+        }
+
+        if ([string]::IsNullOrWhiteSpace($discoveryResult.ResponseBody)) {
+            continue
+        }
+
+        $responseObject = $null
+        try {
+            $responseObject = $discoveryResult.ResponseBody | ConvertFrom-Json -Depth 32
+        } catch {
+            continue
+        }
+
+        $versionRecords = @()
+        if (($responseObject -is [System.Collections.IEnumerable]) -and -not ($responseObject -is [string]) -and -not ($responseObject -is [System.Collections.IDictionary])) {
+            $versionRecords = @($responseObject)
+        } else {
+            $versionsValue = Get-ModtalePropertyValue -Object $responseObject -PropertyName "versions"
+            if ($null -ne $versionsValue) {
+                $versionRecords += @($versionsValue)
+            }
+
+            $contentValue = Get-ModtalePropertyValue -Object $responseObject -PropertyName "content"
+            if ($null -ne $contentValue) {
+                $versionRecords += @($contentValue)
+            }
+        }
+
+        foreach ($versionRecord in $versionRecords) {
+            if ($null -eq $versionRecord) {
+                continue
+            }
+
+            $recordVersion = Get-ModtalePropertyValue -Object $versionRecord -PropertyName "versionNumber"
+            if ([string]::IsNullOrWhiteSpace("$recordVersion")) {
+                $recordVersion = Get-ModtalePropertyValue -Object $versionRecord -PropertyName "version"
+            }
+            if ([string]::IsNullOrWhiteSpace("$recordVersion")) {
+                continue
+            }
+
+            if ("$recordVersion".Trim() -ne $VersionNumber) {
+                continue
+            }
+
+            $recordId = Get-ModtalePropertyValue -Object $versionRecord -PropertyName "id"
+            if (-not [string]::IsNullOrWhiteSpace("$recordId")) {
+                return "$recordId".Trim()
+            }
+        }
+    }
+
+    return ""
+}
+
 if (-not (Test-Path -Path $ConfigPath)) {
     throw "Release config '$ConfigPath' was not found."
 }
@@ -191,14 +291,20 @@ if ($statusCodeInt -lt 200 -or $statusCodeInt -ge 300) {
         }
         $updatePayload = $updatePayloadObject | ConvertTo-Json -Depth 16 -Compress
 
-        $candidateUpdates = @(
-            @{ Method = "PATCH"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/$normalizedVersion" },
-            @{ Method = "PUT"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/$normalizedVersion" },
-            @{ Method = "PATCH"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/by-version/$normalizedVersion" },
-            @{ Method = "PUT"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/by-version/$normalizedVersion" },
-            @{ Method = "PATCH"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions" },
-            @{ Method = "PUT"; Url = "https://api.modtale.net/api/v1/projects/$projectId/versions" }
-        )
+        $existingVersionId = Resolve-ModtaleVersionId -ProjectId $projectId -VersionNumber $normalizedVersion -ApiKey $effectiveApiKey
+
+        $candidateUpdates = @()
+        if (-not [string]::IsNullOrWhiteSpace($existingVersionId)) {
+            $candidateUpdates += @{
+                Method = "PUT"
+                Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/$existingVersionId"
+            }
+        }
+
+        $candidateUpdates += @{
+            Method = "PUT"
+            Url = "https://api.modtale.net/api/v1/projects/$projectId/versions/$normalizedVersion"
+        }
 
         $attemptErrors = @()
         foreach ($candidate in $candidateUpdates) {
@@ -220,7 +326,12 @@ if ($statusCodeInt -lt 200 -or $statusCodeInt -ge 300) {
         }
 
         $attemptSummary = if ($attemptErrors.Count -eq 0) { "No update endpoints attempted." } else { ($attemptErrors -join " || ") }
-        throw "Modtale upload failed because version '$normalizedVersion' already exists and update fallback did not succeed. Attempts: $attemptSummary"
+        $discoverySummary = if ([string]::IsNullOrWhiteSpace($existingVersionId)) {
+            "No existing version id was resolved for '$normalizedVersion'."
+        } else {
+            "Resolved existing version id '$existingVersionId'."
+        }
+        throw "Modtale upload failed because version '$normalizedVersion' already exists and update fallback did not succeed. $discoverySummary Attempts: $attemptSummary"
     }
 
     throw "Modtale upload failed with HTTP status $statusCode. Response: $responseSummary$knownVersionsSummary"

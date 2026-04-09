@@ -452,7 +452,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(
                 new CompanionLifeStageResumeOnLoadSystem(NPCEntity.getComponentType(), lifeStageComponentType)
         );
-        getEntityStoreRegistry().registerSystem(new CommandLinkedRevivableDropSuppressionSystem());
+        registerOptionalCommandLinkedRevivableDropSuppressionSystem();
         getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
         getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
         getEntityStoreRegistry().registerSystem(
@@ -1079,16 +1079,50 @@ public class Tamework extends JavaPlugin {
         if (commandAssetsRegistered) {
             return;
         }
-        getAssetRegistry().register(
-                HytaleAssetStore.builder(TwCommandItemConfig.class, new DefaultAssetMap<>())
-                        .setPath("Tamework/Items/Commands")
-                        .setCodec(TwCommandItemConfig.CODEC)
-                        .setKeyFunction(TwCommandItemConfig::getId)
-                        .build()
-        );
-        getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
-        getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
-        commandAssetsRegistered = true;
+        try {
+            getAssetRegistry().register(
+                    HytaleAssetStore.builder(TwCommandItemConfig.class, new DefaultAssetMap<>())
+                            .setPath("Tamework/Items/Commands")
+                            .setCodec(TwCommandItemConfig.CODEC)
+                            .setKeyFunction(TwCommandItemConfig::getId)
+                            .build()
+            );
+            getEventRegistry().register(LoadedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsLoaded);
+            getEventRegistry().register(RemovedAssetsEvent.class, TwCommandItemConfig.class, this::onCommandAssetsRemoved);
+            commandAssetsRegistered = true;
+        } catch (LinkageError error) {
+            if (!isMissingVector3d(error)) {
+                throw error;
+            }
+            getLogger().at(Level.WARNING).withCause(error).log(
+                    "Skipping command-item asset registration because Vector3d is unavailable in this runtime."
+            );
+        }
+    }
+
+    private void registerOptionalCommandLinkedRevivableDropSuppressionSystem() {
+        try {
+            getEntityStoreRegistry().registerSystem(new CommandLinkedRevivableDropSuppressionSystem());
+        } catch (RuntimeException | LinkageError error) {
+            getLogger().at(Level.WARNING).withCause(error).log(
+                    "Skipping command-linked revivable drop suppression system because required NPC damage dependencies "
+                            + "are unavailable during setup."
+            );
+        }
+    }
+
+    private static boolean isMissingVector3d(@Nullable Throwable throwable) {
+        Throwable cursor = throwable;
+        while (cursor != null) {
+            if (cursor instanceof NoClassDefFoundError || cursor instanceof ClassNotFoundException) {
+                String message = cursor.getMessage();
+                if (message != null && message.contains("com/hypixel/hytale/math/vector/Vector3d")) {
+                    return true;
+                }
+            }
+            cursor = cursor.getCause();
+        }
+        return false;
     }
 
     private void registerGlobalConfigAssets() {
@@ -1541,7 +1575,18 @@ public class Tamework extends JavaPlugin {
         if (commandItemRegistry == null) {
             return 0;
         }
-        DefaultAssetMap<String, TwCommandItemConfig> assetMap = TwCommandItemConfig.getAssetMap();
+        DefaultAssetMap<String, TwCommandItemConfig> assetMap;
+        try {
+            assetMap = TwCommandItemConfig.getAssetMap();
+        } catch (LinkageError error) {
+            if (!isMissingVector3d(error)) {
+                throw error;
+            }
+            getLogger().at(Level.WARNING).withCause(error).log(
+                    "Skipping command-item asset loading because Vector3d is unavailable in this runtime."
+            );
+            return 0;
+        }
         if (assetMap == null) {
             return 0;
         }

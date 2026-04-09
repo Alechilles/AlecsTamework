@@ -16,6 +16,7 @@ This page is the working mental model for how Tamework finds config assets, choo
 - `TwInteractionConfig`: `<ModRoot>/Server/Tamework/Interactions/*.json`
 - `TwSpawnerConfig`: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
 - `TwNameItemConfig`: `<ModRoot>/Server/Tamework/Items/Naming/*.json`
+- `TwNamesConfig`: `<ModRoot>/Server/Tamework/Names/*.json`
 - `TwCommandItemConfig`: `<ModRoot>/Server/Tamework/Items/Commands/*.json`
 - `TwHappinessConfig`: `<ModRoot>/Server/Tamework/Happiness/*.json`
 - `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
@@ -29,6 +30,7 @@ This page is the working mental model for how Tamework finds config assets, choo
 - Use `TwCompanionConfig` for role-scoped ownership and command behavior policy.
 - Use `TwInteractionConfig` for optimized interaction authoring.
 - Use `TwSpawnerConfig`, `TwNameItemConfig`, and `TwCommandItemConfig` when the behavior is bound to an item.
+- Use `TwNamesConfig` when naming UI randomization should resolve from reusable name pools.
 - Use `TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, and `TwTraitConfig` for progression state.
 - Use `TwCoopConfig` when runtime behavior is keyed to a coop id.
 - Use `TwDebugConfig` for dev-only default debug toggles.
@@ -59,6 +61,9 @@ These families resolve from the item in use:
 - `TwSpawnerConfig` by `EmptyItemId`
 - `TwNameItemConfig` by `ItemId`
 - `TwCommandItemConfig` by `ItemIds`
+
+### Name-pool config
+- `TwNamesConfig` resolves by pool id (for example from `TwNameItemConfig.Naming.RandomNamesId`)
 
 ### Coop-scoped config
 - `TwCoopConfig` resolves by `CoopId`

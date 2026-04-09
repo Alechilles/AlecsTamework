@@ -51,6 +51,7 @@ Use this page when you need the shared building blocks rather than one specific 
 
 ## Ownership guidance
 - Global defaults belong in `TwGlobalConfig`
+- Ownership requirement defaults live under `TwGlobalConfig.OwnershipRequirements`
 - Role-specific ownership and command protection belong in `TwCompanionConfig`
 - Item systems should not re-implement their own ownership rules unless the item config explicitly needs a stricter or looser override
 

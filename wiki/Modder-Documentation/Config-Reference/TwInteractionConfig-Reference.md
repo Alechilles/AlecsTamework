@@ -143,6 +143,39 @@ Use this preset when an interaction should hand off into the breeding runtime ra
 ### `Custom`
 No preset-specific fields. Use `Requires` and `Effects` directly.
 
+### `TameworkLaunchProjectile`
+Custom projectile interaction with arc-solve, target-slot fallback, spread, impact effects, and optional lingering hazards.
+
+Fields:
+- `ProjectileId` (required)
+- `Target` (optional: `USER`, `OWNER`, `TARGET`; default `TARGET`)
+- `TargetSlot` (optional; preferred NPC marked target slot before `Target` fallback)
+- `YawSpreadDegrees` (optional)
+- `PitchSpreadDegrees` (optional)
+- `FailIfNoSolution` (optional; default `true`)
+- `TrajectoryMode` (optional: `HIGH_ANGLE`, `DIRECT`; default `HIGH_ANGLE`)
+- `RandomAroundSourceMinRadius` (optional)
+- `RandomAroundSourceMaxRadius` (optional)
+- `RandomAroundSourceVerticalOffset` (optional)
+- `ImpactEffect` (optional nested block)
+- `LingeringHazard` (optional nested block)
+
+`ImpactEffect` fields:
+- `EffectId`
+- `Radius`
+- `ExcludeSource` (optional; default `true`)
+
+`LingeringHazard` fields:
+- `Radius`
+- `DurationSeconds`
+- `TickIntervalSeconds`
+- `DamagePerTick`
+- `ExcludeSource` (optional; default `true`)
+- `SourceTypeId` (optional)
+- `EffectId` (optional)
+
+Use this when you need combat-oriented lobs, source-centered barrage patterns, impact debuffs, or hazard zones that continue after projectile death.
+
 ## Requirement Schema
 `Requires` is split into two buckets:
 - `All`: every authored requirement in the bucket must pass
@@ -491,6 +524,7 @@ Cooldown behavior:
 
 ## Related Pages
 - [Interaction Paths and Role Wiring](/mod/alecs-tamework/interaction-paths-and-role-wiring)
+- [Projectile Combat and Hazard Interactions Guide](/mod/alecs-tamework/projectile-combat-and-hazard-interactions-guide)
 - [Config Discovery, Resolution, and Inheritance](/mod/alecs-tamework/config-discovery-resolution-and-inheritance)
 - [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference)
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)

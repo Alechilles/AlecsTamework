@@ -9,7 +9,7 @@ draft: false
 Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution) | [Developer Documentation](/mod/alecs-tamework/developer-documentation)
 
 ## Command package
-The `commands/` package contains the public `/tw` command surface, with `TameworkCommandRoot` as the root and focused command classes for ownership, alarms, progression, traits, config reload, NPC lookup, and debug toggles.
+The `commands/` package contains the public `/tw` command surface, with `TameworkCommandRoot` as the root and focused command classes for ownership, alarms, progression, traits, config/settings UI, NPC lookup, diagnostics, and debug toggles.
 
 ## Debug state
 `Tamework.java` stores the live debug booleans and role filter state for:
@@ -21,8 +21,15 @@ The `commands/` package contains the public `/tw` command surface, with `Tamewor
 - coop
 - breeding
 - needs-consume diagnostics
+- needs-damage diagnostics
 
 `TwDebugConfig` supplies asset-backed defaults for those toggles.
+
+Additional diagnostics that are command-driven (not startup-toggle defaults) include:
+- `/tw showhitboxes`
+- `/tw debugdb`
+- `/tw debugcrashtelemetry`
+- `/tw debugreviveready`
 
 ## Supporting systems
 - `CompanionDespawnDiagnosticsSystem`

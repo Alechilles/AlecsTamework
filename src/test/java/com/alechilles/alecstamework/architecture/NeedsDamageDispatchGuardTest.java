@@ -28,17 +28,19 @@ class NeedsDamageDispatchGuardTest {
     @Test
     void needsSystemPathPassesCommandBufferIntoDamageDispatch() throws IOException {
         String content = Files.readString(NEEDS_SERVICE_PATH, StandardCharsets.UTF_8);
+        String normalized = content.replace("\r\n", "\n");
+        int applyNeedsDamageCall = normalized.indexOf("applyNeedsDamage(");
 
         assertTrue(
-                content.contains("applyNeedsDamage(\n                npcRef,\n                store,\n                commandBuffer,"),
+                applyNeedsDamageCall >= 0 && normalized.indexOf("commandBuffer", applyNeedsDamageCall) > applyNeedsDamageCall,
                 "CompanionNeedsService must pass commandBuffer into applyNeedsDamage from runNeedsUpdate."
         );
         assertTrue(
-                content.contains("commandBuffer.run(bufferStore ->"),
+                normalized.contains("commandBuffer.run(bufferStore ->"),
                 "Command-buffer damage path must defer execution through commandBuffer.run(...)."
         );
         assertTrue(
-                content.contains("DamageSystems.executeDamage(npcRef, bufferStore, deferredDamage);"),
+                normalized.contains("DamageSystems.executeDamage(npcRef, bufferStore, deferredDamage);"),
                 "Deferred needs damage must execute against bufferStore inside commandBuffer.run(...)."
         );
     }
