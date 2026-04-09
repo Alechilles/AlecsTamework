@@ -243,6 +243,39 @@ class TwConfigInheritanceContractTest {
     }
 
     @Test
+    void happinessImpulsesFeedItemMapReplacesParentWhenExplicit() throws Exception {
+        TwHappinessConfig parent = new TwHappinessConfig();
+        TwHappinessConfig child = new TwHappinessConfig();
+
+        TwHappinessConfig.ImpulseSettings parentImpulses = new TwHappinessConfig.ImpulseSettings();
+        TwHappinessConfig.ImpulseSettings childImpulses = new TwHappinessConfig.ImpulseSettings();
+        setField(parentImpulses, "gainOnFeed", 7.0d);
+        setField(parentImpulses, "handFeedDurationMinutes", 20.0d);
+        setField(parentImpulses, "feedImpulseDurationMinutes", 30.0d);
+        setField(parentImpulses, "feedItemImpulses", Map.of("Tw_Parent_Feed", 9.0d));
+        setField(parentImpulses, "feedParamImpulses", Map.of("FoodFavorite", 6.0d));
+        setField(childImpulses, "gainOnFeed", 2.0d);
+        setField(childImpulses, "feedItemImpulses", Map.of("Tw_Child_Feed", -10.0d));
+        setField(childImpulses, "feedParamImpulses", Map.of("FoodGeneric", -5.0d));
+        setField(parent, "impulses", parentImpulses);
+        setField(child, "impulses", childImpulses);
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("Impulses", Set.of("FeedItemImpulses", "FeedParamImpulses"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("Impulses"), nested);
+
+        assertEquals(7.0d, child.getImpulses().getGainOnFeed(), 0.00001d);
+        assertEquals(20.0d, child.getImpulses().getHandFeedDurationMinutes(), 0.00001d);
+        assertEquals(30.0d, child.getImpulses().getFeedImpulseDurationMinutes(), 0.00001d);
+        Map<String, Double> resolved = child.getImpulses().getFeedItemImpulses();
+        assertEquals(-10.0d, resolved.get("tw_child_feed"), 0.00001d);
+        assertFalse(resolved.containsKey("tw_parent_feed"));
+        Map<String, Double> resolvedParams = child.getImpulses().getFeedParamImpulses();
+        assertEquals(-5.0d, resolvedParams.get("FoodGeneric"), 0.00001d);
+        assertFalse(resolvedParams.containsKey("FoodFavorite"));
+    }
+
+    @Test
     void needsPassiveRefillNestedMergeAndArrayReplacementWork() throws Exception {
         TwNeedsConfig parent = new TwNeedsConfig();
         TwNeedsConfig child = new TwNeedsConfig();

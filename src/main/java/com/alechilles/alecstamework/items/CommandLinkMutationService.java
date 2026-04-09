@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
@@ -57,13 +58,13 @@ final class CommandLinkMutationService {
         if (playerId == null) {
             return LinkToggleResult.notToggled();
         }
+        boolean requireOwner = resolveLinkingRequireOwner();
         LegacyTamedOwnershipBridge.ClaimResult ownerBridgeResult =
-                LegacyTamedOwnershipBridge.claimForPlayerIfEligible(targetRef, store, player);
+                requireOwner
+                        ? LegacyTamedOwnershipBridge.claimForPlayerIfEligible(targetRef, store, player)
+                        : LegacyTamedOwnershipBridge.resolveOwner(targetRef, store);
         UUID ownerId = ownerBridgeResult.getOwnerId();
-        if (ownerId != null && !ownerId.equals(playerId)) {
-            return LinkToggleResult.notToggled();
-        }
-        if (config.isRequireOwner() && ownerId == null) {
+        if (requireOwner && (ownerId == null || !ownerId.equals(playerId))) {
             return LinkToggleResult.notToggled();
         }
         if (config.isRequireTamed() && !TamedStateResolver.isTamed(targetRef, store)) {
@@ -77,7 +78,7 @@ final class CommandLinkMutationService {
             current = new TameworkCommandLinksComponent(playerId, new String[0]);
         }
         UUID linksOwner = current.getOwnerId();
-        if (linksOwner != null && !linksOwner.equals(playerId)) {
+        if (requireOwner && linksOwner != null && !linksOwner.equals(playerId)) {
             return LinkToggleResult.notToggled();
         }
         current.setOwnerId(playerId);
@@ -143,7 +144,7 @@ final class CommandLinkMutationService {
             return false;
         }
         UUID owner = links.getOwnerId();
-        if (owner != null && !owner.equals(player.getUuid())) {
+        if (resolveLinkingRequireOwner() && owner != null && !owner.equals(player.getUuid())) {
             return false;
         }
         store.putComponent(npcRef, TameworkCommandLinksComponent.getComponentType(), links.withToolIdRemoved(toolId));
@@ -224,6 +225,15 @@ final class CommandLinkMutationService {
         }
         String stateName = npc.getRole().getStateSupport().getStateName();
         return (stateName != null && !stateName.isBlank()) ? stateName : null;
+    }
+
+    private boolean resolveLinkingRequireOwner() {
+        return resolveLinkingRequireOwner(TwGlobalConfig.resolveActive());
+    }
+
+    static boolean resolveLinkingRequireOwner(@Nullable TwGlobalConfig globalConfig) {
+        TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
+        return resolved.isOwnershipLinkingRequiresOwner();
     }
 
     ItemStack removeLinkedNpcRecord(ItemStack stack, UUID npcUuid) {

@@ -10,6 +10,7 @@
     "Lag": false,
     "Coop": false,
     "Breeding": false,
-    "NeedsConsume": false
+    "NeedsConsume": false,
+    "NeedsDamage": false
   }
 }

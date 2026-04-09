@@ -33,6 +33,7 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     private static final long WAL_CHECKPOINT_INTERVAL_MINUTES = 30L;
     private static final long VACUUM_INTERVAL_HOURS = 24L;
     private static final long STARTUP_VACUUM_DELAY_MINUTES = 2L;
+    private static final long MAINTENANCE_SHUTDOWN_TIMEOUT_SECONDS = 2L;
     private static final DateTimeFormatter BACKUP_SUFFIX_FORMAT =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
@@ -365,6 +366,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
     @Override
     public void close() {
         maintenanceExecutor.shutdownNow();
+        try {
+            maintenanceExecutor.awaitTermination(MAINTENANCE_SHUTDOWN_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        }
         writeQueue.close();
     }
 

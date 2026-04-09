@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
 import sun.misc.Unsafe;
 
@@ -50,6 +51,43 @@ class InteractionParsingTest {
         assertNull(items[0].getHeal());
         assertEquals("ItemB", items[1].getItem());
         assertEquals(4.0, items[1].getHeal());
+    }
+
+    @Test
+    void mergeFeedItemsUnionsParamAndExplicitEntriesWithCaseInsensitiveDeduping() throws Exception {
+        InteractionParamResolver resolver = new InteractionParamResolver(null, null, null);
+        InteractionParamAccess access = new InteractionParamAccess(
+                resolver,
+                false,
+                new String[0],
+                null,
+                null,
+                "LovedItems",
+                "IsHarvestable",
+                "IsMountable"
+        );
+
+        FeedItem[] paramItems = new FeedItem[] {
+                new FeedItem("Item_A", null),
+                new FeedItem("Item_B", 3.0)
+        };
+        FeedItem[] explicitItems = new FeedItem[] {
+                new FeedItem("item_a", 5.0),
+                new FeedItem("Item_C", null)
+        };
+
+        Method mergeMethod = InteractionParamAccess.class.getDeclaredMethod(
+                "mergeFeedItems",
+                FeedItem[].class,
+                FeedItem[].class
+        );
+        mergeMethod.setAccessible(true);
+        FeedItem[] merged = (FeedItem[]) mergeMethod.invoke(access, (Object) paramItems, (Object) explicitItems);
+
+        assertArrayEquals(new String[] { "item_a", "Item_B", "Item_C" }, InteractionItemParser.extractItemIds(merged));
+        assertEquals(5.0, merged[0].getHeal());
+        assertEquals(3.0, merged[1].getHeal());
+        assertNull(merged[2].getHeal());
     }
 
     @Test

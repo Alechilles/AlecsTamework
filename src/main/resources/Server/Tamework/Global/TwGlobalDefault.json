@@ -12,6 +12,12 @@
     "HarvestAlarmName": "Harvest_Ready",
     "InteractionCooldownAlarmPrefix": "TameworkInteract_Cooldown"
   },
+  "OwnershipRequirements": {
+    "CaptureRequiresOwner": false,
+    "SpawnRequiresOwner": false,
+    "InteractionRequiresOwner": true,
+    "LinkingRequiresOwner": true
+  },
   "Command": {
     "RelocationRetryIntervalMs": 2000,
     "RelocationMaxWaitMs": 20000,
@@ -22,7 +28,9 @@
     "TranquilizerShortbow": false,
     "TranquilizerArrow": false,
     "TranquilizerPotion": false,
-    "FeedTrough": false
+    "FeedTrough": false,
+    "HerbivoreFeed": true,
+    "CarnivoreFeed": true
   },
   "Population": {
     "LimitPerPlayerOwnedTotal": 0,

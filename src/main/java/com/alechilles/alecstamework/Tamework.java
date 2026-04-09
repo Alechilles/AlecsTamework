@@ -35,6 +35,7 @@ import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
+import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -70,6 +71,7 @@ import com.alechilles.alecstamework.items.SpawnerFeatureHandler;
 import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
@@ -134,6 +136,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.components.SpawnBeaconReference;
@@ -167,6 +170,7 @@ public class Tamework extends JavaPlugin {
     private CommandLinkedNpcLostService commandLinkedNpcLostService;
     private CommandLinkedNpcStateSnapshotService commandLinkedNpcStateSnapshotService;
     private CoopResidentStateSnapshotService coopResidentStateSnapshotService;
+    private Path runtimeDataDirectory;
     private TameworkPersistenceRuntime persistenceRuntime;
     private TameworkApi api;
     private TameworkEventBus apiEventBus;
@@ -175,6 +179,7 @@ public class Tamework extends JavaPlugin {
     private ApiSelfTestRunner apiSelfTestRunner;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
+    private CrashTelemetryService crashTelemetryService;
     private SpawnerTooltipBridge spawnerTooltipBridge;
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
@@ -215,6 +220,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<ChunkStore, TameworkFeedTroughWaterChargesComponent> feedTroughWaterChargesComponentType;
     private volatile boolean debugHookLogs;
     private volatile boolean debugSpawnerLogs;
+    private volatile boolean debugSpawnerLocationLogs;
     private volatile boolean debugPromptLogs;
     private volatile boolean debugDespawnLogs;
     private volatile String debugDespawnRoleFilter;
@@ -222,6 +228,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugCoopLogs;
     private volatile boolean debugBreedingLogs;
     private volatile boolean debugNeedsConsumeDiagnosticsLogs;
+    private volatile boolean debugNeedsDamageDiagnosticsLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -230,6 +237,16 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void setup() {
+        initializeCrashTelemetry();
+        try {
+            setupInternal();
+        } catch (Throwable throwable) {
+            captureSetupFailure(throwable);
+            throw throwable;
+        }
+    }
+
+    private void setupInternal() {
         itemFeatureRegistry = new ItemFeatureRegistry();
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
@@ -451,7 +468,7 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new CompanionNeedsSystem());
         getEntityStoreRegistry().registerSystem(new CompanionPassiveBreedingSystem());
         commandNpcRelocationService = new CommandNpcRelocationService(getLogger());
-        Path runtimeDataDirectory = new TameworkDataPathService(getLogger())
+        runtimeDataDirectory = new TameworkDataPathService(getLogger())
                 .resolveAndMigrateDataDirectory(getDataDirectory());
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
         apiEventBus = new TameworkEventBus(getLogger());
@@ -528,6 +545,7 @@ public class Tamework extends JavaPlugin {
                 new OwnerDamageFilterSystem(getLogger())
         );
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
+        getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());
         getEntityStoreRegistry().registerSystem(
                 new PlayerEffectMovementSystem(
                         PlayerRef.getComponentType(),
@@ -633,6 +651,10 @@ public class Tamework extends JavaPlugin {
                 AddPlayerToWorldEvent.class,
                 this::onPlayerAddedToWorldForOverrides
         );
+        getEventRegistry().registerGlobal(
+                RemoveWorldEvent.class,
+                this::onWorldRemovedForCrashTelemetry
+        );
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(
                 "Tamework item configs loaded: spawners="
@@ -654,11 +676,23 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void start() {
+        try {
+            startInternal();
+        } catch (Throwable throwable) {
+            captureStartFailure(throwable);
+            throw throwable;
+        }
+    }
+
+    private void startInternal() {
         OwnerPresenceTimelineService.get().seedOnlinePlayersFromUniverse();
         initializeOverridesForLoadedWorlds();
         getLogger().at(Level.INFO).log("Alec's Tamework! has been enabled!");
         if (hStatsIntegration != null) {
             hStatsIntegration.initialize();
+        }
+        if (crashTelemetryService != null) {
+            crashTelemetryService.start();
         }
         if (assetPackCoordinator != null) {
             assetPackCoordinator.ensureAssetEditorPackVisible();
@@ -667,6 +701,9 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void shutdown() {
+        if (crashTelemetryService != null) {
+            crashTelemetryService.shutdown();
+        }
         overrideInitializedScopeKeys.clear();
         if (spawnerTooltipBridge != null) {
             spawnerTooltipBridge.shutdown();
@@ -683,9 +720,46 @@ public class Tamework extends JavaPlugin {
             persistenceRuntime.close();
             persistenceRuntime = null;
         }
+        runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
+        crashTelemetryService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
+    }
+
+    private void initializeCrashTelemetry() {
+        if (crashTelemetryService != null) {
+            return;
+        }
+        try {
+            crashTelemetryService = CrashTelemetryService.create(this);
+        } catch (Exception ex) {
+            getLogger().at(Level.WARNING).withCause(ex)
+                    .log("Failed to initialize Tamework crash telemetry; continuing without crash telemetry.");
+        }
+    }
+
+    private void captureSetupFailure(@Nullable Throwable throwable) {
+        if (crashTelemetryService == null || throwable == null) {
+            return;
+        }
+        crashTelemetryService.captureSetupFailure(throwable);
+    }
+
+    private void captureStartFailure(@Nullable Throwable throwable) {
+        if (crashTelemetryService == null || throwable == null) {
+            return;
+        }
+        crashTelemetryService.captureStartFailure(throwable);
+    }
+
+    private void onWorldRemovedForCrashTelemetry(@Nonnull RemoveWorldEvent event) {
+        if (event == null
+                || event.getRemovalReason() != RemoveWorldEvent.RemovalReason.EXCEPTIONAL
+                || crashTelemetryService == null) {
+            return;
+        }
+        crashTelemetryService.captureExceptionalWorldRemoval(event.getWorld(), event.getRemovalReason());
     }
 
     private void onPlayerAddedToWorldForOverrides(@Nonnull AddPlayerToWorldEvent event) {
@@ -757,6 +831,11 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
+    public Path getRuntimeDataDirectory() {
+        return runtimeDataDirectory;
+    }
+
+    @Nullable
     public TameworkPersistenceRuntime getPersistenceRuntime() {
         return persistenceRuntime;
     }
@@ -764,6 +843,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public TameworkApi getApi() {
         return api;
+    }
+
+    @Nullable
+    public CrashTelemetryService getCrashTelemetryService() {
+        return crashTelemetryService;
     }
 
     @Nullable
@@ -871,12 +955,14 @@ public class Tamework extends JavaPlugin {
         TwDebugConfig.DebugCommandsSection commands = config.getDebugCommands();
         setDebugHookEnabled(commands.isHook());
         setDebugSpawnerEnabled(commands.isSpawner());
+        setDebugSpawnerLocationEnabled(commands.isSpawner());
         setDebugPromptEnabled(commands.isPrompt());
         setDebugDespawnEnabled(commands.isDespawn());
         setDebugLagEnabled(commands.isLag());
         setDebugCoopEnabled(commands.isCoop());
         setDebugBreedingEnabled(commands.isBreeding());
         setDebugNeedsConsumeDiagnosticsEnabled(commands.isNeedsConsumeDiagnostics());
+        setDebugNeedsDamageDiagnosticsEnabled(commands.isNeedsDamageDiagnostics());
         String roleFilter = commands.getDespawnRoleFilter();
         if (roleFilter == null || roleFilter.isBlank()) {
             clearDebugDespawnRoleFilter();
@@ -888,12 +974,14 @@ public class Tamework extends JavaPlugin {
                         + (config.getId() == null ? "<default>" : config.getId())
                         + ": hook=" + isDebugHookEnabled()
                         + ", spawner=" + isDebugSpawnerEnabled()
+                        + ", spawnerLocation=" + isDebugSpawnerLocationEnabled()
                         + ", prompt=" + isDebugPromptEnabled()
                         + ", despawn=" + isDebugDespawnEnabled()
                         + ", lag=" + isDebugLagEnabled()
                         + ", coop=" + isDebugCoopEnabled()
                         + ", breeding=" + isDebugBreedingEnabled()
                         + ", needsConsumeDiagnostics=" + isDebugNeedsConsumeDiagnosticsEnabled()
+                        + ", needsDamageDiagnostics=" + isDebugNeedsDamageDiagnosticsEnabled()
                         + ", despawnRoleFilter="
                         + (getDebugDespawnRoleFilter() == null ? "<none>" : getDebugDespawnRoleFilter())
         );
@@ -1490,6 +1578,10 @@ public class Tamework extends JavaPlugin {
         return commandItemFeatureHandler;
     }
 
+    public CommandLinkedNpcDeathService getCommandLinkedNpcDeathService() {
+        return commandLinkedNpcDeathService;
+    }
+
     public ComponentType<EntityStore, TameworkOwnerComponent> getOwnerComponentType() {
         return ownerComponentType;
     }
@@ -1584,6 +1676,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugSpawnerEnabled() {
         debugSpawnerLogs = !debugSpawnerLogs;
         return debugSpawnerLogs;
+    }
+
+    public boolean isDebugSpawnerLocationEnabled() {
+        return debugSpawnerLocationLogs;
+    }
+
+    public boolean setDebugSpawnerLocationEnabled(boolean enabled) {
+        debugSpawnerLocationLogs = enabled;
+        return debugSpawnerLocationLogs;
+    }
+
+    public boolean toggleDebugSpawnerLocationEnabled() {
+        debugSpawnerLocationLogs = !debugSpawnerLocationLogs;
+        return debugSpawnerLocationLogs;
     }
 
     public boolean isDebugPromptEnabled() {
@@ -1708,6 +1814,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugNeedsConsumeDiagnosticsEnabled() {
         debugNeedsConsumeDiagnosticsLogs = !debugNeedsConsumeDiagnosticsLogs;
         return debugNeedsConsumeDiagnosticsLogs;
+    }
+
+    public boolean isDebugNeedsDamageDiagnosticsEnabled() {
+        return debugNeedsDamageDiagnosticsLogs;
+    }
+
+    public boolean setDebugNeedsDamageDiagnosticsEnabled(boolean enabled) {
+        debugNeedsDamageDiagnosticsLogs = enabled;
+        return debugNeedsDamageDiagnosticsLogs;
+    }
+
+    public boolean toggleDebugNeedsDamageDiagnosticsEnabled() {
+        debugNeedsDamageDiagnosticsLogs = !debugNeedsDamageDiagnosticsLogs;
+        return debugNeedsDamageDiagnosticsLogs;
     }
 
     // Logs a warning if required global config fields are missing.

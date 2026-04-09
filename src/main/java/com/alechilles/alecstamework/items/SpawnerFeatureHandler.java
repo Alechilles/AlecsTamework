@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
@@ -7,6 +8,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -82,6 +84,7 @@ public final class SpawnerFeatureHandler {
         this.npcIdentityService = new SpawnerNpcIdentityService();
         this.captureFinalizerService = new SpawnerCaptureFinalizerService();
         this.capturePolicyService = new SpawnerCapturePolicyService(
+                logger,
                 rolePolicyService,
                 npcStateService,
                 ownershipPolicyService,
@@ -286,15 +289,25 @@ public final class SpawnerFeatureHandler {
 
     private boolean spawnFromItem(Player player, ItemStack itemStack, ItemFeatureConfig config, Integer hotbarSlot, String emptyItemIdOverride) {
         if (player == null || itemStack == null || config == null) {
+            logSpawnerFlowDebug("spawn denied reason=invalid-input");
+            return false;
+        }
+        UUID playerUuid = player.getUuid();
+        config = buildSpawnerConfigForInteraction(config, null);
+        if (config == null) {
+            logSpawnerFlowDebug("spawn denied reason=missing-config player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
         if (!config.isSpawnerEnabled()) {
+            logSpawnerFlowDebug("spawn denied reason=spawner-disabled player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
         if (isCooldownActive(itemStack, TameworkMetadataKeys.SPAWN_COOLDOWN_UNTIL, config.getSpawnCooldownMs())) {
+            logSpawnerFlowDebug("spawn denied reason=cooldown player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
         if (!itemStackMetadataService.isFilledItem(itemStack, config)) {
+            logSpawnerFlowDebug("spawn denied reason=item-not-filled player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
         UUID capturedNpcUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TARGET_UUID, Codec.UUID_STRING);
@@ -303,34 +316,48 @@ public final class SpawnerFeatureHandler {
 
         String roleId = rolePolicyService.resolveSpawnRoleId(itemStack);
         if (roleId == null || roleId.isBlank()) {
-            logger.at(Level.FINE).log("Spawner spawn: missing role for item=" + itemStack.getItemId());
+            logSpawnerFlowDebug("spawn denied reason=missing-role player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
         if (!rolePolicyService.isRoleAllowed(roleId, config)) {
-            logger.at(Level.FINE).log("Spawner spawn: role not allowed role=" + roleId);
+            logSpawnerFlowDebug("spawn denied reason=role-not-allowed player=" + playerUuid + " role=" + roleId);
             return false;
         }
 
         World world = player.getWorld();
         if (world == null) {
+            logSpawnerFlowDebug("spawn denied reason=missing-world player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
 
         Vector3d spawnPosition = spawnPositionService.resolveSpawnPosition(player, config);
         if (spawnPosition == null) {
+            logSpawnerFlowDebug("spawn denied reason=no-spawn-position player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
         if (!spawnPositionService.isWithinSpawnDistance(player, spawnPosition, config)) {
+            logSpawnerFlowDebug("spawn denied reason=spawn-distance player=" + playerUuid + " maxDistance=" + config.getSpawnMaxDistance());
             return false;
         }
 
         UUID ownerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.OWNER_UUID, Codec.UUID_STRING);
-        if (!ownershipPolicyService.isSpawnAllowed(player.getUuid(), ownerUuid, config)) {
+        UUID captureSourceOwnerUuid = itemStack.getFromMetadataOrNull(TameworkMetadataKeys.CAPTURE_SOURCE_OWNER_UUID, Codec.UUID_STRING);
+        UUID ownerForSpawnPolicy = ownerUuid != null ? ownerUuid : captureSourceOwnerUuid;
+        if (!ownershipPolicyService.isSpawnAllowed(playerUuid, ownerForSpawnPolicy, config)) {
+            logSpawnerFlowDebug(
+                    "spawn denied by ownership policy item=" + itemStack.getItemId()
+                            + " player=" + playerUuid
+                            + " itemOwner=" + ownerUuid
+                            + " captureSourceOwner=" + captureSourceOwnerUuid
+                            + " ownerForPolicy=" + ownerForSpawnPolicy
+                            + " requireOwnerOverride=" + config.getSpawnRequireOwnerOverride()
+                            + " ownerRestricted=" + config.isSpawnOwnerRestricted()
+            );
             return false;
         }
         boolean tamed = Boolean.TRUE.equals(itemStack.getFromMetadataOrNull(TameworkMetadataKeys.TAMED, Codec.BOOLEAN));
         if (ownerUuid == null && config.isSpawnAssignsOwner()) {
-            UUID playerId = player.getUuid();
+            UUID playerId = playerUuid;
             OwnerPopulationCapService.Decision decision = OwnerPopulationCapService.evaluateAcquisition(
                     world.getEntityStore() != null ? world.getEntityStore().getStore() : null,
                     playerId
@@ -342,6 +369,12 @@ public final class SpawnerFeatureHandler {
                         decision.limit(),
                         decision.scope()
                 );
+                logSpawnerFlowDebug(
+                        "spawn denied reason=owner-cap player=" + playerUuid
+                                + " current=" + decision.currentCount()
+                                + " limit=" + decision.limit()
+                                + " scope=" + decision.scope()
+                );
                 return false;
             }
             ownerUuid = playerId;
@@ -350,18 +383,19 @@ public final class SpawnerFeatureHandler {
         Store<EntityStore> store = world.getEntityStore().getStore();
         NPCPlugin npcPlugin = NPCPlugin.get();
         if (npcPlugin == null) {
+            logSpawnerFlowDebug("spawn denied reason=npc-plugin-missing player=" + playerUuid);
             return false;
         }
         int roleIndex = npcPlugin.getIndex(roleId);
         if (roleIndex < 0) {
-            logger.at(Level.FINE).log("Spawner spawn: unknown role=" + roleId);
+            logSpawnerFlowDebug("spawn denied reason=unknown-role player=" + playerUuid + " role=" + roleId);
             return false;
         }
         Ref<EntityStore> playerRef = player.getReference();
         Vector3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            logger.at(Level.FINE).log("Spawner spawn: failed to spawn role=" + roleId);
+            logSpawnerFlowDebug("spawn denied reason=spawn-entity-failed player=" + playerUuid + " role=" + roleId);
             return false;
         }
 
@@ -400,10 +434,20 @@ public final class SpawnerFeatureHandler {
                 : playerInventoryService.updateHeldItem(player, updated);
         if (!updatedOk) {
             logger.at(Level.WARNING).log("Spawner spawn: failed to update held item.");
+            logSpawnerFlowDebug("spawn denied reason=update-held-item-failed player=" + playerUuid + " item=" + itemStack.getItemId());
             return false;
         }
 
         effectService.playSpawnEffects(world, npcRef, config);
+        logSpawnerFlowDebug(
+                "spawn success item=" + itemStack.getItemId()
+                        + " role=" + roleId
+                        + " player=" + playerUuid
+                        + " spawnedNpc=" + spawnedNpcUuid
+                        + " appliedOwner=" + ownerUuid
+                        + " captureSourceOwner=" + captureSourceOwnerUuid
+                        + " assignsOwner=" + config.isSpawnAssignsOwner()
+        );
         return true;
     }
 
@@ -448,13 +492,20 @@ public final class SpawnerFeatureHandler {
         if (baseConfig == null) {
             return null;
         }
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
+        boolean captureClearsOwner = overrides != null && overrides.captureClearsOwner() != null
+                ? overrides.captureClearsOwner()
+                : baseConfig.isCaptureClearsOwner();
         boolean spawnAssignsOwner = spawnAssignsOwnerOverride != null
                 ? spawnAssignsOwnerOverride
                 : baseConfig.isSpawnAssignsOwner();
+        if (overrides != null && overrides.spawnSetsOwner() != null) {
+            spawnAssignsOwner = overrides.spawnSetsOwner();
+        }
         return ItemFeatureConfig.builder()
                 .spawnerEnabled(baseConfig.isSpawnerEnabled())
                 .whistleEnabled(baseConfig.isWhistleEnabled())
-                .captureClearsOwner(baseConfig.isCaptureClearsOwner())
+                .captureClearsOwner(captureClearsOwner)
                 .captureRequireTamed(baseConfig.isCaptureRequireTamed())
                 .captureOwnerRestricted(baseConfig.isCaptureOwnerRestricted())
                 .spawnAssignsOwner(spawnAssignsOwner)
@@ -486,6 +537,10 @@ public final class SpawnerFeatureHandler {
         if (player == null || targetRef == null || itemStack == null || config == null) {
             return false;
         }
+        config = buildSpawnerConfigForInteraction(config, null);
+        if (config == null) {
+            return false;
+        }
         if (itemStackMetadataService.isAlreadyCaptured(itemStack)) {
             logger.at(Level.FINE).log(
                     "Spawner stub: capture denied (item already captured) item=" + itemStack.getItemId()
@@ -493,6 +548,14 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         if (!capturePolicyService.canCapture(player, targetRef, config, itemStack)) {
+            logSpawnerFlowDebug(
+                    "capture denied by policy item=" + itemStack.getItemId()
+                            + " player=" + player.getUuid()
+                            + " targetRef=" + targetRef
+                            + " requireOwnerOverride=" + config.getCaptureRequireOwnerOverride()
+                            + " ownerRestricted=" + config.isCaptureOwnerRestricted()
+                            + " requireTamed=" + config.isCaptureRequireTamed()
+            );
             return false;
         }
         SpawnerCaptureMetadataService.CaptureInfo captureInfo = captureMetadataService.buildCaptureInfo(
@@ -610,8 +673,25 @@ public final class SpawnerFeatureHandler {
                         + " targetUuid=" + targetUuid
                         + " captureClearsOwner=" + config.isCaptureClearsOwner()
         );
+        logSpawnerFlowDebug(
+                "capture success item=" + itemStack.getItemId()
+                        + " player=" + player.getUuid()
+                        + " targetUuid=" + targetUuid
+                        + " existingOwner=" + existingOwner
+                        + " storedOwner=" + ownerToStore
+                        + " captureClearsOwner=" + config.isCaptureClearsOwner()
+        );
         return true;
     }
+
+    private void logSpawnerFlowDebug(String message) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugSpawnerEnabled()) {
+            return;
+        }
+        logger.at(Level.INFO).log("Spawner flow debug: " + message);
+    }
+
     private boolean isCooldownActive(ItemStack itemStack, String key, int cooldownMs) {
         if (itemStack == null || key == null || cooldownMs <= 0) {
             return false;

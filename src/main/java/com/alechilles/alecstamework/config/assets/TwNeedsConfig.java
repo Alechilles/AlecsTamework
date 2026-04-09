@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -298,7 +299,8 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.model = DamageModel.fromConfigValue(value),
             settings -> settings.getModel().toConfigValue()
         )
-        .documentation("Selects the model used to process this behavior.")
+        .documentation("Selects the model used to process this behavior. MIN_ONLY_PERCENT treats per-minute damage "
+                + "values as percentages of max health; MIN_ONLY_FLAT treats them as flat damage amounts.")
         .add()
         .<String>append(
             new KeyedCodec<>("DualNeedRule", Codec.STRING),
@@ -312,14 +314,16 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             (settings, value) -> settings.starvationDamagePerMinute = value,
             settings -> settings.starvationDamagePerMinute
         )
-        .documentation("Damage per minute applied while starving.")
+        .documentation("Damage per minute applied while starving. In MIN_ONLY_PERCENT, this is percent of max health "
+                + "per minute.")
         .add()
         .<Double>append(
             new KeyedCodec<>("DehydrationDamagePerMinute", Codec.DOUBLE),
             (settings, value) -> settings.dehydrationDamagePerMinute = value,
             settings -> settings.dehydrationDamagePerMinute
         )
-        .documentation("Damage per minute applied while dehydrated.")
+        .documentation("Damage per minute applied while dehydrated. In MIN_ONLY_PERCENT, this is percent of max "
+                + "health per minute.")
         .add()
         .<Boolean>append(
             new KeyedCodec<>("Lethal", Codec.BOOLEAN),
@@ -893,11 +897,55 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public TickPolicySettings getTickPolicy() {
-        return tickPolicy == null ? new TickPolicySettings() : tickPolicy;
+        TickPolicySettings base = tickPolicy == null ? new TickPolicySettings() : tickPolicy;
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides == null) {
+            return base;
+        }
+        TickPolicySettings merged = base.copy();
+        if (overrides.needsTickPolicyMode() != null) {
+            merged.mode = TickPolicyMode.fromConfigValue(overrides.needsTickPolicyMode());
+        }
+        if (overrides.needsOwnerOfflineGraceHours() != null) {
+            merged.ownerOfflineGraceHours = overrides.needsOwnerOfflineGraceHours();
+        }
+        if (overrides.needsOwnerOfflineDecayMultiplier() != null) {
+            merged.ownerOfflineDecayMultiplier = overrides.needsOwnerOfflineDecayMultiplier();
+        }
+        return merged;
     }
 
     public DamageSettings getDamage() {
-        return damage == null ? new DamageSettings() : damage;
+        DamageSettings base = damage == null ? new DamageSettings() : damage;
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides == null) {
+            return base;
+        }
+        DamageSettings merged = base.copy();
+        if (overrides.needsDamageEnabled() != null) {
+            merged.enabled = overrides.needsDamageEnabled();
+        }
+        if (overrides.needsDamageModel() != null) {
+            merged.model = DamageModel.fromConfigValue(overrides.needsDamageModel());
+        }
+        if (overrides.needsDamageDualNeedRule() != null) {
+            merged.dualNeedRule = DualNeedRule.fromConfigValue(overrides.needsDamageDualNeedRule());
+        }
+        if (overrides.needsStarvationDamagePerMinute() != null) {
+            merged.starvationDamagePerMinute = overrides.needsStarvationDamagePerMinute();
+        }
+        if (overrides.needsDehydrationDamagePerMinute() != null) {
+            merged.dehydrationDamagePerMinute = overrides.needsDehydrationDamagePerMinute();
+        }
+        if (overrides.needsDamageLethal() != null) {
+            merged.lethal = overrides.needsDamageLethal();
+        }
+        return merged;
+    }
+
+    @Nullable
+    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
+        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
     }
 
     /** Bounds and default values for hunger and thirst state. */
@@ -1084,12 +1132,20 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         public double getOwnerOfflineDecayMultiplier() {
             return sanitizeNonNegative(ownerOfflineDecayMultiplier, 1.0);
         }
+
+        private TickPolicySettings copy() {
+            TickPolicySettings copy = new TickPolicySettings();
+            copy.mode = mode;
+            copy.ownerOfflineGraceHours = ownerOfflineGraceHours;
+            copy.ownerOfflineDecayMultiplier = ownerOfflineDecayMultiplier;
+            return copy;
+        }
     }
 
     /** Time-based hunger/thirst damage settings. */
     public static final class DamageSettings {
         private boolean enabled;
-        private DamageModel model = DamageModel.MIN_ONLY_FLAT;
+        private DamageModel model = DamageModel.MIN_ONLY_PERCENT;
         private DualNeedRule dualNeedRule = DualNeedRule.USE_HIGHER_ONLY;
         private double starvationDamagePerMinute = 2.0;
         private double dehydrationDamagePerMinute = 3.0;
@@ -1100,7 +1156,7 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
         }
 
         public DamageModel getModel() {
-            return model == null ? DamageModel.MIN_ONLY_FLAT : model;
+            return model == null ? DamageModel.MIN_ONLY_PERCENT : model;
         }
 
         public DualNeedRule getDualNeedRule() {
@@ -1117,6 +1173,17 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isLethal() {
             return lethal;
+        }
+
+        private DamageSettings copy() {
+            DamageSettings copy = new DamageSettings();
+            copy.enabled = enabled;
+            copy.model = model;
+            copy.dualNeedRule = dualNeedRule;
+            copy.starvationDamagePerMinute = starvationDamagePerMinute;
+            copy.dehydrationDamagePerMinute = dehydrationDamagePerMinute;
+            copy.lethal = lethal;
+            return copy;
         }
     }
 
@@ -1168,11 +1235,12 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
     /** Damage application model when needs are depleted. */
     public enum DamageModel {
+        MIN_ONLY_PERCENT,
         MIN_ONLY_FLAT;
 
         public static DamageModel fromConfigValue(@Nullable String value) {
             if (value == null || value.isBlank()) {
-                return MIN_ONLY_FLAT;
+                return MIN_ONLY_PERCENT;
             }
             String normalized = value.trim().toUpperCase(Locale.ROOT);
             for (DamageModel model : values()) {
@@ -1180,7 +1248,7 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
                     return model;
                 }
             }
-            return MIN_ONLY_FLAT;
+            return MIN_ONLY_PERCENT;
         }
 
         public String toConfigValue() {

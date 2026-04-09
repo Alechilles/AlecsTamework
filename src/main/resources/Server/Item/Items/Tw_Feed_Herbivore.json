@@ -1,0 +1,83 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Tw_Feed_Herbivore.name",
+    "Description": "server.items.Tw_Feed_Herbivore.description"
+  },
+  "PlayerAnimationsId": "Block",
+  "Categories": [
+    "Items.Tools"
+  ],
+  "Recipe": {
+    "TimeSeconds": 1,
+    "Input": [
+      {
+        "ResourceTypeId": "Vegetables",
+        "Quantity": 5
+      },
+      {
+        "ResourceTypeId": "Fruits",
+        "Quantity": 5
+      }
+    ],
+    "OutputQuantity": 10,
+    "BenchRequirement": [
+      {
+        "Type": "Crafting",
+        "Categories": [
+          "Farming"
+        ],
+        "Id": "Farmingbench"
+      }
+    ]
+  },
+  "Quality": "Common",
+  "IconProperties": {
+    "Scale": 0.5,
+    "Rotation": [
+      22.5,
+      45,
+      22.5
+    ],
+    "Translation": [
+      0,
+      -15
+    ]
+  },
+  "BlockType": {
+    "BlockParticleSetId": "Dust",
+    "BlockSoundSetId": "Cloth",
+    "CustomModelTexture": [
+      {
+        "Weight": 1,
+        "Texture": "Items/Tamework/Feedbag/Petfood_Texture_Green.png"
+      }
+    ],
+    "DrawType": "Model",
+    "Gathering": {
+      "Soft": {}
+    },
+    "HitboxType": "Plant_Full",
+    "Material": "Solid",
+    "Opacity": "Transparent",
+    "Support": {
+      "Down": [
+        {
+          "FaceType": "Full"
+        }
+      ]
+    },
+    "CustomModel": "Items/Tools/Feedbag/Feedbag.blockymodel"
+  },
+  "Model": "Items/Tools/Feedbag/Feedbag.blockymodel",
+  "Texture": "Items/Tamework/Feedbag/Petfood_Texture_Green.png",
+  "Icon": "Icons/ItemsGenerated/Tw_Feed_Herbivore.png",
+  "Scale": 1.2,
+  "Tags": {
+    "Type": [
+      "Tool"
+    ]
+  },
+  "MaxStack": 100,
+  "Tool": {},
+  "ItemSoundSetId": "ISS_Weapons_Wood"
+}

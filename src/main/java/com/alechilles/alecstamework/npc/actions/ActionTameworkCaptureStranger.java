@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -27,6 +28,9 @@ public final class ActionTameworkCaptureStranger extends TameworkActionBase {
                               InfoProvider infoProvider,
                               double dt,
                               Store<EntityStore> store) {
+        if (!resolveCaptureRequiresOwner()) {
+            return false;
+        }
         // Require empty spawner and a different owner before denying capture.
         Player player = resolveInteractionPlayer(role, infoProvider, store);
         if (player == null) {
@@ -82,5 +86,11 @@ public final class ActionTameworkCaptureStranger extends TameworkActionBase {
         }
         // Block capture by strangers. Returning true prevents later capture actions from firing.
         return true;
+    }
+
+    private boolean resolveCaptureRequiresOwner() {
+        TwGlobalConfig global = TwGlobalConfig.resolveActive();
+        TwGlobalConfig resolved = global != null ? global : TwGlobalConfig.defaultConfig();
+        return resolved.isOwnershipCaptureRequiresOwner();
     }
 }

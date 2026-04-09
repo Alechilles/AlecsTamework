@@ -372,6 +372,75 @@ public final class CommandLinkedNpcDeathService {
         }
     }
 
+    @Nonnull
+    public RespawnReadyUpdateResult markOwnerDeadSnapshotsRespawnReady(@Nullable UUID ownerUuid) {
+        if (!canMutate() || ownerUuid == null) {
+            return RespawnReadyUpdateResult.empty();
+        }
+        long nowMs = System.currentTimeMillis();
+        int totalOwned = 0;
+        int markedReady = 0;
+        int alreadyReady = 0;
+        for (Map.Entry<UUID, DeadLinkedNpcSnapshot> entry : deadByNpc.entrySet()) {
+            DeadLinkedNpcSnapshot snapshot = entry.getValue();
+            if (snapshot == null
+                    || snapshot.npcUuid() == null
+                    || snapshot.ownerId() == null
+                    || !ownerUuid.equals(snapshot.ownerId())) {
+                continue;
+            }
+            totalOwned++;
+            if (snapshot.respawnAvailableAtMs() <= nowMs) {
+                alreadyReady++;
+                continue;
+            }
+            DeadLinkedNpcSnapshot updated = new DeadLinkedNpcSnapshot(
+                    snapshot.npcUuid(),
+                    snapshot.ownerId(),
+                    snapshot.ownerName(),
+                    snapshot.toolIds(),
+                    snapshot.roleId(),
+                    snapshot.tamed(),
+                    snapshot.customName(),
+                    snapshot.displayName(),
+                    copyVector(snapshot.lastKnownPosition()),
+                    copyVector(snapshot.homePosition()),
+                    snapshot.diedAtMs(),
+                    nowMs,
+                    snapshot.breedingConfigId(),
+                    snapshot.breedingHappiness(),
+                    snapshot.breedingCooldownUntilMs(),
+                    snapshot.breedingLastPartnerUuid(),
+                    snapshot.traitsConfigId(),
+                    snapshot.traitsRollSeed(),
+                    snapshot.traitsValues(),
+                    snapshot.happinessConfigId(),
+                    snapshot.happinessValue(),
+                    snapshot.happinessLastUpdateMs(),
+                    snapshot.lifeStage(),
+                    snapshot.lifeStageBornAtMs(),
+                    snapshot.lifeStageAdolescentAtMs(),
+                    snapshot.lifeStageAdultAtMs(),
+                    snapshot.lifeStageFullyGrownAtMs(),
+                    snapshot.lifeStageBabyScale(),
+                    snapshot.lifeStageAdolescentScale(),
+                    snapshot.lifeStageAdolescentSwitchScale(),
+                    snapshot.lifeStageAdultStartScale(),
+                    snapshot.lifeStageAdultSwitchScale(),
+                    snapshot.lifeStageAdultScale(),
+                    snapshot.lifeStageGrowthScalingEnabled(),
+                    snapshot.attachmentsConfigId(),
+                    snapshot.attachmentsValues(),
+                    snapshot.breedingEnabled()
+            );
+            deadByNpc.put(snapshot.npcUuid(), updated);
+            enqueueProfileUpdate(updated, null, null);
+            persistSnapshot(updated);
+            markedReady++;
+        }
+        return new RespawnReadyUpdateResult(totalOwned, markedReady, alreadyReady);
+    }
+
     private void loadPersistedSnapshots() {
         if (repository != null) {
             for (DeadLinkedNpcSnapshot snapshot : repository.loadAll()) {
@@ -1021,6 +1090,12 @@ public final class CommandLinkedNpcDeathService {
 
         public boolean isRespawnReady() {
             return System.currentTimeMillis() >= respawnAvailableAtMs;
+        }
+    }
+
+    public record RespawnReadyUpdateResult(int totalOwned, int markedReady, int alreadyReady) {
+        static RespawnReadyUpdateResult empty() {
+            return new RespawnReadyUpdateResult(0, 0, 0);
         }
     }
 }

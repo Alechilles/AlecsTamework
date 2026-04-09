@@ -54,57 +54,37 @@ public final class PassiveBreedingSweepService {
             return;
         }
 
-        List<PassiveBreedingSweepCandidate> sweepCandidates = new ArrayList<>();
         List<PassiveBreedingBirthReservation> birthReservations = new ArrayList<>();
         Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> claimReservations = new HashMap<>();
         Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> playerReservations = new HashMap<>();
         store.forEachChunk(
                 Query.and(npcType, transformType, breedingType),
                 (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
-                        collectCandidates(chunk, npcType, transformType, breedingType, store, sweepCandidates)
+                        processChunk(
+                                chunk,
+                                commandBuffer,
+                                npcType,
+                                transformType,
+                                breedingType,
+                                store,
+                                nowMs,
+                                birthReservations,
+                                claimReservations,
+                                playerReservations
+                        )
         );
-        if (sweepCandidates.isEmpty()) {
-            return;
-        }
-
-        for (PassiveBreedingSweepCandidate candidate : sweepCandidates) {
-            TameworkBreedingComponent breeding = store.getComponent(candidate.ref(), breedingType);
-            if (breeding == null) {
-                continue;
-            }
-            boolean shouldBeReady = resolveShouldBeReady(candidate, breeding, store);
-            if (breeding.isReady() != shouldBeReady) {
-                breeding.setReady(shouldBeReady);
-                store.putComponent(candidate.ref(), breedingType, breeding);
-            }
-            if (!breeding.isEnabled() || !shouldBeReady || breeding.isCooldownActive(nowMs)) {
-                continue;
-            }
-            if (isOvercrowded(candidate, store, birthReservations)) {
-                continue;
-            }
-            if (offspringService.tryCompletePairing(
-                    candidate.ref(),
-                    store,
-                    breeding,
-                    candidate.config(),
-                    claimReservations,
-                    playerReservations
-            )) {
-                String typeKey = populationTypeService.resolveTypeKey(candidate.roleId(), candidate.config());
-                if (typeKey != null && !typeKey.isBlank()) {
-                    birthReservations.add(new PassiveBreedingBirthReservation(typeKey, candidate.position()));
-                }
-            }
-        }
     }
 
-    private static void collectCandidates(@Nonnull ArchetypeChunk<EntityStore> chunk,
-                                          @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
-                                          @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
-                                          @Nonnull ComponentType<EntityStore, TameworkBreedingComponent> breedingType,
-                                          @Nonnull Store<EntityStore> store,
-                                          @Nonnull List<PassiveBreedingSweepCandidate> sweepCandidates) {
+    private void processChunk(@Nonnull ArchetypeChunk<EntityStore> chunk,
+                              @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                              @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
+                              @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
+                              @Nonnull ComponentType<EntityStore, TameworkBreedingComponent> breedingType,
+                              @Nonnull Store<EntityStore> store,
+                              long nowMs,
+                              @Nonnull List<PassiveBreedingBirthReservation> birthReservations,
+                              @Nonnull Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> claimReservations,
+                              @Nonnull Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> playerReservations) {
         int size = chunk.size();
         for (int i = 0; i < size; i++) {
             Ref<EntityStore> ref = chunk.getReferenceTo(i);
@@ -118,12 +98,43 @@ public final class PassiveBreedingSweepService {
             if (roleId == null || roleId.isBlank()) {
                 continue;
             }
-
             TwBreedingConfig config = BreedingConfigResolver.resolveConfig(ref, store, breeding);
             if (config == null || !config.isEnabled() || !config.resolvePassiveBreeding(roleId).isEnabled()) {
                 continue;
             }
-            sweepCandidates.add(new PassiveBreedingSweepCandidate(ref, npc, roleId, new Vector3d(transform.getPosition()), config));
+
+            PassiveBreedingSweepCandidate candidate = new PassiveBreedingSweepCandidate(
+                    ref,
+                    npc,
+                    roleId,
+                    new Vector3d(transform.getPosition()),
+                    config
+            );
+            boolean shouldBeReady = resolveShouldBeReady(candidate, breeding, store);
+            if (breeding.isReady() != shouldBeReady) {
+                breeding.setReady(shouldBeReady);
+                commandBuffer.putComponent(ref, breedingType, breeding);
+            }
+            if (!breeding.isEnabled() || !shouldBeReady || breeding.isCooldownActive(nowMs)) {
+                continue;
+            }
+            if (isOvercrowded(candidate, store, birthReservations)) {
+                continue;
+            }
+            if (offspringService.tryCompletePairing(
+                    ref,
+                    store,
+                    breeding,
+                    config,
+                    claimReservations,
+                    playerReservations,
+                    commandBuffer
+            )) {
+                String typeKey = populationTypeService.resolveTypeKey(roleId, config);
+                if (typeKey != null && !typeKey.isBlank()) {
+                    birthReservations.add(new PassiveBreedingBirthReservation(typeKey, candidate.position()));
+                }
+            }
         }
     }
 

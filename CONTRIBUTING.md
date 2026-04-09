@@ -36,6 +36,15 @@ If you’re unsure where to start, open an issue describing what you want to wor
 - **Resources**: match existing file naming conventions and directory structure.
 - **Docs**: keep language clear and actionable. Prefer examples.
 
+## ECS and thread-safety gates (required)
+- In runtime system classes (`*System.java`), do not call `store.putComponent/removeComponent/tryRemoveComponent/addComponent` directly.
+- Use `CommandBuffer` for ECS writes inside system callbacks.
+- If work is deferred (`CompletableFuture`, delayed executors, schedulers), capture stable IDs (`UUID`) and resolve live refs/components inside `world.execute(...)`.
+- Do not access player-affine APIs (`PlayerRef.getComponent(Player)`, `Universe.getPlayers()` scans for live player mutation) from async/deferred code.
+- Guard tests must pass for system/runtime changes:
+  - `EcsWriteSafetyGuardTest`
+  - `AsyncThreadSafetyGuardTest`
+
 ## Compatibility goals
 - Prefer changes that don’t break existing mod integrations.
 - If a change is breaking, it should be explicit and documented.

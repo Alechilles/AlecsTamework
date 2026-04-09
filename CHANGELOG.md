@@ -1,7 +1,40 @@
 # Changelog
 
 ## Unreleased
-_No entries yet._
+### Changed
+- Updated feed bag recipe outputs so both `Tw_Feed_Herbivore` and `Tw_Feed_Carnivore` now craft `10` items per recipe.
+- Simplified `Tw_Feed_Carnivore` crafting input to `10` meat (`Meats`) and removed the fish requirement.
+
+## 2.8.0 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-07
+### Added
+- Added `/tw settings` UI (`TameworkSettingsPage`) and command wiring with persisted world-level settings storage (`TameworkSettingsStore`).
+- Added crash telemetry runtime services (`CrashTelemetryService`, local crash envelope/store, optional HTTP reporting client) with diagnostics/debug command coverage.
+- Added base feed-family assets in Tamework: `Tw_Feed_Herbivore` and `Tw_Feed_Carnivore`, including icons/lang keys and global asset-set toggles.
+- Added feed impulse mapping support for both item ids and role parameter families (`FeedItemImpulses`, `FeedParamImpulses`) with active-impulse snapshots for linked panel rendering.
+- Added needs-damage diagnostics command/toggle coverage (`/tw debugneedsdamage`) for troubleshooting hunger/thirst damage behavior.
+- Added `/tw debugspawnerlocation` to isolate spawn-position/raycast diagnostics from general spawner flow diagnostics.
+
+### Changed
+- Reworked companion happiness impulse handling so feed/pet/damage impulses are time-bound, refresh on re-apply, and do not stack as duplicate active buffs.
+- Split hand-feed happiness handling from consumed-food impulses (`GainOnFeed` stays hand-feed specific; consumed food uses item/param impulse resolution).
+- Updated linked companion tooltip layout and wording to show `Happiness - <current%> -> <target%>`, simplified need modifier labels, and grouped active impulses at the bottom.
+- Needs damage is now enabled by default via persisted settings for new worlds/saves and can be toggled in `/tw settings`.
+- Updated recipe visibility gating + global config projection to include feed-family toggles and keep toggle-controlled outputs deterministic.
+- Added DynamicTooltipsLib to publish metadata optional dependencies.
+- Hardened runtime ECS mutation paths so needs/happiness/breeding/mounted-nameplate flows route writes through command-buffer-safe paths during system processing.
+- Added architecture safety guard tests and contributor gates to prevent future ECS write-phase and async player-thread-affinity regressions.
+- Tranquilizer shortbow adventure-mode fixes were shipped in `2.7.4`; this `2.8.0` section captures the remaining post-`2.7.3` feature set.
+- `/tw debugspawner` now focuses on capture/spawn flow diagnostics and logs explicit deny reasons when policy or runtime checks block a request.
+
+### Fixed
+- Fixed `GainOnPet` and `LoseOnDamage` not being applied by wiring pet-hook and incoming-damage impulse bridges.
+- Fixed feed tooltip naming to resolve language keys from canonical consumed item ids (instead of prettified ids).
+- Fixed feed impulse tooltip persistence so expired impulses are removed from active display.
+- Fixed startup exceptions when duplicate plugin packs are loaded by hardening pack discovery/filtering.
+- Fixed additional world-thread crash paths (`Store is currently processing`) in damage/needs/passive-breeding/mounted-nameplate runtime flows by removing direct store writes from system-processing contexts.
+- Fixed command-linked revivable drop-suppression setup from building a null query input when command-link component types are unavailable during duplicate/partial plugin load states.
+- Fixed capture/spawn ownership-requirement evaluation so `RequireOwner` no longer blocks unowned targets/items and still enforces owner match when an owner exists.
+- Fixed Soul Lantern/TwSpawner owner checks to consider capture-source ownership metadata during spawn policy evaluation.
 
 ## 2.7.4 - Tranquilizer Shortbow Adventure Ammo Fix - 2026-04-06
 ### Fixed

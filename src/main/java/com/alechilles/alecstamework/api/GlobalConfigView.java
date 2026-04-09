@@ -8,6 +8,7 @@ public record GlobalConfigView(@Nullable String id,
                                boolean enabled,
                                int priority,
                                @Nonnull OwnershipProtectionView ownershipProtection,
+                               @Nonnull OwnershipRequirementsView ownershipRequirements,
                                @Nonnull InteractionDefaultsView interactionDefaults,
                                @Nonnull CommandView command,
                                @Nonnull AssetSetsView assetSets,
@@ -16,6 +17,12 @@ public record GlobalConfigView(@Nullable String id,
     public record OwnershipProtectionView(boolean blockOwnerDamage,
                                           boolean blockAllPlayerDamageIfOwned,
                                           boolean invulnerableIfOwned) {
+    }
+
+    public record OwnershipRequirementsView(boolean captureRequiresOwner,
+                                            boolean spawnRequiresOwner,
+                                            boolean interactionRequiresOwner,
+                                            boolean linkingRequiresOwner) {
     }
 
     public record InteractionDefaultsView(@Nonnull String interactionConfigParam,
@@ -50,7 +57,9 @@ public record GlobalConfigView(@Nullable String id,
     public record AssetSetsView(boolean tranquilizerShortbow,
                                 boolean tranquilizerArrow,
                                 boolean tranquilizerPotion,
-                                boolean feedTrough) {
+                                boolean feedTrough,
+                                boolean herbivoreFeed,
+                                boolean carnivoreFeed) {
     }
 
     public record PopulationView(int limitPerPlayerOwnedTotal,

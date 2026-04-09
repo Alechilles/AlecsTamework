@@ -10,6 +10,7 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
 import com.hypixel.hytale.codec.codecs.array.ArrayCodec;
+import com.hypixel.hytale.codec.codecs.map.MapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import java.util.HashMap;
 import java.util.Locale;
@@ -26,6 +27,8 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         TwParentFallbackAsset<TwHappinessConfig> {
     private static final NeedBandSettings[] EMPTY_BANDS = new NeedBandSettings[0];
     private static final PopulationBandSettings[] EMPTY_POPULATION_BANDS = new PopulationBandSettings[0];
+    private static final MapCodec<Double, Map<String, Double>> FEED_ITEM_IMPULSES_CODEC =
+            new MapCodec<>(Codec.DOUBLE, HashMap::new);
 
     private static final BuilderCodec<ValueSettings> VALUE_CODEC = BuilderCodec.builder(
             ValueSettings.class,
@@ -83,7 +86,21 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             (settings, value) -> settings.gainOnFeed = value,
             settings -> settings.gainOnFeed
         )
-        .documentation("Happiness gained from successful feeding interactions.")
+        .documentation("Happiness impulse applied only when hand-feeding succeeds.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("HandFeedDurationMinutes", Codec.DOUBLE),
+            (settings, value) -> settings.handFeedDurationMinutes = value,
+            settings -> settings.handFeedDurationMinutes
+        )
+        .documentation("Duration in minutes for the hand-feed impulse.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("FeedImpulseDurationMinutes", Codec.DOUBLE),
+            (settings, value) -> settings.feedImpulseDurationMinutes = value,
+            settings -> settings.feedImpulseDurationMinutes
+        )
+        .documentation("Duration in minutes for food-consumption impulses (item or param based).")
         .add()
         .<Double>append(
             new KeyedCodec<>("GainOnPet", Codec.DOUBLE),
@@ -98,6 +115,23 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             settings -> settings.loseOnDamage
         )
         .documentation("Happiness lost when the NPC takes damage.")
+        .add()
+        .<Map<String, Double>>append(
+            new KeyedCodec<>("FeedItemImpulses", FEED_ITEM_IMPULSES_CODEC),
+            (settings, value) -> settings.feedItemImpulses = value == null ? Map.of() : value,
+            settings -> settings.feedItemImpulses
+        )
+        .documentation("Per-item feed impulse overrides keyed by consumed item ID. Inheritance: explicit map replaces "
+                + "parent map (no merge); omitted map inherits parent map.")
+        .add()
+        .<Map<String, Double>>append(
+            new KeyedCodec<>("FeedParamImpulses", FEED_ITEM_IMPULSES_CODEC),
+            (settings, value) -> settings.feedParamImpulses = value == null ? Map.of() : value,
+            settings -> settings.feedParamImpulses
+        )
+        .documentation("Per-role-param feed impulse overrides keyed by role parameter name (for example, FoodFavorite). "
+                + "Each param should resolve to item IDs. Inheritance: explicit map replaces parent map (no merge); "
+                + "omitted map inherits parent map.")
         .add()
         .build();
 
@@ -579,8 +613,20 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
             return;
         }
         if (!nestedExplicitKeys.contains("GainOnFeed")) impulses.gainOnFeed = parent.impulses.gainOnFeed;
+        if (!nestedExplicitKeys.contains("HandFeedDurationMinutes")) {
+            impulses.handFeedDurationMinutes = parent.impulses.handFeedDurationMinutes;
+        }
+        if (!nestedExplicitKeys.contains("FeedImpulseDurationMinutes")) {
+            impulses.feedImpulseDurationMinutes = parent.impulses.feedImpulseDurationMinutes;
+        }
         if (!nestedExplicitKeys.contains("GainOnPet")) impulses.gainOnPet = parent.impulses.gainOnPet;
         if (!nestedExplicitKeys.contains("LoseOnDamage")) impulses.loseOnDamage = parent.impulses.loseOnDamage;
+        if (!nestedExplicitKeys.contains("FeedItemImpulses")) {
+            impulses.feedItemImpulses = parent.impulses.feedItemImpulses;
+        }
+        if (!nestedExplicitKeys.contains("FeedParamImpulses")) {
+            impulses.feedParamImpulses = parent.impulses.feedParamImpulses;
+        }
     }
 
     private void inheritModifiersSection(@Nonnull TwHappinessConfig parent, @Nullable Set<String> nestedExplicitKeys) {
@@ -755,17 +801,36 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         }
     }
 
-    /** Event-style impulse values applied immediately to current happiness. */
+    /** Impulse settings for direct events and timed feed effects. */
     public static final class ImpulseSettings {
+        private static final double DEFAULT_DURATION_MINUTES = 15.0;
         private double gainOnFeed = 5.0;
+        private double handFeedDurationMinutes = DEFAULT_DURATION_MINUTES;
+        private double feedImpulseDurationMinutes = DEFAULT_DURATION_MINUTES;
         private double gainOnPet = 3.0;
         private double loseOnDamage = 10.0;
+        private Map<String, Double> feedItemImpulses = Map.of();
+        private Map<String, Double> feedParamImpulses = Map.of();
 
         public double getGainOnFeed() {
             if (!Double.isFinite(gainOnFeed)) {
                 return 0.0;
             }
             return gainOnFeed;
+        }
+
+        public double getHandFeedDurationMinutes() {
+            if (!Double.isFinite(handFeedDurationMinutes) || handFeedDurationMinutes <= 0.0) {
+                return DEFAULT_DURATION_MINUTES;
+            }
+            return handFeedDurationMinutes;
+        }
+
+        public double getFeedImpulseDurationMinutes() {
+            if (!Double.isFinite(feedImpulseDurationMinutes) || feedImpulseDurationMinutes <= 0.0) {
+                return DEFAULT_DURATION_MINUTES;
+            }
+            return feedImpulseDurationMinutes;
         }
 
         public double getGainOnPet() {
@@ -780,6 +845,42 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
                 return 0.0;
             }
             return loseOnDamage;
+        }
+
+        @Nonnull
+        public Map<String, Double> getFeedItemImpulses() {
+            return normalizeImpulseMap(feedItemImpulses, true);
+        }
+
+        @Nonnull
+        public Map<String, Double> getFeedParamImpulses() {
+            return normalizeImpulseMap(feedParamImpulses, false);
+        }
+
+        @Nonnull
+        private static Map<String, Double> normalizeImpulseMap(@Nullable Map<String, Double> rawValues,
+                                                               boolean lowercaseKeys) {
+            if (rawValues == null || rawValues.isEmpty()) {
+                return Map.of();
+            }
+            HashMap<String, Double> normalized = new HashMap<>();
+            for (Map.Entry<String, Double> entry : rawValues.entrySet()) {
+                if (entry == null || entry.getKey() == null || entry.getValue() == null) {
+                    continue;
+                }
+                String normalizedKey = entry.getKey().trim();
+                if (lowercaseKeys) {
+                    normalizedKey = normalizedKey.toLowerCase(Locale.ROOT);
+                }
+                if (normalizedKey.isBlank() || !Double.isFinite(entry.getValue())) {
+                    continue;
+                }
+                normalized.put(normalizedKey, entry.getValue());
+            }
+            if (normalized.isEmpty()) {
+                return Map.of();
+            }
+            return normalized;
         }
     }
 

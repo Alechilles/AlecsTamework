@@ -71,7 +71,7 @@ For many mods, that work can stay entirely in JSON and asset authoring. The full
 
 ## Roadmap
 - [Tamework Roadmap](https://curious-bench-850.notion.site/32c1f4061f368026b735f19a8187a480?v=32c1f4061f3680ab877b000cdda43a23)
-
+[Alec's Tamework! v2.7.2.jar](../../../install/release/package/game/latest/Server/mods/Alec%27s%20Tamework%21%20v2.7.2.jar)
 ## Issue Reporting
 If you run into a bug, integration issue, or behavior problem, report it in the Discord server:
 

@@ -237,8 +237,8 @@ final class TameworkInteractEffects {
             stateEffects.applyHeal(npcRef, store, healAmount);
             presentationEffects.showFeedingCombatText(npcRef, store, player, healAmount);
         }
-        CompanionHappinessService.applyFeedGain(npcRef, store);
         String heldItemId = ctx != null ? ctx.activeItemId : null;
+        CompanionHappinessService.applyFeedGain(npcRef, store, heldItemId);
         CompanionNeedsService.applyFeedInteractionRefill(npcRef, store, heldItemId);
         return true;
     }

@@ -336,6 +336,12 @@ final class ApiMapper {
                         config.isBlockAllPlayerDamageIfOwned(),
                         config.isInvulnerableIfOwned()
                 ),
+                new GlobalConfigView.OwnershipRequirementsView(
+                        config.isOwnershipCaptureRequiresOwner(),
+                        config.isOwnershipSpawnRequiresOwner(),
+                        config.isOwnershipInteractionRequiresOwner(),
+                        config.isOwnershipLinkingRequiresOwner()
+                ),
                 new GlobalConfigView.InteractionDefaultsView(
                         config.getInteractionConfigParam(),
                         config.getLovedItemsParam(),
@@ -369,7 +375,9 @@ final class ApiMapper {
                         config.isTranquilizerShortbowAssetSetEnabled(),
                         config.isTranquilizerArrowAssetSetEnabled(),
                         config.isTranquilizerPotionAssetSetEnabled(),
-                        config.isFeedTroughAssetSetEnabled()
+                        config.isFeedTroughAssetSetEnabled(),
+                        config.isHerbivoreFeedAssetSetEnabled(),
+                        config.isCarnivoreFeedAssetSetEnabled()
                 ),
                 new GlobalConfigView.PopulationView(
                         config.getPopulationLimitPerPlayerOwnedTotal(),

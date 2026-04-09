@@ -43,6 +43,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 ### `DebugCommands`
 - `Hook`: default state for `/tw debughook`
 - `Spawner`: default state for `/tw debugspawner`
+- `Spawner` also seeds `/tw debugspawnerlocation` unless changed at runtime
 - `Prompt`: default state for `/tw debugprompt`
 - `Despawn`: default state for `/tw debugdespawn`
 - `DespawnRoleFilter`: default role filter for despawn diagnostics

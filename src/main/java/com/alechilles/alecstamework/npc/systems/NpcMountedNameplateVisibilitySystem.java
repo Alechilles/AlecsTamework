@@ -55,7 +55,7 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
 
         String cached = resolveCachedDisplayName(reference, store);
         String captured = (cached != null && !cached.isBlank()) ? cached : resolveVisibleDisplayName(reference, store);
-        commandBuffer.run(bufferStore -> hideMountedNameplate(reference, bufferStore, captured));
+        hideMountedNameplate(reference, store, commandBuffer, captured);
     }
 
     @Override
@@ -70,7 +70,7 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
         if (!hasCachedName && !hasCustomName(reference, store)) {
             return;
         }
-        commandBuffer.run(bufferStore -> restoreNameplateIfDismounted(reference, bufferStore));
+        restoreNameplateIfDismounted(reference, store, commandBuffer);
     }
 
     @Override
@@ -83,6 +83,7 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
 
     private void hideMountedNameplate(Ref<EntityStore> reference,
                                       Store<EntityStore> store,
+                                      @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                       @Nullable String capturedName) {
         if (!isMountedNpc(reference, store)) {
             return;
@@ -92,12 +93,19 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
             return;
         }
         if (hasVisibleName) {
-            store.putComponent(reference, mountedNameplateType, new TameworkMountedNameplateComponent(capturedName));
+            putComponent(
+                    reference,
+                    commandBuffer,
+                    mountedNameplateType,
+                    new TameworkMountedNameplateComponent(capturedName)
+            );
         }
-        setVisibleName(reference, store, null);
+        setVisibleName(reference, store, commandBuffer, null);
     }
 
-    private void restoreNameplateIfDismounted(Ref<EntityStore> reference, Store<EntityStore> store) {
+    private void restoreNameplateIfDismounted(Ref<EntityStore> reference,
+                                              Store<EntityStore> store,
+                                              @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         if (reference == null || store == null || !reference.isValid() || mountedNameplateType == null) {
             return;
         }
@@ -105,8 +113,8 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
             return;
         }
         String restoreName = resolveRestoreName(reference, store);
-        setVisibleName(reference, store, restoreName);
-        store.tryRemoveComponent(reference, mountedNameplateType);
+        setVisibleName(reference, store, commandBuffer, restoreName);
+        commandBuffer.run(bufferStore -> bufferStore.tryRemoveComponent(reference, mountedNameplateType));
     }
 
     private boolean isMountedNpc(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -172,19 +180,26 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
 
     private void setVisibleName(Ref<EntityStore> reference,
                                 Store<EntityStore> store,
+                                @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                 @Nullable String displayName) {
-        updateDisplayNameComponent(reference, store, displayName);
+        updateDisplayNameComponent(reference, store, commandBuffer, displayName);
         updateNameplateComponent(reference, store, displayName);
     }
 
     private void updateDisplayNameComponent(Ref<EntityStore> reference,
                                             Store<EntityStore> store,
+                                            @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                             @Nullable String displayName) {
         ComponentType<EntityStore, DisplayNameComponent> displayNameType = DisplayNameComponent.getComponentType();
         if (!containsComponent(reference, store, displayNameType)) {
             return;
         }
-        store.putComponent(reference, displayNameType, textService.createDisplayNameComponent(displayName));
+        putComponent(
+                reference,
+                commandBuffer,
+                displayNameType,
+                textService.createDisplayNameComponent(displayName)
+        );
     }
 
     private void updateNameplateComponent(Ref<EntityStore> reference,
@@ -206,12 +221,19 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
     }
 
     private <T extends Component<EntityStore>> boolean containsComponent(Ref<EntityStore> reference,
-                                                                         Store<EntityStore> store,
-                                                                         ComponentType<EntityStore, T> componentType) {
+                                                                          Store<EntityStore> store,
+                                                                          ComponentType<EntityStore, T> componentType) {
         if (reference == null || store == null || componentType == null || !reference.isValid()) {
             return false;
         }
         Archetype<EntityStore> archetype = store.getArchetype(reference);
         return archetype.contains(componentType);
+    }
+
+    private <T extends Component<EntityStore>> void putComponent(@Nonnull Ref<EntityStore> reference,
+                                                                 @Nonnull CommandBuffer<EntityStore> commandBuffer,
+                                                                 @Nonnull ComponentType<EntityStore, T> componentType,
+                                                                 @Nonnull T component) {
+        commandBuffer.putComponent(reference, componentType, component);
     }
 }

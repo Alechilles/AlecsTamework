@@ -20,6 +20,8 @@
   },
   "Impulses": {
     "GainOnFeed": 5.0,
+    "HandFeedDurationMinutes": 15.0,
+    "FeedImpulseDurationMinutes": 15.0,
     "GainOnPet": 3.0,
     "LoseOnDamage": 10.0
   },

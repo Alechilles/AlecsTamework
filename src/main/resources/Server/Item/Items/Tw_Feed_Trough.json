@@ -1,7 +1,7 @@
 {
   "TranslationProperties": {
-    "Name": "server.items.Bench_Trough.name",
-    "Description": "server.items.Bench_Trough.description"
+    "Name": "server.items.Tw_Feed_Trough.name",
+    "Description": "server.items.Tw_Feed_Trough.description"
   },
   "Categories": [
     "Furniture.Benches"

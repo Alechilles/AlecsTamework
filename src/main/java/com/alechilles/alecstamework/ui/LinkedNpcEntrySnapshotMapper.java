@@ -46,6 +46,7 @@ final class LinkedNpcEntrySnapshotMapper {
                     max,
                     currentHappiness,
                     maxHappiness,
+                    entry.targetHappinessPercent(),
                     entry.happinessModifierBreakdown(),
                     currentHunger,
                     maxHunger,

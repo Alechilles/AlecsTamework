@@ -186,6 +186,14 @@ class InteractionBehaviorTest {
         assertFalse(InteractionMatchHelpers.matchesNpcHealthPercentValue(60.0, requirement));
     }
 
+    @Test
+    void interactionRequireOwnerResolutionUsesGlobalToggle() {
+        assertTrue(TameworkInteractRequirements.resolveInteractionRequireOwner(null, true));
+        assertTrue(TameworkInteractRequirements.resolveInteractionRequireOwner(Boolean.FALSE, true));
+        assertFalse(TameworkInteractRequirements.resolveInteractionRequireOwner(null, false));
+        assertFalse(TameworkInteractRequirements.resolveInteractionRequireOwner(Boolean.TRUE, false));
+    }
+
     private static ActionTameworkInteract newInteract() throws Exception {
         Unsafe unsafe = getUnsafe();
         ActionTameworkInteract interact = (ActionTameworkInteract) unsafe.allocateInstance(ActionTameworkInteract.class);
@@ -214,7 +222,7 @@ class InteractionBehaviorTest {
         InteractionOwnershipHelper ownershipHelper = new InteractionOwnershipHelper(interact);
         InteractionCooldowns cooldowns = new InteractionCooldowns(interact, "TameworkInteract_Cooldown");
         TameworkInteractRequirements requirements =
-                new TameworkInteractRequirements(interact, feedHelper, alarmHelper, "Harvest_Ready", null);
+                new TameworkInteractRequirements(interact, feedHelper, alarmHelper, "Harvest_Ready", true, null);
         InteractionSelector selector =
                 new InteractionSelector(interact, requirements, cooldowns, alarmHelper, "Harvest_Ready");
         InteractionDiagnostics diagnostics =

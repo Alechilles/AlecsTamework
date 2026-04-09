@@ -24,6 +24,7 @@ public final class PersistenceWriteQueue implements AutoCloseable {
     private static final long FLUSH_INTERVAL_MS = 10L;
     private static final int MAX_TRANSIENT_RETRIES = 3;
     private static final long RETRY_BACKOFF_MS = 20L;
+    private static final long CLOSE_JOIN_TIMEOUT_MS = 2_000L;
 
     @FunctionalInterface
     public interface SqlTransaction {
@@ -263,6 +264,11 @@ public final class PersistenceWriteQueue implements AutoCloseable {
             return;
         }
         workerThread.interrupt();
+        try {
+            workerThread.join(CLOSE_JOIN_TIMEOUT_MS);
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+        }
         decrementPendingTaskCount(queue.size());
         queue.clear();
     }

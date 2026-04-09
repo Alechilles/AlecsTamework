@@ -12,12 +12,12 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 
 /**
- * Toggles spawner debug logging on the server.
+ * Toggles spawner capture/spawn flow debug logging on the server.
  */
 public final class TameworkDebugSpawnerCommand extends AbstractPlayerCommand {
 
     public TameworkDebugSpawnerCommand() {
-        super("debugspawner", "Toggle Tamework spawner debug logging.");
+        super("debugspawner", "Toggle Tamework spawner capture/spawn flow debug logging.");
         setAllowsExtraArguments(true);
     }
 
@@ -38,7 +38,7 @@ public final class TameworkDebugSpawnerCommand extends AbstractPlayerCommand {
                 ? plugin.setDebugSpawnerEnabled(explicit)
                 : plugin.toggleDebugSpawnerEnabled();
         commandContext.sender().sendMessage(Message.raw(
-                "Tamework spawner debug logging: " + (enabled ? "enabled" : "disabled")
+                "Tamework spawner flow debug logging: " + (enabled ? "enabled" : "disabled")
         ));
     }
 

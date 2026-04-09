@@ -5,6 +5,11 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /** Resolves role-scoped parameters and feed item definitions. */
 final class InteractionParamAccess {
@@ -109,22 +114,49 @@ final class InteractionParamAccess {
             return new InteractionFeedItems(new String[0], new FeedItem[0], false);
         }
         FeedItem[] paramItems = resolveFeedItemsFromParam(role, ctx, interaction.getItemsParam());
-        if (paramItems != null && paramItems.length > 0) {
-            String[] paramIds = InteractionItemParser.extractItemIds(paramItems);
-            if (paramIds.length > 0) {
-                return new InteractionFeedItems(paramIds, paramItems, true);
-            }
-        }
         FeedItem[] explicitItems = interaction.getItemsInHand();
-        String[] explicitIds = InteractionItemParser.extractItemIds(explicitItems);
-        if (explicitIds.length > 0) {
-            return new InteractionFeedItems(explicitIds, explicitItems, true);
+        FeedItem[] mergedItems = mergeFeedItems(paramItems, explicitItems);
+        String[] mergedItemIds = InteractionItemParser.extractItemIds(mergedItems);
+        if (mergedItemIds.length > 0) {
+            return new InteractionFeedItems(mergedItemIds, mergedItems, true);
         }
         boolean useLovedItems = interaction.getUseLovedItems() == null || interaction.getUseLovedItems();
         if (useLovedItems) {
             return new InteractionFeedItems(resolveLovedItems(role, ctx), new FeedItem[0], true);
         }
         return new InteractionFeedItems(new String[0], new FeedItem[0], false);
+    }
+
+    @Nonnull
+    private FeedItem[] mergeFeedItems(@Nullable FeedItem[] paramItems, @Nullable FeedItem[] explicitItems) {
+        LinkedHashMap<String, FeedItem> mergedByItemId = new LinkedHashMap<>();
+        mergeFeedItemsIntoMap(mergedByItemId, paramItems);
+        mergeFeedItemsIntoMap(mergedByItemId, explicitItems);
+        if (mergedByItemId.isEmpty()) {
+            return new FeedItem[0];
+        }
+        return mergedByItemId.values().toArray(new FeedItem[0]);
+    }
+
+    private void mergeFeedItemsIntoMap(@Nonnull Map<String, FeedItem> mergedByItemId,
+                                       @Nullable FeedItem[] sourceItems) {
+        if (sourceItems == null || sourceItems.length == 0) {
+            return;
+        }
+        for (FeedItem source : sourceItems) {
+            if (source == null || source.getItem() == null || source.getItem().isBlank()) {
+                continue;
+            }
+            String normalizedItemId = source.getItem().trim().toLowerCase(Locale.ROOT);
+            FeedItem existing = mergedByItemId.get(normalizedItemId);
+            if (existing == null) {
+                mergedByItemId.put(normalizedItemId, source);
+                continue;
+            }
+            if (existing.getHeal() == null && source.getHeal() != null) {
+                mergedByItemId.put(normalizedItemId, source);
+            }
+        }
     }
 
     // Resolves feed items from a parameter that can include JSON or item lists.

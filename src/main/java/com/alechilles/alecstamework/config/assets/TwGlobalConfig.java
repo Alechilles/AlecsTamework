@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -68,6 +69,39 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                     section -> section.invulnerableIfOwned
             )
             .documentation("If true, owned NPCs cannot take damage from normal sources.")
+            .add()
+            .build();
+
+    private static final BuilderCodec<OwnershipRequirementsSection> OWNERSHIP_REQUIREMENTS_SECTION_CODEC = BuilderCodec.builder(
+                    OwnershipRequirementsSection.class, OwnershipRequirementsSection::new
+            )
+            .<Boolean>append(
+                    new KeyedCodec<>("CaptureRequiresOwner", Codec.BOOLEAN),
+                    (section, value) -> section.captureRequiresOwner = value,
+                    section -> section.captureRequiresOwner
+            )
+            .documentation("Default capture ownership requirement when spawner capture settings leave RequireOwner unset.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("SpawnRequiresOwner", Codec.BOOLEAN),
+                    (section, value) -> section.spawnRequiresOwner = value,
+                    section -> section.spawnRequiresOwner
+            )
+            .documentation("Default spawn ownership requirement when spawner spawn settings leave RequireOwner unset.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("InteractionRequiresOwner", Codec.BOOLEAN),
+                    (section, value) -> section.interactionRequiresOwner = value,
+                    section -> section.interactionRequiresOwner
+            )
+            .documentation("Default interaction ownership requirement when TwInteraction entries leave RequireOwner unset.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("LinkingRequiresOwner", Codec.BOOLEAN),
+                    (section, value) -> section.linkingRequiresOwner = value,
+                    section -> section.linkingRequiresOwner
+            )
+            .documentation("Default command-link ownership requirement when TwCommandItemConfig RequireOwner is unset.")
             .add()
             .build();
 
@@ -294,6 +328,20 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             )
             .documentation("Enables the feed trough asset set.")
             .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("HerbivoreFeed", Codec.BOOLEAN),
+                    (section, value) -> section.herbivoreFeed = value,
+                    section -> section.herbivoreFeed
+            )
+            .documentation("Enables the herbivore feed asset set.")
+            .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("CarnivoreFeed", Codec.BOOLEAN),
+                    (section, value) -> section.carnivoreFeed = value,
+                    section -> section.carnivoreFeed
+            )
+            .documentation("Enables the carnivore feed asset set.")
+            .add()
             .build();
     private static final BuilderCodec<PopulationSection> POPULATION_SECTION_CODEC = BuilderCodec.builder(
                     PopulationSection.class, PopulationSection::new
@@ -409,6 +457,15 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             .documentation("Organized section for owner-damage and ownership protection settings. Inheritance: omitted "
                     + "section inherits from parent; when present, only explicitly defined nested fields override parent.")
             .add()
+            .<OwnershipRequirementsSection>append(
+                    new KeyedCodec<>("OwnershipRequirements", OWNERSHIP_REQUIREMENTS_SECTION_CODEC),
+                    TwGlobalConfig::applyOwnershipRequirementsSection,
+                    TwGlobalConfig::toOwnershipRequirementsSection
+            )
+            .documentation("Global ownership fallback toggles for capture/spawn/interactions/command linking. Inheritance: "
+                    + "omitted section inherits from parent; when present, only explicitly defined nested fields "
+                    + "override parent.")
+            .add()
             .<InteractionDefaultsSection>append(
                     new KeyedCodec<>("InteractionDefaults", INTERACTION_DEFAULTS_SECTION_CODEC),
                     TwGlobalConfig::applyInteractionDefaultsSection,
@@ -466,6 +523,10 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private boolean blockOwnerDamage;
     private boolean blockAllPlayerDamageIfOwned;
     private boolean invulnerableIfOwned;
+    private boolean ownershipCaptureRequiresOwner;
+    private boolean ownershipSpawnRequiresOwner;
+    private boolean ownershipInteractionRequiresOwner = true;
+    private boolean ownershipLinkingRequiresOwner = true;
     private String interactionConfigParam = "InteractionConfigId";
     private String lovedItemsParam = "LovedItems";
     private String isHarvestableParam = "IsHarvestable";
@@ -495,6 +556,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     private boolean tranquilizerArrowAssetSetEnabled;
     private boolean tranquilizerPotionAssetSetEnabled;
     private boolean feedTroughAssetSetEnabled;
+    private boolean herbivoreFeedAssetSetEnabled;
+    private boolean carnivoreFeedAssetSetEnabled;
     private int populationLimitPerPlayerOwnedTotal;
     private PerPlayerLimitScope populationPerPlayerLimitScope = PerPlayerLimitScope.PER_WORLD;
     private boolean simpleClaimsEnabled;
@@ -580,6 +643,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         boolean tranquilizerArrowEnabled = false;
         boolean tranquilizerPotionEnabled = false;
         boolean feedTroughEnabled = false;
+        boolean herbivoreFeedEnabled = false;
+        boolean carnivoreFeedEnabled = false;
         for (TwGlobalConfig candidate : assetMap.getAssetMap().values()) {
             if (candidate == null || !candidate.isEnabled()) {
                 continue;
@@ -596,10 +661,18 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             if (candidate.isFeedTroughAssetSetEnabled()) {
                 feedTroughEnabled = true;
             }
+            if (candidate.isHerbivoreFeedAssetSetEnabled()) {
+                herbivoreFeedEnabled = true;
+            }
+            if (candidate.isCarnivoreFeedAssetSetEnabled()) {
+                carnivoreFeedEnabled = true;
+            }
             if (tranquilizerShortbowEnabled
                     && tranquilizerArrowEnabled
                     && tranquilizerPotionEnabled
-                    && feedTroughEnabled) {
+                    && feedTroughEnabled
+                    && herbivoreFeedEnabled
+                    && carnivoreFeedEnabled) {
                 break;
             }
         }
@@ -607,7 +680,9 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                 tranquilizerShortbowEnabled,
                 tranquilizerArrowEnabled,
                 tranquilizerPotionEnabled,
-                feedTroughEnabled
+                feedTroughEnabled,
+                herbivoreFeedEnabled,
+                carnivoreFeedEnabled
         );
     }
 
@@ -726,6 +801,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
                                            @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
         inheritGeneralSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritOwnershipProtectionSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
+        inheritOwnershipRequirementsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritInteractionDefaultsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritCommandSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
         inheritAssetSetsSection(parent, explicitTopLevelKeys, explicitNestedKeysByTopLevel);
@@ -741,16 +817,65 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return priority;
     }
 
+    @Nullable
+    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
+        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
+    }
+
     public boolean isBlockOwnerDamage() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.blockOwnerDamage() != null) {
+            return overrides.blockOwnerDamage();
+        }
         return blockOwnerDamage;
     }
 
     public boolean isBlockAllPlayerDamageIfOwned() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.blockAllPlayerDamageIfOwned() != null) {
+            return overrides.blockAllPlayerDamageIfOwned();
+        }
         return blockAllPlayerDamageIfOwned;
     }
 
     public boolean isInvulnerableIfOwned() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.invulnerableIfOwned() != null) {
+            return overrides.invulnerableIfOwned();
+        }
         return invulnerableIfOwned;
+    }
+
+    public boolean isOwnershipCaptureRequiresOwner() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.captureRequiresOwner() != null) {
+            return overrides.captureRequiresOwner();
+        }
+        return ownershipCaptureRequiresOwner;
+    }
+
+    public boolean isOwnershipSpawnRequiresOwner() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.spawnRequiresOwner() != null) {
+            return overrides.spawnRequiresOwner();
+        }
+        return ownershipSpawnRequiresOwner;
+    }
+
+    public boolean isOwnershipInteractionRequiresOwner() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.interactionRequiresOwner() != null) {
+            return overrides.interactionRequiresOwner();
+        }
+        return ownershipInteractionRequiresOwner;
+    }
+
+    public boolean isOwnershipLinkingRequiresOwner() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.linkingRequiresOwner() != null) {
+            return overrides.linkingRequiresOwner();
+        }
+        return ownershipLinkingRequiresOwner;
     }
 
     public String getInteractionConfigParam() {
@@ -814,6 +939,10 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean isCommandDeadRespawnEnabled() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.reviveSystemEnabled() != null) {
+            return overrides.reviveSystemEnabled();
+        }
         return commandDeadRespawnEnabled;
     }
 
@@ -869,12 +998,28 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return feedTroughAssetSetEnabled;
     }
 
+    public boolean isHerbivoreFeedAssetSetEnabled() {
+        return herbivoreFeedAssetSetEnabled;
+    }
+
+    public boolean isCarnivoreFeedAssetSetEnabled() {
+        return carnivoreFeedAssetSetEnabled;
+    }
+
     public int getPopulationLimitPerPlayerOwnedTotal() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.populationLimitPerPlayerOwnedTotal() != null) {
+            return Math.max(0, overrides.populationLimitPerPlayerOwnedTotal());
+        }
         return Math.max(0, populationLimitPerPlayerOwnedTotal);
     }
 
     @Nonnull
     public PerPlayerLimitScope getPopulationPerPlayerLimitScope() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.populationPerPlayerLimitScope() != null) {
+            return PerPlayerLimitScope.fromConfigValue(overrides.populationPerPlayerLimitScope());
+        }
         if (populationPerPlayerLimitScope == null) {
             return PerPlayerLimitScope.PER_WORLD;
         }
@@ -882,22 +1027,42 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean isSimpleClaimsEnabled() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.simpleClaimsEnabled() != null) {
+            return overrides.simpleClaimsEnabled();
+        }
         return simpleClaimsEnabled;
     }
 
     public int getSimpleClaimsBreedingLimitPerClaimChunk() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.simpleClaimsLimitPerClaimChunk() != null) {
+            return Math.max(0, overrides.simpleClaimsLimitPerClaimChunk());
+        }
         return Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
     }
 
     public int getSimpleClaimsBreedingLimitPerClaimTotal() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.simpleClaimsLimitPerClaimTotal() != null) {
+            return Math.max(0, overrides.simpleClaimsLimitPerClaimTotal());
+        }
         return Math.max(0, simpleClaimsBreedingLimitPerClaimTotal);
     }
 
     public boolean isSimpleClaimsBreedingRequiresClaim() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.simpleClaimsBreedingRequiresClaim() != null) {
+            return overrides.simpleClaimsBreedingRequiresClaim();
+        }
         return simpleClaimsBreedingRequiresClaim;
     }
 
     public boolean isSimpleClaimsDamageProtectTamedFromNonMembers() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.simpleClaimsProtectTamedFromNonMembers() != null) {
+            return overrides.simpleClaimsProtectTamedFromNonMembers();
+        }
         return simpleClaimsDamageProtectTamedFromNonMembers;
     }
 
@@ -911,6 +1076,15 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean hasSimpleClaimsSectionDefined() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null
+                && (overrides.simpleClaimsEnabled() != null
+                || overrides.simpleClaimsLimitPerClaimChunk() != null
+                || overrides.simpleClaimsLimitPerClaimTotal() != null
+                || overrides.simpleClaimsBreedingRequiresClaim() != null
+                || overrides.simpleClaimsProtectTamedFromNonMembers() != null)) {
+            return true;
+        }
         return simpleClaimsSectionDefined;
     }
 
@@ -966,6 +1140,33 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.blockOwnerDamage = blockOwnerDamage;
         section.blockAllPlayerDamageIfOwned = blockAllPlayerDamageIfOwned;
         section.invulnerableIfOwned = invulnerableIfOwned;
+        return section;
+    }
+
+    private void applyOwnershipRequirementsSection(@Nullable OwnershipRequirementsSection section) {
+        if (section == null) {
+            return;
+        }
+        if (section.captureRequiresOwner != null) {
+            ownershipCaptureRequiresOwner = section.captureRequiresOwner;
+        }
+        if (section.spawnRequiresOwner != null) {
+            ownershipSpawnRequiresOwner = section.spawnRequiresOwner;
+        }
+        if (section.interactionRequiresOwner != null) {
+            ownershipInteractionRequiresOwner = section.interactionRequiresOwner;
+        }
+        if (section.linkingRequiresOwner != null) {
+            ownershipLinkingRequiresOwner = section.linkingRequiresOwner;
+        }
+    }
+
+    private OwnershipRequirementsSection toOwnershipRequirementsSection() {
+        OwnershipRequirementsSection section = new OwnershipRequirementsSection();
+        section.captureRequiresOwner = ownershipCaptureRequiresOwner;
+        section.spawnRequiresOwner = ownershipSpawnRequiresOwner;
+        section.interactionRequiresOwner = ownershipInteractionRequiresOwner;
+        section.linkingRequiresOwner = ownershipLinkingRequiresOwner;
         return section;
     }
 
@@ -1112,6 +1313,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         if (section.feedTrough != null) {
             feedTroughAssetSetEnabled = section.feedTrough;
         }
+        if (section.herbivoreFeed != null) {
+            herbivoreFeedAssetSetEnabled = section.herbivoreFeed;
+        }
+        if (section.carnivoreFeed != null) {
+            carnivoreFeedAssetSetEnabled = section.carnivoreFeed;
+        }
     }
 
     private AssetSetsSection toAssetSetsSection() {
@@ -1120,6 +1327,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         section.tranquilizerArrow = tranquilizerArrowAssetSetEnabled;
         section.tranquilizerPotion = tranquilizerPotionAssetSetEnabled;
         section.feedTrough = feedTroughAssetSetEnabled;
+        section.herbivoreFeed = herbivoreFeedAssetSetEnabled;
+        section.carnivoreFeed = carnivoreFeedAssetSetEnabled;
         return section;
     }
 
@@ -1250,6 +1459,36 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("InvulnerableIfOwned")) {
             invulnerableIfOwned = parent.invulnerableIfOwned;
+        }
+    }
+
+    private void inheritOwnershipRequirementsSection(@Nonnull TwGlobalConfig parent,
+                                                     @Nonnull Set<String> explicitTopLevelKeys,
+                                                     @Nullable Map<String, Set<String>> explicitNestedKeysByTopLevel) {
+        if (!explicitTopLevelKeys.contains("OwnershipRequirements")) {
+            ownershipCaptureRequiresOwner = parent.ownershipCaptureRequiresOwner;
+            ownershipSpawnRequiresOwner = parent.ownershipSpawnRequiresOwner;
+            ownershipInteractionRequiresOwner = parent.ownershipInteractionRequiresOwner;
+            ownershipLinkingRequiresOwner = parent.ownershipLinkingRequiresOwner;
+            return;
+        }
+        Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
+                ? null
+                : explicitNestedKeysByTopLevel.get("OwnershipRequirements");
+        if (nestedExplicit == null) {
+            return;
+        }
+        if (!nestedExplicit.contains("CaptureRequiresOwner")) {
+            ownershipCaptureRequiresOwner = parent.ownershipCaptureRequiresOwner;
+        }
+        if (!nestedExplicit.contains("SpawnRequiresOwner")) {
+            ownershipSpawnRequiresOwner = parent.ownershipSpawnRequiresOwner;
+        }
+        if (!nestedExplicit.contains("InteractionRequiresOwner")) {
+            ownershipInteractionRequiresOwner = parent.ownershipInteractionRequiresOwner;
+        }
+        if (!nestedExplicit.contains("LinkingRequiresOwner")) {
+            ownershipLinkingRequiresOwner = parent.ownershipLinkingRequiresOwner;
         }
     }
 
@@ -1389,6 +1628,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
             tranquilizerArrowAssetSetEnabled = parent.tranquilizerArrowAssetSetEnabled;
             tranquilizerPotionAssetSetEnabled = parent.tranquilizerPotionAssetSetEnabled;
             feedTroughAssetSetEnabled = parent.feedTroughAssetSetEnabled;
+            herbivoreFeedAssetSetEnabled = parent.herbivoreFeedAssetSetEnabled;
+            carnivoreFeedAssetSetEnabled = parent.carnivoreFeedAssetSetEnabled;
             return;
         }
         Set<String> nestedExplicit = explicitNestedKeysByTopLevel == null
@@ -1408,6 +1649,12 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         }
         if (!nestedExplicit.contains("FeedTrough")) {
             feedTroughAssetSetEnabled = parent.feedTroughAssetSetEnabled;
+        }
+        if (!nestedExplicit.contains("HerbivoreFeed")) {
+            herbivoreFeedAssetSetEnabled = parent.herbivoreFeedAssetSetEnabled;
+        }
+        if (!nestedExplicit.contains("CarnivoreFeed")) {
+            carnivoreFeedAssetSetEnabled = parent.carnivoreFeedAssetSetEnabled;
         }
     }
 
@@ -1529,6 +1776,13 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Boolean invulnerableIfOwned;
     }
 
+    private static final class OwnershipRequirementsSection {
+        private Boolean captureRequiresOwner;
+        private Boolean spawnRequiresOwner;
+        private Boolean interactionRequiresOwner;
+        private Boolean linkingRequiresOwner;
+    }
+
     private static final class InteractionDefaultsSection {
         private String interactionConfigParam;
         private String lovedItemsParam;
@@ -1566,6 +1820,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         private Boolean tranquilizerArrow;
         private Boolean tranquilizerPotion;
         private Boolean feedTrough;
+        private Boolean herbivoreFeed;
+        private Boolean carnivoreFeed;
     }
 
     private static final class PopulationSection {
@@ -1624,21 +1880,27 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public static final class AssetSetToggles {
-        private static final AssetSetToggles DISABLED = new AssetSetToggles(false, false, false, false);
+        private static final AssetSetToggles DISABLED = new AssetSetToggles(false, false, false, false, false, false);
 
         private final boolean tranquilizerShortbowEnabled;
         private final boolean tranquilizerArrowEnabled;
         private final boolean tranquilizerPotionEnabled;
         private final boolean feedTroughEnabled;
+        private final boolean herbivoreFeedEnabled;
+        private final boolean carnivoreFeedEnabled;
 
         public AssetSetToggles(boolean tranquilizerShortbowEnabled,
                                boolean tranquilizerArrowEnabled,
                                boolean tranquilizerPotionEnabled,
-                               boolean feedTroughEnabled) {
+                               boolean feedTroughEnabled,
+                               boolean herbivoreFeedEnabled,
+                               boolean carnivoreFeedEnabled) {
             this.tranquilizerShortbowEnabled = tranquilizerShortbowEnabled;
             this.tranquilizerArrowEnabled = tranquilizerArrowEnabled;
             this.tranquilizerPotionEnabled = tranquilizerPotionEnabled;
             this.feedTroughEnabled = feedTroughEnabled;
+            this.herbivoreFeedEnabled = herbivoreFeedEnabled;
+            this.carnivoreFeedEnabled = carnivoreFeedEnabled;
         }
 
         public static AssetSetToggles disabled() {
@@ -1659,6 +1921,14 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
 
         public boolean isFeedTroughEnabled() {
             return feedTroughEnabled;
+        }
+
+        public boolean isHerbivoreFeedEnabled() {
+            return herbivoreFeedEnabled;
+        }
+
+        public boolean isCarnivoreFeedEnabled() {
+            return carnivoreFeedEnabled;
         }
     }
 }

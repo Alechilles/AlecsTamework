@@ -579,10 +579,10 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
         .add()
         .<Boolean>append(
             new KeyedCodec<>("RequireOwner", Codec.BOOLEAN),
-            (asset, value) -> asset.requireOwner = value == null || value,
+            (asset, value) -> asset.requireOwner = value,
             asset -> asset.requireOwner
         )
-        .documentation("Requires the acting player to be the owner.")
+        .documentation("Optional owner requirement override. If omitted, global OwnershipRequirements.LinkingRequiresOwner applies.")
         .add()
         .<Integer>append(
             new KeyedCodec<>("MaxTargets", Codec.INTEGER),
@@ -643,7 +643,7 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     private boolean linkEnabled = true;
     private boolean linkUseTogglesMembership = true;
     private boolean requireTamed = true;
-    private boolean requireOwner = true;
+    private Boolean requireOwner;
     private int maxTargets = 25;
     private int maxActive;
     private int cooldownSeconds = 2;
@@ -798,7 +798,16 @@ public class TwCommandItemConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public boolean isRequireOwner() {
+        return requireOwner == null || requireOwner;
+    }
+
+    @Nullable
+    public Boolean getRequireOwnerOverride() {
         return requireOwner;
+    }
+
+    public boolean resolveRequireOwner(boolean fallbackValue) {
+        return requireOwner == null ? fallbackValue : requireOwner;
     }
 
     public int getMaxTargets() {

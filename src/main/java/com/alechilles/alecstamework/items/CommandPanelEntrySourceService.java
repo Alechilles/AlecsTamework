@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -88,6 +89,7 @@ final class CommandPanelEntrySourceService {
         }
 
         Vector3d playerPos = new Vector3d(playerTransform.getPosition());
+        boolean requireOwner = resolveLinkingRequireOwner();
         store.forEachChunk(Query.any(), (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) -> {
             for (int i = 0; i < chunk.size(); i++) {
                 NPCEntity npc = chunk.getComponent(i, NPCEntity.getComponentType());
@@ -99,7 +101,7 @@ final class CommandPanelEntrySourceService {
                     continue;
                 }
                 if (!linkPolicyService.passesOwnerAndTamed(
-                        true,
+                        requireOwner,
                         config != null && config.isRequireTamed(),
                         npcRef,
                         playerUuid,
@@ -134,6 +136,7 @@ final class CommandPanelEntrySourceService {
                         npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
                         healthSnapshot.current,
                         healthSnapshot.max,
+                        0,
                         0,
                         0,
                         null,
@@ -172,6 +175,15 @@ final class CommandPanelEntrySourceService {
             }
         });
         return applyFiltersAndSort(out, stack);
+    }
+
+    private boolean resolveLinkingRequireOwner() {
+        return resolveLinkingRequireOwner(TwGlobalConfig.resolveActive());
+    }
+
+    static boolean resolveLinkingRequireOwner(TwGlobalConfig globalConfig) {
+        TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
+        return resolved.isOwnershipLinkingRequiresOwner();
     }
 
     private List<LinkedNpcEntry> applyFiltersAndSort(List<LinkedNpcEntry> input, ItemStack stack) {

@@ -1,8 +1,11 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
@@ -84,20 +87,9 @@ public final class OwnerInteractionListener {
                 return;
             }
 
-            // If this is a spawner capture attempt and owner restrictions are disabled, allow it.
-            Inventory inventory = player.getInventory();
-            if (inventory != null) {
-                ItemStack active = inventory.getActiveHotbarItem();
-                if (active != null && !active.isEmpty()) {
-                    Tamework instance = Tamework.getInstance();
-                    ItemFeatureRegistry registry = instance != null ? instance.getItemFeatureRegistry() : null;
-                    if (registry != null) {
-                        ItemFeatureConfig config = registry.get(active.getItemId());
-                        if (config != null && config.isSpawnerEnabled() && !config.isCaptureOwnerRestricted()) {
-                            return;
-                        }
-                    }
-                }
+            InteractionOwnershipPolicy ownershipPolicy = resolveOwnershipPolicyForHeldItem(player);
+            if (!isOwnerRequiredForPolicy(ownershipPolicy, resolveGlobalConfig())) {
+                return;
             }
 
             NPCEntity npc = (NPCEntity) target;
@@ -144,28 +136,8 @@ public final class OwnerInteractionListener {
                 }
             }
 
-            // Determine whether this is a capture attempt or a generic interaction.
-            String verb = "interact with";
-            // Decide which verb to show based on whether the held item is a spawner.
-            Inventory interactionInventory = player.getInventory();
-            if (interactionInventory != null) {
-                ItemStack active = interactionInventory.getActiveHotbarItem();
-                if (active != null && !active.isEmpty()) {
-                    Tamework instance = Tamework.getInstance();
-                    ItemFeatureRegistry registry = instance != null ? instance.getItemFeatureRegistry() : null;
-                    if (registry != null) {
-                        ItemFeatureConfig config = registry.get(active.getItemId());
-                        if (config != null && config.isSpawnerEnabled()) {
-                            String filledId = config.getSpawnerFilledItemId();
-                            if (filledId != null && !filledId.isBlank()) {
-                                verb = "capture";
-                            }
-                        }
-                    }
-                }
-            }
             event.setCancelled(true);
-            OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, verb);
+            OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, ownershipPolicy.verb());
             logger.at(Level.FINE).log(
                     "Owner restrict: denied interaction player=" + player.getDisplayName()
                             + " target=" + target.getUuid()
@@ -205,7 +177,85 @@ public final class OwnerInteractionListener {
                         + playerName
                         + ", target="
                         + targetId
-                        + ")."
+                + ")."
         );
+    }
+
+    private InteractionOwnershipPolicy resolveOwnershipPolicyForHeldItem(Player player) {
+        if (player == null) {
+            return InteractionOwnershipPolicy.INTERACTION;
+        }
+        Inventory inventory = player.getInventory();
+        ItemStack active = inventory != null ? inventory.getActiveHotbarItem() : null;
+        if (active == null || active.isEmpty()) {
+            return InteractionOwnershipPolicy.INTERACTION;
+        }
+        String itemId = active.getItemId();
+        if (itemId == null || itemId.isBlank()) {
+            return InteractionOwnershipPolicy.INTERACTION;
+        }
+
+        Tamework instance = Tamework.getInstance();
+        if (instance == null) {
+            return InteractionOwnershipPolicy.INTERACTION;
+        }
+
+        ItemFeatureRegistry itemFeatureRegistry = instance.getItemFeatureRegistry();
+        if (itemFeatureRegistry != null) {
+            ItemFeatureConfig spawnerConfig = itemFeatureRegistry.get(itemId);
+            if (isSpawnerCaptureTool(spawnerConfig)) {
+                return InteractionOwnershipPolicy.CAPTURE;
+            }
+        }
+
+        CommandItemRegistry commandItemRegistry = instance.getCommandItemRegistry();
+        if (commandItemRegistry != null) {
+            TwCommandItemConfig commandConfig = commandItemRegistry.get(itemId);
+            if (commandConfig != null && commandConfig.isEnabled()) {
+                return InteractionOwnershipPolicy.LINKING;
+            }
+        }
+        return InteractionOwnershipPolicy.INTERACTION;
+    }
+
+    private boolean isSpawnerCaptureTool(ItemFeatureConfig config) {
+        if (config == null || !config.isSpawnerEnabled()) {
+            return false;
+        }
+        String filledItemId = config.getSpawnerFilledItemId();
+        return filledItemId != null && !filledItemId.isBlank();
+    }
+
+    private TwGlobalConfig resolveGlobalConfig() {
+        TwGlobalConfig global = TwGlobalConfig.resolveActive();
+        return global != null ? global : TwGlobalConfig.defaultConfig();
+    }
+
+    static boolean isOwnerRequiredForPolicy(InteractionOwnershipPolicy policy, TwGlobalConfig globalConfig) {
+        TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
+        if (policy == null) {
+            return resolved.isOwnershipInteractionRequiresOwner();
+        }
+        return switch (policy) {
+            case CAPTURE -> resolved.isOwnershipCaptureRequiresOwner();
+            case LINKING -> resolved.isOwnershipLinkingRequiresOwner();
+            case INTERACTION -> resolved.isOwnershipInteractionRequiresOwner();
+        };
+    }
+
+    enum InteractionOwnershipPolicy {
+        CAPTURE("capture"),
+        LINKING("link"),
+        INTERACTION("interact with");
+
+        private final String verb;
+
+        InteractionOwnershipPolicy(String verb) {
+            this.verb = verb;
+        }
+
+        String verb() {
+            return verb;
+        }
     }
 }
