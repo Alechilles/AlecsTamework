@@ -42,10 +42,12 @@ If you’re unsure where to start, open an issue describing what you want to wor
 - If work is deferred (`CompletableFuture`, delayed executors, schedulers), capture stable IDs (`UUID`) and resolve live refs/components inside `world.execute(...)`.
 - Do not access player-affine APIs (`PlayerRef.getComponent(Player)`, `Universe.getPlayers()` scans for live player mutation) from async/deferred code.
 - In system/tick/event processing paths, use `DamageSystems.executeDamage(..., commandBuffer, ...)` instead of the store overload.
+- Startup registration for optional integrations/dependencies must degrade gracefully (warn + skip) instead of crashing plugin setup.
 - Guard tests must pass for system/runtime changes:
   - `EcsWriteSafetyGuardTest`
   - `AsyncThreadSafetyGuardTest`
   - `DamageExecutionWriteSafetyGuardTest`
+  - `StartupResilienceGuardTest`
 
 ## Compatibility goals
 - Prefer changes that don’t break existing mod integrations.

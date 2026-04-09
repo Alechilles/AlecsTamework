@@ -13,6 +13,7 @@
 - Added `/tw showhitboxes` to toggle live hitbox/detail-box tracking for the NPC in view (player-local debug rendering).
 - Added feed preference resolution helpers/tests for needs-driven container consumption (`FeedItemPreferenceResolver`, regression coverage).
 - Added `DamageExecutionWriteSafetyGuardTest` and corresponding contributor guardrail documentation for command-buffer-safe damage execution in runtime system paths.
+- Added `StartupResilienceGuardTest` and contributor guardrails for optional setup dependency handling so startup can warn+skip instead of hard-failing.
 
 ### Changed
 - Reworked companion happiness impulse handling so feed/pet/damage impulses are time-bound, refresh on re-apply, and do not stack as duplicate active buffs.
@@ -37,6 +38,8 @@
 - Fixed additional world-thread crash paths (`Store is currently processing`) in damage/needs/passive-breeding/mounted-nameplate runtime flows by removing direct store writes from system-processing contexts.
 - Fixed needs-damage execution paths in runtime/tick flows to use command-buffer-safe damage dispatch when command-buffer context is available.
 - Fixed command-linked revivable drop-suppression setup from building a null query input when command-link component types are unavailable during duplicate/partial plugin load states.
+- Fixed startup failure when NPC damage drop systems are unavailable by making command-linked revivable drop-suppression system registration optional (warn + skip).
+- Fixed startup failure when `Vector3d` is unavailable in constrained runtimes by degrading command-item asset registration/loading gracefully (warn + skip).
 - Fixed capture/spawn ownership-requirement evaluation so `RequireOwner` no longer blocks unowned targets/items and still enforces owner match when an owner exists.
 - Fixed Soul Lantern/TwSpawner owner checks to consider capture-source ownership metadata during spawn policy evaluation.
 
