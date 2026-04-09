@@ -186,6 +186,7 @@ public final class CompanionNeedsConsumeService {
                         npcRef,
                         store,
                         config,
+                        roleId,
                         effectiveFoodIds,
                         consumeRadius,
                         consumeOriginOverride

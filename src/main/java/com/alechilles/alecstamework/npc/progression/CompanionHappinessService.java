@@ -635,6 +635,23 @@ public final class CompanionHappinessService {
         return totalImpulse;
     }
 
+    static double resolveFeedItemPreferenceScore(@Nullable Ref<EntityStore> npcRef,
+                                                 @Nullable Store<EntityStore> store,
+                                                 @Nullable TwHappinessConfig happinessConfig,
+                                                 @Nullable String consumedItemId,
+                                                 double fallbackScore) {
+        ResolvedFeedImpulse resolved = resolveFeedConsumptionImpulse(
+                npcRef,
+                store,
+                happinessConfig,
+                consumedItemId
+        );
+        if (resolved == null || !Double.isFinite(resolved.rawValue())) {
+            return fallbackScore;
+        }
+        return resolved.rawValue();
+    }
+
     private static boolean roleParamContainsItemId(@Nullable Ref<EntityStore> npcRef,
                                                    @Nullable Store<EntityStore> store,
                                                    @Nullable String paramName,

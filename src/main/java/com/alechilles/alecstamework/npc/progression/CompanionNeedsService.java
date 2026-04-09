@@ -579,6 +579,7 @@ public final class CompanionNeedsService {
         NeedsDamageExecutionResult damageResult = applyNeedsDamage(
                 npcRef,
                 store,
+                commandBuffer,
                 pooledDamageAmount,
                 config.getDamage().isLethal()
         );
@@ -797,6 +798,7 @@ public final class CompanionNeedsService {
 
     private static NeedsDamageExecutionResult applyNeedsDamage(@Nonnull Ref<EntityStore> npcRef,
                                                                @Nonnull Store<EntityStore> store,
+                                                               @Nullable CommandBuffer<EntityStore> commandBuffer,
                                                                double requestedDamageAmount,
                                                                boolean lethal) {
         if (!Double.isFinite(requestedDamageAmount) || requestedDamageAmount <= MIN_DAMAGE_AMOUNT) {
@@ -815,7 +817,11 @@ public final class CompanionNeedsService {
                 cause,
                 appliedDamage
         );
-        DamageSystems.executeDamage(npcRef, store, damage);
+        if (commandBuffer != null) {
+            DamageSystems.executeDamage(npcRef, commandBuffer, damage);
+        } else {
+            DamageSystems.executeDamage(npcRef, store, damage);
+        }
         boolean cancelled = damage.isCancelled();
         float finalDamageAmount = damage.getAmount();
         boolean applied = !cancelled && finalDamageAmount > 0.0f;
