@@ -13,5 +13,6 @@ This subsection covers runtime debugging and in-game self-test tooling for integ
 ## Child Pages
 - [In-Game API Self-Tests](/mod/alecs-tamework/in-game-api-self-tests)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
+- [Tamework Settings UI and Persistence](/mod/alecs-tamework/tamework-settings-ui-and-persistence)
 
 

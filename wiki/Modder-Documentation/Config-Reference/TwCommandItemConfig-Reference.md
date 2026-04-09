@@ -55,7 +55,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `LinkEnabled`: allows persistent link and unlink actions for the tool.
 - `LinkUseTogglesMembership`: makes the link action toggle whether the NPC is in the active membership set.
 - `RequireTamed`: requires targets to be tamed.
-- `RequireOwner`: requires the using player to own the target.
+- `RequireOwner`: requires the using player to own the target. If omitted, fallback comes from `TwGlobalConfig.OwnershipRequirements.LinkingRequiresOwner`.
 - `MaxTargets`: max recipients per command dispatch.
 - `MaxActive`: max linked NPCs that can be marked active. `0` means unlimited.
 - `CooldownSeconds`: item cooldown after command use.
@@ -173,6 +173,7 @@ Fields:
 - Left-click typically runs the current command; right-click commonly uses `CommandId: OpenSelectionMenu` to open the radial.
 - The linked panel uses this config’s command list and recipient rules but also depends on runtime services, linked companion records, and effective companion policy from [TwCompanionConfig Reference](/mod/alecs-tamework/twcompanionconfig-reference).
 - Shared relocation retry behavior and unlink-confirm policy come from [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
+- `RequireOwner` can be left unset to inherit global linking-owner policy.
 
 ## Minimal Example
 ```json

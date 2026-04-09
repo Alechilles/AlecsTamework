@@ -17,5 +17,6 @@ This subsection covers feature-system implementation guides for core Tamework ga
 - [Ownership Policy and Core Builders](/mod/alecs-tamework/ownership-policy-and-core-builders)
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)
 - [Coop and Feed Trough Guide](/mod/alecs-tamework/coop-and-feed-trough-guide)
+- [Projectile Combat and Hazard Interactions Guide](/mod/alecs-tamework/projectile-combat-and-hazard-interactions-guide)
 
 

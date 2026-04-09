@@ -68,7 +68,7 @@ Fields:
 - `ClearsOwner`: clears owner metadata when the NPC is captured.
 - `RequireTamed`: requires the NPC to be tamed before capture succeeds.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
-- `RequireOwner`: explicit override that requires the NPC to have an owner.
+- `RequireOwner`: explicit override that requires the NPC to have an owner. If omitted, global default comes from `TwGlobalConfig.OwnershipRequirements.CaptureRequiresOwner`.
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
@@ -77,7 +77,7 @@ Fields:
 ### `Spawn`
 - `AssignsOwner`: assigns the using player as owner when the NPC is spawned.
 - `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
-- `RequireOwner`: explicit override that requires the spawner item to have an owner.
+- `RequireOwner`: explicit override that requires the spawner item to have an owner. If omitted, global default comes from `TwGlobalConfig.OwnershipRequirements.SpawnRequiresOwner`.
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
@@ -161,6 +161,7 @@ Accepted values:
 ## Gotchas
 - `EmptyItemId` is the resolution key. If two active configs target the same item, selection becomes a config-resolution problem instead of an item-authoring problem.
 - `RequireOwner` is an explicit override, not the same thing as `OwnerRestricted`.
+- Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
 - `IconOverrides` and `IconOverridesByRole` are explicit array/map values and replace the parent content when authored in a child asset.
 - `/tw reloadconfig` is required after editing spawner configs during development.
 

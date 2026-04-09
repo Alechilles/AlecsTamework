@@ -16,6 +16,7 @@ This subsection contains one page per `Tw*Config` asset family. Structure is int
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwSpawnerConfig Reference](/mod/alecs-tamework/twspawnerconfig-reference)
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
+- [TwNamesConfig Reference](/mod/alecs-tamework/twnamesconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference)

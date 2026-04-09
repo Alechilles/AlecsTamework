@@ -46,6 +46,7 @@ AutoCloseable handle = api.events().subscribe(NpcProfileChangedEvent.class, even
 - `COMPANION`
 - `SPAWNER`
 - `NAME_ITEM`
+- `NAMES`
 - `COMMAND_ITEM`
 - `COOP`
 - `HAPPINESS`

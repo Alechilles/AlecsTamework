@@ -61,6 +61,7 @@ Fields:
 - `AllowedChars`
 - `TrimWhitespace`
 - `ReplaceExisting`: allows replacing an existing non-Tamework display name.
+- `RandomNamesId`: optional `TwNamesConfig` asset id used by the naming UI randomize button.
 - `ConsumeItem`: consumes one item on success.
 - `CooldownMs`
 - `SoundEvent`
@@ -81,6 +82,7 @@ Custom validation is also supported through:
 ## Runtime Notes
 - The item interaction is `TameworkNameNpc`.
 - When the interaction succeeds, Tamework tries to open the naming UI.
+- If `RandomNamesId` resolves to a valid `TwNamesConfig` pool, the UI randomize button is enabled.
 - If the page cannot be opened, the system falls back to chat input.
 - The server re-validates ownership and taming on submission; client-side UI is not the only gate.
 
@@ -120,6 +122,7 @@ Custom validation is also supported through:
     "AllowedChars": "LettersNumbersSpaces",
     "TrimWhitespace": true,
     "ReplaceExisting": true,
+    "RandomNamesId": "NorthAmericaMale",
     "ConsumeItem": true,
     "CooldownMs": 5000,
     "SoundEvent": "SFX_Tamework_NameTag",

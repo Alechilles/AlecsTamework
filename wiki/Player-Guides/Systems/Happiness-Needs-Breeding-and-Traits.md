@@ -14,11 +14,13 @@ Many Tamework-powered mods share a cluster of long-term progression systems. The
 - A shared wellbeing value used by other systems
 - Often improved by feeding, care, or positive interactions
 - Can influence breeding readiness or other companion behavior
+- Some mods also show short-lived active happiness impulses (for example recent feed, pet, or damage effects)
 
 ## Needs
 - Hunger and thirst are the most common needs
 - Needs can decay over time and may refill from manual feeding, passive sources, or resource-seeking behavior
 - Poor needs often reduce happiness or block other behaviors
+- Some servers enable needs-driven damage when hunger/thirst stay critical for too long
 
 ## Breeding
 - Uses readiness rules, cooldowns, and partner matching

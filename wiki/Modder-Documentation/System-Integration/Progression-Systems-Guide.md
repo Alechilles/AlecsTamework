@@ -101,6 +101,9 @@ For breeding issues, also verify:
 - cooldown state
 - sleep and combat gates
 
+For needs-damage diagnostics, use:
+- `/tw debugneedsdamage [on|off]`
+
 ## Related Pages
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference)

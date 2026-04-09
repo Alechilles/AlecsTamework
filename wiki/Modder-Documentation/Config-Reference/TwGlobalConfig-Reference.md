@@ -15,6 +15,7 @@ Use `TwGlobalConfig` for:
 - interaction parameter names and cooldown alarm naming
 - shared command relocation infrastructure and linked-panel safety rules
 - bundled asset-set gates
+- ownership requirement defaults for capture, spawn, interaction, and linking
 - owned-population limits
 - SimpleClaims integration
 - legacy global ownership and command fallback values
@@ -39,6 +40,7 @@ Do not use it for role-specific companion policy. That belongs in [TwCompanionCo
 {
   "General": { "Enabled": true, "Priority": 0 },
   "OwnershipProtection": { "...": "..." },
+  "OwnershipRequirements": { "...": "..." },
   "InteractionDefaults": { "...": "..." },
   "Command": { "...": "..." },
   "AssetSets": { "...": "..." },
@@ -58,6 +60,14 @@ This is the legacy global home for damage-protection behavior. Prefer role-scope
 - `BlockOwnerDamage`: blocks damage from the owner to owned NPCs.
 - `BlockAllPlayerDamageIfOwned`: blocks all player damage once the NPC is owned.
 - `InvulnerableIfOwned`: makes owned NPCs fully invulnerable.
+
+### `OwnershipRequirements`
+This section defines global default ownership requirements used when feature-specific configs leave ownership gates unset.
+
+- `CaptureRequiresOwner`: default capture owner requirement for spawner capture.
+- `SpawnRequiresOwner`: default owner requirement for spawner spawn.
+- `InteractionRequiresOwner`: default owner requirement for interaction entries that do not explicitly set `RequireOwner`.
+- `LinkingRequiresOwner`: default owner requirement for command linking and command recipient checks when command-item config leaves `RequireOwner` unset.
 
 ### `InteractionDefaults`
 These names are part of the optimized interaction contract. If you rename them here, your role params and action overrides must match.
@@ -100,6 +110,8 @@ These toggles opt bundled Tamework assets into the live game. Any loaded active 
 - `TranquilizerArrow`
 - `TranquilizerPotion`
 - `FeedTrough`
+- `HerbivoreFeed`
+- `CarnivoreFeed`
 
 ### `Population`
 - `LimitPerPlayerOwnedTotal`: cap on how many owned NPCs one player can have. `0` disables the cap.
@@ -127,6 +139,7 @@ Nested `Damage`:
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Global/TwGlobalConfig_Default.json` is the best reference for shipped baseline values.
 - `DeadRespawnCooldownMins` is an alias for `DeadRespawnCooldownMs` and takes priority when both are authored.
+- `OwnershipRequirements` controls defaults that item and interaction systems consume when their local `RequireOwner` values are unset.
 - `OwnershipProtection` and several `Command` fields remain here for backward compatibility, but new role policy should live in `TwCompanionConfig`.
 - `SimpleClaims` selection is more specific than normal global resolution: only configs that actually define the section compete for those settings.
 
@@ -156,6 +169,12 @@ Nested `Damage`:
     "HarvestAlarmName": "Harvest_Ready",
     "InteractionCooldownAlarmPrefix": "TameworkInteract_Cooldown"
   },
+  "OwnershipRequirements": {
+    "CaptureRequiresOwner": false,
+    "SpawnRequiresOwner": false,
+    "InteractionRequiresOwner": true,
+    "LinkingRequiresOwner": true
+  },
   "Command": {
     "RelocationRetryIntervalMs": 2000,
     "RelocationMaxWaitMs": 20000,
@@ -163,7 +182,9 @@ Nested `Damage`:
     "LinkedPanelRequireUnlinkConfirm": true
   },
   "AssetSets": {
-    "FeedTrough": true
+    "FeedTrough": true,
+    "HerbivoreFeed": true,
+    "CarnivoreFeed": true
   },
   "Population": {
     "LimitPerPlayerOwnedTotal": 50,
@@ -185,6 +206,7 @@ Nested `Damage`:
 
 ## Gotchas
 - Renaming `InteractionDefaults` keys without updating role params will silently break interaction resolution.
+- `OwnershipRequirements` is a defaulting layer. Explicit per-entry/per-item `RequireOwner` values still win.
 - `AssetSets` are global gates, not per-role toggles.
 - Explicit maps and arrays replace parent values. Do not expect append behavior.
 - Use `TwCompanionConfig` for role-scoped ownership and command policy. `TwGlobalConfig` is the shared infrastructure layer.

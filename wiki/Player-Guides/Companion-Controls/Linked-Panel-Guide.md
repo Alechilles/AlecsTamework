@@ -19,6 +19,7 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - Name, species or role label, and often health or cooldown indicators
 - Group membership when the tool uses groups
 - Trait or progression indicators when the mod exposes them
+- In some mods, happiness details including current and target trend, plus active impulse modifiers
 
 ## Panel modes
 - `LinkedMode` shows companions linked to the current tool.
@@ -63,6 +64,5 @@ The linked panel is the side panel that appears with Tamework command tools. It 
 - [Troubleshooting for Players](/mod/alecs-tamework/troubleshooting-for-players)
 
 > [Screenshot Placeholder: Linked panel showing active, inactive, dead, and lost rows]
-
 
 

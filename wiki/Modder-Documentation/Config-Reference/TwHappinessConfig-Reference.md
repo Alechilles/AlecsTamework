@@ -59,8 +59,12 @@ This config is especially important when you use:
 
 ### `Impulses`
 - `GainOnFeed`: additive happiness gain from feeding interactions.
+- `HandFeedDurationMinutes`: active-duration window for hand-feed impulse display/target behavior.
+- `FeedImpulseDurationMinutes`: active-duration window for consumed-feed impulse display/target behavior.
 - `GainOnPet`: additive happiness gain from petting or similar positive interactions.
 - `LoseOnDamage`: additive happiness loss from taking damage.
+- `FeedItemImpulses`: per-item consumed-feed impulse map (`ItemId -> delta`).
+- `FeedParamImpulses`: per-family consumed-feed impulse map (`ParamKey -> delta`).
 
 ### `Modifiers`
 These modifiers shift the equilibrium result up or down.
@@ -95,7 +99,8 @@ Additional field:
 
 ## Defaults and Cross-System Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Happiness/TwHappinessConfig_Default.json` is the shipped baseline.
-- Feed interactions use `Impulses.GainOnFeed` and can also be multiplied by traits such as `HappinessGainMultiplier`.
+- Feed interactions use `Impulses.GainOnFeed` for hand-feed gain and can also be multiplied by traits such as `HappinessGainMultiplier`.
+- Consumed item and feed-family impulses can be authored separately with `FeedItemImpulses` and `FeedParamImpulses`.
 - Needs do not directly live in this asset. Hunger and thirst values come from [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference), then feed into the modifier bands here.
 - Breeding-ready checks often combine `TwHappinessConfig` with `TwBreedingConfig.Happiness.Threshold`.
 
@@ -135,8 +140,18 @@ Additional field:
   },
   "Impulses": {
     "GainOnFeed": 5.0,
+    "HandFeedDurationMinutes": 15.0,
+    "FeedImpulseDurationMinutes": 15.0,
     "GainOnPet": 3.0,
-    "LoseOnDamage": 10.0
+    "LoseOnDamage": 10.0,
+    "FeedItemImpulses": {
+      "Tw_Feed_Herbivore": 4.0,
+      "Tw_Feed_Carnivore": 4.0
+    },
+    "FeedParamImpulses": {
+      "Herbivore": 3.0,
+      "Carnivore": 3.0
+    }
   },
   "Modifiers": {
     "Hunger": {
@@ -180,6 +195,7 @@ Additional field:
 - Modifier bands are authored arrays. A child config that authors `Bands` replaces the parent list.
 - Hunger and thirst percent bands assume the values exposed by `TwNeedsConfig`.
 - Keep band ranges intentional and non-overlapping. Tamework applies the authored band logic, not automatic normalization.
+- `GainOnFeed` and consumed-feed impulses are separate channels. Do not assume one setting controls both.
 
 ## Related Pages
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)

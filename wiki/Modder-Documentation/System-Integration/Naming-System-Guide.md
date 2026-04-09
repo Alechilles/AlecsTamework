@@ -21,6 +21,13 @@ Naming items let you attach a reusable naming flow to any item without building 
 3. Create a matching `TwNameItemConfig`
 4. Restrict roles through `AllowedRoles`
 5. Tune naming policy such as owner checks, rename policy, character rules, cooldown, and consume behavior
+6. (Optional) set `Naming.RandomNamesId` to a `TwNamesConfig` pool id so the UI randomize button can suggest names
+
+## Random name pools
+- `TwNamesConfig` assets live under `Server/Tamework/Names/*.json`
+- `TwNameItemConfig.Naming.RandomNamesId` points at a pool id in that family
+- If no pool is configured or it fails to resolve, naming still works and only manual entry is used
+- Use parent fallback in `TwNamesConfig` for shared regional pools with per-pack overrides
 
 ## Validation model
 - The system can require tame state
@@ -34,6 +41,7 @@ Naming items let you attach a reusable naming flow to any item without building 
 
 ## Related Pages
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
+- [TwNamesConfig Reference](/mod/alecs-tamework/twnamesconfig-reference)
 - [Ownership Policy and Core Builders](/mod/alecs-tamework/ownership-policy-and-core-builders)
 - [Debugging and Debug Commands](/mod/alecs-tamework/debugging-and-debug-commands)
 

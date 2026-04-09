@@ -18,7 +18,8 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - `TameworkDependencyMetricsReporter` and related metrics classes detect installed mods and forward tracked data
 - Server owners can opt out through `hstats-server-uuid.txt`
 - Crash telemetry is separate from HStats and uses a store-first, upload-later flow
-- Crash telemetry is strict opt-in through `universe/Tamework/Telemetry/tamework-crash-telemetry.txt` (default `enabled=false`)
+- Crash telemetry settings live at `universe/Tamework/Settings/crash-telemetry.json`
+- Crash telemetry defaults to enabled and supports runtime opt-out via `/tw settings` or settings-file edits
 - Only Tamework-attributed fatal failures are captured:
   - uncaught exceptions (via chained global default uncaught-exception handler)
   - exceptional world removals (`RemoveWorldEvent` with `EXCEPTIONAL`) using world failure details
@@ -34,7 +35,7 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
   - successful upload deletes the local pending file
   - failed upload keeps the file for retry
   - telemetry never throws into runtime/gameplay threads
-- Debug command: `/tw debugcrashtelemetry` (status), `/tw debugcrashtelemetry flush` (manual async upload pass)
+- Debug command: `/tw debugcrashtelemetry` (status), `/tw debugcrashtelemetry flush` (manual async upload pass), `/tw debugcrashtelemetry simulate` (manual simulation path for privileged users)
 - Privacy: payload excludes player-identifying gameplay data by default (stack trace + runtime metadata only)
 
 ## Build and packaging
