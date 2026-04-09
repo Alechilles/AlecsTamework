@@ -32,6 +32,7 @@
 - Fixed feed impulse tooltip persistence so expired impulses are removed from active display.
 - Fixed startup exceptions when duplicate plugin packs are loaded by hardening pack discovery/filtering.
 - Fixed additional world-thread crash paths (`Store is currently processing`) in damage/needs/passive-breeding/mounted-nameplate runtime flows by removing direct store writes from system-processing contexts.
+- Fixed a needs-damage death race when starving/dehydrated NPCs hit lethal damage during needs sweep by deferring damage execution through command-buffer callbacks.
 - Fixed command-linked revivable drop-suppression setup from building a null query input when command-link component types are unavailable during duplicate/partial plugin load states.
 - Fixed capture/spawn ownership-requirement evaluation so `RequireOwner` no longer blocks unowned targets/items and still enforces owner match when an owner exists.
 - Fixed Soul Lantern/TwSpawner owner checks to consider capture-source ownership metadata during spawn policy evaluation.

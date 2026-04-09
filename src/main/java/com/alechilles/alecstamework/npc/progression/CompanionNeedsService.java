@@ -579,6 +579,7 @@ public final class CompanionNeedsService {
         NeedsDamageExecutionResult damageResult = applyNeedsDamage(
                 npcRef,
                 store,
+                commandBuffer,
                 pooledDamageAmount,
                 config.getDamage().isLethal()
         );
@@ -797,6 +798,7 @@ public final class CompanionNeedsService {
 
     private static NeedsDamageExecutionResult applyNeedsDamage(@Nonnull Ref<EntityStore> npcRef,
                                                                @Nonnull Store<EntityStore> store,
+                                                               @Nullable CommandBuffer<EntityStore> commandBuffer,
                                                                double requestedDamageAmount,
                                                                boolean lethal) {
         if (!Double.isFinite(requestedDamageAmount) || requestedDamageAmount <= MIN_DAMAGE_AMOUNT) {
@@ -809,6 +811,26 @@ public final class CompanionNeedsService {
         float appliedDamage = resolveAppliedDamageAmount(npcRef, store, requestedDamageAmount, lethal);
         if (!(appliedDamage > 0.0f)) {
             return NeedsDamageExecutionResult.skipped(requestedDamageAmount);
+        }
+        if (commandBuffer != null) {
+            commandBuffer.run(bufferStore -> {
+                if (!npcRef.isValid()) {
+                    return;
+                }
+                Damage deferredDamage = new Damage(
+                        new Damage.EnvironmentSource(NEEDS_DAMAGE_SOURCE_TYPE),
+                        cause,
+                        appliedDamage
+                );
+                DamageSystems.executeDamage(npcRef, bufferStore, deferredDamage);
+            });
+            return new NeedsDamageExecutionResult(
+                    requestedDamageAmount,
+                    appliedDamage,
+                    appliedDamage,
+                    false,
+                    true
+            );
         }
         Damage damage = new Damage(
                 new Damage.EnvironmentSource(NEEDS_DAMAGE_SOURCE_TYPE),
