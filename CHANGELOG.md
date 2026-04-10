@@ -2,13 +2,16 @@
 
 ## Unreleased
 
+## 2.8.1 - Post-2.8.0 Stability + Mushroom Spores - 2026-04-10
 ### Added
 - Added `Glowing Purple Mushroom Spores`, a Farming Bench Tier 4 seed recipe that lets players cultivate the mushrooms used for tranquilizer potion crafting.
 
 ### Fixed
+- Fixed startup exceptions when duplicate plugin packs are loaded by hardening pack discovery and filtering.
+- Fixed needs-damage execution race paths by deferring command-buffer-context damage dispatch, preventing starvation/dehydration death collisions during needs sweep.
 - Fixed managed coop resident release placement so the front-of-coop cone search no longer accepts spawn positions more than one block below the coop, preventing releases into rooms under thin floors.
 
-## 2.8.1 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-09
+## 2.8.0 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-08
 ### Added
 - Added `/tw settings` UI (`TameworkSettingsPage`) and command wiring with persisted world-level settings storage (`TameworkSettingsStore`).
 - Added crash telemetry runtime services (`CrashTelemetryService`, local crash envelope/store, optional HTTP reporting client) with diagnostics/debug command coverage.
