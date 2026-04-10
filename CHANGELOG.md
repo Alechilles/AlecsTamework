@@ -3,13 +3,25 @@
 ## Unreleased
 
 ### Added
-- Added `Glowing Purple Mushroom Spores`, a Farming Bench Tier 4 seed recipe that lets players cultivate the mushrooms used for tranquilizer potion crafting.
 - Added new role-scoped progression families for companion leveling and passive talents (`TwLevelingConfig`, `TwTalentConfig`), including XP gain from feed/harvest/breeding/combat, level-based stat growth, passive talent purchases, linked-panel summaries, and a companion talent page for spending points on loaded companions.
 
 ### Fixed
-- Fixed managed coop resident release placement so the front-of-coop cone search no longer accepts spawn positions more than one block below the coop, preventing releases into rooms under thin floors.
+- Fixed startup failure when `SpawningPlugin` is unavailable by treating spawn marker/beacon component types as optional in despawn diagnostics setup.
+- Fixed startup crash when SQLite native bindings are unavailable by treating sqlite native linkage failures as recoverable persistence degradation instead of setup-fatal errors.
 
-## 2.8.1 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-09
+## 2.8.1 - Post-2.8.0 Stability + Mushroom Spores - 2026-04-10
+### Added
+- Added `Glowing Purple Mushroom Spores`, a Tier 6 Farming Bench seed recipe that lets players cultivate the mushrooms used for tranquilizer potion crafting.
+
+### Changed
+- Updated `Glowing Purple Mushroom` cultivation to use five growth stages, mud-only planting support, and light-sensitive growth modifiers that strongly favor darkness while making direct sunlight nearly stall growth.
+
+### Fixed
+- Fixed startup exceptions when duplicate plugin packs are loaded by hardening pack discovery and filtering.
+- Fixed needs-damage execution race paths by deferring command-buffer-context damage dispatch, preventing starvation/dehydration death collisions during needs sweep.
+- Fixed managed coop resident release placement so the front-of-coop cone follows the coop block's facing and no longer accepts spawn positions more than one block below the coop, preventing releases behind/on top of the coop or into rooms under thin floors.
+
+## 2.8.0 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-08
 ### Added
 - Added `/tw settings` UI (`TameworkSettingsPage`) and command wiring with persisted world-level settings storage (`TameworkSettingsStore`).
 - Added crash telemetry runtime services (`CrashTelemetryService`, local crash envelope/store, optional HTTP reporting client) with diagnostics/debug command coverage.

@@ -356,6 +356,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                     normalizeIdentifier(world.getName()),
                     coopId,
                     location.block(),
+                    location.blockRotationIndex(),
                     config,
                     container,
                     coopKey
@@ -572,7 +573,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             }
             try {
                 TwCoopConfig config = resolveCoopConfigByIdentifier(coopId);
-                if (!releaseResident(world, entityStore, slotContext, coopBlock, config)) {
+                if (!releaseResident(world, entityStore, slotContext, coopBlock, 0, config)) {
                     debugCoopThrottled(
                             coopKey + "|reason=release_failed",
                             nowMs,
@@ -705,13 +706,21 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                                     @Nonnull Store<EntityStore> entityStore,
                                     @Nonnull ManagedCoopContext coop,
                                     int slot) {
-        return releaseResident(world, entityStore, coop.slotContext(slot), coop.block(), coop.config());
+        return releaseResident(
+                world,
+                entityStore,
+                coop.slotContext(slot),
+                coop.block(),
+                coop.blockRotationIndex(),
+                coop.config()
+        );
     }
 
     private boolean releaseResident(@Nonnull World world,
                                     @Nonnull Store<EntityStore> entityStore,
                                     @Nonnull CommandLinkedNpcCoopService.CoopSlotContext slotContext,
                                     @Nonnull Vector3i coopBlock,
+                                    int coopRotationIndex,
                                     @Nullable TwCoopConfig coopConfig) {
         CommandLinkedNpcCoopService.CoopLedgerSlotSnapshot ledgerSnapshot =
                 coopService.getLedgerSlotSnapshot(slotContext);
@@ -764,10 +773,37 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 world,
                 roleBuilder,
                 coopBlock,
+                coopRotationIndex,
                 coopConfig != null ? coopConfig.getLifecycleRules().getResidentSpawnOffset().getX() : DEFAULT_RELEASE_OFFSET_X,
                 coopConfig != null ? coopConfig.getLifecycleRules().getResidentSpawnOffset().getY() : DEFAULT_RELEASE_OFFSET_Y,
                 coopConfig != null ? coopConfig.getLifecycleRules().getResidentSpawnOffset().getZ() : DEFAULT_RELEASE_OFFSET_Z
         );
+        if (CoopDebugLogger.isEnabled()) {
+            double localOffsetX = coopConfig != null ? coopConfig.getLifecycleRules().getResidentSpawnOffset().getX() : DEFAULT_RELEASE_OFFSET_X;
+            double localOffsetY = coopConfig != null ? coopConfig.getLifecycleRules().getResidentSpawnOffset().getY() : DEFAULT_RELEASE_OFFSET_Y;
+            double localOffsetZ = coopConfig != null ? coopConfig.getLifecycleRules().getResidentSpawnOffset().getZ() : DEFAULT_RELEASE_OFFSET_Z;
+            Vector3d worldOffset = releasePositionService.rotateHorizontalOffset(
+                    coopRotationIndex,
+                    localOffsetX,
+                    localOffsetY,
+                    localOffsetZ
+            );
+            Vector3d forwardDirection = releasePositionService.resolveForwardDirection(
+                    coopRotationIndex,
+                    localOffsetX,
+                    localOffsetZ
+            );
+            debugCoop(
+                    "managed coop release placement coop=" + firstNonBlank(slotContext.coopId(), "<unknown>")
+                            + " slot=" + slotContext.residentSlot()
+                            + " block=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                            + " rotationIndex=" + coopRotationIndex
+                            + " localOffset=" + formatVector(localOffsetX, localOffsetY, localOffsetZ)
+                            + " worldOffset=" + formatVector(worldOffset)
+                            + " forward=" + formatVector(forwardDirection)
+                            + " spawn=" + formatVector(spawnPosition)
+            );
+        }
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(
                 entityStore,
                 roleIndex,
@@ -1352,7 +1388,11 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         int worldZ = ChunkUtil.worldCoordFromLocalCoord(worldChunk.getZ(), localZ);
         BlockType blockType = worldChunk.getBlockType(worldX, localY, worldZ);
         String blockTypeId = normalizeBlockTypeId(blockType != null ? blockType.getId() : null);
-        return new CoopLocation(new Vector3i(worldX, localY, worldZ), blockTypeId);
+        return new CoopLocation(
+                new Vector3i(worldX, localY, worldZ),
+                blockTypeId,
+                worldChunk.getRotationIndex(worldX, localY, worldZ)
+        );
     }
 
     @Nullable
@@ -1740,6 +1780,19 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         return !Double.isNaN(value) && !Double.isInfinite(value);
     }
 
+    @Nonnull
+    private String formatVector(@Nullable Vector3d vector) {
+        if (vector == null) {
+            return "<null>";
+        }
+        return formatVector(vector.x, vector.y, vector.z);
+    }
+
+    @Nonnull
+    private String formatVector(double x, double y, double z) {
+        return x + "," + y + "," + z;
+    }
+
     private void maybeLogStatus(long nowMs, @Nonnull String message) {
         if (!CoopDebugLogger.isEnabled()) {
             return;
@@ -1818,12 +1871,13 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         return (ComponentType<ChunkStore, ? extends Component<ChunkStore>>) type;
     }
 
-    private record CoopLocation(@Nonnull Vector3i block, @Nullable String blockTypeId) {
+    private record CoopLocation(@Nonnull Vector3i block, @Nullable String blockTypeId, int blockRotationIndex) {
     }
 
     private record ManagedCoopContext(@Nullable String worldName,
                                       @Nonnull String coopId,
                                       @Nonnull Vector3i block,
+                                      int blockRotationIndex,
                                       @Nonnull TwCoopConfig config,
                                       @Nullable ItemContainer container,
                                       @Nonnull String coopKey) {

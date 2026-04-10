@@ -5,6 +5,38 @@
   },
   "Parent": "Template_Seeds",
   "Quality": "Junk",
+  "Interactions": {
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "BlockCondition",
+          "Matchers": [
+            {
+              "Block": {
+                "Id": "Soil_Mud"
+              },
+              "Face": "Up"
+            },
+            {
+              "Block": {
+                "Id": "Soil_Mud_Dry"
+              },
+              "Face": "Up"
+            }
+          ],
+          "Next": {
+            "Type": "Replace",
+            "Var": "SeedId",
+            "DefaultValue": {
+              "Interactions": [
+                "Seed_Place"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
   "InteractionVars": {
     "SeedId": {
       "Interactions": [
@@ -16,7 +48,7 @@
     }
   },
   "Texture": "Resources/Plants/SeedBag_Textures/Tw_Glowing_Purple_Mushroom.png",
-  "Icon": "Icons/ItemsGenerated/Plant_Seeds_Mushroom_Glowing_Purple.png",
+  "Icon": "Icons/ItemsGenerated/Tw_Plant_Seeds_Mushroom_Glowing_Purple.png",
   "IconProperties": {
     "Scale": 0.5,
     "Rotation": [
@@ -34,7 +66,7 @@
     "Input": [
       {
         "ItemId": "Ingredient_Life_Essence",
-        "Quantity": 6
+        "Quantity": 8
       },
       {
         "ItemId": "Ingredient_Void_Essence",
@@ -48,7 +80,7 @@
         "Categories": [
           "Seeds"
         ],
-        "RequiredTierLevel": 4
+        "RequiredTierLevel": 6
       }
     ],
     "Output": [

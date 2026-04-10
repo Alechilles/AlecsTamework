@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.math.vector.Vector3d;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.Rotation;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,8 +27,30 @@ class CoopResidentReleasePositionServiceTest {
     void clampsFallbackPositionsToTheOneBlockVerticalLimit() {
         Vector3d clamped = service.clampToVerticalLimit(12, new Vector3d(2.5, 8.0, 4.5));
 
-        assertEquals(2.5, clamped.x);
-        assertEquals(11.0, clamped.y);
-        assertEquals(4.5, clamped.z);
+        assertEquals(2.5, clamped.x, 0.000001);
+        assertEquals(11.0, clamped.y, 0.000001);
+        assertEquals(4.5, clamped.z, 0.000001);
+    }
+
+    @Test
+    void rotatesSpawnOffsetWithCoopYaw() {
+        int rotationIndex = RotationTuple.of(Rotation.Ninety, Rotation.None).index();
+
+        Vector3d rotated = service.rotateHorizontalOffset(rotationIndex, 0.0, 0.0, 3.0);
+
+        assertEquals(3.0, rotated.x, 0.000001);
+        assertEquals(0.0, rotated.y, 0.000001);
+        assertEquals(0.0, rotated.z, 0.000001);
+    }
+
+    @Test
+    void defaultsZeroOffsetForwardToTheCoopFront() {
+        int rotationIndex = RotationTuple.of(Rotation.TwoSeventy, Rotation.None).index();
+
+        Vector3d forward = service.resolveForwardDirection(rotationIndex, 0.0, 0.0);
+
+        assertEquals(-1.0, forward.x, 0.000001);
+        assertEquals(0.0, forward.y, 0.000001);
+        assertEquals(0.0, forward.z, 0.000001);
     }
 }

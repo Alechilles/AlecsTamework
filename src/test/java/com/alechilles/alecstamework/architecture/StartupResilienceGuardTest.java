@@ -58,4 +58,26 @@ class StartupResilienceGuardTest {
                 "Command-item loading must degrade gracefully when Vector3d is absent."
         );
     }
+
+    @Test
+    void despawnDiagnosticsHandlesMissingSpawnPluginGracefully() throws IOException {
+        String content = Files.readString(TAMEWORK_PATH, StandardCharsets.UTF_8);
+
+        assertTrue(
+                content.contains("resolveOptionalSpawnMarkerReferenceComponentType()"),
+                "Tamework setup must resolve SpawnMarkerReference component type through optional helper."
+        );
+        assertTrue(
+                content.contains("resolveOptionalSpawnBeaconReferenceComponentType()"),
+                "Tamework setup must resolve SpawnBeaconReference component type through optional helper."
+        );
+        assertTrue(
+                content.contains("SpawnMarkerReference component type is unavailable"),
+                "Missing spawn marker component type should warn and continue startup."
+        );
+        assertTrue(
+                content.contains("SpawnBeaconReference component type is unavailable"),
+                "Missing spawn beacon component type should warn and continue startup."
+        );
+    }
 }

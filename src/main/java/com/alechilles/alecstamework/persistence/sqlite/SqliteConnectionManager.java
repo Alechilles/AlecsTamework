@@ -33,7 +33,12 @@ public final class SqliteConnectionManager {
     public Connection openConnection() throws SQLException {
         ensureDriverLoaded();
         ensureParentDirectory();
-        Connection connection = DriverManager.getConnection(jdbcUrl);
+        Connection connection;
+        try {
+            connection = DriverManager.getConnection(jdbcUrl);
+        } catch (LinkageError error) {
+            throw new SQLException("sqlite_native_unavailable", error);
+        }
         initializeSessionPragmas(connection);
         return connection;
     }

@@ -289,12 +289,22 @@ final class InteractionStateEffects {
             return false;
         }
         boolean detached = false;
-        ComponentType<EntityStore, SpawnMarkerReference> markerReferenceType = SpawnMarkerReference.getComponentType();
+        ComponentType<EntityStore, SpawnMarkerReference> markerReferenceType = null;
+        try {
+            markerReferenceType = SpawnMarkerReference.getComponentType();
+        } catch (RuntimeException | LinkageError ignored) {
+            markerReferenceType = null;
+        }
         if (markerReferenceType != null && store.getComponent(npcRef, markerReferenceType) != null) {
             store.tryRemoveComponent(npcRef, markerReferenceType);
             detached = true;
         }
-        ComponentType<EntityStore, SpawnBeaconReference> beaconReferenceType = SpawnBeaconReference.getComponentType();
+        ComponentType<EntityStore, SpawnBeaconReference> beaconReferenceType = null;
+        try {
+            beaconReferenceType = SpawnBeaconReference.getComponentType();
+        } catch (RuntimeException | LinkageError ignored) {
+            beaconReferenceType = null;
+        }
         if (beaconReferenceType != null && store.getComponent(npcRef, beaconReferenceType) != null) {
             store.tryRemoveComponent(npcRef, beaconReferenceType);
             detached = true;

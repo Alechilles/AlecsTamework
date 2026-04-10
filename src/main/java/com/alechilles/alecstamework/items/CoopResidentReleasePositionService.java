@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.items;
 
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3i;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.Rotation;
+import com.hypixel.hytale.server.core.asset.type.blocktype.config.RotationTuple;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -27,15 +29,17 @@ public final class CoopResidentReleasePositionService {
     public Vector3d resolveSpawnPosition(@Nonnull World world,
                                          @Nonnull Builder<Role> roleBuilder,
                                          @Nonnull Vector3i coopBlock,
+                                         int coopRotationIndex,
                                          double offsetX,
                                          double offsetY,
                                          double offsetZ) {
+        Vector3d rotatedOffset = rotateHorizontalOffset(coopRotationIndex, offsetX, offsetY, offsetZ);
         Vector3d fallback = clampToVerticalLimit(
                 coopBlock.y,
                 new Vector3d(
-                        coopBlock.x + 0.5 + offsetX,
-                        coopBlock.y + offsetY,
-                        coopBlock.z + 0.5 + offsetZ
+                        coopBlock.x + 0.5 + rotatedOffset.x,
+                        coopBlock.y + rotatedOffset.y,
+                        coopBlock.z + 0.5 + rotatedOffset.z
                 )
         );
         Vector3d validatedFallback = validateSpawnPosition(world, roleBuilder, fallback);
@@ -43,12 +47,14 @@ public final class CoopResidentReleasePositionService {
             fallback = validatedFallback;
         }
 
-        double forwardX = offsetX;
-        double forwardZ = offsetZ;
+        Vector3d forwardDirection = resolveForwardDirection(coopRotationIndex, offsetX, offsetZ);
+        double forwardX = forwardDirection.x;
+        double forwardZ = forwardDirection.z;
         double forwardLength = Math.sqrt((forwardX * forwardX) + (forwardZ * forwardZ));
         if (!Double.isFinite(forwardLength) || forwardLength < 0.001) {
-            forwardX = 0.0;
-            forwardZ = 1.0;
+            Vector3d defaultForward = rotateHorizontalOffset(coopRotationIndex, 0.0, 0.0, 1.0);
+            forwardX = defaultForward.x;
+            forwardZ = defaultForward.z;
             forwardLength = 1.0;
         }
         forwardX /= forwardLength;
@@ -93,6 +99,28 @@ public final class CoopResidentReleasePositionService {
 
     double minimumAllowedSpawnY(int coopBlockY) {
         return coopBlockY - MAX_VERTICAL_DROP_BELOW_COOP;
+    }
+
+    @Nonnull
+    Vector3d rotateHorizontalOffset(int coopRotationIndex, double x, double y, double z) {
+        Rotation yawRotation = resolveYawRotation(coopRotationIndex);
+        return yawRotation.rotateY(new Vector3d(x, y, z), new Vector3d());
+    }
+
+    @Nonnull
+    Vector3d resolveForwardDirection(int coopRotationIndex, double offsetX, double offsetZ) {
+        if (Math.abs(offsetX) < 0.001 && Math.abs(offsetZ) < 0.001) {
+            return rotateHorizontalOffset(coopRotationIndex, 0.0, 0.0, 1.0);
+        }
+        return rotateHorizontalOffset(coopRotationIndex, offsetX, 0.0, offsetZ);
+    }
+
+    @Nonnull
+    private Rotation resolveYawRotation(int coopRotationIndex) {
+        if (coopRotationIndex < 0 || coopRotationIndex >= RotationTuple.VALUES.length) {
+            return Rotation.None;
+        }
+        return RotationTuple.get(coopRotationIndex).yaw();
     }
 
     @Nullable

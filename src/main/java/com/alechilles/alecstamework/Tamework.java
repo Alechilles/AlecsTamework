@@ -483,8 +483,8 @@ public class Tamework extends JavaPlugin {
                         NPCEntity.getComponentType(),
                         tamedComponentType,
                         ownerComponentType,
-                        SpawnMarkerReference.getComponentType(),
-                        SpawnBeaconReference.getComponentType(),
+                        resolveOptionalSpawnMarkerReferenceComponentType(),
+                        resolveOptionalSpawnBeaconReferenceComponentType(),
                         UUIDComponent.getComponentType()
                 )
         );
@@ -1147,6 +1147,32 @@ public class Tamework extends JavaPlugin {
             cursor = cursor.getCause();
         }
         return false;
+    }
+
+    @Nullable
+    private ComponentType<EntityStore, SpawnMarkerReference> resolveOptionalSpawnMarkerReferenceComponentType() {
+        try {
+            return SpawnMarkerReference.getComponentType();
+        } catch (RuntimeException | LinkageError error) {
+            getLogger().at(Level.WARNING).withCause(error).log(
+                    "SpawnMarkerReference component type is unavailable; companion despawn diagnostics will skip marker "
+                            + "reference tracking."
+            );
+            return null;
+        }
+    }
+
+    @Nullable
+    private ComponentType<EntityStore, SpawnBeaconReference> resolveOptionalSpawnBeaconReferenceComponentType() {
+        try {
+            return SpawnBeaconReference.getComponentType();
+        } catch (RuntimeException | LinkageError error) {
+            getLogger().at(Level.WARNING).withCause(error).log(
+                    "SpawnBeaconReference component type is unavailable; companion despawn diagnostics will skip beacon "
+                            + "reference tracking."
+            );
+            return null;
+        }
     }
 
     private void registerGlobalConfigAssets() {
