@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+- Fixed startup failure when `SpawningPlugin` is unavailable by treating spawn marker/beacon component types as optional in despawn diagnostics setup.
+- Fixed startup crash when SQLite native bindings are unavailable by treating sqlite native linkage failures as recoverable persistence degradation instead of setup-fatal errors.
+
 ## 2.8.1 - Post-2.8.0 Stability + Mushroom Spores - 2026-04-10
 ### Added
 - Added `Glowing Purple Mushroom Spores`, a Tier 6 Farming Bench seed recipe that lets players cultivate the mushrooms used for tranquilizer potion crafting.
