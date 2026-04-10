@@ -36,6 +36,11 @@ items.Tw_Feed_Herbivore.description=Budget herbivore feed that restores hunger b
 items.Tw_Feed_Carnivore.name=Carnivore Kibble
 items.Tw_Feed_Carnivore.description=Budget carnivore kibble that restores hunger but isn't very appetizing.
 
+# === Tamework Mushroom Seeds ===
+items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.name=Glowing Purple Mushroom Spores
+items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.description=Cultivates <color is="#ffffff">Glowing Purple Mushrooms</color>.\n• Plant in <color is="#926444">Mud</color>\n• Grows fastest <color is="#ccaa00">out of sunlight</color>\n• Grows <color is="#ccaa00">very slowly</color> in direct sunlight\n\nGrowth Time:\n• <color is="#4ade80">5</color> <color is="#ffffff">Stages</color>\n• <color is="#4ade80">2</color> <color is="#ffffff">Days</color> <color is="#ffffff">in low sunlight</color>
+items.Tw_Plant_Crop_Mushroom_Glowing_Purple_Block.name=Glowing Purple Mushroom
+
 # ===== Tamework UI: Shared =====
 tamework.ui.shared.button.apply=Apply
 tamework.ui.shared.button.back=Back

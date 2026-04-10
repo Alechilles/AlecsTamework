@@ -1,0 +1,23 @@
+{
+  "Type": "LightLevel",
+  "Modifier": 4,
+  "ArtificialLight": {
+    "Red": {
+      "Min": 0,
+      "Max": 4
+    },
+    "Green": {
+      "Min": 0,
+      "Max": 4
+    },
+    "Blue": {
+      "Min": 0,
+      "Max": 4
+    }
+  },
+  "Sunlight": {
+    "Min": 0,
+    "Max": 1
+  },
+  "RequireBoth": true
+}

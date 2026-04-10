@@ -31,7 +31,7 @@
               "Weight": 1
             }
           ],
-          "CustomModelScale": 0.45,
+          "CustomModelScale": 0.35,
           "HitboxType": "Plant_Small",
           "RandomRotation": "YawStep1",
           "Gathering": {
@@ -54,8 +54,54 @@
               "Weight": 1
             }
           ],
-          "CustomModelScale": 0.7,
+          "CustomModelScale": 0.55,
           "HitboxType": "Plant_Medium",
+          "RandomRotation": "YawStep1",
+          "Gathering": {
+            "Soft": {
+              "DropList": "Drops_Plant_Crop_Mushroom_Glowing_Purple_Spores"
+            }
+          },
+          "BlockParticleSetId": "Dust",
+          "BlockSoundSetId": "Mushroom",
+          "ParticleColor": "#723862",
+          "Light": {
+            "Color": "#868"
+          }
+        },
+        "Stage3": {
+          "CustomModel": "Blocks/Foliage/Plants/Mushroom_Balls.blockymodel",
+          "CustomModelTexture": [
+            {
+              "Texture": "Blocks/Foliage/Plants/Mushroom_Balls_Corrupted.png",
+              "Weight": 1
+            }
+          ],
+          "CustomModelScale": 0.75,
+          "HitboxType": "Plant_Medium",
+          "RandomRotation": "YawStep1",
+          "Gathering": {
+            "Soft": {
+              "DropList": "Drops_Plant_Crop_Mushroom_Glowing_Purple_Spores"
+            }
+          },
+          "BlockParticleSetId": "Dust",
+          "BlockSoundSetId": "Mushroom",
+          "ParticleColor": "#723862",
+          "Light": {
+            "Color": "#757"
+          }
+        },
+        "Stage4": {
+          "CustomModel": "Blocks/Foliage/Plants/Mushroom_Balls.blockymodel",
+          "CustomModelTexture": [
+            {
+              "Texture": "Blocks/Foliage/Plants/Mushroom_Balls_Corrupted.png",
+              "Weight": 1
+            }
+          ],
+          "CustomModelScale": 0.95,
+          "HitboxType": "Mushroom_Medium",
           "RandomRotation": "YawStep1",
           "Gathering": {
             "Soft": {
@@ -76,16 +122,16 @@
         "Default": [
           {
             "Duration": {
-              "Min": 10500,
-              "Max": 10500
+              "Min": 138240,
+              "Max": 138240
             },
             "Type": "BlockState",
             "State": "default"
           },
           {
             "Duration": {
-              "Min": 37950,
-              "Max": 37950
+              "Min": 138240,
+              "Max": 138240
             },
             "Type": "BlockState",
             "SoundEventId": "SFX_Crops_Grow",
@@ -93,12 +139,30 @@
           },
           {
             "Duration": {
-              "Min": 37950,
-              "Max": 37950
+              "Min": 138240,
+              "Max": 138240
             },
             "Type": "BlockState",
             "SoundEventId": "SFX_Crops_Grow",
             "State": "Stage2"
+          },
+          {
+            "Duration": {
+              "Min": 138240,
+              "Max": 138240
+            },
+            "Type": "BlockState",
+            "SoundEventId": "SFX_Crops_Grow",
+            "State": "Stage3"
+          },
+          {
+            "Duration": {
+              "Min": 138240,
+              "Max": 138240
+            },
+            "Type": "BlockState",
+            "SoundEventId": "SFX_Crops_Grow",
+            "State": "Stage4"
           },
           {
             "Type": "BlockType",
@@ -111,7 +175,8 @@
       "ActiveGrowthModifiers": [
         "Fertilizer",
         "Water",
-        "LightLevel"
+        "Tw_Mushroom_Darkness",
+        "Tw_Mushroom_Sunlight"
       ]
     },
     "Gathering": {
@@ -122,10 +187,10 @@
     "Support": {
       "Down": [
         {
-          "TagId": "Type=Soil"
+          "BlockTypeId": "Soil_Mud"
         },
         {
-          "TagId": "SubType=Planter"
+          "BlockTypeId": "Soil_Mud_Dry"
         }
       ]
     },

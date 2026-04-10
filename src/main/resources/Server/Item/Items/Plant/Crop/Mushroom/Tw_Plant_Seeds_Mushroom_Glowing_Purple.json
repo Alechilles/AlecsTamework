@@ -5,6 +5,38 @@
   },
   "Parent": "Template_Seeds",
   "Quality": "Junk",
+  "Interactions": {
+    "Secondary": {
+      "Interactions": [
+        {
+          "Type": "BlockCondition",
+          "Matchers": [
+            {
+              "Block": {
+                "Id": "Soil_Mud"
+              },
+              "Face": "Up"
+            },
+            {
+              "Block": {
+                "Id": "Soil_Mud_Dry"
+              },
+              "Face": "Up"
+            }
+          ],
+          "Next": {
+            "Type": "Replace",
+            "Var": "SeedId",
+            "DefaultValue": {
+              "Interactions": [
+                "Seed_Place"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  },
   "InteractionVars": {
     "SeedId": {
       "Interactions": [
