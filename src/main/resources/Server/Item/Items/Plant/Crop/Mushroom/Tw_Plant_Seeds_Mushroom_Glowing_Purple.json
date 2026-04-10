@@ -16,7 +16,7 @@
     }
   },
   "Texture": "Resources/Plants/SeedBag_Textures/Tw_Glowing_Purple_Mushroom.png",
-  "Icon": "Icons/ItemsGenerated/Plant_Seeds_Mushroom_Glowing_Purple.png",
+  "Icon": "Icons/ItemsGenerated/Tw_Plant_Seeds_Mushroom_Glowing_Purple.png",
   "IconProperties": {
     "Scale": 0.5,
     "Rotation": [
