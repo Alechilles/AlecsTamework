@@ -56,6 +56,7 @@ public final class TameworkCommandSelectionPage
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
     private static final String RETURN_HOME_COMMAND_PREFIX = "__returnhome__:";
+    private static final String OPEN_TALENTS_COMMAND_PREFIX = "__talents__:";
     private static final String PANEL_RADIUS_DECREASE_COMMAND_ID = "__panel_radius_dec__";
     private static final String PANEL_RADIUS_INCREASE_COMMAND_ID = "__panel_radius_inc__";
     private static final String PANEL_MANAGE_GROUPS_COMMAND_ID = "__panel_manage_groups__";
@@ -83,7 +84,8 @@ public final class TameworkCommandSelectionPage
                     RESPAWN_COMMAND_PREFIX,
                     RECALL_COMMAND_PREFIX,
                     SET_HOME_COMMAND_PREFIX,
-                    RETURN_HOME_COMMAND_PREFIX
+                    RETURN_HOME_COMMAND_PREFIX,
+                    OPEN_TALENTS_COMMAND_PREFIX
             );
 
     private final CommandOption[] options;
@@ -110,6 +112,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
     private final Consumer<UUID> returnHomeCallback;
+    private final Consumer<UUID> openTalentsCallback;
     private final Consumer<String> panelSetModeCallback;
     private final Runnable panelRadiusDecreaseCallback;
     private final Runnable panelRadiusIncreaseCallback;
@@ -145,11 +148,12 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<UUID> toggleBreedingCallback,
                                         @Nonnull Consumer<UUID> releaseCallback,
                                         @Nonnull Consumer<UUID> cullCallback,
-                                        @Nonnull Consumer<UUID> respawnCallback,
-                                        @Nonnull Consumer<UUID> recallCallback,
-                                        @Nonnull Consumer<UUID> setHomeCallback,
-                                        @Nonnull Consumer<UUID> returnHomeCallback,
-                                        @Nonnull Consumer<String> panelSetModeCallback,
+                                         @Nonnull Consumer<UUID> respawnCallback,
+                                         @Nonnull Consumer<UUID> recallCallback,
+                                         @Nonnull Consumer<UUID> setHomeCallback,
+                                         @Nonnull Consumer<UUID> returnHomeCallback,
+                                         @Nonnull Consumer<UUID> openTalentsCallback,
+                                         @Nonnull Consumer<String> panelSetModeCallback,
                                         @Nonnull Runnable panelRadiusDecreaseCallback,
                                         @Nonnull Runnable panelRadiusIncreaseCallback,
                                         @Nonnull Runnable panelManageGroupsCallback,
@@ -183,6 +187,7 @@ public final class TameworkCommandSelectionPage
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
         this.returnHomeCallback = returnHomeCallback;
+        this.openTalentsCallback = openTalentsCallback;
         this.panelSetModeCallback = panelSetModeCallback;
         this.panelRadiusDecreaseCallback = panelRadiusDecreaseCallback;
         this.panelRadiusIncreaseCallback = panelRadiusIncreaseCallback;
@@ -509,6 +514,18 @@ public final class TameworkCommandSelectionPage
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)) {
+            if (openTalentsCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_TALENTS_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                navigationPending = true;
+                closePage();
+                openTalentsCallback.accept(npcUuid);
             }
             return;
         }

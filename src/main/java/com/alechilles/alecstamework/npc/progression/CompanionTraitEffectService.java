@@ -43,7 +43,7 @@ public final class CompanionTraitEffectService {
             return;
         }
 
-        double multiplier = TraitModifierService.resolveMultiplier(
+        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 MOVE_SPEED_MULTIPLIER_EFFECT_KEY,

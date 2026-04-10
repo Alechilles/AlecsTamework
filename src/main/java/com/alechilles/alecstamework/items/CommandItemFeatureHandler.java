@@ -25,7 +25,13 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
+import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
@@ -69,6 +75,8 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 import java.util.function.Supplier;
 
 /**
@@ -726,6 +734,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, npcUuid),
+                npcUuid -> openTalentPageFromSelection(player, config, toolId, npcUuid),
                 value -> panelActionService.applySetPanelMode(player, toolId, value),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
@@ -782,6 +791,194 @@ public final class CommandItemFeatureHandler {
         if (!opened) {
             feedbackService.showWarningKey(player, "tamework.ui.notifications.command.selection.reopenFailed");
         }
+    }
+
+    private void openTalentPageFromSelection(Player player,
+                                             TwCommandItemConfig config,
+                                             String toolId,
+                                             UUID npcUuid) {
+        if (player == null || config == null || toolId == null || toolId.isBlank() || npcUuid == null) {
+            return;
+        }
+        World world = player.getWorld();
+        if (world == null || player.getPageManager() == null) {
+            feedbackService.showWarning(player, "Talent page is unavailable right now.");
+            return;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        Ref<EntityStore> playerRef = player.getReference();
+        PlayerRef uiPlayerRef = player.getPlayerRef();
+        if (store == null || playerRef == null || !playerRef.isValid() || uiPlayerRef == null || !uiPlayerRef.isValid()) {
+            feedbackService.showWarning(player, "Talent page is unavailable right now.");
+            return;
+        }
+        TameworkCompanionTalentsPage page = new TameworkCompanionTalentsPage(
+                uiPlayerRef,
+                () -> buildTalentPageData(player, npcUuid),
+                talentId -> applyTalentPurchase(player, npcUuid, talentId),
+                () -> reopenSelectionMenu(player, config, toolId)
+        );
+        player.getPageManager().openCustomPage(playerRef, store, page);
+    }
+
+    @Nonnull
+    private TameworkCompanionTalentsPage.PageData buildTalentPageData(@Nonnull Player player,
+                                                                      @Nonnull UUID npcUuid) {
+        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, npcUuid);
+        if (context == null) {
+            return TameworkCompanionTalentsPage.PageData.empty();
+        }
+        CompanionLevelingService.LevelingSnapshot leveling = CompanionLevelingService.resolveSnapshot(
+                context.npcRef(),
+                context.store(),
+                context.roleId()
+        );
+        int availablePoints = CompanionTalentService.resolveAvailablePoints(context.npcRef(), context.store());
+        String levelSummary;
+        if (leveling == null) {
+            levelSummary = "Level data unavailable";
+        } else if (leveling.atMaxLevel()) {
+            levelSummary = "Level " + leveling.level() + " (MAX)";
+        } else {
+            levelSummary = "Level "
+                    + leveling.level()
+                    + " - XP "
+                    + Math.max(0, Math.round(leveling.currentXp()))
+                    + "/"
+                    + Math.max(1, Math.round(leveling.nextLevelDeltaXp()));
+        }
+        String pointsSummary = "Talent Points: " + availablePoints + " available";
+        TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(context.npcRef(), context.store());
+        if (talentConfig == null || !talentConfig.isEnabled() || talentConfig.getTalents().length == 0) {
+            return new TameworkCompanionTalentsPage.PageData(
+                    context.displayName(),
+                    levelSummary,
+                    pointsSummary,
+                    "No talent tree is configured for this companion.",
+                    List.of()
+            );
+        }
+        ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
+        TameworkTalentsComponent talents = talentsType != null ? context.store().getComponent(context.npcRef(), talentsType) : null;
+        ArrayList<TameworkCompanionTalentsPage.TalentEntry> entries = new ArrayList<>();
+        for (TwTalentConfig.TalentDefinition talent : talentConfig.getTalents()) {
+            if (talent == null || talent.getId() == null) {
+                continue;
+            }
+            boolean purchased = talents != null && talents.hasPurchasedTalent(talent.getId());
+            boolean levelMet = leveling != null && leveling.level() >= talent.getMinLevel();
+            String missingPrerequisite = resolveMissingPrerequisiteName(talents, talentConfig, talent);
+            boolean prerequisitesMet = missingPrerequisite == null;
+            boolean canPurchase = !purchased && levelMet && prerequisitesMet && availablePoints >= talent.getPointCost();
+            String status;
+            if (purchased) {
+                status = "Unlocked";
+            } else if (!levelMet) {
+                status = "Requires Level " + talent.getMinLevel();
+            } else if (!prerequisitesMet) {
+                status = "Requires " + missingPrerequisite;
+            } else if (availablePoints < talent.getPointCost()) {
+                status = "Costs " + talent.getPointCost() + " points";
+            } else {
+                status = "Cost " + talent.getPointCost() + " points";
+            }
+            entries.add(new TameworkCompanionTalentsPage.TalentEntry(
+                    talent.getId(),
+                    "Tier " + talent.getTier() + " - " + talent.getDisplayName(),
+                    talent.getDescription() != null ? talent.getDescription() : "Passive talent",
+                    status,
+                    canPurchase
+            ));
+        }
+        entries.sort((left, right) -> {
+            if (left == null && right == null) {
+                return 0;
+            }
+            if (left == null) {
+                return 1;
+            }
+            if (right == null) {
+                return -1;
+            }
+            return left.displayName().compareToIgnoreCase(right.displayName());
+        });
+        return new TameworkCompanionTalentsPage.PageData(
+                context.displayName(),
+                levelSummary,
+                pointsSummary,
+                entries.isEmpty() ? "No talents are configured for this companion." : "Choose a talent to inspect or unlock.",
+                entries
+        );
+    }
+
+    @Nonnull
+    private String applyTalentPurchase(@Nonnull Player player,
+                                       @Nonnull UUID npcUuid,
+                                       @Nullable String talentId) {
+        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, npcUuid);
+        if (context == null) {
+            String message = "Companion is no longer loaded.";
+            feedbackService.showWarning(player, message);
+            return message;
+        }
+        CompanionTalentService.PurchaseResult result = CompanionTalentService.purchaseTalent(
+                context.npcRef(),
+                context.store(),
+                talentId
+        );
+        if (result.applied()) {
+            feedbackService.showSuccess(player, result.message());
+        } else {
+            feedbackService.showWarning(player, result.message());
+        }
+        return result.message();
+    }
+
+    @Nullable
+    private String resolveMissingPrerequisiteName(@Nullable TameworkTalentsComponent talents,
+                                                  @Nonnull TwTalentConfig talentConfig,
+                                                  @Nonnull TwTalentConfig.TalentDefinition talent) {
+        for (String requiredTalentId : talent.getRequiresTalentIds()) {
+            if (requiredTalentId == null || requiredTalentId.isBlank()) {
+                continue;
+            }
+            if (talents != null && talents.hasPurchasedTalent(requiredTalentId)) {
+                continue;
+            }
+            TwTalentConfig.TalentDefinition prerequisite = talentConfig.findTalent(requiredTalentId);
+            return prerequisite != null ? prerequisite.getDisplayName() : requiredTalentId;
+        }
+        return null;
+    }
+
+    @Nullable
+    private LoadedCompanionTalentContext resolveLoadedCompanionTalentContext(@Nonnull Player player,
+                                                                             @Nonnull UUID npcUuid) {
+        World world = player.getWorld();
+        if (world == null) {
+            return null;
+        }
+        Store<EntityStore> store = world.getEntityStore().getStore();
+        if (store == null) {
+            return null;
+        }
+        Ref<EntityStore> npcRef = world.getEntityRef(npcUuid);
+        if (npcRef == null || !npcRef.isValid()) {
+            return null;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npc == null) {
+            return null;
+        }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        if (roleId == null || roleId.isBlank()) {
+            roleId = npcNameResolver.resolveNpcRoleId(npc);
+        }
+        String displayName = npcNameResolver.resolveNpcDisplayName(npcRef, store, npc);
+        if (displayName == null || displayName.isBlank()) {
+            displayName = "Companion";
+        }
+        return new LoadedCompanionTalentContext(npcRef, store, npc, displayName, roleId);
     }
 
     private void applyMenuSelection(Player player,
@@ -1669,6 +1866,13 @@ public final class CommandItemFeatureHandler {
 
     private boolean updateHeldItem(Player player, ItemStack updated) {
         return toolInventoryService.updateHeldItem(player, updated);
+    }
+
+    private record LoadedCompanionTalentContext(@Nonnull Ref<EntityStore> npcRef,
+                                                @Nonnull Store<EntityStore> store,
+                                                @Nonnull NPCEntity npc,
+                                                @Nonnull String displayName,
+                                                @Nullable String roleId) {
     }
 
     private record LinkedRecordCandidate(UUID npcUuid,

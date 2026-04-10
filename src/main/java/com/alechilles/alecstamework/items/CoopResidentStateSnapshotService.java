@@ -5,9 +5,11 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
@@ -239,7 +241,9 @@ public final class CoopResidentStateSnapshotService {
                 copyComponent(sourceSnapshot.happiness()),
                 copyComponent(sourceSnapshot.needs()),
                 copyComponent(sourceSnapshot.breeding()),
+                copyComponent(sourceSnapshot.leveling()),
                 copyComponent(sourceSnapshot.traits()),
+                copyComponent(sourceSnapshot.talents()),
                 copyComponent(sourceSnapshot.lifeStage()),
                 copyComponent(sourceSnapshot.attachments()),
                 System.currentTimeMillis()
@@ -343,7 +347,9 @@ public final class CoopResidentStateSnapshotService {
         putIfPresent(commandBuffer, reference, TameworkHappinessComponent.getComponentType(), snapshot.happiness());
         putIfPresent(commandBuffer, reference, TameworkNeedsComponent.getComponentType(), snapshot.needs());
         putIfPresent(commandBuffer, reference, TameworkBreedingComponent.getComponentType(), snapshot.breeding());
+        putIfPresent(commandBuffer, reference, TameworkLevelingComponent.getComponentType(), snapshot.leveling());
         putIfPresent(commandBuffer, reference, TameworkTraitsComponent.getComponentType(), snapshot.traits());
+        putIfPresent(commandBuffer, reference, TameworkTalentsComponent.getComponentType(), snapshot.talents());
         putIfPresent(commandBuffer, reference, TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
         putIfPresent(commandBuffer, reference, TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
     }
@@ -544,7 +550,9 @@ public final class CoopResidentStateSnapshotService {
                 happiness,
                 needs,
                 copyComponent(store.getComponent(reference, TameworkBreedingComponent.getComponentType())),
+                copyComponent(store.getComponent(reference, TameworkLevelingComponent.getComponentType())),
                 copyComponent(store.getComponent(reference, TameworkTraitsComponent.getComponentType())),
+                copyComponent(store.getComponent(reference, TameworkTalentsComponent.getComponentType())),
                 copyComponent(store.getComponent(reference, TameworkLifeStageComponent.getComponentType())),
                 attachments,
                 System.currentTimeMillis()
@@ -608,7 +616,9 @@ public final class CoopResidentStateSnapshotService {
                                             @Nullable TameworkHappinessComponent happiness,
                                             @Nullable TameworkNeedsComponent needs,
                                             @Nullable TameworkBreedingComponent breeding,
+                                            @Nullable TameworkLevelingComponent leveling,
                                             @Nullable TameworkTraitsComponent traits,
+                                            @Nullable TameworkTalentsComponent talents,
                                             @Nullable TameworkLifeStageComponent lifeStage,
                                             @Nullable TameworkAttachmentsComponent attachments,
                                             long capturedAtMs) {

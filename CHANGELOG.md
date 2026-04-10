@@ -4,6 +4,7 @@
 
 ### Added
 - Added `Glowing Purple Mushroom Spores`, a Farming Bench Tier 4 seed recipe that lets players cultivate the mushrooms used for tranquilizer potion crafting.
+- Added new role-scoped progression families for companion leveling and passive talents (`TwLevelingConfig`, `TwTalentConfig`), including XP gain from feed/harvest/breeding/combat, level-based stat growth, passive talent purchases, linked-panel summaries, and a companion talent page for spending points on loaded companions.
 
 ### Fixed
 - Fixed managed coop resident release placement so the front-of-coop cone search no longer accepts spawn positions more than one block below the coop, preventing releases into rooms under thin floors.

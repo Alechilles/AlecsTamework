@@ -362,6 +362,85 @@ class TwConfigInheritanceContractTest {
     }
 
     @Test
+    void levelingSectionsNestedMergeAndEffectsReplacementWork() throws Exception {
+        TwLevelingConfig parent = new TwLevelingConfig();
+        TwLevelingConfig child = new TwLevelingConfig();
+
+        TwLevelingConfig.LevelSettings parentLevels = new TwLevelingConfig.LevelSettings();
+        TwLevelingConfig.LevelSettings childLevels = new TwLevelingConfig.LevelSettings();
+        setField(parentLevels, "maxLevel", 30);
+        setField(parentLevels, "baseXp", 120.0d);
+        setField(parentLevels, "growthFactor", 1.4d);
+        setField(childLevels, "baseXp", 60.0d);
+        setField(parent, "levels", parentLevels);
+        setField(child, "levels", childLevels);
+
+        TwLevelingConfig.XpSourcesSettings parentSources = new TwLevelingConfig.XpSourcesSettings();
+        TwLevelingConfig.XpSourcesSettings childSources = new TwLevelingConfig.XpSourcesSettings();
+        TwLevelingConfig.SimpleXpSourceSettings parentFeed = new TwLevelingConfig.SimpleXpSourceSettings();
+        TwLevelingConfig.SimpleXpSourceSettings childFeed = new TwLevelingConfig.SimpleXpSourceSettings();
+        TwLevelingConfig.CombatXpSourceSettings parentCombat = new TwLevelingConfig.CombatXpSourceSettings();
+        TwLevelingConfig.CombatXpSourceSettings childCombat = new TwLevelingConfig.CombatXpSourceSettings();
+        setField(parentFeed, "enabled", false);
+        setField(parentFeed, "flatXp", 8.0d);
+        setField(childFeed, "enabled", true);
+        setField(parentCombat, "damageDealtXpPerPoint", 1.25d);
+        setField(parentCombat, "awardVsPlayers", true);
+        setField(childCombat, "damageTakenXpPerPoint", 0.4d);
+        setField(parentSources, "feed", parentFeed);
+        setField(childSources, "feed", childFeed);
+        setField(parentSources, "combat", parentCombat);
+        setField(childSources, "combat", childCombat);
+        setField(parent, "xpSources", parentSources);
+        setField(child, "xpSources", childSources);
+
+        TwLevelingConfig.GrowthEffect parentEffect = new TwLevelingConfig.GrowthEffect();
+        TwLevelingConfig.GrowthEffect childEffect = new TwLevelingConfig.GrowthEffect();
+        TwLevelingConfig.GrowthEffect[] childEffects = new TwLevelingConfig.GrowthEffect[] { childEffect };
+        setField(parentEffect, "effectKey", "MaxHealthMultiplier");
+        setField(childEffect, "effectKey", "DamageDealtMultiplier");
+        setField(parent, "statGrowth", statGrowthWithEffects(parentEffect));
+        setField(child, "statGrowth", statGrowthWithEffects(childEffect));
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("Levels", Set.of("BaseXp"));
+        nested.put("XpSources", Set.of("Feed", "Feed.Enabled", "Combat", "Combat.DamageTakenXpPerPoint"));
+        nested.put("StatGrowth", Set.of("Effects"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("Levels", "XpSources", "StatGrowth"), nested);
+
+        assertEquals(30, child.getLevels().getMaxLevel());
+        assertEquals(60.0d, child.getLevels().getBaseXp(), 0.00001d);
+        assertEquals(1.4d, child.getLevels().getGrowthFactor(), 0.00001d);
+        assertTrue(child.getXpSources().getFeed().isEnabled());
+        assertEquals(8.0d, child.getXpSources().getFeed().getFlatXp(), 0.00001d);
+        assertEquals(1.25d, child.getXpSources().getCombat().getDamageDealtXpPerPoint(), 0.00001d);
+        assertEquals(0.4d, child.getXpSources().getCombat().getDamageTakenXpPerPoint(), 0.00001d);
+        assertTrue(child.getXpSources().getCombat().isAwardVsPlayers());
+        assertEquals(1, child.getStatGrowth().getEffects().length);
+        assertSame(childEffect, child.getStatGrowth().getEffects()[0]);
+    }
+
+    @Test
+    void talentConfigRoleIdsInheritAndTalentsArrayReplacesParent() throws Exception {
+        TwTalentConfig parent = new TwTalentConfig();
+        TwTalentConfig child = new TwTalentConfig();
+
+        TwTalentConfig.TalentDefinition parentTalent = new TwTalentConfig.TalentDefinition();
+        TwTalentConfig.TalentDefinition childTalent = new TwTalentConfig.TalentDefinition();
+        TwTalentConfig.TalentDefinition[] childTalents = new TwTalentConfig.TalentDefinition[] { childTalent };
+        setField(parentTalent, "id", "parent_talent");
+        setField(childTalent, "id", "child_talent");
+        setField(parent, "roleIds", new String[] { "Role_A" });
+        setField(parent, "talents", new TwTalentConfig.TalentDefinition[] { parentTalent });
+        setField(child, "talents", childTalents);
+
+        child.inheritMissingTopLevelFrom(parent, Set.of("Talents"));
+
+        assertArrayEquals(new String[] { "Role_A" }, child.getRoleIds());
+        assertSame(childTalents, child.getTalents());
+    }
+
+    @Test
     void interactionCooldownNestedMergeCopiesMissingFieldsOnly() throws Exception {
         TwInteractionConfig parent = new TwInteractionConfig();
         TwInteractionConfig child = new TwInteractionConfig();
@@ -384,6 +463,12 @@ class TwConfigInheritanceContractTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static TwLevelingConfig.StatGrowthSettings statGrowthWithEffects(TwLevelingConfig.GrowthEffect effect) throws Exception {
+        TwLevelingConfig.StatGrowthSettings settings = new TwLevelingConfig.StatGrowthSettings();
+        setField(settings, "effects", new TwLevelingConfig.GrowthEffect[] { effect });
+        return settings;
     }
 
     private static Object getField(Object target, String fieldName) throws Exception {

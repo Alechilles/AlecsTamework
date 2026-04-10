@@ -111,6 +111,7 @@ class CommandLinkedNpcCoopServicePersistenceTest {
                         new TameworkHappinessComponent("happy_cfg", 0.75, 100L),
                         new TameworkNeedsComponent("needs_cfg", 0.2, 0.1, 0.0, 101L, 102L),
                         new TameworkBreedingComponent("breed_cfg", 0.5, 103L, true, true, 104L, null, 105L, 106L),
+                        null,
                         new TameworkTraitsComponent(
                                 "traits_cfg",
                                 107L,
@@ -118,6 +119,7 @@ class CommandLinkedNpcCoopServicePersistenceTest {
                                         new TameworkTraitsComponent.TraitValue("friendly", 1.0)
                                 }
                         ),
+                        null,
                         lifeStage,
                         new TameworkAttachmentsComponent("attach_cfg", Map.of("head", "crest")),
                         capturedAtMs

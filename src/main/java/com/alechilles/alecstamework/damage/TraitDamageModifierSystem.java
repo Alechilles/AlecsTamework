@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.damage;
 
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
-import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -55,7 +55,7 @@ public final class TraitDamageModifierSystem extends DamageEventSystem {
             return;
         }
 
-        double toughnessMultiplier = sanitizeMultiplier(TraitModifierService.resolveMultiplier(
+        double toughnessMultiplier = sanitizeMultiplier(CompanionProgressionModifierService.resolveMultiplier(
                 targetRef,
                 store,
                 TOUGHNESS_MULTIPLIER_EFFECT_KEY,
@@ -103,7 +103,7 @@ public final class TraitDamageModifierSystem extends DamageEventSystem {
         if (sourceRef == null || !sourceRef.isValid()) {
             return 1.0;
         }
-        return TraitModifierService.resolveMultiplier(
+        return CompanionProgressionModifierService.resolveMultiplier(
                 sourceRef,
                 store,
                 DAMAGE_DEALT_MULTIPLIER_EFFECT_KEY,

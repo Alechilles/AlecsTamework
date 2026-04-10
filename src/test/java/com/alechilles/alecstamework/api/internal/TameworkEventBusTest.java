@@ -115,7 +115,13 @@ class TameworkEventBusTest {
                 false,
                 null,
                 null,
-                false
+                false,
+                null,
+                1,
+                0.0,
+                null,
+                0,
+                null
         ), profile);
         bus.onLostRecorded(new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
                 npcUuid,

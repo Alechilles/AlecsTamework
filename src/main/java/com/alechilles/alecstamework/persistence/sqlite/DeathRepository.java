@@ -105,7 +105,13 @@ public final class DeathRepository {
                             getBoolean(payload, "lifeStageGrowthScalingEnabled", false),
                             getString(payload, "attachmentsConfigId"),
                             getString(payload, "attachmentsValues"),
-                            getBoolean(payload, "breedingEnabled", false)
+                            getBoolean(payload, "breedingEnabled", false),
+                            getString(payload, "levelingConfigId"),
+                            (int) getLong(payload, "levelingLevel", 1L),
+                            getDouble(payload, "levelingTotalXp", 0.0),
+                            getString(payload, "talentsConfigId"),
+                            (int) getLong(payload, "talentsSpentPoints", 0L),
+                            getString(payload, "purchasedTalentIds")
                     ));
                 }
             }
@@ -234,6 +240,12 @@ public final class DeathRepository {
         putString(payload, "attachmentsConfigId", snapshot.attachmentsConfigId());
         putString(payload, "attachmentsValues", snapshot.attachmentsValues());
         payload.addProperty("breedingEnabled", snapshot.breedingEnabled());
+        putString(payload, "levelingConfigId", snapshot.levelingConfigId());
+        payload.addProperty("levelingLevel", snapshot.levelingLevel());
+        payload.addProperty("levelingTotalXp", snapshot.levelingTotalXp());
+        putString(payload, "talentsConfigId", snapshot.talentsConfigId());
+        payload.addProperty("talentsSpentPoints", snapshot.talentsSpentPoints());
+        putString(payload, "purchasedTalentIds", snapshot.purchasedTalentIds());
         return payload.toString();
     }
 

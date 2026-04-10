@@ -7,11 +7,14 @@ import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -679,6 +682,18 @@ public final class CommandLinkedNpcLostService {
             traitsValues = null;
         }
 
+        ComponentType<EntityStore, TameworkLevelingComponent> levelingType = TameworkLevelingComponent.getComponentType();
+        TameworkLevelingComponent levelingComponent = levelingType != null ? store.getComponent(npcRef, levelingType) : null;
+        String levelingConfigId = levelingComponent != null ? levelingComponent.getConfigId() : null;
+        int levelingLevel = levelingComponent != null ? levelingComponent.getLevel() : 1;
+        double levelingTotalXp = levelingComponent != null ? levelingComponent.getTotalXp() : 0.0;
+
+        ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
+        TameworkTalentsComponent talentsComponent = talentsType != null ? store.getComponent(npcRef, talentsType) : null;
+        String talentsConfigId = talentsComponent != null ? talentsComponent.getConfigId() : null;
+        int talentsSpentPoints = talentsComponent != null ? talentsComponent.getSpentPoints() : 0;
+        String purchasedTalentIds = talentsComponent != null ? TalentIdCodec.encode(talentsComponent.getPurchasedTalentIds()) : null;
+
         ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageType = TameworkLifeStageComponent.getComponentType();
         TameworkLifeStageComponent lifeStageComponent = lifeStageType != null
                 ? store.getComponent(npcRef, lifeStageType)
@@ -757,7 +772,13 @@ public final class CommandLinkedNpcLostService {
                 lifeStageGrowthScalingEnabled,
                 attachmentsConfigId,
                 attachmentsValues,
-                breedingEnabled
+                breedingEnabled,
+                levelingConfigId,
+                levelingLevel,
+                levelingTotalXp,
+                talentsConfigId,
+                talentsSpentPoints,
+                purchasedTalentIds
         );
     }
 

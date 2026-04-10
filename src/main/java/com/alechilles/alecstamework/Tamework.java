@@ -28,14 +28,17 @@ import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
+import com.alechilles.alecstamework.damage.CompanionCombatExperienceSystem;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -80,10 +83,12 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
@@ -192,7 +197,9 @@ public class Tamework extends JavaPlugin {
     private boolean happinessAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
+    private boolean levelingAssetsRegistered;
     private boolean traitAssetsRegistered;
+    private boolean talentAssetsRegistered;
     private boolean debugAssetsRegistered;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
@@ -210,7 +217,9 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkHappinessComponent> happinessComponentType;
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
+    private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
+    private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
     private ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> projectileImpactEffectComponentType;
@@ -287,7 +296,9 @@ public class Tamework extends JavaPlugin {
         registerHappinessAssets();
         registerNeedsAssets();
         registerBreedingAssets();
+        registerLevelingAssets();
         registerTraitAssets();
+        registerTalentAssets();
         registerDebugAssets();
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
@@ -349,10 +360,22 @@ public class Tamework extends JavaPlugin {
                 TameworkBreedingComponent.CODEC
         );
 
+        levelingComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkLevelingComponent.class,
+                "TameworkLeveling",
+                TameworkLevelingComponent.CODEC
+        );
+
         traitsComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkTraitsComponent.class,
                 "TameworkTraits",
                 TameworkTraitsComponent.CODEC
+        );
+
+        talentsComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkTalentsComponent.class,
+                "TameworkTalents",
+                TameworkTalentsComponent.CODEC
         );
 
         attachmentsComponentType = getEntityStoreRegistry().registerComponent(
@@ -546,6 +569,7 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
         getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());
+        getEntityStoreRegistry().registerSystem(new CompanionCombatExperienceSystem());
         getEntityStoreRegistry().registerSystem(
                 new PlayerEffectMovementSystem(
                         PlayerRef.getComponentType(),
@@ -1237,6 +1261,22 @@ public class Tamework extends JavaPlugin {
         breedingAssetsRegistered = true;
     }
 
+    private void registerLevelingAssets() {
+        if (levelingAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwLevelingConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Leveling")
+                        .setCodec(TwLevelingConfig.CODEC)
+                        .setKeyFunction(TwLevelingConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsRemoved);
+        levelingAssetsRegistered = true;
+    }
+
     private void registerTraitAssets() {
         if (traitAssetsRegistered) {
             return;
@@ -1251,6 +1291,22 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsRemoved);
         traitAssetsRegistered = true;
+    }
+
+    private void registerTalentAssets() {
+        if (talentAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwTalentConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Talents")
+                        .setCodec(TwTalentConfig.CODEC)
+                        .setKeyFunction(TwTalentConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsRemoved);
+        talentAssetsRegistered = true;
     }
 
     private void registerDebugAssets() {
@@ -1495,6 +1551,20 @@ public class Tamework extends JavaPlugin {
         emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
     }
 
+    private void onLevelingAssetsLoaded(
+            LoadedAssetsEvent<String, TwLevelingConfig, DefaultAssetMap<String, TwLevelingConfig>> event) {
+        TwLevelingConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.LEVELING, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onLevelingAssetsRemoved(
+            RemovedAssetsEvent<String, TwLevelingConfig, DefaultAssetMap<String, TwLevelingConfig>> event) {
+        TwLevelingConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.LEVELING, event.getRemovedAssets());
+    }
+
     private void onTraitAssetsLoaded(
             LoadedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
@@ -1507,6 +1577,20 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
         emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getRemovedAssets());
+    }
+
+    private void onTalentAssetsLoaded(
+            LoadedAssetsEvent<String, TwTalentConfig, DefaultAssetMap<String, TwTalentConfig>> event) {
+        TwTalentConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.TALENT, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onTalentAssetsRemoved(
+            RemovedAssetsEvent<String, TwTalentConfig, DefaultAssetMap<String, TwTalentConfig>> event) {
+        TwTalentConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.TALENT, event.getRemovedAssets());
     }
 
     private void onDebugAssetsLoaded(
@@ -1663,8 +1747,16 @@ public class Tamework extends JavaPlugin {
         return breedingComponentType;
     }
 
+    public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {
+        return levelingComponentType;
+    }
+
     public ComponentType<EntityStore, TameworkTraitsComponent> getTraitsComponentType() {
         return traitsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkTalentsComponent> getTalentsComponentType() {
+        return talentsComponentType;
     }
 
     public ComponentType<EntityStore, TameworkAttachmentsComponent> getAttachmentsComponentType() {

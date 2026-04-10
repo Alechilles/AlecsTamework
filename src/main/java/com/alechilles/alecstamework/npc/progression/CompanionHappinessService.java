@@ -428,7 +428,7 @@ public final class CompanionHappinessService {
 
     private static double resolveDispositionMultiplier(@Nullable Ref<EntityStore> npcRef,
                                                        @Nullable Store<EntityStore> store) {
-        return TraitModifierService.resolveMultiplier(
+        return CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 "HappinessGainMultiplier",

@@ -1,0 +1,163 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer #TameworkCompanionTalentsRoot {
+    Anchor: (Width: 760, Height: 690);
+
+    #Title {
+      $C.@Title #TameworkCompanionTalentsTitle {
+        @Text = %server.tamework.ui.talents.title;
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+
+      Label #TameworkCompanionTalentsLevelSummary {
+        Anchor: (Height: 24, Bottom: 6);
+        Text: Level 1
+        Style: (FontSize: 16, TextColor: #dbe7f7, HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+
+      Label #TameworkCompanionTalentsPointsSummary {
+        Anchor: (Height: 22, Bottom: 6);
+        Text: Talent Points: 0 available
+        Style: (FontSize: 14, TextColor: #9fc2dd, HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+
+      Label #TameworkCompanionTalentsStatus {
+        Anchor: (Height: 20, Bottom: 10);
+        Text: 
+        Style: (FontSize: 13, TextColor: #bfd0e5, HorizontalAlignment: Center, VerticalAlignment: Center);
+      }
+
+      Group {
+        LayoutMode: Right;
+
+        $C.@SmallSecondaryTextButton #TameworkCompanionTalentsBackButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = %server.tamework.ui.talents.button.back;
+          @Anchor = (MinWidth: 128);
+        }
+
+        Group {
+          Anchor: (Width: 12);
+        }
+
+        $C.@SmallSecondaryTextButton #TameworkCompanionTalentsPrevButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = %server.tamework.ui.talents.button.prev;
+          @Anchor = (MinWidth: 108);
+          Visible: false;
+        }
+
+        Group {
+          Anchor: (Width: 12);
+        }
+
+        $C.@SmallSecondaryTextButton #TameworkCompanionTalentsNextButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = %server.tamework.ui.talents.button.next;
+          @Anchor = (MinWidth: 108);
+          Visible: false;
+        }
+
+        Group {
+          Anchor: (Width: 18);
+        }
+
+        Label #TameworkCompanionTalentsPageIndicator {
+          Anchor: (Height: 32, Width: 100);
+          Text: Page 1/1
+          Style: (FontSize: 13, TextColor: #9fc2dd, HorizontalAlignment: Center, VerticalAlignment: Center);
+        }
+      }
+
+      Group {
+        LayoutMode: Top;
+
+        Group #TalentRow0 {
+          Anchor: (Height: 68, Bottom: 8);
+          Background: #0a121b(0.96);
+          Visible: false;
+
+          Label #TalentName0 {
+            Anchor: (Top: 6, Left: 10, Right: 150, Height: 18);
+            Text: Talent
+            Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true);
+          }
+
+          Label #TalentDescription0 {
+            Anchor: (Top: 28, Left: 10, Right: 150, Height: 16);
+            Text: Description
+            Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          Label #TalentStatus0 {
+            Anchor: (Top: 48, Left: 10, Right: 150, Height: 14);
+            Text: Status
+            Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          $C.@SmallSecondaryTextButton #TalentBuyButton0 {
+            @Sounds = $C.@ButtonSounds;
+            @Text = %server.tamework.ui.talents.button.unlock;
+            @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30);
+            Visible: false;
+          }
+        }
+
+        Group #TalentRow1 { @Anchor = (Height: 68, Bottom: 8); @Background = #0a121b(0.96); Visible: false;
+          Label #TalentName1 { Anchor: (Top: 6, Left: 10, Right: 150, Height: 18); Text: Talent; Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true); }
+          Label #TalentDescription1 { Anchor: (Top: 28, Left: 10, Right: 150, Height: 16); Text: Description; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          Label #TalentStatus1 { Anchor: (Top: 48, Left: 10, Right: 150, Height: 14); Text: Status; Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          $C.@SmallSecondaryTextButton #TalentBuyButton1 { @Sounds = $C.@ButtonSounds; @Text = %server.tamework.ui.talents.button.unlock; @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30); Visible: false; }
+        }
+
+        Group #TalentRow2 { @Anchor = (Height: 68, Bottom: 8); @Background = #0a121b(0.96); Visible: false;
+          Label #TalentName2 { Anchor: (Top: 6, Left: 10, Right: 150, Height: 18); Text: Talent; Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true); }
+          Label #TalentDescription2 { Anchor: (Top: 28, Left: 10, Right: 150, Height: 16); Text: Description; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          Label #TalentStatus2 { Anchor: (Top: 48, Left: 10, Right: 150, Height: 14); Text: Status; Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          $C.@SmallSecondaryTextButton #TalentBuyButton2 { @Sounds = $C.@ButtonSounds; @Text = %server.tamework.ui.talents.button.unlock; @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30); Visible: false; }
+        }
+
+        Group #TalentRow3 { @Anchor = (Height: 68, Bottom: 8); @Background = #0a121b(0.96); Visible: false;
+          Label #TalentName3 { Anchor: (Top: 6, Left: 10, Right: 150, Height: 18); Text: Talent; Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true); }
+          Label #TalentDescription3 { Anchor: (Top: 28, Left: 10, Right: 150, Height: 16); Text: Description; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          Label #TalentStatus3 { Anchor: (Top: 48, Left: 10, Right: 150, Height: 14); Text: Status; Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          $C.@SmallSecondaryTextButton #TalentBuyButton3 { @Sounds = $C.@ButtonSounds; @Text = %server.tamework.ui.talents.button.unlock; @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30); Visible: false; }
+        }
+
+        Group #TalentRow4 { @Anchor = (Height: 68, Bottom: 8); @Background = #0a121b(0.96); Visible: false;
+          Label #TalentName4 { Anchor: (Top: 6, Left: 10, Right: 150, Height: 18); Text: Talent; Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true); }
+          Label #TalentDescription4 { Anchor: (Top: 28, Left: 10, Right: 150, Height: 16); Text: Description; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          Label #TalentStatus4 { Anchor: (Top: 48, Left: 10, Right: 150, Height: 14); Text: Status; Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          $C.@SmallSecondaryTextButton #TalentBuyButton4 { @Sounds = $C.@ButtonSounds; @Text = %server.tamework.ui.talents.button.unlock; @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30); Visible: false; }
+        }
+
+        Group #TalentRow5 { @Anchor = (Height: 68, Bottom: 8); @Background = #0a121b(0.96); Visible: false;
+          Label #TalentName5 { Anchor: (Top: 6, Left: 10, Right: 150, Height: 18); Text: Talent; Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true); }
+          Label #TalentDescription5 { Anchor: (Top: 28, Left: 10, Right: 150, Height: 16); Text: Description; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          Label #TalentStatus5 { Anchor: (Top: 48, Left: 10, Right: 150, Height: 14); Text: Status; Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          $C.@SmallSecondaryTextButton #TalentBuyButton5 { @Sounds = $C.@ButtonSounds; @Text = %server.tamework.ui.talents.button.unlock; @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30); Visible: false; }
+        }
+
+        Group #TalentRow6 { @Anchor = (Height: 68, Bottom: 8); @Background = #0a121b(0.96); Visible: false;
+          Label #TalentName6 { Anchor: (Top: 6, Left: 10, Right: 150, Height: 18); Text: Talent; Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true); }
+          Label #TalentDescription6 { Anchor: (Top: 28, Left: 10, Right: 150, Height: 16); Text: Description; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          Label #TalentStatus6 { Anchor: (Top: 48, Left: 10, Right: 150, Height: 14); Text: Status; Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          $C.@SmallSecondaryTextButton #TalentBuyButton6 { @Sounds = $C.@ButtonSounds; @Text = %server.tamework.ui.talents.button.unlock; @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30); Visible: false; }
+        }
+
+        Group #TalentRow7 { @Anchor = (Height: 68, Bottom: 8); @Background = #0a121b(0.96); Visible: false;
+          Label #TalentName7 { Anchor: (Top: 6, Left: 10, Right: 150, Height: 18); Text: Talent; Style: (FontSize: 15, TextColor: #e4efff, HorizontalAlignment: Start, VerticalAlignment: Center, RenderBold: true); }
+          Label #TalentDescription7 { Anchor: (Top: 28, Left: 10, Right: 150, Height: 16); Text: Description; Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          Label #TalentStatus7 { Anchor: (Top: 48, Left: 10, Right: 150, Height: 14); Text: Status; Style: (FontSize: 11, TextColor: #9fc2dd, HorizontalAlignment: Start, VerticalAlignment: Center); }
+          $C.@SmallSecondaryTextButton #TalentBuyButton7 { @Sounds = $C.@ButtonSounds; @Text = %server.tamework.ui.talents.button.unlock; @Anchor = (Top: 18, Right: 10, Width: 128, Height: 30); Visible: false; }
+        }
+      }
+    }
+  }
+}

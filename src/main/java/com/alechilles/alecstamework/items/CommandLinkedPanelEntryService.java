@@ -3,16 +3,20 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
@@ -35,6 +39,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Builds linked-companion panel entries for command-item UI.
@@ -130,7 +136,11 @@ final class CommandLinkedPanelEntryService {
             long breedingCooldownRemainingMs = 0L;
             double breedingCooldownRatio = 0.0;
             boolean breedingCooldownKnown = false;
+            LinkedNpcEntry.FutureStat futureStatA = null;
+            LinkedNpcEntry.FutureStat futureStatB = null;
             LinkedNpcTraitIndicator[] traitIndicators = LinkedNpcTraitIndicator.EMPTY;
+            boolean talentsActionVisible = false;
+            boolean talentsActionEnabled = false;
             if (world != null) {
                 Ref<EntityStore> npcRef = world.getEntityRef(record.npcUuid);
                 if (npcRef != null && npcRef.isValid()) {
@@ -178,6 +188,24 @@ final class CommandLinkedPanelEntryService {
                             breedingCooldownActive = breedingSnapshot.active;
                             breedingCooldownRemainingMs = breedingSnapshot.remainingMs;
                             breedingCooldownRatio = breedingSnapshot.ratio;
+                        }
+                        CompanionLevelingService.LevelingSnapshot levelingSnapshot =
+                                CompanionLevelingService.resolveSnapshot(npcRef, store, resolvedRoleId);
+                        if (levelingSnapshot != null) {
+                            futureStatA = buildLevelFutureStat(levelingSnapshot, playerLanguage);
+                        }
+                        TwTalentConfig talentConfig = CompanionTalentService.resolveTalentConfig(npcRef, store);
+                        if (talentConfig != null && talentConfig.isEnabled()) {
+                            int availableTalentPoints = CompanionTalentService.resolveAvailablePoints(npcRef, store);
+                            int totalEarnedTalentPoints = levelingSnapshot != null
+                                    ? CompanionLevelingService.resolveEarnedTalentPoints(
+                                    levelingSnapshot.level(),
+                                    levelingSnapshot.configId()
+                            )
+                                    : 0;
+                            futureStatB = buildTalentPointFutureStat(availableTalentPoints, totalEarnedTalentPoints, playerLanguage);
+                            talentsActionVisible = true;
+                            talentsActionEnabled = true;
                         }
                         traitIndicators = readTraitIndicators(npcRef, store, traitType);
                     }
@@ -262,13 +290,13 @@ final class CommandLinkedPanelEntryService {
                     inCoop,
                     lost,
                     deadRespawnRemainingMs,
-                    null,
-                    null,
+                    futureStatA,
+                    futureStatB,
                     traitIndicators,
                     false,
                     false,
-                    false,
-                    false,
+                    talentsActionVisible,
+                    talentsActionEnabled,
                     true,
                     active,
                     speciesId,
@@ -284,6 +312,24 @@ final class CommandLinkedPanelEntryService {
             ));
         }
         return entries;
+    }
+
+    private LinkedNpcEntry.FutureStat buildLevelFutureStat(@Nonnull CompanionLevelingService.LevelingSnapshot snapshot,
+                                                           @Nullable String language) {
+        String prefix = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.levelPrefix");
+        if (snapshot.atMaxLevel()) {
+            return new LinkedNpcEntry.FutureStat(prefix + " " + snapshot.level() + " MAX", 1, 1);
+        }
+        int current = Math.max(0, (int) Math.round(snapshot.currentXp()));
+        int max = Math.max(1, (int) Math.round(snapshot.nextLevelDeltaXp()));
+        return new LinkedNpcEntry.FutureStat(prefix + " " + snapshot.level() + " XP", current, max);
+    }
+
+    private LinkedNpcEntry.FutureStat buildTalentPointFutureStat(int availablePoints,
+                                                                 int totalEarnedPoints,
+                                                                 @Nullable String language) {
+        String label = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.talentPoints");
+        return new LinkedNpcEntry.FutureStat(label, Math.max(0, availablePoints), Math.max(1, totalEarnedPoints));
     }
 
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,

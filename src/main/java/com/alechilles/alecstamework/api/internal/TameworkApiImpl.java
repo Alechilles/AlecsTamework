@@ -35,9 +35,11 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
@@ -47,6 +49,7 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
@@ -55,14 +58,17 @@ import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
@@ -682,6 +688,20 @@ public final class TameworkApiImpl
     }
 
     @Override
+    public Optional<RoleScopedConfigView> getLevelingConfigById(String id) {
+        return configById(id, TwLevelingConfig.getAssetMap() != null
+                        ? TwLevelingConfig.getAssetMap().getAssetMap()
+                        : Map.of())
+                .map(config -> ApiMapper.mapRoleScopedConfig(config, gson));
+    }
+
+    @Override
+    public Optional<RoleScopedConfigView> resolveLevelingConfigForRole(String roleId) {
+        return resolveConfigForRole(roleId, TwLevelingConfig::resolveForRole)
+                .map(config -> ApiMapper.mapRoleScopedConfig(config, gson));
+    }
+
+    @Override
     public Optional<RoleScopedConfigView> getTraitConfigById(String id) {
         return configById(id, TwTraitConfig.getAssetMap() != null
                         ? TwTraitConfig.getAssetMap().getAssetMap()
@@ -692,6 +712,20 @@ public final class TameworkApiImpl
     @Override
     public Optional<RoleScopedConfigView> resolveTraitConfigForRole(String roleId) {
         return resolveConfigForRole(roleId, TwTraitConfig::resolveForRole)
+                .map(config -> ApiMapper.mapRoleScopedConfig(config, gson));
+    }
+
+    @Override
+    public Optional<RoleScopedConfigView> getTalentConfigById(String id) {
+        return configById(id, TwTalentConfig.getAssetMap() != null
+                        ? TwTalentConfig.getAssetMap().getAssetMap()
+                        : Map.of())
+                .map(config -> ApiMapper.mapRoleScopedConfig(config, gson));
+    }
+
+    @Override
+    public Optional<RoleScopedConfigView> resolveTalentConfigForRole(String roleId) {
+        return resolveConfigForRole(roleId, TwTalentConfig::resolveForRole)
                 .map(config -> ApiMapper.mapRoleScopedConfig(config, gson));
     }
 
@@ -1556,15 +1590,19 @@ public final class TameworkApiImpl
         ProgressionView.HappinessView happiness = buildHappinessView(liveNpc.reference(), liveNpc.store());
         ProgressionView.NeedsView needs = buildNeedsView(liveNpc.reference(), liveNpc.store());
         ProgressionView.BreedingView breeding = buildBreedingView(liveNpc.reference(), liveNpc.store(), roleId);
+        ProgressionView.LevelingView leveling = buildLevelingView(liveNpc.reference(), liveNpc.store(), roleId);
         ProgressionView.LifeStageView lifeStage = buildLifeStageView(liveNpc.reference(), liveNpc.store(), roleId);
         ProgressionView.TraitsView traits = buildTraitsView(liveNpc.reference(), liveNpc.store(), roleId);
+        ProgressionView.TalentsView talents = buildTalentsView(liveNpc.reference(), liveNpc.store(), roleId);
         ProgressionView.AttachmentsView attachments = buildAttachmentsView(liveNpc.reference(), liveNpc.store());
 
         if (happiness == null
                 && needs == null
                 && breeding == null
+                && leveling == null
                 && lifeStage == null
                 && traits == null
+                && talents == null
                 && attachments == null) {
             return Optional.empty();
         }
@@ -1577,8 +1615,10 @@ public final class TameworkApiImpl
                 happiness,
                 needs,
                 breeding,
+                leveling,
                 lifeStage,
                 traits,
+                talents,
                 attachments
         ));
     }
@@ -1645,7 +1685,7 @@ public final class TameworkApiImpl
         if (config != null) {
             threshold = config.resolveHappiness(roleId).getThreshold();
         }
-        double fertilityMultiplier = TraitModifierService.resolveMultiplier(
+        double fertilityMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 "FertilityMultiplier",
@@ -1690,6 +1730,29 @@ public final class TameworkApiImpl
     }
 
     @Nullable
+    private ProgressionView.LevelingView buildLevelingView(@Nonnull Ref<EntityStore> npcRef,
+                                                           @Nonnull Store<EntityStore> store,
+                                                           @Nullable String roleIdFallback) {
+        CompanionLevelingService.LevelingSnapshot snapshot = CompanionLevelingService.resolveSnapshot(
+                npcRef,
+                store,
+                roleIdFallback
+        );
+        if (snapshot == null) {
+            return null;
+        }
+        return new ProgressionView.LevelingView(
+                snapshot.configId(),
+                snapshot.level(),
+                snapshot.currentXp(),
+                snapshot.totalXp(),
+                snapshot.nextLevelDeltaXp(),
+                snapshot.maxLevel(),
+                snapshot.atMaxLevel()
+        );
+    }
+
+    @Nullable
     private ProgressionView.TraitsView buildTraitsView(@Nonnull Ref<EntityStore> npcRef,
                                                        @Nonnull Store<EntityStore> store,
                                                        @Nullable String roleIdFallback) {
@@ -1698,6 +1761,27 @@ public final class TameworkApiImpl
             return null;
         }
         return ApiMapper.mapTraits(traitsComponent, resolveTraitConfig(npcRef, store, traitsComponent, roleIdFallback));
+    }
+
+    @Nullable
+    private ProgressionView.TalentsView buildTalentsView(@Nonnull Ref<EntityStore> npcRef,
+                                                         @Nonnull Store<EntityStore> store,
+                                                         @Nullable String roleIdFallback) {
+        String resolvedRoleId = firstNonBlank(CompanionRoleIdResolver.resolveRoleId(npcRef, store), roleIdFallback);
+        TwTalentConfig talentConfig = resolvedRoleId != null ? TwTalentConfig.resolveForRole(resolvedRoleId) : null;
+        TameworkTalentsComponent talentsComponent = readComponent(npcRef, store, TameworkTalentsComponent.getComponentType());
+        if ((talentConfig == null || !talentConfig.isEnabled()) && talentsComponent == null) {
+            return null;
+        }
+        int availablePoints = CompanionTalentService.resolveAvailablePoints(npcRef, store);
+        int spentPoints = talentsComponent != null ? talentsComponent.getSpentPoints() : 0;
+        java.util.List<String> purchasedTalentIds = talentsComponent != null
+                ? java.util.List.of(talentsComponent.getPurchasedTalentIds())
+                : java.util.List.of();
+        String configId = talentsComponent != null && talentsComponent.getConfigId() != null && !talentsComponent.getConfigId().isBlank()
+                ? talentsComponent.getConfigId()
+                : talentConfig != null ? talentConfig.getId() : null;
+        return new ProgressionView.TalentsView(configId, availablePoints, spentPoints, purchasedTalentIds);
     }
 
     @Nullable

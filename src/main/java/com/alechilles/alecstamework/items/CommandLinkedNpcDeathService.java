@@ -9,11 +9,14 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -194,7 +197,13 @@ public final class CommandLinkedNpcDeathService {
                                 cached.lifeStageGrowthScalingEnabled(),
                                 cached.attachmentsConfigId(),
                                 cached.attachmentsValues(),
-                                cached.breedingEnabled()
+                                cached.breedingEnabled(),
+                                cached.levelingConfigId(),
+                                cached.levelingLevel(),
+                                cached.levelingTotalXp(),
+                                cached.talentsConfigId(),
+                                cached.talentsSpentPoints(),
+                                cached.purchasedTalentIds()
                         )
                 );
                 DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
@@ -278,6 +287,22 @@ public final class CommandLinkedNpcDeathService {
                 : CompanionModelAttachmentService.resolveCurrentAttachments(reference, store);
         String attachmentsValues = encodeAttachmentSelections(attachmentSelections);
 
+        ComponentType<EntityStore, TameworkLevelingComponent> levelingType = TameworkLevelingComponent.getComponentType();
+        TameworkLevelingComponent levelingComponent = levelingType != null
+                ? store.getComponent(reference, levelingType)
+                : null;
+        String levelingConfigId = levelingComponent != null ? levelingComponent.getConfigId() : null;
+        int levelingLevel = levelingComponent != null ? levelingComponent.getLevel() : 1;
+        double levelingTotalXp = levelingComponent != null ? levelingComponent.getTotalXp() : 0.0;
+
+        ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
+        TameworkTalentsComponent talentsComponent = talentsType != null
+                ? store.getComponent(reference, talentsType)
+                : null;
+        String talentsConfigId = talentsComponent != null ? talentsComponent.getConfigId() : null;
+        int talentsSpentPoints = talentsComponent != null ? talentsComponent.getSpentPoints() : 0;
+        String purchasedTalentIds = talentsComponent != null ? TalentIdCodec.encode(talentsComponent.getPurchasedTalentIds()) : null;
+
         TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
         Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
         Vector3d homePosition = links.hasHome() ? links.getHomePosition() : null;
@@ -326,7 +351,13 @@ public final class CommandLinkedNpcDeathService {
                         lifeStageGrowthScalingEnabled,
                         attachmentsConfigId,
                         attachmentsValues,
-                        breedingEnabled
+                        breedingEnabled,
+                        levelingConfigId,
+                        levelingLevel,
+                        levelingTotalXp,
+                        talentsConfigId,
+                        talentsSpentPoints,
+                        purchasedTalentIds
                 )
         );
         DeadLinkedNpcSnapshot persisted = deadByNpc.get(npcUuid);
@@ -431,7 +462,13 @@ public final class CommandLinkedNpcDeathService {
                     snapshot.lifeStageGrowthScalingEnabled(),
                     snapshot.attachmentsConfigId(),
                     snapshot.attachmentsValues(),
-                    snapshot.breedingEnabled()
+                    snapshot.breedingEnabled(),
+                    snapshot.levelingConfigId(),
+                    snapshot.levelingLevel(),
+                    snapshot.levelingTotalXp(),
+                    snapshot.talentsConfigId(),
+                    snapshot.talentsSpentPoints(),
+                    snapshot.purchasedTalentIds()
             );
             deadByNpc.put(snapshot.npcUuid(), updated);
             enqueueProfileUpdate(updated, null, null);
@@ -599,7 +636,13 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + snapshot.lifeStageGrowthScalingEnabled()
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsConfigId())
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsValues())
-                + FIELD_SEPARATOR + snapshot.breedingEnabled();
+                + FIELD_SEPARATOR + snapshot.breedingEnabled()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.levelingConfigId())
+                + FIELD_SEPARATOR + snapshot.levelingLevel()
+                + FIELD_SEPARATOR + snapshot.levelingTotalXp()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.talentsConfigId())
+                + FIELD_SEPARATOR + snapshot.talentsSpentPoints()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.purchasedTalentIds());
     }
 
     @Nullable
@@ -668,6 +711,12 @@ public final class CommandLinkedNpcDeathService {
         String attachmentsConfigId = parts.length > 34 ? decodeNullableString(parts[34]) : null;
         String attachmentsValues = parts.length > 35 ? decodeNullableString(parts[35]) : null;
         boolean breedingEnabled = parts.length > 36 && Boolean.parseBoolean(parts[36]);
+        String levelingConfigId = parts.length > 37 ? decodeNullableString(parts[37]) : null;
+        int levelingLevel = parts.length > 38 ? (int) parseLong(parts[38], 1L) : 1;
+        double levelingTotalXp = parts.length > 39 ? parseDouble(parts[39], 0.0) : 0.0;
+        String talentsConfigId = parts.length > 40 ? decodeNullableString(parts[40]) : null;
+        int talentsSpentPoints = parts.length > 41 ? (int) parseLong(parts[41], 0L) : 0;
+        String purchasedTalentIds = parts.length > 42 ? decodeNullableString(parts[42]) : null;
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -705,7 +754,13 @@ public final class CommandLinkedNpcDeathService {
                 lifeStageGrowthScalingEnabled,
                 attachmentsConfigId,
                 attachmentsValues,
-                breedingEnabled
+                breedingEnabled,
+                levelingConfigId,
+                levelingLevel,
+                levelingTotalXp,
+                talentsConfigId,
+                talentsSpentPoints,
+                purchasedTalentIds
         );
     }
 
@@ -1073,9 +1128,15 @@ public final class CommandLinkedNpcDeathService {
                                          double lifeStageAdultSwitchScale,
                                          double lifeStageAdultScale,
                                          boolean lifeStageGrowthScalingEnabled,
-                                         @Nullable String attachmentsConfigId,
-                                         @Nullable String attachmentsValues,
-                                         boolean breedingEnabled) {
+                                        @Nullable String attachmentsConfigId,
+                                        @Nullable String attachmentsValues,
+                                        boolean breedingEnabled,
+                                        @Nullable String levelingConfigId,
+                                        int levelingLevel,
+                                        double levelingTotalXp,
+                                        @Nullable String talentsConfigId,
+                                        int talentsSpentPoints,
+                                        @Nullable String purchasedTalentIds) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

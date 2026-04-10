@@ -28,6 +28,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.SpawnParti
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.UiMessageEffect;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.Ref;
@@ -151,7 +152,11 @@ final class TameworkInteractEffects {
         }
         DropItemEffect dropItem = effects.getDropItem();
         if (dropItem != null) {
-            applied |= inventoryEffects.applyDropItem(dropItem, npcRef, store, harvestInteraction);
+            boolean dropped = inventoryEffects.applyDropItem(dropItem, npcRef, store, harvestInteraction);
+            applied |= dropped;
+            if (dropped && harvestInteraction) {
+                CompanionLevelingService.awardHarvestXp(npcRef, store);
+            }
         }
         HookEffect hookEffect = effects.getTriggerNpcHook();
         if (hookEffect != null) {
@@ -240,6 +245,7 @@ final class TameworkInteractEffects {
         String heldItemId = ctx != null ? ctx.activeItemId : null;
         CompanionHappinessService.applyFeedGain(npcRef, store, heldItemId);
         CompanionNeedsService.applyFeedInteractionRefill(npcRef, store, heldItemId);
+        CompanionLevelingService.awardFeedXp(npcRef, store);
         return true;
     }
 

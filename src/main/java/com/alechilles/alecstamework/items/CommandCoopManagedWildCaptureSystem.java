@@ -40,10 +40,8 @@ import com.hypixel.hytale.server.npc.asset.builder.Builder;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
-import com.hypixel.hytale.server.spawning.ISpawnableWithModel;
-import com.hypixel.hytale.server.spawning.SpawnTestResult;
-import com.hypixel.hytale.server.spawning.SpawningContext;
 import it.unimi.dsi.fastutil.Pair;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -78,10 +76,6 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private static final long RELEASE_INTERVAL_MS = 350L;
     private static final long PRODUCE_CHECK_INTERVAL_MS = 2_000L;
     private static final long GAME_MILLIS_PER_HOUR = 3_600_000L;
-    private static final double RELEASE_CONE_DEGREES = 100.0;
-    private static final double RELEASE_MIN_DISTANCE = 1.0;
-    private static final double RELEASE_MAX_DISTANCE = 3.0;
-    private static final int RELEASE_SPAWN_ATTEMPTS = 16;
     private static final double DEFAULT_RELEASE_OFFSET_X = 0.0;
     private static final double DEFAULT_RELEASE_OFFSET_Y = 0.0;
     private static final double DEFAULT_RELEASE_OFFSET_Z = 3.0;
@@ -105,6 +99,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     @Nullable
     private final CoopResidentStateSnapshotService stateSnapshotService;
     private final CoopEffectService coopEffectService;
+    private final CoopResidentReleasePositionService releasePositionService;
 
     private final HashMap<String, Long> nextCaptureAtByCoopKey = new HashMap<>();
     private final HashMap<String, Long> nextReleaseAtByCoopKey = new HashMap<>();
@@ -142,6 +137,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         this.lostService = lostService;
         this.stateSnapshotService = stateSnapshotService;
         this.coopEffectService = new CoopEffectService();
+        this.releasePositionService = new CoopResidentReleasePositionService();
     }
 
     @Override
@@ -267,8 +263,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
     @Nonnull
     private ArrayList<ManagedCoopContext> collectManagedCoops(@Nonnull Store<ChunkStore> chunkStore,
-                                                               @Nonnull World world,
-                                                               @Nonnull CoopScanDiagnostics diagnostics) {
+                                                              @Nonnull World world,
+                                                              @Nonnull CoopScanDiagnostics diagnostics) {
         ArrayList<ManagedCoopContext> out = new ArrayList<>();
         ComponentType<ChunkStore, ?> itemContainerType = resolveItemContainerComponentType();
         ComponentType<ChunkStore, ?> coopType = resolveCoopBlockComponentType();
@@ -336,7 +332,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 diagnostics.missingLocation++;
                 continue;
             }
-                diagnostics.withLocation++;
+            diagnostics.withLocation++;
             String coopAssetId = resolveCoopAssetId(state);
             TwCoopConfig config = resolveCoopConfig(location.blockTypeId(), coopAssetId);
             if (config == null || !config.isEnabled()) {
@@ -547,10 +543,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private int releaseResidentsFromRemovedCoops(@Nonnull World world,
-                                                  @Nonnull Store<ChunkStore> chunkStore,
-                                                  @Nonnull Store<EntityStore> entityStore,
-                                                  @Nonnull Set<String> activeCoopKeys,
-                                                  long nowMs) {
+                                                 @Nonnull Store<ChunkStore> chunkStore,
+                                                 @Nonnull Store<EntityStore> entityStore,
+                                                 @Nonnull Set<String> activeCoopKeys,
+                                                 long nowMs) {
         List<CommandLinkedNpcCoopService.CoopSlotContext> housedSlots =
                 coopService.listHousedSlotsForWorld(world.getName());
         if (housedSlots.isEmpty()) {
@@ -620,7 +616,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                     DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check deferred chunk_unloaded coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
-                    + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
             );
             return false;
         }
@@ -764,7 +760,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return false;
         }
 
-        Vector3d spawnPosition = resolveSpawnPosition(
+        Vector3d spawnPosition = releasePositionService.resolveSpawnPosition(
                 world,
                 roleBuilder,
                 coopBlock,
@@ -883,7 +879,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkHappinessComponent.getComponentType(), snapshot.happiness());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkNeedsComponent.getComponentType(), snapshot.needs());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkBreedingComponent.getComponentType(), snapshot.breeding());
+        safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkLevelingComponent.getComponentType(), snapshot.leveling());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkTraitsComponent.getComponentType(), snapshot.traits());
+        safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkTalentsComponent.getComponentType(), snapshot.talents());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
         if (snapshot.npcName() != null && snapshot.npcName().getName() != null && !snapshot.npcName().getName().isBlank()) {
@@ -970,8 +968,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private void applyEntitySupportDisplayNameIfPresent(@Nonnull Ref<EntityStore> reference,
-                                                         @Nonnull Store<EntityStore> store,
-                                                         @Nullable String displayName) {
+                                                        @Nonnull Store<EntityStore> store,
+                                                        @Nullable String displayName) {
         if (displayName == null || displayName.isBlank() || !reference.isValid()) {
             return;
         }
@@ -1229,77 +1227,6 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         return best;
     }
 
-    @Nonnull
-    private Vector3d resolveSpawnPosition(@Nonnull World world,
-                                          @Nonnull Builder<Role> roleBuilder,
-                                          @Nonnull Vector3i block,
-                                          double offsetX,
-                                          double offsetY,
-                                          double offsetZ) {
-        Vector3d fallback = new Vector3d(
-                block.x + 0.5 + offsetX,
-                block.y + offsetY,
-                block.z + 0.5 + offsetZ
-        );
-        Vector3d validatedFallback = validateSpawnPosition(world, roleBuilder, fallback);
-        if (validatedFallback != null) {
-            fallback = validatedFallback;
-        }
-        double forwardX = offsetX;
-        double forwardZ = offsetZ;
-        double forwardLength = Math.sqrt((forwardX * forwardX) + (forwardZ * forwardZ));
-        if (!Double.isFinite(forwardLength) || forwardLength < 0.001) {
-            forwardX = 0.0;
-            forwardZ = 1.0;
-            forwardLength = 1.0;
-        }
-        forwardX /= forwardLength;
-        forwardZ /= forwardLength;
-
-        double centerX = block.x + 0.5;
-        double centerY = block.y + offsetY;
-        double centerZ = block.z + 0.5;
-        double halfConeRadians = Math.toRadians(RELEASE_CONE_DEGREES * 0.5);
-        ThreadLocalRandom random = ThreadLocalRandom.current();
-        for (int attempt = 0; attempt < RELEASE_SPAWN_ATTEMPTS; attempt++) {
-            double angle = random.nextDouble(-halfConeRadians, halfConeRadians);
-            double distance = random.nextDouble(RELEASE_MIN_DISTANCE, RELEASE_MAX_DISTANCE + 0.0001);
-            double cos = Math.cos(angle);
-            double sin = Math.sin(angle);
-            double rotatedX = (forwardX * cos) - (forwardZ * sin);
-            double rotatedZ = (forwardX * sin) + (forwardZ * cos);
-            Vector3d candidate = new Vector3d(
-                    centerX + (rotatedX * distance),
-                    centerY,
-                    centerZ + (rotatedZ * distance)
-            );
-            Vector3d validated = validateSpawnPosition(world, roleBuilder, candidate);
-            if (validated != null) {
-                return validated;
-            }
-        }
-        return fallback;
-    }
-
-    @Nullable
-    private Vector3d validateSpawnPosition(@Nonnull World world,
-                                           @Nonnull Builder<Role> roleBuilder,
-                                           @Nonnull Vector3d position) {
-        if (!(roleBuilder instanceof ISpawnableWithModel spawnable)) {
-            return position;
-        }
-        SpawningContext spawningContext = new SpawningContext();
-        spawningContext.setSpawnable(spawnable);
-        if (!spawningContext.set(world, position.x, position.y, position.z)) {
-            return null;
-        }
-        if (spawningContext.canSpawn() != SpawnTestResult.TEST_OK) {
-            return null;
-        }
-        Vector3d adjusted = spawningContext.newPosition();
-        return adjusted != null ? new Vector3d(adjusted) : position;
-    }
-
     private boolean shouldResidentsRoam(@Nonnull WorldTimeResource worldTime,
                                         @Nonnull TwCoopConfig.LifecycleRules lifecycleRules) {
         int hour = resolveGameHour(worldTime);
@@ -1535,9 +1462,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private <T extends Component<EntityStore>> void safePutComponent(@Nonnull Store<EntityStore> store,
-                                                                      @Nonnull Ref<EntityStore> reference,
-                                                                      @Nullable ComponentType<EntityStore, T> type,
-                                                                      @Nullable T component) {
+                                                                     @Nonnull Ref<EntityStore> reference,
+                                                                     @Nullable ComponentType<EntityStore, T> type,
+                                                                     @Nullable T component) {
         if (type == null || component == null || !reference.isValid()) {
             return;
         }
@@ -1553,9 +1480,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private <T extends Component<EntityStore>> void queueDeferredComponentPut(@Nonnull Store<EntityStore> store,
-                                                                               @Nonnull Ref<EntityStore> reference,
-                                                                               @Nonnull ComponentType<EntityStore, T> type,
-                                                                               @Nonnull T component) {
+                                                                              @Nonnull Ref<EntityStore> reference,
+                                                                              @Nonnull ComponentType<EntityStore, T> type,
+                                                                              @Nonnull T component) {
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null) {
             return;

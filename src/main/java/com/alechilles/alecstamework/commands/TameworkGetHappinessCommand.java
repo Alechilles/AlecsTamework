@@ -9,7 +9,7 @@ import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
-import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -109,7 +109,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
         TwBreedingConfig config = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         Double threshold = config != null ? config.resolveHappiness(roleId).getThreshold() : null;
-        double fertilityMultiplier = TraitModifierService.resolveMultiplier(
+        double fertilityMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 FERTILITY_MULTIPLIER_KEY,
@@ -124,7 +124,7 @@ public final class TameworkGetHappinessCommand extends AbstractPlayerCommand {
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
         double rateCurrent = BreedingTimeService.resolveCurrentGameSecondsPerRealSecond(store);
         double rateBaseline = BreedingTimeService.resolveBaselineGameSecondsPerRealSecond(store);
-        double cooldownMultiplier = TraitModifierService.resolveMultiplier(
+        double cooldownMultiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 BREED_COOLDOWN_MULTIPLIER_KEY,

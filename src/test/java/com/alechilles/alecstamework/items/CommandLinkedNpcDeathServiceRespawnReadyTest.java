@@ -94,7 +94,13 @@ class CommandLinkedNpcDeathServiceRespawnReadyTest {
                 false,
                 null,
                 null,
-                false
+                false,
+                null,
+                1,
+                0.0,
+                null,
+                0,
+                null
         );
     }
 }

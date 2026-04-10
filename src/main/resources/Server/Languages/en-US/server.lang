@@ -27,6 +27,9 @@ items.Weapon_Shortbow_Tranquilizer.name=Tranquilizer Shortbow
 items.Weapon_Arrow_Tranquilizer.name=Tranquilizer Arrow
 items.Potion_Tranquilizer.name=Tranquilizer Potion
 items.Potion_Tranquilizer.description=Used to craft tranquilizer arrows and equipment.
+items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.name=Glowing Purple Mushroom Spores
+items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.description=Plant on tilled soil or in a planter to cultivate glowing purple mushrooms.
+items.Tw_Plant_Crop_Mushroom_Glowing_Purple_Block.name=Glowing Purple Mushroom Spores
 
 # === Tamework Feed Items ===
 items.Tw_Feed_Trough.name=Feed Trough
@@ -190,8 +193,15 @@ tamework.ui.linkedPanel.filter.placeholder=Filter Text
 tamework.ui.linkedPanel.filter.species=Species
 tamework.ui.linkedPanel.futureAction.talents=Talents
 tamework.ui.linkedPanel.futureAction.traits=Traits
+tamework.ui.linkedPanel.futureStat.levelPrefix=Level
+tamework.ui.linkedPanel.futureStat.talentPoints=Talent Points
 tamework.ui.linkedPanel.futureStat.a.default=Stat A: ?/?
 tamework.ui.linkedPanel.futureStat.b.default=Stat B: ?/?
+tamework.ui.talents.title=Companion Talents
+tamework.ui.talents.button.back=Back
+tamework.ui.talents.button.prev=Prev
+tamework.ui.talents.button.next=Next
+tamework.ui.talents.button.unlock=Unlock
 tamework.ui.linkedPanel.groupAssign.none=None
 tamework.ui.linkedPanel.groupAssign.noneGroups=No groups
 tamework.ui.linkedPanel.groupAssign.prompt=Choose a group.

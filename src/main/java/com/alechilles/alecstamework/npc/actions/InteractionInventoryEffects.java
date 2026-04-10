@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.DropItemEf
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemQuantity;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsHandEffect;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RemoveItemsInventoryEffect;
-import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -205,7 +205,7 @@ final class InteractionInventoryEffects {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return false;
         }
-        double multiplier = TraitModifierService.resolveMultiplier(
+        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY,
