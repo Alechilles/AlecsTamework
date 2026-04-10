@@ -1,0 +1,62 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.name",
+    "Description": "server.items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.description"
+  },
+  "Parent": "Template_Seeds",
+  "Quality": "Junk",
+  "InteractionVars": {
+    "SeedId": {
+      "Interactions": [
+        {
+          "Parent": "Seed_Place",
+          "BlockTypeToPlace": "Tw_Plant_Crop_Mushroom_Glowing_Purple_Block"
+        }
+      ]
+    }
+  },
+  "Texture": "Resources/Plants/SeedBag_Textures/Tw_Glowing_Purple_Mushroom.png",
+  "Icon": "Icons/ItemsGenerated/Plant_Seeds_Mushroom_Glowing_Purple.png",
+  "IconProperties": {
+    "Scale": 0.5,
+    "Rotation": [
+      22.5,
+      45,
+      22.5
+    ],
+    "Translation": [
+      0,
+      -15
+    ]
+  },
+  "Recipe": {
+    "TimeSeconds": 0,
+    "Input": [
+      {
+        "ItemId": "Ingredient_Life_Essence",
+        "Quantity": 6
+      },
+      {
+        "ItemId": "Ingredient_Void_Essence",
+        "Quantity": 1
+      }
+    ],
+    "BenchRequirement": [
+      {
+        "Type": "Crafting",
+        "Id": "Farmingbench",
+        "Categories": [
+          "Seeds"
+        ],
+        "RequiredTierLevel": 4
+      }
+    ],
+    "Output": [
+      {
+        "ItemId": "Tw_Plant_Seeds_Mushroom_Glowing_Purple",
+        "Quantity": 1
+      }
+    ]
+  },
+  "ItemLevel": 12
+}

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- Added `Glowing Purple Mushroom Spores`, a Farming Bench Tier 4 seed recipe that lets players cultivate the mushrooms used for tranquilizer potion crafting.
+
+### Fixed
+- Fixed managed coop resident release placement so the front-of-coop cone search no longer accepts spawn positions more than one block below the coop, preventing releases into rooms under thin floors.
+
 ## 2.8.1 - Settings UI, Crash Telemetry, and Multi-Food Happiness - 2026-04-09
 ### Added
 - Added `/tw settings` UI (`TameworkSettingsPage`) and command wiring with persisted world-level settings storage (`TameworkSettingsStore`).

@@ -1,0 +1,177 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Tw_Plant_Crop_Mushroom_Glowing_Purple_Block.name"
+  },
+  "Quality": "Technical",
+  "Interactions": {
+    "Primary": "Block_Primary",
+    "Secondary": "Block_Secondary"
+  },
+  "BlockType": {
+    "RandomRotation": "YawStep1",
+    "DrawType": "Model",
+    "Opacity": "Transparent",
+    "CustomModel": "Resources/Plants/Seeds.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "Resources/Plants/Seeds_Textures/Tw_Spore_Purple.png",
+        "Weight": 1
+      }
+    ],
+    "Flags": {
+      "IsStackable": false
+    },
+    "State": {
+      "Definitions": {
+        "Stage1": {
+          "CustomModel": "Blocks/Foliage/Plants/Mushroom_Balls.blockymodel",
+          "CustomModelTexture": [
+            {
+              "Texture": "Blocks/Foliage/Plants/Mushroom_Balls_Corrupted.png",
+              "Weight": 1
+            }
+          ],
+          "CustomModelScale": 0.45,
+          "HitboxType": "Plant_Small",
+          "RandomRotation": "YawStep1",
+          "Gathering": {
+            "Soft": {
+              "DropList": "Drops_Plant_Crop_Mushroom_Glowing_Purple_Spores"
+            }
+          },
+          "BlockParticleSetId": "Dust",
+          "BlockSoundSetId": "Mushroom",
+          "ParticleColor": "#723862",
+          "Light": {
+            "Color": "#646"
+          }
+        },
+        "Stage2": {
+          "CustomModel": "Blocks/Foliage/Plants/Mushroom_Balls.blockymodel",
+          "CustomModelTexture": [
+            {
+              "Texture": "Blocks/Foliage/Plants/Mushroom_Balls_Corrupted.png",
+              "Weight": 1
+            }
+          ],
+          "CustomModelScale": 0.7,
+          "HitboxType": "Plant_Medium",
+          "RandomRotation": "YawStep1",
+          "Gathering": {
+            "Soft": {
+              "DropList": "Drops_Plant_Crop_Mushroom_Glowing_Purple_Spores"
+            }
+          },
+          "BlockParticleSetId": "Dust",
+          "BlockSoundSetId": "Mushroom",
+          "ParticleColor": "#723862",
+          "Light": {
+            "Color": "#868"
+          }
+        }
+      }
+    },
+    "Farming": {
+      "Stages": {
+        "Default": [
+          {
+            "Duration": {
+              "Min": 10500,
+              "Max": 10500
+            },
+            "Type": "BlockState",
+            "State": "default"
+          },
+          {
+            "Duration": {
+              "Min": 37950,
+              "Max": 37950
+            },
+            "Type": "BlockState",
+            "SoundEventId": "SFX_Crops_Grow",
+            "State": "Stage1"
+          },
+          {
+            "Duration": {
+              "Min": 37950,
+              "Max": 37950
+            },
+            "Type": "BlockState",
+            "SoundEventId": "SFX_Crops_Grow",
+            "State": "Stage2"
+          },
+          {
+            "Type": "BlockType",
+            "SoundEventId": "SFX_Crops_Grow_Stage_Complete",
+            "Block": "Plant_Crop_Mushroom_Glowing_Purple"
+          }
+        ]
+      },
+      "StartingStageSet": "Default",
+      "ActiveGrowthModifiers": [
+        "Fertilizer",
+        "Water",
+        "LightLevel"
+      ]
+    },
+    "Gathering": {
+      "Soft": {
+        "DropList": "Drops_Plant_Crop_Mushroom_Glowing_Purple_Spores"
+      }
+    },
+    "Support": {
+      "Down": [
+        {
+          "TagId": "Type=Soil"
+        },
+        {
+          "TagId": "SubType=Planter"
+        }
+      ]
+    },
+    "Material": "Empty",
+    "HitboxType": "Plant_Seed",
+    "BlockParticleSetId": "Dust",
+    "BlockSoundSetId": "Seeds",
+    "ParticleColor": "#723862",
+    "CustomModelScale": 0.75,
+    "BlockEntity": {
+      "Components": {
+        "FarmingBlock": {}
+      }
+    }
+  },
+  "PlayerAnimationsId": "Item",
+  "Categories": [
+    "Blocks.Plants"
+  ],
+  "IconProperties": {
+    "Scale": 0.58823,
+    "Translation": [
+      -2.1,
+      -12.3
+    ],
+    "Rotation": [
+      22.5,
+      45,
+      22.5
+    ]
+  },
+  "Icon": "Icons/ItemsGenerated/Plant_Crop_Mushroom_Glowcap_Purple.png",
+  "Tags": {
+    "Type": [
+      "Plant"
+    ],
+    "Family": [
+      "Crop"
+    ]
+  },
+  "ItemSoundSetId": "ISS_Items_Foliage",
+  "InteractionConfig": {
+    "Priorities": {
+      "Secondary": {
+        "MainHand": 1
+      }
+    }
+  }
+}

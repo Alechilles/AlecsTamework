@@ -1,0 +1,14 @@
+{
+  "Container": {
+    "Type": "Multiple",
+    "Containers": [
+      {
+        "Type": "Single",
+        "Weight": 100.0,
+        "Item": {
+          "ItemId": "Tw_Plant_Seeds_Mushroom_Glowing_Purple"
+        }
+      }
+    ]
+  }
+}

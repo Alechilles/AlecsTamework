@@ -21,6 +21,7 @@ public final class TranquilizerRecipeVisibilityService {
     private static final String ITEM_TRANQUILIZER_SHORTBOW = "Weapon_Shortbow_Tranquilizer";
     private static final String ITEM_TRANQUILIZER_ARROW = "Weapon_Arrow_Tranquilizer";
     private static final String ITEM_TRANQUILIZER_POTION = "Potion_Tranquilizer";
+    private static final String ITEM_TRANQUILIZER_SPORES = "Tw_Plant_Seeds_Mushroom_Glowing_Purple";
     private static final String ITEM_FEED_TROUGH = "Tw_Feed_Trough";
     private static final String ITEM_FEED_HERBIVORE = "Tw_Feed_Herbivore";
     private static final String ITEM_FEED_CARNIVORE = "Tw_Feed_Carnivore";
@@ -76,6 +77,13 @@ public final class TranquilizerRecipeVisibilityService {
             );
             addMissingGeneratedRecipesIfEnabled(
                     ITEM_TRANQUILIZER_POTION,
+                    toggles.isTranquilizerPotionEnabled(),
+                    itemMap,
+                    recipeMap,
+                    recipesToRestore
+            );
+            addMissingGeneratedRecipesIfEnabled(
+                    ITEM_TRANQUILIZER_SPORES,
                     toggles.isTranquilizerPotionEnabled(),
                     itemMap,
                     recipeMap,
@@ -157,6 +165,9 @@ public final class TranquilizerRecipeVisibilityService {
             return toggles.isTranquilizerArrowEnabled();
         }
         if (ITEM_TRANQUILIZER_POTION.equals(itemId)) {
+            return toggles.isTranquilizerPotionEnabled();
+        }
+        if (ITEM_TRANQUILIZER_SPORES.equals(itemId)) {
             return toggles.isTranquilizerPotionEnabled();
         }
         if (ITEM_FEED_TROUGH.equals(itemId)) {
