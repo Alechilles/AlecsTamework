@@ -34,7 +34,7 @@
     "Input": [
       {
         "ItemId": "Ingredient_Life_Essence",
-        "Quantity": 6
+        "Quantity": 8
       },
       {
         "ItemId": "Ingredient_Void_Essence",
@@ -48,7 +48,7 @@
         "Categories": [
           "Seeds"
         ],
-        "RequiredTierLevel": 4
+        "RequiredTierLevel": 6
       }
     ],
     "Output": [
