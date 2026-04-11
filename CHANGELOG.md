@@ -2,9 +2,23 @@
 
 ## Unreleased
 
+## 2.8.2 - NameplateBuilder Integration + Companion State Persistence - 2026-04-10
+
+### Added
+- Added an optional NameplateBuilder integration that overrides the built-in `entity-name` segment with Tamework companion custom names when NameplateBuilder `4.260326.7+` is installed.
+- Added optional NameplateBuilder companion segments for happiness, hunger, thirst, tranquilizer status, and traits so players can include companion progression data in their NPC nameplate chains.
+- Added optional NameplateBuilder format variants for tranquilizer stacks/time display, shortened companion stat labels, and trait display modes with shortened or full labels plus raw values or linked-panel-style relative percentages.
+
+### Changed
+- Updated `Glowing Purple Mushroom Spores` so the seed recipe now also requires one `Glowing Purple Mushroom` in addition to the existing essence cost.
+
 ### Fixed
 - Fixed startup failure when `SpawningPlugin` is unavailable by treating spawn marker/beacon component types as optional in despawn diagnostics setup.
 - Fixed startup crash when SQLite native bindings are unavailable by treating sqlite native linkage failures as recoverable persistence degradation instead of setup-fatal errors.
+- Fixed spawner capture/respawn needs restore so companions no longer accrue starvation/dehydration catch-up damage while stored inside capture items.
+- Fixed storage-style capture/coop restore flows fully healing companions by persisting current health across stow/release.
+- Fixed linked panel captured/offline companion names falling back to raw role ids instead of translated species names.
+- Fixed tranquilizer stack displays to track the peak tranquilizer duration reached during the active debuff instead of always reading the base 30-second effect duration.
 
 ## 2.8.1 - Post-2.8.0 Stability + Mushroom Spores - 2026-04-10
 ### Added

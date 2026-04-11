@@ -49,6 +49,7 @@ import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInt
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
+import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -85,6 +86,7 @@ import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
@@ -103,6 +105,7 @@ import com.alechilles.alecstamework.npc.systems.CommandLinkedRevivableDropSuppre
 import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
+import com.alechilles.alecstamework.npc.systems.CompanionTranquilizerPeakSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
@@ -211,6 +214,7 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
+    private ComponentType<EntityStore, TameworkTranquilizerPeakComponent> tranquilizerPeakComponentType;
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
     private ComponentType<EntityStore, TameworkProjectileImpactEffectComponent> projectileImpactEffectComponentType;
@@ -355,6 +359,12 @@ public class Tamework extends JavaPlugin {
                 TameworkTraitsComponent.CODEC
         );
 
+        tranquilizerPeakComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkTranquilizerPeakComponent.class,
+                "TameworkTranquilizerPeak",
+                TameworkTranquilizerPeakComponent.CODEC
+        );
+
         attachmentsComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkAttachmentsComponent.class,
                 "TameworkAttachments",
@@ -441,6 +451,13 @@ public class Tamework extends JavaPlugin {
                         NPCEntity.getComponentType(),
                         EntityStatMap.getComponentType(),
                         traitsComponentType
+                )
+        );
+        getEntityStoreRegistry().registerSystem(
+                new CompanionTranquilizerPeakSystem(
+                        NPCEntity.getComponentType(),
+                        EffectControllerComponent.getComponentType(),
+                        tranquilizerPeakComponentType
                 )
         );
         getEntityStoreRegistry().registerSystem(
@@ -589,6 +606,7 @@ public class Tamework extends JavaPlugin {
                 itemFeatureRegistry,
                 translationRegistry
         );
+        NameplateBuilderBridgeLoader.initialize(this);
 
         // Core handler for capture/spawn flows.
         spawnerFeatureHandler = new SpawnerFeatureHandler(
@@ -1691,6 +1709,10 @@ public class Tamework extends JavaPlugin {
 
     public ComponentType<EntityStore, TameworkTraitsComponent> getTraitsComponentType() {
         return traitsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkTranquilizerPeakComponent> getTranquilizerPeakComponentType() {
+        return tranquilizerPeakComponentType;
     }
 
     public ComponentType<EntityStore, TameworkAttachmentsComponent> getAttachmentsComponentType() {

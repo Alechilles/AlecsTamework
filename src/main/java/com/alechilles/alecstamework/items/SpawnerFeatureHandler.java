@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
@@ -406,7 +407,8 @@ public final class SpawnerFeatureHandler {
         npcStateService.applyTamed(npcRef, tamed, world);
         npcStateService.applyCapturedName(itemStack, npcRef, store);
         progressionMetadataService.applyNpcProgressionFromItem(itemStack, npcRef, store);
-        refreshLifeStageAfterProgressionRestore(npcRef, npc, store);
+        refreshProgressionAfterRestore(npcRef, npc, store);
+        progressionMetadataService.applyNpcHealthFromItem(itemStack, npcRef, store);
         linkedNpcSyncService.restoreCommandLinksFromCapturedSnapshot(npcRef, store, ownerUuid, capturedSnapshot);
         UUID spawnedNpcUuid = npc.getUuid();
         if (capturedNpcUuid != null && spawnedNpcUuid != null) {
@@ -457,12 +459,13 @@ public final class SpawnerFeatureHandler {
      * <p>Spawn flows can bootstrap tamed progression before item metadata restore, which leaves same-role offspring
      * (for example Cat_Pet babies) visually at adult scale unless lifecycle refresh is run again post-restore.
      */
-    private void refreshLifeStageAfterProgressionRestore(@Nullable Ref<EntityStore> npcRef,
-                                                         @Nullable NPCEntity npc,
-                                                         @Nullable Store<EntityStore> store) {
+    private void refreshProgressionAfterRestore(@Nullable Ref<EntityStore> npcRef,
+                                                @Nullable NPCEntity npc,
+                                                @Nullable Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
+        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
         CompanionLifeStageService.refreshLifeStage(npcRef, npc, store);
         CompanionLifeStageService.ensureGrowthTickScheduled(npcRef, npc, store);
     }

@@ -10,7 +10,9 @@ import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.hypixel.hytale.builtin.adventure.farming.component.CoopResidentComponent;
 import com.hypixel.hytale.builtin.adventure.farming.config.FarmingCoopAsset;
 import com.hypixel.hytale.builtin.adventure.farming.states.CoopBlock;
@@ -242,6 +244,7 @@ public final class CoopResidentStateSnapshotService {
                 copyComponent(sourceSnapshot.traits()),
                 copyComponent(sourceSnapshot.lifeStage()),
                 copyComponent(sourceSnapshot.attachments()),
+                sourceSnapshot.healthPercent(),
                 System.currentTimeMillis()
         );
         snapshotsByNpc.put(currentNpcUuid, remapped);
@@ -346,6 +349,19 @@ public final class CoopResidentStateSnapshotService {
         putIfPresent(commandBuffer, reference, TameworkTraitsComponent.getComponentType(), snapshot.traits());
         putIfPresent(commandBuffer, reference, TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
         putIfPresent(commandBuffer, reference, TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
+        if (snapshot.healthPercent() != null) {
+            commandBuffer.run(bufferStore -> applyRestoredHealth(reference, bufferStore, snapshot.healthPercent()));
+        }
+    }
+
+    void applyRestoredHealth(@Nullable Ref<EntityStore> reference,
+                             @Nullable Store<EntityStore> store,
+                             @Nullable Double healthPercent) {
+        if (reference == null || !reference.isValid() || store == null || healthPercent == null) {
+            return;
+        }
+        CompanionStatModifierService.applyTraitModifiers(reference, store);
+        CompanionHealthStateService.applyStoredHealthPercent(reference, store, healthPercent);
     }
 
     private void applyDisplayNameIfPresent(@Nonnull Ref<EntityStore> reference,
@@ -532,6 +548,7 @@ public final class CoopResidentStateSnapshotService {
         TameworkHappinessComponent happiness = resolveHappinessSnapshot(reference, store);
         TameworkNeedsComponent needs = copyComponent(store.getComponent(reference, TameworkNeedsComponent.getComponentType()));
         TameworkAttachmentsComponent attachments = resolveAttachmentSnapshot(reference, store);
+        Double healthPercent = CompanionHealthStateService.captureHealthPercent(reference, store);
         return new CoopResidentStateSnapshot(
                 npcUuid,
                 normalizeIdentifier(coopId),
@@ -547,6 +564,7 @@ public final class CoopResidentStateSnapshotService {
                 copyComponent(store.getComponent(reference, TameworkTraitsComponent.getComponentType())),
                 copyComponent(store.getComponent(reference, TameworkLifeStageComponent.getComponentType())),
                 attachments,
+                healthPercent,
                 System.currentTimeMillis()
         );
     }
@@ -611,6 +629,7 @@ public final class CoopResidentStateSnapshotService {
                                             @Nullable TameworkTraitsComponent traits,
                                             @Nullable TameworkLifeStageComponent lifeStage,
                                             @Nullable TameworkAttachmentsComponent attachments,
+                                            @Nullable Double healthPercent,
                                             long capturedAtMs) {
     }
 

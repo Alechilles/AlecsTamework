@@ -917,6 +917,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkTraitsComponent.getComponentType(), snapshot.traits());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
+        if (stateSnapshotService != null) {
+            stateSnapshotService.applyRestoredHealth(reference, store, snapshot.healthPercent());
+        }
         if (snapshot.npcName() != null && snapshot.npcName().getName() != null && !snapshot.npcName().getName().isBlank()) {
             safePutComponent(
                     store,

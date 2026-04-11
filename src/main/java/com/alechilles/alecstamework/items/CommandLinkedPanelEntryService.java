@@ -191,7 +191,10 @@ final class CommandLinkedPanelEntryService {
                 );
                 if (deadSnapshot != null) {
                     dead = true;
-                    String deadName = deadSnapshot.displayName();
+                    String deadName = npcNameResolver.resolveSnapshotDisplayName(
+                            deadSnapshot.displayName(),
+                            deadSnapshot.roleId()
+                    );
                     if (deadName != null && !deadName.isBlank()) {
                         displayName = deadName;
                     }
@@ -218,7 +221,10 @@ final class CommandLinkedPanelEntryService {
                         captureService.getCapturedSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
                 if (capturedSnapshot != null) {
                     captured = true;
-                    String capturedName = capturedSnapshot.displayName();
+                    String capturedName = npcNameResolver.resolveSnapshotDisplayName(
+                            capturedSnapshot.displayName(),
+                            capturedSnapshot.roleId()
+                    );
                     if (capturedName != null && !capturedName.isBlank()) {
                         displayName = capturedName;
                     }
@@ -229,7 +235,10 @@ final class CommandLinkedPanelEntryService {
                         coopService.getCoopSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
                 if (coopSnapshot != null) {
                     inCoop = true;
-                    String coopName = coopSnapshot.displayName();
+                    String coopName = npcNameResolver.resolveSnapshotDisplayName(
+                            coopSnapshot.displayName(),
+                            coopSnapshot.roleId()
+                    );
                     if (coopName != null && !coopName.isBlank()) {
                         displayName = coopName;
                     }
@@ -497,14 +506,54 @@ final class CommandLinkedPanelEntryService {
                 && !itemNameKey.equals(localizedFromKey)) {
             return localizedFromKey;
         }
-        Item itemAsset = Item.getAssetMap().getAsset(canonicalItemId);
-        if (itemAsset != null && itemAsset.getTranslationKey() != null && !itemAsset.getTranslationKey().isBlank()) {
-            String translated = LocalizedText.resolve(language, itemAsset.getTranslationKey());
-            if (translated != null && !translated.isBlank() && !translated.equals(itemAsset.getTranslationKey())) {
-                return translated;
+        try {
+            Item itemAsset = Item.getAssetMap().getAsset(canonicalItemId);
+            if (itemAsset != null && itemAsset.getTranslationKey() != null && !itemAsset.getTranslationKey().isBlank()) {
+                String translated = LocalizedText.resolve(language, itemAsset.getTranslationKey());
+                if (translated != null && !translated.isBlank() && !translated.equals(itemAsset.getTranslationKey())) {
+                    return translated;
+                }
+            }
+        } catch (Throwable ignored) {
+            // Some tests and degraded startup paths do not initialize Hytale item assets/logging.
+        }
+        return humanizeItemId(canonicalItemId);
+    }
+
+    private String humanizeItemId(String canonicalItemId) {
+        if (canonicalItemId == null || canonicalItemId.isBlank()) {
+            return LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.happiness.food.unknown");
+        }
+        String normalized = canonicalItemId;
+        if (normalized.startsWith("Tw_")) {
+            normalized = normalized.substring(3);
+        }
+        String[] rawParts = normalized.split("_");
+        ArrayList<String> parts = new ArrayList<>(rawParts.length);
+        for (String rawPart : rawParts) {
+            if (rawPart == null || rawPart.isBlank()) {
+                continue;
+            }
+            parts.add(rawPart);
+        }
+        if (parts.isEmpty()) {
+            return canonicalItemId;
+        }
+        if (parts.size() > 1 && parts.get(0).equalsIgnoreCase("Feed")) {
+            String feed = parts.remove(0);
+            parts.add(feed);
+        }
+        StringBuilder out = new StringBuilder();
+        for (String part : parts) {
+            if (!out.isEmpty()) {
+                out.append(' ');
+            }
+            out.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                out.append(part.substring(1).toLowerCase(Locale.ROOT));
             }
         }
-        return canonicalItemId;
+        return out.toString();
     }
 
     private String stripModifierPrefix(String label) {

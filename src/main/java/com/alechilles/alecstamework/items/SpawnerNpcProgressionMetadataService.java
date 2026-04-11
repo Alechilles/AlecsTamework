@@ -8,6 +8,8 @@ import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
+import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.codec.Codec;
@@ -30,7 +32,8 @@ final class SpawnerNpcProgressionMetadataService {
         if (stack == null || npcRef == null || store == null || !npcRef.isValid()) {
             return stack;
         }
-        ItemStack updated = applyNeedsMetadata(stack, npcRef, store);
+        ItemStack updated = applyHealthMetadata(stack, npcRef, store);
+        updated = applyNeedsMetadata(updated, npcRef, store);
         updated = applyHappinessMetadata(updated, npcRef, store);
         updated = applyBreedingMetadata(updated, npcRef, store);
         updated = applyTraitsMetadata(updated, npcRef, store);
@@ -51,7 +54,8 @@ final class SpawnerNpcProgressionMetadataService {
     }
 
     ItemStack clearProgressionMetadata(@Nullable ItemStack stack) {
-        ItemStack updated = clearNeedsMetadata(stack);
+        ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.HEALTH_PERCENT);
+        updated = clearNeedsMetadata(updated);
         updated = clearHappinessMetadata(updated);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_CONFIG_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_HAPPINESS);
@@ -74,6 +78,26 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
         return updated;
+    }
+
+    void applyNpcHealthFromItem(@Nullable ItemStack stack,
+                                @Nullable Ref<EntityStore> npcRef,
+                                @Nullable Store<EntityStore> store) {
+        if (stack == null || npcRef == null || store == null || !npcRef.isValid()) {
+            return;
+        }
+        Double healthPercent = stack.getFromMetadataOrNull(TameworkMetadataKeys.HEALTH_PERCENT, Codec.DOUBLE);
+        CompanionHealthStateService.applyStoredHealthPercent(npcRef, store, healthPercent);
+    }
+
+    private ItemStack applyHealthMetadata(ItemStack stack,
+                                          Ref<EntityStore> npcRef,
+                                          Store<EntityStore> store) {
+        Double healthPercent = CompanionHealthStateService.captureHealthPercent(npcRef, store);
+        if (healthPercent == null) {
+            return clearMetadataKey(stack, TameworkMetadataKeys.HEALTH_PERCENT);
+        }
+        return stack.withMetadata(TameworkMetadataKeys.HEALTH_PERCENT, Codec.DOUBLE, healthPercent);
     }
 
     private ItemStack applyNeedsMetadata(ItemStack stack,
@@ -187,6 +211,26 @@ final class SpawnerNpcProgressionMetadataService {
             return;
         }
         TameworkNeedsComponent existing = store.getComponent(npcRef, type);
+        TameworkNeedsComponent restored = buildPausedRestoredNeedsComponent(
+                existing,
+                configId,
+                hunger,
+                thirst,
+                appliedPenalty
+        );
+        store.putComponent(
+                npcRef,
+                type,
+                restored
+        );
+        CompanionNeedsService.ensureNeedsComponent(npcRef, store, null);
+    }
+
+    static TameworkNeedsComponent buildPausedRestoredNeedsComponent(@Nullable TameworkNeedsComponent existing,
+                                                                    @Nullable String configId,
+                                                                    @Nullable Double hunger,
+                                                                    @Nullable Double thirst,
+                                                                    @Nullable Double appliedPenalty) {
         String resolvedConfigId = (configId != null && !configId.isBlank())
                 ? configId
                 : existing != null ? existing.getConfigId() : null;
@@ -199,27 +243,15 @@ final class SpawnerNpcProgressionMetadataService {
         double resolvedPenalty = appliedPenalty != null
                 ? appliedPenalty
                 : existing != null ? existing.getAppliedHappinessPenalty() : 0.0;
-        long resolvedLastUpdateMs = lastUpdateMs != null && lastUpdateMs > 0L
-                ? lastUpdateMs
-                : existing != null && existing.getLastUpdateMs() > 0L
-                ? existing.getLastUpdateMs()
-                : 0L;
-        long resolvedLastPassiveSweepMs = lastPassiveSweepMs != null && lastPassiveSweepMs > 0L
-                ? lastPassiveSweepMs
-                : existing != null && existing.getLastPassiveSweepMs() > 0L
-                ? existing.getLastPassiveSweepMs()
-                : 0L;
-        store.putComponent(
-                npcRef,
-                type,
-                new TameworkNeedsComponent(
-                        resolvedConfigId,
-                        resolvedHunger,
-                        resolvedThirst,
-                        resolvedPenalty,
-                        resolvedLastUpdateMs,
-                        resolvedLastPassiveSweepMs
-                )
+
+        // Capture items pause needs progression while stowed, so restored timers must restart live ticking.
+        return new TameworkNeedsComponent(
+                resolvedConfigId,
+                resolvedHunger,
+                resolvedThirst,
+                resolvedPenalty,
+                0L,
+                0L
         );
     }
 

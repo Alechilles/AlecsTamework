@@ -15,6 +15,7 @@ public final class TameworkMetadataKeys {
     public static final String HAPPINESS_CONFIG_ID = "Tamework.Happiness.ConfigId";
     public static final String HAPPINESS_VALUE = "Tamework.Happiness.Value";
     public static final String HAPPINESS_LAST_UPDATE_MS = "Tamework.Happiness.LastUpdateMs";
+    public static final String HEALTH_PERCENT = "Tamework.Health.Percent";
     public static final String NEEDS_CONFIG_ID = "Tamework.Needs.ConfigId";
     public static final String NEEDS_HUNGER = "Tamework.Needs.Hunger";
     public static final String NEEDS_THIRST = "Tamework.Needs.Thirst";
