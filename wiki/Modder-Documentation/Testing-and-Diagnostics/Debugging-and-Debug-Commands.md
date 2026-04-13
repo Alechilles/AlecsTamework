@@ -19,6 +19,8 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw getowner`, `/tw setowner`
 - `/tw gettamed`, `/tw settamed`
 - `/tw getalarm [AlarmName] [NpcUuid]`
+- `/tw config`
+- `/tw settings`
 - `/tw reloadconfig`
 - `/tw gethappiness`, `/tw sethappiness`
 - `/tw getneeds`, `/tw setneeds`, `/tw sethunger`, `/tw setthirst`
@@ -27,6 +29,11 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw getlifestage`
 - `/tw findnpc <uuid>`
 - `/tw getflockdebug`
+- `/tw npcclean <roleId>`
+- `/tw showhitboxes`
+- `/tw debugdb [checkpoint|vacuum]`
+- `/tw debugreviveready`
+- `/tw debugcrashtelemetry [flush|simulate]`
 
 ## Debug toggles
 - `/tw debughook [on|off]`
@@ -35,8 +42,13 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debuglag [on|off]`
+- `/tw debugcoop [on|off]`
+- `/tw debugneedsconsume [on|off]`
+- `/tw debugneedsdamage [on|off]`
 
 `TwDebugConfig` can supply default values for those debug toggles, including `DespawnRoleFilter`.
+
+`/tw showhitboxes` is diagnostic rendering, but it is not part of `TwDebugConfig` startup defaults.
 
 ## Log patterns to watch
 - Missing builder ids
@@ -47,6 +59,7 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 
 ## Related Pages
 - [TwDebugConfig Reference](/mod/alecs-tamework/twdebugconfig-reference)
+- [Tamework Settings UI and Persistence](/mod/alecs-tamework/tamework-settings-ui-and-persistence)
 - [TwInteractionConfig Reference](/mod/alecs-tamework/twinteractionconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 
