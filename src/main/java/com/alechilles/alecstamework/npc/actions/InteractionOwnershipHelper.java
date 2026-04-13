@@ -8,6 +8,7 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /** Checks ownership/tamed state and sends ownership denial messages. */
 final class InteractionOwnershipHelper {
@@ -18,17 +19,40 @@ final class InteractionOwnershipHelper {
     }
 
     // Returns whether the NPC is marked as tamed.
-    boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return TamedStateResolver.isTamed(npcRef, store);
+    boolean isTamed(Ref<EntityStore> npcRef,
+                    Store<EntityStore> store,
+                    @Nullable InteractionContextSnapshot ctx) {
+        if (ctx != null && ctx.cachedNpcTamed != null) {
+            return ctx.cachedNpcTamed;
+        }
+        boolean tamed = TamedStateResolver.isTamed(npcRef, store);
+        if (ctx != null) {
+            ctx.cachedNpcTamed = tamed;
+        }
+        return tamed;
     }
 
     // Returns whether the player is the owner of the NPC.
-    boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        if (player == null) {
+    boolean isOwner(Ref<EntityStore> npcRef,
+                    Store<EntityStore> store,
+                    Player player,
+                    @Nullable InteractionContextSnapshot ctx) {
+        if (ctx != null && ctx.cachedPlayerIsOwner != null) {
+            return ctx.cachedPlayerIsOwner;
+        }
+        if (player == null && (ctx == null || ctx.playerId == null)) {
             return false;
         }
-        UUID ownerId = LegacyTamedOwnershipBridge.resolveOwner(npcRef, store).getOwnerId();
-        return ownerId != null && ownerId.equals(owner.getPlayerUuid(player));
+        UUID playerId = ctx != null && ctx.playerId != null ? ctx.playerId : owner.getPlayerUuid(player);
+        if (playerId == null) {
+            return false;
+        }
+        UUID ownerId = resolveOwnerId(npcRef, store, ctx);
+        boolean isOwner = ownerId != null && ownerId.equals(playerId);
+        if (ctx != null) {
+            ctx.cachedPlayerIsOwner = isOwner;
+        }
+        return isOwner;
     }
 
     // Sends a denial message to non-owners when applicable.
@@ -47,5 +71,19 @@ final class InteractionOwnershipHelper {
         String npcName = owner.resolveNpcName(owner.resolveNpcEntity(npcRef, store));
         String ownerName = ownerInfo.getOwnerName();
         OwnerMessageUtil.sendDenied(player, npcName, ownerName, ownerUuid, "interact with");
+    }
+
+    @Nullable
+    private UUID resolveOwnerId(Ref<EntityStore> npcRef,
+                                Store<EntityStore> store,
+                                @Nullable InteractionContextSnapshot ctx) {
+        if (ctx != null && ctx.cachedNpcOwnerId != null) {
+            return ctx.cachedNpcOwnerId;
+        }
+        UUID ownerId = LegacyTamedOwnershipBridge.resolveOwner(npcRef, store).getOwnerId();
+        if (ctx != null) {
+            ctx.cachedNpcOwnerId = ownerId;
+        }
+        return ownerId;
     }
 }

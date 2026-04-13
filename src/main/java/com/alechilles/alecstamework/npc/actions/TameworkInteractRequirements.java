@@ -1,11 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
 import com.alechilles.alecstamework.api.InteractionRequirementContext;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
@@ -19,6 +17,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Requiremen
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -244,11 +243,11 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isTamed()
-                && !owner.isTamed(npcRef, store)) {
+                && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (bucket.isNotTamed()
-                && owner.isTamed(npcRef, store)) {
+                && owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (bucket.isPlayerHandEmpty()
@@ -256,11 +255,11 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isPlayerCrouching()
-                && !owner.isPlayerCrouching(role, infoProvider, store)) {
+                && !owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return false;
         }
         if (bucket.isPlayerIsOwner()
-                && !owner.isOwner(npcRef, store, player)) {
+                && !owner.isOwner(npcRef, store, player, ctx)) {
             return false;
         }
         if (bucket.isHarvestAlarmReady()
@@ -302,7 +301,7 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (!requireAnyMatch(bucket.getPlayerMovementState(),
-                requirement -> owner.matchesMovementState(requirement, role, infoProvider, store))) {
+                requirement -> owner.matchesMovementState(requirement, role, infoProvider, store, ctx))) {
             return false;
         }
         if (!requireAnyMatch(bucket.getInteractionContext(),
@@ -353,11 +352,11 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isTamed()
-                && owner.isTamed(npcRef, store)) {
+                && owner.isTamed(npcRef, store, ctx)) {
             return true;
         }
         if (bucket.isNotTamed()
-                && !owner.isTamed(npcRef, store)) {
+                && !owner.isTamed(npcRef, store, ctx)) {
             return true;
         }
         if (bucket.isPlayerHandEmpty()
@@ -365,11 +364,11 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isPlayerCrouching()
-                && owner.isPlayerCrouching(role, infoProvider, store)) {
+                && owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return true;
         }
         if (bucket.isPlayerIsOwner()
-                && owner.isOwner(npcRef, store, player)) {
+                && owner.isOwner(npcRef, store, player, ctx)) {
             return true;
         }
         if (bucket.isHarvestAlarmReady()
@@ -411,7 +410,7 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (anyMatch(bucket.getPlayerMovementState(),
-                requirement -> owner.matchesMovementState(requirement, role, infoProvider, store))) {
+                requirement -> owner.matchesMovementState(requirement, role, infoProvider, store, ctx))) {
             return true;
         }
         if (anyMatch(bucket.getInteractionContext(),
@@ -467,7 +466,7 @@ final class TameworkInteractRequirements {
                                           Store<EntityStore> store,
                                           Player player,
                                           InteractionContextSnapshot ctx) {
-        if (owner.isTamed(npcRef, store)) {
+        if (owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         return matchesPresetItems(
@@ -488,7 +487,7 @@ final class TameworkInteractRequirements {
                                           Store<EntityStore> store,
                                           Player player,
                                           InteractionContextSnapshot ctx) {
-        if (!owner.isTamed(npcRef, store)) {
+        if (!owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         InteractionFeedItems resolved = feedHelper.resolveFeedItems(interaction, role, ctx);
@@ -510,7 +509,7 @@ final class TameworkInteractRequirements {
         boolean requireHarvestable = optionOrDefault(interaction.getRequireHarvestable(), true);
         boolean requireAlarm = optionOrDefault(interaction.getRequireHarvestAlarmReady(), true);
         boolean requireContext = optionOrDefault(interaction.getRequireHarvestInteractionContext(), true);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (requireHarvestable && !owner.resolveIsHarvestable(role, ctx)) {
@@ -539,16 +538,16 @@ final class TameworkInteractRequirements {
         boolean requireOwner = resolveInteractionRequireOwner(interaction.getRequireOwner(), interactionRequireOwnerDefault);
         boolean requireMountable = optionOrDefault(interaction.getRequireMountable(), true);
         boolean requireCrouching = optionOrDefault(interaction.getRequireCrouching(), true);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (requireOwner && !owner.isOwner(npcRef, store, player)) {
+        if (requireOwner && !owner.isOwner(npcRef, store, player, ctx)) {
             return false;
         }
         if (requireMountable && !owner.resolveIsMountable(role, ctx)) {
             return false;
         }
-        if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store)) {
+        if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return false;
         }
         return true;
@@ -563,10 +562,10 @@ final class TameworkInteractRequirements {
                                                InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
         boolean requireOwner = resolveInteractionRequireOwner(interaction.getRequireOwner(), interactionRequireOwnerDefault);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (requireOwner && !owner.isOwner(npcRef, store, player)) {
+        if (requireOwner && !owner.isOwner(npcRef, store, player, ctx)) {
             return false;
         }
         return true;
@@ -580,7 +579,7 @@ final class TameworkInteractRequirements {
                                            Player player,
                                            InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (!isBreedingEnabled(npcRef, store)) {
@@ -801,15 +800,9 @@ final class TameworkInteractRequirements {
 
     static boolean resolveInteractionRequireOwner(@Nullable Boolean ignoredEntryRequireOwner, boolean globalRequireOwner) {
         // /tw settings global ownership requirement always wins for interaction checks.
-        try {
-            if (Tamework.getInstance() != null) {
-                TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-                if (globalConfig != null) {
-                    return globalConfig.isOwnershipInteractionRequiresOwner();
-                }
-            }
-        } catch (Throwable ignored) {
-            // Fall back to constructor snapshot if runtime/plugin context is unavailable.
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
+        if (overrides != null && overrides.interactionRequiresOwner() != null) {
+            return overrides.interactionRequiresOwner();
         }
         return globalRequireOwner;
     }

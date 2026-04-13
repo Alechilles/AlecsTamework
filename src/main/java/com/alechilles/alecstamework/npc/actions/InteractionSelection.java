@@ -128,13 +128,17 @@ final class InteractionSelection {
     boolean matchesMovementState(MovementStateRequirement requirement,
                                  Role role,
                                  InfoProvider infoProvider,
-                                 Store<EntityStore> store) {
-        return matchHelpers.matchesMovementState(requirement, role, infoProvider, store);
+                                 Store<EntityStore> store,
+                                 InteractionContextSnapshot ctx) {
+        return matchHelpers.matchesMovementState(requirement, role, infoProvider, store, ctx);
     }
 
     // Returns true if the player is crouching.
-    boolean isPlayerCrouching(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
-        return matchHelpers.isPlayerCrouching(role, infoProvider, store);
+    boolean isPlayerCrouching(Role role,
+                              InfoProvider infoProvider,
+                              Store<EntityStore> store,
+                              InteractionContextSnapshot ctx) {
+        return matchHelpers.isPlayerCrouching(role, infoProvider, store, ctx);
     }
 
     // Checks an alarm state requirement.
@@ -159,13 +163,18 @@ final class InteractionSelection {
     }
 
     // Returns true if the NPC is tamed.
-    boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return ownershipHelper.isTamed(npcRef, store);
+    boolean isTamed(Ref<EntityStore> npcRef,
+                    Store<EntityStore> store,
+                    InteractionContextSnapshot ctx) {
+        return ownershipHelper.isTamed(npcRef, store, ctx);
     }
 
     // Returns true if the player is the owner.
-    boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        return ownershipHelper.isOwner(npcRef, store, player);
+    boolean isOwner(Ref<EntityStore> npcRef,
+                    Store<EntityStore> store,
+                    Player player,
+                    InteractionContextSnapshot ctx) {
+        return ownershipHelper.isOwner(npcRef, store, player, ctx);
     }
 
     // Notifies the player if ownership prevents interaction.

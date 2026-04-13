@@ -25,9 +25,12 @@ public final class TameworkSettingsStore {
     private static final int CURRENT_VERSION = 1;
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private static final Object GLOBAL_CACHE_LOCK = new Object();
+    private static final Object RUNTIME_OVERRIDES_CACHE_LOCK = new Object();
 
     @Nullable
     private static volatile CachedGlobalDocument cachedGlobalDocument;
+    @Nullable
+    private static volatile CachedRuntimeOverrides cachedRuntimeOverrides;
 
     private TameworkSettingsStore() {
     }
@@ -62,7 +65,32 @@ public final class TameworkSettingsStore {
         if (plugin == null) {
             return null;
         }
-        return loadGlobalOverrides(resolveGlobalSettingsFile(plugin), plugin.getLogger());
+        Path globalSettingsFile = resolveGlobalSettingsFile(plugin);
+        CachedRuntimeOverrides cached = cachedRuntimeOverrides;
+        if (cached != null && cached.path().equals(globalSettingsFile)) {
+            return cached.overrides();
+        }
+        synchronized (RUNTIME_OVERRIDES_CACHE_LOCK) {
+            cached = cachedRuntimeOverrides;
+            if (cached != null && cached.path().equals(globalSettingsFile)) {
+                return cached.overrides();
+            }
+            GlobalOverrides loaded = loadGlobalOverrides(globalSettingsFile, plugin.getLogger());
+            cachedRuntimeOverrides = new CachedRuntimeOverrides(
+                    globalSettingsFile,
+                    loaded
+            );
+            return loaded;
+        }
+    }
+
+    public static void invalidateRuntimeGlobalOverridesCache() {
+        synchronized (RUNTIME_OVERRIDES_CACHE_LOCK) {
+            cachedRuntimeOverrides = null;
+        }
+        synchronized (GLOBAL_CACHE_LOCK) {
+            cachedGlobalDocument = null;
+        }
     }
 
     @Nullable
@@ -139,6 +167,7 @@ public final class TameworkSettingsStore {
             return false;
         }
         updateGlobalCache(globalSettingsFile, document);
+        updateRuntimeOverridesCache(globalSettingsFile, toOverrides(document));
         return true;
     }
 
@@ -187,6 +216,16 @@ public final class TameworkSettingsStore {
                     globalSettingsFile,
                     lastModifiedMillis(globalSettingsFile),
                     document
+            );
+        }
+    }
+
+    private static void updateRuntimeOverridesCache(@Nonnull Path globalSettingsFile,
+                                                    @Nullable GlobalOverrides overrides) {
+        synchronized (RUNTIME_OVERRIDES_CACHE_LOCK) {
+            cachedRuntimeOverrides = new CachedRuntimeOverrides(
+                    globalSettingsFile,
+                    overrides
             );
         }
     }
@@ -491,6 +530,10 @@ public final class TameworkSettingsStore {
     private record CachedGlobalDocument(@Nonnull Path path,
                                         long lastModifiedMillis,
                                         @Nullable GlobalSettingsDocument document) {
+    }
+
+    private record CachedRuntimeOverrides(@Nonnull Path path,
+                                          @Nullable GlobalOverrides overrides) {
     }
 
     private static final class GlobalSettingsDocument {

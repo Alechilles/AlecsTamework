@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.npc.systems;
 
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.AddReason;
@@ -46,6 +48,9 @@ public final class CompanionTraitBootstrapOnLoadSystem extends RefSystem<EntityS
         if (config == null || !config.isEnabled()) {
             return;
         }
+        if (!requiresTraitBootstrap(reference, store, config)) {
+            return;
+        }
         commandBuffer.run(bufferStore -> {
             if (bufferStore == null || reference == null || !reference.isValid()) {
                 return;
@@ -71,5 +76,31 @@ public final class CompanionTraitBootstrapOnLoadSystem extends RefSystem<EntityS
             return Query.any();
         }
         return Query.and(npcType);
+    }
+
+    private boolean requiresTraitBootstrap(@Nonnull Ref<EntityStore> reference,
+                                           @Nonnull Store<EntityStore> store,
+                                           @Nonnull TwTraitConfig config) {
+        var traitsType = TameworkTraitsComponent.getComponentType();
+        if (traitsType == null) {
+            return false;
+        }
+        TameworkTraitsComponent traits = store.getComponent(reference, traitsType);
+        if (traits == null) {
+            return true;
+        }
+        String configId = config.getId();
+        if (configId != null
+                && !configId.isBlank()
+                && (traits.getConfigId() == null
+                || traits.getConfigId().isBlank()
+                || !configId.equalsIgnoreCase(traits.getConfigId()))) {
+            return true;
+        }
+        if (traits.getRollSeed() == 0L || traits.getTraitValues() == null || traits.getTraitValues().length == 0) {
+            return true;
+        }
+        var lifeStageType = TameworkLifeStageComponent.getComponentType();
+        return lifeStageType != null && store.getComponent(reference, lifeStageType) == null;
     }
 }

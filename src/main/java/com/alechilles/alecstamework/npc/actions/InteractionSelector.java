@@ -54,44 +54,101 @@ final class InteractionSelector {
         if (entries == null || entries.length == 0) {
             return null;
         }
-        ActionTameworkInteract.ResolvedInteraction blockedContext = null;
-        ActionTameworkInteract.ResolvedInteraction best = null;
-        int bestScore = -1;
+        ActionTameworkInteract.ResolvedInteraction[] blockedContext = new ActionTameworkInteract.ResolvedInteraction[1];
+        ActionTameworkInteract.ResolvedInteraction contextual = findFirstPromptMatch(
+                config,
+                interactionConfigId,
+                entries,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                EntryPromptCategory.CONTEXTUAL,
+                blocked -> blockedContext[0] = blockedContext[0] == null ? blocked : blockedContext[0]
+        );
+        if (contextual != null) {
+            return contextual;
+        }
+        ActionTameworkInteract.ResolvedInteraction conditional = findFirstPromptMatch(
+                config,
+                interactionConfigId,
+                entries,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                EntryPromptCategory.CONDITIONAL,
+                blocked -> {
+                }
+        );
+        if (conditional != null) {
+            return conditional;
+        }
+        ActionTameworkInteract.ResolvedInteraction generic = findFirstPromptMatch(
+                config,
+                interactionConfigId,
+                entries,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                EntryPromptCategory.GENERIC,
+                blocked -> {
+                }
+        );
+        return generic != null ? generic : blockedContext[0];
+    }
+
+    private ActionTameworkInteract.ResolvedInteraction findFirstPromptMatch(TwInteractionConfig config,
+                                                                            String interactionConfigId,
+                                                                            InteractionEntry[] entries,
+                                                                            Ref<EntityStore> npcRef,
+                                                                            Role role,
+                                                                            InfoProvider infoProvider,
+                                                                            Store<EntityStore> store,
+                                                                            Player player,
+                                                                            InteractionContextSnapshot ctx,
+                                                                            EntryPromptCategory category,
+                                                                            BlockedContextConsumer blockedContextConsumer) {
         for (int index = 0; index < entries.length; index++) {
             InteractionEntry entry = entries[index];
-            if (entry == null || !entry.isEnabled()) {
+            if (entry == null || !entry.isEnabled() || classifyPromptEntry(entry) != category) {
                 continue;
             }
-            boolean contextual = isContextualEntry(entry);
-            int score = contextual ? 100 : (isConditionalEntry(entry) ? 50 : 0);
             int cooldownSeconds = cooldowns.resolveCooldownSeconds(config, entry);
             String cooldownAlarmName = cooldownSeconds > 0
                     ? cooldowns.buildCooldownAlarmName(config, index)
                     : null;
             if (cooldownSeconds > 0
                     && (cooldownAlarmName == null || !cooldowns.isCooldownReady(npcRef, store, cooldownAlarmName))) {
-                if (contextual && blockedContext == null) {
-                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                if (category == EntryPromptCategory.CONTEXTUAL) {
+                    blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
                             interactionConfigId,
                             entry,
                             index,
                             cooldownSeconds,
                             cooldownAlarmName,
                             true
-                    );
+                    ));
                 }
                 continue;
             }
             if (isHarvestAlarmBlocking(entry, npcRef, role, infoProvider, store, ctx, true)) {
-                if (contextual && blockedContext == null) {
-                    blockedContext = new ActionTameworkInteract.ResolvedInteraction(
+                if (category == EntryPromptCategory.CONTEXTUAL) {
+                    blockedContextConsumer.accept(new ActionTameworkInteract.ResolvedInteraction(
                             interactionConfigId,
                             entry,
                             index,
                             cooldownSeconds,
                             cooldownAlarmName,
                             true
-                    );
+                    ));
                 }
                 continue;
             }
@@ -108,18 +165,35 @@ final class InteractionSelector {
             )) {
                 continue;
             }
-            if (score > bestScore) {
-                bestScore = score;
-                best = new ActionTameworkInteract.ResolvedInteraction(
-                        interactionConfigId,
-                        entry,
-                        index,
-                        cooldownSeconds,
-                        cooldownAlarmName
-                );
-            }
+            return new ActionTameworkInteract.ResolvedInteraction(
+                    interactionConfigId,
+                    entry,
+                    index,
+                    cooldownSeconds,
+                    cooldownAlarmName
+            );
         }
-        return best != null ? best : blockedContext;
+        return null;
+    }
+
+    private EntryPromptCategory classifyPromptEntry(InteractionEntry entry) {
+        if (isContextualEntry(entry)) {
+            return EntryPromptCategory.CONTEXTUAL;
+        }
+        if (isConditionalEntry(entry)) {
+            return EntryPromptCategory.CONDITIONAL;
+        }
+        return EntryPromptCategory.GENERIC;
+    }
+
+    private interface BlockedContextConsumer {
+        void accept(ActionTameworkInteract.ResolvedInteraction blockedContext);
+    }
+
+    private enum EntryPromptCategory {
+        CONTEXTUAL,
+        CONDITIONAL,
+        GENERIC
     }
 
     private ActionTameworkInteract.ResolvedInteraction selectInteractionInternal(TwInteractionConfig config,

@@ -99,13 +99,21 @@ final class InteractionMatchHelpers {
                                                InfoProvider infoProvider,
                                                InteractionContextSnapshot ctx,
                                                boolean allowBlank) {
-        if (matchesInteractionContext(context, role, infoProvider, allowBlank)) {
-            return true;
-        }
         if (context == null || context.isBlank()) {
             return allowBlank;
         }
-        return matchesHeldItemInteractionContext(context, ctx);
+        if (ctx != null) {
+            Boolean cachedMatch = ctx.promptContextMatches.get(context);
+            if (cachedMatch != null) {
+                return cachedMatch;
+            }
+        }
+        boolean matched = matchesRoleInteractionContext(context, role, infoProvider, ctx)
+                || matchesHeldItemInteractionContext(context, ctx);
+        if (ctx != null) {
+            ctx.promptContextMatches.put(context, matched);
+        }
+        return matched;
     }
 
     // Checks whether the held item advertises the given interaction context.
@@ -190,17 +198,21 @@ final class InteractionMatchHelpers {
     boolean matchesMovementState(MovementStateRequirement requirement,
                                  Role role,
                                  InfoProvider infoProvider,
-                                 Store<EntityStore> store) {
+                                 Store<EntityStore> store,
+                                 InteractionContextSnapshot ctx) {
         if (requirement == null || requirement.getState() == null || requirement.getState().isBlank()) {
             return false;
         }
-        MovementStates states = statesForPlayer(role, infoProvider, store);
+        MovementStates states = statesForPlayer(role, infoProvider, store, ctx);
         return matchesMovementState(states, requirement.getState());
     }
 
     // Returns true when the player is crouching.
-    boolean isPlayerCrouching(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
-        return matchesMovementState(statesForPlayer(role, infoProvider, store), "Crouching");
+    boolean isPlayerCrouching(Role role,
+                              InfoProvider infoProvider,
+                              Store<EntityStore> store,
+                              InteractionContextSnapshot ctx) {
+        return matchesMovementState(statesForPlayer(role, infoProvider, store, ctx), "Crouching");
     }
 
     // Matches a state name against the movement state snapshot.
@@ -342,12 +354,44 @@ final class InteractionMatchHelpers {
 
     // Retrieves movement states for the interacting player.
     private MovementStates statesForPlayer(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
-        Ref<EntityStore> playerRef = owner.resolveInteractionTarget(role, infoProvider);
+        return statesForPlayer(role, infoProvider, store, null);
+    }
+
+    private boolean matchesRoleInteractionContext(String context,
+                                                  Role role,
+                                                  InfoProvider infoProvider,
+                                                  InteractionContextSnapshot ctx) {
+        if (role == null || role.getStateSupport() == null) {
+            return false;
+        }
+        Ref<EntityStore> playerRef = ctx != null && ctx.playerRef != null
+                ? ctx.playerRef
+                : owner.resolveInteractionTarget(role, infoProvider);
+        if (playerRef == null || !playerRef.isValid()) {
+            return false;
+        }
+        return role.getStateSupport().hasContextualInteraction(playerRef, context);
+    }
+
+    private MovementStates statesForPlayer(Role role,
+                                           InfoProvider infoProvider,
+                                           Store<EntityStore> store,
+                                           InteractionContextSnapshot ctx) {
+        if (ctx != null && ctx.cachedPlayerMovementStates != null) {
+            return ctx.cachedPlayerMovementStates;
+        }
+        Ref<EntityStore> playerRef = ctx != null && ctx.playerRef != null
+                ? ctx.playerRef
+                : owner.resolveInteractionTarget(role, infoProvider);
         if (playerRef == null || !playerRef.isValid()) {
             return null;
         }
         MovementStatesComponent component = store.getComponent(playerRef, MovementStatesComponent.getComponentType());
-        return component != null ? component.getMovementStates() : null;
+        MovementStates states = component != null ? component.getMovementStates() : null;
+        if (ctx != null) {
+            ctx.cachedPlayerMovementStates = states;
+        }
+        return states;
     }
 
 }

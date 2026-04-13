@@ -1,8 +1,7 @@
 package com.alechilles.alecstamework.npc.sensors;
 
-import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
-import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedBelow;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -48,13 +47,12 @@ public final class SensorTameworkNeedBelow extends TameworkSensorBase {
             return false;
         }
 
-        TwNeedsConfig config = resolveNeedsConfig(ref, store, needs);
-        if (config == null || !config.isEnabled()) {
+        NeedsConfigResolver.NeedsSensorConfig config = NeedsConfigResolver.resolveSensorConfig(ref, store, needs);
+        if (config == null || !config.enabled()) {
             return false;
         }
-        TwNeedsConfig.ValueSettings values = config.getValues();
-        double min = needType == NeedType.THIRST ? values.getThirstMin() : values.getHungerMin();
-        double max = needType == NeedType.THIRST ? values.getThirstMax() : values.getHungerMax();
+        double min = needType == NeedType.THIRST ? config.thirstMin() : config.hungerMin();
+        double max = needType == NeedType.THIRST ? config.thirstMax() : config.hungerMax();
         double current = needType == NeedType.THIRST ? needs.getThirst() : needs.getHunger();
         double ratio = resolveRatio(current, min, max);
         return ratio <= ratioBelow + EPSILON;
@@ -63,21 +61,6 @@ public final class SensorTameworkNeedBelow extends TameworkSensorBase {
     @Override
     public InfoProvider getSensorInfo() {
         return null;
-    }
-
-    @Nullable
-    private static TwNeedsConfig resolveNeedsConfig(@Nonnull Ref<EntityStore> ref,
-                                                    @Nonnull Store<EntityStore> store,
-                                                    @Nonnull TameworkNeedsComponent needs) {
-        String configId = needs.getConfigId();
-        if (configId != null && !configId.isBlank()) {
-            TwNeedsConfig fromId = TwNeedsConfig.resolveById(configId);
-            if (fromId != null) {
-                return fromId;
-            }
-        }
-        String roleId = CompanionRoleIdResolver.resolveRoleId(ref, store);
-        return TwNeedsConfig.resolveForRole(roleId);
     }
 
     private static double resolveRatio(double value, double min, double max) {

@@ -14,15 +14,19 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
+import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -32,6 +36,9 @@ import javax.annotation.Nullable;
 public final class CompanionNeedsEnvironmentService {
     private static final int DEFAULT_CONTAINER_VERTICAL_SCAN_RADIUS = 2;
     private static final int DEFAULT_WATER_VERTICAL_SCAN_RADIUS = 1;
+    private static final long SEARCH_CACHE_HIT_TTL_MS = 1_500L;
+    private static final long SEARCH_CACHE_MISS_TTL_MS = 500L;
+    private static final int SEARCH_CACHE_MAX_ENTRIES = 8192;
     private static final int[][] HORIZONTAL_NEIGHBOR_OFFSETS = {
             {1, 0},
             {-1, 0},
@@ -41,6 +48,7 @@ public final class CompanionNeedsEnvironmentService {
     private static final int[] STAND_HEIGHT_OFFSETS = {0, 1, -1};
     private static final double STAND_POSITION_Y_OFFSET = 0.05;
     private static final double SCORE_EPSILON = 0.000001;
+    private static final ConcurrentHashMap<NeedsSearchCacheKey, CachedSearchResult> SEARCH_CACHE = new ConcurrentHashMap<>();
 
     enum ContainerConsumeStatus {
         SUCCESS,
@@ -236,16 +244,16 @@ public final class CompanionNeedsEnvironmentService {
         }
     }
 
-    boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
-                        @Nullable Store<EntityStore> store,
-                        @Nonnull TwNeedsConfig config) {
+    public boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
+                               @Nullable Store<EntityStore> store,
+                               @Nonnull TwNeedsConfig config) {
         return isNearWater(npcRef, store, config, null);
     }
 
-    boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
-                        @Nullable Store<EntityStore> store,
-                        @Nonnull TwNeedsConfig config,
-                        @Nullable Vector3d scanCenterOverride) {
+    public boolean isNearWater(@Nullable Ref<EntityStore> npcRef,
+                               @Nullable Store<EntityStore> store,
+                               @Nonnull TwNeedsConfig config,
+                               @Nullable Vector3d scanCenterOverride) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
@@ -332,6 +340,15 @@ public final class CompanionNeedsEnvironmentService {
                                                      @Nullable Store<EntityStore> store,
                                                      double radius,
                                                      int verticalScanRadius) {
+        return findNearestWaterDrinkingPosition(npcRef, store, radius, verticalScanRadius, 1.0);
+    }
+
+    @Nullable
+    public Vector3d findNearestWaterDrinkingPosition(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store,
+                                                     double radius,
+                                                     int verticalScanRadius,
+                                                     double consumeRadius) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
             return null;
         }
@@ -342,6 +359,20 @@ public final class CompanionNeedsEnvironmentService {
         }
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return null;
+        }
+        long nowMs = resolveCurrentTimeMs(store);
+        NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
+                npcRef,
+                store,
+                ResourceSearchKind.WATER,
+                transform.getPosition(),
+                radius,
+                verticalScanRadius,
+                null
+        );
+        Vector3d cachedTarget = getCachedSearchTarget(cacheKey, nowMs);
+        if (cachedTarget != CACHE_MISS) {
+            return cachedTarget;
         }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
@@ -356,40 +387,66 @@ public final class CompanionNeedsEnvironmentService {
         double radiusSq = radius * radius;
         int clampedVerticalRadius = Math.max(0, verticalScanRadius);
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        // Prefer the same edge-adjacent style target that food seek uses so the NPC visibly walks up to water.
+        Vector3d bestTarget = findNearestWaterTarget(
+                chunkStore,
+                chunkStoreStore,
+                transform.getPosition(),
+                blockX,
+                blockY,
+                blockZ,
+                searchRadius,
+                clampedVerticalRadius,
+                1.0,
+                radiusSq,
+                chunkCache
+        );
+        if (bestTarget == null && consumeRadius > 1.0 + SCORE_EPSILON) {
+            bestTarget = findNearestWaterTarget(
+                    chunkStore,
+                    chunkStoreStore,
+                    transform.getPosition(),
+                    blockX,
+                    blockY,
+                    blockZ,
+                    searchRadius,
+                    clampedVerticalRadius,
+                    consumeRadius,
+                    radiusSq,
+                    chunkCache
+            );
+        }
+        cacheSearchTarget(cacheKey, bestTarget, nowMs);
+        return bestTarget;
+    }
+
+    @Nullable
+    private static Vector3d findNearestWaterTarget(@Nonnull ChunkStore chunkStore,
+                                                   @Nonnull Store<ChunkStore> chunkStoreStore,
+                                                   @Nonnull Vector3d npcPosition,
+                                                   int blockX,
+                                                   int blockY,
+                                                   int blockZ,
+                                                   int searchRadius,
+                                                   int verticalScanRadius,
+                                                   double consumeRadius,
+                                                   double radiusSq,
+                                                   @Nonnull Map<Long, WorldChunk> chunkCache) {
         Vector3d bestTarget = null;
-        double bestDistanceSq = Double.MAX_VALUE;
-        for (int y = blockY - clampedVerticalRadius; y <= blockY + clampedVerticalRadius; y++) {
-            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
-                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
-                    double dx = x - blockX;
-                    double dz = z - blockZ;
-                    if ((dx * dx) + (dz * dz) > radiusSq) {
-                        continue;
-                    }
-                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
-                    if (worldChunk == null || !isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
-                        continue;
-                    }
-                    Vector3d standPosition = findNearestStandPositionAdjacentToBlock(
-                            chunkStore,
-                            chunkStoreStore,
-                            x,
-                            y,
-                            z,
-                            transform.getPosition(),
-                            chunkCache
-                    );
-                    if (standPosition == null) {
-                        continue;
-                    }
-                    double distanceSq = distanceSquared(standPosition, transform.getPosition());
-                    if (!Double.isFinite(distanceSq) || distanceSq >= bestDistanceSq) {
-                        continue;
-                    }
-                    bestDistanceSq = distanceSq;
-                    bestTarget = standPosition;
-                }
-            }
+        for (int horizontalRadius = 0; horizontalRadius <= searchRadius && bestTarget == null; horizontalRadius++) {
+            bestTarget = findNearestWaterTargetInHorizontalRing(
+                    chunkStore,
+                    chunkStoreStore,
+                    npcPosition,
+                    blockX,
+                    blockY,
+                    blockZ,
+                    horizontalRadius,
+                    verticalScanRadius,
+                    consumeRadius,
+                    radiusSq,
+                    chunkCache
+            );
         }
         return bestTarget;
     }
@@ -527,6 +584,20 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return null;
         }
+        long nowMs = resolveCurrentTimeMs(store);
+        NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
+                npcRef,
+                store,
+                ResourceSearchKind.FOOD_CONTAINER,
+                transform.getPosition(),
+                radius,
+                verticalScanRadius,
+                allowedFoods
+        );
+        Vector3d cachedTarget = getCachedSearchTarget(cacheKey, nowMs);
+        if (cachedTarget != CACHE_MISS) {
+            return cachedTarget;
+        }
         ChunkStore chunkStore = world.getChunkStore();
         Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
         if (chunkStoreStore == null) {
@@ -541,10 +612,108 @@ public final class CompanionNeedsEnvironmentService {
         int clampedVerticalRadius = Math.max(0, verticalScanRadius);
         Map<Long, WorldChunk> chunkCache = new HashMap<>();
         Vector3d bestTarget = null;
+        for (int horizontalRadius = 0; horizontalRadius <= searchRadius && bestTarget == null; horizontalRadius++) {
+            bestTarget = findNearestFoodTargetInHorizontalRing(
+                    chunkStore,
+                    chunkStoreStore,
+                    transform.getPosition(),
+                    blockX,
+                    blockY,
+                    blockZ,
+                    horizontalRadius,
+                    clampedVerticalRadius,
+                    radiusSq,
+                    allowedFoods,
+                    chunkCache
+            );
+        }
+        cacheSearchTarget(cacheKey, bestTarget, nowMs);
+        return bestTarget;
+    }
+
+    @Nullable
+    private static Vector3d findNearestWaterTargetInHorizontalRing(@Nonnull ChunkStore chunkStore,
+                                                                   @Nonnull Store<ChunkStore> chunkStoreStore,
+                                                                   @Nonnull Vector3d npcPosition,
+                                                                   int blockX,
+                                                                   int blockY,
+                                                                   int blockZ,
+                                                                   int horizontalRadius,
+                                                                   int verticalScanRadius,
+                                                                   double consumeRadius,
+                                                                   double radiusSq,
+                                                                   @Nonnull Map<Long, WorldChunk> chunkCache) {
+        Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
-        for (int y = blockY - clampedVerticalRadius; y <= blockY + clampedVerticalRadius; y++) {
-            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
-                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
+        for (int yOffset = -verticalScanRadius; yOffset <= verticalScanRadius; yOffset++) {
+            int y = blockY + yOffset;
+            for (int x = blockX - horizontalRadius; x <= blockX + horizontalRadius; x++) {
+                for (int z = blockZ - horizontalRadius; z <= blockZ + horizontalRadius; z++) {
+                    if (horizontalRadius > 0
+                            && x > blockX - horizontalRadius
+                            && x < blockX + horizontalRadius
+                            && z > blockZ - horizontalRadius
+                            && z < blockZ + horizontalRadius) {
+                        continue;
+                    }
+                    double dx = x - blockX;
+                    double dz = z - blockZ;
+                    if ((dx * dx) + (dz * dz) > radiusSq) {
+                        continue;
+                    }
+                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
+                    if (worldChunk == null || !isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
+                        continue;
+                    }
+                    Vector3d standPosition = findNearestStandPositionNearWaterSource(
+                            chunkStore,
+                            chunkStoreStore,
+                            x,
+                            y,
+                            z,
+                            npcPosition,
+                            consumeRadius,
+                            chunkCache
+                    );
+                    if (standPosition == null) {
+                        continue;
+                    }
+                    double distanceSq = distanceSquared(standPosition, npcPosition);
+                    if (Double.isFinite(distanceSq) && distanceSq < bestDistanceSq) {
+                        bestDistanceSq = distanceSq;
+                        bestTarget = standPosition;
+                    }
+                }
+            }
+        }
+        return bestTarget;
+    }
+
+    @Nullable
+    private static Vector3d findNearestFoodTargetInHorizontalRing(@Nonnull ChunkStore chunkStore,
+                                                                  @Nonnull Store<ChunkStore> chunkStoreStore,
+                                                                  @Nonnull Vector3d npcPosition,
+                                                                  int blockX,
+                                                                  int blockY,
+                                                                  int blockZ,
+                                                                  int horizontalRadius,
+                                                                  int verticalScanRadius,
+                                                                  double radiusSq,
+                                                                  @Nonnull Set<String> allowedFoods,
+                                                                  @Nonnull Map<Long, WorldChunk> chunkCache) {
+        Vector3d bestTarget = null;
+        double bestDistanceSq = Double.MAX_VALUE;
+        for (int yOffset = -verticalScanRadius; yOffset <= verticalScanRadius; yOffset++) {
+            int y = blockY + yOffset;
+            for (int x = blockX - horizontalRadius; x <= blockX + horizontalRadius; x++) {
+                for (int z = blockZ - horizontalRadius; z <= blockZ + horizontalRadius; z++) {
+                    if (horizontalRadius > 0
+                            && x > blockX - horizontalRadius
+                            && x < blockX + horizontalRadius
+                            && z > blockZ - horizontalRadius
+                            && z < blockZ + horizontalRadius) {
+                        continue;
+                    }
                     double dx = x - blockX;
                     double dz = z - blockZ;
                     if ((dx * dx) + (dz * dz) > radiusSq) {
@@ -562,10 +731,7 @@ public final class CompanionNeedsEnvironmentService {
                             z
                     );
                     ItemContainer container = FeedTroughContainerCompat.getItemContainer(containerState);
-                    if (container == null) {
-                        continue;
-                    }
-                    if (!containsAllowedFood(container, allowedFoods)) {
+                    if (container == null || !containsAllowedFood(container, allowedFoods)) {
                         continue;
                     }
                     Vector3d standPosition = findNearestStandPositionAdjacentToBlock(
@@ -574,23 +740,129 @@ public final class CompanionNeedsEnvironmentService {
                             x,
                             y,
                             z,
-                            transform.getPosition(),
+                            npcPosition,
                             chunkCache
                     );
                     if (standPosition == null) {
                         continue;
                     }
-                    double distanceSq = distanceSquared(standPosition, transform.getPosition());
-                    if (!Double.isFinite(distanceSq) || distanceSq >= bestDistanceSq) {
-                        continue;
+                    double distanceSq = distanceSquared(standPosition, npcPosition);
+                    if (Double.isFinite(distanceSq) && distanceSq < bestDistanceSq) {
+                        bestDistanceSq = distanceSq;
+                        bestTarget = standPosition;
                     }
-                    bestDistanceSq = distanceSq;
-                    bestTarget = standPosition;
                 }
             }
         }
         return bestTarget;
     }
+
+    @Nullable
+    private static Vector3d getCachedSearchTarget(@Nullable NeedsSearchCacheKey cacheKey, long nowMs) {
+        if (cacheKey == null) {
+            return CACHE_MISS;
+        }
+        CachedSearchResult cached = SEARCH_CACHE.get(cacheKey);
+        if (cached == null) {
+            return CACHE_MISS;
+        }
+        if (nowMs >= cached.expiresAtMs()) {
+            SEARCH_CACHE.remove(cacheKey, cached);
+            return CACHE_MISS;
+        }
+        return cached.target();
+    }
+
+    private static void cacheSearchTarget(@Nullable NeedsSearchCacheKey cacheKey,
+                                          @Nullable Vector3d target,
+                                          long nowMs) {
+        if (cacheKey == null) {
+            return;
+        }
+        long ttlMs = target != null ? SEARCH_CACHE_HIT_TTL_MS : SEARCH_CACHE_MISS_TTL_MS;
+        SEARCH_CACHE.put(
+                cacheKey,
+                new CachedSearchResult(target != null ? new Vector3d(target) : null, nowMs + ttlMs)
+        );
+        cleanupExpiredSearchCache(nowMs);
+    }
+
+    private static void cleanupExpiredSearchCache(long nowMs) {
+        if (SEARCH_CACHE.size() < SEARCH_CACHE_MAX_ENTRIES) {
+            return;
+        }
+        SEARCH_CACHE.entrySet().removeIf(entry -> entry == null
+                || entry.getKey() == null
+                || entry.getValue() == null
+                || nowMs >= entry.getValue().expiresAtMs());
+    }
+
+    @Nullable
+    private static NeedsSearchCacheKey buildSearchCacheKey(@Nullable Ref<EntityStore> npcRef,
+                                                           @Nullable Store<EntityStore> store,
+                                                           @Nonnull ResourceSearchKind resourceKind,
+                                                           @Nullable Vector3d position,
+                                                           double radius,
+                                                           int verticalScanRadius,
+                                                           @Nullable Set<String> normalizedItemIds) {
+        if (npcRef == null || store == null || !npcRef.isValid() || position == null) {
+            return null;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        UUID npcUuid = npc != null ? npc.getUuid() : null;
+        World world = resolveWorld(store);
+        String worldName = world != null ? world.getName() : null;
+        if (npcUuid == null || worldName == null || worldName.isBlank()) {
+            return null;
+        }
+        int blockX = (int) Math.floor(position.x);
+        int blockY = (int) Math.floor(position.y);
+        int blockZ = (int) Math.floor(position.z);
+        int radiusKey = Math.max(1, (int) Math.ceil(radius * 10.0));
+        int itemIdsHash = normalizedItemIds == null || normalizedItemIds.isEmpty() ? 0 : normalizedItemIds.hashCode();
+        return new NeedsSearchCacheKey(
+                npcUuid,
+                worldName,
+                resourceKind,
+                blockX,
+                blockY,
+                blockZ,
+                radiusKey,
+                Math.max(0, verticalScanRadius),
+                itemIdsHash
+        );
+    }
+
+    private static long resolveCurrentTimeMs(@Nullable Store<EntityStore> store) {
+        if (store == null) {
+            return System.currentTimeMillis();
+        }
+        WorldTimeResource worldTime = store.getResource(WorldTimeResource.getResourceType());
+        return worldTime != null ? worldTime.getGameTime().toEpochMilli() : System.currentTimeMillis();
+    }
+
+    private enum ResourceSearchKind {
+        WATER,
+        FOOD_CONTAINER
+    }
+
+    private record NeedsSearchCacheKey(@Nonnull UUID npcUuid,
+                                       @Nonnull String worldName,
+                                       @Nonnull ResourceSearchKind resourceKind,
+                                       int blockX,
+                                       int blockY,
+                                       int blockZ,
+                                       int radiusKey,
+                                       int verticalScanRadius,
+                                       int itemIdsHash) {
+    }
+
+    private record CachedSearchResult(@Nullable Vector3d target,
+                                      long expiresAtMs) {
+    }
+
+    @Nullable
+    private static final Vector3d CACHE_MISS = new Vector3d(Double.NaN, Double.NaN, Double.NaN);
 
     int consumeNearbyContainerFood(@Nullable Ref<EntityStore> npcRef,
                                    @Nullable Store<EntityStore> store,
@@ -888,27 +1160,77 @@ public final class CompanionNeedsEnvironmentService {
                                                                     int sourceZ,
                                                                     @Nonnull Vector3d npcPosition,
                                                                     @Nonnull Map<Long, WorldChunk> chunkCache) {
+        return findNearestStandPositionNearBlock(
+                chunkStore,
+                chunkStoreStore,
+                sourceX,
+                sourceY,
+                sourceZ,
+                npcPosition,
+                1.0,
+                chunkCache
+        );
+    }
+
+    @Nullable
+    private static Vector3d findNearestStandPositionNearWaterSource(@Nonnull ChunkStore chunkStore,
+                                                                    @Nonnull Store<ChunkStore> chunkStoreStore,
+                                                                    int sourceX,
+                                                                    int sourceY,
+                                                                    int sourceZ,
+                                                                    @Nonnull Vector3d npcPosition,
+                                                                    double consumeRadius,
+                                                                    @Nonnull Map<Long, WorldChunk> chunkCache) {
+        return findNearestStandPositionNearBlock(
+                chunkStore,
+                chunkStoreStore,
+                sourceX,
+                sourceY,
+                sourceZ,
+                npcPosition,
+                Math.max(1.0, consumeRadius),
+                chunkCache
+        );
+    }
+
+    @Nullable
+    private static Vector3d findNearestStandPositionNearBlock(@Nonnull ChunkStore chunkStore,
+                                                              @Nonnull Store<ChunkStore> chunkStoreStore,
+                                                              int sourceX,
+                                                              int sourceY,
+                                                              int sourceZ,
+                                                              @Nonnull Vector3d npcPosition,
+                                                              double maxDistance,
+                                                              @Nonnull Map<Long, WorldChunk> chunkCache) {
         Vector3d bestTarget = null;
         double bestDistanceSq = Double.MAX_VALUE;
-        for (int[] offset : HORIZONTAL_NEIGHBOR_OFFSETS) {
-            int candidateX = sourceX + offset[0];
-            int candidateZ = sourceZ + offset[1];
-            for (int yOffset : STAND_HEIGHT_OFFSETS) {
-                int candidateY = sourceY + yOffset;
-                if (!canStandAt(chunkStore, chunkStoreStore, candidateX, candidateY, candidateZ, chunkCache)) {
+        double normalizedMaxDistance = Double.isFinite(maxDistance) && maxDistance > 0.0 ? maxDistance : 1.0;
+        int standRadius = Math.max(1, (int) Math.ceil(normalizedMaxDistance));
+        double maxDistanceSq = normalizedMaxDistance * normalizedMaxDistance;
+        for (int candidateX = sourceX - standRadius; candidateX <= sourceX + standRadius; candidateX++) {
+            for (int candidateZ = sourceZ - standRadius; candidateZ <= sourceZ + standRadius; candidateZ++) {
+                double dx = candidateX - sourceX;
+                double dz = candidateZ - sourceZ;
+                if ((dx * dx) + (dz * dz) > maxDistanceSq) {
                     continue;
                 }
-                Vector3d target = new Vector3d(
-                        candidateX + 0.5,
-                        candidateY + STAND_POSITION_Y_OFFSET,
-                        candidateZ + 0.5
-                );
-                double distanceSq = distanceSquared(target, npcPosition);
-                if (!Double.isFinite(distanceSq) || distanceSq >= bestDistanceSq) {
-                    continue;
+                for (int yOffset : STAND_HEIGHT_OFFSETS) {
+                    int candidateY = sourceY + yOffset;
+                    if (!canStandAt(chunkStore, chunkStoreStore, candidateX, candidateY, candidateZ, chunkCache)) {
+                        continue;
+                    }
+                    Vector3d target = new Vector3d(
+                            candidateX + 0.5,
+                            candidateY + STAND_POSITION_Y_OFFSET,
+                            candidateZ + 0.5
+                    );
+                    double distanceSq = distanceSquared(target, npcPosition);
+                    if (!Double.isFinite(distanceSq) || distanceSq >= bestDistanceSq) {
+                        continue;
+                    }
+                    bestDistanceSq = distanceSq;
+                    bestTarget = target;
                 }
-                bestDistanceSq = distanceSq;
-                bestTarget = target;
             }
         }
         return bestTarget;

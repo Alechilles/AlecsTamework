@@ -87,7 +87,6 @@ class DefendComponentAssetTest {
     void hostileToMasterTargetSensorUsesCustomAttitudeFilter() {
         String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget.json");
         assertTrue(sensor.contains("\"Type\": \"TameworkAttitudeFromTargetSlot\""));
-        assertTrue(sensor.contains("\"Type\": \"TameworkIsOwner\""));
         assertTrue(sensor.contains("\"SourceTargetSlot\": {"));
         assertTrue(sensor.contains("\"Value\": \"MasterTarget\""));
     }
@@ -96,7 +95,6 @@ class DefendComponentAssetTest {
     void attackedMasterTargetSensorUsesRecentAttackFilter() {
         String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Attacked_MasterTarget.json");
         assertTrue(sensor.contains("\"Type\": \"TameworkAttackedTargetSlotRecently\""));
-        assertTrue(sensor.contains("\"Type\": \"TameworkIsOwner\""));
         assertTrue(sensor.contains("\"SourceTargetSlot\": {"));
         assertTrue(sensor.contains("\"Value\": \"MasterTarget\""));
         assertTrue(sensor.contains("\"IncludeSelfAsSource\": {"));

@@ -89,6 +89,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
+import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
@@ -1538,6 +1539,7 @@ public class Tamework extends JavaPlugin {
     private void onNeedsAssetsLoaded(
             LoadedAssetsEvent<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> event) {
         TwNeedsConfig.clearRoleCache();
+        NeedsConfigResolver.clearCache();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.NEEDS, event.getLoadedAssets().keySet());
         }
@@ -1546,6 +1548,7 @@ public class Tamework extends JavaPlugin {
     private void onNeedsAssetsRemoved(
             RemovedAssetsEvent<String, TwNeedsConfig, DefaultAssetMap<String, TwNeedsConfig>> event) {
         TwNeedsConfig.clearRoleCache();
+        NeedsConfigResolver.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.NEEDS, event.getRemovedAssets());
     }
 

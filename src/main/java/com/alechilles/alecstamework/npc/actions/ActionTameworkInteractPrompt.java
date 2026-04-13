@@ -62,7 +62,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             return false;
         }
 
-        InteractionContextSnapshot ctx = buildContextSnapshot(player, role);
+        InteractionContextSnapshot ctx = buildContextSnapshot(player, interactionTarget, role);
         TwInteractionConfig config = resolveConfig(role, ctx);
         ActionTameworkInteract.ResolvedInteraction resolved = null;
         if (config != null && config.isEnabled()) {

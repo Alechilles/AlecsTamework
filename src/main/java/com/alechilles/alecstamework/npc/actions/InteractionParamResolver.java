@@ -4,6 +4,9 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.DoubleSupplier;
 import java.util.function.Supplier;
@@ -13,6 +16,7 @@ final class InteractionParamResolver {
     private final StdScope globalScopeSnapshot;
     private final StdScope execScopeSnapshot;
     private final StdScope sensorScopeSnapshot;
+    private final Map<StdScope, Map<String, StringArrayParamKind>> stringArrayParamKindsByScope = new WeakHashMap<>();
 
     InteractionParamResolver(StdScope globalScopeSnapshot,
                              StdScope execScopeSnapshot,
@@ -140,32 +144,83 @@ final class InteractionParamResolver {
         if (scope == null) {
             return null;
         }
-        Supplier<String[]> arraySupplier;
+        StringArrayParamKind kind = getCachedStringArrayParamKind(scope, paramName);
+        if (kind == null) {
+            return resolveAndCacheStringArrayFromScope(scope, paramName);
+        }
         try {
-            arraySupplier = scope.getStringArraySupplier(paramName);
+            return switch (kind) {
+                case STRING_ARRAY -> normalizeStringArrayValue(scope.getStringArraySupplier(paramName).get());
+                case STRING -> normalizeStringValue(scope.getStringSupplier(paramName).get());
+                case MISSING -> null;
+            };
         } catch (IllegalStateException ignored) {
-            arraySupplier = null;
+            clearCachedStringArrayParamKind(scope, paramName);
+            return resolveAndCacheStringArrayFromScope(scope, paramName);
         }
-        if (arraySupplier != null) {
-            String[] values = arraySupplier.get();
-            if (values != null && values.length > 0) {
-                return values;
-            }
-        }
-        Supplier<String> stringSupplier;
+    }
+
+    private String[] resolveAndCacheStringArrayFromScope(StdScope scope, String paramName) {
         try {
-            stringSupplier = scope.getStringSupplier(paramName);
+            String[] values = normalizeStringArrayValue(scope.getStringArraySupplier(paramName).get());
+            cacheStringArrayParamKind(scope, paramName, StringArrayParamKind.STRING_ARRAY);
+            return values;
         } catch (IllegalStateException ignored) {
-            stringSupplier = null;
+            // Fall through to scalar-string lookup.
         }
-        if (stringSupplier == null) {
+        try {
+            String[] values = normalizeStringValue(scope.getStringSupplier(paramName).get());
+            cacheStringArrayParamKind(scope, paramName, StringArrayParamKind.STRING);
+            return values;
+        } catch (IllegalStateException ignored) {
+            cacheStringArrayParamKind(scope, paramName, StringArrayParamKind.MISSING);
             return null;
         }
-        String value = stringSupplier.get();
+    }
+
+    private String[] normalizeStringArrayValue(String[] values) {
+        return values != null && values.length > 0 ? values : null;
+    }
+
+    private String[] normalizeStringValue(String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
         return new String[] { value };
+    }
+
+    private void cacheStringArrayParamKind(StdScope scope, String paramName, StringArrayParamKind kind) {
+        synchronized (stringArrayParamKindsByScope) {
+            stringArrayParamKindsByScope
+                    .computeIfAbsent(scope, ignored -> new HashMap<>())
+                    .put(paramName, kind);
+        }
+    }
+
+    private void clearCachedStringArrayParamKind(StdScope scope, String paramName) {
+        synchronized (stringArrayParamKindsByScope) {
+            Map<String, StringArrayParamKind> kindsByParam = stringArrayParamKindsByScope.get(scope);
+            if (kindsByParam == null) {
+                return;
+            }
+            kindsByParam.remove(paramName);
+            if (kindsByParam.isEmpty()) {
+                stringArrayParamKindsByScope.remove(scope);
+            }
+        }
+    }
+
+    private StringArrayParamKind getCachedStringArrayParamKind(StdScope scope, String paramName) {
+        synchronized (stringArrayParamKindsByScope) {
+            Map<String, StringArrayParamKind> kindsByParam = stringArrayParamKindsByScope.get(scope);
+            return kindsByParam != null ? kindsByParam.get(paramName) : null;
+        }
+    }
+
+    private enum StringArrayParamKind {
+        STRING_ARRAY,
+        STRING,
+        MISSING
     }
 
     private Boolean getBooleanFromScope(StdScope scope, String paramName) {

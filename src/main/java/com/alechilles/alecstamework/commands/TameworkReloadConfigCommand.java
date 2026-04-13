@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -37,6 +38,7 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
         }
         commandContext.sender().sendMessage(Message.raw("Reloading Tamework configs..."));
         CompletableFuture.supplyAsync(() -> {
+            TameworkSettingsStore.invalidateRuntimeGlobalOverridesCache();
             TwConfigOverrideManager.ReloadResult reloadResult = plugin.reloadConfigOverrides(world);
             int loaded = plugin.reloadItemFeatureConfigs();
             int totalSpawners = plugin.getItemFeatureRegistry() != null
