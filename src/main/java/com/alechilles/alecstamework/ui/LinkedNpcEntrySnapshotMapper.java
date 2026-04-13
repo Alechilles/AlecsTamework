@@ -59,6 +59,7 @@ final class LinkedNpcEntrySnapshotMapper {
                     entry.inCoop(),
                     entry.lost(),
                     entry.deadRespawnRemainingMs(),
+                    entry.deathCauseHint(),
                     entry.futureStatA(),
                     entry.futureStatB(),
                     entry.traitIndicators(),

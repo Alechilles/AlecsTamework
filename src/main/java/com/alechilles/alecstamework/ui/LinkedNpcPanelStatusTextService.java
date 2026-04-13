@@ -31,6 +31,18 @@ final class LinkedNpcPanelStatusTextService {
         );
     }
 
+    static String resolveDeadHealthTooltip(LinkedNpcEntry entry) {
+        return resolveDeadHealthTooltip(entry, null);
+    }
+
+    static String resolveDeadHealthTooltip(LinkedNpcEntry entry, String language) {
+        String primary = resolveDeadHealthText(entry, language);
+        if (entry == null || entry.deathCauseHint() == null || entry.deathCauseHint().isBlank()) {
+            return primary;
+        }
+        return primary + "\n" + entry.deathCauseHint();
+    }
+
     static String resolveAvailabilityStatusText(LinkedNpcEntry entry) {
         return resolveAvailabilityStatusText(entry, null);
     }

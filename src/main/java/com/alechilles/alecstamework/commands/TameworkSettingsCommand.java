@@ -1,13 +1,11 @@
 package com.alechilles.alecstamework.commands;
 
-import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.ui.TameworkSettingsPage;
+import com.alechilles.alecstamework.ui.TameworkSettingsPageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -31,28 +29,13 @@ public final class TameworkSettingsCommand extends AbstractPlayerCommand {
                            @Nonnull Ref<EntityStore> ref,
                            @Nonnull PlayerRef playerRef,
                            @Nonnull World world) {
-        Tamework plugin = Tamework.getInstance();
-        if (plugin == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework settings are not available."));
-            return;
-        }
         if (!TameworkConfigPermission.hasAccess(commandContext.sender())) {
             commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw settings."));
             return;
         }
-
-        Player player = store.getComponent(ref, Player.getComponentType());
-        if (player == null || player.getPageManager() == null) {
-            commandContext.sender().sendMessage(Message.raw("Unable to open settings right now."));
-            return;
+        String error = TameworkSettingsPageService.openSettingsPage(ref, store, world);
+        if (error != null) {
+            commandContext.sender().sendMessage(Message.raw(error));
         }
-        PlayerRef uiPlayerRef = player.getPlayerRef();
-        if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
-            commandContext.sender().sendMessage(Message.raw("Unable to open settings right now."));
-            return;
-        }
-
-        TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
-        player.getPageManager().openCustomPage(ref, store, page);
     }
 }

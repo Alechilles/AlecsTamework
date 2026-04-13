@@ -12,14 +12,54 @@ This page explains what `/tw settings` changes, where those values are stored, a
 
 ## Command
 - `/tw settings` opens the curated in-game settings page.
+- `/tw news` opens the current settings announcement popup on demand.
 
 Use it for live world tuning of high-impact server settings without editing many JSON files manually.
 
+## Presets
+- `/tw settings` now includes experience presets that load recommended values into the form before apply.
+- Presets do not save immediately; they update the current form and still require `Apply`.
+- Presets only change the experience/system toggles below, so ownership, claims, telemetry, and other admin policies stay under manual control.
+
+Current presets:
+- `Simplified (Minecraft-like)`: disables needs, needs damage, happiness, passive breeding, breeding happiness requirements, and traits.
+- `Easier`: enables most systems but keeps needs damage off.
+- `Full Experience`: enables the full needs, happiness, passive breeding, breeding happiness, and traits stack.
+
+## Automatic Review Announcement
+- Eligible players can also see a login-time settings review popup before opening `/tw settings` manually.
+- The popup uses the same access rule as `/tw settings`: `tamework.config` with the usual OP/Admin/Operator fallback groups.
+- `/tw news` uses the same access rule and ignores prior opt-out state so eligible players can reopen the current announcement whenever they want.
+- Players only stop seeing the popup for the current announcement after checking the opt-out box.
+- Changing the active announcement id re-arms the popup for eligible players on later logins.
+- If `useBuiltInAnnouncementId` stays `true`, future Tamework releases can re-arm the popup automatically when the built-in announcement id changes.
+
 ## Where Data Is Stored
 - Universe settings file: `universe/Tamework/Settings/tamework-settings.json`
+- Settings announcement file: `universe/Tamework/Settings/tamework-settings-announcement.json`
+- Settings announcement opt-out state: `universe/Tamework/Settings/tamework-settings-announcement-state.json`
 - Crash telemetry settings file: `universe/Tamework/Settings/crash-telemetry.json`
 
 These files are universe-local runtime settings, not shipped mod assets.
+
+## Settings Announcement File
+- `enabled`: turns the login popup on or off without disabling `/tw settings` itself.
+- `useBuiltInAnnouncementId`: when `true`, Tamework's built-in announcement id controls re-show behavior across releases.
+- `useBuiltInText`: when `true`, the built-in announcement copy is resolved from `Server/Languages/en-US/server.lang` for the player's language.
+- `announcementId`: used only when `useBuiltInAnnouncementId` is `false`; bump it to force the popup to appear again.
+- `title`, `bodyLines`, and `optOutLabel`: let the server owner customize the popup copy.
+
+When `useBuiltInText` is `false`, you can still provide raw `title`, `subtitle`, `bodyLines`, and `optOutLabel` values directly in the universe file for one-off server messaging.
+
+## Built-In Localization Keys
+- `tamework.ui.settingsAnnouncement.title`
+- `tamework.ui.settingsAnnouncement.subtitle`
+- `tamework.ui.settingsAnnouncement.body.intro`
+- `tamework.ui.settingsAnnouncement.body.defaults`
+- `tamework.ui.settingsAnnouncement.body.scope`
+- `tamework.ui.settingsAnnouncement.optOut`
+
+This lets you keep Alec's built-in re-arm behavior while still replacing the visible message with server-specific instructions.
 
 ## Settings Covered by the UI
 ### Population
@@ -45,7 +85,12 @@ These files are universe-local runtime settings, not shipped mod assets.
 - `SpawnSetsOwner`
 
 ### Needs and Revive
+- Needs system enabled toggle
 - Needs tick policy and needs-damage values (including model/rates/lethal)
+- Happiness system enabled toggle
+- Passive breeding enabled toggle
+- Breeding requires happiness toggle
+- Traits system enabled toggle
 - Revive system enabled toggle
 
 ### Crash Telemetry
@@ -54,8 +99,10 @@ These files are universe-local runtime settings, not shipped mod assets.
 
 ## Runtime Behavior
 - Applying settings writes updated files and refreshes runtime state.
+- Loading a preset only changes the current UI form; `Apply` persists it.
 - Crash telemetry enablement and breadcrumbs are applied immediately when possible.
 - `/tw settings` is intended for world-level operations and diagnostics, not per-mod content packs.
+- The login popup is shown at most once per player login session, so world changes do not reopen it repeatedly.
 
 ## Relationship to `Tw*Config` Assets
 - `TwGlobalConfig`, `TwNeedsConfig`, and related assets remain the content-authoring path.
@@ -65,6 +112,7 @@ These files are universe-local runtime settings, not shipped mod assets.
 ## Best Practices
 - Use config assets for shipped defaults and mod distribution.
 - Use `/tw settings` for server-specific tuning after deployment.
+- Keep the announcement copy focused on major setting changes and use `announcementId` changes sparingly so the popup stays meaningful.
 - Keep a backup of `universe/Tamework/Settings/` before major balancing experiments.
 
 ## Related Pages

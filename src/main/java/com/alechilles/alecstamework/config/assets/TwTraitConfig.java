@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -394,7 +395,7 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
             return cache;
         }
         for (TwTraitConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
+            if (candidate == null || !candidate.isConfiguredEnabled()) {
                 continue;
             }
             String[] candidateRoles = candidate.getRoleIds();
@@ -585,7 +586,20 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public boolean isEnabled() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.traitsEnabled() != null) {
+            return overrides.traitsEnabled();
+        }
         return enabled;
+    }
+
+    public boolean isConfiguredEnabled() {
+        return enabled;
+    }
+
+    @Nullable
+    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
+        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
     }
 
     public int getPriority() {

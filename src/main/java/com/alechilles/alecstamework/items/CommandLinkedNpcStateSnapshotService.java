@@ -259,7 +259,9 @@ public final class CommandLinkedNpcStateSnapshotService {
                 lifeStageGrowthScalingEnabled,
                 attachmentsConfigId,
                 attachmentsValues,
-                breedingEnabled
+                breedingEnabled,
+                null,
+                null
         );
     }
 

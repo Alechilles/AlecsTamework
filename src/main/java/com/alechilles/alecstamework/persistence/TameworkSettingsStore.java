@@ -109,6 +109,7 @@ public final class TameworkSettingsStore {
         document.ownership.linkingRequiresOwner = snapshot.linkingRequiresOwner();
 
         document.needs = new NeedsSection();
+        document.needs.enabled = snapshot.needsEnabled();
         document.needs.tickPolicy = new NeedsTickPolicySection();
         document.needs.tickPolicy.mode = trimToNull(snapshot.needsTickPolicyMode());
         document.needs.tickPolicy.ownerOfflineGraceHours = Math.max(0.0, snapshot.needsOwnerOfflineGraceHours());
@@ -120,6 +121,16 @@ public final class TameworkSettingsStore {
         document.needs.damage.starvationDamagePerMinute = Math.max(0.0, snapshot.needsStarvationDamagePerMinute());
         document.needs.damage.dehydrationDamagePerMinute = Math.max(0.0, snapshot.needsDehydrationDamagePerMinute());
         document.needs.damage.lethal = snapshot.needsDamageLethal();
+
+        document.happiness = new HappinessSection();
+        document.happiness.enabled = snapshot.happinessEnabled();
+
+        document.breeding = new BreedingSection();
+        document.breeding.passiveBreedingEnabled = snapshot.passiveBreedingEnabled();
+        document.breeding.requiresHappiness = snapshot.breedingRequiresHappiness();
+
+        document.traits = new TraitsSection();
+        document.traits.enabled = snapshot.traitsEnabled();
 
         document.revive = new ReviveSection();
         document.revive.enabled = snapshot.reviveSystemEnabled();
@@ -217,6 +228,7 @@ public final class TameworkSettingsStore {
         document.ownership.linkingRequiresOwner = true;
 
         document.needs = new NeedsSection();
+        document.needs.enabled = true;
         document.needs.tickPolicy = new NeedsTickPolicySection();
         document.needs.tickPolicy.mode = "OWNER_ONLINE_GRACE_THEN_DECAY";
         document.needs.tickPolicy.ownerOfflineGraceHours = 72.0;
@@ -228,6 +240,16 @@ public final class TameworkSettingsStore {
         document.needs.damage.starvationDamagePerMinute = 2.0;
         document.needs.damage.dehydrationDamagePerMinute = 3.0;
         document.needs.damage.lethal = true;
+
+        document.happiness = new HappinessSection();
+        document.happiness.enabled = true;
+
+        document.breeding = new BreedingSection();
+        document.breeding.passiveBreedingEnabled = true;
+        document.breeding.requiresHappiness = true;
+
+        document.traits = new TraitsSection();
+        document.traits.enabled = true;
 
         document.revive = new ReviveSection();
         document.revive.enabled = true;
@@ -336,6 +358,9 @@ public final class TameworkSettingsStore {
         NeedsSection needs = document.needs;
         NeedsTickPolicySection needsTickPolicy = needs != null ? needs.tickPolicy : null;
         NeedsDamageSection needsDamage = needs != null ? needs.damage : null;
+        HappinessSection happiness = document.happiness;
+        BreedingSection breeding = document.breeding;
+        TraitsSection traits = document.traits;
         ReviveSection revive = document.revive;
 
         return new GlobalOverrides(
@@ -373,6 +398,7 @@ public final class TameworkSettingsStore {
                 ownership != null
                         ? ownership.linkingRequiresOwner
                         : null,
+                needs != null ? needs.enabled : null,
                 needsTickPolicy != null ? trimToNull(needsTickPolicy.mode) : null,
                 needsTickPolicy != null ? needsTickPolicy.ownerOfflineGraceHours : null,
                 needsTickPolicy != null ? needsTickPolicy.ownerOfflineDecayMultiplier : null,
@@ -382,6 +408,10 @@ public final class TameworkSettingsStore {
                 needsDamage != null ? needsDamage.starvationDamagePerMinute : null,
                 needsDamage != null ? needsDamage.dehydrationDamagePerMinute : null,
                 needsDamage != null ? needsDamage.lethal : null,
+                happiness != null ? happiness.enabled : null,
+                breeding != null ? breeding.passiveBreedingEnabled : null,
+                breeding != null ? breeding.requiresHappiness : null,
+                traits != null ? traits.enabled : null,
                 revive != null ? revive.enabled : null
         );
     }
@@ -401,20 +431,25 @@ public final class TameworkSettingsStore {
                                          boolean invulnerableIfOwned,
                                          boolean captureClearsOwner,
                                          boolean spawnSetsOwner,
-                                         boolean captureRequiresOwner,
-                                         boolean spawnRequiresOwner,
-                                         boolean interactionRequiresOwner,
-                                         boolean linkingRequiresOwner,
-                                         @Nonnull String needsTickPolicyMode,
-                                         double needsOwnerOfflineGraceHours,
-                                         double needsOwnerOfflineDecayMultiplier,
-                                         boolean needsDamageEnabled,
-                                         @Nonnull String needsDamageModel,
-                                         @Nonnull String needsDamageDualNeedRule,
-                                         double needsStarvationDamagePerMinute,
-                                         double needsDehydrationDamagePerMinute,
-                                         boolean needsDamageLethal,
-                                         boolean reviveSystemEnabled) {
+                                          boolean captureRequiresOwner,
+                                          boolean spawnRequiresOwner,
+                                          boolean interactionRequiresOwner,
+                                          boolean linkingRequiresOwner,
+                                          boolean needsEnabled,
+                                          @Nonnull String needsTickPolicyMode,
+                                          double needsOwnerOfflineGraceHours,
+                                          double needsOwnerOfflineDecayMultiplier,
+                                          boolean needsDamageEnabled,
+                                          @Nonnull String needsDamageModel,
+                                          @Nonnull String needsDamageDualNeedRule,
+                                          double needsStarvationDamagePerMinute,
+                                          double needsDehydrationDamagePerMinute,
+                                          boolean needsDamageLethal,
+                                          boolean happinessEnabled,
+                                          boolean passiveBreedingEnabled,
+                                          boolean breedingRequiresHappiness,
+                                          boolean traitsEnabled,
+                                          boolean reviveSystemEnabled) {
     }
 
     /**
@@ -432,20 +467,25 @@ public final class TameworkSettingsStore {
                                   @Nullable Boolean invulnerableIfOwned,
                                   @Nullable Boolean captureClearsOwner,
                                   @Nullable Boolean spawnSetsOwner,
-                                  @Nullable Boolean captureRequiresOwner,
-                                  @Nullable Boolean spawnRequiresOwner,
-                                  @Nullable Boolean interactionRequiresOwner,
-                                  @Nullable Boolean linkingRequiresOwner,
-                                  @Nullable String needsTickPolicyMode,
-                                  @Nullable Double needsOwnerOfflineGraceHours,
-                                  @Nullable Double needsOwnerOfflineDecayMultiplier,
-                                  @Nullable Boolean needsDamageEnabled,
-                                  @Nullable String needsDamageModel,
-                                  @Nullable String needsDamageDualNeedRule,
-                                  @Nullable Double needsStarvationDamagePerMinute,
-                                  @Nullable Double needsDehydrationDamagePerMinute,
-                                  @Nullable Boolean needsDamageLethal,
-                                  @Nullable Boolean reviveSystemEnabled) {
+                                   @Nullable Boolean captureRequiresOwner,
+                                   @Nullable Boolean spawnRequiresOwner,
+                                   @Nullable Boolean interactionRequiresOwner,
+                                   @Nullable Boolean linkingRequiresOwner,
+                                   @Nullable Boolean needsEnabled,
+                                   @Nullable String needsTickPolicyMode,
+                                   @Nullable Double needsOwnerOfflineGraceHours,
+                                   @Nullable Double needsOwnerOfflineDecayMultiplier,
+                                   @Nullable Boolean needsDamageEnabled,
+                                   @Nullable String needsDamageModel,
+                                   @Nullable String needsDamageDualNeedRule,
+                                   @Nullable Double needsStarvationDamagePerMinute,
+                                   @Nullable Double needsDehydrationDamagePerMinute,
+                                   @Nullable Boolean needsDamageLethal,
+                                   @Nullable Boolean happinessEnabled,
+                                   @Nullable Boolean passiveBreedingEnabled,
+                                   @Nullable Boolean breedingRequiresHappiness,
+                                   @Nullable Boolean traitsEnabled,
+                                   @Nullable Boolean reviveSystemEnabled) {
     }
 
     private record CachedGlobalDocument(@Nonnull Path path,
@@ -459,6 +499,9 @@ public final class TameworkSettingsStore {
         private SimpleClaimsSection simpleClaims;
         private OwnershipSection ownership;
         private NeedsSection needs;
+        private HappinessSection happiness;
+        private BreedingSection breeding;
+        private TraitsSection traits;
         private ReviveSection revive;
     }
 
@@ -497,8 +540,22 @@ public final class TameworkSettingsStore {
     }
 
     private static final class NeedsSection {
+        private Boolean enabled;
         private NeedsTickPolicySection tickPolicy;
         private NeedsDamageSection damage;
+    }
+
+    private static final class HappinessSection {
+        private Boolean enabled;
+    }
+
+    private static final class BreedingSection {
+        private Boolean passiveBreedingEnabled;
+        private Boolean requiresHappiness;
+    }
+
+    private static final class TraitsSection {
+        private Boolean enabled;
     }
 
     private static final class NeedsTickPolicySection {

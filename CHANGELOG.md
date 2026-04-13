@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+- Added a login-time Tamework settings review popup for `/tw settings` access holders, with per-player opt-out tracking and once-per-session dedupe so operators can be re-prompted when a new settings announcement is published.
+- Added `/tw news` to reopen the current settings announcement on demand for eligible players, independent of prior opt-out state.
+- Added built-in settings announcement localization through `Server/Languages/en-US/server.lang`, with universe config support for either built-in localized copy or raw per-world override text.
+- Added `/tw settings` experience presets plus new global toggles for needs, happiness, passive breeding, breeding happiness requirements, and traits so server owners can switch between simplified, easier, and full-experience progression rules without editing assets by hand.
+
+### Fixed
+- Fixed companion combat target selection so owner hits no longer become retaliation targets during defend/aggressive behavior, including wake-ups from sleep with an owner locked as the target.
+- Fixed linked-panel dead companion rows so they can now retain likely death attribution hints such as starvation, dehydration, or the most recent player/NPC killer while keeping revive timing as the primary status text.
+
 ## 2.8.2 - NameplateBuilder Integration + Health Persistence + Stability - 2026-04-10
 
 ### Added

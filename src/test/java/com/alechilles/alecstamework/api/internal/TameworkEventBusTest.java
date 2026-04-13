@@ -115,7 +115,9 @@ class TameworkEventBusTest {
                 false,
                 null,
                 null,
-                false
+                false,
+                CommandLinkedNpcDeathService.DeathCauseKind.PLAYER,
+                "Owner B"
         ), profile);
         bus.onLostRecorded(new CommandLinkedNpcLostService.LostLinkedNpcSnapshot(
                 npcUuid,

@@ -757,7 +757,9 @@ public final class CommandLinkedNpcLostService {
                 lifeStageGrowthScalingEnabled,
                 attachmentsConfigId,
                 attachmentsValues,
-                breedingEnabled
+                breedingEnabled,
+                null,
+                null
         );
     }
 

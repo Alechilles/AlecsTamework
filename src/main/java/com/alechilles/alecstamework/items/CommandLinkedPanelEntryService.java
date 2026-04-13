@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Builds linked-companion panel entries for command-item UI.
@@ -99,6 +101,7 @@ final class CommandLinkedPanelEntryService {
             boolean inCoop = false;
             boolean lost = false;
             long deadRespawnRemainingMs = 0L;
+            String deathCauseHint = null;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
             String groupId = normalizeOptional(record.groupId);
@@ -214,6 +217,7 @@ final class CommandLinkedPanelEntryService {
                     } else {
                         deadRespawnRemainingMs = -1L;
                     }
+                    deathCauseHint = resolveDeathCauseHint(deadSnapshot, playerLanguage);
                 }
             }
             if (!loaded && !dead && captureService != null) {
@@ -271,6 +275,7 @@ final class CommandLinkedPanelEntryService {
                     inCoop,
                     lost,
                     deadRespawnRemainingMs,
+                    deathCauseHint,
                     null,
                     null,
                     traitIndicators,
@@ -293,6 +298,45 @@ final class CommandLinkedPanelEntryService {
             ));
         }
         return entries;
+    }
+
+    @Nullable
+    private String resolveDeathCauseHint(@Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+                                         @Nullable String language) {
+        if (snapshot == null || snapshot.deathCauseKind() == null) {
+            return null;
+        }
+        return switch (snapshot.deathCauseKind()) {
+            case STARVATION -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.starvation");
+            case DEHYDRATION -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.dehydration");
+            case STARVATION_AND_DEHYDRATION ->
+                    LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.starvationAndDehydration");
+            case PLAYER -> LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.deathCause.killedByPlayer",
+                    fallbackDeathSourceName(snapshot.deathSourceName(), language, true)
+            );
+            case NPC -> LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.deathCause.killedByNpc",
+                    fallbackDeathSourceName(snapshot.deathSourceName(), language, false)
+            );
+            case ENVIRONMENT -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.environment");
+            case UNKNOWN -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.unknown");
+        };
+    }
+
+    @Nonnull
+    private String fallbackDeathSourceName(@Nullable String sourceName, @Nullable String language, boolean player) {
+        if (sourceName != null && !sourceName.isBlank()) {
+            return sourceName;
+        }
+        return LocalizedText.resolve(
+                language,
+                player
+                        ? "tamework.ui.linkedPanel.deathCause.killer.playerFallback"
+                        : "tamework.ui.linkedPanel.deathCause.killer.npcFallback"
+        );
     }
 
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,

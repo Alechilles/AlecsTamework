@@ -70,6 +70,12 @@
             }
           },
           {
+            "Type": "Not",
+            "Filter": {
+              "Type": "TameworkIsOwner"
+            }
+          },
+          {
             "Enabled": {
               "Compute": "!isEmptyStringArray(ExcludeGroups)"
             },
@@ -105,6 +111,12 @@
             },
             "Attitudes": {
               "Compute": "Attitudes"
+            }
+          },
+          {
+            "Type": "Not",
+            "Filter": {
+              "Type": "TameworkIsOwner"
             }
           },
           {
@@ -152,6 +164,12 @@
             },
             "Attitudes": {
               "Compute": "Attitudes"
+            }
+          },
+          {
+            "Type": "Not",
+            "Filter": {
+              "Type": "TameworkIsOwner"
             }
           },
           {

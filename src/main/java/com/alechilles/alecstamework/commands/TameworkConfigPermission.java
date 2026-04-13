@@ -34,4 +34,8 @@ public final class TameworkConfigPermission {
         }
         return false;
     }
+
+    public static boolean hasAccess(@Nullable Object holder) {
+        return holder instanceof PermissionHolder permissionHolder && hasAccess(permissionHolder);
+    }
 }

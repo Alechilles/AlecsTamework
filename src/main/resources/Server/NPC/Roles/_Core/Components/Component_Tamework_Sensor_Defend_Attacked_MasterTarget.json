@@ -75,6 +75,12 @@
             }
           },
           {
+            "Type": "Not",
+            "Filter": {
+              "Type": "TameworkIsOwner"
+            }
+          },
+          {
             "Enabled": {
               "Compute": "!isEmptyStringArray(ExcludeGroups)"
             },
@@ -113,6 +119,12 @@
             },
             "IncludeSelfAsSource": {
               "Compute": "IncludeSelfAsSource"
+            }
+          },
+          {
+            "Type": "Not",
+            "Filter": {
+              "Type": "TameworkIsOwner"
             }
           },
           {
@@ -163,6 +175,12 @@
             },
             "IncludeSelfAsSource": {
               "Compute": "IncludeSelfAsSource"
+            }
+          },
+          {
+            "Type": "Not",
+            "Filter": {
+              "Type": "TameworkIsOwner"
             }
           },
           {

@@ -94,6 +94,7 @@ import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntim
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureMarkerComponent;
 import com.alechilles.alecstamework.selftest.ApiSelfTestRunner;
+import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
 import com.alechilles.alecstamework.npc.systems.CompanionProgressionBootstrapOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionPassiveBreedingSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionLifeStageResumeOnLoadSystem;
@@ -129,6 +130,7 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
@@ -183,6 +185,7 @@ public class Tamework extends JavaPlugin {
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private CrashTelemetryService crashTelemetryService;
+    private TameworkSettingsAnnouncementService settingsAnnouncementService;
     private SpawnerTooltipBridge spawnerTooltipBridge;
     private boolean globalAssetsRegistered;
     private boolean companionAssetsRegistered;
@@ -638,6 +641,7 @@ public class Tamework extends JavaPlugin {
             getCommandRegistry().registerCommand(new TameworkCommandRoot());
         }
         applyDebugConfigDefaults();
+        settingsAnnouncementService = new TameworkSettingsAnnouncementService(this);
 
         // Global listener to enforce owner-only interactions.
         OwnerInteractionListener ownerInteractionListener =
@@ -655,6 +659,20 @@ public class Tamework extends JavaPlugin {
                 PlayerDisconnectEvent.class,
                 ownerPresenceTimelineService::onPlayerDisconnect
         );
+        if (settingsAnnouncementService != null) {
+            getEventRegistry().registerGlobal(
+                    PlayerConnectEvent.class,
+                    settingsAnnouncementService::onPlayerConnect
+            );
+            getEventRegistry().registerGlobal(
+                    PlayerDisconnectEvent.class,
+                    settingsAnnouncementService::onPlayerDisconnect
+            );
+            getEventRegistry().registerGlobal(
+                    PlayerReadyEvent.class,
+                    settingsAnnouncementService::onPlayerReady
+            );
+        }
         if (namingFeatureHandler != null) {
             getEventRegistry().registerGlobal(PlayerChatEvent.class, namingFeatureHandler::onPlayerChat);
             getEventRegistry().registerGlobal(PlayerDisconnectEvent.class, namingFeatureHandler::onPlayerDisconnect);
@@ -742,6 +760,7 @@ public class Tamework extends JavaPlugin {
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
         crashTelemetryService = null;
+        settingsAnnouncementService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
 
@@ -866,6 +885,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public CrashTelemetryService getCrashTelemetryService() {
         return crashTelemetryService;
+    }
+
+    @Nullable
+    public TameworkSettingsAnnouncementService getSettingsAnnouncementService() {
+        return settingsAnnouncementService;
     }
 
     @Nullable

@@ -101,12 +101,14 @@ public final class DeathRepository {
                             getDouble(payload, "lifeStageAdolescentSwitchScale", 0.80),
                             getDouble(payload, "lifeStageAdultStartScale", 0.80),
                             getDouble(payload, "lifeStageAdultSwitchScale", 1.00),
-                            getDouble(payload, "lifeStageAdultScale", 1.00),
-                            getBoolean(payload, "lifeStageGrowthScalingEnabled", false),
-                            getString(payload, "attachmentsConfigId"),
-                            getString(payload, "attachmentsValues"),
-                            getBoolean(payload, "breedingEnabled", false)
-                    ));
+                             getDouble(payload, "lifeStageAdultScale", 1.00),
+                             getBoolean(payload, "lifeStageGrowthScalingEnabled", false),
+                             getString(payload, "attachmentsConfigId"),
+                             getString(payload, "attachmentsValues"),
+                             getBoolean(payload, "breedingEnabled", false),
+                             parseDeathCauseKind(payload, "deathCauseKind"),
+                             getString(payload, "deathSourceName")
+                     ));
                 }
             }
         } catch (Exception ignored) {
@@ -234,7 +236,25 @@ public final class DeathRepository {
         putString(payload, "attachmentsConfigId", snapshot.attachmentsConfigId());
         putString(payload, "attachmentsValues", snapshot.attachmentsValues());
         payload.addProperty("breedingEnabled", snapshot.breedingEnabled());
+        if (snapshot.deathCauseKind() != null) {
+            payload.addProperty("deathCauseKind", snapshot.deathCauseKind().name());
+        }
+        putString(payload, "deathSourceName", snapshot.deathSourceName());
         return payload.toString();
+    }
+
+    @Nullable
+    private CommandLinkedNpcDeathService.DeathCauseKind parseDeathCauseKind(@Nonnull JsonObject source,
+                                                                            @Nonnull String key) {
+        String raw = getString(source, key);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return CommandLinkedNpcDeathService.DeathCauseKind.valueOf(raw.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     @Nullable

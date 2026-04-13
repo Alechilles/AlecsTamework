@@ -36,11 +36,13 @@ final class LinkedNpcPanelVitalsBinder {
         String healthTextSelector = entrySelector + " #HealthText";
         String healthTextShadowSelector = entrySelector + " #HealthTextShadow";
         String healthFillSelector = entrySelector + " #HealthFill";
+        String healthTooltipSelector = entrySelector + " #HealthTooltip";
         if (entry.hasHealth()) {
             String healthText = entry.currentHealth() + "/" + entry.maxHealth();
             commandBuilder.set(healthTextSelector + ".Text", healthText);
             commandBuilder.set(healthTextShadowSelector + ".Text", healthText);
             commandBuilder.set(healthFillSelector + ".Visible", true);
+            commandBuilder.set(healthTooltipSelector + ".TooltipText", healthText);
             commandBuilder.setObject(
                     healthFillSelector + ".Anchor",
                     LinkedNpcPanelAnchorFactory.buildHealthFillAnchor(entry.healthRatio(), VITAL_FILL_MAX_WIDTH)
@@ -52,6 +54,10 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthTextSelector + ".Text", deadText);
             commandBuilder.set(healthTextShadowSelector + ".Text", deadText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
+            commandBuilder.set(
+                    healthTooltipSelector + ".TooltipText",
+                    LinkedNpcPanelStatusTextService.resolveDeadHealthTooltip(entry, language)
+            );
             return;
         }
         if (entry.inCoop()) {
@@ -59,6 +65,7 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthTextSelector + ".Text", coopText);
             commandBuilder.set(healthTextShadowSelector + ".Text", coopText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
+            commandBuilder.set(healthTooltipSelector + ".TooltipText", coopText);
             return;
         }
         if (entry.lost()) {
@@ -66,6 +73,7 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthTextSelector + ".Text", lostText);
             commandBuilder.set(healthTextShadowSelector + ".Text", lostText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
+            commandBuilder.set(healthTooltipSelector + ".TooltipText", lostText);
             return;
         }
         if (!entry.loaded()) {
@@ -75,12 +83,14 @@ final class LinkedNpcPanelVitalsBinder {
             commandBuilder.set(healthTextSelector + ".Text", statusText);
             commandBuilder.set(healthTextShadowSelector + ".Text", statusText);
             commandBuilder.set(healthFillSelector + ".Visible", false);
+            commandBuilder.set(healthTooltipSelector + ".TooltipText", statusText);
             return;
         }
         String notAvailable = LocalizedText.resolve(language, "tamework.ui.linkedPanel.health.notAvailable");
         commandBuilder.set(healthTextSelector + ".Text", notAvailable);
         commandBuilder.set(healthTextShadowSelector + ".Text", notAvailable);
         commandBuilder.set(healthFillSelector + ".Visible", false);
+        commandBuilder.set(healthTooltipSelector + ".TooltipText", notAvailable);
     }
 
     private static void bindNeedRings(UICommandBuilder commandBuilder,

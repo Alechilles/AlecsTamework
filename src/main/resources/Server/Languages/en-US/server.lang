@@ -161,6 +161,14 @@ tamework.ui.configEditor.warning.applyFailed=Failed to apply config drafts.
 tamework.ui.configEditor.warning.applyInProgress=Apply already in progress.
 tamework.ui.configEditor.warning.unknownOverrideKeys=Unknown override keys: {0}
 
+# ===== Tamework UI: Settings Announcement =====
+tamework.ui.settingsAnnouncement.title=Important Alec's Tamework Update
+tamework.ui.settingsAnnouncement.subtitle=New features, settings, or updates have been added to Tamework that require your attention.
+tamework.ui.settingsAnnouncement.body.intro=As of Alec's Tamework v2.8.0+, many important settings were migrated to the "/tw settings" menu. If you have not checked these settings, please click "Review Settings" to ensure everything is set up the way you would expect for your server.
+tamework.ui.settingsAnnouncement.body.defaults=This includes things like "Hunger/Thirst damage" being enabled by default, and "per-player/per-claim taming/breeding limits" that may be vitally important to server owners.
+tamework.ui.settingsAnnouncement.body.scope=These popups are only shown to OPs and players with the permissions to use /tw settings, and will only appear after major changes that have been deemed important enough to require your immediate attention.
+tamework.ui.settingsAnnouncement.optOut=Don't show again until next announcement
+
 # ===== Tamework UI: Linked NPC Panel =====
 tamework.ui.linkedPanel.breedingCooldown.ready=Breeding ready
 tamework.ui.linkedPanel.breedingCooldown.remaining=Breeding cooldown: {0}
@@ -185,6 +193,15 @@ tamework.ui.linkedPanel.card.tooltip.returnHome=Return Home
 tamework.ui.linkedPanel.card.tooltip.setHome=Set Home
 tamework.ui.linkedPanel.card.tooltip.unlink=Unlink
 tamework.ui.linkedPanel.card.trait.tooltip=Trait
+tamework.ui.linkedPanel.deathCause.dehydration=Died from dehydration
+tamework.ui.linkedPanel.deathCause.environment=Died from the environment
+tamework.ui.linkedPanel.deathCause.killedByNpc=Killed by {0}
+tamework.ui.linkedPanel.deathCause.killedByPlayer=Killed by {0}
+tamework.ui.linkedPanel.deathCause.killer.npcFallback=another NPC
+tamework.ui.linkedPanel.deathCause.killer.playerFallback=a player
+tamework.ui.linkedPanel.deathCause.starvation=Died from starvation
+tamework.ui.linkedPanel.deathCause.starvationAndDehydration=Died from starvation and dehydration
+tamework.ui.linkedPanel.deathCause.unknown=Cause of death unknown
 tamework.ui.linkedPanel.emptyState=No linked NPCs yet. Primary-use on an owned NPC to link it.
 tamework.ui.linkedPanel.filter.group=Group
 tamework.ui.linkedPanel.filter.label=Filter:

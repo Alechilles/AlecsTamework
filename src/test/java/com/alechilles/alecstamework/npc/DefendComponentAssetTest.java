@@ -30,6 +30,7 @@ class DefendComponentAssetTest {
         String aggressive = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Aggressive.json");
         assertTrue(aggressive.contains("\"Reference\": \"Component_Sensor_Standard_Detection\""));
         assertTrue(aggressive.contains("\"Reference\": \"Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget\""));
+        assertTrue(aggressive.contains("\"Type\": \"TameworkIsOwner\""));
     }
 
     @Test
@@ -86,6 +87,7 @@ class DefendComponentAssetTest {
     void hostileToMasterTargetSensorUsesCustomAttitudeFilter() {
         String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Hostile_To_MasterTarget.json");
         assertTrue(sensor.contains("\"Type\": \"TameworkAttitudeFromTargetSlot\""));
+        assertTrue(sensor.contains("\"Type\": \"TameworkIsOwner\""));
         assertTrue(sensor.contains("\"SourceTargetSlot\": {"));
         assertTrue(sensor.contains("\"Value\": \"MasterTarget\""));
     }
@@ -94,11 +96,20 @@ class DefendComponentAssetTest {
     void attackedMasterTargetSensorUsesRecentAttackFilter() {
         String sensor = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Sensor_Defend_Attacked_MasterTarget.json");
         assertTrue(sensor.contains("\"Type\": \"TameworkAttackedTargetSlotRecently\""));
+        assertTrue(sensor.contains("\"Type\": \"TameworkIsOwner\""));
         assertTrue(sensor.contains("\"SourceTargetSlot\": {"));
         assertTrue(sensor.contains("\"Value\": \"MasterTarget\""));
         assertTrue(sensor.contains("\"IncludeSelfAsSource\": {"));
         assertTrue(sensor.contains("\"Value\": false"));
         assertTrue(sensor.contains("\"Compute\": \"IncludeSelfAsSource\""));
+    }
+
+    @Test
+    void defendInstructionClearsLockedOwnerTargetBeforeCombat() {
+        String defend = readResource("Server/NPC/Roles/_Core/Components/Component_Tamework_Instruction_Defend.json");
+        assertTrue(defend.contains("Never retaliate against the owner"));
+        assertTrue(defend.contains("\"TargetSlot\": \"LockedTarget\""));
+        assertTrue(defend.contains("\"Type\": \"TameworkIsOwner\""));
     }
 
     private String readResource(String path) {

@@ -17,6 +17,7 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetOwner;
 import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
+import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
@@ -128,6 +129,7 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderEntityFilterTameworkAttackedTargetSlotRecently.BUILDER_ID,
                     BuilderEntityFilterTameworkAttackedTargetSlotRecently::new
             );
+            filterFactory.add(BuilderEntityFilterTameworkIsOwner.BUILDER_ID, BuilderEntityFilterTameworkIsOwner::new);
         }
 
         npcActionsRegistered = true;

@@ -28,6 +28,7 @@ public final class LinkedNpcEntry {
     private final boolean lost;
     private final boolean hasHome;
     private final long deadRespawnRemainingMs;
+    private final String deathCauseHint;
     private final String speciesId;
     private final String speciesLabel;
     private final String groupId;
@@ -85,6 +86,7 @@ public final class LinkedNpcEntry {
                 inCoop,
                 lost,
                 deadRespawnRemainingMs,
+                null,
                 null,
                 null,
                 traitIndicators,
@@ -152,6 +154,7 @@ public final class LinkedNpcEntry {
                 inCoop,
                 lost,
                 deadRespawnRemainingMs,
+                null,
                 futureStatA,
                 futureStatB,
                 traitIndicators,
@@ -193,6 +196,7 @@ public final class LinkedNpcEntry {
                           boolean inCoop,
                           boolean lost,
                           long deadRespawnRemainingMs,
+                          String deathCauseHint,
                           FutureStat futureStatA,
                           FutureStat futureStatB,
                           LinkedNpcTraitIndicator[] traitIndicators,
@@ -233,6 +237,7 @@ public final class LinkedNpcEntry {
         this.inCoop = inCoop;
         this.lost = lost;
         this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
+        this.deathCauseHint = deathCauseHint;
         this.speciesId = speciesId;
         this.speciesLabel = speciesLabel;
         this.groupId = groupId;
@@ -338,6 +343,10 @@ public final class LinkedNpcEntry {
 
     public long deadRespawnRemainingMs() {
         return deadRespawnRemainingMs;
+    }
+
+    public String deathCauseHint() {
+        return deathCauseHint;
     }
 
     public String speciesId() {
