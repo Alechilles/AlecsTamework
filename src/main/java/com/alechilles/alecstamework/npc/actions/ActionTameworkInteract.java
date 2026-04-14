@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionContextRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquippedRequirement;
@@ -384,6 +385,12 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return resolution.resolveLovedItems(role, ctx);
     }
 
+    InteractionRequiredItems resolveFeedRequirementItems(FeedInteraction interaction,
+                                                         Role role,
+                                                         InteractionContextSnapshot ctx) {
+        return resolution.resolveFeedRequirementItems(interaction, role, ctx);
+    }
+
     boolean resolveIsHarvestable(Role role, InteractionContextSnapshot ctx) {
         return resolution.resolveIsHarvestable(role, ctx);
     }
@@ -437,23 +444,35 @@ public class ActionTameworkInteract extends TameworkActionBase {
     }
 
     boolean isHarvestAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
+        return isHarvestAlarmReady(npcRef, store, null);
+    }
+
+    boolean isHarvestAlarmReady(Ref<EntityStore> npcRef,
+                                Store<EntityStore> store,
+                                InteractionContextSnapshot ctx) {
+        return alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
     }
 
     boolean isHarvestAlarmPassed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "passed");
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "passed", null);
     }
 
     boolean isHarvestAlarmActive(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "active");
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "active", null);
     }
 
     boolean isHarvestAlarmUnset(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "unset");
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "unset", null);
     }
 
     InteractionAlarmHelper.AlarmSnapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.snapshot(npcRef, store, harvestAlarmName);
+        return getHarvestAlarmSnapshot(npcRef, store, null);
+    }
+
+    InteractionAlarmHelper.AlarmSnapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef,
+                                                                 Store<EntityStore> store,
+                                                                 InteractionContextSnapshot ctx) {
+        return alarmHelper.snapshot(npcRef, store, harvestAlarmName, ctx);
     }
 
     String getHarvestAlarmName() {

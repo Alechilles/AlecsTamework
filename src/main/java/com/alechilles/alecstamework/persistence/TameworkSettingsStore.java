@@ -26,11 +26,14 @@ public final class TameworkSettingsStore {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private static final Object GLOBAL_CACHE_LOCK = new Object();
     private static final Object RUNTIME_OVERRIDES_CACHE_LOCK = new Object();
+    private static final Object PATH_CACHE_LOCK = new Object();
 
     @Nullable
     private static volatile CachedGlobalDocument cachedGlobalDocument;
     @Nullable
     private static volatile CachedRuntimeOverrides cachedRuntimeOverrides;
+    @Nullable
+    private static volatile CachedResolvedPaths cachedResolvedPaths;
 
     private TameworkSettingsStore() {
     }
@@ -38,12 +41,12 @@ public final class TameworkSettingsStore {
     @Nonnull
     public static Path resolveSettingsDirectory(@Nonnull Tamework plugin) {
         Objects.requireNonNull(plugin, "plugin");
-        return resolveTameworkUniverseRoot(plugin).resolve(SETTINGS_DIRECTORY_NAME).normalize();
+        return resolveCachedPaths(plugin).settingsDirectory();
     }
 
     @Nonnull
     public static Path resolveGlobalSettingsFile(@Nonnull Tamework plugin) {
-        return resolveSettingsDirectory(plugin).resolve(GLOBAL_SETTINGS_FILE_NAME).normalize();
+        return resolveCachedPaths(plugin).globalSettingsFile();
     }
 
     @Nonnull
@@ -90,6 +93,9 @@ public final class TameworkSettingsStore {
         }
         synchronized (GLOBAL_CACHE_LOCK) {
             cachedGlobalDocument = null;
+        }
+        synchronized (PATH_CACHE_LOCK) {
+            cachedResolvedPaths = null;
         }
     }
 
@@ -174,6 +180,28 @@ public final class TameworkSettingsStore {
     @Nonnull
     public static Path resolveTameworkUniverseRoot(@Nonnull Tamework plugin) {
         Objects.requireNonNull(plugin, "plugin");
+        return resolveCachedPaths(plugin).tameworkUniverseRoot();
+    }
+
+    @Nonnull
+    private static CachedResolvedPaths resolveCachedPaths(@Nonnull Tamework plugin) {
+        CachedResolvedPaths cached = cachedResolvedPaths;
+        if (cached != null && cached.plugin() == plugin) {
+            return cached;
+        }
+        synchronized (PATH_CACHE_LOCK) {
+            cached = cachedResolvedPaths;
+            if (cached != null && cached.plugin() == plugin) {
+                return cached;
+            }
+            CachedResolvedPaths resolved = buildResolvedPaths(plugin);
+            cachedResolvedPaths = resolved;
+            return resolved;
+        }
+    }
+
+    @Nonnull
+    private static CachedResolvedPaths buildResolvedPaths(@Nonnull Tamework plugin) {
         Path runtimeDataDirectory = plugin.getRuntimeDataDirectory();
         Path resolvedDataDirectory = runtimeDataDirectory;
         if (resolvedDataDirectory == null) {
@@ -182,7 +210,10 @@ public final class TameworkSettingsStore {
         }
         Path normalized = resolvedDataDirectory.toAbsolutePath().normalize();
         Path parent = normalized.getParent();
-        return parent == null ? normalized : parent;
+        Path tameworkUniverseRoot = parent == null ? normalized : parent;
+        Path settingsDirectory = tameworkUniverseRoot.resolve(SETTINGS_DIRECTORY_NAME).normalize();
+        Path globalSettingsFile = settingsDirectory.resolve(GLOBAL_SETTINGS_FILE_NAME).normalize();
+        return new CachedResolvedPaths(plugin, tameworkUniverseRoot, settingsDirectory, globalSettingsFile);
     }
 
     @Nullable
@@ -534,6 +565,12 @@ public final class TameworkSettingsStore {
 
     private record CachedRuntimeOverrides(@Nonnull Path path,
                                           @Nullable GlobalOverrides overrides) {
+    }
+
+    private record CachedResolvedPaths(@Nonnull Tamework plugin,
+                                       @Nonnull Path tameworkUniverseRoot,
+                                       @Nonnull Path settingsDirectory,
+                                       @Nonnull Path globalSettingsFile) {
     }
 
     private static final class GlobalSettingsDocument {

@@ -298,8 +298,8 @@ final class InteractionSelector {
             return false;
         }
         return forPrompt
-                ? !owner.isHarvestAlarmReady(npcRef, store)
-                : !alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
+                ? !owner.isHarvestAlarmReady(npcRef, store, ctx)
+                : !alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
     }
 
     // Returns true when the interaction is explicitly tied to contextual input.

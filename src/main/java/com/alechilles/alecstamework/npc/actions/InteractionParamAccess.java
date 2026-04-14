@@ -16,6 +16,7 @@ import javax.annotation.Nullable;
 /** Resolves role-scoped parameters and feed item definitions. */
 final class InteractionParamAccess {
     private final InteractionParamResolver paramResolver;
+    private final InteractionItemIdResolver itemIdResolver;
     private final boolean hasLovedItemsOverride;
     private final String[] lovedItemsOverride;
     private final Boolean isHarvestableOverride;
@@ -33,6 +34,7 @@ final class InteractionParamAccess {
                            String isHarvestableParamName,
                            String isMountableParamName) {
         this.paramResolver = paramResolver;
+        this.itemIdResolver = new InteractionItemIdResolver(paramResolver);
         this.hasLovedItemsOverride = hasLovedItemsOverride;
         this.lovedItemsOverride = lovedItemsOverride;
         this.isHarvestableOverride = isHarvestableOverride;
@@ -92,6 +94,15 @@ final class InteractionParamAccess {
         }
         String[] items = getRoleStringArrayParam(role, ctx, lovedItemsParamName);
         return items != null ? items : new String[0];
+    }
+
+    InteractionRequiredItems resolveFeedRequirementItems(FeedInteraction interaction,
+                                                         Role role,
+                                                         InteractionContextSnapshot ctx) {
+        if (interaction == null) {
+            return new InteractionRequiredItems(new String[0], false);
+        }
+        return itemIdResolver.resolveFeedRequirementItems(interaction, role, ctx, resolveLovedItems(role, ctx));
     }
 
     // Resolves whether the role is harvestable using overrides or params.
@@ -183,5 +194,10 @@ final class InteractionParamAccess {
         }
         FeedItem[] items = InteractionItemParser.toFeedItems(rawValues);
         return items != null && items.length > 0 ? items : null;
+    }
+
+    @Nullable
+    String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
+        return itemIdResolver.resolveItemsParam(role, ctx, itemsParam);
     }
 }

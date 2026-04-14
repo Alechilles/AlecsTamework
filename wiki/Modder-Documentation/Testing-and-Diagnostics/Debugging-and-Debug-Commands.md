@@ -45,6 +45,7 @@ Use this page when a Tamework integration compiles but behaves incorrectly at ru
 - `/tw debugcoop [on|off]`
 - `/tw debugneedsconsume [on|off]`
 - `/tw debugneedsdamage [on|off]`
+- `/tw debugneedsseek [on|off]`
 
 `TwDebugConfig` can supply default values for those debug toggles, including `DespawnRoleFilter`.
 

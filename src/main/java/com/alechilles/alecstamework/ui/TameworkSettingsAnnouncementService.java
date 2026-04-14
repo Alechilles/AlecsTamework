@@ -81,9 +81,6 @@ public final class TameworkSettingsAnnouncementService {
         if (player.getPageManager() == null) {
             return respectEnabled ? null : "Unable to open Tamework news right now.";
         }
-        if (!TameworkSettingsPageService.hasAccess(player)) {
-            return respectEnabled ? null : "You do not have permission to use /tw news.";
-        }
 
         ResolvedAnnouncement announcement = TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(
                 resolveAnnouncementConfigFile(),
@@ -105,6 +102,9 @@ public final class TameworkSettingsAnnouncementService {
         PlayerRef uiPlayerRef = player.getPlayerRef();
         if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
             return respectEnabled ? null : "Unable to open Tamework news right now.";
+        }
+        if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, player)) {
+            return respectEnabled ? null : "You do not have permission to use /tw news.";
         }
 
         AnnouncementCopy copy = resolveCopy(uiPlayerRef, announcement);

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.MovementStates;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -35,6 +36,9 @@ final class InteractionContextSnapshot {
     @Nullable
     MovementStates cachedPlayerMovementStates;
     final Map<String, Boolean> promptContextMatches;
+    final Map<String, String[]> resolvedItemIdsByParamName;
+    final Map<FeedInteraction, InteractionRequiredItems> feedRequirementItemsByInteraction;
+    final Map<String, InteractionAlarmHelper.AlarmSnapshot> alarmSnapshotsByName;
 
     private InteractionContextSnapshot(Player player,
                                        Inventory inventory,
@@ -53,6 +57,9 @@ final class InteractionContextSnapshot {
         this.roleScopes = roleScopes;
         this.playerRef = playerRef;
         this.promptContextMatches = new HashMap<>();
+        this.resolvedItemIdsByParamName = new HashMap<>();
+        this.feedRequirementItemsByInteraction = new HashMap<>();
+        this.alarmSnapshotsByName = new HashMap<>();
     }
 
     private InteractionContextSnapshot(Player player,

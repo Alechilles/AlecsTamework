@@ -14,7 +14,6 @@ import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.inventory.transaction.ItemStackSlotTransaction;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
-import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -307,6 +306,52 @@ public final class CompanionNeedsEnvironmentService {
         return false;
     }
 
+    public boolean hasConsumableWaterSourceInRange(@Nullable Ref<EntityStore> npcRef,
+                                                   @Nullable Store<EntityStore> store,
+                                                   double radius,
+                                                   int verticalScanRadius) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        World world = resolveWorld(store);
+        if (transform == null || world == null || world.getChunkStore() == null) {
+            return false;
+        }
+        if (!Double.isFinite(radius) || radius <= 0.0) {
+            return false;
+        }
+        ChunkStore chunkStore = world.getChunkStore();
+        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
+        if (chunkStoreStore == null) {
+            return false;
+        }
+        int blockX = (int) Math.floor(transform.getPosition().x);
+        int blockY = (int) Math.floor(transform.getPosition().y);
+        int blockZ = (int) Math.floor(transform.getPosition().z);
+        int searchRadius = Math.max(1, (int) Math.ceil(radius));
+        double radiusSq = radius * radius;
+        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
+        Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        for (int yOffset = -clampedVerticalRadius; yOffset <= clampedVerticalRadius; yOffset++) {
+            int y = blockY + yOffset;
+            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
+                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
+                    double dx = x - blockX;
+                    double dz = z - blockZ;
+                    if ((dx * dx) + (dz * dz) > radiusSq) {
+                        continue;
+                    }
+                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
+                    if (worldChunk != null && isConsumableWaterSourceAt(worldChunk, chunkStoreStore, x, y, z)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
+    }
+
     @Nullable
     Vector3d findNearestWaterDrinkingPosition(@Nullable Ref<EntityStore> npcRef,
                                               @Nullable Store<EntityStore> store,
@@ -360,7 +405,7 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return null;
         }
-        long nowMs = resolveCurrentTimeMs(store);
+        long nowMs = resolveCurrentTimeMs();
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
@@ -584,7 +629,7 @@ public final class CompanionNeedsEnvironmentService {
         if (!Double.isFinite(radius) || radius <= 0.0) {
             return null;
         }
-        long nowMs = resolveCurrentTimeMs(store);
+        long nowMs = resolveCurrentTimeMs();
         NeedsSearchCacheKey cacheKey = buildSearchCacheKey(
                 npcRef,
                 store,
@@ -629,6 +674,68 @@ public final class CompanionNeedsEnvironmentService {
         }
         cacheSearchTarget(cacheKey, bestTarget, nowMs);
         return bestTarget;
+    }
+
+    public boolean hasFoodContainerWithAllowedFoodInRange(@Nullable Ref<EntityStore> npcRef,
+                                                          @Nullable Store<EntityStore> store,
+                                                          double radius,
+                                                          @Nullable String[] allowedItemIds,
+                                                          int verticalScanRadius) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        Set<String> allowedFoods = normalizeItemIds(allowedItemIds);
+        if (allowedFoods.isEmpty()) {
+            return false;
+        }
+        TransformComponent transform = store.getComponent(npcRef, TransformComponent.getComponentType());
+        World world = resolveWorld(store);
+        if (transform == null || world == null || world.getChunkStore() == null) {
+            return false;
+        }
+        if (!Double.isFinite(radius) || radius <= 0.0) {
+            return false;
+        }
+        ChunkStore chunkStore = world.getChunkStore();
+        Store<ChunkStore> chunkStoreStore = chunkStore.getStore();
+        if (chunkStoreStore == null) {
+            return false;
+        }
+        int blockX = (int) Math.floor(transform.getPosition().x);
+        int blockY = (int) Math.floor(transform.getPosition().y);
+        int blockZ = (int) Math.floor(transform.getPosition().z);
+        int searchRadius = Math.max(1, (int) Math.ceil(radius));
+        double radiusSq = radius * radius;
+        int clampedVerticalRadius = Math.max(0, verticalScanRadius);
+        Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        for (int yOffset = -clampedVerticalRadius; yOffset <= clampedVerticalRadius; yOffset++) {
+            int y = blockY + yOffset;
+            for (int x = blockX - searchRadius; x <= blockX + searchRadius; x++) {
+                for (int z = blockZ - searchRadius; z <= blockZ + searchRadius; z++) {
+                    double dx = x - blockX;
+                    double dz = z - blockZ;
+                    if ((dx * dx) + (dz * dz) > radiusSq) {
+                        continue;
+                    }
+                    WorldChunk worldChunk = resolveWorldChunk(chunkStore, chunkStoreStore, x, z, chunkCache);
+                    if (worldChunk == null) {
+                        continue;
+                    }
+                    Object containerState = FeedTroughContainerCompat.resolveContainerState(
+                            worldChunk,
+                            chunkStoreStore,
+                            x,
+                            y,
+                            z
+                    );
+                    ItemContainer container = FeedTroughContainerCompat.getItemContainer(containerState);
+                    if (container != null && containsAllowedFood(container, allowedFoods)) {
+                        return true;
+                    }
+                }
+            }
+        }
+        return false;
     }
 
     @Nullable
@@ -833,12 +940,8 @@ public final class CompanionNeedsEnvironmentService {
         );
     }
 
-    private static long resolveCurrentTimeMs(@Nullable Store<EntityStore> store) {
-        if (store == null) {
-            return System.currentTimeMillis();
-        }
-        WorldTimeResource worldTime = store.getResource(WorldTimeResource.getResourceType());
-        return worldTime != null ? worldTime.getGameTime().toEpochMilli() : System.currentTimeMillis();
+    private static long resolveCurrentTimeMs() {
+        return System.currentTimeMillis();
     }
 
     private enum ResourceSearchKind {

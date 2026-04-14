@@ -252,7 +252,7 @@ final class InteractionMatchHelpers {
             return false;
         }
         String state = requirement.getState() != null ? requirement.getState().trim().toLowerCase(Locale.ROOT) : "";
-        return alarmHelper.matchesAlarmState(npcRef, store, alarmName, state);
+        return alarmHelper.matchesAlarmState(npcRef, store, alarmName, state, ctx);
     }
 
     // Checks an NPC health-percent requirement against the target NPC.

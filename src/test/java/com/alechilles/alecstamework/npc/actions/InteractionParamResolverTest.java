@@ -60,6 +60,17 @@ class InteractionParamResolverTest {
         assertEquals(1, primary.stringAttempts);
     }
 
+    @Test
+    void stringParamLookupCachesMissingParamAfterFirstFailure() throws Exception {
+        CountingMissingScope primary = new CountingMissingScope();
+        InteractionParamResolver resolver = new InteractionParamResolver(null, null, null);
+        Role role = newRoleWithScope(primary);
+
+        assertNull(resolver.getStringParam(role, null, "MissingStringParam"));
+        assertNull(resolver.getStringParam(role, null, "MissingStringParam"));
+        assertEquals(1, primary.stringAttempts);
+    }
+
     private static Role newRoleWithScope(StdScope scope) throws Exception {
         Unsafe unsafe = getUnsafe();
         Role role = (Role) unsafe.allocateInstance(Role.class);

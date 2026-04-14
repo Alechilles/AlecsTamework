@@ -18,6 +18,8 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameIntera
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.inventory.Inventory;
+import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.role.Role;
@@ -27,6 +29,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
  * Updates the NPC interaction prompt based on the first matching Tamework interaction entry.
  */
 public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
+    private static final long PROMPT_SELECTION_CACHE_TTL_MS = 500L;
     private static final String HINT_GENERIC = "server.interactionHints.generic";
     private static final String HINT_HARVEST = "server.interactionHints.harvest";
     private static final String HINT_HARVEST_CONTEXT = "server.interactionHints.harvestContext";
@@ -39,6 +42,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
 
     private final Map<UUID, PromptState> lastPrompts = new HashMap<>();
     private final Map<UUID, Long> lastDebugMs = new HashMap<>();
+    private final Map<UUID, CachedPromptSelection> cachedPromptSelections = new HashMap<>();
 
     public ActionTameworkInteractPrompt(BuilderActionTameworkInteractPrompt builder, BuilderSupport support) {
         super(builder, support);
@@ -62,30 +66,57 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
             return false;
         }
 
-        InteractionContextSnapshot ctx = buildContextSnapshot(player, interactionTarget, role);
-        TwInteractionConfig config = resolveConfig(role, ctx);
-        ActionTameworkInteract.ResolvedInteraction resolved = null;
-        if (config != null && config.isEnabled()) {
-            resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
-        }
-        if (resolved != null && resolved.entry instanceof HarvestInteraction) {
-            HarvestInteraction harvest = (HarvestInteraction) resolved.entry;
-            boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null || harvest.getRequireHarvestAlarmReady();
-            // Prompt should only show when the harvest alarm is ready (unset or passed).
-            if (requireAlarm && !isHarvestAlarmReady(npcRef, store)) {
-                resolved = null;
-            }
-        }
-
-        PromptState prompt = resolvePromptState(resolved);
-        UUID playerId = ctx != null ? ctx.playerId : null;
+        UUID playerId = player.getUuid();
         if (playerId == null) {
             return false;
+        }
+
+        long nowMs = System.currentTimeMillis();
+        PromptSelectionFingerprint fingerprint = buildPromptSelectionFingerprint(player, role);
+        CachedPromptSelection cachedSelection = cachedPromptSelections.get(playerId);
+
+        InteractionContextSnapshot ctx = null;
+        TwInteractionConfig config = null;
+        ActionTameworkInteract.ResolvedInteraction resolved = null;
+        PromptState prompt;
+        if (cachedSelection != null
+                && cachedSelection.matches(fingerprint, nowMs)) {
+            config = cachedSelection.config();
+            resolved = cachedSelection.resolvedInteraction();
+            prompt = cachedSelection.promptState();
+        } else {
+            ctx = buildContextSnapshot(player, interactionTarget, role);
+            config = resolveConfig(role, ctx);
+            if (config != null && config.isEnabled()) {
+                resolved = selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
+            }
+            if (resolved != null && resolved.entry instanceof HarvestInteraction) {
+                HarvestInteraction harvest = (HarvestInteraction) resolved.entry;
+                boolean requireAlarm = harvest.getRequireHarvestAlarmReady() == null || harvest.getRequireHarvestAlarmReady();
+                // Prompt should only show when the harvest alarm is ready (unset or passed).
+                if (requireAlarm && !isHarvestAlarmReady(npcRef, store, ctx)) {
+                    resolved = null;
+                }
+            }
+
+            prompt = resolvePromptState(resolved);
+            cachedPromptSelections.put(
+                    playerId,
+                    new CachedPromptSelection(
+                            fingerprint,
+                            nowMs + PROMPT_SELECTION_CACHE_TTL_MS,
+                            config,
+                            resolved,
+                            prompt
+                    )
+            );
         }
         PromptState previous = lastPrompts.get(playerId);
         boolean changed = !prompt.equals(previous);
         boolean interactable = prompt.interactable;
-        maybeLogPromptDebug(resolved, config, npcRef, role, store, ctx, prompt);
+        if (ctx != null) {
+            maybeLogPromptDebug(resolved, config, npcRef, role, store, ctx, prompt);
+        }
         if (changed) {
             // Force a refresh when the prompt changes so the hint updates on the client.
             role.getStateSupport().setInteractable(npcRef, interactionTarget, false, null, false, store);
@@ -100,6 +131,16 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         );
         lastPrompts.put(playerId, prompt);
         return true;
+    }
+
+    private PromptSelectionFingerprint buildPromptSelectionFingerprint(Player player, Role role) {
+        Inventory inventory = player != null ? player.getInventory() : null;
+        ItemStack activeItem = inventory != null ? inventory.getActiveHotbarItem() : null;
+        String activeItemId = activeItem != null && !activeItem.isEmpty() ? activeItem.getItemId() : null;
+        int activeQuantity = activeItem != null && !activeItem.isEmpty() ? activeItem.getQuantity() : 0;
+        int stateIndex = role != null && role.getStateSupport() != null ? role.getStateSupport().getStateIndex() : -1;
+        int subStateIndex = role != null && role.getStateSupport() != null ? role.getStateSupport().getSubStateIndex() : -1;
+        return new PromptSelectionFingerprint(activeItemId, activeQuantity, stateIndex, subStateIndex);
     }
 
     // Determines the prompt state (visibility + hint key) for the selected entry.
@@ -202,6 +243,22 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
     }
 
+    private record PromptSelectionFingerprint(String activeItemId,
+                                              int activeQuantity,
+                                              int stateIndex,
+                                              int subStateIndex) {
+    }
+
+    private record CachedPromptSelection(PromptSelectionFingerprint fingerprint,
+                                         long expiresAtMs,
+                                         TwInteractionConfig config,
+                                         ActionTameworkInteract.ResolvedInteraction resolvedInteraction,
+                                         PromptState promptState) {
+        private boolean matches(PromptSelectionFingerprint fingerprint, long nowMs) {
+            return this.fingerprint.equals(fingerprint) && nowMs < expiresAtMs;
+        }
+    }
+
     private void maybeLogPromptDebug(ActionTameworkInteract.ResolvedInteraction resolved,
                                      TwInteractionConfig config,
                                      Ref<EntityStore> npcRef,
@@ -231,7 +288,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 : "<none>";
         boolean showPrompt = !prompt.isHidden();
         boolean interactable = prompt.interactable;
-        InteractionAlarmHelper.AlarmSnapshot alarm = getHarvestAlarmSnapshot(npcRef, store);
+        InteractionAlarmHelper.AlarmSnapshot alarm = getHarvestAlarmSnapshot(npcRef, store, ctx);
         boolean requireAlarm = false;
         boolean requireContext = false;
         if (resolved != null && resolved.entry instanceof HarvestInteraction) {

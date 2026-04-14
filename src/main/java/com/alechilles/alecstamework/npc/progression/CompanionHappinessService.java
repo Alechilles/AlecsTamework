@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
@@ -17,11 +18,11 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -48,6 +49,7 @@ public final class CompanionHappinessService {
     private static final String IMPULSE_KEY_DAMAGE = "damage";
     private static final String IMPULSE_LABEL_DAMAGE = "Attacked";
     private static final double SECONDS_PER_MINUTE = 60.0;
+    private static final StdScopeLookupCache SCOPE_LOOKUP_CACHE = new StdScopeLookupCache();
 
     private CompanionHappinessService() {
     }
@@ -66,54 +68,70 @@ public final class CompanionHappinessService {
                                         @Nullable Store<EntityStore> store,
                                         @Nullable String consumedItemId,
                                         int consumedCount) {
-        if (npcRef == null || store == null || !npcRef.isValid()) {
+        if (consumedCount <= 0) {
             return false;
         }
-        if (consumedCount <= 0) {
+        return reconcileWithFeedEffects(
+                npcRef,
+                store,
+                null,
+                true,
+                consumedItemId,
+                null
+        );
+    }
+
+    public static boolean applyFeedImpulses(@Nullable Ref<EntityStore> npcRef,
+                                            @Nullable Store<EntityStore> store,
+                                            @Nullable Map<String, Integer> consumedItemCountsByItemId) {
+        return reconcileWithFeedEffects(
+                npcRef,
+                store,
+                null,
+                false,
+                null,
+                consumedItemCountsByItemId
+        );
+    }
+
+    public static boolean reconcileWithFeedEffects(@Nullable Ref<EntityStore> npcRef,
+                                                   @Nullable Store<EntityStore> store,
+                                                   @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                   boolean includeHandFeedImpulse,
+                                                   @Nullable String consumedItemId,
+                                                   @Nullable Map<String, Integer> consumedItemCountsByItemId) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
             return false;
         }
         ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
         HappinessRules rules = resolveRules(happinessConfig);
-        ArrayList<TimedImpulseActivation> activations = new ArrayList<>(2);
-        addHandFeedActivation(activations, happinessConfig, rules.feedGain);
-        addFoodConsumptionActivation(
-                activations,
-                npcRef,
-                store,
-                happinessConfig,
-                consumedItemId
-        );
-        return applyTimedImpulses(npcRef, store, activations);
-    }
-
-    public static boolean applyFeedImpulses(@Nullable Ref<EntityStore> npcRef,
-                                            @Nullable Store<EntityStore> store,
-                                            @Nullable Map<String, Integer> consumedItemCountsByItemId) {
-        if (npcRef == null || store == null || !npcRef.isValid()) {
-            return false;
-        }
-        if (consumedItemCountsByItemId == null || consumedItemCountsByItemId.isEmpty()) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkHappinessComponent> happinessType = TameworkHappinessComponent.getComponentType();
-        TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
-        TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
         ArrayList<TimedImpulseActivation> activations = new ArrayList<>();
-        for (Map.Entry<String, Integer> consumedEntry : consumedItemCountsByItemId.entrySet()) {
-            if (consumedEntry == null || consumedEntry.getValue() == null || consumedEntry.getValue() <= 0) {
-                continue;
-            }
-            addFoodConsumptionActivation(
-                    activations,
-                    npcRef,
-                    store,
-                    happinessConfig,
-                    consumedEntry.getKey()
-            );
+        if (includeHandFeedImpulse) {
+            addHandFeedActivation(activations, happinessConfig, rules.feedGain);
         }
-        return applyTimedImpulses(npcRef, store, activations);
+        Map<String, Integer> effectiveConsumedItems = consumedItemCountsByItemId;
+        if ((effectiveConsumedItems == null || effectiveConsumedItems.isEmpty())
+                && consumedItemId != null
+                && !consumedItemId.isBlank()) {
+            effectiveConsumedItems = Collections.singletonMap(consumedItemId, 1);
+        }
+        if (effectiveConsumedItems != null && !effectiveConsumedItems.isEmpty()) {
+            for (Map.Entry<String, Integer> consumedEntry : effectiveConsumedItems.entrySet()) {
+                if (consumedEntry == null || consumedEntry.getValue() == null || consumedEntry.getValue() <= 0) {
+                    continue;
+                }
+                addFoodConsumptionActivation(
+                        activations,
+                        npcRef,
+                        store,
+                        happinessConfig,
+                        consumedEntry.getKey()
+                );
+            }
+        }
+        return updateHappiness(npcRef, store, commandBuffer, 0.0, false, activations);
     }
 
     public static boolean applyPetGain(@Nullable Ref<EntityStore> npcRef,
@@ -703,30 +721,8 @@ public final class CompanionHappinessService {
     @Nonnull
     private static String[] resolveRoleStringArrayParam(@Nonnull StdScope sensorScope,
                                                         @Nonnull String paramName) {
-        try {
-            Supplier<String[]> arraySupplier = sensorScope.getStringArraySupplier(paramName);
-            if (arraySupplier != null) {
-                String[] values = arraySupplier.get();
-                if (values != null && values.length > 0) {
-                    return values;
-                }
-            }
-        } catch (IllegalStateException ignored) {
-            // Fall through to string-param fallback.
-        }
-        try {
-            Supplier<String> stringSupplier = sensorScope.getStringSupplier(paramName);
-            if (stringSupplier == null) {
-                return new String[0];
-            }
-            String value = stringSupplier.get();
-            if (value == null || value.isBlank()) {
-                return new String[0];
-            }
-            return new String[] {value};
-        } catch (IllegalStateException ignored) {
-            return new String[0];
-        }
+        String[] values = SCOPE_LOOKUP_CACHE.getStringArrayOrString(sensorScope, paramName);
+        return values != null ? values : new String[0];
     }
 
     private static TimedImpulseMutationResult applyTimedImpulseMutations(@Nonnull TameworkHappinessComponent happiness,

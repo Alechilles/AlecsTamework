@@ -90,6 +90,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakCompo
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.OwnerPresenceTimelineService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.persistence.TameworkDataPathService;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 import com.alechilles.alecstamework.selftest.ApiSelfTestFixtureManager;
@@ -237,6 +238,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugBreedingLogs;
     private volatile boolean debugNeedsConsumeDiagnosticsLogs;
     private volatile boolean debugNeedsDamageDiagnosticsLogs;
+    private volatile boolean debugNeedsSeekDiagnosticsLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -1006,6 +1008,7 @@ public class Tamework extends JavaPlugin {
         setDebugBreedingEnabled(commands.isBreeding());
         setDebugNeedsConsumeDiagnosticsEnabled(commands.isNeedsConsumeDiagnostics());
         setDebugNeedsDamageDiagnosticsEnabled(commands.isNeedsDamageDiagnostics());
+        setDebugNeedsSeekDiagnosticsEnabled(commands.isNeedsSeekDiagnostics());
         String roleFilter = commands.getDespawnRoleFilter();
         if (roleFilter == null || roleFilter.isBlank()) {
             clearDebugDespawnRoleFilter();
@@ -1025,6 +1028,7 @@ public class Tamework extends JavaPlugin {
                         + ", breeding=" + isDebugBreedingEnabled()
                         + ", needsConsumeDiagnostics=" + isDebugNeedsConsumeDiagnosticsEnabled()
                         + ", needsDamageDiagnostics=" + isDebugNeedsDamageDiagnosticsEnabled()
+                        + ", needsSeekDiagnostics=" + isDebugNeedsSeekDiagnosticsEnabled()
                         + ", despawnRoleFilter="
                         + (getDebugDespawnRoleFilter() == null ? "<none>" : getDebugDespawnRoleFilter())
         );
@@ -1525,6 +1529,7 @@ public class Tamework extends JavaPlugin {
     private void onHappinessAssetsLoaded(
             LoadedAssetsEvent<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> event) {
         TwHappinessConfig.clearRoleCache();
+        CompanionHappinessModifierService.clearCache();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.HAPPINESS, event.getLoadedAssets().keySet());
         }
@@ -1533,6 +1538,7 @@ public class Tamework extends JavaPlugin {
     private void onHappinessAssetsRemoved(
             RemovedAssetsEvent<String, TwHappinessConfig, DefaultAssetMap<String, TwHappinessConfig>> event) {
         TwHappinessConfig.clearRoleCache();
+        CompanionHappinessModifierService.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.HAPPINESS, event.getRemovedAssets());
     }
 
@@ -1555,6 +1561,7 @@ public class Tamework extends JavaPlugin {
     private void onBreedingAssetsLoaded(
             LoadedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
         TwBreedingConfig.clearRoleCache();
+        CompanionHappinessModifierService.clearCache();
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getLoadedAssets().keySet());
         }
@@ -1563,6 +1570,7 @@ public class Tamework extends JavaPlugin {
     private void onBreedingAssetsRemoved(
             RemovedAssetsEvent<String, TwBreedingConfig, DefaultAssetMap<String, TwBreedingConfig>> event) {
         TwBreedingConfig.clearRoleCache();
+        CompanionHappinessModifierService.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
     }
 
@@ -1948,6 +1956,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugNeedsDamageDiagnosticsEnabled() {
         debugNeedsDamageDiagnosticsLogs = !debugNeedsDamageDiagnosticsLogs;
         return debugNeedsDamageDiagnosticsLogs;
+    }
+
+    public boolean isDebugNeedsSeekDiagnosticsEnabled() {
+        return debugNeedsSeekDiagnosticsLogs;
+    }
+
+    public boolean setDebugNeedsSeekDiagnosticsEnabled(boolean enabled) {
+        debugNeedsSeekDiagnosticsLogs = enabled;
+        return debugNeedsSeekDiagnosticsLogs;
+    }
+
+    public boolean toggleDebugNeedsSeekDiagnosticsEnabled() {
+        debugNeedsSeekDiagnosticsLogs = !debugNeedsSeekDiagnosticsLogs;
+        return debugNeedsSeekDiagnosticsLogs;
     }
 
     // Logs a warning if required global config fields are missing.

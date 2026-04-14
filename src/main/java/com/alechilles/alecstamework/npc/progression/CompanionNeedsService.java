@@ -180,7 +180,7 @@ public final class CompanionNeedsService {
                                     @Nullable Store<EntityStore> store,
                                     @Nullable CommandBuffer<EntityStore> commandBuffer,
                                     @Nullable String roleId) {
-        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, commandBuffer, null);
+        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, commandBuffer, null);
     }
 
     /**
@@ -343,6 +343,23 @@ public final class CompanionNeedsService {
         return runNeedsUpdate(npcRef, store, null, 0.0, 0.0, true, heldItemId);
     }
 
+    public static boolean applyFeedInteractionRefill(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store,
+                                                     @Nullable String heldItemId,
+                                                     boolean reconcileHappiness) {
+        return runNeedsUpdate(
+                npcRef,
+                store,
+                null,
+                0.0,
+                0.0,
+                true,
+                reconcileHappiness,
+                null,
+                heldItemId
+        );
+    }
+
     /**
      * Applies an explicit consume attempt for water and/or food from action-driven seek flow.
      */
@@ -468,6 +485,7 @@ public final class CompanionNeedsService {
                 explicitHungerGain,
                 explicitThirstGain,
                 includeConfiguredManualGains,
+                true,
                 null,
                 heldItemId
         );
@@ -479,6 +497,7 @@ public final class CompanionNeedsService {
                                   double explicitHungerGain,
                                   double explicitThirstGain,
                                   boolean includeConfiguredManualGains,
+                                  boolean reconcileHappiness,
                                   @Nullable CommandBuffer<EntityStore> commandBuffer,
                                   @Nullable String heldItemId) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
@@ -615,7 +634,9 @@ public final class CompanionNeedsService {
         if (componentChanged) {
             putComponent(npcRef, store, commandBuffer, needsType, component);
         }
-        boolean happinessChanged = CompanionHappinessService.reconcile(npcRef, store, commandBuffer);
+        boolean happinessChanged = reconcileHappiness
+                ? CompanionHappinessService.reconcile(npcRef, store, commandBuffer)
+                : false;
         if (diagnosticsEnabled) {
             logNeedsDamageDiagnostics(
                     npcId,

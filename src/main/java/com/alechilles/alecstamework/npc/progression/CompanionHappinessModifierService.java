@@ -18,7 +18,11 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -28,8 +32,18 @@ import javax.annotation.Nullable;
 public final class CompanionHappinessModifierService {
     private static final double PERCENT_EPSILON = 0.000001;
     private static final double MIN_DISPOSITION_MULTIPLIER = 0.01;
+    private static final long POPULATION_CACHE_TTL_MS = 5_000L;
+    private static final long POPULATION_CACHE_CLEANUP_INTERVAL_MS = 30_000L;
+    private static final int POPULATION_CACHE_CELL_SIZE = 8;
+    private static final ConcurrentHashMap<UUID, CachedPopulationCount> POPULATION_COUNT_BY_NPC = new ConcurrentHashMap<>();
+    private static final AtomicLong LAST_POPULATION_CACHE_CLEANUP_MS = new AtomicLong();
 
     private CompanionHappinessModifierService() {
+    }
+
+    public static void clearCache() {
+        POPULATION_COUNT_BY_NPC.clear();
+        LAST_POPULATION_CACHE_CLEANUP_MS.set(0L);
     }
 
     @Nonnull
@@ -135,7 +149,16 @@ public final class CompanionHappinessModifierService {
         if (sourceTypeKey == null || sourceTypeKey.isBlank()) {
             return 0.0;
         }
-        int nearbyCount = countNearbyPopulation(store, npcType, transformType, sourceNpc, sourceTransform.getPosition(), radius, sourceTypeKey, breedingConfig);
+        int nearbyCount = resolveNearbyPopulationCount(
+                store,
+                npcType,
+                transformType,
+                sourceNpc,
+                sourceTransform.getPosition(),
+                radius,
+                sourceTypeKey,
+                breedingConfig
+        );
         TwHappinessConfig.PopulationBandSettings band = findPopulationBand(settings, nearbyCount);
         if (band == null) {
             return 0.0;
@@ -159,6 +182,68 @@ public final class CompanionHappinessModifierService {
         String entryLabel = "Population: " + suffix;
         outModifiers.add(new ModifierEntry(entryId, entryLabel, adjustedOffset));
         return adjustedOffset;
+    }
+
+    private static int resolveNearbyPopulationCount(@Nonnull Store<EntityStore> store,
+                                                    @Nonnull ComponentType<EntityStore, NPCEntity> npcType,
+                                                    @Nonnull ComponentType<EntityStore, TransformComponent> transformType,
+                                                    @Nonnull NPCEntity sourceNpc,
+                                                    @Nonnull Vector3d sourcePosition,
+                                                    double radius,
+                                                    @Nonnull String sourceTypeKey,
+                                                    @Nullable TwBreedingConfig breedingConfig) {
+        UUID npcUuid = sourceNpc.getUuid();
+        long nowMs = System.currentTimeMillis();
+        if (npcUuid == null) {
+            return countNearbyPopulation(store, npcType, transformType, sourceNpc, sourcePosition, radius, sourceTypeKey, breedingConfig);
+        }
+        int cellX = quantizePopulationCell(sourcePosition.x);
+        int cellY = quantizePopulationCell(sourcePosition.y);
+        int cellZ = quantizePopulationCell(sourcePosition.z);
+        CachedPopulationCount cached = POPULATION_COUNT_BY_NPC.get(npcUuid);
+        if (cached != null && cached.matches(store, sourceTypeKey, radius, cellX, cellY, cellZ, nowMs)) {
+            maybeCleanupPopulationCache(nowMs);
+            return cached.nearbyCount();
+        }
+        int resolved = countNearbyPopulation(store, npcType, transformType, sourceNpc, sourcePosition, radius, sourceTypeKey, breedingConfig);
+        POPULATION_COUNT_BY_NPC.put(
+                npcUuid,
+                new CachedPopulationCount(
+                        store,
+                        sourceTypeKey,
+                        radius,
+                        cellX,
+                        cellY,
+                        cellZ,
+                        nowMs + POPULATION_CACHE_TTL_MS,
+                        resolved
+                )
+        );
+        maybeCleanupPopulationCache(nowMs);
+        return resolved;
+    }
+
+    private static int quantizePopulationCell(double value) {
+        if (!Double.isFinite(value)) {
+            return Integer.MIN_VALUE;
+        }
+        return (int) Math.floor(value / POPULATION_CACHE_CELL_SIZE);
+    }
+
+    private static void maybeCleanupPopulationCache(long nowMs) {
+        long lastCleanupMs = LAST_POPULATION_CACHE_CLEANUP_MS.get();
+        if (nowMs - lastCleanupMs < POPULATION_CACHE_CLEANUP_INTERVAL_MS) {
+            return;
+        }
+        if (!LAST_POPULATION_CACHE_CLEANUP_MS.compareAndSet(lastCleanupMs, nowMs)) {
+            return;
+        }
+        for (Map.Entry<UUID, CachedPopulationCount> entry : POPULATION_COUNT_BY_NPC.entrySet()) {
+            CachedPopulationCount cached = entry.getValue();
+            if (entry.getKey() == null || cached == null || nowMs >= cached.expiresAtMs()) {
+                POPULATION_COUNT_BY_NPC.remove(entry.getKey(), cached);
+            }
+        }
     }
 
     private static double resolveNeedOffset(@Nonnull String idPrefix,
@@ -416,5 +501,30 @@ public final class CompanionHappinessModifierService {
      * Effective base/target snapshot used by happiness updates and UI presentation.
      */
     public record ModifierSnapshot(double baseSetpoint, double target, List<ModifierEntry> modifiers) {
+    }
+
+    private record CachedPopulationCount(@Nonnull Store<EntityStore> store,
+                                         @Nonnull String sourceTypeKey,
+                                         double radius,
+                                         int cellX,
+                                         int cellY,
+                                         int cellZ,
+                                         long expiresAtMs,
+                                         int nearbyCount) {
+        private boolean matches(@Nonnull Store<EntityStore> store,
+                                @Nonnull String sourceTypeKey,
+                                double radius,
+                                int cellX,
+                                int cellY,
+                                int cellZ,
+                                long nowMs) {
+            return this.store == store
+                    && this.sourceTypeKey.equals(sourceTypeKey)
+                    && Double.compare(this.radius, radius) == 0
+                    && this.cellX == cellX
+                    && this.cellY == cellY
+                    && this.cellZ == cellZ
+                    && nowMs < expiresAtMs;
+        }
     }
 }

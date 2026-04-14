@@ -8,6 +8,7 @@ import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.annotation.Nonnull;
@@ -18,6 +19,8 @@ import javax.annotation.Nullable;
  */
 public final class ActionTameworkDebugMessage extends TameworkActionBase {
     private static final Logger FALLBACK_LOGGER = Logger.getLogger(ActionTameworkDebugMessage.class.getName());
+    private static final long REPEAT_LOG_INTERVAL_MS = 2_000L;
+    private static final ConcurrentHashMap<String, Long> LAST_LOG_BY_MESSAGE_KEY = new ConcurrentHashMap<>();
 
     @Nullable
     private final String message;
@@ -50,13 +53,28 @@ public final class ActionTameworkDebugMessage extends TameworkActionBase {
         String value = message == null ? "" : message.trim();
         String probe = value.isBlank() ? "<empty>" : value;
         String logMessage = "Debug action message: npc=" + npcId + " message=" + probe;
-        Tamework instance = Tamework.getInstance();
-        if (instance != null && instance.getLogger() != null) {
-            instance.getLogger().at(Level.INFO).log(logMessage);
+        long nowMs = System.currentTimeMillis();
+        if (shouldSuppress(npcId + '|' + probe, nowMs)) {
             return true;
         }
-        FALLBACK_LOGGER.log(Level.INFO, logMessage);
+        Level level = resolveLevel(probe);
+        Tamework instance = Tamework.getInstance();
+        if (instance != null && instance.getLogger() != null) {
+            instance.getLogger().at(level).log(logMessage);
+            return true;
+        }
+        FALLBACK_LOGGER.log(level, logMessage);
         return true;
+    }
+
+    private static boolean shouldSuppress(@Nonnull String messageKey, long nowMs) {
+        Long previous = LAST_LOG_BY_MESSAGE_KEY.put(messageKey, nowMs);
+        return previous != null && nowMs < previous + REPEAT_LOG_INTERVAL_MS;
+    }
+
+    @Nonnull
+    private static Level resolveLevel(@Nonnull String probe) {
+        return probe.startsWith("Needs seek blocked:") ? Level.WARNING : Level.INFO;
     }
 
     @Nonnull

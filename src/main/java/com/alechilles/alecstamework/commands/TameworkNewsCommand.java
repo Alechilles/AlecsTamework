@@ -2,10 +2,12 @@ package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
+import com.alechilles.alecstamework.ui.TameworkSettingsPageService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.CommandSender;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
@@ -23,6 +25,11 @@ public final class TameworkNewsCommand extends AbstractPlayerCommand {
         requirePermission(TameworkConfigPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
         setAllowsExtraArguments(true);
+    }
+
+    @Override
+    public boolean hasPermission(CommandSender sender) {
+        return TameworkSettingsPageService.hasAccess(sender);
     }
 
     @Override

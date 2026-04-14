@@ -52,6 +52,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `Breeding`: enables breeding-related debug output
 - `NeedsConsume`: enables needs-consumption debug output
 - `NeedsDamage`: enables needs-damage diagnostics (`/tw debugneedsdamage`)
+- `NeedsSeek`: enables needs-seek target resolution diagnostics (`/tw debugneedsseek`)
 
 ## Defaults and Usage Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Debug/TwDebugConfig_Default.json` ships with all debug toggles disabled.
@@ -83,7 +84,8 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
     "Lag": false,
     "Coop": false,
     "Breeding": true,
-    "NeedsConsume": true
+    "NeedsConsume": true,
+    "NeedsSeek": true
   }
 }
 ```

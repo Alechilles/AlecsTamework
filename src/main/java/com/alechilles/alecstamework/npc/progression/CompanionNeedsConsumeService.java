@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -12,7 +13,7 @@ import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.LinkedHashSet;
 import java.util.Locale;
-import java.util.function.Supplier;
+import java.util.Map;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -22,6 +23,7 @@ import javax.annotation.Nullable;
 public final class CompanionNeedsConsumeService {
     private static final double ACTION_FOOD_CONSUME_RADIUS_FLOOR = 2.0;
     private static final CompanionNeedsEnvironmentService ENVIRONMENT_SERVICE = new CompanionNeedsEnvironmentService();
+    private static final StdScopeLookupCache SCOPE_LOOKUP_CACHE = new StdScopeLookupCache();
 
     private CompanionNeedsConsumeService() {
     }
@@ -166,6 +168,7 @@ public final class CompanionNeedsConsumeService {
         double hungerGain = 0.0;
         double thirstGain = 0.0;
         int consumedItems = 0;
+        Map<String, Integer> consumedItemCountsByItemId = null;
 
         if (mode.consumesFood()) {
             if (!passiveRefill.isNearbyContainerFeedEnabled()) {
@@ -194,11 +197,7 @@ public final class CompanionNeedsConsumeService {
                 consumedItems = containerResult.getConsumedItems();
                 if (consumedItems > 0) {
                     hungerGain = consumedItems * passiveRefill.getHungerGainPerConsumedItem();
-                    CompanionHappinessService.applyFeedImpulses(
-                            npcRef,
-                            store,
-                            containerResult.getConsumedItemCountsByItemId()
-                    );
+                    consumedItemCountsByItemId = containerResult.getConsumedItemCountsByItemId();
                 } else {
                     NeedsConsumeDiagnostics.appendFailureReason(
                             failureReasons,
@@ -263,7 +262,17 @@ public final class CompanionNeedsConsumeService {
                 hungerGain,
                 thirstGain,
                 false,
+                false,
+                null,
                 null
+        );
+        boolean happinessChanged = CompanionHappinessService.reconcileWithFeedEffects(
+                npcRef,
+                store,
+                null,
+                false,
+                null,
+                consumedItemCountsByItemId
         );
         if (updated) {
             NeedsConsumeDiagnostics.maybeLogConsume(
@@ -273,6 +282,21 @@ public final class CompanionNeedsConsumeService {
                     roleId,
                     mode.name(),
                     "success",
+                    consumedItems,
+                    hungerGain,
+                    thirstGain
+            );
+            return true;
+        }
+
+        if (happinessChanged) {
+            NeedsConsumeDiagnostics.maybeLogConsume(
+                    diagnostics,
+                    NeedsConsumeDiagnostics.LogLevel.FINE,
+                    npcId,
+                    roleId,
+                    mode.name(),
+                    "success_happiness_only",
                     consumedItems,
                     hungerGain,
                     thirstGain
@@ -330,30 +354,8 @@ public final class CompanionNeedsConsumeService {
     @Nonnull
     private static String[] resolveScopeItemIds(@Nonnull StdScope sensorScope,
                                                 @Nonnull String paramName) {
-        try {
-            Supplier<String[]> arraySupplier = sensorScope.getStringArraySupplier(paramName);
-            if (arraySupplier != null) {
-                String[] values = sanitizeItemIds(arraySupplier.get());
-                if (values.length > 0) {
-                    return values;
-                }
-            }
-        } catch (IllegalStateException ignored) {
-            // Fall through to string-param fallback.
-        }
-        try {
-            Supplier<String> stringSupplier = sensorScope.getStringSupplier(paramName);
-            if (stringSupplier == null) {
-                return new String[0];
-            }
-            String value = stringSupplier.get();
-            if (value == null || value.isBlank()) {
-                return new String[0];
-            }
-            return sanitizeItemIds(new String[] {value});
-        } catch (IllegalStateException ignored) {
-            return new String[0];
-        }
+        String[] values = SCOPE_LOOKUP_CACHE.getStringArrayOrString(sensorScope, paramName);
+        return values != null ? sanitizeItemIds(values) : new String[0];
     }
 
     @Nonnull

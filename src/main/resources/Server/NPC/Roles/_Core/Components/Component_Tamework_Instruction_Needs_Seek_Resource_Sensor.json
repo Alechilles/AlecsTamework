@@ -68,13 +68,6 @@
               "State": ".Listen"
             },
             {
-              "Type": "Timer",
-              "Name": {
-                "Compute": "NeedsSeekFailedCooldownName"
-              },
-              "State": "Stopped"
-            },
-            {
               "Type": "TameworkNeedBelow",
               "Need": "Thirst",
               "RatioBelow": {
@@ -122,13 +115,6 @@
             {
               "Type": "State",
               "State": ".Listen"
-            },
-            {
-              "Type": "Timer",
-              "Name": {
-                "Compute": "NeedsSeekFailedCooldownName"
-              },
-              "State": "Stopped"
             },
             {
               "Type": "TameworkNeedBelow",
