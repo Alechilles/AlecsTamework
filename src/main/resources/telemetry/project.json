@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "projectId": "alecs-tamework",
+  "displayName": "Alec's Tamework!",
+  "ownerPluginIdentifiers": [
+    "Alechilles:Alec's Tamework!"
+  ],
+  "packagePrefixes": [
+    "com.alechilles.alecstamework"
+  ],
+  "capture": {
+    "uncaughtExceptions": true,
+    "setupFailures": true,
+    "startFailures": true,
+    "exceptionalWorldRemovals": true
+  },
+  "defaults": {
+    "enabled": true,
+    "destinationMode": "hosted"
+  },
+  "hosted": {
+    "endpoint": "http://127.0.0.1:8787/api/v1/ingest/crash",
+    "projectKey": "dev_tamework_local_test"
+  }
+}
