@@ -19,7 +19,7 @@
     "destinationMode": "hosted"
   },
   "hosted": {
-    "endpoint": "http://127.0.0.1:8787/api/v1/ingest/crash",
+    "endpoint": "https://telemetry.alecsmods.com/ingest/crash",
     "projectKey": "dev_tamework_local_test"
   }
 }
