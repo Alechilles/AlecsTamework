@@ -706,7 +706,8 @@ public final class TameworkCommandSelectionPage
         boolean hasEntries = linkedNpcEntries.length > 0;
         commandBuilder.set("#TameworkLinkedPanelEmptyState.Visible", !hasEntries);
         commandBuilder.set("#TameworkLinkedPanelListViewport.Visible", hasEntries);
-        boolean structureChanged = renderedLinkedNpcCardCount != linkedNpcEntries.length;
+        boolean structureChanged = renderedLinkedNpcCardCount != linkedNpcEntries.length
+                || renderedLinkedNpcEntries.length != linkedNpcEntries.length;
         boolean pendingUnlinkChanged = !java.util.Objects.equals(renderedPendingUnlinkNpcUuid, pendingUnlinkNpcUuid);
         if (structureChanged) {
             commandBuilder.clear("#TameworkLinkedPanelList");
