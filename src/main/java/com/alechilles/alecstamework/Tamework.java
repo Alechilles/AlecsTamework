@@ -50,6 +50,8 @@ import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInterac
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
+import com.alechilles.alecstamework.integration.telemetry.AlecsTelemetryBridgeLoader;
+import com.alechilles.alecstamework.integration.telemetry.AlecsTelemetryBridgeLoader.AlecsTelemetryBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -155,6 +157,8 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
  */
 public class Tamework extends JavaPlugin {
 
+    private static final String ALECS_TELEMETRY_PROJECT_ID = "alecs-tamework";
+
     private static Tamework instance;
 
     private ItemFeatureRegistry itemFeatureRegistry;
@@ -187,6 +191,7 @@ public class Tamework extends JavaPlugin {
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private CrashTelemetryService crashTelemetryService;
+    private AlecsTelemetryBridge alecsTelemetryBridge;
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
     private SpawnerTooltipBridge spawnerTooltipBridge;
     private boolean globalAssetsRegistered;
@@ -248,10 +253,13 @@ public class Tamework extends JavaPlugin {
     @Override
     protected void setup() {
         initializeCrashTelemetry();
+        alecsTelemetryBridge = AlecsTelemetryBridgeLoader.initialize(getLogger(), ALECS_TELEMETRY_PROJECT_ID);
         try {
             setupInternal();
+            recordAlecsTelemetryBreadcrumb("lifecycle", "Tamework setup completed.");
         } catch (Throwable throwable) {
             captureSetupFailure(throwable);
+            captureAlecsTelemetrySetupFailure(throwable);
             throw throwable;
         }
     }
@@ -717,8 +725,10 @@ public class Tamework extends JavaPlugin {
     protected void start() {
         try {
             startInternal();
+            recordAlecsTelemetryBreadcrumb("lifecycle", "Tamework start completed.");
         } catch (Throwable throwable) {
             captureStartFailure(throwable);
+            captureAlecsTelemetryStartFailure(throwable);
             throw throwable;
         }
     }
@@ -763,6 +773,7 @@ public class Tamework extends JavaPlugin {
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
         crashTelemetryService = null;
+        alecsTelemetryBridge = null;
         settingsAnnouncementService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
@@ -791,6 +802,27 @@ public class Tamework extends JavaPlugin {
             return;
         }
         crashTelemetryService.captureStartFailure(throwable);
+    }
+
+    private void captureAlecsTelemetrySetupFailure(@Nullable Throwable throwable) {
+        if (alecsTelemetryBridge == null || throwable == null) {
+            return;
+        }
+        alecsTelemetryBridge.captureSetupFailure(throwable);
+    }
+
+    private void captureAlecsTelemetryStartFailure(@Nullable Throwable throwable) {
+        if (alecsTelemetryBridge == null || throwable == null) {
+            return;
+        }
+        alecsTelemetryBridge.captureStartFailure(throwable);
+    }
+
+    private void recordAlecsTelemetryBreadcrumb(@Nonnull String category, @Nonnull String detail) {
+        if (alecsTelemetryBridge == null) {
+            return;
+        }
+        alecsTelemetryBridge.recordBreadcrumb(category, detail);
     }
 
     private void onWorldRemovedForCrashTelemetry(@Nonnull RemoveWorldEvent event) {
