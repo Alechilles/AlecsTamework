@@ -73,6 +73,7 @@ import com.alechilles.alecstamework.items.TranquilizerRecipeVisibilityService;
 import com.alechilles.alecstamework.localization.ModLanguageDiscovery;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.metrics.TameworkHStatsIntegration;
 import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
@@ -187,6 +188,7 @@ public class Tamework extends JavaPlugin {
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
     private TameworkHStatsIntegration hStatsIntegration;
     private CrashTelemetryService crashTelemetryService;
+    private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
     private SpawnerTooltipBridge spawnerTooltipBridge;
     private boolean globalAssetsRegistered;
@@ -247,10 +249,18 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void setup() {
+        long startedAtNanos = System.nanoTime();
         initializeCrashTelemetry();
         try {
             setupInternal();
+            int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
+            telemetryEvents.recordLifecycle("plugin_setup", durationMs, true, "Tamework setupInternal completed.");
+            telemetryEvents.recordPerformance("plugin_setup_duration", durationMs, (double) durationMs, "Tamework plugin setup duration.");
         } catch (Throwable throwable) {
+            int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
+            telemetryEvents.recordLifecycle("plugin_setup", durationMs, false, "Tamework setupInternal failed.");
+            telemetryEvents.recordPerformance("plugin_setup_duration", durationMs, (double) durationMs, "Failed Tamework plugin setup duration.");
+            telemetryEvents.recordError("plugin_setup_failed", throwable, "Tamework setupInternal threw an exception.");
             captureSetupFailure(throwable);
             throw throwable;
         }
@@ -715,9 +725,17 @@ public class Tamework extends JavaPlugin {
 
     @Override
     protected void start() {
+        long startedAtNanos = System.nanoTime();
         try {
             startInternal();
+            int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
+            telemetryEvents.recordLifecycle("plugin_start", durationMs, true, "Tamework startInternal completed.");
+            telemetryEvents.recordPerformance("plugin_start_duration", durationMs, (double) durationMs, "Tamework plugin start duration.");
         } catch (Throwable throwable) {
+            int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
+            telemetryEvents.recordLifecycle("plugin_start", durationMs, false, "Tamework startInternal failed.");
+            telemetryEvents.recordPerformance("plugin_start_duration", durationMs, (double) durationMs, "Failed Tamework plugin start duration.");
+            telemetryEvents.recordError("plugin_start_failed", throwable, "Tamework startInternal threw an exception.");
             captureStartFailure(throwable);
             throw throwable;
         }
@@ -836,6 +854,15 @@ public class Tamework extends JavaPlugin {
         }
         TwConfigOverrideManager.ReloadResult reloadResult = configOverrideManager.reloadOverrides(world);
         if (reloadResult.hasErrors()) {
+            telemetryEvents.recordError(
+                    "world_override_reload_errors",
+                    null,
+                    "Loaded overrides for world "
+                            + world.getName()
+                            + " with "
+                            + reloadResult.getErrors().size()
+                            + " error(s)."
+            );
             getLogger().at(Level.WARNING).log(
                     "Loaded Tamework overrides for world "
                             + world.getName()
@@ -888,6 +915,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public CrashTelemetryService getCrashTelemetryService() {
         return crashTelemetryService;
+    }
+
+    @Nonnull
+    public TameworkTelemetryEvents getTelemetryEvents() {
+        return telemetryEvents;
     }
 
     @Nullable
