@@ -63,6 +63,14 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                             : "Crash telemetry flush was not scheduled (disabled, already running, or no executor available)."
             ));
         } else if ("eventerror".equals(action)) {
+            Player player = store.getComponent(ref, Player.getComponentType());
+            UUID playerUuid = player == null ? null : player.getUuid();
+            if (!isAllowedSimulateCaller(playerUuid)) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "You are not allowed to run /tw debugcrashtelemetry eventerror."
+                ));
+                return;
+            }
             String token = Long.toHexString(System.currentTimeMillis());
             AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordError(
                     "debug_command_error",
@@ -71,6 +79,14 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
             );
             commandContext.sender().sendMessage(Message.raw(result.message()));
         } else if ("eventlifecycle".equals(action)) {
+            Player player = store.getComponent(ref, Player.getComponentType());
+            UUID playerUuid = player == null ? null : player.getUuid();
+            if (!isAllowedSimulateCaller(playerUuid)) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "You are not allowed to run /tw debugcrashtelemetry eventlifecycle."
+                ));
+                return;
+            }
             String token = Long.toHexString(System.currentTimeMillis());
             AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordLifecycle(
                     "debug_command_lifecycle",
