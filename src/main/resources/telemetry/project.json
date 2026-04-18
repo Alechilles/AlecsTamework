@@ -18,7 +18,20 @@
       "settings_announcement_reviewed"
     ]
   },
+  "ownerPluginIdentifiers": [
+    "Alechilles:Alec's Tamework!"
+  ],
+  "packagePrefixes": [
+    "com.alechilles.alecstamework"
+  ],
+  "capture": {
+    "uncaughtExceptions": true,
+    "setupFailures": true,
+    "startFailures": true,
+    "exceptionalWorldRemovals": true
+  },
   "defaults": {
+    "enabled": true,
     "destinationMode": "hosted"
   },
   "hosted": {

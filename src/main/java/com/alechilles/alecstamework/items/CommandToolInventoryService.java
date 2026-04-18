@@ -105,6 +105,10 @@ final class CommandToolInventoryService {
         return buildLinkedPanelEntriesForTool(player, toolId, null);
     }
 
+    List<LinkedNpcEntry> buildLinkedPanelBaseEntriesForTool(Player player, String toolId) {
+        return buildLinkedPanelBaseEntriesForTool(player, toolId, null);
+    }
+
     List<LinkedNpcEntry> buildLinkedPanelEntriesForTool(Player player,
                                                         String toolId,
                                                         com.alechilles.alecstamework.config.assets.TwCommandItemConfig config) {
@@ -138,6 +142,44 @@ final class CommandToolInventoryService {
                 return panelEntrySourceService.buildEntries(player, store, stack, config, toolId);
             }
             return panelEntryService.buildEntries(player, store, stack, toolId);
+        }
+        return List.of();
+    }
+
+    List<LinkedNpcEntry> buildLinkedPanelBaseEntriesForTool(Player player,
+                                                            String toolId,
+                                                            com.alechilles.alecstamework.config.assets.TwCommandItemConfig config) {
+        if (player == null || toolId == null || toolId.isBlank()) {
+            return List.of();
+        }
+        Inventory inventory = player.getInventory();
+        if (inventory == null || inventory.getHotbar() == null) {
+            return List.of();
+        }
+        ItemContainer hotbar = inventory.getHotbar();
+        short capacity = hotbar.getCapacity();
+        for (short slot = 0; slot < capacity; slot++) {
+            ItemStack stack = hotbar.getItemStack(slot);
+            if (stack == null || stack.isEmpty()) {
+                continue;
+            }
+            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
+            if (stackToolId == null || !stackToolId.equals(toolId)) {
+                continue;
+            }
+            World world = player.getWorld();
+            if (world == null) {
+                return List.of();
+            }
+            Store<EntityStore> store = world.getEntityStore().getStore();
+            if (store == null) {
+                return List.of();
+            }
+            ItemStack unfilteredStack = panelPreferenceService.applySelectedFilterText(stack, "");
+            if (panelEntrySourceService != null) {
+                return panelEntrySourceService.buildEntries(player, store, unfilteredStack, config, toolId);
+            }
+            return panelEntryService.buildEntries(player, store, unfilteredStack, toolId);
         }
         return List.of();
     }

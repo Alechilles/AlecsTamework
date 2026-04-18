@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import java.util.Objects;
 
 /**
  * Immutable trait indicator model rendered in linked companion cards.
@@ -83,5 +84,27 @@ public final class LinkedNpcTraitIndicator {
             return 0.0;
         }
         return Math.max(0.0, Math.min(1.0, value));
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof LinkedNpcTraitIndicator other)) {
+            return false;
+        }
+        return Double.compare(fillRatio, other.fillRatio) == 0
+                && counterClockwise == other.counterClockwise
+                && belowDefault == other.belowDefault
+                && Objects.equals(iconText, other.iconText)
+                && Objects.equals(iconTexturePath, other.iconTexturePath)
+                && Objects.equals(label, other.label)
+                && Objects.equals(tooltipText, other.tooltipText);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(iconText, iconTexturePath, label, tooltipText, fillRatio, counterClockwise, belowDefault);
     }
 }
