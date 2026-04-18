@@ -22,8 +22,8 @@
     "destinationMode": "hosted"
   },
   "hosted": {
-    "endpoint": "http://178.156.251.66:8797/ingest/crash",
-    "eventEndpoint": "http://178.156.251.66:8797/ingest/event",
+    "endpoint": "https://telemetry.alecsmods.com/ingest/crash",
+    "eventEndpoint": "https://telemetry.alecsmods.com/ingest/event",
     "projectKey": "dev_tamework_local_test"
   }
 }

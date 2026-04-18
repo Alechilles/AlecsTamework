@@ -180,12 +180,13 @@ public final class TameworkSettingsAnnouncementService {
                                   @Nonnull String announcementId,
                                   boolean suppressUntilNextAnnouncement) {
         persistOptOutIfRequested(playerUuid, announcementId, suppressUntilNextAnnouncement);
-        plugin.getTelemetryEvents().recordUsage("settings_announcement_reviewed", "Opened settings from announcement.");
         String error = TameworkSettingsPageService.openSettingsPage(ref, store);
         if (error != null) {
             plugin.getTelemetryEvents().recordError("settings_announcement_review_failed", null, error);
             playerRef.sendMessage(Message.raw(error));
+            return;
         }
+        plugin.getTelemetryEvents().recordUsage("settings_announcement_reviewed", "Opened settings from announcement.");
     }
 
     private void persistOptOutIfRequested(@Nonnull UUID playerUuid,
