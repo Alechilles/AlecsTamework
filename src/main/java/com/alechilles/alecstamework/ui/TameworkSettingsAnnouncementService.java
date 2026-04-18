@@ -119,6 +119,7 @@ public final class TameworkSettingsAnnouncementService {
                 suppress -> onDismissAnnouncement(playerUuid, announcement.announcementId(), suppress)
         );
         player.getPageManager().openCustomPage(playerRef, store, page);
+        plugin.getTelemetryEvents().recordUsage("settings_announcement_opened", "Opened Tamework settings announcement.");
         return null;
     }
 
@@ -181,8 +182,11 @@ public final class TameworkSettingsAnnouncementService {
         persistOptOutIfRequested(playerUuid, announcementId, suppressUntilNextAnnouncement);
         String error = TameworkSettingsPageService.openSettingsPage(ref, store);
         if (error != null) {
+            plugin.getTelemetryEvents().recordError("settings_announcement_review_failed", null, error);
             playerRef.sendMessage(Message.raw(error));
+            return;
         }
+        plugin.getTelemetryEvents().recordUsage("settings_announcement_reviewed", "Opened settings from announcement.");
     }
 
     private void persistOptOutIfRequested(@Nonnull UUID playerUuid,
@@ -199,6 +203,11 @@ public final class TameworkSettingsAnnouncementService {
         )) {
             return;
         }
+        plugin.getTelemetryEvents().recordError(
+                "settings_announcement_opt_out_persist_failed",
+                null,
+                "Failed to persist announcement opt-out for player " + playerUuid + "."
+        );
         plugin.getLogger().at(Level.WARNING).log(
                 "Failed to persist Tamework settings announcement opt-out for player " + playerUuid + "."
         );

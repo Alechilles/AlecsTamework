@@ -12,11 +12,18 @@
     "enabled": true,
     "allowedEvents": [
       "reload_config_command_used",
-      "settings_page_opened"
+      "settings_page_opened",
+      "news_command_opened",
+      "settings_announcement_opened",
+      "settings_announcement_reviewed"
     ]
   },
   "defaults": {
     "destinationMode": "hosted"
   },
-  "hosted": {}
+  "hosted": {
+    "endpoint": "https://telemetry.alecsmods.com/ingest/crash",
+    "eventEndpoint": "https://telemetry.alecsmods.com/ingest/event",
+    "projectKey": "dev_tamework_local_test"
+  }
 }
