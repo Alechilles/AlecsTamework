@@ -103,6 +103,7 @@ public final class TameworkSettingsPageService {
         }
         TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
         player.getPageManager().openCustomPage(ref, store, page);
+        plugin.getTelemetryEvents().recordUsage("settings_page_opened", "Opened via /tw settings.");
         return null;
     }
 

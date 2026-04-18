@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "projectId": "alecs-tamework",
+  "displayName": "Alec's Tamework!",
+  "runtimeMode": "dependency",
+  "performance": {
+    "enabled": true,
+    "sampleRate": 1.0,
+    "thresholdMs": 100
+  },
+  "usage": {
+    "enabled": true,
+    "allowedEvents": [
+      "reload_config_command_used",
+      "settings_page_opened"
+    ]
+  },
+  "defaults": {
+    "destinationMode": "hosted"
+  },
+  "hosted": {}
+}

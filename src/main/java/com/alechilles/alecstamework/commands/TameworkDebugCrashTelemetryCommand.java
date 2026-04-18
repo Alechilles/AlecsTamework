@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.metrics.AlecsTelemetryBridge;
 import com.alechilles.alecstamework.metrics.CrashTelemetryDiagnostics;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.hypixel.hytale.server.core.HytaleServer;
@@ -31,7 +32,7 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
     );
 
     public TameworkDebugCrashTelemetryCommand() {
-        super("debugcrashtelemetry", "Show crash telemetry diagnostics. Optional: flush|simulate");
+        super("debugcrashtelemetry", "Show crash telemetry diagnostics. Optional: flush|simulate|eventerror|eventlifecycle");
         setAllowsExtraArguments(true);
     }
 
@@ -61,6 +62,39 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                             ? "Crash telemetry flush scheduled."
                             : "Crash telemetry flush was not scheduled (disabled, already running, or no executor available)."
             ));
+        } else if ("eventerror".equals(action)) {
+            Player player = store.getComponent(ref, Player.getComponentType());
+            UUID playerUuid = player == null ? null : player.getUuid();
+            if (!isAllowedSimulateCaller(playerUuid)) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "You are not allowed to run /tw debugcrashtelemetry eventerror."
+                ));
+                return;
+            }
+            String token = Long.toHexString(System.currentTimeMillis());
+            AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordError(
+                    "debug_command_error",
+                    new IllegalStateException("Simulated Tamework telemetry error event (" + token + ")"),
+                    "Triggered by /tw debugcrashtelemetry eventerror (token=" + token + ")"
+            );
+            commandContext.sender().sendMessage(Message.raw(result.message()));
+        } else if ("eventlifecycle".equals(action)) {
+            Player player = store.getComponent(ref, Player.getComponentType());
+            UUID playerUuid = player == null ? null : player.getUuid();
+            if (!isAllowedSimulateCaller(playerUuid)) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "You are not allowed to run /tw debugcrashtelemetry eventlifecycle."
+                ));
+                return;
+            }
+            String token = Long.toHexString(System.currentTimeMillis());
+            AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordLifecycle(
+                    "debug_command_lifecycle",
+                    123,
+                    true,
+                    "Triggered by /tw debugcrashtelemetry eventlifecycle (token=" + token + ")"
+            );
+            commandContext.sender().sendMessage(Message.raw(result.message()));
         } else if ("simulate".equals(action)) {
             Player player = store.getComponent(ref, Player.getComponentType());
             UUID playerUuid = player == null ? null : player.getUuid();
@@ -88,7 +122,7 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                 }
             }
         } else if (action != null) {
-            commandContext.sender().sendMessage(Message.raw("Usage: /tw debugcrashtelemetry [flush|simulate]"));
+            commandContext.sender().sendMessage(Message.raw("Usage: /tw debugcrashtelemetry [flush|simulate|eventerror|eventlifecycle]"));
             return;
         }
 
