@@ -61,7 +61,10 @@ public final class TameworkNewsCommand extends AbstractPlayerCommand {
 
         String error = service.openAnnouncementNow(ref, store, player);
         if (error != null) {
+            plugin.getTelemetryEvents().recordError("news_command_open_failed", null, error);
             commandContext.sender().sendMessage(Message.raw(error));
+            return;
         }
+        plugin.getTelemetryEvents().recordUsage("news_command_opened", "Opened via /tw news.");
     }
 }
