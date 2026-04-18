@@ -718,6 +718,7 @@ public final class CommandItemFeatureHandler {
                 selectedId,
                 requireUnlinkConfirm,
                 () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
+                () -> toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelModeValueForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),

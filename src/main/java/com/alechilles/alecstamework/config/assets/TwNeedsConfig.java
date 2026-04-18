@@ -530,7 +530,7 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
             return cache;
         }
         for (TwNeedsConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
+            if (candidate == null || !candidate.isConfiguredEnabled()) {
                 continue;
             }
             String[] candidateRoles = candidate.getRoleIds();
@@ -861,6 +861,14 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public boolean isEnabled() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.needsEnabled() != null) {
+            return overrides.needsEnabled();
+        }
+        return enabled;
+    }
+
+    public boolean isConfiguredEnabled() {
         return enabled;
     }
 

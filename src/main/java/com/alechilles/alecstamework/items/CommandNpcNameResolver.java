@@ -23,6 +23,15 @@ import java.util.List;
  * 3) role id.
  */
 final class CommandNpcNameResolver {
+    private final TranslationRegistry translationRegistry;
+
+    CommandNpcNameResolver() {
+        this(null);
+    }
+
+    CommandNpcNameResolver(TranslationRegistry translationRegistry) {
+        this.translationRegistry = translationRegistry;
+    }
 
     String resolveNpcDisplayName(Ref<EntityStore> npcRef, Store<EntityStore> store, NPCEntity npc) {
         if (npc == null) {
@@ -55,6 +64,10 @@ final class CommandNpcNameResolver {
             return null;
         }
         if (record.cachedDisplayName != null && !record.cachedDisplayName.isBlank()) {
+            String translated = translateSnapshotName(record.cachedDisplayName, record.cachedNameKey, record.cachedRoleId);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
             return record.cachedDisplayName;
         }
         if (record.cachedNameKey != null && !record.cachedNameKey.isBlank()) {
@@ -65,7 +78,29 @@ final class CommandNpcNameResolver {
             return record.cachedNameKey;
         }
         if (record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
+            String translated = translateNpcNameKey(record.cachedRoleId);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
             return record.cachedRoleId;
+        }
+        return null;
+    }
+
+    String resolveSnapshotDisplayName(String snapshotDisplayName, String roleId) {
+        String translated = translateSnapshotName(snapshotDisplayName, null, roleId);
+        if (translated != null && !translated.isBlank()) {
+            return translated;
+        }
+        if (snapshotDisplayName != null && !snapshotDisplayName.isBlank()) {
+            return snapshotDisplayName;
+        }
+        if (roleId != null && !roleId.isBlank()) {
+            String translatedRole = translateNpcNameKey(roleId);
+            if (translatedRole != null && !translatedRole.isBlank()) {
+                return translatedRole;
+            }
+            return roleId;
         }
         return null;
     }
@@ -155,8 +190,11 @@ final class CommandNpcNameResolver {
         if (nameKey == null || nameKey.isBlank()) {
             return null;
         }
-        Tamework instance = Tamework.getInstance();
-        TranslationRegistry registry = instance != null ? instance.getTranslationRegistry() : null;
+        TranslationRegistry registry = translationRegistry;
+        if (registry == null) {
+            Tamework instance = Tamework.getInstance();
+            registry = instance != null ? instance.getTranslationRegistry() : null;
+        }
         if (registry == null) {
             return null;
         }
@@ -176,6 +214,8 @@ final class CommandNpcNameResolver {
         ArrayList<String> candidates = new ArrayList<>(8);
         addCandidate(candidates, nameKey);
         if (!nameKey.contains(".")) {
+            addCandidate(candidates, "npcRole." + nameKey + ".name");
+            addCandidate(candidates, "server.npcRole." + nameKey + ".name");
             addCandidate(candidates, "npcRoles." + nameKey + ".name");
             addCandidate(candidates, "server.npcRoles." + nameKey + ".name");
             return candidates;
@@ -205,6 +245,36 @@ final class CommandNpcNameResolver {
         if (!candidates.contains(key)) {
             candidates.add(key);
         }
+    }
+
+    private String translateSnapshotName(String snapshotDisplayName, String nameKey, String roleId) {
+        if (snapshotDisplayName != null && !snapshotDisplayName.isBlank()) {
+            if (looksLikeTranslationKey(snapshotDisplayName)) {
+                String translated = translateNpcNameKey(snapshotDisplayName);
+                if (translated != null && !translated.isBlank()) {
+                    return translated;
+                }
+            }
+            if (roleId != null && !roleId.isBlank() && snapshotDisplayName.equalsIgnoreCase(roleId)) {
+                String translated = translateNpcNameKey(roleId);
+                if (translated != null && !translated.isBlank()) {
+                    return translated;
+                }
+            }
+            if (nameKey != null && !nameKey.isBlank() && snapshotDisplayName.equalsIgnoreCase(nameKey)) {
+                String translated = translateNpcNameKey(nameKey);
+                if (translated != null && !translated.isBlank()) {
+                    return translated;
+                }
+            }
+        }
+        if (nameKey != null && !nameKey.isBlank()) {
+            String translated = translateNpcNameKey(nameKey);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
+        }
+        return null;
     }
 
     private static String readScopeStringParam(Object scope, String... paramNames) {

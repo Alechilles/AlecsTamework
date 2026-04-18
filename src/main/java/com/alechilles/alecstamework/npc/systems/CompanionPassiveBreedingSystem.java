@@ -18,10 +18,14 @@ import javax.annotation.Nullable;
  */
 public final class CompanionPassiveBreedingSystem extends TickingSystem<EntityStore> {
     private static final long SWEEP_INTERVAL_MS = 30_000L;
+    private static final long RUNTIME_SETTINGS_REFRESH_INTERVAL_MS = 5_000L;
 
     private final PassiveBreedingSweepService sweepService;
     private long nextSweepAtMs;
     private long lastSchedulerNowMs;
+    @Nullable
+    private SweepRuntimeSettings cachedRuntimeSettings;
+    private long nextRuntimeSettingsRefreshAtMs;
 
     public CompanionPassiveBreedingSystem() {
         this.sweepService = new PassiveBreedingSweepService();
@@ -29,7 +33,7 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
 
     @Override
     public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
-        SweepRuntimeSettings runtimeSettings = resolveRuntimeSettings();
+        SweepRuntimeSettings runtimeSettings = resolveRuntimeSettings(store);
         long schedulerNowMs = resolveSchedulerNowMs(store, runtimeSettings.basis());
         if (lastSchedulerNowMs > 0L && schedulerNowMs < lastSchedulerNowMs) {
             nextSweepAtMs = 0L;
@@ -47,7 +51,20 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
     }
 
     @Nonnull
-    private static SweepRuntimeSettings resolveRuntimeSettings() {
+    private SweepRuntimeSettings resolveRuntimeSettings(@Nonnull Store<EntityStore> store) {
+        long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
+        SweepRuntimeSettings cached = cachedRuntimeSettings;
+        if (cached != null && nowMs < nextRuntimeSettingsRefreshAtMs) {
+            return cached;
+        }
+        SweepRuntimeSettings resolved = computeRuntimeSettings();
+        cachedRuntimeSettings = resolved;
+        nextRuntimeSettingsRefreshAtMs = nowMs + RUNTIME_SETTINGS_REFRESH_INTERVAL_MS;
+        return resolved;
+    }
+
+    @Nonnull
+    private static SweepRuntimeSettings computeRuntimeSettings() {
         int intervalSeconds = (int) Math.max(1L, SWEEP_INTERVAL_MS / 1000L);
         @Nullable TwBreedingConfig.TimerBasis basis = null;
         DefaultAssetMap<String, TwBreedingConfig> assetMap = TwBreedingConfig.getAssetMap();
@@ -59,7 +76,7 @@ public final class CompanionPassiveBreedingSystem extends TickingSystem<EntitySt
             if (config == null || !config.isEnabled()) {
                 continue;
             }
-            TwBreedingConfig.PassiveBreedingSettings passive = config.getPassiveBreeding();
+            TwBreedingConfig.PassiveBreedingSettings passive = config.resolvePassiveBreeding(null);
             if (passive == null || !passive.isEnabled()) {
                 continue;
             }

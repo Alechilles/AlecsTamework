@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -1599,12 +1600,21 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
     public HappinessSettings resolveHappiness(@Nullable String roleId) {
         RoleOverrideSettings override = resolveRoleOverride(roleId);
+        HappinessSettings resolved;
         if (override == null || override.happiness == null) {
-            return getHappiness();
+            resolved = copyHappiness(getHappiness());
+        } else {
+            resolved = copyHappiness(getHappiness());
+            override.happiness.applyTo(resolved);
         }
-        HappinessSettings resolved = copyHappiness(getHappiness());
-        override.happiness.applyTo(resolved);
+        if (!isHappinessRequiredByRuntimeOverrides()) {
+            resolved.threshold = 0.0;
+        }
         return resolved;
+    }
+
+    public boolean isHappinessRequired(@Nullable String roleId) {
+        return resolveHappiness(roleId).getThreshold() > 0.0;
     }
 
     public EligibilitySettings getEligibility() {
@@ -1658,13 +1668,35 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     }
 
     public PassiveBreedingSettings resolvePassiveBreeding(@Nullable String roleId) {
+        PassiveBreedingSettings resolved;
         RoleOverrideSettings override = resolveRoleOverride(roleId);
         if (override == null || override.passiveBreeding == null) {
-            return getPassiveBreeding();
+            resolved = copyPassiveBreeding(getPassiveBreeding());
+        } else {
+            resolved = copyPassiveBreeding(getPassiveBreeding());
+            override.passiveBreeding.applyTo(resolved);
         }
-        PassiveBreedingSettings resolved = copyPassiveBreeding(getPassiveBreeding());
-        override.passiveBreeding.applyTo(resolved);
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.passiveBreedingEnabled() != null) {
+            resolved.enabled = overrides.passiveBreedingEnabled();
+        }
         return resolved;
+    }
+
+    @Nullable
+    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
+        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
+    }
+
+    private static boolean isHappinessRequiredByRuntimeOverrides() {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides == null) {
+            return true;
+        }
+        if (overrides.happinessEnabled() != null && !overrides.happinessEnabled()) {
+            return false;
+        }
+        return overrides.breedingRequiresHappiness() == null || overrides.breedingRequiresHappiness();
     }
 
     public TimingSettings getTiming() {

@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionContextRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquippedRequirement;
@@ -170,7 +171,7 @@ public class ActionTameworkInteract extends TameworkActionBase {
             selection.logDebug("TameworkInteract: no player resolved for interaction.");
             return false;
         }
-        InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, role);
+        InteractionContextSnapshot ctx = resolution.buildContextSnapshot(player, interactionTarget, role);
         String roleName = role != null ? role.getRoleName() : "<null>";
         String roleOverride = getRoleStringParam(role, ctx, configParamName);
         selection.logDebug(String.format(
@@ -207,8 +208,10 @@ public class ActionTameworkInteract extends TameworkActionBase {
     }
 
     // Builds the cached context snapshot for prompt/selection helpers.
-    InteractionContextSnapshot buildContextSnapshot(Player player, Role role) {
-        return resolution.buildContextSnapshot(player, role);
+    InteractionContextSnapshot buildContextSnapshot(Player player,
+                                                    Ref<EntityStore> playerRef,
+                                                    Role role) {
+        return resolution.buildContextSnapshot(player, playerRef, role);
     }
 
     // Resolves the interaction config for prompt/selection helpers.
@@ -238,12 +241,12 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return selection.selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
-    boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return selection.isTamed(npcRef, store);
+    boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store, InteractionContextSnapshot ctx) {
+        return selection.isTamed(npcRef, store, ctx);
     }
 
-    boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player) {
-        return selection.isOwner(npcRef, store, player);
+    boolean isOwner(Ref<EntityStore> npcRef, Store<EntityStore> store, Player player, InteractionContextSnapshot ctx) {
+        return selection.isOwner(npcRef, store, player, ctx);
     }
 
     // Delegates item-in-hand requirements to the shared resolver.
@@ -316,14 +319,18 @@ public class ActionTameworkInteract extends TameworkActionBase {
     }
 
     boolean matchesMovementState(MovementStateRequirement requirement,
-                                         Role role,
-                                         InfoProvider infoProvider,
-                                         Store<EntityStore> store) {
-        return selection.matchesMovementState(requirement, role, infoProvider, store);
+                                          Role role,
+                                          InfoProvider infoProvider,
+                                          Store<EntityStore> store,
+                                          InteractionContextSnapshot ctx) {
+        return selection.matchesMovementState(requirement, role, infoProvider, store, ctx);
     }
 
-    boolean isPlayerCrouching(Role role, InfoProvider infoProvider, Store<EntityStore> store) {
-        return selection.isPlayerCrouching(role, infoProvider, store);
+    boolean isPlayerCrouching(Role role,
+                              InfoProvider infoProvider,
+                              Store<EntityStore> store,
+                              InteractionContextSnapshot ctx) {
+        return selection.isPlayerCrouching(role, infoProvider, store, ctx);
     }
 
     boolean matchesAlarmState(AlarmRequirement requirement,
@@ -376,6 +383,12 @@ public class ActionTameworkInteract extends TameworkActionBase {
 
     String[] resolveLovedItems(Role role, InteractionContextSnapshot ctx) {
         return resolution.resolveLovedItems(role, ctx);
+    }
+
+    InteractionRequiredItems resolveFeedRequirementItems(FeedInteraction interaction,
+                                                         Role role,
+                                                         InteractionContextSnapshot ctx) {
+        return resolution.resolveFeedRequirementItems(interaction, role, ctx);
     }
 
     boolean resolveIsHarvestable(Role role, InteractionContextSnapshot ctx) {
@@ -431,23 +444,35 @@ public class ActionTameworkInteract extends TameworkActionBase {
     }
 
     boolean isHarvestAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
+        return isHarvestAlarmReady(npcRef, store, null);
+    }
+
+    boolean isHarvestAlarmReady(Ref<EntityStore> npcRef,
+                                Store<EntityStore> store,
+                                InteractionContextSnapshot ctx) {
+        return alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
     }
 
     boolean isHarvestAlarmPassed(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "passed");
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "passed", null);
     }
 
     boolean isHarvestAlarmActive(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "active");
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "active", null);
     }
 
     boolean isHarvestAlarmUnset(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "unset");
+        return alarmHelper.matchesAlarmState(npcRef, store, harvestAlarmName, "unset", null);
     }
 
     InteractionAlarmHelper.AlarmSnapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        return alarmHelper.snapshot(npcRef, store, harvestAlarmName);
+        return getHarvestAlarmSnapshot(npcRef, store, null);
+    }
+
+    InteractionAlarmHelper.AlarmSnapshot getHarvestAlarmSnapshot(Ref<EntityStore> npcRef,
+                                                                 Store<EntityStore> store,
+                                                                 InteractionContextSnapshot ctx) {
+        return alarmHelper.snapshot(npcRef, store, harvestAlarmName, ctx);
     }
 
     String getHarvestAlarmName() {

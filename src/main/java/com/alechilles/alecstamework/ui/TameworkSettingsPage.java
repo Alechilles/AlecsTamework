@@ -13,6 +13,7 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
 import com.hypixel.hytale.server.core.ui.DropdownEntryInfo;
 import com.hypixel.hytale.server.core.ui.LocalizableString;
@@ -39,8 +40,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String ACTION = "Action";
     private static final String ACTION_REFRESH = "Refresh";
     private static final String ACTION_APPLY = "Apply";
+    private static final String ACTION_LOAD_PRESET = "LoadPreset";
     private static final String ACTION_CLOSE = "Close";
 
+    private static final String KEY_PRESET = "@Preset";
     private static final String KEY_POP_LIMIT = "@PopulationLimit";
     private static final String KEY_POP_SCOPE = "@PopulationScope";
     private static final String KEY_SIMPLE_CLAIMS_ENABLED = "@SimpleClaimsEnabled";
@@ -57,6 +60,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_SPAWN_REQUIRES_OWNER = "@SpawnRequiresOwner";
     private static final String KEY_INTERACTION_REQUIRES_OWNER = "@InteractionRequiresOwner";
     private static final String KEY_LINKING_REQUIRES_OWNER = "@LinkingRequiresOwner";
+    private static final String KEY_NEEDS_ENABLED = "@NeedsEnabled";
     private static final String KEY_NEEDS_DAMAGE_ENABLED = "@NeedsDamageEnabled";
     private static final String KEY_NEEDS_TICK_POLICY_MODE = "@NeedsTickPolicyMode";
     private static final String KEY_NEEDS_OWNER_OFFLINE_GRACE_HOURS = "@NeedsOwnerOfflineGraceHours";
@@ -66,6 +70,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_NEEDS_STARVATION_DAMAGE_PER_MINUTE = "@NeedsStarvationDamagePerMinute";
     private static final String KEY_NEEDS_DEHYDRATION_DAMAGE_PER_MINUTE = "@NeedsDehydrationDamagePerMinute";
     private static final String KEY_NEEDS_DAMAGE_LETHAL = "@NeedsDamageLethal";
+    private static final String KEY_HAPPINESS_ENABLED = "@HappinessEnabled";
+    private static final String KEY_PASSIVE_BREEDING_ENABLED = "@PassiveBreedingEnabled";
+    private static final String KEY_BREEDING_REQUIRES_HAPPINESS = "@BreedingRequiresHappiness";
+    private static final String KEY_TRAITS_ENABLED = "@TraitsEnabled";
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
     private static final String KEY_TELEMETRY_ENABLED = "@TelemetryEnabled";
     private static final String KEY_TELEMETRY_BREADCRUMBS_ENABLED = "@TelemetryBreadcrumbsEnabled";
@@ -73,7 +81,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private final Tamework plugin;
     private final World world;
 
-    private SettingsValues currentValues;
+    private TameworkSettingsValues currentValues;
     private String statusLine = "";
     private String warningLine = "";
     private boolean applyInProgress;
@@ -84,7 +92,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         super(playerRef, CustomPageLifetime.CanDismiss, EventPayload.CODEC);
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.world = Objects.requireNonNull(world, "world");
-        this.currentValues = SettingsValues.fromRuntime();
+        this.currentValues = TameworkSettingsValues.fromRuntime();
     }
 
     @Override
@@ -105,15 +113,21 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         switch (action) {
             case ACTION_CLOSE -> close();
             case ACTION_REFRESH -> {
-                currentValues = SettingsValues.fromRuntime();
+                currentValues = TameworkSettingsValues.fromRuntime();
                 statusLine = "Settings refreshed.";
                 warningLine = "";
                 refreshUi();
             }
+            case ACTION_LOAD_PRESET -> onLoadPreset(data);
             case ACTION_APPLY -> onApply(data);
             default -> {
             }
         }
+    }
+
+    @Override
+    public void onDismiss(@Nonnull Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
+        playerRef.sendMessage(Message.raw("You can change these settings again any time with /tw settings."));
     }
 
     private void bindStaticEvents(@Nonnull UIEventBuilder eventBuilder) {
@@ -131,75 +145,99 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         );
         eventBuilder.addEventBinding(
                 CustomUIEventBindingType.Activating,
-                "#TwSettingsApplyButton",
-                EventData.of(ACTION, ACTION_APPLY)
-                        .append(KEY_POP_LIMIT, "#TwSettingsPopulationLimitInput.Value")
-                        .append(KEY_POP_SCOPE, "#TwSettingsPopulationScopeDropdown.Value")
-                        .append(KEY_SIMPLE_CLAIMS_ENABLED, "#TwSettingsSimpleClaimsEnabledCheck.Value")
-                        .append(KEY_CLAIM_LIMIT_CHUNK, "#TwSettingsClaimLimitChunkInput.Value")
-                        .append(KEY_CLAIM_LIMIT_TOTAL, "#TwSettingsClaimLimitTotalInput.Value")
-                        .append(KEY_BREEDING_REQUIRES_CLAIM, "#TwSettingsBreedingRequiresClaimCheck.Value")
-                        .append(KEY_SIMPLE_CLAIMS_PROTECT, "#TwSettingsSimpleClaimsProtectCheck.Value")
-                        .append(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, "#TwSettingsBlockOwnerDamageCheck.Value")
-                        .append(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, "#TwSettingsBlockAllDamageIfOwnedCheck.Value")
-                        .append(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, "#TwSettingsInvulnerableIfOwnedCheck.Value")
-                        .append(KEY_CAPTURE_CLEARS_OWNER, "#TwSettingsCaptureClearsOwnerCheck.Value")
-                        .append(KEY_SPAWN_SETS_OWNER, "#TwSettingsSpawnSetsOwnerCheck.Value")
-                        .append(KEY_CAPTURE_REQUIRES_OWNER, "#TwSettingsCaptureRequiresOwnerCheck.Value")
-                        .append(KEY_SPAWN_REQUIRES_OWNER, "#TwSettingsSpawnRequiresOwnerCheck.Value")
-                        .append(KEY_INTERACTION_REQUIRES_OWNER, "#TwSettingsInteractionRequiresOwnerCheck.Value")
-                        .append(KEY_LINKING_REQUIRES_OWNER, "#TwSettingsLinkingRequiresOwnerCheck.Value")
-                        .append(KEY_NEEDS_DAMAGE_ENABLED, "#TwSettingsNeedsDamageEnabledCheck.Value")
-                        .append(KEY_NEEDS_TICK_POLICY_MODE, "#TwSettingsNeedsTickPolicyModeDropdown.Value")
-                        .append(KEY_NEEDS_OWNER_OFFLINE_GRACE_HOURS, "#TwSettingsNeedsOwnerOfflineGraceHoursInput.Value")
-                        .append(KEY_NEEDS_OWNER_OFFLINE_DECAY_MULTIPLIER, "#TwSettingsNeedsOwnerOfflineDecayMultiplierInput.Value")
-                        .append(KEY_NEEDS_DAMAGE_MODEL, "#TwSettingsNeedsDamageModelDropdown.Value")
-                        .append(KEY_NEEDS_DAMAGE_DUAL_NEED_RULE, "#TwSettingsNeedsDamageDualNeedRuleDropdown.Value")
-                        .append(KEY_NEEDS_STARVATION_DAMAGE_PER_MINUTE, "#TwSettingsNeedsStarvationDamagePerMinuteInput.Value")
-                        .append(KEY_NEEDS_DEHYDRATION_DAMAGE_PER_MINUTE, "#TwSettingsNeedsDehydrationDamagePerMinuteInput.Value")
-                        .append(KEY_NEEDS_DAMAGE_LETHAL, "#TwSettingsNeedsDamageLethalCheck.Value")
-                        .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
-                        .append(KEY_TELEMETRY_ENABLED, "#TwSettingsTelemetryEnabledCheck.Value")
-                        .append(KEY_TELEMETRY_BREADCRUMBS_ENABLED, "#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value"),
+                "#TwSettingsLoadPresetButton",
+                appendFormEventData(EventData.of(ACTION, ACTION_LOAD_PRESET)),
                 false
         );
+        eventBuilder.addEventBinding(
+                CustomUIEventBindingType.Activating,
+                "#TwSettingsApplyButton",
+                appendFormEventData(EventData.of(ACTION, ACTION_APPLY)),
+                false
+        );
+    }
+
+    @Nonnull
+    private EventData appendFormEventData(@Nonnull EventData eventData) {
+        return eventData
+                .append(KEY_PRESET, "#TwSettingsPresetDropdown.Value")
+                .append(KEY_POP_LIMIT, "#TwSettingsPopulationLimitInput.Value")
+                .append(KEY_POP_SCOPE, "#TwSettingsPopulationScopeDropdown.Value")
+                .append(KEY_SIMPLE_CLAIMS_ENABLED, "#TwSettingsSimpleClaimsEnabledCheck.Value")
+                .append(KEY_CLAIM_LIMIT_CHUNK, "#TwSettingsClaimLimitChunkInput.Value")
+                .append(KEY_CLAIM_LIMIT_TOTAL, "#TwSettingsClaimLimitTotalInput.Value")
+                .append(KEY_BREEDING_REQUIRES_CLAIM, "#TwSettingsBreedingRequiresClaimCheck.Value")
+                .append(KEY_SIMPLE_CLAIMS_PROTECT, "#TwSettingsSimpleClaimsProtectCheck.Value")
+                .append(KEY_OWNERSHIP_BLOCK_OWNER_DAMAGE, "#TwSettingsBlockOwnerDamageCheck.Value")
+                .append(KEY_OWNERSHIP_BLOCK_ALL_DAMAGE_IF_OWNED, "#TwSettingsBlockAllDamageIfOwnedCheck.Value")
+                .append(KEY_OWNERSHIP_INVULNERABLE_IF_OWNED, "#TwSettingsInvulnerableIfOwnedCheck.Value")
+                .append(KEY_CAPTURE_CLEARS_OWNER, "#TwSettingsCaptureClearsOwnerCheck.Value")
+                .append(KEY_SPAWN_SETS_OWNER, "#TwSettingsSpawnSetsOwnerCheck.Value")
+                .append(KEY_CAPTURE_REQUIRES_OWNER, "#TwSettingsCaptureRequiresOwnerCheck.Value")
+                .append(KEY_SPAWN_REQUIRES_OWNER, "#TwSettingsSpawnRequiresOwnerCheck.Value")
+                .append(KEY_INTERACTION_REQUIRES_OWNER, "#TwSettingsInteractionRequiresOwnerCheck.Value")
+                .append(KEY_LINKING_REQUIRES_OWNER, "#TwSettingsLinkingRequiresOwnerCheck.Value")
+                .append(KEY_NEEDS_ENABLED, "#TwSettingsNeedsEnabledCheck.Value")
+                .append(KEY_NEEDS_DAMAGE_ENABLED, "#TwSettingsNeedsDamageEnabledCheck.Value")
+                .append(KEY_NEEDS_TICK_POLICY_MODE, "#TwSettingsNeedsTickPolicyModeDropdown.Value")
+                .append(KEY_NEEDS_OWNER_OFFLINE_GRACE_HOURS, "#TwSettingsNeedsOwnerOfflineGraceHoursInput.Value")
+                .append(KEY_NEEDS_OWNER_OFFLINE_DECAY_MULTIPLIER, "#TwSettingsNeedsOwnerOfflineDecayMultiplierInput.Value")
+                .append(KEY_NEEDS_DAMAGE_MODEL, "#TwSettingsNeedsDamageModelDropdown.Value")
+                .append(KEY_NEEDS_DAMAGE_DUAL_NEED_RULE, "#TwSettingsNeedsDamageDualNeedRuleDropdown.Value")
+                .append(KEY_NEEDS_STARVATION_DAMAGE_PER_MINUTE, "#TwSettingsNeedsStarvationDamagePerMinuteInput.Value")
+                .append(KEY_NEEDS_DEHYDRATION_DAMAGE_PER_MINUTE, "#TwSettingsNeedsDehydrationDamagePerMinuteInput.Value")
+                .append(KEY_NEEDS_DAMAGE_LETHAL, "#TwSettingsNeedsDamageLethalCheck.Value")
+                .append(KEY_HAPPINESS_ENABLED, "#TwSettingsHappinessEnabledCheck.Value")
+                .append(KEY_PASSIVE_BREEDING_ENABLED, "#TwSettingsPassiveBreedingEnabledCheck.Value")
+                .append(KEY_BREEDING_REQUIRES_HAPPINESS, "#TwSettingsBreedingRequiresHappinessCheck.Value")
+                .append(KEY_TRAITS_ENABLED, "#TwSettingsTraitsEnabledCheck.Value")
+                .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
+                .append(KEY_TELEMETRY_ENABLED, "#TwSettingsTelemetryEnabledCheck.Value")
+                .append(KEY_TELEMETRY_BREADCRUMBS_ENABLED, "#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value");
     }
 
     private void render(@Nonnull UICommandBuilder commandBuilder) {
         commandBuilder.set("#TwSettingsStatusLine.Text", warningLine.isBlank() ? statusLine : warningLine);
         commandBuilder.set("#TwSettingsApplyButton.Text", applyInProgress ? "Applying..." : "Apply");
-        commandBuilder.set("#TwSettingsPopulationLimitInput.Value", String.valueOf(currentValues.populationLimitPerPlayerOwnedTotal));
+        commandBuilder.set("#TwSettingsPresetDropdown.Entries", TameworkSettingsPreset.dropdownEntries());
+        commandBuilder.set("#TwSettingsPresetDropdown.Value", TameworkSettingsPreset.match(currentValues).value());
+        commandBuilder.set("#TwSettingsPopulationLimitInput.Value", String.valueOf(currentValues.populationLimitPerPlayerOwnedTotal()));
         commandBuilder.set("#TwSettingsPopulationScopeDropdown.Entries", populationScopeEntries());
-        commandBuilder.set("#TwSettingsPopulationScopeDropdown.Value", currentValues.populationPerPlayerLimitScope.configValue());
-        commandBuilder.set("#TwSettingsSimpleClaimsEnabledCheck.Value", currentValues.simpleClaimsEnabled);
-        commandBuilder.set("#TwSettingsClaimLimitChunkInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimChunk));
-        commandBuilder.set("#TwSettingsClaimLimitTotalInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimTotal));
-        commandBuilder.set("#TwSettingsBreedingRequiresClaimCheck.Value", currentValues.simpleClaimsBreedingRequiresClaim);
-        commandBuilder.set("#TwSettingsSimpleClaimsProtectCheck.Value", currentValues.simpleClaimsProtectTamedFromNonMembers);
-        commandBuilder.set("#TwSettingsBlockOwnerDamageCheck.Value", currentValues.blockOwnerDamage);
-        commandBuilder.set("#TwSettingsBlockAllDamageIfOwnedCheck.Value", currentValues.blockAllPlayerDamageIfOwned);
-        commandBuilder.set("#TwSettingsInvulnerableIfOwnedCheck.Value", currentValues.invulnerableIfOwned);
-        commandBuilder.set("#TwSettingsCaptureClearsOwnerCheck.Value", currentValues.captureClearsOwner);
-        commandBuilder.set("#TwSettingsSpawnSetsOwnerCheck.Value", currentValues.spawnSetsOwner);
-        commandBuilder.set("#TwSettingsCaptureRequiresOwnerCheck.Value", currentValues.captureRequiresOwner);
-        commandBuilder.set("#TwSettingsSpawnRequiresOwnerCheck.Value", currentValues.spawnRequiresOwner);
-        commandBuilder.set("#TwSettingsInteractionRequiresOwnerCheck.Value", currentValues.interactionRequiresOwner);
-        commandBuilder.set("#TwSettingsLinkingRequiresOwnerCheck.Value", currentValues.linkingRequiresOwner);
-        commandBuilder.set("#TwSettingsNeedsDamageEnabledCheck.Value", currentValues.needsDamageEnabled);
+        commandBuilder.set("#TwSettingsPopulationScopeDropdown.Value", currentValues.populationPerPlayerLimitScope().configValue());
+        commandBuilder.set("#TwSettingsSimpleClaimsEnabledCheck.Value", currentValues.simpleClaimsEnabled());
+        commandBuilder.set("#TwSettingsClaimLimitChunkInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimChunk()));
+        commandBuilder.set("#TwSettingsClaimLimitTotalInput.Value", String.valueOf(currentValues.simpleClaimsLimitPerClaimTotal()));
+        commandBuilder.set("#TwSettingsBreedingRequiresClaimCheck.Value", currentValues.simpleClaimsBreedingRequiresClaim());
+        commandBuilder.set("#TwSettingsSimpleClaimsProtectCheck.Value", currentValues.simpleClaimsProtectTamedFromNonMembers());
+        commandBuilder.set("#TwSettingsBlockOwnerDamageCheck.Value", currentValues.blockOwnerDamage());
+        commandBuilder.set("#TwSettingsBlockAllDamageIfOwnedCheck.Value", currentValues.blockAllPlayerDamageIfOwned());
+        commandBuilder.set("#TwSettingsInvulnerableIfOwnedCheck.Value", currentValues.invulnerableIfOwned());
+        commandBuilder.set("#TwSettingsCaptureClearsOwnerCheck.Value", currentValues.captureClearsOwner());
+        commandBuilder.set("#TwSettingsSpawnSetsOwnerCheck.Value", currentValues.spawnSetsOwner());
+        commandBuilder.set("#TwSettingsCaptureRequiresOwnerCheck.Value", currentValues.captureRequiresOwner());
+        commandBuilder.set("#TwSettingsSpawnRequiresOwnerCheck.Value", currentValues.spawnRequiresOwner());
+        commandBuilder.set("#TwSettingsInteractionRequiresOwnerCheck.Value", currentValues.interactionRequiresOwner());
+        commandBuilder.set("#TwSettingsLinkingRequiresOwnerCheck.Value", currentValues.linkingRequiresOwner());
+        commandBuilder.set("#TwSettingsNeedsEnabledCheck.Value", currentValues.needsEnabled());
+        commandBuilder.set("#TwSettingsNeedsDamageEnabledCheck.Value", currentValues.needsDamageEnabled());
         commandBuilder.set("#TwSettingsNeedsTickPolicyModeDropdown.Entries", needsTickPolicyModeEntries());
-        commandBuilder.set("#TwSettingsNeedsTickPolicyModeDropdown.Value", currentValues.needsTickPolicyMode.toConfigValue());
-        commandBuilder.set("#TwSettingsNeedsOwnerOfflineGraceHoursInput.Value", String.valueOf(currentValues.needsOwnerOfflineGraceHours));
-        commandBuilder.set("#TwSettingsNeedsOwnerOfflineDecayMultiplierInput.Value", String.valueOf(currentValues.needsOwnerOfflineDecayMultiplier));
+        commandBuilder.set("#TwSettingsNeedsTickPolicyModeDropdown.Value", currentValues.needsTickPolicyMode().toConfigValue());
+        commandBuilder.set("#TwSettingsNeedsOwnerOfflineGraceHoursInput.Value", String.valueOf(currentValues.needsOwnerOfflineGraceHours()));
+        commandBuilder.set("#TwSettingsNeedsOwnerOfflineDecayMultiplierInput.Value", String.valueOf(currentValues.needsOwnerOfflineDecayMultiplier()));
         commandBuilder.set("#TwSettingsNeedsDamageModelDropdown.Entries", needsDamageModelEntries());
-        commandBuilder.set("#TwSettingsNeedsDamageModelDropdown.Value", currentValues.needsDamageModel.toConfigValue());
+        commandBuilder.set("#TwSettingsNeedsDamageModelDropdown.Value", currentValues.needsDamageModel().toConfigValue());
         commandBuilder.set("#TwSettingsNeedsDamageDualNeedRuleDropdown.Entries", needsDamageDualNeedRuleEntries());
-        commandBuilder.set("#TwSettingsNeedsDamageDualNeedRuleDropdown.Value", currentValues.needsDamageDualNeedRule.toConfigValue());
-        commandBuilder.set("#TwSettingsNeedsStarvationDamagePerMinuteInput.Value", String.valueOf(currentValues.needsStarvationDamagePerMinute));
-        commandBuilder.set("#TwSettingsNeedsDehydrationDamagePerMinuteInput.Value", String.valueOf(currentValues.needsDehydrationDamagePerMinute));
-        commandBuilder.set("#TwSettingsNeedsDamageLethalCheck.Value", currentValues.needsDamageLethal);
-        commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled);
-        commandBuilder.set("#TwSettingsTelemetryEnabledCheck.Value", currentValues.telemetryEnabled);
-        commandBuilder.set("#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value", currentValues.telemetryBreadcrumbsEnabled);
+        commandBuilder.set("#TwSettingsNeedsDamageDualNeedRuleDropdown.Value", currentValues.needsDamageDualNeedRule().toConfigValue());
+        commandBuilder.set("#TwSettingsNeedsStarvationDamagePerMinuteInput.Value", String.valueOf(currentValues.needsStarvationDamagePerMinute()));
+        commandBuilder.set("#TwSettingsNeedsDehydrationDamagePerMinuteInput.Value", String.valueOf(currentValues.needsDehydrationDamagePerMinute()));
+        commandBuilder.set("#TwSettingsNeedsDamageLethalCheck.Value", currentValues.needsDamageLethal());
+        commandBuilder.set("#TwSettingsHappinessEnabledCheck.Value", currentValues.happinessEnabled());
+        commandBuilder.set("#TwSettingsPassiveBreedingEnabledCheck.Value", currentValues.passiveBreedingEnabled());
+        commandBuilder.set("#TwSettingsBreedingRequiresHappinessCheck.Value", currentValues.breedingRequiresHappiness());
+        commandBuilder.set("#TwSettingsTraitsEnabledCheck.Value", currentValues.traitsEnabled());
+        commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
+        commandBuilder.set("#TwSettingsTelemetryEnabledCheck.Value", currentValues.telemetryEnabled());
+        commandBuilder.set("#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value", currentValues.telemetryBreadcrumbsEnabled());
     }
 
     private void onApply(@Nonnull EventPayload payload) {
@@ -218,7 +256,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             return;
         }
 
-        SettingsValues requested = parseResult.values();
+        TameworkSettingsValues requested = parseResult.values();
         applyInProgress = true;
         statusLine = "Applying settings...";
         warningLine = "";
@@ -235,7 +273,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                         refreshUi();
                         return;
                     }
-                    currentValues = SettingsValues.fromRuntime();
+                    currentValues = TameworkSettingsValues.fromRuntime();
                     if (outcome == null) {
                         statusLine = "";
                         warningLine = "Failed to apply settings.";
@@ -253,15 +291,35 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 }));
     }
 
+    private void onLoadPreset(@Nonnull EventPayload payload) {
+        TameworkSettingsPreset preset = TameworkSettingsPreset.fromConfigValue(payload.preset);
+        if (!preset.isLoadable()) {
+            statusLine = "Select a preset to load.";
+            warningLine = "";
+            refreshUi();
+            return;
+        }
+        ParseResult parseResult = parseValues(payload);
+        TameworkSettingsValues baseValues = parseResult.success() && parseResult.values() != null
+                ? parseResult.values()
+                : currentValues;
+        currentValues = preset.applyTo(baseValues);
+        statusLine = parseResult.success()
+                ? "Loaded " + preset.displayName() + " preset. Review and click Apply to save."
+                : "Loaded " + preset.displayName() + " preset. Invalid unsaved numeric inputs were discarded.";
+        warningLine = "";
+        refreshUi();
+    }
+
     @Nonnull
-    private ApplyOutcome applySettings(@Nonnull SettingsValues values) {
+    private ApplyOutcome applySettings(@Nonnull TameworkSettingsValues values) {
         Path globalSettingsPath = resolveSettingsDirectory().resolve(TameworkSettingsStore.GLOBAL_SETTINGS_FILE_NAME);
         TameworkSettingsStore.GlobalSettingsSnapshot snapshot = values.toGlobalSettingsSnapshot();
         if (!TameworkSettingsStore.saveGlobalSettings(globalSettingsPath, snapshot, plugin.getLogger())) {
             return ApplyOutcome.failure("Failed to save universe settings.");
         }
 
-        String telemetryWarning = saveTelemetrySettings(values.telemetryEnabled, values.telemetryBreadcrumbsEnabled);
+        String telemetryWarning = saveTelemetrySettings(values.telemetryEnabled(), values.telemetryBreadcrumbsEnabled());
         if (!telemetryWarning.isBlank()) {
             return ApplyOutcome.partial("Applied universe settings.", telemetryWarning);
         }
@@ -337,39 +395,40 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         TwGlobalConfig.PerPlayerLimitScope scope = TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(payload.populationScope);
         String tickPolicyModeValue = trim(payload.needsTickPolicyMode);
         if (tickPolicyModeValue.isBlank()) {
-            tickPolicyModeValue = currentValues.needsTickPolicyMode.toConfigValue();
+            tickPolicyModeValue = currentValues.needsTickPolicyMode().toConfigValue();
         }
         TwNeedsConfig.TickPolicyMode tickPolicyMode = TwNeedsConfig.TickPolicyMode.fromConfigValue(tickPolicyModeValue);
         String damageModelValue = trim(payload.needsDamageModel);
         if (damageModelValue.isBlank()) {
-            damageModelValue = currentValues.needsDamageModel.toConfigValue();
+            damageModelValue = currentValues.needsDamageModel().toConfigValue();
         }
         TwNeedsConfig.DamageModel damageModel = TwNeedsConfig.DamageModel.fromConfigValue(damageModelValue);
         String damageDualNeedRuleValue = trim(payload.needsDamageDualNeedRule);
         if (damageDualNeedRuleValue.isBlank()) {
-            damageDualNeedRuleValue = currentValues.needsDamageDualNeedRule.toConfigValue();
+            damageDualNeedRuleValue = currentValues.needsDamageDualNeedRule().toConfigValue();
         }
         TwNeedsConfig.DualNeedRule damageDualNeedRule =
                 TwNeedsConfig.DualNeedRule.fromConfigValue(damageDualNeedRuleValue);
 
-        SettingsValues values = new SettingsValues(
+        TameworkSettingsValues values = new TameworkSettingsValues(
                 populationLimit,
                 scope,
-                boolOrDefault(payload.simpleClaimsEnabled, currentValues.simpleClaimsEnabled),
+                boolOrDefault(payload.simpleClaimsEnabled, currentValues.simpleClaimsEnabled()),
                 claimLimitChunk,
                 claimLimitTotal,
-                boolOrDefault(payload.breedingRequiresClaim, currentValues.simpleClaimsBreedingRequiresClaim),
-                boolOrDefault(payload.simpleClaimsProtect, currentValues.simpleClaimsProtectTamedFromNonMembers),
-                boolOrDefault(payload.blockOwnerDamage, currentValues.blockOwnerDamage),
-                boolOrDefault(payload.blockAllDamageIfOwned, currentValues.blockAllPlayerDamageIfOwned),
-                boolOrDefault(payload.invulnerableIfOwned, currentValues.invulnerableIfOwned),
-                boolOrDefault(payload.captureClearsOwner, currentValues.captureClearsOwner),
-                boolOrDefault(payload.spawnSetsOwner, currentValues.spawnSetsOwner),
-                boolOrDefault(payload.captureRequiresOwner, currentValues.captureRequiresOwner),
-                boolOrDefault(payload.spawnRequiresOwner, currentValues.spawnRequiresOwner),
-                boolOrDefault(payload.interactionRequiresOwner, currentValues.interactionRequiresOwner),
-                boolOrDefault(payload.linkingRequiresOwner, currentValues.linkingRequiresOwner),
-                boolOrDefault(payload.needsDamageEnabled, currentValues.needsDamageEnabled),
+                boolOrDefault(payload.breedingRequiresClaim, currentValues.simpleClaimsBreedingRequiresClaim()),
+                boolOrDefault(payload.simpleClaimsProtect, currentValues.simpleClaimsProtectTamedFromNonMembers()),
+                boolOrDefault(payload.blockOwnerDamage, currentValues.blockOwnerDamage()),
+                boolOrDefault(payload.blockAllDamageIfOwned, currentValues.blockAllPlayerDamageIfOwned()),
+                boolOrDefault(payload.invulnerableIfOwned, currentValues.invulnerableIfOwned()),
+                boolOrDefault(payload.captureClearsOwner, currentValues.captureClearsOwner()),
+                boolOrDefault(payload.spawnSetsOwner, currentValues.spawnSetsOwner()),
+                boolOrDefault(payload.captureRequiresOwner, currentValues.captureRequiresOwner()),
+                boolOrDefault(payload.spawnRequiresOwner, currentValues.spawnRequiresOwner()),
+                boolOrDefault(payload.interactionRequiresOwner, currentValues.interactionRequiresOwner()),
+                boolOrDefault(payload.linkingRequiresOwner, currentValues.linkingRequiresOwner()),
+                boolOrDefault(payload.needsEnabled, currentValues.needsEnabled()),
+                boolOrDefault(payload.needsDamageEnabled, currentValues.needsDamageEnabled()),
                 tickPolicyMode,
                 needsOwnerOfflineGraceHours,
                 needsOwnerOfflineDecayMultiplier,
@@ -377,10 +436,14 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 damageDualNeedRule,
                 needsStarvationDamagePerMinute,
                 needsDehydrationDamagePerMinute,
-                boolOrDefault(payload.needsDamageLethal, currentValues.needsDamageLethal),
-                boolOrDefault(payload.reviveSystemEnabled, currentValues.reviveSystemEnabled),
-                boolOrDefault(payload.telemetryEnabled, currentValues.telemetryEnabled),
-                boolOrDefault(payload.telemetryBreadcrumbsEnabled, currentValues.telemetryBreadcrumbsEnabled)
+                boolOrDefault(payload.needsDamageLethal, currentValues.needsDamageLethal()),
+                boolOrDefault(payload.happinessEnabled, currentValues.happinessEnabled()),
+                boolOrDefault(payload.passiveBreedingEnabled, currentValues.passiveBreedingEnabled()),
+                boolOrDefault(payload.breedingRequiresHappiness, currentValues.breedingRequiresHappiness()),
+                boolOrDefault(payload.traitsEnabled, currentValues.traitsEnabled()),
+                boolOrDefault(payload.reviveSystemEnabled, currentValues.reviveSystemEnabled()),
+                boolOrDefault(payload.telemetryEnabled, currentValues.telemetryEnabled()),
+                boolOrDefault(payload.telemetryBreadcrumbsEnabled, currentValues.telemetryBreadcrumbsEnabled())
         );
         return ParseResult.success(values);
     }
@@ -482,8 +545,8 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         return value == null ? "" : value.trim();
     }
 
-    private record ParseResult(boolean success, @Nonnull String message, @Nullable SettingsValues values) {
-        static ParseResult success(@Nonnull SettingsValues values) {
+    private record ParseResult(boolean success, @Nonnull String message, @Nullable TameworkSettingsValues values) {
+        static ParseResult success(@Nonnull TameworkSettingsValues values) {
             return new ParseResult(true, "", values);
         }
 
@@ -506,154 +569,11 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         }
     }
 
-    private record SettingsValues(int populationLimitPerPlayerOwnedTotal,
-                                  @Nonnull TwGlobalConfig.PerPlayerLimitScope populationPerPlayerLimitScope,
-                                  boolean simpleClaimsEnabled,
-                                  int simpleClaimsLimitPerClaimChunk,
-                                  int simpleClaimsLimitPerClaimTotal,
-                                  boolean simpleClaimsBreedingRequiresClaim,
-                                  boolean simpleClaimsProtectTamedFromNonMembers,
-                                  boolean blockOwnerDamage,
-                                  boolean blockAllPlayerDamageIfOwned,
-                                  boolean invulnerableIfOwned,
-                                  boolean captureClearsOwner,
-                                  boolean spawnSetsOwner,
-                                  boolean captureRequiresOwner,
-                                  boolean spawnRequiresOwner,
-                                  boolean interactionRequiresOwner,
-                                  boolean linkingRequiresOwner,
-                                  boolean needsDamageEnabled,
-                                  @Nonnull TwNeedsConfig.TickPolicyMode needsTickPolicyMode,
-                                  double needsOwnerOfflineGraceHours,
-                                  double needsOwnerOfflineDecayMultiplier,
-                                  @Nonnull TwNeedsConfig.DamageModel needsDamageModel,
-                                  @Nonnull TwNeedsConfig.DualNeedRule needsDamageDualNeedRule,
-                                  double needsStarvationDamagePerMinute,
-                                  double needsDehydrationDamagePerMinute,
-                                  boolean needsDamageLethal,
-                                  boolean reviveSystemEnabled,
-                                  boolean telemetryEnabled,
-                                  boolean telemetryBreadcrumbsEnabled) {
-        @Nonnull
-        TameworkSettingsStore.GlobalSettingsSnapshot toGlobalSettingsSnapshot() {
-            return new TameworkSettingsStore.GlobalSettingsSnapshot(
-                    populationLimitPerPlayerOwnedTotal,
-                    populationPerPlayerLimitScope.configValue(),
-                    simpleClaimsEnabled,
-                    simpleClaimsLimitPerClaimChunk,
-                    simpleClaimsLimitPerClaimTotal,
-                    simpleClaimsBreedingRequiresClaim,
-                    simpleClaimsProtectTamedFromNonMembers,
-                    blockOwnerDamage,
-                    blockAllPlayerDamageIfOwned,
-                    invulnerableIfOwned,
-                    captureClearsOwner,
-                    spawnSetsOwner,
-                    captureRequiresOwner,
-                    spawnRequiresOwner,
-                    interactionRequiresOwner,
-                    linkingRequiresOwner,
-                    needsTickPolicyMode.toConfigValue(),
-                    needsOwnerOfflineGraceHours,
-                    needsOwnerOfflineDecayMultiplier,
-                    needsDamageEnabled,
-                    needsDamageModel.toConfigValue(),
-                    needsDamageDualNeedRule.toConfigValue(),
-                    needsStarvationDamagePerMinute,
-                    needsDehydrationDamagePerMinute,
-                    needsDamageLethal,
-                    reviveSystemEnabled
-            );
-        }
-
-        static SettingsValues fromRuntime() {
-            TwGlobalConfig global = TwGlobalConfig.resolveActive();
-            if (global == null) {
-                global = TwGlobalConfig.defaultConfig();
-            }
-            TwNeedsConfig needsConfig = resolvePreferredNeedsConfig();
-            TwNeedsConfig.TickPolicySettings tickPolicy = needsConfig != null
-                    ? needsConfig.getTickPolicy()
-                    : new TwNeedsConfig.TickPolicySettings();
-            TwNeedsConfig.DamageSettings needsDamage = needsConfig != null
-                    ? needsConfig.getDamage()
-                    : new TwNeedsConfig.DamageSettings();
-            Tamework plugin = Tamework.getInstance();
-            Path telemetryPath = plugin != null
-                    ? TameworkSettingsStore.resolveSettingsDirectory(plugin).resolve(CrashTelemetrySettings.FILE_NAME)
-                    : Path.of(CrashTelemetrySettings.FILE_NAME);
-            CrashTelemetrySettings telemetrySettings = CrashTelemetrySettings.load(
-                    telemetryPath,
-                    plugin != null ? plugin.getLogger() : null
-            );
-            TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
-            return new SettingsValues(
-                    global.getPopulationLimitPerPlayerOwnedTotal(),
-                    global.getPopulationPerPlayerLimitScope(),
-                    global.isSimpleClaimsEnabled(),
-                    global.getSimpleClaimsBreedingLimitPerClaimChunk(),
-                    global.getSimpleClaimsBreedingLimitPerClaimTotal(),
-                    global.isSimpleClaimsBreedingRequiresClaim(),
-                    global.isSimpleClaimsDamageProtectTamedFromNonMembers(),
-                    global.isBlockOwnerDamage(),
-                    global.isBlockAllPlayerDamageIfOwned(),
-                    global.isInvulnerableIfOwned(),
-                    overrides != null && overrides.captureClearsOwner() != null
-                            ? overrides.captureClearsOwner()
-                            : true,
-                    overrides != null && overrides.spawnSetsOwner() != null
-                            ? overrides.spawnSetsOwner()
-                            : true,
-                    global.isOwnershipCaptureRequiresOwner(),
-                    global.isOwnershipSpawnRequiresOwner(),
-                    global.isOwnershipInteractionRequiresOwner(),
-                    global.isOwnershipLinkingRequiresOwner(),
-                    needsDamage.isEnabled(),
-                    tickPolicy.getMode(),
-                    tickPolicy.getOwnerOfflineGraceHours(),
-                    tickPolicy.getOwnerOfflineDecayMultiplier(),
-                    needsDamage.getModel(),
-                    needsDamage.getDualNeedRule(),
-                    needsDamage.getStarvationDamagePerMinute(),
-                    needsDamage.getDehydrationDamagePerMinute(),
-                    needsDamage.isLethal(),
-                    global.isCommandDeadRespawnEnabled(),
-                    telemetrySettings.enabled(),
-                    telemetrySettings.breadcrumbsEnabled()
-            );
-        }
-
-        @Nullable
-        private static TwNeedsConfig resolvePreferredNeedsConfig() {
-            var assetMap = TwNeedsConfig.getAssetMap();
-            if (assetMap == null || assetMap.getAssetMap() == null) {
-                return null;
-            }
-            TwNeedsConfig bestRoleless = null;
-            TwNeedsConfig bestAny = null;
-            for (TwNeedsConfig candidate : assetMap.getAssetMap().values()) {
-                if (candidate == null || !candidate.isEnabled()) {
-                    continue;
-                }
-                if (bestAny == null || candidate.getPriority() > bestAny.getPriority()) {
-                    bestAny = candidate;
-                }
-                String[] roleIds = candidate.getRoleIds();
-                if (roleIds != null && roleIds.length > 0) {
-                    continue;
-                }
-                if (bestRoleless == null || candidate.getPriority() > bestRoleless.getPriority()) {
-                    bestRoleless = candidate;
-                }
-            }
-            return bestRoleless != null ? bestRoleless : bestAny;
-        }
-    }
-
     /** Event payload for settings page actions. */
     public static final class EventPayload {
         public static final BuilderCodec<EventPayload> CODEC = BuilderCodec.builder(EventPayload.class, EventPayload::new)
                 .<String>append(new KeyedCodec<>(ACTION, Codec.STRING), (x, v) -> x.action = v, x -> x.action).add()
+                .<String>append(new KeyedCodec<>(KEY_PRESET, Codec.STRING), (x, v) -> x.preset = v, x -> x.preset).add()
                 .<String>append(new KeyedCodec<>(KEY_POP_LIMIT, Codec.STRING), (x, v) -> x.populationLimit = v, x -> x.populationLimit).add()
                 .<String>append(new KeyedCodec<>(KEY_POP_SCOPE, Codec.STRING), (x, v) -> x.populationScope = v, x -> x.populationScope).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_SIMPLE_CLAIMS_ENABLED, Codec.BOOLEAN), (x, v) -> x.simpleClaimsEnabled = v, x -> x.simpleClaimsEnabled).add()
@@ -670,6 +590,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_SPAWN_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.spawnRequiresOwner = v, x -> x.spawnRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_INTERACTION_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.interactionRequiresOwner = v, x -> x.interactionRequiresOwner).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_LINKING_REQUIRES_OWNER, Codec.BOOLEAN), (x, v) -> x.linkingRequiresOwner = v, x -> x.linkingRequiresOwner).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsEnabled = v, x -> x.needsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_DAMAGE_ENABLED, Codec.BOOLEAN), (x, v) -> x.needsDamageEnabled = v, x -> x.needsDamageEnabled).add()
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_TICK_POLICY_MODE, Codec.STRING), (x, v) -> x.needsTickPolicyMode = v, x -> x.needsTickPolicyMode).add()
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_OWNER_OFFLINE_GRACE_HOURS, Codec.STRING), (x, v) -> x.needsOwnerOfflineGraceHours = v, x -> x.needsOwnerOfflineGraceHours).add()
@@ -679,6 +600,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_STARVATION_DAMAGE_PER_MINUTE, Codec.STRING), (x, v) -> x.needsStarvationDamagePerMinute = v, x -> x.needsStarvationDamagePerMinute).add()
                 .<String>append(new KeyedCodec<>(KEY_NEEDS_DEHYDRATION_DAMAGE_PER_MINUTE, Codec.STRING), (x, v) -> x.needsDehydrationDamagePerMinute = v, x -> x.needsDehydrationDamagePerMinute).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_NEEDS_DAMAGE_LETHAL, Codec.BOOLEAN), (x, v) -> x.needsDamageLethal = v, x -> x.needsDamageLethal).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_HAPPINESS_ENABLED, Codec.BOOLEAN), (x, v) -> x.happinessEnabled = v, x -> x.happinessEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_PASSIVE_BREEDING_ENABLED, Codec.BOOLEAN), (x, v) -> x.passiveBreedingEnabled = v, x -> x.passiveBreedingEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_REQUIRES_HAPPINESS, Codec.BOOLEAN), (x, v) -> x.breedingRequiresHappiness = v, x -> x.breedingRequiresHappiness).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_TRAITS_ENABLED, Codec.BOOLEAN), (x, v) -> x.traitsEnabled = v, x -> x.traitsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_TELEMETRY_ENABLED, Codec.BOOLEAN), (x, v) -> x.telemetryEnabled = v, x -> x.telemetryEnabled).add()
                 .<Boolean>append(
@@ -690,6 +615,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .build();
 
         private String action;
+        private String preset;
         private String populationLimit;
         private String populationScope;
         private Boolean simpleClaimsEnabled;
@@ -706,6 +632,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private Boolean spawnRequiresOwner;
         private Boolean interactionRequiresOwner;
         private Boolean linkingRequiresOwner;
+        private Boolean needsEnabled;
         private Boolean needsDamageEnabled;
         private String needsTickPolicyMode;
         private String needsOwnerOfflineGraceHours;
@@ -715,6 +642,10 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private String needsStarvationDamagePerMinute;
         private String needsDehydrationDamagePerMinute;
         private Boolean needsDamageLethal;
+        private Boolean happinessEnabled;
+        private Boolean passiveBreedingEnabled;
+        private Boolean breedingRequiresHappiness;
+        private Boolean traitsEnabled;
         private Boolean reviveSystemEnabled;
         private Boolean telemetryEnabled;
         private Boolean telemetryBreadcrumbsEnabled;

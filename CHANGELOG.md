@@ -5,9 +5,42 @@
 ### Added
 - Added new role-scoped progression families for companion leveling and passive talents (`TwLevelingConfig`, `TwTalentConfig`), including XP gain from feed/harvest/breeding/combat, level-based stat growth, passive talent purchases, linked-panel summaries, and a companion talent page for spending points on loaded companions.
 
+## 2.8.3 - Settings Announcements, Presets, and Needs Diagnostics - 2026-04-13
+
+### Added
+- Added a login-time Tamework settings review popup for `/tw settings` access holders, with per-player opt-out tracking and once-per-session dedupe so operators can be re-prompted when a new settings announcement is published.
+- Added `/tw news` to reopen the current settings announcement on demand for eligible players, independent of prior opt-out state.
+- Added `/tw npcspawntamed` for spawning owned+tamed NPC batches from a requested role id, with optional command-item auto-linking and attachment overrides.
+- Added built-in settings announcement localization through `Server/Languages/en-US/server.lang`, with universe config support for either built-in localized copy or raw per-world override text.
+- Added `/tw settings` experience presets plus new global toggles for needs, happiness, passive breeding, breeding happiness requirements, and traits so server owners can switch between simplified, easier, and full-experience progression rules without editing assets by hand.
+- Added `/tw debugneedsseek` plus throttled seek-target diagnostics so failed hunger/thirst seek passes now report whether they were blocked by need thresholds, missing config/item ids, cached misses, or no resolved water/food target.
+
+### Fixed
+- Fixed companion combat target selection so owner hits no longer become retaliation targets during defend/aggressive behavior, including wake-ups from sleep with an owner locked as the target.
+- Fixed linked-panel dead companion rows so they can now retain likely death attribution hints such as starvation, dehydration, or the most recent player/NPC killer while keeping revive timing as the primary status text.
+- Fixed severe startup hitching around login by skipping redundant companion trait/progression bootstrap work for already-initialized tamed NPCs.
+- Fixed dense-NPC interaction prompt lag by caching prompt selections plus repeated settings, path, alarm, item, and requirement lookup work inside prompt evaluation instead of recomputing them every tick.
+- Fixed managed coop wild-capture scans doing unnecessary work while coops are roaming, full, or still on capture cooldown, reducing background coop overhead.
+- Fixed needs seek scans running too aggressively by gating food/water target searches behind the actual hunger/thirst seek thresholds and caching derived needs config lookups used by the `NeedBelow` sensor.
+- Fixed companion water-seeking reliability so dehydrated companions more consistently choose reachable drinking spots near water and can still drink when they are already within water consume range.
+- Fixed local singleplayer `/tw settings` and `/tw news` access so the world owner can use them without OP/permission nodes, and added a close-time chat reminder that `/tw settings` can be reopened later.
+
+## 2.8.2 - NameplateBuilder Integration + Health Persistence + Stability - 2026-04-10
+
+### Added
+- Added an optional NameplateBuilder integration that overrides the built-in `entity-name` segment with Tamework companion custom names when NameplateBuilder `4.260326.7+` is installed.
+- Added optional NameplateBuilder companion segments for happiness, hunger, thirst, tranquilizer status, and traits so players can include companion progression data in their NPC nameplate chains.
+- Added optional NameplateBuilder format variants for tranquilizer stacks/time display, shortened companion stat labels, and trait display modes with shortened or full labels plus raw values or linked-panel-style relative percentages.
+
+### Changed
+- Updated `Glowing Purple Mushroom Spores` so the seed recipe now also requires one `Glowing Purple Mushroom` in addition to the existing essence cost.
+
 ### Fixed
 - Fixed startup failure when `SpawningPlugin` is unavailable by treating spawn marker/beacon component types as optional in despawn diagnostics setup.
 - Fixed startup crash when SQLite native bindings are unavailable by treating sqlite native linkage failures as recoverable persistence degradation instead of setup-fatal errors.
+- Fixed spawner capture/respawn needs restore so companions no longer accrue starvation/dehydration catch-up damage while stored inside capture items.
+- Fixed storage-style capture/coop restore flows fully healing companions by persisting current health across stow/release.
+- Fixed linked panel captured/offline companion names falling back to raw role ids instead of translated species names.
 
 ## 2.8.1 - Post-2.8.0 Stability + Mushroom Spores - 2026-04-10
 ### Added

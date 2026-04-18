@@ -177,6 +177,28 @@
         ]
       },
       {
+        "$Comment": "Never retaliate against the owner if damage or other sensors locked them as the combat target.",
+        "Sensor": {
+          "Type": "Target",
+          "TargetSlot": "LockedTarget",
+          "Filters": [
+            {
+              "Type": "TameworkIsOwner"
+            }
+          ]
+        },
+        "Actions": [
+          {
+            "Type": "ReleaseTarget",
+            "TargetSlot": "LockedTarget"
+          },
+          {
+            "Type": "State",
+            "State": ".Default"
+          }
+        ]
+      },
+      {
         "$Comment": "If a combat target is already locked, enter combat.",
         "Continue": true,
         "Sensor": {

@@ -62,14 +62,14 @@ final class InteractionDiagnostics {
                                Player player,
                                InteractionContextSnapshot ctx) {
         String roleName = role != null ? role.getRoleName() : "<null>";
-        boolean tamed = owner.isTamed(npcRef, store);
-        boolean isOwner = owner.isOwner(npcRef, store, player);
+        boolean tamed = owner.isTamed(npcRef, store, ctx);
+        boolean isOwner = owner.isOwner(npcRef, store, player, ctx);
         boolean hasLoved = owner.isHeldItemInList(owner.resolveLovedItems(role, ctx), ctx);
         boolean isHarvestable = owner.resolveIsHarvestable(role, ctx);
-        boolean harvestReady = alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName);
+        boolean harvestReady = alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx);
         boolean harvestContext = owner.matchesHarvestContext(role, infoProvider, ctx);
         boolean isMountable = owner.resolveIsMountable(role, ctx);
-        boolean crouching = owner.isPlayerCrouching(role, infoProvider, store);
+        boolean crouching = owner.isPlayerCrouching(role, infoProvider, store, ctx);
         String configId = config != null ? config.getId() : "<null>";
         return String.format(
                 "TameworkInteract: no interactions matched (role=%s config=%s). " +

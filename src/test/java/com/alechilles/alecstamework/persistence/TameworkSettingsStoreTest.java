@@ -37,6 +37,7 @@ class TameworkSettingsStoreTest {
                 false,
                 false,
                 true,
+                false,
                 "OWNER_ONLINE_GRACE_THEN_DECAY",
                 48.0,
                 1.25,
@@ -46,6 +47,10 @@ class TameworkSettingsStoreTest {
                 4.5,
                 5.5,
                 false,
+                true,
+                false,
+                false,
+                true,
                 false
         );
 
@@ -69,6 +74,7 @@ class TameworkSettingsStoreTest {
         assertEquals(false, overrides.spawnRequiresOwner());
         assertEquals(false, overrides.interactionRequiresOwner());
         assertEquals(true, overrides.linkingRequiresOwner());
+        assertEquals(false, overrides.needsEnabled());
         assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", overrides.needsTickPolicyMode());
         assertEquals(48.0, overrides.needsOwnerOfflineGraceHours());
         assertEquals(1.25, overrides.needsOwnerOfflineDecayMultiplier());
@@ -78,6 +84,10 @@ class TameworkSettingsStoreTest {
         assertEquals(4.5, overrides.needsStarvationDamagePerMinute());
         assertEquals(5.5, overrides.needsDehydrationDamagePerMinute());
         assertEquals(false, overrides.needsDamageLethal());
+        assertEquals(true, overrides.happinessEnabled());
+        assertEquals(false, overrides.passiveBreedingEnabled());
+        assertEquals(false, overrides.breedingRequiresHappiness());
+        assertEquals(true, overrides.traitsEnabled());
         assertEquals(false, overrides.reviveSystemEnabled());
 
         String raw = Files.readString(settingsFile);
@@ -91,6 +101,10 @@ class TameworkSettingsStoreTest {
         assertTrue(raw.contains("\"interactionRequiresOwner\""));
         assertTrue(raw.contains("\"linkingRequiresOwner\""));
         assertTrue(raw.contains("\"needs\""));
+        assertTrue(raw.contains("\"enabled\""));
+        assertTrue(raw.contains("\"happiness\""));
+        assertTrue(raw.contains("\"breeding\""));
+        assertTrue(raw.contains("\"traits\""));
         assertTrue(raw.contains("\"revive\""));
     }
 
@@ -120,6 +134,7 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.spawnRequiresOwner());
         assertEquals(true, overrides.interactionRequiresOwner());
         assertEquals(true, overrides.linkingRequiresOwner());
+        assertEquals(true, overrides.needsEnabled());
         assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", overrides.needsTickPolicyMode());
         assertEquals(72.0, overrides.needsOwnerOfflineGraceHours());
         assertEquals(1.0, overrides.needsOwnerOfflineDecayMultiplier());
@@ -129,6 +144,10 @@ class TameworkSettingsStoreTest {
         assertEquals(2.0, overrides.needsStarvationDamagePerMinute());
         assertEquals(3.0, overrides.needsDehydrationDamagePerMinute());
         assertEquals(true, overrides.needsDamageLethal());
+        assertEquals(true, overrides.happinessEnabled());
+        assertEquals(true, overrides.passiveBreedingEnabled());
+        assertEquals(true, overrides.breedingRequiresHappiness());
+        assertEquals(true, overrides.traitsEnabled());
         assertEquals(true, overrides.reviveSystemEnabled());
     }
 }

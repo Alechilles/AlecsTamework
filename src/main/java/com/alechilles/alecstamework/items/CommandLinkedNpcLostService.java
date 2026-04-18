@@ -778,7 +778,9 @@ public final class CommandLinkedNpcLostService {
                 levelingTotalXp,
                 talentsConfigId,
                 talentsSpentPoints,
-                purchasedTalentIds
+                purchasedTalentIds,
+                null,
+                null
         );
     }
 

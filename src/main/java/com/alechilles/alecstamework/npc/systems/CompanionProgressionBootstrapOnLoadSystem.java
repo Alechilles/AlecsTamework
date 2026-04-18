@@ -1,7 +1,17 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.config.assets.TwTraitConfig;
+import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
+import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -44,6 +54,10 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
         if (tamed == null || !tamed.isTamed()) {
             return;
         }
+        String roleId = CompanionRoleIdResolver.resolveRoleId(reference, store);
+        if (!requiresProgressionBootstrap(reference, store, roleId)) {
+            return;
+        }
         commandBuffer.run(bufferStore -> {
             if (bufferStore == null || reference == null || !reference.isValid()) {
                 return;
@@ -55,7 +69,7 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
             if (latestTamed == null || !latestTamed.isTamed()) {
                 return;
             }
-            CompanionProgressionBootstrapService.ensureProgressionComponents(reference, bufferStore);
+            CompanionProgressionBootstrapService.ensureProgressionComponents(reference, bufferStore, roleId);
         });
     }
 
@@ -73,5 +87,86 @@ public final class CompanionProgressionBootstrapOnLoadSystem extends RefSystem<E
             return Query.any();
         }
         return Query.and(npcType, tamedType);
+    }
+
+    private boolean requiresProgressionBootstrap(@Nonnull Ref<EntityStore> reference,
+                                                 @Nonnull Store<EntityStore> store,
+                                                 String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        if (isNeedsBootstrapRequired(reference, store, roleId)) {
+            return true;
+        }
+        if (isHappinessBootstrapRequired(reference, store, roleId)) {
+            return true;
+        }
+        if (isBreedingBootstrapRequired(reference, store, roleId)) {
+            return true;
+        }
+        return isTraitBootstrapRequired(reference, store, roleId);
+    }
+
+    private boolean isNeedsBootstrapRequired(@Nonnull Ref<EntityStore> reference,
+                                             @Nonnull Store<EntityStore> store,
+                                             @Nonnull String roleId) {
+        TwNeedsConfig config = TwNeedsConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        var needsType = TameworkNeedsComponent.getComponentType();
+        if (needsType == null) {
+            return false;
+        }
+        TameworkNeedsComponent needs = store.getComponent(reference, needsType);
+        return needs == null || needs.getLastUpdateMs() <= 0L || needs.getLastPassiveSweepMs() <= 0L;
+    }
+
+    private boolean isHappinessBootstrapRequired(@Nonnull Ref<EntityStore> reference,
+                                                 @Nonnull Store<EntityStore> store,
+                                                 @Nonnull String roleId) {
+        TwHappinessConfig config = TwHappinessConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        var happinessType = TameworkHappinessComponent.getComponentType();
+        if (happinessType == null) {
+            return false;
+        }
+        TameworkHappinessComponent happiness = store.getComponent(reference, happinessType);
+        return happiness == null || happiness.getLastUpdateMs() <= 0L;
+    }
+
+    private boolean isBreedingBootstrapRequired(@Nonnull Ref<EntityStore> reference,
+                                                @Nonnull Store<EntityStore> store,
+                                                @Nonnull String roleId) {
+        TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        var breedingType = TameworkBreedingComponent.getComponentType();
+        if (breedingType == null) {
+            return false;
+        }
+        return store.getComponent(reference, breedingType) == null;
+    }
+
+    private boolean isTraitBootstrapRequired(@Nonnull Ref<EntityStore> reference,
+                                             @Nonnull Store<EntityStore> store,
+                                             @Nonnull String roleId) {
+        TwTraitConfig config = TwTraitConfig.resolveForRole(roleId);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        var traitsType = TameworkTraitsComponent.getComponentType();
+        var lifeStageType = TameworkLifeStageComponent.getComponentType();
+        if (traitsType == null || lifeStageType == null) {
+            return false;
+        }
+        TameworkTraitsComponent traits = store.getComponent(reference, traitsType);
+        if (traits == null || traits.getRollSeed() == 0L || traits.getTraitValues() == null || traits.getTraitValues().length == 0) {
+            return true;
+        }
+        return store.getComponent(reference, lifeStageType) == null;
     }
 }

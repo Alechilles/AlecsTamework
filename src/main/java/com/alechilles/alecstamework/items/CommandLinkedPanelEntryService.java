@@ -105,6 +105,7 @@ final class CommandLinkedPanelEntryService {
             boolean inCoop = false;
             boolean lost = false;
             long deadRespawnRemainingMs = 0L;
+            String deathCauseHint = null;
             boolean hasHome = record.homePosition != null;
             boolean active = record.active;
             String groupId = normalizeOptional(record.groupId);
@@ -219,7 +220,10 @@ final class CommandLinkedPanelEntryService {
                 );
                 if (deadSnapshot != null) {
                     dead = true;
-                    String deadName = deadSnapshot.displayName();
+                    String deadName = npcNameResolver.resolveSnapshotDisplayName(
+                            deadSnapshot.displayName(),
+                            deadSnapshot.roleId()
+                    );
                     if (deadName != null && !deadName.isBlank()) {
                         displayName = deadName;
                     }
@@ -239,6 +243,7 @@ final class CommandLinkedPanelEntryService {
                     } else {
                         deadRespawnRemainingMs = -1L;
                     }
+                    deathCauseHint = resolveDeathCauseHint(deadSnapshot, playerLanguage);
                 }
             }
             if (!loaded && !dead && captureService != null) {
@@ -246,7 +251,10 @@ final class CommandLinkedPanelEntryService {
                         captureService.getCapturedSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
                 if (capturedSnapshot != null) {
                     captured = true;
-                    String capturedName = capturedSnapshot.displayName();
+                    String capturedName = npcNameResolver.resolveSnapshotDisplayName(
+                            capturedSnapshot.displayName(),
+                            capturedSnapshot.roleId()
+                    );
                     if (capturedName != null && !capturedName.isBlank()) {
                         displayName = capturedName;
                     }
@@ -257,7 +265,10 @@ final class CommandLinkedPanelEntryService {
                         coopService.getCoopSnapshotForToolOrOwner(record.npcUuid, toolId, player.getUuid());
                 if (coopSnapshot != null) {
                     inCoop = true;
-                    String coopName = coopSnapshot.displayName();
+                    String coopName = npcNameResolver.resolveSnapshotDisplayName(
+                            coopSnapshot.displayName(),
+                            coopSnapshot.roleId()
+                    );
                     if (coopName != null && !coopName.isBlank()) {
                         displayName = coopName;
                     }
@@ -290,6 +301,7 @@ final class CommandLinkedPanelEntryService {
                     inCoop,
                     lost,
                     deadRespawnRemainingMs,
+                    deathCauseHint,
                     futureStatA,
                     futureStatB,
                     traitIndicators,
@@ -330,6 +342,45 @@ final class CommandLinkedPanelEntryService {
                                                                  @Nullable String language) {
         String label = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.talentPoints");
         return new LinkedNpcEntry.FutureStat(label, Math.max(0, availablePoints), Math.max(1, totalEarnedPoints));
+    }
+
+    @Nullable
+    private String resolveDeathCauseHint(@Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+                                         @Nullable String language) {
+        if (snapshot == null || snapshot.deathCauseKind() == null) {
+            return null;
+        }
+        return switch (snapshot.deathCauseKind()) {
+            case STARVATION -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.starvation");
+            case DEHYDRATION -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.dehydration");
+            case STARVATION_AND_DEHYDRATION ->
+                    LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.starvationAndDehydration");
+            case PLAYER -> LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.deathCause.killedByPlayer",
+                    fallbackDeathSourceName(snapshot.deathSourceName(), language, true)
+            );
+            case NPC -> LocalizedText.format(
+                    language,
+                    "tamework.ui.linkedPanel.deathCause.killedByNpc",
+                    fallbackDeathSourceName(snapshot.deathSourceName(), language, false)
+            );
+            case ENVIRONMENT -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.environment");
+            case UNKNOWN -> LocalizedText.resolve(language, "tamework.ui.linkedPanel.deathCause.unknown");
+        };
+    }
+
+    @Nonnull
+    private String fallbackDeathSourceName(@Nullable String sourceName, @Nullable String language, boolean player) {
+        if (sourceName != null && !sourceName.isBlank()) {
+            return sourceName;
+        }
+        return LocalizedText.resolve(
+                language,
+                player
+                        ? "tamework.ui.linkedPanel.deathCause.killer.playerFallback"
+                        : "tamework.ui.linkedPanel.deathCause.killer.npcFallback"
+        );
     }
 
     LinkedNpcTraitIndicator[] readLoadedTraitIndicators(Ref<EntityStore> npcRef,
@@ -543,14 +594,54 @@ final class CommandLinkedPanelEntryService {
                 && !itemNameKey.equals(localizedFromKey)) {
             return localizedFromKey;
         }
-        Item itemAsset = Item.getAssetMap().getAsset(canonicalItemId);
-        if (itemAsset != null && itemAsset.getTranslationKey() != null && !itemAsset.getTranslationKey().isBlank()) {
-            String translated = LocalizedText.resolve(language, itemAsset.getTranslationKey());
-            if (translated != null && !translated.isBlank() && !translated.equals(itemAsset.getTranslationKey())) {
-                return translated;
+        try {
+            Item itemAsset = Item.getAssetMap().getAsset(canonicalItemId);
+            if (itemAsset != null && itemAsset.getTranslationKey() != null && !itemAsset.getTranslationKey().isBlank()) {
+                String translated = LocalizedText.resolve(language, itemAsset.getTranslationKey());
+                if (translated != null && !translated.isBlank() && !translated.equals(itemAsset.getTranslationKey())) {
+                    return translated;
+                }
+            }
+        } catch (Throwable ignored) {
+            // Some tests and degraded startup paths do not initialize Hytale item assets/logging.
+        }
+        return humanizeItemId(canonicalItemId);
+    }
+
+    private String humanizeItemId(String canonicalItemId) {
+        if (canonicalItemId == null || canonicalItemId.isBlank()) {
+            return LocalizedText.resolve((String) null, "tamework.ui.linkedPanel.happiness.food.unknown");
+        }
+        String normalized = canonicalItemId;
+        if (normalized.startsWith("Tw_")) {
+            normalized = normalized.substring(3);
+        }
+        String[] rawParts = normalized.split("_");
+        ArrayList<String> parts = new ArrayList<>(rawParts.length);
+        for (String rawPart : rawParts) {
+            if (rawPart == null || rawPart.isBlank()) {
+                continue;
+            }
+            parts.add(rawPart);
+        }
+        if (parts.isEmpty()) {
+            return canonicalItemId;
+        }
+        if (parts.size() > 1 && parts.get(0).equalsIgnoreCase("Feed")) {
+            String feed = parts.remove(0);
+            parts.add(feed);
+        }
+        StringBuilder out = new StringBuilder();
+        for (String part : parts) {
+            if (!out.isEmpty()) {
+                out.append(' ');
+            }
+            out.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                out.append(part.substring(1).toLowerCase(Locale.ROOT));
             }
         }
-        return canonicalItemId;
+        return out.toString();
     }
 
     private String stripModifierPrefix(String label) {

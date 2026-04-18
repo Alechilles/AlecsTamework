@@ -2,7 +2,9 @@ package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedItem;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.LinkedHashMap;
@@ -14,6 +16,7 @@ import javax.annotation.Nullable;
 /** Resolves role-scoped parameters and feed item definitions. */
 final class InteractionParamAccess {
     private final InteractionParamResolver paramResolver;
+    private final InteractionItemIdResolver itemIdResolver;
     private final boolean hasLovedItemsOverride;
     private final String[] lovedItemsOverride;
     private final Boolean isHarvestableOverride;
@@ -31,6 +34,7 @@ final class InteractionParamAccess {
                            String isHarvestableParamName,
                            String isMountableParamName) {
         this.paramResolver = paramResolver;
+        this.itemIdResolver = new InteractionItemIdResolver(paramResolver);
         this.hasLovedItemsOverride = hasLovedItemsOverride;
         this.lovedItemsOverride = lovedItemsOverride;
         this.isHarvestableOverride = isHarvestableOverride;
@@ -41,9 +45,11 @@ final class InteractionParamAccess {
     }
 
     // Builds an interaction snapshot from the player and role scopes.
-    InteractionContextSnapshot buildContextSnapshot(Player player, Role role) {
+    InteractionContextSnapshot buildContextSnapshot(Player player,
+                                                   @Nullable Ref<EntityStore> playerRef,
+                                                   Role role) {
         StdScope[] roleScopes = paramResolver.resolveRoleScopes(role, null);
-        return InteractionContextSnapshot.from(player, roleScopes);
+        return InteractionContextSnapshot.from(player, roleScopes, playerRef);
     }
 
     // Resolves the primary role scope for param evaluation.
@@ -88,6 +94,15 @@ final class InteractionParamAccess {
         }
         String[] items = getRoleStringArrayParam(role, ctx, lovedItemsParamName);
         return items != null ? items : new String[0];
+    }
+
+    InteractionRequiredItems resolveFeedRequirementItems(FeedInteraction interaction,
+                                                         Role role,
+                                                         InteractionContextSnapshot ctx) {
+        if (interaction == null) {
+            return new InteractionRequiredItems(new String[0], false);
+        }
+        return itemIdResolver.resolveFeedRequirementItems(interaction, role, ctx, resolveLovedItems(role, ctx));
     }
 
     // Resolves whether the role is harvestable using overrides or params.
@@ -179,5 +194,10 @@ final class InteractionParamAccess {
         }
         FeedItem[] items = InteractionItemParser.toFeedItems(rawValues);
         return items != null && items.length > 0 ? items : null;
+    }
+
+    @Nullable
+    String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
+        return itemIdResolver.resolveItemsParam(role, ctx, itemsParam);
     }
 }

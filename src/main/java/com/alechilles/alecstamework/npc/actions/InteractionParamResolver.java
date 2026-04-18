@@ -1,18 +1,17 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.util.Arrays;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 
 /** Interaction param resolver. */
 final class InteractionParamResolver {
     private final StdScope globalScopeSnapshot;
     private final StdScope execScopeSnapshot;
     private final StdScope sensorScopeSnapshot;
+    private final StdScopeLookupCache scopeLookupCache = new StdScopeLookupCache();
 
     InteractionParamResolver(StdScope globalScopeSnapshot,
                              StdScope execScopeSnapshot,
@@ -124,86 +123,22 @@ final class InteractionParamResolver {
     }
 
     private String getStringFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        Supplier<String> supplier;
-        try {
-            supplier = scope.getStringSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            return null;
-        }
-        return supplier != null ? supplier.get() : null;
+        return scopeLookupCache.getString(scope, paramName);
     }
 
     private String[] getStringArrayFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        Supplier<String[]> arraySupplier;
-        try {
-            arraySupplier = scope.getStringArraySupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            arraySupplier = null;
-        }
-        if (arraySupplier != null) {
-            String[] values = arraySupplier.get();
-            if (values != null && values.length > 0) {
-                return values;
-            }
-        }
-        Supplier<String> stringSupplier;
-        try {
-            stringSupplier = scope.getStringSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            stringSupplier = null;
-        }
-        if (stringSupplier == null) {
-            return null;
-        }
-        String value = stringSupplier.get();
-        if (value == null || value.isBlank()) {
-            return null;
-        }
-        return new String[] { value };
+        return scopeLookupCache.getStringArrayOrString(scope, paramName);
     }
 
     private Boolean getBooleanFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        BooleanSupplier supplier;
-        try {
-            supplier = scope.getBooleanSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            return null;
-        }
-        return supplier != null ? supplier.getAsBoolean() : null;
+        return scopeLookupCache.getBoolean(scope, paramName);
     }
 
     private Double getNumberFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        DoubleSupplier supplier;
-        try {
-            supplier = scope.getNumberSupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            return null;
-        }
-        return supplier != null ? supplier.getAsDouble() : null;
+        return scopeLookupCache.getNumber(scope, paramName);
     }
 
     private double[] getNumberArrayFromScope(StdScope scope, String paramName) {
-        if (scope == null) {
-            return null;
-        }
-        Supplier<double[]> supplier;
-        try {
-            supplier = scope.getNumberArraySupplier(paramName);
-        } catch (IllegalStateException ignored) {
-            return null;
-        }
-        return supplier != null ? supplier.get() : null;
+        return scopeLookupCache.getNumberArray(scope, paramName);
     }
 }

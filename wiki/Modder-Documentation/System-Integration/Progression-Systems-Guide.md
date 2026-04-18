@@ -129,6 +129,9 @@ For breeding issues, also verify:
 For needs-damage diagnostics, use:
 - `/tw debugneedsdamage [on|off]`
 
+For needs seek/targeting diagnostics, use:
+- `/tw debugneedsseek [on|off]`
+
 ## Related Pages
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 - [TwLevelingConfig Reference](/mod/alecs-tamework/twlevelingconfig-reference)

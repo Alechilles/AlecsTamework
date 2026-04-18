@@ -94,6 +94,13 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             )
             .documentation("Debug setting for needs damage and regen suppression diagnostics.")
             .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("NeedsSeek", Codec.BOOLEAN),
+                    (section, value) -> section.needsSeekDiagnostics = value,
+                    section -> section.needsSeekDiagnostics
+            )
+            .documentation("Debug setting for needs seek target resolution diagnostics.")
+            .add()
             .build();
 
     public static final AssetBuilderCodec<String, TwDebugConfig> CODEC = AssetBuilderCodec.builder(
@@ -358,6 +365,7 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean breeding;
         private boolean needsConsumeDiagnostics;
         private boolean needsDamageDiagnostics;
+        private boolean needsSeekDiagnostics;
 
         public boolean isHook() {
             return hook;
@@ -398,6 +406,10 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isNeedsDamageDiagnostics() {
             return needsDamageDiagnostics;
+        }
+
+        public boolean isNeedsSeekDiagnostics() {
+            return needsSeekDiagnostics;
         }
     }
 }

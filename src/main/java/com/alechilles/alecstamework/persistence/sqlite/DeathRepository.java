@@ -111,7 +111,9 @@ public final class DeathRepository {
                             getDouble(payload, "levelingTotalXp", 0.0),
                             getString(payload, "talentsConfigId"),
                             (int) getLong(payload, "talentsSpentPoints", 0L),
-                            getString(payload, "purchasedTalentIds")
+                            getString(payload, "purchasedTalentIds"),
+                            parseDeathCauseKind(payload, "deathCauseKind"),
+                            getString(payload, "deathSourceName")
                     ));
                 }
             }
@@ -246,7 +248,25 @@ public final class DeathRepository {
         putString(payload, "talentsConfigId", snapshot.talentsConfigId());
         payload.addProperty("talentsSpentPoints", snapshot.talentsSpentPoints());
         putString(payload, "purchasedTalentIds", snapshot.purchasedTalentIds());
+        if (snapshot.deathCauseKind() != null) {
+            payload.addProperty("deathCauseKind", snapshot.deathCauseKind().name());
+        }
+        putString(payload, "deathSourceName", snapshot.deathSourceName());
         return payload.toString();
+    }
+
+    @Nullable
+    private CommandLinkedNpcDeathService.DeathCauseKind parseDeathCauseKind(@Nonnull JsonObject source,
+                                                                            @Nonnull String key) {
+        String raw = getString(source, key);
+        if (raw == null || raw.isBlank()) {
+            return null;
+        }
+        try {
+            return CommandLinkedNpcDeathService.DeathCauseKind.valueOf(raw.trim());
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     @Nullable

@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.ui;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Objects;
 import java.util.UUID;
 
 /**
@@ -28,6 +30,7 @@ public final class LinkedNpcEntry {
     private final boolean lost;
     private final boolean hasHome;
     private final long deadRespawnRemainingMs;
+    private final String deathCauseHint;
     private final String speciesId;
     private final String speciesLabel;
     private final String groupId;
@@ -85,6 +88,7 @@ public final class LinkedNpcEntry {
                 inCoop,
                 lost,
                 deadRespawnRemainingMs,
+                null,
                 null,
                 null,
                 traitIndicators,
@@ -152,6 +156,7 @@ public final class LinkedNpcEntry {
                 inCoop,
                 lost,
                 deadRespawnRemainingMs,
+                null,
                 futureStatA,
                 futureStatB,
                 traitIndicators,
@@ -193,6 +198,7 @@ public final class LinkedNpcEntry {
                           boolean inCoop,
                           boolean lost,
                           long deadRespawnRemainingMs,
+                          String deathCauseHint,
                           FutureStat futureStatA,
                           FutureStat futureStatB,
                           LinkedNpcTraitIndicator[] traitIndicators,
@@ -233,6 +239,7 @@ public final class LinkedNpcEntry {
         this.inCoop = inCoop;
         this.lost = lost;
         this.deadRespawnRemainingMs = Math.max(0L, deadRespawnRemainingMs);
+        this.deathCauseHint = deathCauseHint;
         this.speciesId = speciesId;
         this.speciesLabel = speciesLabel;
         this.groupId = groupId;
@@ -338,6 +345,10 @@ public final class LinkedNpcEntry {
 
     public long deadRespawnRemainingMs() {
         return deadRespawnRemainingMs;
+    }
+
+    public String deathCauseHint() {
+        return deathCauseHint;
     }
 
     public String speciesId() {
@@ -492,6 +503,101 @@ public final class LinkedNpcEntry {
         return Math.max(0, Math.min(100, Math.round((float) (ratio * 100.0))));
     }
 
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        }
+        if (!(obj instanceof LinkedNpcEntry other)) {
+            return false;
+        }
+        return currentHealth == other.currentHealth
+                && maxHealth == other.maxHealth
+                && currentHappiness == other.currentHappiness
+                && maxHappiness == other.maxHappiness
+                && targetHappinessPercent == other.targetHappinessPercent
+                && currentHunger == other.currentHunger
+                && maxHunger == other.maxHunger
+                && currentThirst == other.currentThirst
+                && maxThirst == other.maxThirst
+                && loaded == other.loaded
+                && linked == other.linked
+                && active == other.active
+                && dead == other.dead
+                && captured == other.captured
+                && inCoop == other.inCoop
+                && lost == other.lost
+                && hasHome == other.hasHome
+                && deadRespawnRemainingMs == other.deadRespawnRemainingMs
+                && breedingEnabled == other.breedingEnabled
+                && breedingCooldownActive == other.breedingCooldownActive
+                && breedingCooldownRemainingMs == other.breedingCooldownRemainingMs
+                && Double.compare(breedingCooldownRatio, other.breedingCooldownRatio) == 0
+                && breedingCooldownKnown == other.breedingCooldownKnown
+                && traitsActionVisible == other.traitsActionVisible
+                && traitsActionEnabled == other.traitsActionEnabled
+                && talentsActionVisible == other.talentsActionVisible
+                && talentsActionEnabled == other.talentsActionEnabled
+                && Objects.equals(npcUuid, other.npcUuid)
+                && Objects.equals(displayName, other.displayName)
+                && Objects.equals(happinessModifierBreakdown, other.happinessModifierBreakdown)
+                && Objects.equals(deathCauseHint, other.deathCauseHint)
+                && Objects.equals(speciesId, other.speciesId)
+                && Objects.equals(speciesLabel, other.speciesLabel)
+                && Objects.equals(groupId, other.groupId)
+                && Objects.equals(groupName, other.groupName)
+                && Objects.equals(groupColorHex, other.groupColorHex)
+                && Objects.equals(futureStatA, other.futureStatA)
+                && Objects.equals(futureStatB, other.futureStatB)
+                && Arrays.equals(traitIndicators, other.traitIndicators);
+    }
+
+    @Override
+    public int hashCode() {
+        int result = Objects.hash(
+                npcUuid,
+                displayName,
+                currentHealth,
+                maxHealth,
+                currentHappiness,
+                maxHappiness,
+                targetHappinessPercent,
+                happinessModifierBreakdown,
+                currentHunger,
+                maxHunger,
+                currentThirst,
+                maxThirst,
+                loaded,
+                linked,
+                active,
+                dead,
+                captured,
+                inCoop,
+                lost,
+                hasHome,
+                deadRespawnRemainingMs,
+                deathCauseHint,
+                speciesId,
+                speciesLabel,
+                groupId,
+                groupName,
+                groupColorHex,
+                breedingEnabled,
+                breedingCooldownActive,
+                breedingCooldownRemainingMs,
+                breedingCooldownRatio,
+                breedingCooldownKnown,
+                futureStatA,
+                futureStatB,
+                traitsActionVisible,
+                traitsActionEnabled,
+                talentsActionVisible,
+                talentsActionEnabled
+        );
+        result = 31 * result + Arrays.hashCode(traitIndicators);
+        return result;
+    }
+
     /**
      * Placeholder stat entry used for future linked-panel bars (hunger/thirst/happiness/etc.).
      */
@@ -516,6 +622,22 @@ public final class LinkedNpcEntry {
 
         public int max() {
             return max;
+        }
+
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof FutureStat other)) {
+                return false;
+            }
+            return current == other.current && max == other.max && Objects.equals(label, other.label);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(label, current, max);
         }
     }
 }

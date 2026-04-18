@@ -1,11 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.api.InteractionPresetDefinition;
 import com.alechilles.alecstamework.api.InteractionRequirementContext;
 import com.alechilles.alecstamework.api.InteractionRequirementSpec;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
-import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.BreedInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.CustomInteraction;
@@ -14,11 +12,21 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.HarvestInt
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionEntry;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsEquippedRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInHandRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ItemsInInventoryRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthPercentRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MovementStateRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.AlarmRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.InteractionContextRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementBucket;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.RequirementGroup;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -29,7 +37,6 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
-import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
 /** Tamework interact requirements. */
@@ -244,11 +251,11 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isTamed()
-                && !owner.isTamed(npcRef, store)) {
+                && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (bucket.isNotTamed()
-                && owner.isTamed(npcRef, store)) {
+                && owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (bucket.isPlayerHandEmpty()
@@ -256,72 +263,72 @@ final class TameworkInteractRequirements {
             return false;
         }
         if (bucket.isPlayerCrouching()
-                && !owner.isPlayerCrouching(role, infoProvider, store)) {
+                && !owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return false;
         }
         if (bucket.isPlayerIsOwner()
-                && !owner.isOwner(npcRef, store, player)) {
+                && !owner.isOwner(npcRef, store, player, ctx)) {
             return false;
         }
         if (bucket.isHarvestAlarmReady()
                 && !(forPrompt
-                ? owner.isHarvestAlarmReady(npcRef, store)
-                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName))) {
+                ? owner.isHarvestAlarmReady(npcRef, store, ctx)
+                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx))) {
             return false;
         }
         if (bucket.isHarvestInteractionContext()
                 && !matchesHarvestContext(role, infoProvider, ctx, forPrompt)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getItemsInHand(),
-                requirement -> owner.matchesItemsInHand(requirement, role, ctx))) {
+        if (hasRequirements(bucket.getItemsInHand())
+                && !matchesAnyItemsInHand(bucket.getItemsInHand(), role, ctx)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getItemsInInventory(),
-                requirement -> owner.matchesItemsInInventory(requirement, role, ctx))) {
+        if (hasRequirements(bucket.getItemsInInventory())
+                && !matchesAnyItemsInInventory(bucket.getItemsInInventory(), role, ctx)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getItemsEquipped(),
-                requirement -> owner.matchesItemsEquipped(requirement, role, ctx))) {
+        if (hasRequirements(bucket.getItemsEquipped())
+                && !matchesAnyItemsEquipped(bucket.getItemsEquipped(), role, ctx)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getParameter(),
-                requirement -> owner.matchesParamRequirement(requirement, role))) {
+        if (hasRequirements(bucket.getParameter())
+                && !matchesAnyParameters(bucket.getParameter(), role)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getNpcHealthPercent(),
-                requirement -> owner.matchesNpcHealthPercent(requirement, npcRef, store))) {
+        if (hasRequirements(bucket.getNpcHealthPercent())
+                && !matchesAnyNpcHealthPercent(bucket.getNpcHealthPercent(), npcRef, store)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getAlarmState(),
-                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role, ctx))) {
+        if (hasRequirements(bucket.getAlarmState())
+                && !matchesAnyAlarmState(bucket.getAlarmState(), npcRef, store, role, ctx)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getNpcState(),
-                requirement -> owner.matchesNpcState(requirement, role))) {
+        if (hasRequirements(bucket.getNpcState())
+                && !matchesAnyNpcState(bucket.getNpcState(), role)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getPlayerMovementState(),
-                requirement -> owner.matchesMovementState(requirement, role, infoProvider, store))) {
+        if (hasRequirements(bucket.getPlayerMovementState())
+                && !matchesAnyPlayerMovementState(bucket.getPlayerMovementState(), role, infoProvider, store, ctx)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getInteractionContext(),
-                requirement -> matchesInteractionContext(requirement, role, infoProvider, ctx, forPrompt))) {
+        if (hasRequirements(bucket.getInteractionContext())
+                && !matchesAnyInteractionContext(bucket.getInteractionContext(), role, infoProvider, ctx, forPrompt)) {
             return false;
         }
-        if (!requireAnyMatch(bucket.getCustom(),
-                requirement -> evaluateCustomRequirement(
-                        requirement,
-                        interactionConfigId,
-                        interactionIndex,
-                        npcRef,
-                        role,
-                        infoProvider,
-                        store,
-                        player,
-                        ctx,
-                        forPrompt
-                ))) {
+        if (hasRequirements(bucket.getCustom())
+                && !matchesAnyCustomRequirements(
+                bucket.getCustom(),
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                forPrompt
+        )) {
             return false;
         }
         return true;
@@ -353,11 +360,11 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isTamed()
-                && owner.isTamed(npcRef, store)) {
+                && owner.isTamed(npcRef, store, ctx)) {
             return true;
         }
         if (bucket.isNotTamed()
-                && !owner.isTamed(npcRef, store)) {
+                && !owner.isTamed(npcRef, store, ctx)) {
             return true;
         }
         if (bucket.isPlayerHandEmpty()
@@ -365,99 +372,231 @@ final class TameworkInteractRequirements {
             return true;
         }
         if (bucket.isPlayerCrouching()
-                && owner.isPlayerCrouching(role, infoProvider, store)) {
+                && owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return true;
         }
         if (bucket.isPlayerIsOwner()
-                && owner.isOwner(npcRef, store, player)) {
+                && owner.isOwner(npcRef, store, player, ctx)) {
             return true;
         }
         if (bucket.isHarvestAlarmReady()
                 && (forPrompt
-                ? owner.isHarvestAlarmReady(npcRef, store)
-                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName))) {
+                ? owner.isHarvestAlarmReady(npcRef, store, ctx)
+                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx))) {
             return true;
         }
         if (bucket.isHarvestInteractionContext()
                 && matchesHarvestContext(role, infoProvider, ctx, forPrompt)) {
             return true;
         }
-        if (anyMatch(bucket.getItemsInHand(),
-                requirement -> owner.matchesItemsInHand(requirement, role, ctx))) {
+        if (matchesAnyItemsInHand(bucket.getItemsInHand(), role, ctx)) {
             return true;
         }
-        if (anyMatch(bucket.getItemsInInventory(),
-                requirement -> owner.matchesItemsInInventory(requirement, role, ctx))) {
+        if (matchesAnyItemsInInventory(bucket.getItemsInInventory(), role, ctx)) {
             return true;
         }
-        if (anyMatch(bucket.getItemsEquipped(),
-                requirement -> owner.matchesItemsEquipped(requirement, role, ctx))) {
+        if (matchesAnyItemsEquipped(bucket.getItemsEquipped(), role, ctx)) {
             return true;
         }
-        if (anyMatch(bucket.getParameter(),
-                requirement -> owner.matchesParamRequirement(requirement, role))) {
+        if (matchesAnyParameters(bucket.getParameter(), role)) {
             return true;
         }
-        if (anyMatch(bucket.getNpcHealthPercent(),
-                requirement -> owner.matchesNpcHealthPercent(requirement, npcRef, store))) {
+        if (matchesAnyNpcHealthPercent(bucket.getNpcHealthPercent(), npcRef, store)) {
             return true;
         }
-        if (anyMatch(bucket.getAlarmState(),
-                requirement -> owner.matchesAlarmState(requirement, npcRef, store, role, ctx))) {
+        if (matchesAnyAlarmState(bucket.getAlarmState(), npcRef, store, role, ctx)) {
             return true;
         }
-        if (anyMatch(bucket.getNpcState(),
-                requirement -> owner.matchesNpcState(requirement, role))) {
+        if (matchesAnyNpcState(bucket.getNpcState(), role)) {
             return true;
         }
-        if (anyMatch(bucket.getPlayerMovementState(),
-                requirement -> owner.matchesMovementState(requirement, role, infoProvider, store))) {
+        if (matchesAnyPlayerMovementState(bucket.getPlayerMovementState(), role, infoProvider, store, ctx)) {
             return true;
         }
-        if (anyMatch(bucket.getInteractionContext(),
-                requirement -> matchesInteractionContext(requirement, role, infoProvider, ctx, forPrompt))) {
+        if (matchesAnyInteractionContext(bucket.getInteractionContext(), role, infoProvider, ctx, forPrompt)) {
             return true;
         }
-        if (anyMatch(bucket.getCustom(),
-                requirement -> evaluateCustomRequirement(
-                        requirement,
-                        interactionConfigId,
-                        interactionIndex,
-                        npcRef,
-                        role,
-                        infoProvider,
-                        store,
-                        player,
-                        ctx,
-                        forPrompt
-                ))) {
+        if (matchesAnyCustomRequirements(
+                bucket.getCustom(),
+                interactionConfigId,
+                interactionIndex,
+                npcRef,
+                role,
+                infoProvider,
+                store,
+                player,
+                ctx,
+                forPrompt
+        )) {
             return true;
         }
         return false;
     }
 
-    private <T> boolean requireAnyMatch(T[] requirements, Predicate<T> matcher) {
-        if (requirements == null || requirements.length == 0) {
-            return true;
-        }
-        for (T requirement : requirements) {
-            if (requirement != null && matcher.test(requirement)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private <T> boolean anyMatch(T[] requirements, Predicate<T> matcher) {
-        if (requirements == null || requirements.length == 0) {
+    private boolean matchesAnyItemsInHand(ItemsInHandRequirement[] requirements,
+                                          Role role,
+                                          InteractionContextSnapshot ctx) {
+        if (!hasRequirements(requirements)) {
             return false;
         }
-        for (T requirement : requirements) {
-            if (requirement != null && matcher.test(requirement)) {
+        for (ItemsInHandRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesItemsInHand(requirement, role, ctx)) {
                 return true;
             }
         }
         return false;
+    }
+
+    private boolean matchesAnyItemsInInventory(ItemsInInventoryRequirement[] requirements,
+                                               Role role,
+                                               InteractionContextSnapshot ctx) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (ItemsInInventoryRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesItemsInInventory(requirement, role, ctx)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyItemsEquipped(ItemsEquippedRequirement[] requirements,
+                                            Role role,
+                                            InteractionContextSnapshot ctx) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (ItemsEquippedRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesItemsEquipped(requirement, role, ctx)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyParameters(ParamRequirement[] requirements,
+                                         Role role) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (ParamRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesParamRequirement(requirement, role)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyNpcHealthPercent(NpcHealthPercentRequirement[] requirements,
+                                               Ref<EntityStore> npcRef,
+                                               Store<EntityStore> store) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (NpcHealthPercentRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesNpcHealthPercent(requirement, npcRef, store)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyAlarmState(AlarmRequirement[] requirements,
+                                         Ref<EntityStore> npcRef,
+                                         Store<EntityStore> store,
+                                         Role role,
+                                         InteractionContextSnapshot ctx) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (AlarmRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesAlarmState(requirement, npcRef, store, role, ctx)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyNpcState(StringRequirement[] requirements,
+                                       Role role) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (StringRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesNpcState(requirement, role)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyPlayerMovementState(MovementStateRequirement[] requirements,
+                                                  Role role,
+                                                  InfoProvider infoProvider,
+                                                  Store<EntityStore> store,
+                                                  InteractionContextSnapshot ctx) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (MovementStateRequirement requirement : requirements) {
+            if (requirement != null && owner.matchesMovementState(requirement, role, infoProvider, store, ctx)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyInteractionContext(InteractionContextRequirement[] requirements,
+                                                 Role role,
+                                                 InfoProvider infoProvider,
+                                                 InteractionContextSnapshot ctx,
+                                                 boolean forPrompt) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (InteractionContextRequirement requirement : requirements) {
+            if (requirement != null && matchesInteractionContext(requirement, role, infoProvider, ctx, forPrompt)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean matchesAnyCustomRequirements(CustomRequirement[] requirements,
+                                                 @Nullable String interactionConfigId,
+                                                 int interactionIndex,
+                                                 Ref<EntityStore> npcRef,
+                                                 Role role,
+                                                 InfoProvider infoProvider,
+                                                 Store<EntityStore> store,
+                                                 Player player,
+                                                 InteractionContextSnapshot ctx,
+                                                 boolean forPrompt) {
+        if (!hasRequirements(requirements)) {
+            return false;
+        }
+        for (CustomRequirement requirement : requirements) {
+            if (requirement != null && evaluateCustomRequirement(
+                    requirement,
+                    interactionConfigId,
+                    interactionIndex,
+                    npcRef,
+                    role,
+                    infoProvider,
+                    store,
+                    player,
+                    ctx,
+                    forPrompt
+            )) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasRequirements(Object[] requirements) {
+        return requirements != null && requirements.length > 0;
     }
 
     private boolean meetsTameRequirements(TameInteraction interaction,
@@ -467,7 +606,7 @@ final class TameworkInteractRequirements {
                                           Store<EntityStore> store,
                                           Player player,
                                           InteractionContextSnapshot ctx) {
-        if (owner.isTamed(npcRef, store)) {
+        if (owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         return matchesPresetItems(
@@ -488,14 +627,14 @@ final class TameworkInteractRequirements {
                                           Store<EntityStore> store,
                                           Player player,
                                           InteractionContextSnapshot ctx) {
-        if (!owner.isTamed(npcRef, store)) {
+        if (!owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        InteractionFeedItems resolved = feedHelper.resolveFeedItems(interaction, role, ctx);
+        InteractionRequiredItems resolved = owner.resolveFeedRequirementItems(interaction, role, ctx);
         if (resolved == null || !resolved.requiresItems()) {
             return true;
         }
-        return owner.isHeldItemInList(resolved.getItemIds(), ctx);
+        return owner.isHeldItemInList(resolved.getItems(), ctx);
     }
 
     private boolean meetsHarvestRequirements(HarvestInteraction interaction,
@@ -510,7 +649,7 @@ final class TameworkInteractRequirements {
         boolean requireHarvestable = optionOrDefault(interaction.getRequireHarvestable(), true);
         boolean requireAlarm = optionOrDefault(interaction.getRequireHarvestAlarmReady(), true);
         boolean requireContext = optionOrDefault(interaction.getRequireHarvestInteractionContext(), true);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (requireHarvestable && !owner.resolveIsHarvestable(role, ctx)) {
@@ -518,8 +657,8 @@ final class TameworkInteractRequirements {
         }
         if (requireAlarm
                 && !(forPrompt
-                ? owner.isHarvestAlarmReady(npcRef, store)
-                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName))) {
+                ? owner.isHarvestAlarmReady(npcRef, store, ctx)
+                : alarmHelper.isAlarmReady(npcRef, store, harvestAlarmName, ctx))) {
             return false;
         }
         if (requireContext && !matchesHarvestContext(role, infoProvider, ctx, forPrompt)) {
@@ -539,16 +678,16 @@ final class TameworkInteractRequirements {
         boolean requireOwner = resolveInteractionRequireOwner(interaction.getRequireOwner(), interactionRequireOwnerDefault);
         boolean requireMountable = optionOrDefault(interaction.getRequireMountable(), true);
         boolean requireCrouching = optionOrDefault(interaction.getRequireCrouching(), true);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (requireOwner && !owner.isOwner(npcRef, store, player)) {
+        if (requireOwner && !owner.isOwner(npcRef, store, player, ctx)) {
             return false;
         }
         if (requireMountable && !owner.resolveIsMountable(role, ctx)) {
             return false;
         }
-        if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store)) {
+        if (requireCrouching && !owner.isPlayerCrouching(role, infoProvider, store, ctx)) {
             return false;
         }
         return true;
@@ -563,10 +702,10 @@ final class TameworkInteractRequirements {
                                                InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
         boolean requireOwner = resolveInteractionRequireOwner(interaction.getRequireOwner(), interactionRequireOwnerDefault);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (requireOwner && !owner.isOwner(npcRef, store, player)) {
+        if (requireOwner && !owner.isOwner(npcRef, store, player, ctx)) {
             return false;
         }
         return true;
@@ -580,7 +719,7 @@ final class TameworkInteractRequirements {
                                            Player player,
                                            InteractionContextSnapshot ctx) {
         boolean requireTamed = optionOrDefault(interaction.getRequireTamed(), true);
-        if (requireTamed && !owner.isTamed(npcRef, store)) {
+        if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
         if (!isBreedingEnabled(npcRef, store)) {
@@ -742,35 +881,35 @@ final class TameworkInteractRequirements {
                                        Player player,
                                        InteractionContextSnapshot ctx,
                                        boolean defaultUseLovedItems) {
-        ResolvedItemList resolved = resolvePresetItemsInHand(
+        InteractionRequiredItems resolved = resolvePresetItemsInHand(
                 optionOrDefault(useLovedItemsFlag, defaultUseLovedItems),
                 explicitItems,
                 paramName,
                 role,
                 ctx
         );
-        if (!resolved.requiresItems) {
+        if (!resolved.requiresItems()) {
             return true;
         }
-        return owner.isHeldItemInList(resolved.items, ctx);
+        return owner.isHeldItemInList(resolved.getItems(), ctx);
     }
 
-    private ResolvedItemList resolvePresetItemsInHand(boolean useLovedItems,
-                                                      String[] explicitItems,
-                                                      String paramName,
-                                                      Role role,
-                                                      InteractionContextSnapshot ctx) {
+    private InteractionRequiredItems resolvePresetItemsInHand(boolean useLovedItems,
+                                                              String[] explicitItems,
+                                                              String paramName,
+                                                              Role role,
+                                                              InteractionContextSnapshot ctx) {
         String[] paramItems = owner.resolveItemsParam(role, ctx, paramName);
         if (hasItems(paramItems)) {
-            return new ResolvedItemList(paramItems, true);
+            return new InteractionRequiredItems(paramItems, true);
         }
         if (hasItems(explicitItems)) {
-            return new ResolvedItemList(explicitItems, true);
+            return new InteractionRequiredItems(explicitItems, true);
         }
         if (useLovedItems) {
-            return new ResolvedItemList(owner.resolveLovedItems(role, ctx), true);
+            return new InteractionRequiredItems(owner.resolveLovedItems(role, ctx), true);
         }
-        return new ResolvedItemList(new String[0], false);
+        return new InteractionRequiredItems(new String[0], false);
     }
 
     private boolean hasItems(String[] items) {
@@ -785,31 +924,15 @@ final class TameworkInteractRequirements {
         return false;
     }
 
-    private static final class ResolvedItemList {
-        private final String[] items;
-        private final boolean requiresItems;
-
-        private ResolvedItemList(String[] items, boolean requiresItems) {
-            this.items = items == null ? new String[0] : items;
-            this.requiresItems = requiresItems;
-        }
-    }
-
     private boolean optionOrDefault(Boolean value, boolean defaultValue) {
         return value == null ? defaultValue : value;
     }
 
     static boolean resolveInteractionRequireOwner(@Nullable Boolean ignoredEntryRequireOwner, boolean globalRequireOwner) {
         // /tw settings global ownership requirement always wins for interaction checks.
-        try {
-            if (Tamework.getInstance() != null) {
-                TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
-                if (globalConfig != null) {
-                    return globalConfig.isOwnershipInteractionRequiresOwner();
-                }
-            }
-        } catch (Throwable ignored) {
-            // Fall back to constructor snapshot if runtime/plugin context is unavailable.
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
+        if (overrides != null && overrides.interactionRequiresOwner() != null) {
+            return overrides.interactionRequiresOwner();
         }
         return globalRequireOwner;
     }

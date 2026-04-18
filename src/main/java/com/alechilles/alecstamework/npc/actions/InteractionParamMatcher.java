@@ -3,15 +3,14 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamOperator;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
+import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
-import java.util.function.BooleanSupplier;
-import java.util.function.DoubleSupplier;
-import java.util.function.Supplier;
 
 /** Evaluates parameter-based requirements against role scopes. */
 final class InteractionParamMatcher {
     private final InteractionParamAccess paramAccess;
+    private final StdScopeLookupCache scopeLookupCache = new StdScopeLookupCache();
 
     InteractionParamMatcher(InteractionParamAccess paramAccess) {
         this.paramAccess = paramAccess;
@@ -43,27 +42,13 @@ final class InteractionParamMatcher {
                 if (scope == null) {
                     continue;
                 }
-                BooleanSupplier booleanSupplier;
-                try {
-                    booleanSupplier = scope.getBooleanSupplier(requirement.getName());
-                } catch (IllegalStateException ignored) {
-                    booleanSupplier = null;
-                }
-
-                DoubleSupplier numberSupplier;
-                try {
-                    numberSupplier = scope.getNumberSupplier(requirement.getName());
-                } catch (IllegalStateException ignored) {
-                    numberSupplier = null;
-                }
-
-                Supplier<String> stringSupplier;
-                try {
-                    stringSupplier = scope.getStringSupplier(requirement.getName());
-                } catch (IllegalStateException ignored) {
-                    stringSupplier = null;
-                }
-                matched = evaluateParamTarget(operator, target, booleanSupplier, numberSupplier, stringSupplier);
+                matched = evaluateParamTarget(
+                        operator,
+                        target,
+                        scopeLookupCache.getBoolean(scope, requirement.getName()),
+                        scopeLookupCache.getNumber(scope, requirement.getName()),
+                        scopeLookupCache.getString(scope, requirement.getName())
+                );
                 if (matched) {
                     break;
                 }
@@ -85,15 +70,15 @@ final class InteractionParamMatcher {
     // Evaluates a single target value against a parameter supplier.
     private boolean evaluateParamTarget(ParamOperator operator,
                                         String target,
-                                        BooleanSupplier booleanSupplier,
-                                        DoubleSupplier numberSupplier,
-                                        Supplier<String> stringSupplier) {
+                                        Boolean actualBoolean,
+                                        Double actualNumber,
+                                        String actualString) {
         if (target == null) {
             return false;
         }
         boolean targetIsBoolean = target.equalsIgnoreCase("true") || target.equalsIgnoreCase("false");
-        if ((operator == ParamOperator.Equals || operator == ParamOperator.NotEquals) && targetIsBoolean && booleanSupplier != null) {
-            boolean actual = booleanSupplier.getAsBoolean();
+        if ((operator == ParamOperator.Equals || operator == ParamOperator.NotEquals) && targetIsBoolean && actualBoolean != null) {
+            boolean actual = actualBoolean;
             boolean expected = Boolean.parseBoolean(target);
             return operator == ParamOperator.Equals ? actual == expected : actual != expected;
         }
@@ -103,8 +88,8 @@ final class InteractionParamMatcher {
         } catch (NumberFormatException ignored) {
             targetNumber = null;
         }
-        if (numberSupplier != null && targetNumber != null) {
-            double actual = numberSupplier.getAsDouble();
+        if (actualNumber != null && targetNumber != null) {
+            double actual = actualNumber;
             int compare = Double.compare(actual, targetNumber);
             return switch (operator) {
                 case Equals -> compare == 0;
@@ -115,9 +100,8 @@ final class InteractionParamMatcher {
                 case LessThanOrEqual -> compare <= 0;
             };
         }
-        if ((operator == ParamOperator.Equals || operator == ParamOperator.NotEquals) && stringSupplier != null) {
-            String value = stringSupplier.get();
-            boolean matches = value != null && value.equalsIgnoreCase(target);
+        if ((operator == ParamOperator.Equals || operator == ParamOperator.NotEquals) && actualString != null) {
+            boolean matches = actualString.equalsIgnoreCase(target);
             return operator == ParamOperator.Equals ? matches : !matches;
         }
         return false;

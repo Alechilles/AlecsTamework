@@ -280,7 +280,9 @@ public final class CommandLinkedNpcStateSnapshotService {
                 levelingTotalXp,
                 talentsConfigId,
                 talentsSpentPoints,
-                purchasedTalentIds
+                purchasedTalentIds,
+                null,
+                null
         );
     }
 

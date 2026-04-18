@@ -243,8 +243,15 @@ final class TameworkInteractEffects {
             presentationEffects.showFeedingCombatText(npcRef, store, player, healAmount);
         }
         String heldItemId = ctx != null ? ctx.activeItemId : null;
-        CompanionHappinessService.applyFeedGain(npcRef, store, heldItemId);
-        CompanionNeedsService.applyFeedInteractionRefill(npcRef, store, heldItemId);
+        CompanionNeedsService.applyFeedInteractionRefill(npcRef, store, heldItemId, false);
+        CompanionHappinessService.reconcileWithFeedEffects(
+                npcRef,
+                store,
+                null,
+                true,
+                heldItemId,
+                null
+        );
         CompanionLevelingService.awardFeedXp(npcRef, store);
         return true;
     }

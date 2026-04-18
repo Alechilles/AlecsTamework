@@ -549,6 +549,14 @@ Group {
             Text: "?/?";
             Style: (FontSize: 9, RenderBold: true, TextColor: #eef4fa, HorizontalAlignment: Center, VerticalAlignment: Center);
         }
+
+        TextButton #HealthTooltip {
+            Anchor: (Top: 0, Left: 0, Width: 206, Height: 14);
+            Style: @TraitTooltipButtonStyle;
+            Text: "";
+            TooltipText: %server.tamework.ui.linkedPanel.health.notAvailable;
+            TextTooltipStyle: @LinkedActionTooltipStyle;
+        }
     }
 
     Group #NeedRingRow {

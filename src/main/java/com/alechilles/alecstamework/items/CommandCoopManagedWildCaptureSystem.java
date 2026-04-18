@@ -67,7 +67,8 @@ import javax.annotation.Nullable;
  */
 public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<ChunkStore> {
     private static final Logger LOGGER = Logger.getLogger("Alec's Tamework!");
-    private static final long SWEEP_INTERVAL_MS = 250L;
+    private static final long SWEEP_INTERVAL_MS = 1_000L;
+    private static final long REMOVED_COOP_RELEASE_CHECK_INTERVAL_MS = 5_000L;
     private static final long DEBUG_STATUS_INTERVAL_MS = 2_000L;
     private static final long DEBUG_STATUS_UNCHANGED_HEARTBEAT_MS = 30_000L;
     private static final long DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS = 30_000L;
@@ -111,6 +112,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     private final HashSet<String> inFlightSlots = new HashSet<>();
 
     private long nextSweepAtMs;
+    private long nextRemovedCoopReleaseCheckAtMs;
     private long nextDebugStatusAtMs;
     @Nullable
     private String lastDebugStatusMessage;
@@ -181,9 +183,14 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             activeCoopKeys.add(coop.coopKey());
         }
         pruneRuntimeState(activeCoopKeys);
-        int removedCoopReleased = scanDiagnostics.containerTypeMissing
+        boolean shouldCheckRemovedCoops = !scanDiagnostics.containerTypeMissing
+                && nowMs >= nextRemovedCoopReleaseCheckAtMs;
+        int removedCoopReleased = !shouldCheckRemovedCoops
                 ? 0
                 : releaseResidentsFromRemovedCoops(world, chunkStore, entityStore, activeCoopKeys, nowMs);
+        if (shouldCheckRemovedCoops) {
+            nextRemovedCoopReleaseCheckAtMs = nowMs + REMOVED_COOP_RELEASE_CHECK_INTERVAL_MS;
+        }
         if (managedCoops.isEmpty()) {
             maybeLogStatus(
                     nowMs,
@@ -194,7 +201,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
             return;
         }
 
-        ArrayList<NpcCandidate> npcCandidates = collectNpcCandidates(entityStore);
+        boolean hasCaptureDemand = hasCaptureDemand(managedCoops, worldTime, nowMs);
+        ArrayList<NpcCandidate> npcCandidates = hasCaptureDemand
+                ? collectNpcCandidates(entityStore)
+                : new ArrayList<>();
         HashSet<UUID> consumedNpcs = new HashSet<>();
         int roamingCoops = 0;
 
@@ -226,6 +236,34 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                         + " removedReleased=" + removedCoopReleased
                         + " scan=" + scanDiagnostics.toSummary()
         );
+    }
+
+    private boolean hasCaptureDemand(@Nonnull List<ManagedCoopContext> managedCoops,
+                                     @Nonnull WorldTimeResource worldTime,
+                                     long nowMs) {
+        for (ManagedCoopContext coop : managedCoops) {
+            if (coop != null && canAttemptCapture(coop, worldTime, nowMs)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean canAttemptCapture(@Nonnull ManagedCoopContext coop,
+                                      @Nonnull WorldTimeResource worldTime,
+                                      long nowMs) {
+        TwCoopConfig.LifecycleRules lifecycleRules = coop.config().getLifecycleRules();
+        if (shouldResidentsRoam(worldTime, lifecycleRules)) {
+            return false;
+        }
+        if (!lifecycleRules.isCaptureWildNPCsInRange()) {
+            return false;
+        }
+        long nextAllowedAt = nextCaptureAtByCoopKey.getOrDefault(coop.coopKey(), 0L);
+        if (nowMs < nextAllowedAt) {
+            return false;
+        }
+        return findFirstEmptySlot(coop) >= 0;
     }
 
     private void pruneRuntimeState(@Nonnull Set<String> activeCoopKeys) {
@@ -920,6 +958,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkTalentsComponent.getComponentType(), snapshot.talents());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
+        if (stateSnapshotService != null) {
+            stateSnapshotService.applyRestoredHealth(reference, store, snapshot.healthPercent());
+        }
         if (snapshot.npcName() != null && snapshot.npcName().getName() != null && !snapshot.npcName().getName().isBlank()) {
             safePutComponent(
                     store,

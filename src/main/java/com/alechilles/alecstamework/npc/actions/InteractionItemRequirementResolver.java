@@ -19,11 +19,11 @@ import java.util.Set;
 
 /** Handles item-based requirement resolution and checks for interactions. */
 final class InteractionItemRequirementResolver {
-    private final InteractionParamResolver paramResolver;
+    private final InteractionItemIdResolver itemIdResolver;
 
     // Builds a resolver tied to the shared parameter resolver.
     InteractionItemRequirementResolver(InteractionParamResolver paramResolver) {
-        this.paramResolver = paramResolver;
+        this.itemIdResolver = new InteractionItemIdResolver(paramResolver);
     }
 
     // Returns true if the held item matches the requirement and quantity.
@@ -193,16 +193,7 @@ final class InteractionItemRequirementResolver {
 
     // Reads items from a role parameter, parsing arrays when provided.
     String[] resolveItemsParam(Role role, InteractionContextSnapshot ctx, String itemsParam) {
-        String paramName = itemsParam;
-        if (paramName == null || paramName.isBlank()) {
-            return null;
-        }
-        String[] rawValues = paramResolver.getStringArrayParam(role, ctx, paramName);
-        if (rawValues == null || rawValues.length == 0) {
-            return null;
-        }
-        String[] resolved = InteractionItemParser.parseItemIdsFromParam(rawValues);
-        return resolved != null && resolved.length > 0 ? resolved : null;
+        return itemIdResolver.resolveItemsParam(role, ctx, itemsParam);
     }
 
     // Returns a normalized set of item ids for matching.

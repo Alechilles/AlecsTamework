@@ -24,12 +24,14 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkGetTamedCommand());
         addSubCommand(new TameworkSetTamedCommand());
         addSubCommand(new TameworkFindNpcCommand());
+        addSubCommand(new TameworkNpcSpawnTamedCommand());
         addSubCommand(new TameworkNpcCleanCommand());
         addSubCommand(new TameworkGetAlarmCommand());
         addSubCommand(new TameworkGetFlockDebugCommand());
         addSubCommand(new TameworkApiCommandCollection());
         addSubCommand(new TameworkConfigCommand());
         addSubCommand(new TameworkSettingsCommand());
+        addSubCommand(new TameworkNewsCommand());
         addSubCommand(new TameworkReloadConfigCommand());
         addSubCommand(new TameworkDebugHookCommand());
         addSubCommand(new TameworkDebugSpawnerCommand());
@@ -40,6 +42,7 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugCoopCommand());
         addSubCommand(new TameworkDebugNeedsConsumeCommand());
         addSubCommand(new TameworkDebugNeedsDamageCommand());
+        addSubCommand(new TameworkDebugNeedsSeekCommand());
         addSubCommand(new TameworkShowHitboxesCommand());
         addSubCommand(new TameworkDebugDbCommand());
         addSubCommand(new TameworkDebugCrashTelemetryCommand());

@@ -10,6 +10,7 @@ import com.hypixel.hytale.server.npc.asset.builder.holder.StringHolder;
 import com.hypixel.hytale.server.npc.asset.builder.validators.StringNotEmptyValidator;
 import com.hypixel.hytale.server.npc.instructions.Sensor;
 import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
 
 /**
  * Builder for SensorTameworkNeedsResourceTarget.
@@ -18,6 +19,8 @@ public final class BuilderSensorTameworkNeedsResourceTarget extends TameworkSens
     public static final String BUILDER_ID = "TameworkNeedsResourceTarget";
 
     private final StringHolder resourceType = new StringHolder();
+    private final StringHolder need = new StringHolder();
+    private final DoubleHolder ratioBelow = new DoubleHolder();
     private final DoubleHolder range = new DoubleHolder();
     private final StringArrayHolder itemIds = new StringArrayHolder();
 
@@ -62,6 +65,26 @@ public final class BuilderSensorTameworkNeedsResourceTarget extends TameworkSens
                 "Resource kind to search for: Water or FoodContainer.",
                 null
         );
+        this.getString(
+                data,
+                "Need",
+                this.need,
+                null,
+                StringNotEmptyValidator.get(),
+                BuilderDescriptorState.Stable,
+                "Optional need type gate: Hunger or Thirst.",
+                null
+        );
+        this.getDouble(
+                data,
+                "RatioBelow",
+                this.ratioBelow,
+                Double.NaN,
+                null,
+                BuilderDescriptorState.Stable,
+                "Optional normalized need threshold gate [0..1].",
+                null
+        );
         this.getDouble(
                 data,
                 "Range",
@@ -94,6 +117,15 @@ public final class BuilderSensorTameworkNeedsResourceTarget extends TameworkSens
 
     public double getRange(@Nonnull BuilderSupport support) {
         return this.range.get(support.getExecutionContext());
+    }
+
+    @Nullable
+    public String getNeed(@Nonnull BuilderSupport support) {
+        return this.need.get(support.getExecutionContext());
+    }
+
+    public double getRatioBelow(@Nonnull BuilderSupport support) {
+        return this.ratioBelow.get(support.getExecutionContext());
     }
 
     @Nonnull

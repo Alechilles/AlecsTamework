@@ -1,7 +1,10 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.hypixel.hytale.component.Ref;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 
 /** Resolves interaction configs and role-scoped parameters. */
@@ -15,8 +18,10 @@ final class InteractionResolution {
     }
 
     // Builds the cached interaction snapshot for a player and role.
-    InteractionContextSnapshot buildContextSnapshot(Player player, Role role) {
-        return paramAccess.buildContextSnapshot(player, role);
+    InteractionContextSnapshot buildContextSnapshot(Player player,
+                                                    Ref<EntityStore> playerRef,
+                                                    Role role) {
+        return paramAccess.buildContextSnapshot(player, playerRef, role);
     }
 
     // Resolves the interaction config using overrides and role params.
@@ -52,6 +57,12 @@ final class InteractionResolution {
     // Resolves loved items from overrides or role params.
     String[] resolveLovedItems(Role role, InteractionContextSnapshot ctx) {
         return paramAccess.resolveLovedItems(role, ctx);
+    }
+
+    InteractionRequiredItems resolveFeedRequirementItems(FeedInteraction interaction,
+                                                         Role role,
+                                                         InteractionContextSnapshot ctx) {
+        return paramAccess.resolveFeedRequirementItems(interaction, role, ctx);
     }
 
     // Resolves whether the role is harvestable using overrides or params.

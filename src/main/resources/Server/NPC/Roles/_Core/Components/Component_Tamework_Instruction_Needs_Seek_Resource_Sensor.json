@@ -68,13 +68,6 @@
               "State": ".Listen"
             },
             {
-              "Type": "Timer",
-              "Name": {
-                "Compute": "NeedsSeekFailedCooldownName"
-              },
-              "State": "Stopped"
-            },
-            {
               "Type": "TameworkNeedBelow",
               "Need": "Thirst",
               "RatioBelow": {
@@ -83,6 +76,10 @@
             },
             {
               "Type": "TameworkNeedsResourceTarget",
+              "Need": "Thirst",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenThirstBelowRatio"
+              },
               "ResourceType": "Water",
               "Range": {
                 "Compute": "NeedsSeekWaterSearchRange"
@@ -120,13 +117,6 @@
               "State": ".Listen"
             },
             {
-              "Type": "Timer",
-              "Name": {
-                "Compute": "NeedsSeekFailedCooldownName"
-              },
-              "State": "Stopped"
-            },
-            {
               "Type": "TameworkNeedBelow",
               "Need": "Hunger",
               "RatioBelow": {
@@ -135,6 +125,10 @@
             },
             {
               "Type": "TameworkNeedsResourceTarget",
+              "Need": "Hunger",
+              "RatioBelow": {
+                "Compute": "NeedsSeekWhenHungerBelowRatio"
+              },
               "ResourceType": "FoodContainer",
               "Range": {
                 "Compute": "NeedsSeekFoodSearchRange"

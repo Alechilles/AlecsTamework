@@ -21,6 +21,18 @@ final class InteractionAlarmHelper {
 
     // Returns true when the alarm exists and is unset or has passed.
     boolean isAlarmReady(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
+        return isAlarmReady(npcRef, store, alarmName, null);
+    }
+
+    boolean isAlarmReady(Ref<EntityStore> npcRef,
+                         Store<EntityStore> store,
+                         String alarmName,
+                         InteractionContextSnapshot ctx) {
+        return snapshot(npcRef, store, alarmName, ctx).ready;
+    }
+
+    // Returns true when the alarm exists and is unset or has passed.
+    boolean isAlarmReadyUncached(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
         return snapshot(npcRef, store, alarmName).ready;
     }
 
@@ -29,8 +41,16 @@ final class InteractionAlarmHelper {
                               Store<EntityStore> store,
                               String alarmName,
                               String state) {
+        return matchesAlarmState(npcRef, store, alarmName, state, null);
+    }
+
+    boolean matchesAlarmState(Ref<EntityStore> npcRef,
+                              Store<EntityStore> store,
+                              String alarmName,
+                              String state,
+                              InteractionContextSnapshot ctx) {
         String normalized = state != null ? state.trim().toLowerCase(Locale.ROOT) : "";
-        AlarmSnapshot snapshot = snapshot(npcRef, store, alarmName);
+        AlarmSnapshot snapshot = snapshot(npcRef, store, alarmName, ctx);
         switch (normalized) {
             case "unset":
                 return snapshot.unset;
@@ -45,6 +65,28 @@ final class InteractionAlarmHelper {
 
     // Captures the raw alarm state used by prompt diagnostics.
     AlarmSnapshot snapshot(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
+        return snapshot(npcRef, store, alarmName, null);
+    }
+
+    AlarmSnapshot snapshot(Ref<EntityStore> npcRef,
+                           Store<EntityStore> store,
+                           String alarmName,
+                           InteractionContextSnapshot ctx) {
+        if (ctx != null && alarmName != null && !alarmName.isBlank()) {
+            AlarmSnapshot cached = ctx.alarmSnapshotsByName.get(alarmName);
+            if (cached != null) {
+                return cached;
+            }
+        }
+        AlarmSnapshot snapshot = snapshotUncached(npcRef, store, alarmName);
+        if (ctx != null && alarmName != null && !alarmName.isBlank()) {
+            ctx.alarmSnapshotsByName.put(alarmName, snapshot);
+        }
+        return snapshot;
+    }
+
+    // Captures the raw alarm state used by prompt diagnostics.
+    AlarmSnapshot snapshotUncached(Ref<EntityStore> npcRef, Store<EntityStore> store, String alarmName) {
         if (alarmName == null || alarmName.isBlank()) {
             return AlarmSnapshot.invalidName();
         }

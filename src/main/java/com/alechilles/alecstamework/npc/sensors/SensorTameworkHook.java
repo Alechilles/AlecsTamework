@@ -40,6 +40,7 @@ public final class SensorTameworkHook extends TameworkSensorBase {
     private final SingleDoubleParameterProvider targetZProvider;
     private final TameworkHookInfo hookInfo = new TameworkHookInfo();
     private final InfoProvider infoProvider;
+    private boolean providersDirty;
 
     public SensorTameworkHook(@Nonnull BuilderSensorTameworkHook builder, @Nonnull BuilderSupport support) {
         super(builder);
@@ -118,6 +119,7 @@ public final class SensorTameworkHook extends TameworkSensorBase {
         this.targetYProvider.overrideDouble(component.getTargetY());
         this.targetZProvider.overrideDouble(component.getTargetZ());
         this.hookInfo.updateFrom(component);
+        this.providersDirty = true;
         logHookEvent("match", ref, component, null);
         if (consume || component.isConsumeOnMatch()) {
             store.putComponent(ref, type, new TameworkHookComponent());
@@ -131,8 +133,20 @@ public final class SensorTameworkHook extends TameworkSensorBase {
     }
 
     private void clearProviders() {
-        this.parameterProvider.clear();
+        if (!providersDirty) {
+            return;
+        }
+        this.hookIdProvider.clear();
+        this.playerIdProvider.clear();
+        this.playerNameProvider.clear();
+        this.heldItemProvider.clear();
+        this.timestampProvider.clear();
+        this.hasTargetPositionProvider.clear();
+        this.targetXProvider.clear();
+        this.targetYProvider.clear();
+        this.targetZProvider.clear();
         this.hookInfo.clear();
+        this.providersDirty = false;
     }
 
     private void logHookEvent(String action,

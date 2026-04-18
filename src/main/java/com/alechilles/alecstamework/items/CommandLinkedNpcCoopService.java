@@ -1280,6 +1280,9 @@ public final class CommandLinkedNpcCoopService {
                     com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.class);
             putComponentJson(payload, "attachments", snapshot.attachments(),
                     com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.class);
+            if (snapshot.healthPercent() != null) {
+                payload.addProperty("healthPercent", snapshot.healthPercent());
+            }
             return payload.toString();
         } catch (Exception ignored) {
             return null;
@@ -1338,6 +1341,7 @@ public final class CommandLinkedNpcCoopService {
             com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent attachments =
                     parseComponent(payload, "attachments",
                             com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.class);
+            Double healthPercent = getJsonDouble(payload, "healthPercent");
             return new CoopResidentStateSnapshotService.CoopResidentStateSnapshot(
                     npcUuid,
                     coopId,
@@ -1355,6 +1359,7 @@ public final class CommandLinkedNpcCoopService {
                     talents,
                     lifeStage,
                     attachments,
+                    healthPercent,
                     capturedAtMs
             );
         } catch (Exception ignored) {
@@ -1419,6 +1424,19 @@ public final class CommandLinkedNpcCoopService {
             return payload.get(key).getAsLong();
         } catch (Exception ignored) {
             return fallback;
+        }
+    }
+
+    @Nullable
+    private Double getJsonDouble(@Nonnull JsonObject payload, @Nonnull String key) {
+        if (!payload.has(key) || payload.get(key).isJsonNull()) {
+            return null;
+        }
+        try {
+            double value = payload.get(key).getAsDouble();
+            return Double.isFinite(value) ? value : null;
+        } catch (Exception ignored) {
+            return null;
         }
     }
 

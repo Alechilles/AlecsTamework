@@ -9,6 +9,64 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class LinkedNpcPanelStatusTextServiceTest {
 
     @Test
+    void includesDeathCauseInDeadTooltipWhileKeepingRespawnStatePrimary() {
+        LinkedNpcEntry deadEntry = new LinkedNpcEntry(
+                UUID.randomUUID(),
+                "Dead Companion",
+                0,
+                0,
+                0,
+                0,
+                0,
+                null,
+                0,
+                0,
+                0,
+                0,
+                false,
+                false,
+                true,
+                false,
+                false,
+                false,
+                15_000L,
+                "Died from starvation",
+                null,
+                null,
+                LinkedNpcTraitIndicator.EMPTY,
+                false,
+                false,
+                false,
+                false,
+                true,
+                true,
+                null,
+                null,
+                null,
+                null,
+                null,
+                false,
+                false,
+                0L,
+                0.0,
+                false
+        );
+
+        assertEquals(
+                LocalizedText.format(
+                        (String) null,
+                        "tamework.ui.linkedPanel.health.deadRespawnIn",
+                        LocalizedText.format((String) null, "tamework.ui.shared.duration.seconds", 15)
+                ),
+                LinkedNpcPanelStatusTextService.resolveDeadHealthText(deadEntry)
+        );
+        assertEquals(
+                LinkedNpcPanelStatusTextService.resolveDeadHealthText(deadEntry) + "\nDied from starvation",
+                LinkedNpcPanelStatusTextService.resolveDeadHealthTooltip(deadEntry)
+        );
+    }
+
+    @Test
     void exposesLostStatusAndRecoveryHints() {
         LinkedNpcEntry lostEntry = new LinkedNpcEntry(
                 UUID.randomUUID(),

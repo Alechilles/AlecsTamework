@@ -1,0 +1,238 @@
+package com.alechilles.alecstamework.ui;
+
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore;
+import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
+import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.ResolvedAnnouncement;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import java.nio.file.Path;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Level;
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+
+/**
+ * Opens the Tamework settings announcement once per login session for eligible players.
+ */
+public final class TameworkSettingsAnnouncementService {
+    private final Tamework plugin;
+    private final Set<UUID> attemptedThisSession = ConcurrentHashMap.newKeySet();
+
+    public TameworkSettingsAnnouncementService(@Nonnull Tamework plugin) {
+        this.plugin = plugin;
+    }
+
+    public void onPlayerConnect(@Nullable PlayerConnectEvent event) {
+        clearSessionState(event != null && event.getPlayerRef() != null ? event.getPlayerRef().getUuid() : null);
+    }
+
+    public void onPlayerDisconnect(@Nullable PlayerDisconnectEvent event) {
+        clearSessionState(event != null && event.getPlayerRef() != null ? event.getPlayerRef().getUuid() : null);
+    }
+
+    public void onPlayerReady(@Nullable PlayerReadyEvent event) {
+        if (event == null || event.getPlayer() == null || event.getPlayerRef() == null) {
+            return;
+        }
+        Player player = event.getPlayer();
+        UUID playerUuid = player.getUuid();
+        if (playerUuid == null || !attemptedThisSession.add(playerUuid)) {
+            return;
+        }
+        Store<EntityStore> store = event.getPlayerRef().getStore();
+        if (store == null) {
+            return;
+        }
+        openAnnouncement(playerUuid, event.getPlayerRef(), store, player, true, false);
+    }
+
+    @Nullable
+    public String openAnnouncementNow(@Nonnull Ref<EntityStore> playerRef,
+                                      @Nonnull Store<EntityStore> store,
+                                      @Nonnull Player player) {
+        UUID playerUuid = player.getUuid();
+        if (playerUuid == null) {
+            return "Unable to open Tamework news right now.";
+        }
+        return openAnnouncement(playerUuid, playerRef, store, player, false, true);
+    }
+
+    @Nullable
+    private String openAnnouncement(@Nonnull UUID playerUuid,
+                                    @Nonnull Ref<EntityStore> playerRef,
+                                    @Nonnull Store<EntityStore> store,
+                                    @Nonnull Player player,
+                                    boolean respectEnabled,
+                                    boolean ignoreOptOutState) {
+        if (!playerRef.isValid()) {
+            return respectEnabled ? null : "Unable to open Tamework news right now.";
+        }
+        if (player.getPageManager() == null) {
+            return respectEnabled ? null : "Unable to open Tamework news right now.";
+        }
+
+        ResolvedAnnouncement announcement = TameworkSettingsAnnouncementStore.loadResolvedAnnouncement(
+                resolveAnnouncementConfigFile(),
+                plugin.getLogger()
+        );
+        if (respectEnabled && !announcement.enabled()) {
+            return null;
+        }
+        if (!ignoreOptOutState) {
+            AnnouncementOptOutState state = TameworkSettingsAnnouncementStore.loadAnnouncementState(
+                    resolveAnnouncementStateFile(),
+                    plugin.getLogger()
+            );
+            if (!TameworkSettingsAnnouncementStore.shouldShowAnnouncement(announcement, state, playerUuid)) {
+                return null;
+            }
+        }
+
+        PlayerRef uiPlayerRef = player.getPlayerRef();
+        if (uiPlayerRef == null || !uiPlayerRef.isValid()) {
+            return respectEnabled ? null : "Unable to open Tamework news right now.";
+        }
+        if (!TameworkSettingsPageService.hasAccess(uiPlayerRef, player)) {
+            return respectEnabled ? null : "You do not have permission to use /tw news.";
+        }
+
+        AnnouncementCopy copy = resolveCopy(uiPlayerRef, announcement);
+
+        TameworkSettingsAnnouncementPage page = new TameworkSettingsAnnouncementPage(
+                uiPlayerRef,
+                copy.title(),
+                copy.subtitle(),
+                copy.bodyText(),
+                copy.optOutLabel(),
+                suppress -> onReviewSettings(playerRef, store, uiPlayerRef, playerUuid, announcement.announcementId(), suppress),
+                suppress -> onDismissAnnouncement(playerUuid, announcement.announcementId(), suppress)
+        );
+        player.getPageManager().openCustomPage(playerRef, store, page);
+        plugin.getTelemetryEvents().recordUsage("settings_announcement_opened", "Opened Tamework settings announcement.");
+        return null;
+    }
+
+    @Nonnull
+    private static AnnouncementCopy resolveCopy(@Nonnull PlayerRef playerRef, @Nonnull ResolvedAnnouncement announcement) {
+        if (!announcement.useBuiltInText()) {
+            return new AnnouncementCopy(
+                    announcement.title(),
+                    announcement.subtitle(),
+                    String.join("\n\n", announcement.bodyLines()),
+                    announcement.optOutLabel()
+            );
+        }
+        String title = resolveBuiltIn(playerRef, TameworkSettingsAnnouncementStore.BUILT_IN_TITLE_KEY, announcement.title());
+        String subtitle = resolveBuiltIn(
+                playerRef,
+                TameworkSettingsAnnouncementStore.BUILT_IN_SUBTITLE_KEY,
+                announcement.subtitle()
+        );
+        String optOutLabel = resolveBuiltIn(
+                playerRef,
+                TameworkSettingsAnnouncementStore.BUILT_IN_OPT_OUT_LABEL_KEY,
+                announcement.optOutLabel()
+        );
+        String bodyText = resolveBodyText(playerRef, announcement.bodyLines());
+        return new AnnouncementCopy(title, subtitle, bodyText, optOutLabel);
+    }
+
+    @Nonnull
+    private static String resolveBuiltIn(@Nonnull PlayerRef playerRef, @Nonnull String key, @Nonnull String fallback) {
+        String resolved = LocalizedText.resolve(playerRef, key);
+        return resolved.equals(key) || resolved.isBlank() ? fallback : resolved;
+    }
+
+    @Nonnull
+    private static String resolveBodyText(@Nonnull PlayerRef playerRef, @Nonnull java.util.List<String> fallbackBodyLines) {
+        StringBuilder body = new StringBuilder();
+        for (int index = 0; index < TameworkSettingsAnnouncementStore.BUILT_IN_BODY_LINE_KEYS.length; index++) {
+            if (index > 0) {
+                body.append("\n\n");
+            }
+            String fallback = index < fallbackBodyLines.size() ? fallbackBodyLines.get(index) : "";
+            body.append(resolveBuiltIn(playerRef, TameworkSettingsAnnouncementStore.BUILT_IN_BODY_LINE_KEYS[index], fallback));
+        }
+        return body.toString();
+    }
+
+    private void onDismissAnnouncement(@Nonnull UUID playerUuid,
+                                       @Nonnull String announcementId,
+                                       boolean suppressUntilNextAnnouncement) {
+        persistOptOutIfRequested(playerUuid, announcementId, suppressUntilNextAnnouncement);
+    }
+
+    private void onReviewSettings(@Nonnull Ref<EntityStore> ref,
+                                  @Nonnull Store<EntityStore> store,
+                                  @Nonnull PlayerRef playerRef,
+                                  @Nonnull UUID playerUuid,
+                                  @Nonnull String announcementId,
+                                  boolean suppressUntilNextAnnouncement) {
+        persistOptOutIfRequested(playerUuid, announcementId, suppressUntilNextAnnouncement);
+        String error = TameworkSettingsPageService.openSettingsPage(ref, store);
+        if (error != null) {
+            plugin.getTelemetryEvents().recordError("settings_announcement_review_failed", null, error);
+            playerRef.sendMessage(Message.raw(error));
+            return;
+        }
+        plugin.getTelemetryEvents().recordUsage("settings_announcement_reviewed", "Opened settings from announcement.");
+    }
+
+    private void persistOptOutIfRequested(@Nonnull UUID playerUuid,
+                                          @Nonnull String announcementId,
+                                          boolean suppressUntilNextAnnouncement) {
+        if (!suppressUntilNextAnnouncement) {
+            return;
+        }
+        if (TameworkSettingsAnnouncementStore.recordOptOut(
+                resolveAnnouncementStateFile(),
+                playerUuid,
+                announcementId,
+                plugin.getLogger()
+        )) {
+            return;
+        }
+        plugin.getTelemetryEvents().recordError(
+                "settings_announcement_opt_out_persist_failed",
+                null,
+                "Failed to persist announcement opt-out for player " + playerUuid + "."
+        );
+        plugin.getLogger().at(Level.WARNING).log(
+                "Failed to persist Tamework settings announcement opt-out for player " + playerUuid + "."
+        );
+    }
+
+    private void clearSessionState(@Nullable UUID playerUuid) {
+        if (playerUuid == null) {
+            return;
+        }
+        attemptedThisSession.remove(playerUuid);
+    }
+
+    @Nonnull
+    private Path resolveAnnouncementConfigFile() {
+        return TameworkSettingsAnnouncementStore.resolveAnnouncementConfigFile(plugin);
+    }
+
+    @Nonnull
+    private Path resolveAnnouncementStateFile() {
+        return TameworkSettingsAnnouncementStore.resolveAnnouncementStateFile(plugin);
+    }
+
+    private record AnnouncementCopy(@Nonnull String title,
+                                    @Nonnull String subtitle,
+                                    @Nonnull String bodyText,
+                                    @Nonnull String optOutLabel) {
+    }
+}

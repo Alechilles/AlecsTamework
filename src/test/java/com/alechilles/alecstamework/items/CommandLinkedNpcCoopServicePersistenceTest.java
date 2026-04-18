@@ -122,6 +122,7 @@ class CommandLinkedNpcCoopServicePersistenceTest {
                         null,
                         lifeStage,
                         new TameworkAttachmentsComponent("attach_cfg", Map.of("head", "crest")),
+                        37.5,
                         capturedAtMs
                 );
 
@@ -162,6 +163,7 @@ class CommandLinkedNpcCoopServicePersistenceTest {
             assertNotNull(persisted.stateSnapshot().traits());
             assertEquals(1, persisted.stateSnapshot().traits().getTraitValues().length);
             assertEquals("friendly", persisted.stateSnapshot().traits().getTraitValues()[0].getId());
+            assertEquals(37.5, persisted.stateSnapshot().healthPercent());
             assertEquals(capturedAtMs, persisted.stateSnapshot().capturedAtMs());
         }
     }

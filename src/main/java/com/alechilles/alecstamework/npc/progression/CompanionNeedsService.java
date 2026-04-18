@@ -2,6 +2,8 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
+import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -178,7 +180,7 @@ public final class CompanionNeedsService {
                                     @Nullable Store<EntityStore> store,
                                     @Nullable CommandBuffer<EntityStore> commandBuffer,
                                     @Nullable String roleId) {
-        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, commandBuffer, null);
+        return runNeedsUpdate(npcRef, store, roleId, 0.0, 0.0, false, true, commandBuffer, null);
     }
 
     /**
@@ -341,6 +343,23 @@ public final class CompanionNeedsService {
         return runNeedsUpdate(npcRef, store, null, 0.0, 0.0, true, heldItemId);
     }
 
+    public static boolean applyFeedInteractionRefill(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store,
+                                                     @Nullable String heldItemId,
+                                                     boolean reconcileHappiness) {
+        return runNeedsUpdate(
+                npcRef,
+                store,
+                null,
+                0.0,
+                0.0,
+                true,
+                reconcileHappiness,
+                null,
+                heldItemId
+        );
+    }
+
     /**
      * Applies an explicit consume attempt for water and/or food from action-driven seek flow.
      */
@@ -466,6 +485,7 @@ public final class CompanionNeedsService {
                 explicitHungerGain,
                 explicitThirstGain,
                 includeConfiguredManualGains,
+                true,
                 null,
                 heldItemId
         );
@@ -477,6 +497,7 @@ public final class CompanionNeedsService {
                                   double explicitHungerGain,
                                   double explicitThirstGain,
                                   boolean includeConfiguredManualGains,
+                                  boolean reconcileHappiness,
                                   @Nullable CommandBuffer<EntityStore> commandBuffer,
                                   @Nullable String heldItemId) {
         if (npcRef == null || store == null || !npcRef.isValid()) {
@@ -576,6 +597,12 @@ public final class CompanionNeedsService {
         }
         double pooledDamageAmount = needsDamagePool.getDamageToApply();
         double healthBeforeDamage = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
+        recordRecentNeedsDeathCause(
+                npcRef,
+                store,
+                resolveNeedsDamageCauseHint(config, values, hunger, thirst, effectiveElapsedMs, healthMax),
+                pooledDamageAmount
+        );
         NeedsDamageExecutionResult damageResult = applyNeedsDamage(
                 npcRef,
                 store,
@@ -607,7 +634,9 @@ public final class CompanionNeedsService {
         if (componentChanged) {
             putComponent(npcRef, store, commandBuffer, needsType, component);
         }
-        boolean happinessChanged = CompanionHappinessService.reconcile(npcRef, store, commandBuffer);
+        boolean happinessChanged = reconcileHappiness
+                ? CompanionHappinessService.reconcile(npcRef, store, commandBuffer)
+                : false;
         if (diagnosticsEnabled) {
             logNeedsDamageDiagnostics(
                     npcId,
@@ -794,6 +823,87 @@ public final class CompanionNeedsService {
             return 0.0;
         }
         return pendingNeedsDamage - Math.floor(pendingNeedsDamage);
+    }
+
+    @Nullable
+    static CommandLinkedNpcDeathService.DeathCauseKind resolveNeedsDamageCauseHint(@Nullable TwNeedsConfig config,
+                                                                                    @Nullable TwNeedsConfig.ValueSettings values,
+                                                                                    double hunger,
+                                                                                    double thirst,
+                                                                                    long effectiveElapsedMs,
+                                                                                    double healthMax) {
+        if (config == null || values == null || effectiveElapsedMs <= 0L) {
+            return null;
+        }
+        TwNeedsConfig.DamageSettings damageSettings = config.getDamage();
+        if (damageSettings == null || !damageSettings.isEnabled()) {
+            return null;
+        }
+        double elapsedMinutes = effectiveElapsedMs / MILLIS_PER_MINUTE;
+        if (!Double.isFinite(elapsedMinutes) || elapsedMinutes <= 0.0) {
+            return null;
+        }
+        boolean atHungerMin = hunger <= values.getHungerMin() + EPSILON;
+        boolean atThirstMin = thirst <= values.getThirstMin() + EPSILON;
+        if (!atHungerMin && !atThirstMin) {
+            return null;
+        }
+        double starvationDamage = atHungerMin
+                ? sanitizeNeedsDamageAmount(damageSettings.getStarvationDamagePerMinute() * elapsedMinutes)
+                : 0.0;
+        double dehydrationDamage = atThirstMin
+                ? sanitizeNeedsDamageAmount(damageSettings.getDehydrationDamagePerMinute() * elapsedMinutes)
+                : 0.0;
+        double selectedDamage = switch (damageSettings.getDualNeedRule()) {
+            case SUM_BOTH -> starvationDamage + dehydrationDamage;
+            case USE_HIGHER_ONLY -> Math.max(starvationDamage, dehydrationDamage);
+        };
+        if (selectedDamage <= 0.0) {
+            return null;
+        }
+        if (damageSettings.getModel() == TwNeedsConfig.DamageModel.MIN_ONLY_PERCENT
+                && (!Double.isFinite(healthMax) || healthMax <= 0.0)) {
+            return null;
+        }
+        if (starvationDamage > 0.0 && dehydrationDamage > 0.0) {
+            if (damageSettings.getDualNeedRule() == TwNeedsConfig.DualNeedRule.USE_HIGHER_ONLY) {
+                if (starvationDamage > dehydrationDamage) {
+                    return CommandLinkedNpcDeathService.DeathCauseKind.STARVATION;
+                }
+                if (dehydrationDamage > starvationDamage) {
+                    return CommandLinkedNpcDeathService.DeathCauseKind.DEHYDRATION;
+                }
+            }
+            return CommandLinkedNpcDeathService.DeathCauseKind.STARVATION_AND_DEHYDRATION;
+        }
+        if (starvationDamage > 0.0) {
+            return CommandLinkedNpcDeathService.DeathCauseKind.STARVATION;
+        }
+        if (dehydrationDamage > 0.0) {
+            return CommandLinkedNpcDeathService.DeathCauseKind.DEHYDRATION;
+        }
+        return null;
+    }
+
+    private static void recordRecentNeedsDeathCause(@Nonnull Ref<EntityStore> npcRef,
+                                                    @Nonnull Store<EntityStore> store,
+                                                    @Nullable CommandLinkedNpcDeathService.DeathCauseKind causeKind,
+                                                    double pooledDamageAmount) {
+        if (causeKind == null || !Double.isFinite(pooledDamageAmount) || pooledDamageAmount <= MIN_DAMAGE_AMOUNT) {
+            return;
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        if (npc == null || npc.getUuid() == null) {
+            return;
+        }
+        RecentNeedsDeathCauseService.getInstance().record(npc.getUuid(), causeKind, System.currentTimeMillis());
+    }
+
+    private static double sanitizeNeedsDamageAmount(double value) {
+        if (!Double.isFinite(value) || value < 0.0) {
+            return 0.0;
+        }
+        return value;
     }
 
     private static NeedsDamageExecutionResult applyNeedsDamage(@Nonnull Ref<EntityStore> npcRef,
