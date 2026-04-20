@@ -825,8 +825,8 @@ public final class CommandItemFeatureHandler {
         }
         TameworkCompanionTalentsPage page = new TameworkCompanionTalentsPage(
                 uiPlayerRef,
-                () -> buildTalentPageData(player, npcUuid),
-                talentId -> applyTalentPurchase(player, npcUuid, talentId),
+                () -> buildTalentPageData(player, toolId, npcUuid),
+                talentId -> applyTalentPurchase(player, toolId, npcUuid, talentId),
                 () -> reopenSelectionMenu(player, config, toolId)
         );
         try {
@@ -843,8 +843,9 @@ public final class CommandItemFeatureHandler {
 
     @Nonnull
     private TameworkCompanionTalentsPage.PageData buildTalentPageData(@Nonnull Player player,
+                                                                      @Nonnull String toolId,
                                                                       @Nonnull UUID npcUuid) {
-        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, npcUuid);
+        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
         if (context == null) {
             return TameworkCompanionTalentsPage.PageData.empty();
         }
@@ -933,9 +934,10 @@ public final class CommandItemFeatureHandler {
 
     @Nonnull
     private String applyTalentPurchase(@Nonnull Player player,
+                                       @Nonnull String toolId,
                                        @Nonnull UUID npcUuid,
                                        @Nullable String talentId) {
-        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, npcUuid);
+        LoadedCompanionTalentContext context = resolveLoadedCompanionTalentContext(player, toolId, npcUuid);
         if (context == null) {
             String message = "Companion is no longer loaded.";
             feedbackService.showWarning(player, message);
@@ -973,7 +975,11 @@ public final class CommandItemFeatureHandler {
 
     @Nullable
     private LoadedCompanionTalentContext resolveLoadedCompanionTalentContext(@Nonnull Player player,
+                                                                             @Nonnull String toolId,
                                                                              @Nonnull UUID npcUuid) {
+        if (toolId == null || toolId.isBlank()) {
+            return null;
+        }
         World world = player.getWorld();
         if (world == null) {
             return null;
@@ -986,8 +992,27 @@ public final class CommandItemFeatureHandler {
         if (npcRef == null || !npcRef.isValid()) {
             return null;
         }
+        ItemStack toolStack = findCommandToolStack(player, toolId);
+        if (toolStack == null || toolStack.isEmpty()) {
+            return null;
+        }
+        LinkedNpcRecord record = linkMutationService.findLinkedNpcRecord(
+                linkMutationService.readLinkedNpcRecords(toolStack),
+                npcUuid
+        );
+        if (record == null) {
+            return null;
+        }
         NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
         if (npc == null) {
+            return null;
+        }
+        TameworkCommandLinksComponent links = store.getComponent(npcRef, TameworkCommandLinksComponent.getComponentType());
+        if (links == null || !links.containsToolId(toolId)) {
+            return null;
+        }
+        UUID ownerId = links.getOwnerId();
+        if (ownerId != null && !ownerId.equals(player.getUuid())) {
             return null;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);

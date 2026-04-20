@@ -48,14 +48,15 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         if (targetRef == null || !targetRef.isValid()) {
             return;
         }
-        awardTakenXp(targetRef, store, damage);
         Ref<EntityStore> sourceRef = resolveNpcSourceRef(damage.getSource(), store);
+        awardTakenXp(sourceRef, targetRef, store, damage);
         if (sourceRef != null && sourceRef.isValid() && !sourceRef.equals(targetRef)) {
             awardDealtXp(sourceRef, targetRef, store, damage);
         }
     }
 
-    private void awardTakenXp(@Nonnull Ref<EntityStore> targetRef,
+    private void awardTakenXp(@Nullable Ref<EntityStore> sourceRef,
+                              @Nonnull Ref<EntityStore> targetRef,
                               @Nonnull Store<EntityStore> store,
                               @Nonnull Damage damage) {
         String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
@@ -71,7 +72,7 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
         if (!(finalDamage >= combat.getMinimumDamageEvent())) {
             return;
         }
-        if (!isCombatPairEligible(null, targetRef, store, combat, damage.getSource())) {
+        if (!isCombatPairEligible(sourceRef, targetRef, store, combat, damage.getSource())) {
             return;
         }
         double xp = finalDamage * combat.getDamageTakenXpPerPoint();
