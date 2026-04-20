@@ -8,7 +8,8 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -466,7 +467,7 @@ final class BreedingOffspringService {
                 ? ThreadLocalRandom.current().nextInt(minDelay, maxDelay + 1)
                 : minDelay;
         double baseSecondsWithDelay = (double) baseSeconds + (double) randomDelay;
-        double multiplier = TraitModifierService.resolveMultiplier(
+        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 BREED_COOLDOWN_MULTIPLIER_EFFECT_KEY,
@@ -822,6 +823,10 @@ final class BreedingOffspringService {
                     fertilityRoll.parentBMultiplier(),
                     fertilityRoll.expectedOffspring()
             ));
+        }
+        if (spawnedCount > 0) {
+            CompanionLevelingService.awardBreedingXp(parentARef, store);
+            CompanionLevelingService.awardBreedingXp(parentBRef, store);
         }
     }
 

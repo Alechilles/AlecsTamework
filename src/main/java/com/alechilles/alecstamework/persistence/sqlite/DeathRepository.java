@@ -101,14 +101,20 @@ public final class DeathRepository {
                             getDouble(payload, "lifeStageAdolescentSwitchScale", 0.80),
                             getDouble(payload, "lifeStageAdultStartScale", 0.80),
                             getDouble(payload, "lifeStageAdultSwitchScale", 1.00),
-                             getDouble(payload, "lifeStageAdultScale", 1.00),
-                             getBoolean(payload, "lifeStageGrowthScalingEnabled", false),
-                             getString(payload, "attachmentsConfigId"),
-                             getString(payload, "attachmentsValues"),
-                             getBoolean(payload, "breedingEnabled", false),
-                             parseDeathCauseKind(payload, "deathCauseKind"),
-                             getString(payload, "deathSourceName")
-                     ));
+                            getDouble(payload, "lifeStageAdultScale", 1.00),
+                            getBoolean(payload, "lifeStageGrowthScalingEnabled", false),
+                            getString(payload, "attachmentsConfigId"),
+                            getString(payload, "attachmentsValues"),
+                            getBoolean(payload, "breedingEnabled", false),
+                            getString(payload, "levelingConfigId"),
+                            (int) getLong(payload, "levelingLevel", 1L),
+                            getDouble(payload, "levelingTotalXp", 0.0),
+                            getString(payload, "talentsConfigId"),
+                            (int) getLong(payload, "talentsSpentPoints", 0L),
+                            getString(payload, "purchasedTalentIds"),
+                            parseDeathCauseKind(payload, "deathCauseKind"),
+                            getString(payload, "deathSourceName")
+                    ));
                 }
             }
         } catch (Exception ignored) {
@@ -236,6 +242,12 @@ public final class DeathRepository {
         putString(payload, "attachmentsConfigId", snapshot.attachmentsConfigId());
         putString(payload, "attachmentsValues", snapshot.attachmentsValues());
         payload.addProperty("breedingEnabled", snapshot.breedingEnabled());
+        putString(payload, "levelingConfigId", snapshot.levelingConfigId());
+        payload.addProperty("levelingLevel", snapshot.levelingLevel());
+        payload.addProperty("levelingTotalXp", snapshot.levelingTotalXp());
+        putString(payload, "talentsConfigId", snapshot.talentsConfigId());
+        payload.addProperty("talentsSpentPoints", snapshot.talentsSpentPoints());
+        putString(payload, "purchasedTalentIds", snapshot.purchasedTalentIds());
         if (snapshot.deathCauseKind() != null) {
             payload.addProperty("deathCauseKind", snapshot.deathCauseKind().name());
         }

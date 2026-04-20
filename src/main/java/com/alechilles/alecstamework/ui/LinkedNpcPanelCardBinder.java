@@ -13,6 +13,8 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  */
 final class LinkedNpcPanelCardBinder {
     private static final int CARD_HEIGHT = 92;
+    private static final int FUTURE_STAT_FILL_WIDTH = 358;
+    private static final int FUTURE_STAT_FILL_HEIGHT = 8;
 
     private LinkedNpcPanelCardBinder() {
     }
@@ -40,7 +42,11 @@ final class LinkedNpcPanelCardBinder {
         String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
         String statusConfirmSelector = entrySelector + " #StatusConfirm";
         String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
+        String secondaryStatFillSelector = entrySelector + " #FutureStatAFill";
+        String secondaryStatTextSelector = entrySelector + " #FutureStatAText";
         String tertiaryStatFrameSelector = entrySelector + " #FutureStatBFrame";
+        String tertiaryStatFillSelector = entrySelector + " #FutureStatBFill";
+        String tertiaryStatTextSelector = entrySelector + " #FutureStatBText";
         String futureActionBarSelector = entrySelector + " #FutureActionBar";
         String traitsButtonSelector = entrySelector + " #TraitsButton";
         String talentsButtonSelector = entrySelector + " #TalentsButton";
@@ -130,6 +136,8 @@ final class LinkedNpcPanelCardBinder {
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
         commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
+        bindFutureStat(commandBuilder, secondaryStatFillSelector, secondaryStatTextSelector, entry.futureStatA());
+        bindFutureStat(commandBuilder, tertiaryStatFillSelector, tertiaryStatTextSelector, entry.futureStatB());
         commandBuilder.set(futureActionBarSelector + ".Visible", entry.hasAnyFutureAction());
         commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
         commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
@@ -246,6 +254,36 @@ final class LinkedNpcPanelCardBinder {
                     false
             );
         }
+        if (entry.isTalentsActionVisible() && entry.isTalentsActionEnabled() && !pendingUnlink) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    talentsButtonSelector,
+                    EventData.of(config.eventCommandId(), config.openTalentsCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+    }
+
+    private static void bindFutureStat(UICommandBuilder commandBuilder,
+                                       String fillSelector,
+                                       String textSelector,
+                                       LinkedNpcEntry.FutureStat stat) {
+        if (commandBuilder == null || fillSelector == null || textSelector == null || stat == null) {
+            return;
+        }
+        commandBuilder.set(textSelector + ".Text", stat.label() + ": " + stat.current() + "/" + stat.max());
+        commandBuilder.setObject(fillSelector + ".Anchor", buildFutureStatFillAnchor(stat.current(), stat.max()));
+    }
+
+    private static Anchor buildFutureStatFillAnchor(int current, int max) {
+        double ratio = max <= 0 ? 0.0 : Math.max(0.0, Math.min(1.0, ((double) current) / (double) max));
+        int width = Math.max(0, Math.min(FUTURE_STAT_FILL_WIDTH, (int) Math.round(FUTURE_STAT_FILL_WIDTH * ratio)));
+        Anchor anchor = new Anchor();
+        anchor.setLeft(Value.of(1));
+        anchor.setTop(Value.of(1));
+        anchor.setWidth(Value.of(width));
+        anchor.setHeight(Value.of(FUTURE_STAT_FILL_HEIGHT));
+        return anchor;
     }
 
     private static Anchor buildCardAnchor() {
@@ -269,6 +307,7 @@ final class LinkedNpcPanelCardBinder {
                              String respawnCommandPrefix,
                              String recallCommandPrefix,
                              String setHomeCommandPrefix,
-                             String returnHomeCommandPrefix) {
+                             String returnHomeCommandPrefix,
+                             String openTalentsCommandPrefix) {
     }
 }

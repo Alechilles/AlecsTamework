@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ui.TameworkNameInputPage;
@@ -249,8 +250,17 @@ public final class NamingFeatureHandler {
                         ? () -> handleUiRandomRequested(player, request.playerUuid, request.requestId)
                         : null
         );
-        player.getPageManager().openCustomPage(playerRef, store, page);
-        return true;
+        try {
+            player.getPageManager().openCustomPage(playerRef, store, page);
+            return true;
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkNameInputPage"
+            );
+            return false;
+        }
     }
 
     private void handleUiNameCancelled(Player player, UUID playerUuid, UUID requestId) {

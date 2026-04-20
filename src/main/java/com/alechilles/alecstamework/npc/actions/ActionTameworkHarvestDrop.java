@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.ItemUtils;
@@ -84,7 +84,7 @@ public final class ActionTameworkHarvestDrop extends ActionDropItem {
     }
 
     private boolean shouldDoubleDrops(@Nonnull Ref<EntityStore> npcRef, @Nonnull Store<EntityStore> store) {
-        double multiplier = TraitModifierService.resolveMultiplier(
+        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 HARVEST_DOUBLE_DROP_CHANCE_EFFECT_KEY,

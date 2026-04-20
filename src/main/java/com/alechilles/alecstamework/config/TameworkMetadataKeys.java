@@ -27,6 +27,12 @@ public final class TameworkMetadataKeys {
     public static final String BREEDING_ENABLED = "Tamework.Breeding.Enabled";
     public static final String BREEDING_COOLDOWN_UNTIL = "Tamework.Breeding.CooldownUntil";
     public static final String BREEDING_LAST_PARTNER_UUID = "Tamework.Breeding.LastPartnerUuid";
+    public static final String LEVELING_CONFIG_ID = "Tamework.Leveling.ConfigId";
+    public static final String LEVELING_LEVEL = "Tamework.Leveling.Level";
+    public static final String LEVELING_TOTAL_XP = "Tamework.Leveling.TotalXp";
+    public static final String TALENTS_CONFIG_ID = "Tamework.Talents.ConfigId";
+    public static final String TALENTS_SPENT_POINTS = "Tamework.Talents.SpentPoints";
+    public static final String TALENTS_PURCHASED_IDS = "Tamework.Talents.PurchasedIds";
     public static final String TRAITS_CONFIG_ID = "Tamework.Traits.ConfigId";
     public static final String TRAITS_ROLL_SEED = "Tamework.Traits.RollSeed";
     public static final String TRAITS_VALUES = "Tamework.Traits.Values";

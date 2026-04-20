@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.ExtraInfo;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -98,13 +99,22 @@ public final class TameworkCommandGroupManagerPage
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        refreshGroups();
-        commandBuilder.append(UI_PATH);
-        commandBuilder.set("#TameworkGroupManagerSubtitle.Text", resolveSubtitleText());
-        commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
-        commandBuilder.set("#TameworkGroupColorInput.Color", draftColor);
-        bindList(commandBuilder, eventBuilder);
-        bindHeaderEvents(eventBuilder);
+        try {
+            refreshGroups();
+            commandBuilder.append(UI_PATH);
+            commandBuilder.set("#TameworkGroupManagerSubtitle.Text", resolveSubtitleText());
+            commandBuilder.set("#TameworkGroupNameInput.Value", draftName);
+            commandBuilder.set("#TameworkGroupColorInput.Color", draftColor);
+            bindList(commandBuilder, eventBuilder);
+            bindHeaderEvents(eventBuilder);
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_build_failed",
+                    throwable,
+                    "page=TameworkCommandGroupManagerPage"
+            );
+            throw throwable;
+        }
     }
 
     @Override

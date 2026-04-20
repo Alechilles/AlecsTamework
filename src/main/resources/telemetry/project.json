@@ -2,6 +2,25 @@
   "schemaVersion": 1,
   "projectId": "alecs-tamework",
   "displayName": "Alec's Tamework!",
+  "runtimeMode": "dependency",
+  "performance": {
+    "enabled": true,
+    "sampleRate": 1.0,
+    "thresholdMs": 100
+  },
+  "usage": {
+    "enabled": true,
+    "allowedEvents": [
+      "config_editor_opened",
+      "config_editor_apply_requested",
+      "config_editor_apply_succeeded",
+      "reload_config_command_used",
+      "settings_page_opened",
+      "news_command_opened",
+      "settings_announcement_opened",
+      "settings_announcement_reviewed"
+    ]
+  },
   "ownerPluginIdentifiers": [
     "Alechilles:Alec's Tamework!"
   ],
@@ -20,6 +39,7 @@
   },
   "hosted": {
     "endpoint": "https://telemetry.alecsmods.com/ingest/crash",
+    "eventEndpoint": "https://telemetry.alecsmods.com/ingest/event",
     "projectKey": "dev_tamework_local_test"
   }
 }

@@ -100,9 +100,18 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        commandBuilder.append(UI_PATH);
-        bindStaticEvents(eventBuilder);
-        render(commandBuilder);
+        try {
+            commandBuilder.append(UI_PATH);
+            bindStaticEvents(eventBuilder);
+            render(commandBuilder);
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_build_failed",
+                    throwable,
+                    "page=TameworkSettingsPage"
+            );
+            throw throwable;
+        }
     }
 
     @Override

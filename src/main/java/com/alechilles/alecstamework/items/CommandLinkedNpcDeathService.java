@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.DeathRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
@@ -11,11 +12,14 @@ import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -53,6 +57,7 @@ public final class CommandLinkedNpcDeathService {
     private static final String ARRAY_SEPARATOR = ";";
     private static final String ATTACHMENT_KV_SEPARATOR = ",";
     private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
+    private static final long BLOCKED_TELEMETRY_INTERVAL_MS = 5000L;
 
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
     @Nullable
@@ -65,6 +70,7 @@ public final class CommandLinkedNpcDeathService {
     private final Object persistenceLock = new Object();
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
+    private volatile long lastBlockedTelemetryAtMs;
 
     public CommandLinkedNpcDeathService() {
         this(null, null, null, null, null);
@@ -199,6 +205,12 @@ public final class CommandLinkedNpcDeathService {
                                 cached.attachmentsConfigId(),
                                 cached.attachmentsValues(),
                                 cached.breedingEnabled(),
+                                cached.levelingConfigId(),
+                                cached.levelingLevel(),
+                                cached.levelingTotalXp(),
+                                cached.talentsConfigId(),
+                                cached.talentsSpentPoints(),
+                                cached.purchasedTalentIds(),
                                 deathDetails.causeKind(),
                                 deathDetails.sourceName()
                         )
@@ -284,6 +296,22 @@ public final class CommandLinkedNpcDeathService {
                 : CompanionModelAttachmentService.resolveCurrentAttachments(reference, store);
         String attachmentsValues = encodeAttachmentSelections(attachmentSelections);
 
+        ComponentType<EntityStore, TameworkLevelingComponent> levelingType = TameworkLevelingComponent.getComponentType();
+        TameworkLevelingComponent levelingComponent = levelingType != null
+                ? store.getComponent(reference, levelingType)
+                : null;
+        String levelingConfigId = levelingComponent != null ? levelingComponent.getConfigId() : null;
+        int levelingLevel = levelingComponent != null ? levelingComponent.getLevel() : 1;
+        double levelingTotalXp = levelingComponent != null ? levelingComponent.getTotalXp() : 0.0;
+
+        ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
+        TameworkTalentsComponent talentsComponent = talentsType != null
+                ? store.getComponent(reference, talentsType)
+                : null;
+        String talentsConfigId = talentsComponent != null ? talentsComponent.getConfigId() : null;
+        int talentsSpentPoints = talentsComponent != null ? talentsComponent.getSpentPoints() : 0;
+        String purchasedTalentIds = talentsComponent != null ? TalentIdCodec.encode(talentsComponent.getPurchasedTalentIds()) : null;
+
         TransformComponent transform = store.getComponent(reference, TransformComponent.getComponentType());
         Vector3d lastKnownPosition = transform != null ? new Vector3d(transform.getPosition()) : null;
         Vector3d homePosition = links.hasHome() ? links.getHomePosition() : null;
@@ -334,6 +362,12 @@ public final class CommandLinkedNpcDeathService {
                         attachmentsConfigId,
                         attachmentsValues,
                         breedingEnabled,
+                        levelingConfigId,
+                        levelingLevel,
+                        levelingTotalXp,
+                        talentsConfigId,
+                        talentsSpentPoints,
+                        purchasedTalentIds,
                         deathDetails.causeKind(),
                         deathDetails.sourceName()
                 )
@@ -441,6 +475,12 @@ public final class CommandLinkedNpcDeathService {
                     snapshot.attachmentsConfigId(),
                     snapshot.attachmentsValues(),
                     snapshot.breedingEnabled(),
+                    snapshot.levelingConfigId(),
+                    snapshot.levelingLevel(),
+                    snapshot.levelingTotalXp(),
+                    snapshot.talentsConfigId(),
+                    snapshot.talentsSpentPoints(),
+                    snapshot.purchasedTalentIds(),
                     snapshot.deathCauseKind(),
                     snapshot.deathSourceName()
             );
@@ -478,7 +518,12 @@ public final class CommandLinkedNpcDeathService {
                     }
                     deadByNpc.put(snapshot.npcUuid(), snapshot);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "death_snapshot_load_failed",
+                        ex,
+                        "Failed to load dead linked-NPC snapshots from " + persistencePath + "."
+                );
                 // Ignore persistence read issues; runtime tracking still works for newly dead NPCs.
             }
         }
@@ -512,7 +557,12 @@ public final class CommandLinkedNpcDeathService {
                     builder.append(encodeSnapshot(snapshot));
                 }
                 Files.writeString(persistencePath, builder.toString(), StandardCharsets.UTF_8);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "death_snapshot_persist_failed",
+                        ex,
+                        "Failed to persist dead linked-NPC snapshots to " + persistencePath + "."
+                );
                 // Ignore persistence write issues; runtime tracking remains available.
             }
         }
@@ -542,6 +592,17 @@ public final class CommandLinkedNpcDeathService {
             return true;
         }
         PersistenceHealthService.HealthState state = healthService.getState();
+        long now = System.currentTimeMillis();
+        if (now - lastBlockedTelemetryAtMs >= BLOCKED_TELEMETRY_INTERVAL_MS) {
+            lastBlockedTelemetryAtMs = now;
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "death_transition_blocked",
+                    null,
+                    "Persistence blocked death transition: "
+                            + (state.reason() != null ? state.reason() : "unknown")
+                            + "."
+            );
+        }
         CoopDebugLogger.log(
                 "persistence blocked mutation service=death reason="
                         + (state.reason() != null ? state.reason() : "unknown")
@@ -611,6 +672,12 @@ public final class CommandLinkedNpcDeathService {
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsConfigId())
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.attachmentsValues())
                 + FIELD_SEPARATOR + snapshot.breedingEnabled()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.levelingConfigId())
+                + FIELD_SEPARATOR + snapshot.levelingLevel()
+                + FIELD_SEPARATOR + snapshot.levelingTotalXp()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.talentsConfigId())
+                + FIELD_SEPARATOR + snapshot.talentsSpentPoints()
+                + FIELD_SEPARATOR + encodeNullableString(snapshot.purchasedTalentIds())
                 + FIELD_SEPARATOR + encodeNullableEnum(snapshot.deathCauseKind())
                 + FIELD_SEPARATOR + encodeNullableString(snapshot.deathSourceName());
     }
@@ -681,8 +748,34 @@ public final class CommandLinkedNpcDeathService {
         String attachmentsConfigId = parts.length > 34 ? decodeNullableString(parts[34]) : null;
         String attachmentsValues = parts.length > 35 ? decodeNullableString(parts[35]) : null;
         boolean breedingEnabled = parts.length > 36 && Boolean.parseBoolean(parts[36]);
-        DeathCauseKind deathCauseKind = parts.length > 37 ? decodeNullableEnum(parts[37], DeathCauseKind.class) : null;
-        String deathSourceName = parts.length > 38 ? decodeNullableString(parts[38]) : null;
+        String levelingConfigId = null;
+        int levelingLevel = 1;
+        double levelingTotalXp = 0.0;
+        String talentsConfigId = null;
+        int talentsSpentPoints = 0;
+        String purchasedTalentIds = null;
+        DeathCauseKind deathCauseKind = null;
+        String deathSourceName = null;
+        if (parts.length >= 45) {
+            levelingConfigId = decodeNullableString(parts[37]);
+            levelingLevel = (int) parseLong(parts[38], 1L);
+            levelingTotalXp = parseDouble(parts[39], 0.0);
+            talentsConfigId = decodeNullableString(parts[40]);
+            talentsSpentPoints = (int) parseLong(parts[41], 0L);
+            purchasedTalentIds = decodeNullableString(parts[42]);
+            deathCauseKind = decodeNullableEnum(parts[43], DeathCauseKind.class);
+            deathSourceName = decodeNullableString(parts[44]);
+        } else if (parts.length >= 43) {
+            levelingConfigId = decodeNullableString(parts[37]);
+            levelingLevel = (int) parseLong(parts[38], 1L);
+            levelingTotalXp = parseDouble(parts[39], 0.0);
+            talentsConfigId = decodeNullableString(parts[40]);
+            talentsSpentPoints = (int) parseLong(parts[41], 0L);
+            purchasedTalentIds = decodeNullableString(parts[42]);
+        } else if (parts.length >= 39) {
+            deathCauseKind = decodeNullableEnum(parts[37], DeathCauseKind.class);
+            deathSourceName = decodeNullableString(parts[38]);
+        }
         return new DeadLinkedNpcSnapshot(
                 npcUuid,
                 ownerId,
@@ -721,6 +814,12 @@ public final class CommandLinkedNpcDeathService {
                 attachmentsConfigId,
                 attachmentsValues,
                 breedingEnabled,
+                levelingConfigId,
+                levelingLevel,
+                levelingTotalXp,
+                talentsConfigId,
+                talentsSpentPoints,
+                purchasedTalentIds,
                 deathCauseKind,
                 deathSourceName
         );
@@ -1139,11 +1238,17 @@ public final class CommandLinkedNpcDeathService {
                                          double lifeStageAdultSwitchScale,
                                          double lifeStageAdultScale,
                                          boolean lifeStageGrowthScalingEnabled,
-                                         @Nullable String attachmentsConfigId,
-                                         @Nullable String attachmentsValues,
-                                         boolean breedingEnabled,
-                                         @Nullable DeathCauseKind deathCauseKind,
-                                         @Nullable String deathSourceName) {
+                                          @Nullable String attachmentsConfigId,
+                                          @Nullable String attachmentsValues,
+                                          boolean breedingEnabled,
+                                          @Nullable String levelingConfigId,
+                                          int levelingLevel,
+                                          double levelingTotalXp,
+                                          @Nullable String talentsConfigId,
+                                          int talentsSpentPoints,
+                                          @Nullable String purchasedTalentIds,
+                                          @Nullable DeathCauseKind deathCauseKind,
+                                          @Nullable String deathSourceName) {
         public boolean containsToolId(String toolId) {
             if (toolId == null || toolIds == null || toolIds.length == 0) {
                 return false;

@@ -13,8 +13,10 @@ public record ProgressionView(@Nullable String profileId,
                               @Nullable HappinessView happiness,
                               @Nullable NeedsView needs,
                               @Nullable BreedingView breeding,
+                              @Nullable LevelingView leveling,
                               @Nullable LifeStageView lifeStage,
                               @Nullable TraitsView traits,
+                              @Nullable TalentsView talents,
                               @Nullable AttachmentsView attachments) {
     public record HappinessView(@Nullable String configId,
                                 double value,
@@ -56,8 +58,17 @@ public record ProgressionView(@Nullable String profileId,
                                long lastHappinessUpdateMs,
                                @Nullable Double effectiveHappiness,
                                @Nullable Double threshold,
-                               @Nullable Boolean eligible,
-                               double fertilityMultiplier) {
+                                @Nullable Boolean eligible,
+                                double fertilityMultiplier) {
+    }
+
+    public record LevelingView(@Nullable String configId,
+                               int level,
+                               double currentXp,
+                               double totalXp,
+                               double nextLevelXp,
+                               int maxLevel,
+                               boolean atMaxLevel) {
     }
 
     public record LifeStageView(@Nonnull String stage,
@@ -82,6 +93,15 @@ public record ProgressionView(@Nullable String profileId,
     public record TraitsView(@Nullable String configId,
                              long rollSeed,
                              @Nonnull List<TraitValueView> values) {
+    }
+
+    public record TalentsView(@Nullable String configId,
+                              int availablePoints,
+                              int spentPoints,
+                              @Nonnull List<String> purchasedTalentIds) {
+        public TalentsView {
+            purchasedTalentIds = List.copyOf(purchasedTalentIds);
+        }
     }
 
     public record TraitValueView(@Nonnull String id,

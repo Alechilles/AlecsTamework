@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.progression;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.hypixel.hytale.component.Store;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
@@ -246,6 +247,37 @@ class CompanionNeedsServiceDamageTest {
         assertEquals(30.0, resolution.getNextBaselineHealth(), 0.000001);
         assertEquals(0.0, resolution.getNextAllowedExternalHeal(), 0.000001);
         assertEquals(20.0, resolution.getHealthOverflowToRemove(), 0.000001);
+    }
+
+    @Test
+    void frequentSuppressionTickSkippedForHealthyCompanionsWithoutResidualState() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled();
+        TameworkNeedsComponent component = new TameworkNeedsComponent("needs", 50.0, 50.0, 0.0, 0L, 0L);
+
+        boolean required = CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(component, config);
+
+        assertEquals(false, required);
+    }
+
+    @Test
+    void frequentSuppressionTickRequiredWhileNeedsDamageStateActive() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled();
+        TameworkNeedsComponent component = new TameworkNeedsComponent("needs", 0.0, 50.0, 0.0, 0L, 0L);
+
+        boolean required = CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(component, config);
+
+        assertEquals(true, required);
+    }
+
+    @Test
+    void frequentSuppressionTickRequiredForResidualSuppressionCleanup() throws Exception {
+        TwNeedsConfig config = createConfigWithDamageEnabled();
+        TameworkNeedsComponent component = new TameworkNeedsComponent("needs", 50.0, 50.0, 0.0, 0L, 0L);
+        component.setRegenSuppressionBaselineHealth(12.0);
+
+        boolean required = CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(component, config);
+
+        assertEquals(true, required);
     }
 
     @Test

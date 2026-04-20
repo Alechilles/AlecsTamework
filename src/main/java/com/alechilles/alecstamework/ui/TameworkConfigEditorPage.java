@@ -119,9 +119,18 @@ public final class TameworkConfigEditorPage
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        commandBuilder.append(UI_PATH);
-        bindStaticEvents(eventBuilder);
-        render(commandBuilder, eventBuilder);
+        try {
+            commandBuilder.append(UI_PATH);
+            bindStaticEvents(eventBuilder);
+            render(commandBuilder, eventBuilder);
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_build_failed",
+                    throwable,
+                    "page=TameworkConfigEditorPage"
+            );
+            throw throwable;
+        }
     }
 
     @Override
@@ -244,6 +253,7 @@ public final class TameworkConfigEditorPage
             statusLine = "";
             return;
         }
+        plugin.getTelemetryEvents().recordUsage("config_editor_apply_requested", "Apply requested from /tw config.");
         applyConfirmVisible = false;
         String validationError = firstValidationError();
         if (validationError != null) {
@@ -288,18 +298,32 @@ public final class TameworkConfigEditorPage
                     applyInProgress = false;
                     if (throwable != null || result == null) {
                         plugin.getLogger().at(Level.WARNING).withCause(throwable).log("TwConfig async apply failed.");
+                        plugin.getTelemetryEvents().recordError(
+                                "config_editor_apply_failed",
+                                throwable,
+                                "Async /tw config apply failed."
+                        );
                         statusLine = "";
                         warningLine = tr("tamework.ui.configEditor.warning.applyFailed");
                         refreshUi();
                         return;
                     }
                     if (result.isSuccess()) {
+                        plugin.getTelemetryEvents().recordUsage(
+                                "config_editor_apply_succeeded",
+                                "Applied overrides from /tw config."
+                        );
                         reloadSnapshot(false);
                         statusLine = result.getMessage();
                         warningLine = "";
                         refreshUi();
                         return;
                     }
+                    plugin.getTelemetryEvents().recordError(
+                            "config_editor_apply_failed",
+                            null,
+                            result.getMessage()
+                    );
                     statusLine = "";
                     warningLine = result.getMessage();
                     refreshUi();

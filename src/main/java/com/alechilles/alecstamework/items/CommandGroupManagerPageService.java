@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.ui.TameworkCommandGroupManagerPage;
 import com.hypixel.hytale.codec.Codec;
@@ -55,7 +56,15 @@ final class CommandGroupManagerPageService {
                 backCallback != null ? backCallback : () -> { },
                 () -> { }
         );
-        player.getPageManager().openCustomPage(playerRef, store, page);
+        try {
+            player.getPageManager().openCustomPage(playerRef, store, page);
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkCommandGroupManagerPage toolId=" + toolId
+            );
+        }
     }
 
     private List<TameworkCommandGroupManagerPage.GroupEntry> resolveGroupEntriesForTool(Player player, String toolId) {

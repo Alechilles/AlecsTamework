@@ -116,6 +116,12 @@ class TameworkEventBusTest {
                 null,
                 null,
                 false,
+                null,
+                1,
+                0.0,
+                null,
+                0,
+                null,
                 CommandLinkedNpcDeathService.DeathCauseKind.PLAYER,
                 "Owner B"
         ), profile);

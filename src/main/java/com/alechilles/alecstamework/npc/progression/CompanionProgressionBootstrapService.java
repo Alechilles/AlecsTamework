@@ -46,9 +46,11 @@ public final class CompanionProgressionBootstrapService {
         TwBreedingConfig breedingConfig = TwBreedingConfig.resolveForRole(roleId);
         bootstrapHappinessComponent(npcRef, store, roleId);
         CompanionNeedsService.tickNeeds(npcRef, store, roleId);
+        CompanionLevelingService.ensureLevelingComponent(npcRef, store, roleId);
         TameworkHappinessComponent happiness = resolveHappinessComponent(npcRef, store);
         bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
         ensureTraitComponents(npcRef, store, roleId);
+        CompanionAttachmentStateService.seedStoredAttachments(npcRef, store);
     }
 
     /**
@@ -71,6 +73,7 @@ public final class CompanionProgressionBootstrapService {
         TwTraitConfig traitConfig = TwTraitConfig.resolveForRole(roleId);
         double previousSizeMultiplier = resolveSizeMultiplier(npcRef, store, traitConfig);
         bootstrapTraitsComponent(npcRef, store, roleId);
+        CompanionLevelingService.ensureLevelingComponent(npcRef, store, roleId);
         double nextSizeMultiplier = resolveSizeMultiplier(npcRef, store, traitConfig);
         CompanionStatModifierService.applyTraitModifiers(npcRef, store);
         CompanionLifeStageService.ensureLifeStageComponent(npcRef, store, roleId);

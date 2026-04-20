@@ -52,7 +52,17 @@ public final class TameworkConfigCommand extends AbstractPlayerCommand {
             return;
         }
 
-        TameworkConfigEditorPage page = new TameworkConfigEditorPage(uiPlayerRef, plugin, world);
-        player.getPageManager().openCustomPage(ref, store, page);
+        try {
+            TameworkConfigEditorPage page = new TameworkConfigEditorPage(uiPlayerRef, plugin, world);
+            player.getPageManager().openCustomPage(ref, store, page);
+            plugin.getTelemetryEvents().recordUsage("config_editor_opened", "Opened via /tw config.");
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkConfigEditorPage action=/tw config"
+            );
+            commandContext.sender().sendMessage(Message.raw("Unable to open the config editor right now."));
+        }
     }
 }

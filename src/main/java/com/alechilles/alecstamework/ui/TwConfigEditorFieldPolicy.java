@@ -215,6 +215,7 @@ final class TwConfigEditorFieldPolicy {
             case BREEDING -> BREEDING_TIMER_BASIS_PATHS.contains(normalized)
                     ? enumValues(TwBreedingConfig.TimerBasis.values(), TwBreedingConfig.TimerBasis::toConfigValue)
                     : List.of();
+            case LEVELING, TALENT -> List.of();
             case NEEDS -> {
                 if (NEEDS_TIMER_BASIS_PATHS.contains(normalized)) {
                     yield enumValues(TwNeedsConfig.TimerBasis.values(), TwNeedsConfig.TimerBasis::toConfigValue);

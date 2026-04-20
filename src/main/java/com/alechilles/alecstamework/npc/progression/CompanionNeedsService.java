@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -471,6 +472,33 @@ public final class CompanionNeedsService {
         return shouldSuppressNaturalRegen(config, values, hunger, thirst);
     }
 
+    /**
+     * Returns whether this NPC needs the high-frequency suppression-only pass between normal needs sweeps.
+     *
+     * <p>Healthy companions with no active suppression state can skip that per-tick work until the next normal
+     * sweep updates hunger/thirst again.
+     */
+    public static boolean requiresFrequentNaturalRegenSuppressionTick(@Nullable Ref<EntityStore> npcRef,
+                                                                      @Nullable Store<EntityStore> store,
+                                                                      @Nullable String roleId) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return false;
+        }
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
+        if (needsType == null) {
+            return false;
+        }
+        TameworkNeedsComponent component = store.getComponent(npcRef, needsType);
+        if (component == null) {
+            return false;
+        }
+        TwNeedsConfig config = resolveNeedsConfig(npcRef, store, roleId, component);
+        if (config == null || !config.isEnabled()) {
+            return false;
+        }
+        return requiresFrequentNaturalRegenSuppressionTick(component, config);
+    }
+
     static boolean runNeedsUpdate(@Nullable Ref<EntityStore> npcRef,
                                   @Nullable Store<EntityStore> store,
                                   @Nullable String roleId,
@@ -528,6 +556,7 @@ public final class CompanionNeedsService {
         boolean diagnosticsEnabled = isNeedsDamageDiagnosticsEnabled();
         String npcId = diagnosticsEnabled ? resolveNpcId(npcRef, store) : "<disabled>";
         double healthBeforeTick = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
+        double managedHealthBeforeTick = diagnosticsEnabled ? normalizeManagedHealth(component.getLastManagedHealth()) : REGEN_SUPPRESSION_BASELINE_UNSET;
         double pendingNeedsDamageBefore = component.getPendingNeedsDamage();
         double baselineBeforeSuppression = component.getRegenSuppressionBaselineHealth();
         double allowedHealBeforeSuppression = component.getRegenSuppressionAllowedHeal();
@@ -637,7 +666,18 @@ public final class CompanionNeedsService {
         boolean happinessChanged = reconcileHappiness
                 ? CompanionHappinessService.reconcile(npcRef, store, commandBuffer)
                 : false;
-        if (diagnosticsEnabled) {
+        boolean externalDamageSuspected = diagnosticsEnabled
+                && isExternalDamageSuspected(healthBeforeTick, managedHealthBeforeTick, suppressNaturalRegen, pooledDamageAmount);
+        String recentAttackerLabel = externalDamageSuspected ? resolveRecentAttackerLabel(npcRef, store) : "<none>";
+        if (diagnosticsEnabled && shouldLogNeedsDamageDiagnostics(
+                suppressNaturalRegen,
+                regenSuppressionChanged,
+                suppressionHealthDelta,
+                needsDamageAmount,
+                pooledDamageAmount,
+                damageResult,
+                externalDamageSuspected
+        )) {
             logNeedsDamageDiagnostics(
                     npcId,
                     roleId,
@@ -666,11 +706,37 @@ public final class CompanionNeedsService {
                     component.getRegenSuppressionAllowedHeal(),
                     suppressionHealthDelta,
                     damageResult,
+                    externalDamageSuspected,
+                    recentAttackerLabel,
                     componentChanged,
                     happinessChanged
             );
         }
         return componentChanged || happinessChanged || damageApplied;
+    }
+
+    static boolean requiresFrequentNaturalRegenSuppressionTick(@Nullable TameworkNeedsComponent component,
+                                                               @Nullable TwNeedsConfig config) {
+        if (component == null || config == null || !config.isEnabled()) {
+            return false;
+        }
+        TwNeedsConfig.ValueSettings values = config.getValues();
+        double hunger = sanitizeAndClamp(
+                component.getHunger(),
+                values.getHungerDefault(),
+                values.getHungerMin(),
+                values.getHungerMax()
+        );
+        double thirst = sanitizeAndClamp(
+                component.getThirst(),
+                values.getThirstDefault(),
+                values.getThirstMin(),
+                values.getThirstMax()
+        );
+        if (shouldSuppressNaturalRegen(config, values, hunger, thirst)) {
+            return true;
+        }
+        return hasResidualNaturalRegenSuppressionState(component);
     }
 
     @Nullable
@@ -745,6 +811,16 @@ public final class CompanionNeedsService {
         boolean atHungerMin = hunger <= values.getHungerMin() + EPSILON;
         boolean atThirstMin = thirst <= values.getThirstMin() + EPSILON;
         return atHungerMin || atThirstMin;
+    }
+
+    private static boolean hasResidualNaturalRegenSuppressionState(@Nonnull TameworkNeedsComponent component) {
+        double baseline = normalizeRegenSuppressionBaselineHealth(component.getRegenSuppressionBaselineHealth());
+        if (Math.abs(baseline - REGEN_SUPPRESSION_BASELINE_UNSET) > EPSILON
+                || !Double.isFinite(component.getRegenSuppressionBaselineHealth())) {
+            return true;
+        }
+        double allowance = normalizeRegenSuppressionAllowedHeal(component.getRegenSuppressionAllowedHeal());
+        return allowance > EPSILON || !Double.isFinite(component.getRegenSuppressionAllowedHeal());
     }
 
     static double resolveNeedsDamageAmount(@Nullable TwNeedsConfig config,
@@ -1296,6 +1372,8 @@ public final class CompanionNeedsService {
                                                   double allowedHealAfter,
                                                   double suppressionHealthDelta,
                                                   @Nonnull NeedsDamageExecutionResult damageResult,
+                                                  boolean externalDamageSuspected,
+                                                  @Nonnull String recentAttackerLabel,
                                                   boolean componentChanged,
                                                   boolean happinessChanged) {
         LOGGER.log(Level.INFO, String.format(
@@ -1304,6 +1382,7 @@ public final class CompanionNeedsService {
                         + "hpDamage=%.3f->%.3f suppress=%s baseline=%.3f->%.3f allowance=%.3f->%.3f "
                         + "suppressionDelta=%.3f damageRaw=%.6f pending=%.6f->%.6f apply=%.6f "
                         + "damageRequested=%.6f damagePlanned=%.6f damageFinal=%.6f damageCancelled=%s damageApplied=%s "
+                        + "externalDamageSuspected=%s recentAttacker=%s "
                         + "componentChanged=%s happinessChanged=%s",
                 npcId,
                 safeLabel(roleId),
@@ -1336,9 +1415,87 @@ public final class CompanionNeedsService {
                 damageResult.finalDamageAmount,
                 damageResult.cancelled,
                 damageResult.applied,
+                externalDamageSuspected,
+                recentAttackerLabel,
                 componentChanged,
                 happinessChanged
         ));
+    }
+
+    private static boolean shouldLogNeedsDamageDiagnostics(boolean suppressNaturalRegen,
+                                                           boolean regenSuppressionChanged,
+                                                           double suppressionHealthDelta,
+                                                           double calculatedDamageAmount,
+                                                           double pooledDamageAmount,
+                                                           @Nonnull NeedsDamageExecutionResult damageResult) {
+        if (regenSuppressionChanged || suppressionHealthDelta > EPSILON) {
+            return true;
+        }
+        if (suppressNaturalRegen) {
+            return true;
+        }
+        if (calculatedDamageAmount > MIN_DAMAGE_AMOUNT || pooledDamageAmount > MIN_DAMAGE_AMOUNT) {
+            return true;
+        }
+        return damageResult.applied
+                || damageResult.cancelled
+                || damageResult.plannedDamageAmount > MIN_DAMAGE_AMOUNT
+                || damageResult.finalDamageAmount > MIN_DAMAGE_AMOUNT;
+    }
+
+    private static boolean shouldLogNeedsDamageDiagnostics(boolean suppressNaturalRegen,
+                                                           boolean regenSuppressionChanged,
+                                                           double suppressionHealthDelta,
+                                                           double calculatedDamageAmount,
+                                                           double pooledDamageAmount,
+                                                           @Nonnull NeedsDamageExecutionResult damageResult,
+                                                           boolean externalDamageSuspected) {
+        if (externalDamageSuspected) {
+            return true;
+        }
+        return shouldLogNeedsDamageDiagnostics(
+                suppressNaturalRegen,
+                regenSuppressionChanged,
+                suppressionHealthDelta,
+                calculatedDamageAmount,
+                pooledDamageAmount,
+                damageResult
+        );
+    }
+
+    private static boolean isExternalDamageSuspected(double currentHealth,
+                                                     double previousManagedHealth,
+                                                     boolean suppressNaturalRegen,
+                                                     double pooledDamageAmount) {
+        if (suppressNaturalRegen || pooledDamageAmount > MIN_DAMAGE_AMOUNT) {
+            return false;
+        }
+        if (!Double.isFinite(currentHealth)
+                || previousManagedHealth == REGEN_SUPPRESSION_BASELINE_UNSET
+                || !Double.isFinite(previousManagedHealth)) {
+            return false;
+        }
+        return currentHealth + EPSILON < previousManagedHealth;
+    }
+
+    @Nonnull
+    private static String resolveRecentAttackerLabel(@Nullable Ref<EntityStore> npcRef,
+                                                     @Nullable Store<EntityStore> store) {
+        if (npcRef == null || store == null || !npcRef.isValid()) {
+            return "<none>";
+        }
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        UUID npcUuid = npc != null ? npc.getUuid() : null;
+        DamageTargetMemoryService.RecentAttackerSnapshot snapshot = DamageTargetMemoryService.getInstance()
+                .getRecentAttacker(npcUuid, 60_000L, System.currentTimeMillis());
+        if (snapshot == null) {
+            return "<none>";
+        }
+        String attackerName = snapshot.attackerName();
+        if (attackerName != null && !attackerName.isBlank()) {
+            return snapshot.attackerKind() + ":" + attackerName;
+        }
+        return snapshot.attackerKind().name();
     }
 
     @Nonnull

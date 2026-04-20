@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -75,13 +76,22 @@ public final class TameworkSettingsAnnouncementPage
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        commandBuilder.append(UI_PATH);
-        commandBuilder.set("#TwSettingsAnnouncementTitle.Text", title);
-        commandBuilder.set("#TwSettingsAnnouncementSubtitle.Text", subtitle);
-        commandBuilder.set("#TwSettingsAnnouncementBody.Text", bodyText);
-        commandBuilder.set("#TwSettingsAnnouncementOptOutLabel.Text", optOutLabel);
-        commandBuilder.set("#TwSettingsAnnouncementOptOutCheck.Value", suppressUntilNextAnnouncement);
-        bindEvents(eventBuilder);
+        try {
+            commandBuilder.append(UI_PATH);
+            commandBuilder.set("#TwSettingsAnnouncementTitle.Text", title);
+            commandBuilder.set("#TwSettingsAnnouncementSubtitle.Text", subtitle);
+            commandBuilder.set("#TwSettingsAnnouncementBody.Text", bodyText);
+            commandBuilder.set("#TwSettingsAnnouncementOptOutLabel.Text", optOutLabel);
+            commandBuilder.set("#TwSettingsAnnouncementOptOutCheck.Value", suppressUntilNextAnnouncement);
+            bindEvents(eventBuilder);
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_build_failed",
+                    throwable,
+                    "page=TameworkSettingsAnnouncementPage"
+            );
+            throw throwable;
+        }
     }
 
     @Override

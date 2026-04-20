@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.util.ChunkUtil;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
@@ -10,12 +11,17 @@ import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.core.util.TargetUtil;
+import java.util.HashMap;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -32,6 +38,8 @@ final class CommandCompanionPlacementService {
     };
     private static final double COMMAND_PLACEMENT_MIN_RELATIVE_Y = -2.0;
     private static final double COMMAND_PLACEMENT_MAX_RELATIVE_Y = 4.0;
+    private static final int SAFE_VERTICAL_SCAN_STEPS = 4;
+    private static final double SAFE_STAND_HEIGHT_OFFSET = 0.05;
 
     Vector3d computeSafeRecallPosition(Ref<EntityStore> playerRef,
                                        Store<EntityStore> store,
@@ -126,9 +134,12 @@ final class CommandCompanionPlacementService {
             return nearPlayer;
         }
         if (desired != null) {
-            return new Vector3d(desired.x, playerPos.y + 1.0, desired.z);
+            Vector3d safeDesired = projectToSurface(world, desired.x, desired.y + 8.0, desired.z, 48.0);
+            if (safeDesired != null && isWithinPlacementVerticalBand(safeDesired.y, playerPos.y, minRelativeY, maxRelativeY)) {
+                return safeDesired;
+            }
         }
-        return new Vector3d(playerPos.x, playerPos.y + 1.0, playerPos.z);
+        return null;
     }
 
     private Vector3d computeDesiredPlacementPosition(Vector3d playerPos,
@@ -282,12 +293,103 @@ final class CommandCompanionPlacementService {
         if (target == null) {
             return null;
         }
-        int blockY = (int) Math.floor(target.y);
-        double surfaceY = blockY + 1.0 + 0.05;
-        if (surfaceY < target.y + 0.02) {
-            surfaceY = target.y + 0.02;
+        return resolveSafeStandPosition(world, x, target.y, z);
+    }
+
+    @Nullable
+    private Vector3d resolveSafeStandPosition(@Nullable World world,
+                                              double x,
+                                              double y,
+                                              double z) {
+        if (world == null || world.getChunkStore() == null) {
+            return null;
         }
-        return new Vector3d(x, surfaceY, z);
+        ChunkStore chunkStore = world.getChunkStore();
+        Store<ChunkStore> chunkStoreStore = chunkStore != null ? chunkStore.getStore() : null;
+        if (chunkStoreStore == null) {
+            return null;
+        }
+        int blockX = (int) Math.floor(x);
+        int blockY = (int) Math.floor(y);
+        int blockZ = (int) Math.floor(z);
+        Map<Long, WorldChunk> chunkCache = new HashMap<>();
+        for (int step = 0; step <= SAFE_VERTICAL_SCAN_STEPS; step++) {
+            int upY = blockY + step;
+            if (canStandAt(chunkStore, chunkStoreStore, blockX, upY, blockZ, chunkCache)) {
+                return toStandPosition(blockX, upY, blockZ);
+            }
+            if (step == 0) {
+                continue;
+            }
+            int downY = blockY - step;
+            if (canStandAt(chunkStore, chunkStoreStore, blockX, downY, blockZ, chunkCache)) {
+                return toStandPosition(blockX, downY, blockZ);
+            }
+        }
+        return null;
+    }
+
+    private boolean canStandAt(@Nonnull ChunkStore chunkStore,
+                               @Nonnull Store<ChunkStore> chunkStoreStore,
+                               int blockX,
+                               int blockY,
+                               int blockZ,
+                               @Nonnull Map<Long, WorldChunk> chunkCache) {
+        WorldChunk feetChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        WorldChunk headChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        WorldChunk groundChunk = resolveWorldChunk(chunkStore, chunkStoreStore, blockX, blockZ, chunkCache);
+        if (feetChunk == null || headChunk == null || groundChunk == null) {
+            return false;
+        }
+        int feetFluid = feetChunk.getFluidId(blockX, blockY, blockZ);
+        int headFluid = headChunk.getFluidId(blockX, blockY + 1, blockZ);
+        int groundFluid = groundChunk.getFluidId(blockX, blockY - 1, blockZ);
+        if (feetFluid != 0 || headFluid != 0) {
+            return false;
+        }
+        int feetBlockId = feetChunk.getBlock(blockX, blockY, blockZ);
+        int headBlockId = headChunk.getBlock(blockX, blockY + 1, blockZ);
+        int groundBlockId = groundChunk.getBlock(blockX, blockY - 1, blockZ);
+        if (isSolidBlock(feetBlockId, feetFluid) || isSolidBlock(headBlockId, headFluid)) {
+            return false;
+        }
+        return isSolidBlock(groundBlockId, groundFluid);
+    }
+
+    @Nullable
+    private WorldChunk resolveWorldChunk(@Nonnull ChunkStore chunkStore,
+                                         @Nonnull Store<ChunkStore> chunkStoreStore,
+                                         int blockX,
+                                         int blockZ,
+                                         @Nonnull Map<Long, WorldChunk> chunkCache) {
+        long chunkIndex = ChunkUtil.indexChunkFromBlock(blockX, blockZ);
+        if (chunkCache.containsKey(chunkIndex)) {
+            return chunkCache.get(chunkIndex);
+        }
+        Ref<ChunkStore> chunkRef = chunkStore.getChunkReference(chunkIndex);
+        if (chunkRef == null || !chunkRef.isValid()) {
+            chunkCache.put(chunkIndex, null);
+            return null;
+        }
+        WorldChunk worldChunk = chunkStoreStore.getComponent(chunkRef, WorldChunk.getComponentType());
+        chunkCache.put(chunkIndex, worldChunk);
+        return worldChunk;
+    }
+
+    @Nonnull
+    private Vector3d toStandPosition(int blockX, int blockY, int blockZ) {
+        return new Vector3d(blockX + 0.5, blockY + SAFE_STAND_HEIGHT_OFFSET, blockZ + 0.5);
+    }
+
+    private boolean isSolidBlock(int blockId, int fluidId) {
+        if (blockId == 0) {
+            return false;
+        }
+        BlockType blockType = BlockType.getAssetMap().getAsset(blockId);
+        if (blockType == null || blockType == BlockType.UNKNOWN) {
+            return false;
+        }
+        return WorldUtil.isSolidOnlyBlock(blockType, fluidId);
     }
 
     private boolean isBlockingSpawnBlock(int blockId) {

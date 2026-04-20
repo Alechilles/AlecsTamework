@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -57,6 +58,7 @@ public final class TameworkCommandSelectionPage
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
     private static final String RETURN_HOME_COMMAND_PREFIX = "__returnhome__:";
+    private static final String OPEN_TALENTS_COMMAND_PREFIX = "__talents__:";
     private static final String PANEL_RADIUS_DECREASE_COMMAND_ID = "__panel_radius_dec__";
     private static final String PANEL_RADIUS_INCREASE_COMMAND_ID = "__panel_radius_inc__";
     private static final String PANEL_MANAGE_GROUPS_COMMAND_ID = "__panel_manage_groups__";
@@ -85,7 +87,8 @@ public final class TameworkCommandSelectionPage
                     RESPAWN_COMMAND_PREFIX,
                     RECALL_COMMAND_PREFIX,
                     SET_HOME_COMMAND_PREFIX,
-                    RETURN_HOME_COMMAND_PREFIX
+                    RETURN_HOME_COMMAND_PREFIX,
+                    OPEN_TALENTS_COMMAND_PREFIX
             );
 
     private final CommandOption[] options;
@@ -116,6 +119,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
     private final Consumer<UUID> returnHomeCallback;
+    private final Consumer<UUID> openTalentsCallback;
     private final Consumer<String> panelSetModeCallback;
     private final Runnable panelRadiusDecreaseCallback;
     private final Runnable panelRadiusIncreaseCallback;
@@ -154,11 +158,12 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Consumer<UUID> toggleBreedingCallback,
                                         @Nonnull Consumer<UUID> releaseCallback,
                                         @Nonnull Consumer<UUID> cullCallback,
-                                        @Nonnull Consumer<UUID> respawnCallback,
-                                        @Nonnull Consumer<UUID> recallCallback,
-                                        @Nonnull Consumer<UUID> setHomeCallback,
-                                        @Nonnull Consumer<UUID> returnHomeCallback,
-                                        @Nonnull Consumer<String> panelSetModeCallback,
+                                         @Nonnull Consumer<UUID> respawnCallback,
+                                         @Nonnull Consumer<UUID> recallCallback,
+                                         @Nonnull Consumer<UUID> setHomeCallback,
+                                         @Nonnull Consumer<UUID> returnHomeCallback,
+                                         @Nonnull Consumer<UUID> openTalentsCallback,
+                                         @Nonnull Consumer<String> panelSetModeCallback,
                                         @Nonnull Runnable panelRadiusDecreaseCallback,
                                         @Nonnull Runnable panelRadiusIncreaseCallback,
                                         @Nonnull Runnable panelManageGroupsCallback,
@@ -196,6 +201,7 @@ public final class TameworkCommandSelectionPage
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
         this.returnHomeCallback = returnHomeCallback;
+        this.openTalentsCallback = openTalentsCallback;
         this.panelSetModeCallback = panelSetModeCallback;
         this.panelRadiusDecreaseCallback = panelRadiusDecreaseCallback;
         this.panelRadiusIncreaseCallback = panelRadiusIncreaseCallback;
@@ -226,37 +232,46 @@ public final class TameworkCommandSelectionPage
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        refreshLinkedNpcEntries();
-        commandBuilder.append(UI_PATH);
-        commandBuilder.append(LINKED_PANEL_UI_PATH);
-        commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
-        commandBuilder.set("#TameworkCommandMenuTitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.title"));
-        commandBuilder.set("#TameworkCommandMenuSubtitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.subtitle"));
-        commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
-        commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
-        commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
-        commandBuilder.set(
-                "#TameworkLinkedPanelSubtitle.Text",
-                LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid, resolveLanguage())
-        );
-        commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", resolveModeDropdownEntries());
-        commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
-        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", shouldShowNearbyRadiusControls());
-        commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
-        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", resolveSortDropdownEntries());
-        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
-        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", resolveFilterModeDropdownEntries());
-        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
-        boolean showFilterInputControls = shouldShowFilterInputControls();
-        commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
-        commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
-        applyGroupAssignOverlayState(commandBuilder);
+        try {
+            refreshLinkedNpcEntries();
+            commandBuilder.append(UI_PATH);
+            commandBuilder.append(LINKED_PANEL_UI_PATH);
+            commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
+            commandBuilder.set("#TameworkCommandMenuTitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.title"));
+            commandBuilder.set("#TameworkCommandMenuSubtitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.subtitle"));
+            commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
+            commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
+            commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
+            commandBuilder.set(
+                    "#TameworkLinkedPanelSubtitle.Text",
+                    LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid, resolveLanguage())
+            );
+            commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", resolveModeDropdownEntries());
+            commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
+            commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", shouldShowNearbyRadiusControls());
+            commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
+            commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", resolveSortDropdownEntries());
+            commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
+            commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", resolveFilterModeDropdownEntries());
+            commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
+            boolean showFilterInputControls = shouldShowFilterInputControls();
+            commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
+            commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
+            applyGroupAssignOverlayState(commandBuilder);
 
-        buildCommandButtons(commandBuilder, eventBuilder);
-        buildLinkedNpcPanel(commandBuilder, eventBuilder);
-        bindPanelControlEvents(eventBuilder);
-        bindCloseButtonEvent(eventBuilder);
-        startRefreshLoop();
+            buildCommandButtons(commandBuilder, eventBuilder);
+            buildLinkedNpcPanel(commandBuilder, eventBuilder);
+            bindPanelControlEvents(eventBuilder);
+            bindCloseButtonEvent(eventBuilder);
+            startRefreshLoop();
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_build_failed",
+                    throwable,
+                    "page=TameworkCommandSelectionPage"
+            );
+            throw throwable;
+        }
     }
 
     @Override
@@ -524,6 +539,18 @@ public final class TameworkCommandSelectionPage
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (commandId.startsWith(OPEN_TALENTS_COMMAND_PREFIX)) {
+            if (openTalentsCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, OPEN_TALENTS_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                navigationPending = true;
+                closePage();
+                openTalentsCallback.accept(npcUuid);
             }
             return;
         }
