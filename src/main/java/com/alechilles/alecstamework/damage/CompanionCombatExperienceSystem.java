@@ -126,7 +126,7 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
             }
         }
         if (!combat.isAwardVsOwnedAllies()) {
-            UUID sourceOwner = resolveOwnerId(sourceRef, store);
+            UUID sourceOwner = resolveSourceOwnerId(sourceRef, source, store);
             UUID targetOwner = resolveOwnerId(targetRef, store);
             if (sourceOwner != null && targetOwner != null && sourceOwner.equals(targetOwner)) {
                 return false;
@@ -160,9 +160,34 @@ public final class CompanionCombatExperienceSystem extends DamageEventSystem {
     }
 
     @Nullable
+    private UUID resolveSourceOwnerId(@Nullable Ref<EntityStore> sourceRef,
+                                      @Nullable Damage.Source source,
+                                      @Nonnull Store<EntityStore> store) {
+        UUID ownerId = resolveOwnerId(sourceRef, store);
+        if (ownerId != null) {
+            return ownerId;
+        }
+        if (source instanceof Damage.EntitySource entitySource) {
+            return resolveOwnerId(entitySource.getRef(), store);
+        }
+        if (source instanceof Damage.ProjectileSource projectileSource) {
+            ownerId = resolveOwnerId(projectileSource.getRef(), store);
+            if (ownerId != null) {
+                return ownerId;
+            }
+            return resolveOwnerId(projectileSource.getProjectile(), store);
+        }
+        return null;
+    }
+
+    @Nullable
     private UUID resolveOwnerId(@Nullable Ref<EntityStore> ref, @Nonnull Store<EntityStore> store) {
         if (ref == null || !ref.isValid()) {
             return null;
+        }
+        Player player = store.getComponent(ref, Player.getComponentType());
+        if (player != null && player.getUuid() != null) {
+            return player.getUuid();
         }
         ComponentType<EntityStore, TameworkOwnerComponent> ownerType = TameworkOwnerComponent.getComponentType();
         if (ownerType != null) {
