@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.metrics;
 
+import com.alechilles.alecstamework.Tamework;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -42,5 +43,34 @@ public final class TameworkTelemetryEvents {
         }
         long elapsedMs = elapsedNanos / 1_000_000L;
         return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
+    }
+
+    public static void recordErrorIfAvailable(@Nonnull String eventName,
+                                              @Nullable Throwable throwable,
+                                              @Nullable String detail) {
+        try {
+            TameworkTelemetryEvents telemetry = resolveAvailable();
+            if (telemetry != null) {
+                telemetry.recordError(eventName, throwable, detail);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void recordUsageIfAvailable(@Nonnull String eventName,
+                                              @Nullable String detail) {
+        try {
+            TameworkTelemetryEvents telemetry = resolveAvailable();
+            if (telemetry != null) {
+                telemetry.recordUsage(eventName, detail);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Nullable
+    private static TameworkTelemetryEvents resolveAvailable() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin != null ? plugin.getTelemetryEvents() : null;
     }
 }

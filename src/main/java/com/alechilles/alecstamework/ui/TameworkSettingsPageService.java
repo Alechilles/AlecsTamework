@@ -101,10 +101,19 @@ public final class TameworkSettingsPageService {
         if (!hasAccess(uiPlayerRef, player)) {
             return "You do not have permission to use /tw settings.";
         }
-        TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
-        player.getPageManager().openCustomPage(ref, store, page);
-        plugin.getTelemetryEvents().recordUsage("settings_page_opened", "Opened via /tw settings.");
-        return null;
+        try {
+            TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
+            player.getPageManager().openCustomPage(ref, store, page);
+            plugin.getTelemetryEvents().recordUsage("settings_page_opened", "Opened via /tw settings.");
+            return null;
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkSettingsPage action=/tw settings"
+            );
+            return "Unable to open settings right now.";
+        }
     }
 
     private static boolean isLocalSingleplayerOwner(@Nullable PlayerRef playerRef) {

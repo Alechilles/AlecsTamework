@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.StoreSourc
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TargetSource;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.TriggerHookStep;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
@@ -753,8 +754,17 @@ public final class CommandItemFeatureHandler {
                 ),
                 commandId -> applyMenuSelection(player, toolId, config, commandId)
         );
-        player.getPageManager().openCustomPage(playerRef, store, page);
-        return true;
+        try {
+            player.getPageManager().openCustomPage(playerRef, store, page);
+            return true;
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkCommandSelectionPage toolId=" + toolId
+            );
+            return false;
+        }
     }
 
     private void openGroupManagerFromSelection(Player player,
@@ -819,7 +829,16 @@ public final class CommandItemFeatureHandler {
                 talentId -> applyTalentPurchase(player, npcUuid, talentId),
                 () -> reopenSelectionMenu(player, config, toolId)
         );
-        player.getPageManager().openCustomPage(playerRef, store, page);
+        try {
+            player.getPageManager().openCustomPage(playerRef, store, page);
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkCompanionTalentsPage npc=" + npcUuid
+            );
+            feedbackService.showWarning(player, "Talent page is unavailable right now.");
+        }
     }
 
     @Nonnull

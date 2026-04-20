@@ -27,10 +27,6 @@ items.Weapon_Shortbow_Tranquilizer.name=Tranquilizer Shortbow
 items.Weapon_Arrow_Tranquilizer.name=Tranquilizer Arrow
 items.Potion_Tranquilizer.name=Tranquilizer Potion
 items.Potion_Tranquilizer.description=Used to craft tranquilizer arrows and equipment.
-items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.name=Glowing Purple Mushroom Spores
-items.Tw_Plant_Seeds_Mushroom_Glowing_Purple.description=Plant on tilled soil or in a planter to cultivate glowing purple mushrooms.
-items.Tw_Plant_Crop_Mushroom_Glowing_Purple_Block.name=Glowing Purple Mushroom Spores
-
 # === Tamework Feed Items ===
 items.Tw_Feed_Trough.name=Feed Trough
 items.Tw_Feed_Trough.description=A trough for feeding and watering your animals.\n- Insert food to feed nearby animals.\n- Right-click with water bucket to water nearby animals.

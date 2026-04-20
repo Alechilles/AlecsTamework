@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.CommandEntry;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -231,37 +232,46 @@ public final class TameworkCommandSelectionPage
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        refreshLinkedNpcEntries();
-        commandBuilder.append(UI_PATH);
-        commandBuilder.append(LINKED_PANEL_UI_PATH);
-        commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
-        commandBuilder.set("#TameworkCommandMenuTitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.title"));
-        commandBuilder.set("#TameworkCommandMenuSubtitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.subtitle"));
-        commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
-        commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
-        commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
-        commandBuilder.set(
-                "#TameworkLinkedPanelSubtitle.Text",
-                LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid, resolveLanguage())
-        );
-        commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", resolveModeDropdownEntries());
-        commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
-        commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", shouldShowNearbyRadiusControls());
-        commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
-        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", resolveSortDropdownEntries());
-        commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
-        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", resolveFilterModeDropdownEntries());
-        commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
-        boolean showFilterInputControls = shouldShowFilterInputControls();
-        commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
-        commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
-        applyGroupAssignOverlayState(commandBuilder);
+        try {
+            refreshLinkedNpcEntries();
+            commandBuilder.append(UI_PATH);
+            commandBuilder.append(LINKED_PANEL_UI_PATH);
+            commandBuilder.set("#TameworkCommandMenuWheel.Visible", true);
+            commandBuilder.set("#TameworkCommandMenuTitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.title"));
+            commandBuilder.set("#TameworkCommandMenuSubtitle.Text", LocalizedText.resolve(playerRef, "tamework.ui.commandMenu.subtitle"));
+            commandBuilder.set("#TameworkCommandMenuCurrent.Text", resolveCurrentLabel());
+            commandBuilder.set("#TameworkLinkedPanelRoot.Visible", true);
+            commandBuilder.set("#TameworkLinkedPanelTitle.Text", resolvePanelTitleText());
+            commandBuilder.set(
+                    "#TameworkLinkedPanelSubtitle.Text",
+                    LinkedNpcPanelSubtitleService.resolveSubtitle(linkedNpcEntries, pendingUnlinkNpcUuid, resolveLanguage())
+            );
+            commandBuilder.set("#TameworkLinkedPanelModeDropdown.Entries", resolveModeDropdownEntries());
+            commandBuilder.set("#TameworkLinkedPanelModeDropdown.Value", resolvePanelModeValue());
+            commandBuilder.set("#TameworkLinkedPanelSubtitleRadiusControls.Visible", shouldShowNearbyRadiusControls());
+            commandBuilder.set("#TameworkLinkedPanelRadiusValue.Text", resolvePanelRadiusLabel());
+            commandBuilder.set("#TameworkLinkedPanelSortDropdown.Entries", resolveSortDropdownEntries());
+            commandBuilder.set("#TameworkLinkedPanelSortDropdown.Value", resolvePanelSortValue());
+            commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Entries", resolveFilterModeDropdownEntries());
+            commandBuilder.set("#TameworkLinkedPanelFilterDropdown.Value", resolvePanelFilterModeValue());
+            boolean showFilterInputControls = shouldShowFilterInputControls();
+            commandBuilder.set("#TameworkLinkedPanelInlineFilterTextControls.Visible", showFilterInputControls);
+            commandBuilder.set("#TameworkLinkedPanelFilterInput.Value", resolvePanelFilterInputValue());
+            applyGroupAssignOverlayState(commandBuilder);
 
-        buildCommandButtons(commandBuilder, eventBuilder);
-        buildLinkedNpcPanel(commandBuilder, eventBuilder);
-        bindPanelControlEvents(eventBuilder);
-        bindCloseButtonEvent(eventBuilder);
-        startRefreshLoop();
+            buildCommandButtons(commandBuilder, eventBuilder);
+            buildLinkedNpcPanel(commandBuilder, eventBuilder);
+            bindPanelControlEvents(eventBuilder);
+            bindCloseButtonEvent(eventBuilder);
+            startRefreshLoop();
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_build_failed",
+                    throwable,
+                    "page=TameworkCommandSelectionPage"
+            );
+            throw throwable;
+        }
     }
 
     @Override

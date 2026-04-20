@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
 import com.hypixel.hytale.codec.builder.BuilderCodec;
@@ -58,8 +59,17 @@ public final class TameworkCompanionTalentsPage
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        commandBuilder.append(UI_PATH);
-        bindPage(commandBuilder, eventBuilder);
+        try {
+            commandBuilder.append(UI_PATH);
+            bindPage(commandBuilder, eventBuilder);
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_build_failed",
+                    throwable,
+                    "page=TameworkCompanionTalentsPage"
+            );
+            throw throwable;
+        }
     }
 
     @Override

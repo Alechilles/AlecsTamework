@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
@@ -43,6 +44,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -83,19 +85,19 @@ final class CommandRespawnService {
                                    long followRetryDelayMs) {
         if (player == null || playerRef == null || !playerRef.isValid() || store == null || stack == null
                 || stack.isEmpty() || record == null || deadSnapshot == null) {
-            return null;
+            return recordRespawnFailure("invalid_input", deadSnapshot, null);
         }
         String roleId = deadSnapshot.roleId();
         if (roleId == null || roleId.isBlank()) {
-            return null;
+            return recordRespawnFailure("missing_role_id", deadSnapshot, null);
         }
         NPCPlugin npcPlugin = NPCPlugin.get();
         if (npcPlugin == null) {
-            return null;
+            return recordRespawnFailure("npc_plugin_unavailable", deadSnapshot, roleId);
         }
         int roleIndex = npcPlugin.getIndex(roleId);
         if (roleIndex < 0) {
-            return null;
+            return recordRespawnFailure("unknown_role_id", deadSnapshot, roleId);
         }
         Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
         Vector3d destination = companionPlacementService.computeSafeRespawnPosition(
@@ -106,12 +108,12 @@ final class CommandRespawnService {
                 sourceHint
         );
         if (destination == null) {
-            return null;
+            return recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId);
         }
         Vector3f rotation = resolveRespawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            return null;
+            return recordRespawnFailure("spawn_entity_failed", deadSnapshot, roleId);
         }
         Ref<EntityStore> spawnedRef = spawned.first();
         NPCEntity spawnedNpc = spawned.second();
@@ -182,6 +184,24 @@ final class CommandRespawnService {
             deathService.clearDeadSnapshot(deadSnapshot.npcUuid());
         }
         return updated;
+    }
+
+    @Nullable
+    private ItemStack recordRespawnFailure(@Nonnull String reason,
+                                           @Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+                                           @Nullable String roleId) {
+        String npcId = snapshot != null && snapshot.npcUuid() != null ? snapshot.npcUuid().toString() : "unknown";
+        String resolvedRoleId = roleId != null && !roleId.isBlank()
+                ? roleId
+                : snapshot != null && snapshot.roleId() != null && !snapshot.roleId().isBlank()
+                ? snapshot.roleId()
+                : "unknown";
+        TameworkTelemetryEvents.recordErrorIfAvailable(
+                "linked_respawn_failed",
+                null,
+                "reason=" + reason + " npc=" + npcId + " role=" + resolvedRoleId
+        );
+        return null;
     }
 
     private void applyRespawnProgressionState(Ref<EntityStore> spawnedRef,

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.LostRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -416,7 +417,12 @@ public final class CommandLinkedNpcLostService {
                     }
                     snapshotsByNpc.put(snapshot.npcUuid(), snapshot);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "lost_snapshot_load_failed",
+                        ex,
+                        "Failed to load lost linked-NPC snapshots from " + persistencePath + "."
+                );
                 // Ignore persistence read issues; runtime updates still track new lost companions.
             }
         }
@@ -450,7 +456,12 @@ public final class CommandLinkedNpcLostService {
                     builder.append(encodeSnapshot(snapshot));
                 }
                 Files.writeString(persistencePath, builder.toString(), StandardCharsets.UTF_8);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "lost_snapshot_persist_failed",
+                        ex,
+                        "Failed to persist lost linked-NPC snapshots to " + persistencePath + "."
+                );
                 // Ignore persistence write issues; runtime tracking remains available.
             }
         }
@@ -485,6 +496,13 @@ public final class CommandLinkedNpcLostService {
             return false;
         }
         lastBlockedMutationLogAtMs = now;
+        TameworkTelemetryEvents.recordErrorIfAvailable(
+                "lost_transition_blocked",
+                null,
+                "Persistence blocked lost transition: "
+                        + (state.reason() != null ? state.reason() : "unknown")
+                        + "."
+        );
         if (logger != null) {
             logger.at(Level.WARNING).log(
                     "Persistence blocked mutation in lost service: "

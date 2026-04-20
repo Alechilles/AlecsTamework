@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemoryService;
 import com.alechilles.alecstamework.damage.RecentNeedsDeathCauseService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.DeathRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
@@ -56,6 +57,7 @@ public final class CommandLinkedNpcDeathService {
     private static final String ARRAY_SEPARATOR = ";";
     private static final String ATTACHMENT_KV_SEPARATOR = ",";
     private static final long RECENT_ATTACKER_MAX_AGE_MS = 30_000L;
+    private static final long BLOCKED_TELEMETRY_INTERVAL_MS = 5000L;
 
     private final ConcurrentHashMap<UUID, DeadLinkedNpcSnapshot> deadByNpc = new ConcurrentHashMap<>();
     @Nullable
@@ -68,6 +70,7 @@ public final class CommandLinkedNpcDeathService {
     private final Object persistenceLock = new Object();
     @Nullable
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
+    private volatile long lastBlockedTelemetryAtMs;
 
     public CommandLinkedNpcDeathService() {
         this(null, null, null, null, null);
@@ -515,7 +518,12 @@ public final class CommandLinkedNpcDeathService {
                     }
                     deadByNpc.put(snapshot.npcUuid(), snapshot);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "death_snapshot_load_failed",
+                        ex,
+                        "Failed to load dead linked-NPC snapshots from " + persistencePath + "."
+                );
                 // Ignore persistence read issues; runtime tracking still works for newly dead NPCs.
             }
         }
@@ -549,7 +557,12 @@ public final class CommandLinkedNpcDeathService {
                     builder.append(encodeSnapshot(snapshot));
                 }
                 Files.writeString(persistencePath, builder.toString(), StandardCharsets.UTF_8);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "death_snapshot_persist_failed",
+                        ex,
+                        "Failed to persist dead linked-NPC snapshots to " + persistencePath + "."
+                );
                 // Ignore persistence write issues; runtime tracking remains available.
             }
         }
@@ -579,6 +592,17 @@ public final class CommandLinkedNpcDeathService {
             return true;
         }
         PersistenceHealthService.HealthState state = healthService.getState();
+        long now = System.currentTimeMillis();
+        if (now - lastBlockedTelemetryAtMs >= BLOCKED_TELEMETRY_INTERVAL_MS) {
+            lastBlockedTelemetryAtMs = now;
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "death_transition_blocked",
+                    null,
+                    "Persistence blocked death transition: "
+                            + (state.reason() != null ? state.reason() : "unknown")
+                            + "."
+            );
+        }
         CoopDebugLogger.log(
                 "persistence blocked mutation service=death reason="
                         + (state.reason() != null ? state.reason() : "unknown")

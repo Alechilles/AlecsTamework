@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence.sqlite;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.sql.Connection;
 import java.util.ArrayList;
@@ -204,6 +205,11 @@ public final class PersistenceWriteQueue implements AutoCloseable {
                             "SQLite after-commit callback failed (" + task.operationName + "): " + ex.getMessage()
                     );
                 }
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "persistence_after_commit_callback_failed",
+                        ex,
+                        "SQLite after-commit callback failed for operation " + task.operationName + "."
+                );
             }
         }
     }
@@ -213,6 +219,11 @@ public final class PersistenceWriteQueue implements AutoCloseable {
         failedBatches.incrementAndGet();
         lastFailureReason.set(reason);
         lastFailureAtMs.set(System.currentTimeMillis());
+        TameworkTelemetryEvents.recordErrorIfAvailable(
+                "persistence_write_failed",
+                ex,
+                "SQLite write failed: " + reason + "."
+        );
         if (logger != null) {
             logger.at(Level.SEVERE).log("SQLite write failed (" + reason + "): " + ex.getMessage());
         }

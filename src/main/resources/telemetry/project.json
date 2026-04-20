@@ -11,6 +11,9 @@
   "usage": {
     "enabled": true,
     "allowedEvents": [
+      "config_editor_opened",
+      "config_editor_apply_requested",
+      "config_editor_apply_succeeded",
       "reload_config_command_used",
       "settings_page_opened",
       "news_command_opened",

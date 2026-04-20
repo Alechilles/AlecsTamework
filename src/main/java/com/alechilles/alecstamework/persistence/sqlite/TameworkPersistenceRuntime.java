@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCoopService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcLostService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.logger.HytaleLogger;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -114,6 +115,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             }
         } catch (Exception ex) {
             health.markDegraded("sqlite_schema_bootstrap_failed");
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "persistence_schema_bootstrap_failed",
+                    ex,
+                    "SQLite schema bootstrap failed for " + sqlitePath + "."
+            );
             if (logger != null) {
                 logger.at(Level.SEVERE).log("SQLite schema bootstrap failed: " + ex.getMessage());
             }
@@ -255,6 +261,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             }
         } catch (Exception ex) {
             healthService.markDegraded("legacy_dat_import_failed");
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "persistence_legacy_import_failed",
+                    ex,
+                    "Legacy .dat migration failed for " + runtimeDataDirectory + "."
+            );
             if (logger != null) {
                 logger.at(Level.SEVERE).log("Legacy .dat migration failed: " + ex.getMessage());
             }
@@ -301,6 +312,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
              Statement statement = connection.createStatement()) {
             statement.execute("PRAGMA wal_checkpoint(TRUNCATE)");
         } catch (Exception ex) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "persistence_wal_checkpoint_failed",
+                    ex,
+                    "SQLite WAL checkpoint failed for " + sqlitePath + "."
+            );
             logWarning("SQLite WAL checkpoint failed: " + ex.getMessage());
         }
     }
@@ -311,6 +327,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             connection.setAutoCommit(true);
             statement.execute("VACUUM");
         } catch (Exception ex) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "persistence_vacuum_failed",
+                    ex,
+                    "SQLite VACUUM failed for " + sqlitePath + "."
+            );
             logWarning("SQLite VACUUM failed: " + ex.getMessage());
         }
     }
@@ -320,6 +341,11 @@ public final class TameworkPersistenceRuntime implements AutoCloseable {
             maintenanceExecutor.execute(task);
             return true;
         } catch (RejectedExecutionException ex) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "persistence_maintenance_rejected",
+                    ex,
+                    "SQLite maintenance task rejected: " + rejectedReason + "."
+            );
             logWarning("SQLite maintenance task rejected: " + rejectedReason);
             return false;
         }

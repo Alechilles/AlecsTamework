@@ -118,9 +118,18 @@ public final class TameworkSettingsAnnouncementService {
                 suppress -> onReviewSettings(playerRef, store, uiPlayerRef, playerUuid, announcement.announcementId(), suppress),
                 suppress -> onDismissAnnouncement(playerUuid, announcement.announcementId(), suppress)
         );
-        player.getPageManager().openCustomPage(playerRef, store, page);
-        plugin.getTelemetryEvents().recordUsage("settings_announcement_opened", "Opened Tamework settings announcement.");
-        return null;
+        try {
+            player.getPageManager().openCustomPage(playerRef, store, page);
+            plugin.getTelemetryEvents().recordUsage("settings_announcement_opened", "Opened Tamework settings announcement.");
+            return null;
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkSettingsAnnouncementPage action=/tw news"
+            );
+            return respectEnabled ? null : "Unable to open Tamework news right now.";
+        }
     }
 
     @Nonnull

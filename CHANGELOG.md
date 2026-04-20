@@ -3,7 +3,27 @@
 ## Unreleased
 
 ### Added
-- Added new role-scoped progression families for companion leveling and passive talents (`TwLevelingConfig`, `TwTalentConfig`), including XP gain from feed/harvest/breeding/combat, level-based stat growth, passive talent purchases, linked-panel summaries, and a companion talent page for spending points on loaded companions.
+- Added new role-scoped progression families for companion leveling and passive talents (`TwLevelingConfig`, `TwTalentConfig`), including XP gain from feed/harvest/breeding/combat, level-based stat growth, passive talent purchases, linked-panel summaries, and a companion talent page for spending points on loaded companions. These systems remain unreleased and are not ready for player/modder usage yet.
+
+## 2.8.4 - Telemetry Integration + Respawn/Needs Stability - 2026-04-20
+
+### Added
+- Added optional Alec's Telemetry integration detection/bridge support plus a bundled telemetry project descriptor for hosted crash, usage, and performance reporting when Alec's Telemetry is installed.
+- Added live Alec's Telemetry event emission for `/tw reloadconfig`, `/tw settings`, `/tw news`, and settings-announcement open/review flows, with built-in hosted project defaults for the Tamework telemetry project.
+
+### Changed
+- Updated hosted telemetry descriptors/defaults to target the public Alec's Telemetry endpoints instead of local/dev-only endpoints.
+- Updated the linked companion command panel to debounce inline text filtering and avoid redundant refresh/binding work during live updates, reducing panel churn with larger companion lists.
+
+### Fixed
+- Fixed initial linked companion panel refresh diffing so first-open refreshes no longer do unstable extra redraw work.
+- Fixed spawned companions outside breeding inheritance flows losing their initial random attachments when later growing up by seeding stored attachment state during spawn/bootstrap.
+- Fixed revived companions carrying stale low-health/needs runtime state after starvation/dehydration deaths and then dying again immediately on respawn.
+- Fixed healthy companions still paying the high-frequency natural-regen suppression maintenance cost between normal needs sweeps, reducing unnecessary needs-system work.
+- Fixed `/tw debugneedsdamage` spam so diagnostics now only log active suppression/damage work and can flag likely external damage instead of routine healthy ticks.
+- Fixed debug telemetry tooling so injected debug events stay constrained to the intended supported telemetry usage flow.
+- Fixed command-linked respawn placement safety so revived companions now require real standable clearance and are less likely to respawn embedded in walls.
+- Fixed Tamework custom UI localization regressions that could make pages like the group manager show raw `%server...` keys instead of resolved text.
 
 ## 2.8.3 - Settings Announcements, Presets, and Needs Diagnostics - 2026-04-13
 
