@@ -98,7 +98,7 @@ public final class CompanionNeedsSystem extends TickingSystem<EntityStore> {
                                     && CompanionNeedsService.isNeedsDamageActive(ref, store, roleId)) {
                                 starvingLinkedByOwner.merge(linkedOwnerId, 1, Integer::sum);
                             }
-                        } else {
+                        } else if (CompanionNeedsService.requiresFrequentNaturalRegenSuppressionTick(ref, store, roleId)) {
                             CompanionNeedsService.tickNaturalRegenSuppressionOnly(ref, store, commandBuffer, roleId);
                         }
                     }

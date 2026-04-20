@@ -1,21 +1,25 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
@@ -140,6 +144,7 @@ final class CommandRespawnService {
         }
         applyRespawnAttachmentState(spawnedRef, spawnedNpc, store, deadSnapshot);
         applyRespawnProgressionState(spawnedRef, store, deadSnapshot);
+        applyRespawnRecoveryState(spawnedRef, store, deadSnapshot);
         if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
             ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
             if (nameType != null) {
@@ -192,6 +197,46 @@ final class CommandRespawnService {
         applyRespawnTalentsState(spawnedRef, store, snapshot);
         applyRespawnLifeStageState(spawnedRef, store, snapshot);
         CompanionStatModifierService.applyTraitModifiers(spawnedRef, store);
+    }
+
+    private void applyRespawnRecoveryState(Ref<EntityStore> spawnedRef,
+                                           Store<EntityStore> store,
+                                           CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        if (spawnedRef == null || !spawnedRef.isValid() || store == null) {
+            return;
+        }
+        CompanionHealthStateService.applyStoredHealthPercent(spawnedRef, store, 100.0);
+
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
+        if (needsType == null) {
+            return;
+        }
+        String roleId = snapshot != null && snapshot.roleId() != null && !snapshot.roleId().isBlank()
+                ? snapshot.roleId()
+                : CompanionRoleIdResolver.resolveRoleId(spawnedRef, store);
+        TwNeedsConfig needsConfig = TwNeedsConfig.resolveForRole(roleId);
+        if (needsConfig == null || !needsConfig.isEnabled()) {
+            return;
+        }
+        TameworkNeedsComponent component = createRespawnNeedsComponent(needsConfig, CompanionRuntimeClock.nowMs());
+        store.putComponent(spawnedRef, needsType, component);
+    }
+
+    static TameworkNeedsComponent createRespawnNeedsComponent(TwNeedsConfig needsConfig, long nowMs) {
+        TwNeedsConfig.ValueSettings values = needsConfig.getValues();
+        TameworkNeedsComponent component = new TameworkNeedsComponent(
+                needsConfig.getId(),
+                values.getHungerDefault(),
+                values.getThirstDefault(),
+                0.0,
+                0.0,
+                nowMs,
+                nowMs
+        );
+        component.setRegenSuppressionBaselineHealth(-1.0);
+        component.setRegenSuppressionAllowedHeal(0.0);
+        component.setLastManagedHealth(-1.0);
+        return component;
     }
 
     private void applyRespawnAttachmentState(Ref<EntityStore> spawnedRef,

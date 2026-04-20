@@ -50,6 +50,7 @@ public final class CompanionProgressionBootstrapService {
         TameworkHappinessComponent happiness = resolveHappinessComponent(npcRef, store);
         bootstrapBreedingComponent(npcRef, store, breedingConfig, happiness);
         ensureTraitComponents(npcRef, store, roleId);
+        CompanionAttachmentStateService.seedStoredAttachments(npcRef, store);
     }
 
     /**
