@@ -112,6 +112,22 @@ final class CommandPanelPreferenceService {
                 : MembershipMode.LinkedOnly;
     }
 
+    boolean resolveAutoLinkEnabled(@Nullable ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return true;
+        }
+        Boolean raw = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_PANEL_AUTO_LINK, Codec.BOOLEAN);
+        return raw == null || raw;
+    }
+
+    ItemStack setAutoLinkEnabled(@Nullable ItemStack stack, boolean enabled) {
+        if (stack == null || stack.isEmpty()) {
+            return stack;
+        }
+        ItemStack updated = withSchemaVersion(stack);
+        return updated.withMetadata(TameworkMetadataKeys.COMMAND_PANEL_AUTO_LINK, Codec.BOOLEAN, enabled);
+    }
+
     ItemStack togglePanelMode(@Nullable ItemStack stack, @Nullable TwCommandItemConfig config) {
         if (stack == null || stack.isEmpty()) {
             return stack;

@@ -10,6 +10,7 @@
 ### Added
 - Added optional Alec's Telemetry integration detection/bridge support plus a bundled telemetry project descriptor for hosted crash, usage, and performance reporting when Alec's Telemetry is installed.
 - Added live Alec's Telemetry event emission for `/tw reloadconfig`, `/tw settings`, `/tw news`, and settings-announcement open/review flows, with built-in hosted project defaults for the Tamework telemetry project.
+- Added an `Auto-Link` toggle to command-item linked panels so newly tamed companions can automatically bind to the first applicable command item in the player's hotbar or inventory, and breeding offspring can inherit Parent A's command tool binding when their owner is online.
 
 ### Changed
 - Updated hosted telemetry descriptors/defaults to target the public Alec's Telemetry endpoints instead of local/dev-only endpoints.

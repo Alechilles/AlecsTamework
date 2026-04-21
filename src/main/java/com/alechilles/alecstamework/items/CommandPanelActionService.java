@@ -172,6 +172,19 @@ final class CommandPanelActionService {
         }
     }
 
+    void applySetAutoLinkEnabled(Player player,
+                                 String toolId,
+                                 boolean enabled) {
+        boolean updated = toolInventoryService.mutateToolStack(
+                player,
+                toolId,
+                stack -> panelPreferenceService.setAutoLinkEnabled(stack, enabled)
+        );
+        if (!updated && player != null) {
+            feedbackService.showWarningKey(player, "tamework.ui.notifications.command.panel.autoLinkUpdateFailed");
+        }
+    }
+
     void applyAdjustPanelRadius(Player player,
                                 String toolId,
                                 TwCommandItemConfig config,

@@ -164,6 +164,12 @@ public final class CommandItemFeatureHandler {
                 linkPolicyService,
                 npcNameResolver
         );
+        this.linkMutationService = new CommandLinkMutationService(
+                linkedNpcRecordStore,
+                linkPolicyService,
+                npcNameResolver,
+                stateSnapshotService
+        );
         this.toolInventoryService = new CommandToolInventoryService(
                 panelEntryService,
                 panelEntrySourceService,
@@ -180,12 +186,6 @@ public final class CommandItemFeatureHandler {
                 relocationService,
                 linkedNpcRecordStore,
                 npcNameResolver
-        );
-        this.linkMutationService = new CommandLinkMutationService(
-                linkedNpcRecordStore,
-                linkPolicyService,
-                npcNameResolver,
-                stateSnapshotService
         );
         this.npcExistenceService = new CommandNpcExistenceService();
         this.relocationDispatchService = new CommandRelocationDispatchService(
@@ -721,6 +721,7 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.buildLinkedPanelEntriesForTool(player, toolId, config),
                 () -> toolInventoryService.buildLinkedPanelBaseEntriesForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelModeValueForTool(player, toolId, config),
+                () -> toolInventoryService.resolvePanelAutoLinkEnabledForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelRadiusLabelForTool(player, toolId, config),
                 () -> toolInventoryService.resolvePanelSortValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
@@ -738,6 +739,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuReturnHome(player, toolId, npcUuid),
                 npcUuid -> openTalentPageFromSelection(player, config, toolId, npcUuid),
                 value -> panelActionService.applySetPanelMode(player, toolId, value),
+                enabled -> panelActionService.applySetAutoLinkEnabled(player, toolId, enabled),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, false),
                 () -> panelActionService.applyAdjustPanelRadius(player, toolId, config, true),
                 () -> openGroupManagerFromSelection(player, config, toolId),

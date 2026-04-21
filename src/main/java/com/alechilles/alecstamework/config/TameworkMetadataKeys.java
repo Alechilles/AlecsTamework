@@ -62,6 +62,7 @@ public final class TameworkMetadataKeys {
     public static final String COMMAND_LINKED_NPCS = "Tamework.Command.LinkedNpcs";
     public static final String COMMAND_PANEL_SCHEMA_VERSION = "Tamework.Command.PanelSchemaVersion";
     public static final String COMMAND_PANEL_MODE = "Tamework.Command.PanelMode";
+    public static final String COMMAND_PANEL_AUTO_LINK = "Tamework.Command.PanelAutoLink";
     public static final String COMMAND_PANEL_RADIUS = "Tamework.Command.PanelRadius";
     public static final String COMMAND_PANEL_SORT = "Tamework.Command.PanelSort";
     public static final String COMMAND_PANEL_FILTER_MODE = "Tamework.Command.PanelFilterMode";
