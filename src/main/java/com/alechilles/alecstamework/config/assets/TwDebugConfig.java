@@ -101,6 +101,13 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             )
             .documentation("Debug setting for needs seek target resolution diagnostics.")
             .add()
+            .<Boolean>append(
+                    new KeyedCodec<>("FlyingCompanion", Codec.BOOLEAN),
+                    (section, value) -> section.flyingCompanion = value,
+                    section -> section.flyingCompanion
+            )
+            .documentation("Debug setting for flying companion landing and grounded handoff diagnostics.")
+            .add()
             .build();
 
     public static final AssetBuilderCodec<String, TwDebugConfig> CODEC = AssetBuilderCodec.builder(
@@ -329,6 +336,12 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!nestedExplicitKeys.contains("NeedsDamage")) {
             debugCommands.needsDamageDiagnostics = parent.debugCommands.needsDamageDiagnostics;
         }
+        if (!nestedExplicitKeys.contains("NeedsSeek")) {
+            debugCommands.needsSeekDiagnostics = parent.debugCommands.needsSeekDiagnostics;
+        }
+        if (!nestedExplicitKeys.contains("FlyingCompanion")) {
+            debugCommands.flyingCompanion = parent.debugCommands.flyingCompanion;
+        }
     }
 
     @Nullable
@@ -366,6 +379,7 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean needsConsumeDiagnostics;
         private boolean needsDamageDiagnostics;
         private boolean needsSeekDiagnostics;
+        private boolean flyingCompanion;
 
         public boolean isHook() {
             return hook;
@@ -410,6 +424,10 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isNeedsSeekDiagnostics() {
             return needsSeekDiagnostics;
+        }
+
+        public boolean isFlyingCompanion() {
+            return flyingCompanion;
         }
     }
 }

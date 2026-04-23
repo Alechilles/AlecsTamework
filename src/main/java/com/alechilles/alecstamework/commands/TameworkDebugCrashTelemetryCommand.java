@@ -1,7 +1,6 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.metrics.AlecsTelemetryBridge;
 import com.alechilles.alecstamework.metrics.CrashTelemetryDiagnostics;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.hypixel.hytale.server.core.HytaleServer;
@@ -72,12 +71,16 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                 return;
             }
             String token = Long.toHexString(System.currentTimeMillis());
-            AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordError(
+            boolean recorded = crashTelemetryService.recordError(
                     "debug_command_error",
                     new IllegalStateException("Simulated Tamework telemetry error event (" + token + ")"),
                     "Triggered by /tw debugcrashtelemetry eventerror (token=" + token + ")"
             );
-            commandContext.sender().sendMessage(Message.raw(result.message()));
+            commandContext.sender().sendMessage(Message.raw(
+                    recorded
+                            ? "Embedded telemetry error event queued."
+                            : "Embedded telemetry error event was not queued (telemetry disabled or event delivery not configured)."
+            ));
         } else if ("eventlifecycle".equals(action)) {
             Player player = store.getComponent(ref, Player.getComponentType());
             UUID playerUuid = player == null ? null : player.getUuid();
@@ -88,13 +91,17 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                 return;
             }
             String token = Long.toHexString(System.currentTimeMillis());
-            AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordLifecycle(
+            boolean recorded = crashTelemetryService.recordLifecycle(
                     "debug_command_lifecycle",
                     123,
                     true,
                     "Triggered by /tw debugcrashtelemetry eventlifecycle (token=" + token + ")"
             );
-            commandContext.sender().sendMessage(Message.raw(result.message()));
+            commandContext.sender().sendMessage(Message.raw(
+                    recorded
+                            ? "Embedded telemetry lifecycle event queued."
+                            : "Embedded telemetry lifecycle event was not queued (telemetry disabled or event delivery not configured)."
+            ));
         } else if ("simulate".equals(action)) {
             Player player = store.getComponent(ref, Player.getComponentType());
             UUID playerUuid = player == null ? null : player.getUuid();

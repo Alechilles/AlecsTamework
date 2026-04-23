@@ -5,6 +5,16 @@
 ### Added
 - Added new role-scoped progression families for companion leveling and passive talents (`TwLevelingConfig`, `TwTalentConfig`), including XP gain from feed/harvest/breeding/combat, level-based stat growth, passive talent purchases, linked-panel summaries, and a companion talent page for spending points on loaded companions. These systems remain unreleased and are not ready for player/modder usage yet.
 
+## 2.8.5 - Embedded Telemetry + Flying Companion Grounding - 2026-04-23
+
+### Added
+- Added Tamework-managed flying companion landing control support with `TameworkFlyingCompanionComponent`, the `TameworkSetFlyingCompanionMode` action/builder, and a new `FlyingCompanionControlSystem` to help flying companions descend, settle, and hand off into grounded hold states more reliably.
+- Added `/tw debugflyingcompanion` plus matching `TwDebugConfig.DebugCommands.FlyingCompanion` support so flying companion landing/grounded handoff diagnostics can be toggled at runtime.
+
+### Changed
+- Switched Tamework telemetry over to the bundled embedded Alec's Telemetry runtime so crash, lifecycle, performance, and usage reporting all use one in-jar telemetry path, while preserving the existing `/tw settings` telemetry toggles and `/tw debugcrashtelemetry` tooling.
+- Updated the bundled embedded telemetry project descriptor to use Tamework's hosted project key and the `telemetry-dev.alecsmods.com` ingest endpoints while the hosted portal rollout is still under test.
+
 ## 2.8.4 - Telemetry Integration + Respawn/Needs Stability - 2026-04-20
 
 ### Added

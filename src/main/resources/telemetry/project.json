@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "projectId": "alecs-tamework",
   "displayName": "Alec's Tamework!",
-  "runtimeMode": "dependency",
+  "runtimeMode": "embedded",
   "performance": {
     "enabled": true,
     "sampleRate": 1.0,
@@ -38,8 +38,8 @@
     "destinationMode": "hosted"
   },
   "hosted": {
-    "endpoint": "https://telemetry.alecsmods.com/ingest/crash",
-    "eventEndpoint": "https://telemetry.alecsmods.com/ingest/event",
-    "projectKey": "dev_tamework_local_test"
+    "endpoint": "https://telemetry-dev.alecsmods.com/ingest/crash",
+    "eventEndpoint": "https://telemetry-dev.alecsmods.com/ingest/event",
+    "projectKey": "proj_Oqk6x0Z_fVMUpXarjSyZbOkS"
   }
 }
