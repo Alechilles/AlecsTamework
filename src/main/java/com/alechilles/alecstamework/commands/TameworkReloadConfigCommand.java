@@ -92,11 +92,13 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
                 return;
             }
             plugin.applyDebugConfigDefaults();
+            String result = TameworkReloadConfigTelemetry.reloadResultLabel(summary.reloadResult());
+            boolean partial = "partial".equals(result);
             telemetryEvents.recordLifecycle(
                     "reload_config",
                     durationMs,
-                    true,
-                    reloadSummaryContext("Reloaded Tamework configs via " + COMMAND_NAME + ".", summary, "success")
+                    !partial,
+                    reloadSummaryContext("Reloaded Tamework configs via " + COMMAND_NAME + ".", summary, result)
                             .detail("source", "command")
                             .build()
             );
@@ -104,9 +106,9 @@ public final class TameworkReloadConfigCommand extends AbstractPlayerCommand {
                     "reload_config_duration",
                     durationMs,
                     (double) durationMs,
-                    reloadSummaryContext("Successful " + COMMAND_NAME + " duration.", summary, "success").build()
+                    reloadSummaryContext("Completed " + COMMAND_NAME + " duration.", summary, result).build()
             );
-            if (summary.reloadResult().hasErrors()) {
+            if (partial) {
                 telemetryEvents.recordError(
                         "reload_config_override_errors",
                         null,

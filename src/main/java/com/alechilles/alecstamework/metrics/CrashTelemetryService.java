@@ -214,12 +214,12 @@ public final class CrashTelemetryService {
     public boolean recordError(@Nonnull String eventName,
                                @Nullable Throwable throwable,
                                @Nullable TelemetryEventContext context) {
-        if (!canRecordEvents() || !project.events().errors().enabled()) {
+        if (!canRecordEvents()) {
             return false;
         }
-        engine.recordError(project.projectId(), eventName, throwable, context);
+        boolean recorded = engine.recordError(project.projectId(), eventName, throwable, context);
         syncLastFlushStatus();
-        return true;
+        return recorded;
     }
 
     public boolean recordLifecycle(@Nonnull String eventName,
@@ -233,12 +233,12 @@ public final class CrashTelemetryService {
                                    int durationMs,
                                    boolean success,
                                    @Nullable TelemetryEventContext context) {
-        if (!canRecordEvents() || !project.events().lifecycle().enabled()) {
+        if (!canRecordEvents()) {
             return false;
         }
-        engine.recordLifecycle(project.projectId(), eventName, durationMs, success, context);
+        boolean recorded = engine.recordLifecycle(project.projectId(), eventName, durationMs, success, context);
         syncLastFlushStatus();
-        return true;
+        return recorded;
     }
 
     public void recordPerformance(@Nonnull String eventName,

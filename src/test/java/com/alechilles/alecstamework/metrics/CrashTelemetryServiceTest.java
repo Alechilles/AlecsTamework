@@ -116,6 +116,26 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
+    void typedErrorContextIncludesStructuredDetails() {
+        SequencedClient client = new SequencedClient(CrashReportClient.UploadResult.success(204));
+        CrashTelemetryService service = createService(true, true, client);
+
+        assertTrue(service.recordError(
+                "debug_error",
+                testThrowable("context details"),
+                TelemetryEventContext.error()
+                        .detail("source", "settings_ui")
+                        .detail("overrideErrorCount", 2)
+                        .build()
+        ));
+        service.flushPendingReportsNow("typed-error-context");
+
+        JsonObject payload = JsonParser.parseString(client.payloads.getFirst()).getAsJsonObject();
+        assertEquals("settings_ui", payload.getAsJsonObject("details").get("source").getAsString());
+        assertEquals(2, payload.getAsJsonObject("details").get("overrideErrorCount").getAsInt());
+    }
+
+    @Test
     void disabledErrorAndLifecycleEventsReturnFalseWithoutQueueing() {
         CrashTelemetryService service = createService(
                 true,

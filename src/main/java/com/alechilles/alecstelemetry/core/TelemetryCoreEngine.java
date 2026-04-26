@@ -176,26 +176,26 @@ public final class TelemetryCoreEngine {
         captureExplicitProject(projectId, SOURCE_START_FAILURE, throwable);
     }
 
-    public void recordError(@Nonnull String projectId,
-                            @Nonnull String eventName,
-                            @Nullable Throwable throwable,
-                            @Nullable String detail) {
-        recordError(projectId, eventName, throwable, TelemetryEventContext.builder().detail(detail).build());
+    public boolean recordError(@Nonnull String projectId,
+                               @Nonnull String eventName,
+                               @Nullable Throwable throwable,
+                               @Nullable String detail) {
+        return recordError(projectId, eventName, throwable, TelemetryEventContext.builder().detail(detail).build());
     }
 
-    public void recordError(@Nonnull String projectId,
-                            @Nonnull String eventName,
-                            @Nullable Throwable throwable,
-                            @Nullable TelemetryEventContext context) {
+    public boolean recordError(@Nonnull String projectId,
+                               @Nonnull String eventName,
+                               @Nullable Throwable throwable,
+                               @Nullable TelemetryEventContext context) {
         if (!enabled.get()) {
-            return;
+            return false;
         }
         TelemetryProjectRegistration project = findProject(projectId);
         if (project == null
                 || !project.isEnabled()
                 || !project.events().errors().enabled()
                 || project.resolveEventDeliveryTarget(settings) == null) {
-            return;
+            return false;
         }
         TelemetryEventContext normalizedContext = normalizeContext(context);
         CrashReportEnvelope.RuntimeMetadata runtimeMetadata = CrashReportEnvelope.RuntimeMetadata.capture(loadedMods);
@@ -205,7 +205,7 @@ public final class TelemetryCoreEngine {
             attributes.put("throwableType", throwable.getClass().getName());
             attributes.put("throwableMessage", throwable.getMessage() == null ? "<empty>" : throwable.getMessage());
         }
-        LinkedHashMap<String, Object> details = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>(normalizedContext.details());
         putBreadcrumbDetails(project, details);
         TelemetryEventEnvelope event = TelemetryEventEnvelope.error(
                 project.projectId(),
@@ -225,33 +225,34 @@ public final class TelemetryCoreEngine {
         );
         if (!eventStoreFor(project).persist(event)) {
             logWarning("Failed to store telemetry error event for project " + project.projectId() + ".", null);
-            return;
+            return false;
         }
         requestFlushAsync("event", project.projectId());
+        return true;
     }
 
-    public void recordLifecycle(@Nonnull String projectId,
-                                @Nonnull String eventName,
-                                int durationMs,
-                                boolean success,
-                                @Nullable String detail) {
-        recordLifecycle(projectId, eventName, durationMs, success, TelemetryEventContext.builder().detail(detail).build());
+    public boolean recordLifecycle(@Nonnull String projectId,
+                                   @Nonnull String eventName,
+                                   int durationMs,
+                                   boolean success,
+                                   @Nullable String detail) {
+        return recordLifecycle(projectId, eventName, durationMs, success, TelemetryEventContext.builder().detail(detail).build());
     }
 
-    public void recordLifecycle(@Nonnull String projectId,
-                                @Nonnull String eventName,
-                                int durationMs,
-                                boolean success,
-                                @Nullable TelemetryEventContext context) {
+    public boolean recordLifecycle(@Nonnull String projectId,
+                                   @Nonnull String eventName,
+                                   int durationMs,
+                                   boolean success,
+                                   @Nullable TelemetryEventContext context) {
         if (!enabled.get()) {
-            return;
+            return false;
         }
         TelemetryProjectRegistration project = findProject(projectId);
         if (project == null
                 || !project.isEnabled()
                 || !project.events().lifecycle().enabled()
                 || project.resolveEventDeliveryTarget(settings) == null) {
-            return;
+            return false;
         }
         TelemetryEventContext normalizedContext = normalizeContext(context);
         CrashReportEnvelope.RuntimeMetadata runtimeMetadata = CrashReportEnvelope.RuntimeMetadata.capture(loadedMods);
@@ -280,9 +281,10 @@ public final class TelemetryCoreEngine {
         );
         if (!eventStoreFor(project).persist(event)) {
             logWarning("Failed to store telemetry lifecycle event for project " + project.projectId() + ".", null);
-            return;
+            return false;
         }
         requestFlushAsync("event", project.projectId());
+        return true;
     }
 
     public void recordPerformance(@Nonnull String projectId,
