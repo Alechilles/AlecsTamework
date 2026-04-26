@@ -136,6 +136,29 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
+    void typedLifecycleContextIncludesStructuredDetails() {
+        SequencedClient client = new SequencedClient(CrashReportClient.UploadResult.success(204));
+        CrashTelemetryService service = createService(true, true, client);
+
+        assertTrue(service.recordLifecycle(
+                "debug_lifecycle",
+                123,
+                true,
+                TelemetryEventContext.lifecycle()
+                        .detail("source", "command")
+                        .detail("result", "partial")
+                        .detail("overrideErrorCount", 2)
+                        .build()
+        ));
+        service.flushPendingReportsNow("typed-lifecycle-context");
+
+        JsonObject payload = JsonParser.parseString(client.payloads.getFirst()).getAsJsonObject();
+        assertEquals("command", payload.getAsJsonObject("details").get("source").getAsString());
+        assertEquals("partial", payload.getAsJsonObject("details").get("result").getAsString());
+        assertEquals(2, payload.getAsJsonObject("details").get("overrideErrorCount").getAsInt());
+    }
+
+    @Test
     void disabledErrorAndLifecycleEventsReturnFalseWithoutQueueing() {
         CrashTelemetryService service = createService(
                 true,

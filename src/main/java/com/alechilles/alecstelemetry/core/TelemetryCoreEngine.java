@@ -258,7 +258,7 @@ public final class TelemetryCoreEngine {
         CrashReportEnvelope.RuntimeMetadata runtimeMetadata = CrashReportEnvelope.RuntimeMetadata.capture(loadedMods);
         LinkedHashMap<String, Object> attributes = new LinkedHashMap<>();
         putDetail(attributes, normalizedContext);
-        LinkedHashMap<String, Object> details = new LinkedHashMap<>();
+        LinkedHashMap<String, Object> details = new LinkedHashMap<>(normalizedContext.details());
         if (!success) {
             putBreadcrumbDetails(project, details);
         }
