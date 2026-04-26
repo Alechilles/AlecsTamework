@@ -1,5 +1,6 @@
 package com.alechilles.alecstelemetry.event;
 
+import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.alechilles.alecstelemetry.crash.CrashReportEnvelope;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -22,6 +23,7 @@ public record TelemetryEventEnvelope(int schemaVersion,
                                      @Nonnull String projectDisplayName,
                                      @Nonnull String source,
                                      @Nonnull String sessionId,
+                                     @Nullable String fingerprint,
                                      @Nonnull String capturedAtUtc,
                                      @Nonnull String pluginIdentifier,
                                      @Nonnull String pluginVersion,
@@ -29,8 +31,21 @@ public record TelemetryEventEnvelope(int schemaVersion,
                                      @Nonnull String severity,
                                      @Nullable Integer durationMs,
                                      @Nullable Double metricValue,
+                                     @Nullable String subsystem,
+                                     @Nullable String phase,
+                                     @Nullable String operation,
+                                     @Nullable String target,
+                                     @Nullable String featureKey,
+                                     @Nullable String entryPoint,
+                                     @Nullable String runtimeSide,
+                                     @Nullable String entityType,
+                                     @Nullable String itemId,
+                                     @Nullable String blockId,
+                                     @Nullable String biomeId,
+                                     @Nullable String commandName,
                                      @Nullable CrashReportEnvelope.EnvironmentSnapshot environment,
                                      @Nonnull Map<String, Object> attributes,
+                                     @Nonnull Map<String, Object> details,
                                      @Nonnull CrashReportEnvelope.RuntimeMetadata runtime) {
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
@@ -56,6 +71,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                                                @Nonnull String severity,
                                                @Nonnull CrashReportEnvelope.EnvironmentSnapshot environment,
                                                @Nonnull Map<String, Object> attributes,
+                                               @Nonnull Map<String, Object> details,
+                                               @Nonnull TelemetryEventContext context,
                                                @Nonnull CrashReportEnvelope.RuntimeMetadata runtime) {
         return create(
                 TYPE_ERROR,
@@ -72,6 +89,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 null,
                 environment,
                 attributes,
+                details,
+                context,
                 runtime
         );
     }
@@ -89,6 +108,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                                                    int durationMs,
                                                    @Nonnull CrashReportEnvelope.EnvironmentSnapshot environment,
                                                    @Nonnull Map<String, Object> attributes,
+                                                   @Nonnull Map<String, Object> details,
+                                                   @Nonnull TelemetryEventContext context,
                                                    @Nonnull CrashReportEnvelope.RuntimeMetadata runtime) {
         LinkedHashMap<String, Object> withSuccess = new LinkedHashMap<>(attributes);
         withSuccess.putIfAbsent("success", success);
@@ -107,6 +128,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 null,
                 environment,
                 withSuccess,
+                details,
+                context,
                 runtime
         );
     }
@@ -124,6 +147,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                                                      @Nullable Double metricValue,
                                                      @Nonnull CrashReportEnvelope.EnvironmentSnapshot environment,
                                                      @Nonnull Map<String, Object> attributes,
+                                                     @Nonnull Map<String, Object> details,
+                                                     @Nonnull TelemetryEventContext context,
                                                      @Nonnull CrashReportEnvelope.RuntimeMetadata runtime) {
         return create(
                 TYPE_PERFORMANCE,
@@ -140,6 +165,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 metricValue,
                 environment,
                 attributes,
+                details,
+                context,
                 runtime
         );
     }
@@ -155,6 +182,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                                                @Nullable String worldName,
                                                @Nonnull CrashReportEnvelope.EnvironmentSnapshot environment,
                                                @Nonnull Map<String, Object> attributes,
+                                               @Nonnull Map<String, Object> details,
+                                               @Nonnull TelemetryEventContext context,
                                                @Nonnull CrashReportEnvelope.RuntimeMetadata runtime) {
         return create(
                 TYPE_USAGE,
@@ -171,6 +200,8 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 null,
                 environment,
                 attributes,
+                details,
+                context,
                 runtime
         );
     }
@@ -201,7 +232,10 @@ public record TelemetryEventEnvelope(int schemaVersion,
                                                  @Nullable Double metricValue,
                                                  @Nonnull CrashReportEnvelope.EnvironmentSnapshot environment,
                                                  @Nonnull Map<String, Object> attributes,
+                                                 @Nonnull Map<String, Object> details,
+                                                 @Nonnull TelemetryEventContext context,
                                                  @Nonnull CrashReportEnvelope.RuntimeMetadata runtime) {
+        TelemetryEventContext normalizedContext = context.normalize();
         return new TelemetryEventEnvelope(
                 SCHEMA_VERSION,
                 normalizeType(eventType),
@@ -211,6 +245,7 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 normalizeNonBlank(projectDisplayName, projectId),
                 normalizeNonBlank(source, "runtime"),
                 normalizeNonBlank(sessionId, UUID.randomUUID().toString()),
+                normalizeNullable(normalizedContext.fingerprint()),
                 Instant.now().toString(),
                 normalizeNonBlank(pluginIdentifier, "unknown"),
                 normalizeNonBlank(pluginVersion, "unknown"),
@@ -218,8 +253,21 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 normalizeSeverity(severity),
                 durationMs == null ? null : Math.max(0, durationMs),
                 metricValue,
+                normalizeNullable(normalizedContext.subsystem()),
+                normalizeNullable(normalizedContext.phase()),
+                normalizeNullable(normalizedContext.operation()),
+                normalizeNullable(normalizedContext.target()),
+                normalizeNullable(normalizedContext.featureKey()),
+                normalizeNullable(normalizedContext.entryPoint()),
+                normalizeNullable(normalizedContext.runtimeSide()),
+                normalizeNullable(normalizedContext.entityType()),
+                normalizeNullable(normalizedContext.itemId()),
+                normalizeNullable(normalizedContext.blockId()),
+                normalizeNullable(normalizedContext.biomeId()),
+                normalizeNullable(normalizedContext.commandName()),
                 environment.normalize(),
-                normalizeAttributes(attributes),
+                normalizeObjectMap(attributes),
+                normalizeObjectMap(details),
                 runtime.normalize()
         );
     }
@@ -235,6 +283,7 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 normalizeNonBlank(projectDisplayName(), projectId()),
                 normalizeNonBlank(source(), "runtime"),
                 normalizeNonBlank(sessionId(), UUID.randomUUID().toString()),
+                normalizeNullable(fingerprint()),
                 normalizeNonBlank(capturedAtUtc(), Instant.now().toString()),
                 normalizeNonBlank(pluginIdentifier(), "unknown"),
                 normalizeNonBlank(pluginVersion(), "unknown"),
@@ -242,8 +291,21 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 normalizeSeverity(severity()),
                 durationMs() == null ? null : Math.max(0, durationMs()),
                 metricValue(),
+                normalizeNullable(subsystem()),
+                normalizeNullable(phase()),
+                normalizeNullable(operation()),
+                normalizeNullable(target()),
+                normalizeNullable(featureKey()),
+                normalizeNullable(entryPoint()),
+                normalizeNullable(runtimeSide()),
+                normalizeNullable(entityType()),
+                normalizeNullable(itemId()),
+                normalizeNullable(blockId()),
+                normalizeNullable(biomeId()),
+                normalizeNullable(commandName()),
                 environment() == null ? new CrashReportEnvelope.EnvironmentSnapshot("unknown", "unknown", "unknown") : environment().normalize(),
-                normalizeAttributes(attributes()),
+                normalizeObjectMap(attributes()),
+                normalizeObjectMap(details()),
                 runtime() == null ? CrashReportEnvelope.RuntimeMetadata.capture(java.util.List.of()) : runtime().normalize()
         );
     }
@@ -265,17 +327,19 @@ public record TelemetryEventEnvelope(int schemaVersion,
                 null,
                 new CrashReportEnvelope.EnvironmentSnapshot("unknown", "unknown", "unknown"),
                 Map.of(),
+                Map.of(),
+                TelemetryEventContext.empty(),
                 CrashReportEnvelope.RuntimeMetadata.capture(java.util.List.of())
         );
     }
 
     @Nonnull
-    private static Map<String, Object> normalizeAttributes(@Nullable Map<String, Object> attributes) {
-        if (attributes == null || attributes.isEmpty()) {
+    private static Map<String, Object> normalizeObjectMap(@Nullable Map<String, Object> values) {
+        if (values == null || values.isEmpty()) {
             return Map.of();
         }
         LinkedHashMap<String, Object> normalized = new LinkedHashMap<>();
-        for (Map.Entry<String, Object> entry : attributes.entrySet()) {
+        for (Map.Entry<String, Object> entry : values.entrySet()) {
             if (entry == null || entry.getKey() == null || entry.getKey().isBlank() || entry.getValue() == null) {
                 continue;
             }

@@ -80,6 +80,11 @@ public record TelemetryProjectRegistration(@Nonnull TelemetryProjectDescriptor d
     }
 
     @Nonnull
+    public TelemetryProjectDescriptor.EventOptions events() {
+        return descriptor.events();
+    }
+
+    @Nonnull
     public TelemetryProjectDescriptor.PerformanceOptions performance() {
         if (override == null || override.performance() == null) {
             return descriptor.performance();
@@ -89,7 +94,8 @@ public record TelemetryProjectRegistration(@Nonnull TelemetryProjectDescriptor d
         return new TelemetryProjectDescriptor.PerformanceOptions(
                 performanceOverride.enabled() == null ? defaults.enabled() : performanceOverride.enabled(),
                 performanceOverride.sampleRate() == null ? defaults.sampleRate() : performanceOverride.sampleRate(),
-                performanceOverride.thresholdMs() == null ? defaults.thresholdMs() : performanceOverride.thresholdMs()
+                performanceOverride.thresholdMs() == null ? defaults.thresholdMs() : performanceOverride.thresholdMs(),
+                defaults.details()
         );
     }
 
@@ -102,7 +108,8 @@ public record TelemetryProjectRegistration(@Nonnull TelemetryProjectDescriptor d
         TelemetryProjectOverride.UsageOverride usageOverride = override.usage();
         return new TelemetryProjectDescriptor.UsageOptions(
                 usageOverride.enabled() == null ? defaults.enabled() : usageOverride.enabled(),
-                usageOverride.allowedEvents().isEmpty() ? defaults.allowedEvents() : usageOverride.allowedEvents()
+                usageOverride.allowedEvents().isEmpty() ? defaults.allowedEvents() : usageOverride.allowedEvents(),
+                defaults.details()
         );
     }
 

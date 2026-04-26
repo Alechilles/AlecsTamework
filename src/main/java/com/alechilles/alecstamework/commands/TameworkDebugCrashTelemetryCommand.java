@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.commands;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.metrics.CrashTelemetryDiagnostics;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -74,7 +75,17 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
             boolean recorded = crashTelemetryService.recordError(
                     "debug_command_error",
                     new IllegalStateException("Simulated Tamework telemetry error event (" + token + ")"),
-                    "Triggered by /tw debugcrashtelemetry eventerror (token=" + token + ")"
+                    TameworkTelemetryEvents.commandContext(
+                                    "/tw debugcrashtelemetry",
+                                    "telemetry_debug",
+                                    "crash_telemetry_debug"
+                            )
+                            .operation("eventerror")
+                            .detail("Triggered by /tw debugcrashtelemetry eventerror.")
+                            .detail("source", "debug_command")
+                            .detail("debugAction", "eventerror")
+                            .detail("debugToken", token)
+                            .build()
             );
             commandContext.sender().sendMessage(Message.raw(
                     recorded
@@ -95,7 +106,17 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                     "debug_command_lifecycle",
                     123,
                     true,
-                    "Triggered by /tw debugcrashtelemetry eventlifecycle (token=" + token + ")"
+                    TameworkTelemetryEvents.commandContext(
+                                    "/tw debugcrashtelemetry",
+                                    "telemetry_debug",
+                                    "crash_telemetry_debug"
+                            )
+                            .operation("eventlifecycle")
+                            .detail("Triggered by /tw debugcrashtelemetry eventlifecycle.")
+                            .detail("source", "debug_command")
+                            .detail("debugAction", "eventlifecycle")
+                            .detail("debugToken", token)
+                            .build()
             );
             commandContext.sender().sendMessage(Message.raw(
                     recorded

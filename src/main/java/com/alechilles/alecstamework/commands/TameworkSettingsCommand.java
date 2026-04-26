@@ -39,7 +39,7 @@ public final class TameworkSettingsCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw settings."));
             return;
         }
-        String error = TameworkSettingsPageService.openSettingsPage(ref, store, world);
+        String error = TameworkSettingsPageService.openSettingsPage(ref, store, world, "command", "/tw settings");
         if (error != null) {
             commandContext.sender().sendMessage(Message.raw(error));
         }

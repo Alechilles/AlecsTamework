@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.commands.TameworkConfigPermission;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.command.system.CommandSender;
@@ -55,12 +56,20 @@ public final class TameworkSettingsPageService {
         if (!hasAccess(playerRef, player)) {
             return "You do not have permission to use /tw settings.";
         }
-        return openSettingsPage(player, ref, store, world);
+        return openSettingsPage(player, ref, store, world, "api", "settings_api");
     }
 
     @Nullable
     public static String openSettingsPage(@Nonnull Ref<EntityStore> ref,
                                           @Nonnull Store<EntityStore> store) {
+        return openSettingsPage(ref, store, "api", "settings_api");
+    }
+
+    @Nullable
+    public static String openSettingsPage(@Nonnull Ref<EntityStore> ref,
+                                          @Nonnull Store<EntityStore> store,
+                                          @Nonnull String telemetrySource,
+                                          @Nonnull String entryPoint) {
         if (store.getExternalData() == null) {
             return "Unable to open settings right now.";
         }
@@ -68,25 +77,36 @@ public final class TameworkSettingsPageService {
         if (world == null) {
             return "Unable to open settings right now.";
         }
-        return openSettingsPage(ref, store, world);
+        return openSettingsPage(ref, store, world, telemetrySource, entryPoint);
     }
 
     @Nullable
     public static String openSettingsPage(@Nonnull Ref<EntityStore> ref,
                                           @Nonnull Store<EntityStore> store,
                                           @Nonnull World world) {
+        return openSettingsPage(ref, store, world, "api", "settings_api");
+    }
+
+    @Nullable
+    public static String openSettingsPage(@Nonnull Ref<EntityStore> ref,
+                                          @Nonnull Store<EntityStore> store,
+                                          @Nonnull World world,
+                                          @Nonnull String telemetrySource,
+                                          @Nonnull String entryPoint) {
         Player player = store.getComponent(ref, Player.getComponentType());
         if (player == null) {
             return "Unable to open settings right now.";
         }
-        return openSettingsPage(player, ref, store, world);
+        return openSettingsPage(player, ref, store, world, telemetrySource, entryPoint);
     }
 
     @Nullable
     private static String openSettingsPage(@Nonnull Player player,
                                            @Nonnull Ref<EntityStore> ref,
                                            @Nonnull Store<EntityStore> store,
-                                           @Nonnull World world) {
+                                           @Nonnull World world,
+                                           @Nonnull String telemetrySource,
+                                           @Nonnull String entryPoint) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
             return "Tamework settings are not available.";
@@ -104,13 +124,25 @@ public final class TameworkSettingsPageService {
         try {
             TameworkSettingsPage page = new TameworkSettingsPage(uiPlayerRef, plugin, world);
             player.getPageManager().openCustomPage(ref, store, page);
-            plugin.getTelemetryEvents().recordUsage("settings_page_opened", "Opened via /tw settings.");
+            plugin.getTelemetryEvents().recordUsage(
+                    "settings_page_opened",
+                    TameworkTelemetryEvents.featureContext("settings", "settings_page", entryPoint)
+                            .operation("open")
+                            .detail("Opened Tamework settings page.")
+                            .detail("source", telemetrySource)
+                            .build()
+            );
             return null;
         } catch (Throwable throwable) {
             plugin.getTelemetryEvents().recordError(
                     "ui_page_open_failed",
                     throwable,
-                    "page=TameworkSettingsPage action=/tw settings"
+                    TameworkTelemetryEvents.featureContext("settings", "settings_page", entryPoint)
+                            .operation("open")
+                            .target("TameworkSettingsPage")
+                            .detail("Failed to open Tamework settings page.")
+                            .detail("source", telemetrySource)
+                            .build()
             );
             return "Unable to open settings right now.";
         }

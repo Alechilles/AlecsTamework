@@ -21,13 +21,14 @@ public record TelemetryProjectDescriptor(int schemaVersion,
                                          @Nonnull String displayName,
                                          @Nonnull String runtimeMode,
                                          @Nonnull List<String> ownerPluginIdentifiers,
-                                          @Nonnull List<String> packagePrefixes,
-                                          @Nonnull CaptureOptions capture,
-                                          @Nonnull PerformanceOptions performance,
-                                          @Nonnull UsageOptions usage,
-                                          @Nonnull Defaults defaults,
-                                          @Nonnull HostedDestination hosted,
-                                          @Nonnull CustomEndpoint customEndpoint) {
+                                         @Nonnull List<String> packagePrefixes,
+                                         @Nonnull CaptureOptions capture,
+                                         @Nonnull EventOptions events,
+                                         @Nonnull PerformanceOptions performance,
+                                         @Nonnull UsageOptions usage,
+                                         @Nonnull Defaults defaults,
+                                         @Nonnull HostedDestination hosted,
+                                         @Nonnull CustomEndpoint customEndpoint) {
 
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().create();
     private static final int CURRENT_SCHEMA_VERSION = 1;
@@ -75,18 +76,33 @@ public record TelemetryProjectDescriptor(int schemaVersion,
         );
 
         PerformanceOptions performance = safe.performance == null
-                ? new PerformanceOptions(false, 1.0d, 100)
+                ? new PerformanceOptions(false, 1.0d, 100, Map.of())
                 : new PerformanceOptions(
                 boolOrDefault(safe.performance.enabled, false),
                 doubleOrDefault(safe.performance.sampleRate, 1.0d, 0.0d, 1.0d),
-                intOrDefault(safe.performance.thresholdMs, 100, 1, 60000)
+                intOrDefault(safe.performance.thresholdMs, 100, 1, 60000),
+                normalizeDetailRules(safe.performance.details)
         );
 
         UsageOptions usage = safe.usage == null
-                ? new UsageOptions(false, List.of())
+                ? new UsageOptions(false, List.of(), Map.of())
                 : new UsageOptions(
                 boolOrDefault(safe.usage.enabled, false),
-                normalizeNonBlankList(safe.usage.allowedEvents, 120)
+                normalizeNonBlankList(safe.usage.allowedEvents, 120),
+                normalizeDetailRules(safe.usage.details)
+        );
+
+        EventOptions events = safe.events == null
+                ? EventOptions.defaults()
+                : new EventOptions(
+                new EventTypeOptions(safe.events.errors == null || boolOrDefault(safe.events.errors.enabled, true)),
+                new EventTypeOptions(safe.events.lifecycle == null || boolOrDefault(safe.events.lifecycle.enabled, true)),
+                safe.events.breadcrumbs == null
+                        ? new BreadcrumbOptions(true, true)
+                        : new BreadcrumbOptions(
+                        boolOrDefault(safe.events.breadcrumbs.enabled, true),
+                        boolOrDefault(safe.events.breadcrumbs.automatic, true)
+                )
         );
 
         HostedDestination hosted = new HostedDestination(
@@ -114,6 +130,7 @@ public record TelemetryProjectDescriptor(int schemaVersion,
                 ownerPluginIdentifiers,
                 packagePrefixes,
                 capture,
+                events,
                 performance,
                 usage,
                 defaults,
@@ -229,12 +246,146 @@ public record TelemetryProjectDescriptor(int schemaVersion,
         return Map.copyOf(normalized);
     }
 
+    @Nonnull
+    private static Map<String, DetailRules> normalizeDetailRules(@Nullable Map<String, DetailRulesDocument> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashMap<String, DetailRules> normalized = new LinkedHashMap<>();
+        for (Map.Entry<String, DetailRulesDocument> entry : documents.entrySet()) {
+            if (entry == null) {
+                continue;
+            }
+            String eventName = normalizeNullable(entry.getKey());
+            DetailRules rules = normalizeDetailRule(entry.getValue());
+            if (eventName != null && !rules.allowedFields().isEmpty()) {
+                normalized.putIfAbsent(eventName.toLowerCase(Locale.ROOT), rules);
+            }
+        }
+        return Map.copyOf(normalized);
+    }
+
+    @Nonnull
+    private static DetailRules normalizeDetailRule(@Nullable DetailRulesDocument document) {
+        if (document == null || document.allowedFields == null || document.allowedFields.isEmpty()) {
+            return new DetailRules(Map.of());
+        }
+        LinkedHashMap<String, DetailFieldRule> fields = new LinkedHashMap<>();
+        for (Map.Entry<String, DetailFieldDocument> entry : document.allowedFields.entrySet()) {
+            if (fields.size() >= 20 || entry == null) {
+                break;
+            }
+            String key = normalizeNullable(entry.getKey());
+            DetailFieldRule field = normalizeDetailField(entry.getValue());
+            if (key != null && field != null) {
+                fields.putIfAbsent(key, field);
+            }
+        }
+        return new DetailRules(Map.copyOf(fields));
+    }
+
+    @Nullable
+    private static DetailFieldRule normalizeDetailField(@Nullable DetailFieldDocument document) {
+        if (document == null) {
+            return null;
+        }
+        String type = normalizeNullable(document.type);
+        if (type == null) {
+            return null;
+        }
+        String normalizedType = type.toLowerCase(Locale.ROOT);
+        if (!"string".equals(normalizedType)
+                && !"number".equals(normalizedType)
+                && !"boolean".equals(normalizedType)
+                && !"enum".equals(normalizedType)) {
+            return null;
+        }
+        List<String> values = "enum".equals(normalizedType)
+                ? normalizeNonBlankList(document.values, 120)
+                : List.of();
+        if ("enum".equals(normalizedType) && values.isEmpty()) {
+            return null;
+        }
+        return new DetailFieldRule(
+                normalizedType,
+                values,
+                intOrDefault(document.maxLength, 120, 1, 500)
+        );
+    }
+
     @Nullable
     private static String normalizeNullable(@Nullable String value) {
         if (value == null || value.isBlank()) {
             return null;
         }
         return value.trim();
+    }
+
+    @Nonnull
+    private static Map<String, Object> sanitizeDetailMap(@Nonnull Map<String, DetailRules> rulesByEventName,
+                                                         @Nonnull String eventName,
+                                                         @Nullable Map<String, Object> rawDetails) {
+        if (rulesByEventName.isEmpty() || rawDetails == null || rawDetails.isEmpty()) {
+            return Map.of();
+        }
+        String normalizedEventName = normalizeNullable(eventName);
+        if (normalizedEventName == null) {
+            return Map.of();
+        }
+        DetailRules rules = rulesByEventName.get(normalizedEventName.toLowerCase(Locale.ROOT));
+        if (rules == null || rules.allowedFields().isEmpty()) {
+            return Map.of();
+        }
+        LinkedHashMap<String, Object> sanitized = new LinkedHashMap<>();
+        for (Map.Entry<String, DetailFieldRule> field : rules.allowedFields().entrySet()) {
+            if (sanitized.size() >= 20) {
+                break;
+            }
+            Object value = sanitizeDetailValue(field.getValue(), rawDetails.get(field.getKey()));
+            if (value != null) {
+                sanitized.put(field.getKey(), value);
+            }
+        }
+        return Map.copyOf(sanitized);
+    }
+
+    @Nullable
+    private static Object sanitizeDetailValue(@Nonnull DetailFieldRule rule, @Nullable Object rawValue) {
+        if (rawValue == null) {
+            return null;
+        }
+        return switch (rule.type()) {
+            case "number" -> rawValue instanceof Number ? rawValue : null;
+            case "boolean" -> rawValue instanceof Boolean ? rawValue : null;
+            case "enum" -> sanitizeEnumValue(rule, rawValue);
+            default -> sanitizeStringValue(rule, rawValue);
+        };
+    }
+
+    @Nullable
+    private static String sanitizeStringValue(@Nonnull DetailFieldRule rule, @Nonnull Object rawValue) {
+        if (!(rawValue instanceof CharSequence text)) {
+            return null;
+        }
+        String normalized = normalizeNullable(text.toString());
+        if (normalized == null) {
+            return null;
+        }
+        return normalized.length() <= rule.maxLength() ? normalized : normalized.substring(0, rule.maxLength());
+    }
+
+    @Nullable
+    private static String sanitizeEnumValue(@Nonnull DetailFieldRule rule, @Nonnull Object rawValue) {
+        String normalized = sanitizeStringValue(rule, rawValue);
+        if (normalized == null) {
+            return null;
+        }
+        for (String allowed : rule.values()) {
+            if (allowed.equalsIgnoreCase(normalized)) {
+                return allowed;
+            }
+        }
+        return null;
     }
 
     @Nonnull
@@ -307,23 +458,66 @@ public record TelemetryProjectDescriptor(int schemaVersion,
     }
 
     /**
+     * Explicit controls for generic telemetry events.
+     */
+    public record EventOptions(@Nonnull EventTypeOptions errors,
+                               @Nonnull EventTypeOptions lifecycle,
+                               @Nonnull BreadcrumbOptions breadcrumbs) {
+
+        @Nonnull
+        public static EventOptions defaults() {
+            return new EventOptions(
+                    new EventTypeOptions(true),
+                    new EventTypeOptions(true),
+                    new BreadcrumbOptions(true, true)
+            );
+        }
+    }
+
+    public record EventTypeOptions(boolean enabled) {
+    }
+
+    public record BreadcrumbOptions(boolean enabled, boolean automatic) {
+    }
+
+    /**
      * Performance telemetry defaults for one project.
      */
     public record PerformanceOptions(boolean enabled,
                                      double sampleRate,
-                                     int thresholdMs) {
+                                     int thresholdMs,
+                                     @Nonnull Map<String, DetailRules> details) {
+
+        @Nonnull
+        public Map<String, Object> sanitizeDetails(@Nonnull String eventName, @Nullable Map<String, Object> rawDetails) {
+            return sanitizeDetailMap(details, eventName, rawDetails);
+        }
     }
 
     /**
      * Usage telemetry defaults and allowlist for one project.
      */
     public record UsageOptions(boolean enabled,
-                               @Nonnull List<String> allowedEvents) {
+                               @Nonnull List<String> allowedEvents,
+                               @Nonnull Map<String, DetailRules> details) {
 
         public boolean allows(@Nonnull String eventName) {
             String normalized = normalizeNullable(eventName);
             return enabled() && normalized != null && allowedEvents().stream().anyMatch(normalized::equalsIgnoreCase);
         }
+
+        @Nonnull
+        public Map<String, Object> sanitizeDetails(@Nonnull String eventName, @Nullable Map<String, Object> rawDetails) {
+            return sanitizeDetailMap(details, eventName, rawDetails);
+        }
+    }
+
+    public record DetailRules(@Nonnull Map<String, DetailFieldRule> allowedFields) {
+    }
+
+    public record DetailFieldRule(@Nonnull String type,
+                                  @Nonnull List<String> values,
+                                  int maxLength) {
     }
 
     /**
@@ -340,7 +534,7 @@ public record TelemetryProjectDescriptor(int schemaVersion,
      */
     public record CustomEndpoint(@Nullable String url,
                                  @Nullable String eventUrl,
-                                  @Nonnull Map<String, String> headers) {
+                                 @Nonnull Map<String, String> headers) {
     }
 
     /**
@@ -360,6 +554,7 @@ public record TelemetryProjectDescriptor(int schemaVersion,
         private List<String> ownerPluginIdentifiers;
         private List<String> packagePrefixes;
         private CaptureDocument capture;
+        private EventsDocument events;
         private PerformanceDocument performance;
         private UsageDocument usage;
         private DefaultsDocument defaults;
@@ -379,15 +574,42 @@ public record TelemetryProjectDescriptor(int schemaVersion,
         private String destinationMode;
     }
 
+    private static final class EventsDocument {
+        private EventTypeDocument errors;
+        private EventTypeDocument lifecycle;
+        private BreadcrumbsDocument breadcrumbs;
+    }
+
+    private static final class EventTypeDocument {
+        private Boolean enabled;
+    }
+
+    private static final class BreadcrumbsDocument {
+        private Boolean enabled;
+        private Boolean automatic;
+    }
+
     private static final class PerformanceDocument {
         private Boolean enabled;
         private Double sampleRate;
         private Integer thresholdMs;
+        private Map<String, DetailRulesDocument> details;
     }
 
     private static final class UsageDocument {
         private Boolean enabled;
         private List<String> allowedEvents;
+        private Map<String, DetailRulesDocument> details;
+    }
+
+    private static final class DetailRulesDocument {
+        private Map<String, DetailFieldDocument> allowedFields;
+    }
+
+    private static final class DetailFieldDocument {
+        private String type;
+        private List<String> values;
+        private Integer maxLength;
     }
 
     private static final class HostedDocument {

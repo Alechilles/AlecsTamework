@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.AnnouncementOptOutState;
 import com.alechilles.alecstamework.persistence.TameworkSettingsAnnouncementStore.ResolvedAnnouncement;
@@ -120,13 +121,25 @@ public final class TameworkSettingsAnnouncementService {
         );
         try {
             player.getPageManager().openCustomPage(playerRef, store, page);
-            plugin.getTelemetryEvents().recordUsage("settings_announcement_opened", "Opened Tamework settings announcement.");
+            plugin.getTelemetryEvents().recordUsage(
+                    "settings_announcement_opened",
+                    TameworkTelemetryEvents.featureContext("settings", "settings_announcement", "settings_announcement")
+                            .operation("open")
+                            .detail("Opened Tamework settings announcement.")
+                            .detail("source", "announcement")
+                            .build()
+            );
             return null;
         } catch (Throwable throwable) {
             plugin.getTelemetryEvents().recordError(
                     "ui_page_open_failed",
                     throwable,
-                    "page=TameworkSettingsAnnouncementPage action=/tw news"
+                    TameworkTelemetryEvents.featureContext("settings", "settings_announcement", "settings_announcement")
+                            .operation("open")
+                            .target("TameworkSettingsAnnouncementPage")
+                            .detail("Failed to open Tamework settings announcement.")
+                            .detail("source", "announcement")
+                            .build()
             );
             return respectEnabled ? null : "Unable to open Tamework news right now.";
         }
@@ -187,15 +200,30 @@ public final class TameworkSettingsAnnouncementService {
                                   @Nonnull PlayerRef playerRef,
                                   @Nonnull UUID playerUuid,
                                   @Nonnull String announcementId,
-                                  boolean suppressUntilNextAnnouncement) {
+        boolean suppressUntilNextAnnouncement) {
         persistOptOutIfRequested(playerUuid, announcementId, suppressUntilNextAnnouncement);
-        String error = TameworkSettingsPageService.openSettingsPage(ref, store);
+        String error = TameworkSettingsPageService.openSettingsPage(ref, store, "announcement", "settings_announcement");
         if (error != null) {
-            plugin.getTelemetryEvents().recordError("settings_announcement_review_failed", null, error);
+            plugin.getTelemetryEvents().recordError(
+                    "settings_announcement_review_failed",
+                    null,
+                    TameworkTelemetryEvents.featureContext("settings", "settings_announcement", "settings_announcement")
+                            .operation("review_settings")
+                            .detail(error)
+                            .detail("source", "announcement")
+                            .build()
+            );
             playerRef.sendMessage(Message.raw(error));
             return;
         }
-        plugin.getTelemetryEvents().recordUsage("settings_announcement_reviewed", "Opened settings from announcement.");
+        plugin.getTelemetryEvents().recordUsage(
+                "settings_announcement_reviewed",
+                TameworkTelemetryEvents.featureContext("settings", "settings_announcement", "settings_announcement")
+                        .operation("review_settings")
+                        .detail("Opened settings from announcement.")
+                        .detail("source", "announcement")
+                        .build()
+        );
     }
 
     private void persistOptOutIfRequested(@Nonnull UUID playerUuid,
@@ -215,7 +243,11 @@ public final class TameworkSettingsAnnouncementService {
         plugin.getTelemetryEvents().recordError(
                 "settings_announcement_opt_out_persist_failed",
                 null,
-                "Failed to persist announcement opt-out for player " + playerUuid + "."
+                TameworkTelemetryEvents.featureContext("settings", "settings_announcement", "settings_announcement")
+                        .operation("persist_opt_out")
+                        .detail("Failed to persist announcement opt-out.")
+                        .detail("source", "announcement")
+                        .build()
         );
         plugin.getLogger().at(Level.WARNING).log(
                 "Failed to persist Tamework settings announcement opt-out for player " + playerUuid + "."
