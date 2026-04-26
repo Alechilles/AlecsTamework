@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.metrics;
 
+import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.alechilles.alecstelemetry.core.TelemetryCoreEngine;
 import com.alechilles.alecstelemetry.crash.CrashReportClient;
 import com.alechilles.alecstelemetry.crash.CrashReportEnvelope;
@@ -207,10 +208,16 @@ public final class CrashTelemetryService {
     public boolean recordError(@Nonnull String eventName,
                                @Nullable Throwable throwable,
                                @Nullable String detail) {
+        return recordError(eventName, throwable, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public boolean recordError(@Nonnull String eventName,
+                               @Nullable Throwable throwable,
+                               @Nullable TelemetryEventContext context) {
         if (!canRecordEvents()) {
             return false;
         }
-        engine.recordError(project.projectId(), eventName, throwable, detail);
+        engine.recordError(project.projectId(), eventName, throwable, context);
         syncLastFlushStatus();
         return true;
     }
@@ -219,10 +226,17 @@ public final class CrashTelemetryService {
                                    int durationMs,
                                    boolean success,
                                    @Nullable String detail) {
+        return recordLifecycle(eventName, durationMs, success, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public boolean recordLifecycle(@Nonnull String eventName,
+                                   int durationMs,
+                                   boolean success,
+                                   @Nullable TelemetryEventContext context) {
         if (!canRecordEvents()) {
             return false;
         }
-        engine.recordLifecycle(project.projectId(), eventName, durationMs, success, detail);
+        engine.recordLifecycle(project.projectId(), eventName, durationMs, success, context);
         syncLastFlushStatus();
         return true;
     }
@@ -231,19 +245,31 @@ public final class CrashTelemetryService {
                                   int durationMs,
                                   @Nullable Double metricValue,
                                   @Nullable String detail) {
+        recordPerformance(eventName, durationMs, metricValue, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public void recordPerformance(@Nonnull String eventName,
+                                  int durationMs,
+                                  @Nullable Double metricValue,
+                                  @Nullable TelemetryEventContext context) {
         if (!canRecordEvents()) {
             return;
         }
-        engine.recordPerformance(project.projectId(), eventName, durationMs, metricValue, detail);
+        engine.recordPerformance(project.projectId(), eventName, durationMs, metricValue, context);
         syncLastFlushStatus();
     }
 
     public void recordUsage(@Nonnull String eventName,
                             @Nullable String detail) {
+        recordUsage(eventName, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public void recordUsage(@Nonnull String eventName,
+                            @Nullable TelemetryEventContext context) {
         if (!canRecordEvents()) {
             return;
         }
-        engine.recordUsage(project.projectId(), eventName, detail);
+        engine.recordUsage(project.projectId(), eventName, context);
         syncLastFlushStatus();
     }
 

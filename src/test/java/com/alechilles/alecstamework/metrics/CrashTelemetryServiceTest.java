@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.metrics;
 
+import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.alechilles.alecstelemetry.crash.CrashReportClient;
 import com.alechilles.alecstelemetry.crash.CrashReportEnvelope;
 import com.alechilles.alecstelemetry.project.TelemetryProjectDescriptor;
@@ -87,6 +88,33 @@ class CrashTelemetryServiceTest {
         assertEquals(0, payload.getAsJsonArray("breadcrumbs").size());
     }
 
+    @Test
+    void typedUsageContextPromotesFieldsAndValidatedDetails() {
+        SequencedClient client = new SequencedClient(CrashReportClient.UploadResult.success(204));
+        CrashTelemetryService service = createService(true, true, client);
+
+        service.recordUsage(
+                "debug_usage",
+                TelemetryEventContext.usage()
+                        .subsystem("settings")
+                        .featureKey("settings_page")
+                        .entryPoint("/tw settings")
+                        .runtimeSide("server")
+                        .detail("source", "settings_ui")
+                        .detail("ignored", "drop me")
+                        .build()
+        );
+        service.flushPendingReportsNow("typed-context");
+
+        JsonObject payload = JsonParser.parseString(client.payloads.getFirst()).getAsJsonObject();
+        assertEquals("settings", payload.get("subsystem").getAsString());
+        assertEquals("settings_page", payload.get("featureKey").getAsString());
+        assertEquals("/tw settings", payload.get("entryPoint").getAsString());
+        assertEquals("server", payload.get("runtimeSide").getAsString());
+        assertEquals("settings_ui", payload.getAsJsonObject("details").get("source").getAsString());
+        assertTrue(!payload.getAsJsonObject("details").has("ignored"));
+    }
+
     @Nonnull
     private CrashTelemetryService createService(boolean enabled,
                                                 boolean breadcrumbsEnabled,
@@ -127,7 +155,14 @@ class CrashTelemetryServiceTest {
                   },
                   "usage": {
                     "enabled": true,
-                    "allowedEvents": ["debug_usage"]
+                    "allowedEvents": ["debug_usage"],
+                    "details": {
+                      "debug_usage": {
+                        "allowedFields": {
+                          "source": { "type": "enum", "values": ["command", "settings_ui"] }
+                        }
+                      }
+                    }
                   },
                   "defaults": {
                     "enabled": true,

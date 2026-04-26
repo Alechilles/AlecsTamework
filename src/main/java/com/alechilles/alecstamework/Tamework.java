@@ -266,16 +266,66 @@ public class Tamework extends JavaPlugin {
         try {
             setupInternal();
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_setup", durationMs, true, "Tamework setupInternal completed.");
-            telemetryEvents.recordPerformance("plugin_setup_duration", durationMs, (double) durationMs, "Tamework plugin setup duration.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_setup",
+                    durationMs,
+                    true,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework setupInternal completed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_setup_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework plugin setup duration.")
+                            .build()
+            );
             if (crashTelemetryService != null) {
                 crashTelemetryService.recordBreadcrumb("lifecycle", "Tamework setup completed.");
             }
         } catch (Throwable throwable) {
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_setup", durationMs, false, "Tamework setupInternal failed.");
-            telemetryEvents.recordPerformance("plugin_setup_duration", durationMs, (double) durationMs, "Failed Tamework plugin setup duration.");
-            telemetryEvents.recordError("plugin_setup_failed", throwable, "Tamework setupInternal threw an exception.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_setup",
+                    durationMs,
+                    false,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework setupInternal failed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_setup_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Failed Tamework plugin setup duration.")
+                            .detail("result", "failed")
+                            .build()
+            );
+            telemetryEvents.recordError(
+                    "plugin_setup_failed",
+                    throwable,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework setupInternal threw an exception.")
+                            .build()
+            );
             captureSetupFailure(throwable);
             throw throwable;
         }
@@ -766,16 +816,66 @@ public class Tamework extends JavaPlugin {
         try {
             startInternal();
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_start", durationMs, true, "Tamework startInternal completed.");
-            telemetryEvents.recordPerformance("plugin_start_duration", durationMs, (double) durationMs, "Tamework plugin start duration.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_start",
+                    durationMs,
+                    true,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework startInternal completed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_start_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework plugin start duration.")
+                            .build()
+            );
             if (crashTelemetryService != null) {
                 crashTelemetryService.recordBreadcrumb("lifecycle", "Tamework start completed.");
             }
         } catch (Throwable throwable) {
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_start", durationMs, false, "Tamework startInternal failed.");
-            telemetryEvents.recordPerformance("plugin_start_duration", durationMs, (double) durationMs, "Failed Tamework plugin start duration.");
-            telemetryEvents.recordError("plugin_start_failed", throwable, "Tamework startInternal threw an exception.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_start",
+                    durationMs,
+                    false,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework startInternal failed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_start_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Failed Tamework plugin start duration.")
+                            .detail("result", "failed")
+                            .build()
+            );
+            telemetryEvents.recordError(
+                    "plugin_start_failed",
+                    throwable,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework startInternal threw an exception.")
+                            .build()
+            );
             captureStartFailure(throwable);
             throw throwable;
         }
@@ -897,11 +997,14 @@ public class Tamework extends JavaPlugin {
             telemetryEvents.recordError(
                     "world_override_reload_errors",
                     null,
-                    "Loaded overrides for world "
-                            + world.getName()
-                            + " with "
-                            + reloadResult.getErrors().size()
-                            + " error(s)."
+                    TameworkTelemetryEvents.context()
+                            .subsystem("config")
+                            .featureKey("config_overrides")
+                            .operation("reload_overrides")
+                            .target("world_overrides")
+                            .detail("Loaded overrides with " + reloadResult.getErrors().size() + " error(s).")
+                            .detail("overrideErrorCount", reloadResult.getErrors().size())
+                            .build()
             );
             getLogger().at(Level.WARNING).log(
                     "Loaded Tamework overrides for world "
