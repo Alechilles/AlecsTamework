@@ -214,7 +214,7 @@ public final class CrashTelemetryService {
     public boolean recordError(@Nonnull String eventName,
                                @Nullable Throwable throwable,
                                @Nullable TelemetryEventContext context) {
-        if (!canRecordEvents()) {
+        if (!canRecordEvents() || !project.events().errors().enabled()) {
             return false;
         }
         engine.recordError(project.projectId(), eventName, throwable, context);
@@ -233,7 +233,7 @@ public final class CrashTelemetryService {
                                    int durationMs,
                                    boolean success,
                                    @Nullable TelemetryEventContext context) {
-        if (!canRecordEvents()) {
+        if (!canRecordEvents() || !project.events().lifecycle().enabled()) {
             return false;
         }
         engine.recordLifecycle(project.projectId(), eventName, durationMs, success, context);

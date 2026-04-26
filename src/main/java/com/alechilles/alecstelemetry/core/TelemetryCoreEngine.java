@@ -626,7 +626,7 @@ public final class TelemetryCoreEngine {
 
     private void putBreadcrumbDetails(@Nonnull TelemetryProjectRegistration project,
                                       @Nonnull Map<String, Object> details) {
-        if (!project.events().breadcrumbs().enabled()) {
+        if (!project.events().breadcrumbs().enabled() || !project.events().breadcrumbs().automatic()) {
             return;
         }
         List<CrashReportEnvelope.BreadcrumbEntry> snapshot = breadcrumbs.snapshot(project.projectId());

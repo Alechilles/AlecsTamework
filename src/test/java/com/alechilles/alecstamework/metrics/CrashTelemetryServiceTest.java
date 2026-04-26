@@ -115,10 +115,79 @@ class CrashTelemetryServiceTest {
         assertTrue(!payload.getAsJsonObject("details").has("ignored"));
     }
 
+    @Test
+    void disabledErrorAndLifecycleEventsReturnFalseWithoutQueueing() {
+        CrashTelemetryService service = createService(
+                true,
+                true,
+                new SequencedClient(),
+                """
+                  "events": {
+                    "errors": { "enabled": false },
+                    "lifecycle": { "enabled": false }
+                  },
+                """
+        );
+
+        assertFalse(service.recordError("disabled_error", testThrowable("disabled error"), "detail"));
+        assertFalse(service.recordLifecycle("disabled_lifecycle", 123, false, "detail"));
+        assertEquals(0, service.diagnostics().pendingReports());
+    }
+
+    @Test
+    void automaticBreadcrumbFlagControlsEventBreadcrumbDetails() {
+        SequencedClient client = new SequencedClient(CrashReportClient.UploadResult.success(204));
+        CrashTelemetryService service = createService(
+                true,
+                true,
+                client,
+                """
+                  "events": {
+                    "errors": { "enabled": true },
+                    "breadcrumbs": { "enabled": true, "automatic": false }
+                  },
+                """
+        );
+
+        service.recordBreadcrumb("settings", "Opened settings.");
+        assertTrue(service.recordError("debug_error", testThrowable("with breadcrumb"), "detail"));
+        service.flushPendingReportsNow("automatic-breadcrumbs-disabled");
+
+        JsonObject payload = JsonParser.parseString(client.payloads.getFirst()).getAsJsonObject();
+        assertFalse(payload.getAsJsonObject("details").has("breadcrumbs"));
+
+        service.captureSetupFailure(testThrowable("crash still gets breadcrumbs"));
+        service.flushPendingReportsNow("manual-breadcrumbs-still-enabled");
+
+        JsonObject crashPayload = JsonParser.parseString(client.payloads.getLast()).getAsJsonObject();
+        var crashBreadcrumbs = crashPayload.getAsJsonArray("breadcrumbs");
+        assertTrue(crashBreadcrumbs.size() >= 1);
+        assertEquals("settings", crashBreadcrumbs.get(0).getAsJsonObject().get("category").getAsString());
+    }
+
+    @Test
+    void typedContextDropsNullableDetailValuesBeforeCopying() {
+        TelemetryEventContext context = TelemetryEventContext.usage()
+                .detail("kept", 42)
+                .detail("missing", null)
+                .build();
+
+        assertEquals(42, context.details().get("kept"));
+        assertFalse(context.details().containsKey("missing"));
+    }
+
     @Nonnull
     private CrashTelemetryService createService(boolean enabled,
                                                 boolean breadcrumbsEnabled,
                                                 CrashReportClient client) {
+        return createService(enabled, breadcrumbsEnabled, client, "");
+    }
+
+    @Nonnull
+    private CrashTelemetryService createService(boolean enabled,
+                                                boolean breadcrumbsEnabled,
+                                                CrashReportClient client,
+                                                @Nonnull String extraDescriptorFields) {
         Path telemetryRoot = tempDir.resolve("Telemetry");
         Path settingsPath = tempDir.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
         CrashTelemetrySettings compatibilitySettings = new CrashTelemetrySettings(
@@ -148,6 +217,7 @@ class CrashTelemetryServiceTest {
                   "runtimeMode": "embedded",
                   "ownerPluginIdentifiers": ["Alechilles:Alec's Tamework!"],
                   "packagePrefixes": ["com.alechilles.alecstamework"],
+                %s
                   "performance": {
                     "enabled": true,
                     "sampleRate": 1.0,
@@ -172,7 +242,7 @@ class CrashTelemetryServiceTest {
                     "url": "https://example.invalid/telemetry"
                   }
                 }
-                """,
+                """.formatted(extraDescriptorFields),
                 null
         );
         TelemetryProjectRegistration registration = new TelemetryProjectRegistration(

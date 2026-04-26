@@ -267,7 +267,7 @@ public record TelemetryEventContext(@Nullable String detail,
                     biomeId,
                     commandName,
                     worldName,
-                    Map.copyOf(details)
+                    new LinkedHashMap<>(details)
             ).normalize();
         }
     }
