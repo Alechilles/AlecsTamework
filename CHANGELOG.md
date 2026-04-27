@@ -2,8 +2,20 @@
 
 ## Unreleased
 
+## 2.8.6 - Breeding Families + Runtime Compatibility - 2026-04-26
+
 ### Added
-- Added new role-scoped progression families for companion leveling and passive talents (`TwLevelingConfig`, `TwTalentConfig`), including XP gain from feed/harvest/breeding/combat, level-based stat growth, passive talent purchases, linked-panel summaries, and a companion talent page for spending points on loaded companions. These systems remain unreleased and are not ready for player/modder usage yet.
+- Added family-based breeding compatibility so related adult roles can breed together, optionally require different adult roles, share a baby role, and persist a weighted future adult role for growth. Existing same-role breeding configs remain valid.
+- Added typed telemetry event context for non-crash events so Tamework and downstream integrations can report structured details such as subsystem, phase, operation, target, feature key, runtime side, entity/item/block IDs, command names, and bounded custom detail fields.
+
+### Changed
+- Deprecated `Pairing.RequireSameRoleId` in favor of `Pairing.RoleCompatibility`; old configs still read the legacy field, while new defaults, docs, and the config editor use `RoleCompatibility`.
+- Updated bundled telemetry routing so Tamework crash/report delivery uses the hosted event ingest endpoint and prefers `eventEndpoint` in embedded project descriptors.
+
+### Fixed
+- Fixed player movement speed effects from other mods being applied twice by removing Tamework's player movement effect resync; the base game now remains the only owner for player `HorizontalSpeedMultiplier` movement updates.
+- Fixed `/tw showhitboxes` compatibility with Hytale builds where optional debug shape flags are unavailable.
+- Fixed typed telemetry event controls, outcomes, and lifecycle details so non-crash telemetry keeps the intended category-specific metadata.
 
 ## 2.8.5 - Embedded Telemetry + Flying Companion Grounding - 2026-04-23
 
