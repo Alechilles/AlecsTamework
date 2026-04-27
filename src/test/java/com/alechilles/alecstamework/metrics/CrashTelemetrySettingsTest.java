@@ -23,7 +23,7 @@ class CrashTelemetrySettingsTest {
         assertTrue(settings.enabled());
         assertTrue(settings.breadcrumbsEnabled());
         assertEquals(40, settings.breadcrumbsCapacity());
-        assertEquals("https://telemetry.alecsmods.com/tamework/crash-report", settings.endpoint());
+        assertEquals("https://telemetry.alecsmods.com/ingest/event", settings.endpoint());
         assertEquals(2000, settings.connectTimeoutMs());
         assertEquals(3000, settings.readTimeoutMs());
         assertEquals(200, settings.maxPendingReports());
@@ -34,7 +34,7 @@ class CrashTelemetrySettingsTest {
         assertTrue(raw.contains("\"enabled\": true"));
         assertTrue(raw.contains("\"breadcrumbsEnabled\": true"));
         assertTrue(raw.contains("\"breadcrumbsCapacity\": 40"));
-        assertTrue(raw.contains("\"endpoint\": \"https://telemetry.alecsmods.com/tamework/crash-report\""));
+        assertTrue(raw.contains("\"endpoint\": \"https://telemetry.alecsmods.com/ingest/event\""));
         assertFalse(raw.contains("api_key"));
     }
 

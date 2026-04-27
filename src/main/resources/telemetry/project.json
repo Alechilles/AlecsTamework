@@ -170,7 +170,7 @@
     "destinationMode": "hosted"
   },
   "hosted": {
-    "endpoint": "https://telemetry-dev.alecsmods.com/ingest/crash",
+    "endpoint": "https://telemetry-dev.alecsmods.com/ingest/event",
     "eventEndpoint": "https://telemetry-dev.alecsmods.com/ingest/event",
     "projectKey": "proj_Oqk6x0Z_fVMUpXarjSyZbOkS"
   }

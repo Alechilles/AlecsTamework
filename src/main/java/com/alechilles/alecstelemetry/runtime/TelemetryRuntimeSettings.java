@@ -28,7 +28,7 @@ public record TelemetryRuntimeSettings(@Nonnull Path filePath,
                                        @Nonnull String hostedEventIngestEndpoint) {
 
     public static final String DEFAULT_HOSTED_INGEST_ENDPOINT =
-            "https://telemetry.alecsmods.com/ingest/crash";
+            "https://telemetry.alecsmods.com/ingest/event";
     public static final String DEFAULT_HOSTED_EVENT_INGEST_ENDPOINT =
             "https://telemetry.alecsmods.com/ingest/event";
 

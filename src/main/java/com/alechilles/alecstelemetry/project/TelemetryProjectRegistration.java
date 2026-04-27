@@ -136,8 +136,11 @@ public record TelemetryProjectRegistration(@Nonnull TelemetryProjectDescriptor d
         }
 
         String endpoint = firstNonBlank(
+                override == null ? null : override.hosted().eventEndpoint(),
+                descriptor.hosted().eventEndpoint(),
                 override == null ? null : override.hosted().endpoint(),
                 descriptor.hosted().endpoint(),
+                settings.hostedEventIngestEndpoint(),
                 settings.hostedIngestEndpoint()
         );
         LinkedHashMap<String, String> headers = new LinkedHashMap<>(mergeHeaders(

@@ -66,6 +66,42 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
+    void hostedCrashDeliveryUsesEventEndpointWhenConfigured() {
+        TelemetryRuntimeSettings runtimeSettings = TelemetryRuntimeSettings.load(
+                tempDir.resolve("Telemetry").resolve("Settings").resolve("runtime.json"),
+                null
+        );
+        TelemetryProjectDescriptor descriptor = TelemetryProjectDescriptor.fromJson(
+                """
+                {
+                  "projectId": "alecs-tamework",
+                  "displayName": "Alec's Tamework!",
+                  "defaults": {
+                    "enabled": true,
+                    "destinationMode": "hosted"
+                  },
+                  "hosted": {
+                    "endpoint": "https://telemetry.alecsmods.com/ingest/crash",
+                    "eventEndpoint": "https://telemetry.alecsmods.com/ingest/event"
+                  }
+                }
+                """,
+                null
+        );
+        TelemetryProjectRegistration registration = new TelemetryProjectRegistration(
+                descriptor,
+                "Alechilles:Alec's Tamework!",
+                "2.8.5",
+                null
+        );
+
+        CrashReportClient.DeliveryTarget crashTarget = registration.resolveDeliveryTarget(runtimeSettings);
+
+        assertTrue(crashTarget != null);
+        assertEquals("https://telemetry.alecsmods.com/ingest/event", crashTarget.endpoint());
+    }
+
+    @Test
     void applyEnabledSettingUpdatesRuntimeToggle() {
         CrashTelemetryService service = createService(false, true, new SequencedClient());
         assertFalse(service.diagnostics().enabled());

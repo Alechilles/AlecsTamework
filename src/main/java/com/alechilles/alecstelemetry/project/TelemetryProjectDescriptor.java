@@ -151,14 +151,17 @@ public record TelemetryProjectDescriptor(int schemaVersion,
             return new CrashReportClient.DeliveryTarget(customEndpoint.url(), customEndpoint.headers());
         }
 
-        String endpoint = hosted.endpoint() == null || hosted.endpoint().isBlank()
-                ? settings.hostedIngestEndpoint()
-                : hosted.endpoint();
+        String endpoint = firstNonBlank(
+                hosted.eventEndpoint(),
+                hosted.endpoint(),
+                settings.hostedEventIngestEndpoint(),
+                settings.hostedIngestEndpoint()
+        );
         LinkedHashMap<String, String> headers = new LinkedHashMap<>(hosted.headers());
         if (hosted.projectKey() != null && !hosted.projectKey().isBlank()) {
             headers.put(PROJECT_KEY_HEADER, hosted.projectKey());
         }
-        return new CrashReportClient.DeliveryTarget(endpoint, headers);
+        return endpoint == null ? null : new CrashReportClient.DeliveryTarget(endpoint, headers);
     }
 
     private static boolean boolOrDefault(@Nullable Boolean value, boolean fallback) {
@@ -319,6 +322,16 @@ public record TelemetryProjectDescriptor(int schemaVersion,
             return null;
         }
         return value.trim();
+    }
+
+    @Nullable
+    private static String firstNonBlank(@Nullable String... values) {
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value.trim();
+            }
+        }
+        return null;
     }
 
     @Nonnull
