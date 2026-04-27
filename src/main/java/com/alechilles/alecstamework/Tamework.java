@@ -46,7 +46,6 @@ import com.alechilles.alecstamework.damage.TameworkLingeringHazardSystem;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
-import com.alechilles.alecstamework.effects.PlayerEffectMovementSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
@@ -133,7 +132,6 @@ import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
@@ -149,7 +147,6 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Int
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -666,13 +663,6 @@ public class Tamework extends JavaPlugin {
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
         getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());
         getEntityStoreRegistry().registerSystem(new CompanionCombatExperienceSystem());
-        getEntityStoreRegistry().registerSystem(
-                new PlayerEffectMovementSystem(
-                        PlayerRef.getComponentType(),
-                        MovementManager.getComponentType(),
-                        EffectControllerComponent.getComponentType()
-                )
-        );
         getEntityStoreRegistry().registerSystem(
                 new TameworkProjectileImpactEffectSystem(
                         projectileImpactEffectComponentType,
