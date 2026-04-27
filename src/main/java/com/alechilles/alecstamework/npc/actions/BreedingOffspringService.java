@@ -755,6 +755,24 @@ final class BreedingOffspringService {
         Vector3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
         int spawnedCount = 0;
         for (int i = 0; i < targetSpawnCount; i++) {
+            BreedingOffspringSpawnService.ResolvedSpawnRole childSpawnRole = i == 0
+                    ? spawnRole
+                    : spawnService.resolveSpawnRole(
+                            baseRoleId,
+                            childBreedingConfig,
+                            context.parentARoleIndex(),
+                            context.parentBRoleIndex(),
+                            npcPlugin
+                    );
+            if (childSpawnRole == null) {
+                logWarn(String.format(
+                        "Breeding spawn skipped: unable to resolve offspring role for child %d (parentA=%s, parentB=%s).",
+                        i + 1,
+                        context.parentAUuid(),
+                        context.parentBUuid()
+                ));
+                continue;
+            }
             Vector3d spawnAttemptPosition = i == 0
                     ? spawnPosition
                     : new Vector3d(
@@ -765,15 +783,15 @@ final class BreedingOffspringService {
             Pair<Ref<EntityStore>, NPCEntity> spawned = spawnService.spawnWithFallback(
                     npcPlugin,
                     store,
-                    spawnRole.roleIndex(),
+                    childSpawnRole.roleIndex(),
                     spawnAttemptPosition,
                     spawnRotation
             );
             if (spawned == null || spawned.first() == null || spawned.second() == null) {
                 logWarn(String.format(
                         "Breeding spawn failed after fallback attempts: role=%s index=%d parentA=%s parentB=%s pos=(%.2f, %.2f, %.2f).",
-                        spawnRole.roleId(),
-                        spawnRole.roleIndex(),
+                        childSpawnRole.roleId(),
+                        childSpawnRole.roleIndex(),
                         context.parentAUuid(),
                         context.parentBUuid(),
                         spawnAttemptPosition.x,
@@ -790,14 +808,15 @@ final class BreedingOffspringService {
                     childNpc,
                     parentARef,
                     parentBRef,
-                    spawnRole.roleId(),
+                    childSpawnRole.roleId(),
                     context.parentAOwner(),
                     context.parentBOwner(),
                     context.parentATamed(),
                     context.parentBTamed(),
                     context.breedingConfigId(),
                     childCooldown.durationMs(),
-                    spawnRole.lifecycleFamily(),
+                    childSpawnRole.adultRoleId(),
+                    childSpawnRole.lifecycleFamily(),
                     store
             );
             spawnHeartsParticle(childRef, store);
@@ -806,7 +825,7 @@ final class BreedingOffspringService {
             logInfo(String.format(
                     "Breeding spawn success: child=%s role=%s parentA=%s parentB=%s offspringOwner=%s.",
                     childNpc.getUuid(),
-                    spawnRole.roleId(),
+                    childSpawnRole.roleId(),
                     context.parentAUuid(),
                     context.parentBUuid(),
                     describeOwner(childOwner)

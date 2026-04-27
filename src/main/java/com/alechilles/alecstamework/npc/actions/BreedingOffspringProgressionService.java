@@ -61,6 +61,7 @@ final class BreedingOffspringProgressionService {
                              boolean parentBTamed,
                              @Nullable String breedingConfigId,
                              long childCooldownMs,
+                             @Nullable String selectedAdultRoleId,
                              @Nullable TwBreedingConfig.RoleFamily lifecycleFamily,
                              Store<EntityStore> store) {
         if (childRef == null || !childRef.isValid() || store == null || childRoleId == null || childRoleId.isBlank()) {
@@ -99,6 +100,7 @@ final class BreedingOffspringProgressionService {
                 store,
                 childRoleId,
                 breedingConfig,
+                selectedAdultRoleId,
                 lifecycleFamily
         );
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);

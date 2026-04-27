@@ -172,6 +172,29 @@ class CompanionLifeStageServiceTest {
     }
 
     @Test
+    void persistedAdultRoleWinsOverFamilyPrimaryAdultRole() throws Exception {
+        TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
+        setPrivateField(family, "adultRoles", new TwBreedingConfig.AdultRoleChoice[] {
+                adultRole("Deer_Stag", 1.0),
+                adultRole("Deer_Doe", 1.0)
+        });
+        setPrivateField(family, "babyRoleId", "Deer_Fawn");
+        TameworkLifeStageComponent lifeStage = new TameworkLifeStageComponent();
+        lifeStage.setAdultRoleId("Deer_Doe");
+
+        Method resolver = CompanionLifeStageService.class.getDeclaredMethod(
+                "resolveTargetRoleIdForStage",
+                String.class,
+                TameworkLifeStageComponent.class,
+                TwBreedingConfig.RoleFamily.class
+        );
+        resolver.setAccessible(true);
+
+        Object adultRole = resolver.invoke(null, CompanionLifeStageService.STAGE_ADULT, lifeStage, family);
+        assertEquals("Deer_Doe", adultRole);
+    }
+
+    @Test
     void isUninitializedAdultComponentDetectsDefaultAdultShell() throws Exception {
         TameworkLifeStageComponent uninitialized = new TameworkLifeStageComponent(
                 CompanionLifeStageService.STAGE_ADULT,
@@ -216,5 +239,12 @@ class CompanionLifeStageServiceTest {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);
         field.set(target, value);
+    }
+
+    private static TwBreedingConfig.AdultRoleChoice adultRole(String roleId, double weight) throws Exception {
+        TwBreedingConfig.AdultRoleChoice choice = new TwBreedingConfig.AdultRoleChoice();
+        setPrivateField(choice, "roleId", roleId);
+        setPrivateField(choice, "weight", weight);
+        return choice;
     }
 }

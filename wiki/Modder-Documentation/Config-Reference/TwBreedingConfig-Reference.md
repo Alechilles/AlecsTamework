@@ -17,6 +17,7 @@ Use it when you want to control:
 - whether breeding requires taming, adulthood, owner matching, or specific behavior states
 - what the offspring inherits
 - how baby and adolescent roles grow into adult roles
+- whether related adult roles can breed as one lifecycle family
 
 ## Asset Location and Resolution
 - Location: `<ModRoot>/Server/Tamework/Breeding/*.json`
@@ -74,8 +75,15 @@ These gates apply before pairing starts.
 - `RequireWanderMode`: requires a breedable NPC to be in a roaming or wandering state before pairing.
 - `RequireSameOwner`: only pair companions owned by the same player.
 - `MaxNearbySameType`: crowding cap for nearby same-type NPCs.
-- `RequireSameRoleId`: requires the candidate pair to share the same role id.
+- `RoleCompatibility`: controls candidate role matching. This is the preferred field for new content.
+- `RequireSameRoleId`: deprecated legacy boolean compatibility field. It is still read for old configs. When `RoleCompatibility` is omitted, `true` resolves to `SameRole` and `false` resolves to `Any`.
 - `RoleMaxNearbySameType`: per-role override list for the crowding cap.
+
+Accepted `RoleCompatibility` values:
+- `SameRole`: default behavior. Partners must have the same role id.
+- `SameLifecycleFamily`: partners can share any adult role in the same `OffspringLifecycle.Families` entry, including same-role pairs.
+- `DifferentFamilyRole`: partners must be different adult roles in the same `OffspringLifecycle.Families` entry.
+- `Any`: broad compatibility. This matches legacy `RequireSameRoleId: false` behavior.
 
 Each `RoleMaxNearbySameType` entry supports:
 - `RoleId`
@@ -138,6 +146,7 @@ Authoring guidance:
 
 Each `Families` entry supports:
 - `AdultRoleId`
+- `AdultRoles`
 - `BabyRoleId`
 - `AdolescentRoleId`
 - `TimeToFullGrownSeconds`
@@ -148,7 +157,27 @@ Each `Families` entry supports:
 - `AdolescentSwitchScale`
 - `AdultSwitchScale`
 
-Use a family entry when a specific adult role should resolve to a dedicated baby or adolescent role instead of relying only on the global lifecycle defaults.
+Use a family entry when one adult role, or a set of related adult roles, should resolve to a dedicated baby or adolescent role instead of relying only on the global lifecycle defaults.
+
+`AdultRoleId` is the legacy single-adult field and remains valid. New cross-role families should prefer `AdultRoles`, which supports weighted adult choices:
+```json
+{
+  "AdultRoles": [
+    { "RoleId": "Deer_Stag", "Weight": 1.0 },
+    { "RoleId": "Deer_Doe", "Weight": 1.0 }
+  ],
+  "BabyRoleId": "Deer_Fawn"
+}
+```
+
+When `AdultRoles` is present:
+- Every listed adult role is treated as part of the same lifecycle family.
+- `SameLifecycleFamily` pairing can match those adult roles to each other.
+- `DifferentFamilyRole` pairing can require two different adult roles from the same family.
+- The baby spawn role comes from `BabyRoleId` when it is valid.
+- The future adult role is selected once at birth using the configured weights and is persisted for growth.
+
+Invalid, blank, or non-positive weighted adult entries are ignored for selection.
 
 ### `RoleOverrides`
 `RoleOverrides` is a map keyed by exact role id. Each value can override only the breeding sections that matter for that role:
@@ -210,7 +239,7 @@ Important behavior:
   "Pairing": {
     "BreedRadius": 15.0,
     "RequireSameOwner": true,
-    "RequireSameRoleId": true,
+    "RoleCompatibility": "SameRole",
     "MaxNearbySameType": 8
   },
   "Cooldowns": {
@@ -262,6 +291,39 @@ Important behavior:
         ]
       }
     }
+  }
+}
+```
+
+## Cross-Role Family Example
+This pattern allows two different adult roles to breed together, produce one shared baby role, and grow into one of the configured adult roles. Use `SameLifecycleFamily` instead when same-role pairs in the family should also be valid.
+
+```json
+{
+  "Enabled": true,
+  "Priority": 100,
+  "RoleIds": [
+    "Deer_Stag",
+    "Deer_Doe",
+    "Deer_Fawn"
+  ],
+  "Pairing": {
+    "RoleCompatibility": "DifferentFamilyRole",
+    "RequireSameOwner": false,
+    "MaxNearbySameType": 8
+  },
+  "OffspringLifecycle": {
+    "Enabled": true,
+    "DefaultTimeToFullGrownMinutes": 48,
+    "Families": [
+      {
+        "AdultRoles": [
+          { "RoleId": "Deer_Stag", "Weight": 1.0 },
+          { "RoleId": "Deer_Doe", "Weight": 1.0 }
+        ],
+        "BabyRoleId": "Deer_Fawn"
+      }
+    ]
   }
 }
 ```

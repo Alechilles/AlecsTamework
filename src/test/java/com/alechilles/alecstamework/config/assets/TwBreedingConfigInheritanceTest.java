@@ -61,6 +61,26 @@ class TwBreedingConfigInheritanceTest {
         assertEquals(120, child.getCooldowns().getBaseCooldownSeconds());
     }
 
+    @Test
+    void pairingRoleCompatibilityInheritsWhenNestedKeyOmitted() throws Exception {
+        TwBreedingConfig parent = new TwBreedingConfig();
+        TwBreedingConfig child = new TwBreedingConfig();
+
+        TwBreedingConfig.PairingSettings parentPairing = new TwBreedingConfig.PairingSettings();
+        TwBreedingConfig.PairingSettings childPairing = new TwBreedingConfig.PairingSettings();
+        setField(parentPairing, "roleCompatibility", TwBreedingConfig.RoleCompatibility.SAME_LIFECYCLE_FAMILY);
+        setField(childPairing, "requireSameOwner", true);
+        setField(parent, "pairing", parentPairing);
+        setField(child, "pairing", childPairing);
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("Pairing", Set.of("RequireSameOwner"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("Pairing"), nested);
+
+        assertEquals(TwBreedingConfig.RoleCompatibility.SAME_LIFECYCLE_FAMILY,
+                child.getPairing().getRoleCompatibility());
+    }
+
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);

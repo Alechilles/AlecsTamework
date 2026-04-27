@@ -91,6 +91,7 @@ public final class CompanionLifeStageService {
                                                     @Nullable Store<EntityStore> store,
                                                     @Nullable String spawnedRoleId,
                                                     @Nullable TwBreedingConfig breedingConfig,
+                                                    @Nullable String selectedAdultRoleId,
                                                     @Nullable TwBreedingConfig.RoleFamily preResolvedFamily) {
         if (childRef == null || !childRef.isValid() || store == null) {
             return;
@@ -102,10 +103,10 @@ public final class CompanionLifeStageService {
 
         long nowMs = BreedingTimeService.resolveCurrentTimeMs(store);
         String adultRoleId = preResolvedFamily != null
-                && preResolvedFamily.getAdultRoleId() != null
-                && !preResolvedFamily.getAdultRoleId().isBlank()
-                ? preResolvedFamily.getAdultRoleId()
-                : spawnedRoleId;
+                && selectedAdultRoleId != null
+                && !selectedAdultRoleId.isBlank()
+                ? selectedAdultRoleId
+                : resolveAdultRoleId(spawnedRoleId, preResolvedFamily);
         double adultScale = resolveAdultScale(childRef, store, adultRoleId);
         LifecycleComputation lifecycle = computeLifecycle(
                 nowMs,
@@ -130,7 +131,7 @@ public final class CompanionLifeStageService {
                 true
         );
         if (preResolvedFamily != null) {
-            component.setAdultRoleId(preResolvedFamily.getAdultRoleId());
+            component.setAdultRoleId(adultRoleId);
             component.setBabyRoleId(preResolvedFamily.getBabyRoleId());
             component.setAdolescentRoleId(preResolvedFamily.getAdolescentRoleId());
         } else {
@@ -142,6 +143,15 @@ public final class CompanionLifeStageService {
         CompanionModelScaleService.applyScale(childRef, childNpc, store, initialScale);
         scheduleInitialScaleRetry(childRef, childNpc, store, INITIAL_SCALE_MAX_RETRIES, null);
         ensureGrowthTickScheduled(childRef, childNpc, store);
+    }
+
+    @Nullable
+    private static String resolveAdultRoleId(@Nullable String spawnedRoleId,
+                                             @Nullable TwBreedingConfig.RoleFamily family) {
+        if (family != null && family.getAdultRoleId() != null && !family.getAdultRoleId().isBlank()) {
+            return family.getAdultRoleId();
+        }
+        return spawnedRoleId;
     }
 
     private static TameworkLifeStageComponent createInitialLifeStageComponent(Ref<EntityStore> npcRef,
@@ -159,7 +169,7 @@ public final class CompanionLifeStageService {
                 if (lifecycleSettings != null && lifecycleSettings.isEnabled()) {
                     family = config.resolveLifecycleFamilyForRole(roleId);
                     if (family != null && family.getAdultRoleId() != null && !family.getAdultRoleId().isBlank()) {
-                        adultRoleId = family.getAdultRoleId();
+                        adultRoleId = family.matchesAdultRole(roleId) ? roleId : family.getAdultRoleId();
                     }
                     String inferredStage = inferStageFromFamilyRole(roleId, family);
                     if (STAGE_BABY.equals(inferredStage) || STAGE_ADOLESCENT.equals(inferredStage)) {
@@ -233,8 +243,8 @@ public final class CompanionLifeStageService {
                 growthScalingEnabled
         );
         if (family != null) {
-            if (family.getAdultRoleId() != null && !family.getAdultRoleId().isBlank()) {
-                created.setAdultRoleId(family.getAdultRoleId());
+            if (adultRoleId != null && !adultRoleId.isBlank()) {
+                created.setAdultRoleId(adultRoleId);
             }
             if (family.getBabyRoleId() != null && !family.getBabyRoleId().isBlank()) {
                 created.setBabyRoleId(family.getBabyRoleId());
@@ -517,7 +527,7 @@ public final class CompanionLifeStageService {
                 if ((component.getAdultRoleId() == null || component.getAdultRoleId().isBlank())
                         && family.getAdultRoleId() != null
                         && !family.getAdultRoleId().isBlank()) {
-                    component.setAdultRoleId(family.getAdultRoleId());
+                    component.setAdultRoleId(family.matchesAdultRole(roleId) ? roleId : family.getAdultRoleId());
                     changed = true;
                 }
                 if ((component.getBabyRoleId() == null || component.getBabyRoleId().isBlank())
@@ -1067,7 +1077,7 @@ public final class CompanionLifeStageService {
         if (roleIdsMatch(roleId, family.getAdolescentRoleId())) {
             return STAGE_ADOLESCENT;
         }
-        if (roleIdsMatch(roleId, family.getAdultRoleId())) {
+        if (family.matchesAdultRole(roleId)) {
             return STAGE_ADULT;
         }
         return null;

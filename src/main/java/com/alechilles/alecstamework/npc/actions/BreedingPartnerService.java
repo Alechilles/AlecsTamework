@@ -28,6 +28,8 @@ import javax.annotation.Nullable;
  * Resolves nearby breeding partners based on role/config pairing rules.
  */
 final class BreedingPartnerService {
+    private final BreedingRoleCompatibilityService compatibilityService = new BreedingRoleCompatibilityService();
+
     @Nullable
     PartnerCandidate findNearestPartner(Ref<EntityStore> sourceRef,
                                         Store<EntityStore> store,
@@ -52,7 +54,6 @@ final class BreedingPartnerService {
         TwBreedingConfig.EligibilitySettings eligibility = config != null ? config.resolveEligibility(sourceRoleId) : null;
         double radius = sanitizeRadius(pairing != null ? pairing.getBreedRadius() : 10.0);
         double radiusSq = radius * radius;
-        boolean requireSameRole = pairing == null || pairing.isRequireSameRoleId();
         boolean requireSameOwner = pairing != null && pairing.isRequireSameOwner();
         boolean requireWander = pairing == null || pairing.isRequireWanderMode();
         boolean requireTamed = eligibility == null || eligibility.isRequireTamed();
@@ -99,7 +100,7 @@ final class BreedingPartnerService {
                     continue;
                 }
                 String candidateRoleId = resolveRoleId(candidateNpc);
-                if (requireSameRole && !equalsIgnoreCase(sourceRoleId, candidateRoleId)) {
+                if (!compatibilityService.canPair(sourceRoleId, candidateRoleId, config, pairing)) {
                     continue;
                 }
                 if (requireAdult && !CompanionLifeStageService.isAdult(candidateRef, store, candidateRoleId)) {
@@ -138,13 +139,6 @@ final class BreedingPartnerService {
             return null;
         }
         return new PartnerCandidate(best.ref, best.npc, best.breeding, best.roleId, best.ownerId, best.distanceSq);
-    }
-
-    private static boolean equalsIgnoreCase(@Nullable String left, @Nullable String right) {
-        if (left == null || right == null) {
-            return false;
-        }
-        return left.equalsIgnoreCase(right);
     }
 
     private static boolean sameOwner(@Nullable UUID sourceOwnerId, @Nullable UUID candidateOwnerId) {

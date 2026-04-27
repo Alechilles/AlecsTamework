@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TwConfigEditorFieldPolicyTest {
@@ -138,6 +139,43 @@ class TwConfigEditorFieldPolicyTest {
         assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, timingBasis.type());
         assertTrue(passiveBasis.options().contains("REAL_TIME"));
         assertTrue(passiveBasis.options().contains("WORLD_TIME_SCALED"));
+    }
+
+    @Test
+    void breedingEditorHidesLegacySameRoleToggleButShowsRoleCompatibility() {
+        JsonObject effective = new JsonObject();
+        JsonObject pairing = new JsonObject();
+        pairing.addProperty("RequireSameRoleId", true);
+        pairing.addProperty("RoleCompatibility", "DifferentFamilyRole");
+        effective.add("Pairing", pairing);
+
+        JsonObject roleOverrides = new JsonObject();
+        JsonObject deerOverride = new JsonObject();
+        JsonObject overridePairing = new JsonObject();
+        overridePairing.addProperty("RequireSameRoleId", false);
+        overridePairing.addProperty("RoleCompatibility", "SameLifecycleFamily");
+        deerOverride.add("Pairing", overridePairing);
+        roleOverrides.add("Deer_Stag", deerOverride);
+        effective.add("RoleOverrides", roleOverrides);
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> fields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.BREEDING, true, true),
+                null,
+                effective
+        );
+
+        assertNull(TwConfigEditorFieldPolicy.findField(fields, "Pairing.RequireSameRoleId"));
+        assertNull(TwConfigEditorFieldPolicy.findField(fields, "RoleOverrides.Deer_Stag.Pairing.RequireSameRoleId"));
+
+        TwConfigEditorFieldPolicy.EditorFieldSpec compatibility =
+                TwConfigEditorFieldPolicy.findField(fields, "Pairing.RoleCompatibility");
+        TwConfigEditorFieldPolicy.EditorFieldSpec overrideCompatibility =
+                TwConfigEditorFieldPolicy.findField(fields, "RoleOverrides.Deer_Stag.Pairing.RoleCompatibility");
+        assertNotNull(compatibility);
+        assertNotNull(overrideCompatibility);
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, compatibility.type());
+        assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, overrideCompatibility.type());
+        assertTrue(compatibility.options().contains("DifferentFamilyRole"));
     }
 
     @Test

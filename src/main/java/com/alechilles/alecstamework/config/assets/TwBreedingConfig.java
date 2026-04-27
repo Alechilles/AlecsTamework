@@ -28,6 +28,7 @@ import javax.annotation.Nullable;
 public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultAssetMap<String, TwBreedingConfig>>,
         TwParentFallbackAsset<TwBreedingConfig> {
     private static final int SECONDS_PER_MINUTE = 60;
+    private static final AdultRoleChoice[] EMPTY_ADULT_ROLE_CHOICES = new AdultRoleChoice[0];
     private static final RoleFamily[] EMPTY_ROLE_FAMILIES = new RoleFamily[0];
     private static final RoleMaxNearbySameTypeOverride[] EMPTY_ROLE_MAX_NEARBY_OVERRIDES =
             new RoleMaxNearbySameTypeOverride[0];
@@ -141,7 +142,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.requireSameRoleId = value,
             settings -> settings.requireSameRoleId
         )
-        .documentation("Requires breeding partners to share the same role ID.")
+        .documentation("Deprecated legacy compatibility toggle. Prefer RoleCompatibility. If RoleCompatibility is omitted, true maps to SameRole and false maps to Any.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("RoleCompatibility", Codec.STRING),
+            (settings, value) -> settings.roleCompatibility = RoleCompatibility.fromConfigValue(value, null),
+            settings -> settings.roleCompatibility == null ? null : settings.roleCompatibility.toConfigValue()
+        )
+        .documentation("Partner role compatibility mode: SameRole, SameLifecycleFamily, DifferentFamilyRole, or Any. Inheritance: missing nested key inherits parent value.")
         .add()
         .<RoleMaxNearbySameTypeOverride[]>append(
             new KeyedCodec<>("RoleMaxNearbySameType", ROLE_MAX_NEARBY_OVERRIDE_ARRAY_CODEC),
@@ -301,6 +309,29 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
+    private static final BuilderCodec<AdultRoleChoice> ADULT_ROLE_CHOICE_CODEC = BuilderCodec.builder(
+            AdultRoleChoice.class,
+            AdultRoleChoice::new
+    )
+        .<String>append(
+            new KeyedCodec<>("RoleId", Codec.STRING),
+            (choice, value) -> choice.roleId = value,
+            choice -> choice.roleId
+        )
+        .documentation("Adult role ID that offspring can grow into.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("Weight", Codec.DOUBLE),
+            (choice, value) -> choice.weight = value,
+            choice -> choice.weight
+        )
+        .documentation("Relative weighted chance for this adult role. Non-positive values are ignored.")
+        .add()
+        .build();
+
+    private static final ArrayCodec<AdultRoleChoice> ADULT_ROLE_CHOICE_ARRAY_CODEC =
+            new ArrayCodec<>(ADULT_ROLE_CHOICE_CODEC, AdultRoleChoice[]::new);
+
     private static final BuilderCodec<RoleFamily> ROLE_FAMILY_CODEC = BuilderCodec.builder(
             RoleFamily.class,
             RoleFamily::new
@@ -310,7 +341,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (family, value) -> family.adultRoleId = value,
             family -> family.adultRoleId
         )
-        .documentation("Role ID assigned when offspring reaches adult stage.")
+        .documentation("Legacy single adult role ID assigned when offspring reaches adult stage. Ignored for weighted selection when AdultRoles is present.")
+        .add()
+        .<AdultRoleChoice[]>append(
+            new KeyedCodec<>("AdultRoles", ADULT_ROLE_CHOICE_ARRAY_CODEC),
+            (family, value) -> family.adultRoles = value == null ? EMPTY_ADULT_ROLE_CHOICES : value,
+            family -> family.adultRoles
+        )
+        .documentation("Weighted adult roles that this family can breed as and grow into. Explicit array replaces the parent family entry.")
         .add()
         .<String>append(
             new KeyedCodec<>("BabyRoleId", Codec.STRING),
@@ -596,7 +634,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             (settings, value) -> settings.requireSameRoleId = value,
             settings -> settings.requireSameRoleId
         )
-        .documentation("Requires breeding partners to share the same role ID.")
+        .documentation("Deprecated legacy compatibility toggle. Prefer RoleCompatibility. If RoleCompatibility is omitted, true maps to SameRole and false maps to Any.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("RoleCompatibility", Codec.STRING),
+            (settings, value) -> settings.roleCompatibility = RoleCompatibility.fromConfigValue(value, null),
+            settings -> settings.roleCompatibility == null ? null : settings.roleCompatibility.toConfigValue()
+        )
+        .documentation("Partner role compatibility mode: SameRole, SameLifecycleFamily, DifferentFamilyRole, or Any.")
         .add()
         .<RoleMaxNearbySameTypeOverride[]>append(
             new KeyedCodec<>("RoleMaxNearbySameType", ROLE_MAX_NEARBY_OVERRIDE_ARRAY_CODEC),
@@ -1356,6 +1401,9 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         if (!nestedExplicitKeys.contains("RequireSameRoleId")) {
             pairing.requireSameRoleId = parent.pairing.requireSameRoleId;
         }
+        if (!nestedExplicitKeys.contains("RoleCompatibility")) {
+            pairing.roleCompatibility = parent.pairing.roleCompatibility;
+        }
         if (!nestedExplicitKeys.contains("RoleMaxNearbySameType")) {
             pairing.roleMaxNearbySameType = parent.pairing.roleMaxNearbySameType;
         }
@@ -1818,6 +1866,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         copy.requireSameOwner = base.requireSameOwner;
         copy.maxNearbySameType = base.maxNearbySameType;
         copy.requireSameRoleId = base.requireSameRoleId;
+        copy.roleCompatibility = base.roleCompatibility;
         copy.roleMaxNearbySameType = base.roleMaxNearbySameType == null
                 ? EMPTY_ROLE_MAX_NEARBY_OVERRIDES
                 : base.roleMaxNearbySameType.clone();
@@ -1951,6 +2000,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private Boolean requireSameOwner;
         private Integer maxNearbySameType;
         private Boolean requireSameRoleId;
+        private RoleCompatibility roleCompatibility;
         private RoleMaxNearbySameTypeOverride[] roleMaxNearbySameType;
 
         private void applyTo(@Nonnull PairingSettings target) {
@@ -1968,6 +2018,9 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             }
             if (requireSameRoleId != null) {
                 target.requireSameRoleId = requireSameRoleId;
+            }
+            if (roleCompatibility != null) {
+                target.roleCompatibility = roleCompatibility;
             }
             if (roleMaxNearbySameType != null) {
                 target.roleMaxNearbySameType = roleMaxNearbySameType;
@@ -2152,6 +2205,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private boolean requireSameOwner;
         private int maxNearbySameType;
         private boolean requireSameRoleId = true;
+        private RoleCompatibility roleCompatibility;
         private RoleMaxNearbySameTypeOverride[] roleMaxNearbySameType = EMPTY_ROLE_MAX_NEARBY_OVERRIDES;
 
         public double getBreedRadius() {
@@ -2172,6 +2226,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         public boolean isRequireSameRoleId() {
             return requireSameRoleId;
+        }
+
+        public RoleCompatibility getRoleCompatibility() {
+            if (roleCompatibility != null) {
+                return roleCompatibility;
+            }
+            return requireSameRoleId ? RoleCompatibility.SAME_ROLE : RoleCompatibility.ANY;
         }
 
         public RoleMaxNearbySameTypeOverride[] getRoleMaxNearbySameType() {
@@ -2285,6 +2346,48 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         public String toConfigValue() {
             return name();
+        }
+    }
+
+    /** Partner role compatibility modes for breeding pair selection. */
+    public enum RoleCompatibility {
+        SAME_ROLE("SameRole"),
+        SAME_LIFECYCLE_FAMILY("SameLifecycleFamily"),
+        DIFFERENT_FAMILY_ROLE("DifferentFamilyRole"),
+        ANY("Any");
+
+        private final String configValue;
+
+        RoleCompatibility(String configValue) {
+            this.configValue = configValue;
+        }
+
+        @Nullable
+        public static RoleCompatibility fromConfigValue(@Nullable String value,
+                                                        @Nullable RoleCompatibility fallback) {
+            if (value == null || value.isBlank()) {
+                return fallback;
+            }
+            String normalized = normalizeEnumToken(value);
+            for (RoleCompatibility compatibility : values()) {
+                if (normalizeEnumToken(compatibility.name()).equals(normalized)
+                        || normalizeEnumToken(compatibility.configValue).equals(normalized)) {
+                    return compatibility;
+                }
+            }
+            return fallback;
+        }
+
+        public String toConfigValue() {
+            return configValue;
+        }
+
+        private static String normalizeEnumToken(@Nonnull String value) {
+            return value.trim()
+                    .replace("_", "")
+                    .replace("-", "")
+                    .replace(" ", "")
+                    .toLowerCase(Locale.ROOT);
         }
     }
 
@@ -2478,9 +2581,36 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
     }
 
+    /** Weighted adult role option for multi-adult breeding families. */
+    public static final class AdultRoleChoice {
+        private String roleId;
+        private double weight = 1.0;
+
+        @Nullable
+        public String getRoleId() {
+            return roleId;
+        }
+
+        public double getWeight() {
+            if (!Double.isFinite(weight) || weight <= 0.0) {
+                return 0.0;
+            }
+            return weight;
+        }
+
+        public boolean hasPositiveWeight() {
+            return getWeight() > 0.0;
+        }
+
+        public boolean matchesRole(@Nullable String targetRoleId) {
+            return RoleFamily.matchesRoleId(roleId, targetRoleId);
+        }
+    }
+
     /** Explicit role-family mapping for baby/adolescent/adult lifecycle transitions. */
     public static final class RoleFamily {
         private String adultRoleId;
+        private AdultRoleChoice[] adultRoles = EMPTY_ADULT_ROLE_CHOICES;
         private String babyRoleId;
         private String adolescentRoleId;
         private Integer timeToFullGrownSeconds;
@@ -2492,6 +2622,20 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         @Nullable
         public String getAdultRoleId() {
+            String fromWeighted = firstWeightedAdultRoleId();
+            return fromWeighted != null ? fromWeighted : adultRoleId;
+        }
+
+        public AdultRoleChoice[] getAdultRoles() {
+            return adultRoles == null ? EMPTY_ADULT_ROLE_CHOICES : adultRoles;
+        }
+
+        public boolean hasWeightedAdultRoles() {
+            return getAdultRoles().length > 0;
+        }
+
+        @Nullable
+        public String getLegacyAdultRoleId() {
             return adultRoleId;
         }
 
@@ -2539,9 +2683,50 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             if (roleId == null || roleId.isBlank()) {
                 return false;
             }
-            return matchesRoleId(adultRoleId, roleId)
+            return matchesAdultRole(roleId)
                     || matchesRoleId(babyRoleId, roleId)
                     || matchesRoleId(adolescentRoleId, roleId);
+        }
+
+        public boolean matchesAdultRole(@Nullable String roleId) {
+            if (roleId == null || roleId.isBlank()) {
+                return false;
+            }
+            if (hasWeightedAdultRoles()) {
+                for (AdultRoleChoice choice : getAdultRoles()) {
+                    if (choice != null && choice.matchesRole(roleId)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            return matchesRoleId(adultRoleId, roleId);
+        }
+
+        public boolean hasSelectableAdultRole() {
+            if (hasWeightedAdultRoles()) {
+                for (AdultRoleChoice choice : getAdultRoles()) {
+                    if (choice != null
+                            && choice.getRoleId() != null
+                            && !choice.getRoleId().isBlank()
+                            && choice.hasPositiveWeight()) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+            return adultRoleId != null && !adultRoleId.isBlank();
+        }
+
+        @Nullable
+        private String firstWeightedAdultRoleId() {
+            for (AdultRoleChoice choice : getAdultRoles()) {
+                if (choice == null || choice.getRoleId() == null || choice.getRoleId().isBlank()) {
+                    continue;
+                }
+                return choice.getRoleId();
+            }
+            return null;
         }
 
         private static boolean matchesRoleId(@Nullable String candidate, @Nullable String roleId) {

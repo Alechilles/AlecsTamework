@@ -122,7 +122,8 @@ Behavior:
 - Enforces `TwBreedingConfig.Eligibility` gates (`RequireTamed`, `RequireAdult`, `RequireNotSleeping`, `RequireNotInCombat`).
 - Uses effective fertility: `(sharedHappiness * FertilityMultiplier) + FertilityBonus`.
 - When ready pair found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
-- Offspring flow supports baby-role preference, life-stage initialization, trait/attachment inheritance, and growth timing.
+- Pairing can require the same role, require different adult roles in one lifecycle family, allow any adult in one lifecycle family, or explicitly allow any role through `TwBreedingConfig.Pairing.RoleCompatibility`.
+- Offspring flow supports baby-role preference, persisted weighted adult-role selection, life-stage initialization, trait/attachment inheritance, and growth timing.
 
 ## Custom interactions
 `Type: "Custom"` exposes full `Requires` + `Effects` control.
@@ -175,7 +176,7 @@ Behavior:
 - Random-around-source targeting samples a uniform point in the authored radius band, which is useful for source-centered area denial barrages.
 - `ImpactEffect` applies on projectile removal, which lets a single authored effect cover direct hits and explosion splashes.
 - `LingeringHazard` damage is driven server-side from the projectile's final transform position when the projectile is removed.
-- Player movement now honors active `EntityEffect.ApplicationEffects.HorizontalSpeedMultiplier` values through Tamework's runtime player-effect sync.
+- Player movement effects are handled by the base game; Tamework does not resync player `HorizontalSpeedMultiplier` values.
 
 Example:
 ```json
