@@ -9,7 +9,10 @@ import org.junit.jupiter.api.io.TempDir;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -176,6 +179,76 @@ class CrashTelemetryServiceTest {
 
         assertEquals(42, context.details().get("kept"));
         assertFalse(context.details().containsKey("missing"));
+    }
+
+    @Test
+    void importsLegacyCrashTelemetryOptOutBeforeCreatingDefaultSettings() throws Exception {
+        Path preferred = tempDir.resolve("universe").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
+        Path legacy = tempDir.resolve("plugin-data").resolve(CrashTelemetrySettings.FILE_NAME);
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(
+                legacy,
+                """
+                {
+                  "enabled": false,
+                  "breadcrumbsEnabled": false
+                }
+                """,
+                StandardCharsets.UTF_8
+        );
+
+        CrashTelemetryService.importLegacyCrashTelemetrySettings(preferred, List.of(legacy), null);
+        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
+
+        assertFalse(settings.enabled());
+        assertFalse(settings.breadcrumbsEnabled());
+    }
+
+    @Test
+    void doesNotOverwriteExistingCrashTelemetrySettingsWithLegacyFallback() throws Exception {
+        Path preferred = tempDir.resolve("universe").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
+        Path legacy = tempDir.resolve("plugin-data").resolve(CrashTelemetrySettings.FILE_NAME);
+        Files.createDirectories(preferred.getParent());
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(preferred, "{\"enabled\": true}", StandardCharsets.UTF_8);
+        Files.writeString(legacy, "{\"enabled\": false}", StandardCharsets.UTF_8);
+
+        CrashTelemetryService.importLegacyCrashTelemetrySettings(preferred, List.of(legacy), null);
+        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
+
+        assertTrue(settings.enabled());
+    }
+
+    @Test
+    void migratesLegacyLowercaseTelemetryDirectoryIntoStandardEmbeddedDirectory() throws Exception {
+        Path target = tempDir.resolve("plugin-data").resolve("Telemetry");
+        Path legacyLowercase = tempDir.resolve("plugin-data").resolve("telemetry");
+        Path pendingReport = legacyLowercase.resolve("crash-reports").resolve("pending").resolve("report.json");
+        Path serverId = legacyLowercase.resolve("Settings").resolve("server-id.txt");
+        Files.createDirectories(pendingReport.getParent());
+        Files.createDirectories(serverId.getParent());
+        Files.writeString(pendingReport, "{}", StandardCharsets.UTF_8);
+        Files.writeString(serverId, "legacy-server", StandardCharsets.UTF_8);
+
+        CrashTelemetryService.migrateLegacyTelemetryData(target, List.of(legacyLowercase), null);
+
+        assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("pending").resolve("report.json")));
+        assertEquals("legacy-server", Files.readString(target.resolve("Settings").resolve("server-id.txt"), StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void doesNotOverwriteNonEmptyEmbeddedTelemetryDirectory() throws Exception {
+        Path target = tempDir.resolve("plugin-data").resolve("Telemetry");
+        Path legacyLowercase = tempDir.resolve("legacy-plugin-data").resolve("telemetry");
+        Files.createDirectories(target);
+        Files.writeString(target.resolve("existing.txt"), "keep", StandardCharsets.UTF_8);
+        Files.createDirectories(legacyLowercase);
+        Files.writeString(legacyLowercase.resolve("legacy.txt"), "legacy", StandardCharsets.UTF_8);
+
+        CrashTelemetryService.migrateLegacyTelemetryData(target, List.of(legacyLowercase), null);
+
+        assertTrue(Files.isRegularFile(target.resolve("existing.txt")));
+        assertFalse(Files.exists(target.resolve("legacy.txt")));
     }
 
     @Nonnull

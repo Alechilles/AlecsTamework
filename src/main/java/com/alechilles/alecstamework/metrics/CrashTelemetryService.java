@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
@@ -39,12 +40,23 @@ public final class CrashTelemetryService {
     public static CrashTelemetryService create(@Nonnull Tamework plugin) {
         Objects.requireNonNull(plugin, "plugin");
         HytaleLogger logger = plugin.getLogger();
+        Path pluginDataDirectory = plugin.getDataDirectory().toAbsolutePath().normalize();
+        Path tameworkUniverseRoot = TameworkSettingsStore.resolveTameworkUniverseRoot(plugin).toAbsolutePath().normalize();
         Path compatibilitySettingsPath = TameworkSettingsStore.resolveSettingsDirectory(plugin)
                 .resolve(CrashTelemetrySettings.FILE_NAME)
                 .toAbsolutePath()
                 .normalize();
+        importLegacyCrashTelemetrySettings(
+                compatibilitySettingsPath,
+                legacyCrashTelemetrySettingsCandidates(pluginDataDirectory, tameworkUniverseRoot),
+                logger
+        );
         CrashTelemetrySettings compatibilitySettings = CrashTelemetrySettings.load(compatibilitySettingsPath, logger);
-        migrateLegacyTelemetryData(plugin, logger);
+        migrateLegacyTelemetryData(
+                pluginDataDirectory.resolve("Telemetry"),
+                legacyTelemetryRootCandidates(pluginDataDirectory, tameworkUniverseRoot),
+                logger
+        );
         EmbeddedTelemetryService embeddedTelemetry = EmbeddedTelemetryBootstrap.bootstrap(plugin);
         return new CrashTelemetryService(compatibilitySettings, new EmbeddedServiceRuntime(embeddedTelemetry));
     }
@@ -293,30 +305,92 @@ public final class CrashTelemetryService {
         return name == null || name.isBlank() ? "<unknown-world>" : name.trim();
     }
 
-    private static void migrateLegacyTelemetryData(@Nonnull Tamework plugin, @Nullable HytaleLogger logger) {
-        Path oldTelemetryRoot = TameworkSettingsStore.resolveTameworkUniverseRoot(plugin)
-                .resolve("Telemetry")
-                .toAbsolutePath()
-                .normalize();
-        Path newTelemetryRoot = plugin.getDataDirectory()
-                .toAbsolutePath()
-                .normalize()
-                .resolve("Telemetry");
-        if (oldTelemetryRoot.equals(newTelemetryRoot)
-                || !Files.isDirectory(oldTelemetryRoot)
-                || Files.exists(newTelemetryRoot)) {
+    @Nonnull
+    static List<Path> legacyCrashTelemetrySettingsCandidates(@Nonnull Path pluginDataDirectory,
+                                                             @Nonnull Path tameworkUniverseRoot) {
+        return List.of(
+                pluginDataDirectory.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize()
+        );
+    }
+
+    static void importLegacyCrashTelemetrySettings(@Nonnull Path preferredSettingsPath,
+                                                   @Nonnull List<Path> legacySettingsCandidates,
+                                                   @Nullable HytaleLogger logger) {
+        Path preferred = preferredSettingsPath.toAbsolutePath().normalize();
+        if (Files.isRegularFile(preferred)) {
             return;
         }
+        for (Path candidate : legacySettingsCandidates) {
+            Path source = candidate.toAbsolutePath().normalize();
+            if (source.equals(preferred) || !Files.isRegularFile(source)) {
+                continue;
+            }
+            try {
+                Path parent = preferred.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                Files.copy(source, preferred);
+                logInfo(logger, "Imported legacy crash telemetry settings from " + source + ".");
+                return;
+            } catch (Exception ex) {
+                logWarning(logger, "Unable to import legacy crash telemetry settings from " + source + ".", ex);
+            }
+        }
+    }
+
+    @Nonnull
+    static List<Path> legacyTelemetryRootCandidates(@Nonnull Path pluginDataDirectory,
+                                                   @Nonnull Path tameworkUniverseRoot) {
+        return List.of(
+                tameworkUniverseRoot.resolve("Telemetry").toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("telemetry").toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").toAbsolutePath().normalize()
+        );
+    }
+
+    static void migrateLegacyTelemetryData(@Nonnull Path newTelemetryRoot,
+                                           @Nonnull List<Path> legacyTelemetryRootCandidates,
+                                           @Nullable HytaleLogger logger) {
+        Path targetRoot = newTelemetryRoot.toAbsolutePath().normalize();
+        if (isNonEmptyDirectory(targetRoot)) {
+            return;
+        }
+        for (Path candidate : legacyTelemetryRootCandidates) {
+            Path sourceRoot = candidate.toAbsolutePath().normalize();
+            if (sourceRoot.equals(targetRoot) || isSamePath(sourceRoot, targetRoot) || !Files.isDirectory(sourceRoot)) {
+                continue;
+            }
+            if (migrateTelemetryDirectory(sourceRoot, targetRoot, logger)) {
+                return;
+            }
+        }
+    }
+
+    private static boolean migrateTelemetryDirectory(@Nonnull Path oldTelemetryRoot,
+                                                     @Nonnull Path newTelemetryRoot,
+                                                     @Nullable HytaleLogger logger) {
         try {
             Files.createDirectories(newTelemetryRoot.getParent());
+            if (Files.exists(newTelemetryRoot)) {
+                copyDirectory(oldTelemetryRoot, newTelemetryRoot);
+                logInfo(logger, "Copied embedded telemetry data to " + newTelemetryRoot + ".");
+                return true;
+            }
             Files.move(oldTelemetryRoot, newTelemetryRoot);
             logInfo(logger, "Migrated embedded telemetry data to " + newTelemetryRoot + ".");
+            return true;
         } catch (Exception moveFailure) {
             try {
                 copyDirectory(oldTelemetryRoot, newTelemetryRoot);
                 logInfo(logger, "Copied embedded telemetry data to " + newTelemetryRoot + ".");
+                return true;
             } catch (Exception copyFailure) {
                 logWarning(logger, "Unable to migrate embedded telemetry data from " + oldTelemetryRoot + " to " + newTelemetryRoot + ".", copyFailure);
+                return false;
             }
         }
     }
@@ -332,6 +406,25 @@ public final class CrashTelemetryService {
                     Files.copy(sourcePath, targetPath, StandardCopyOption.COPY_ATTRIBUTES);
                 }
             }
+        }
+    }
+
+    private static boolean isNonEmptyDirectory(@Nonnull Path directory) {
+        if (!Files.isDirectory(directory)) {
+            return false;
+        }
+        try (Stream<Path> stream = Files.list(directory)) {
+            return stream.findAny().isPresent();
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private static boolean isSamePath(@Nonnull Path first, @Nonnull Path second) {
+        try {
+            return Files.exists(first) && Files.exists(second) && Files.isSameFile(first, second);
+        } catch (Exception ignored) {
+            return false;
         }
     }
 
