@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -58,11 +59,21 @@ final class BreedingPartnerService {
         boolean requireWander = pairing == null || pairing.isRequireWanderMode();
         boolean requireTamed = eligibility == null || eligibility.isRequireTamed();
         boolean requireAdult = eligibility == null || eligibility.isRequireAdult();
+        TwBreedingConfig.GenderSettings genderSettings = config != null ? config.resolveGender(sourceRoleId) : null;
+        boolean requireDifferentGender = genderSettings != null
+                && genderSettings.isEnabled()
+                && genderSettings.isRequireDifferentGender();
+        String sourceGender = requireDifferentGender
+                ? CompanionGenderService.resolveGender(sourceRef, store, sourceRoleId, config)
+                : null;
 
         if (requireWander && !isInWanderState(sourceNpc.getRole())) {
             return null;
         }
         if (requireAdult && !CompanionLifeStageService.isAdult(sourceRef, store, sourceRoleId)) {
+            return null;
+        }
+        if (requireDifferentGender && sourceGender == null) {
             return null;
         }
 
@@ -103,6 +114,17 @@ final class BreedingPartnerService {
                 if (!compatibilityService.canPair(sourceRoleId, candidateRoleId, config, pairing)) {
                     continue;
                 }
+                if (requireDifferentGender) {
+                    String candidateGender = CompanionGenderService.resolveGender(
+                            candidateRef,
+                            store,
+                            candidateRoleId,
+                            resolveCandidateConfig(candidateRoleId, config)
+                    );
+                    if (!CompanionGenderService.different(sourceGender, candidateGender)) {
+                        continue;
+                    }
+                }
                 if (requireAdult && !CompanionLifeStageService.isAdult(candidateRef, store, candidateRoleId)) {
                     continue;
                 }
@@ -139,6 +161,46 @@ final class BreedingPartnerService {
             return null;
         }
         return new PartnerCandidate(best.ref, best.npc, best.breeding, best.roleId, best.ownerId, best.distanceSq);
+    }
+
+    @Nullable
+    static TwBreedingConfig resolveCandidateConfig(@Nullable String candidateRoleId,
+                                                   @Nullable TwBreedingConfig sourceConfig) {
+        TwBreedingConfig candidateConfig = TwBreedingConfig.resolveForRole(candidateRoleId);
+        if (candidateConfig != null) {
+            return candidateConfig;
+        }
+        return configDeclaresRole(sourceConfig, candidateRoleId) ? sourceConfig : null;
+    }
+
+    private static boolean configDeclaresRole(@Nullable TwBreedingConfig config, @Nullable String roleId) {
+        if (config == null || roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        String normalized = normalizeRoleId(roleId);
+        for (String configuredRoleId : config.getRoleIds()) {
+            if (normalized.equals(normalizeRoleId(configuredRoleId))) {
+                return true;
+            }
+        }
+        for (String overrideRoleId : config.getRoleOverrides().keySet()) {
+            if (normalized.equals(normalizeRoleId(overrideRoleId))) {
+                return true;
+            }
+        }
+        return config.resolveLifecycleFamilyForRole(roleId) != null;
+    }
+
+    private static String normalizeRoleId(@Nullable String roleId) {
+        if (roleId == null) {
+            return "";
+        }
+        String normalized = roleId.trim().toLowerCase(Locale.ROOT);
+        int separator = normalized.lastIndexOf(':');
+        if (separator >= 0 && separator < normalized.length() - 1) {
+            return normalized.substring(separator + 1);
+        }
+        return normalized;
     }
 
     private static boolean sameOwner(@Nullable UUID sourceOwnerId, @Nullable UUID candidateOwnerId) {

@@ -81,6 +81,51 @@ class TwBreedingConfigInheritanceTest {
                 child.getPairing().getRoleCompatibility());
     }
 
+    @Test
+    void genderSectionInheritsMissingNestedKeys() throws Exception {
+        TwBreedingConfig parent = new TwBreedingConfig();
+        TwBreedingConfig child = new TwBreedingConfig();
+
+        TwBreedingConfig.GenderSettings parentGender = new TwBreedingConfig.GenderSettings();
+        TwBreedingConfig.GenderSettings childGender = new TwBreedingConfig.GenderSettings();
+        setField(parentGender, "enabled", true);
+        setField(parentGender, "maleWeight", 2.0);
+        setField(parentGender, "femaleWeight", 3.0);
+        setField(childGender, "enabled", false);
+        setField(childGender, "femaleWeight", 4.0);
+        setField(parent, "gender", parentGender);
+        setField(child, "gender", childGender);
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("Gender", Set.of("FemaleWeight"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("Gender"), nested);
+
+        assertTrue(child.getGender().isEnabled());
+        assertEquals(2.0, child.getGender().getMaleWeight(), 0.000001);
+        assertEquals(4.0, child.getGender().getFemaleWeight(), 0.000001);
+    }
+
+    @Test
+    void genderCanBeOverriddenPerRole() throws Exception {
+        TwBreedingConfig config = new TwBreedingConfig();
+        TwBreedingConfig.GenderSettings gender = new TwBreedingConfig.GenderSettings();
+        TwBreedingConfig.RoleOverrideSettings roleOverride = new TwBreedingConfig.RoleOverrideSettings();
+        TwBreedingConfig.GenderSettingsOverride genderOverride = new TwBreedingConfig.GenderSettingsOverride();
+        Map<String, TwBreedingConfig.RoleOverrideSettings> overrides = new HashMap<>();
+        overrides.put("Tamed_Deer_Stag", roleOverride);
+
+        setField(gender, "enabled", false);
+        setField(gender, "maleWeight", 1.0);
+        setField(genderOverride, "enabled", true);
+        setField(genderOverride, "maleWeight", 4.0);
+        setField(roleOverride, "gender", genderOverride);
+        setField(config, "gender", gender);
+        setField(config, "roleOverrides", overrides);
+
+        assertTrue(config.resolveGender("Tamed_Deer_Stag").isEnabled());
+        assertEquals(4.0, config.resolveGender("Tamed_Deer_Stag").getMaleWeight(), 0.000001);
+    }
+
     private static void setField(Object target, String fieldName, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(fieldName);
         field.setAccessible(true);

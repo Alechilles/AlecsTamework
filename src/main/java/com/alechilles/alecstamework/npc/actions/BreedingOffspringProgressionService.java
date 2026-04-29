@@ -12,6 +12,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentInheritanceService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -62,6 +63,7 @@ final class BreedingOffspringProgressionService {
                              @Nullable String breedingConfigId,
                              long childCooldownMs,
                              @Nullable String selectedAdultRoleId,
+                             @Nullable TwBreedingConfig.Gender selectedGender,
                              @Nullable TwBreedingConfig.RoleFamily lifecycleFamily,
                              Store<EntityStore> store) {
         if (childRef == null || !childRef.isValid() || store == null || childRoleId == null || childRoleId.isBlank()) {
@@ -103,6 +105,7 @@ final class BreedingOffspringProgressionService {
                 selectedAdultRoleId,
                 lifecycleFamily
         );
+        CompanionGenderService.ensureGender(childRef, store, childRoleId, breedingConfig, selectedGender);
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
         boolean familyAssigned = familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);

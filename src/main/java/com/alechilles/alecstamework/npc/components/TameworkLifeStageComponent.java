@@ -106,6 +106,12 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
             TameworkLifeStageComponent::getAdolescentRoleId
         )
         .add()
+        .append(
+            new KeyedCodec<>("Gender", Codec.STRING),
+            TameworkLifeStageComponent::setGender,
+            TameworkLifeStageComponent::getGender
+        )
+        .add()
         .build();
 
     private String stage = "Adult";
@@ -123,6 +129,7 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
     private String adultRoleId;
     private String babyRoleId;
     private String adolescentRoleId;
+    private String gender;
 
     public TameworkLifeStageComponent() {
     }
@@ -278,6 +285,14 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
         this.adolescentRoleId = adolescentRoleId;
     }
 
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
     @Override
     public TameworkLifeStageComponent clone() {
         TameworkLifeStageComponent clone = new TameworkLifeStageComponent(
@@ -297,6 +312,7 @@ public final class TameworkLifeStageComponent implements Component<EntityStore> 
         clone.setAdultRoleId(adultRoleId);
         clone.setBabyRoleId(babyRoleId);
         clone.setAdolescentRoleId(adolescentRoleId);
+        clone.setGender(gender);
         return clone;
     }
 }

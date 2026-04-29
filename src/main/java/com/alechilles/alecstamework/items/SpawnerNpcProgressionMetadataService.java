@@ -92,6 +92,7 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
         return updated;
     }
 
@@ -648,6 +649,7 @@ final class SpawnerNpcProgressionMetadataService {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
             return updated;
         }
         ItemStack updated = stack;
@@ -699,6 +701,11 @@ final class SpawnerNpcProgressionMetadataService {
                 Codec.BOOLEAN,
                 component.isGrowthScalingEnabled()
         );
+        if (component.getGender() != null && !component.getGender().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_GENDER, Codec.STRING, component.getGender());
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
+        }
         return updated;
     }
 
@@ -730,6 +737,7 @@ final class SpawnerNpcProgressionMetadataService {
                 TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED,
                 Codec.BOOLEAN
         );
+        String gender = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_GENDER, Codec.STRING);
         boolean hasData = (stage != null && !stage.isBlank())
                 || bornAtMs != null
                 || adolescentAtMs != null
@@ -741,7 +749,8 @@ final class SpawnerNpcProgressionMetadataService {
                 || adultStartScale != null
                 || adultSwitchScale != null
                 || adultScale != null
-                || growthScaling != null;
+                || growthScaling != null
+                || (gender != null && !gender.isBlank());
         if (!hasData) {
             return;
         }
@@ -784,6 +793,12 @@ final class SpawnerNpcProgressionMetadataService {
                         ? growthScaling
                         : existing != null && existing.isGrowthScalingEnabled()
         );
+        restored.setAdultRoleId(existing != null ? existing.getAdultRoleId() : null);
+        restored.setBabyRoleId(existing != null ? existing.getBabyRoleId() : null);
+        restored.setAdolescentRoleId(existing != null ? existing.getAdolescentRoleId() : null);
+        restored.setGender(gender != null && !gender.isBlank()
+                ? gender
+                : existing != null ? existing.getGender() : null);
         store.putComponent(npcRef, type, restored);
     }
 

@@ -87,7 +87,8 @@ public record ProgressionView(@Nullable String profileId,
                                 double adultScale,
                                 @Nullable String adultRoleId,
                                 @Nullable String babyRoleId,
-                                @Nullable String adolescentRoleId) {
+                                @Nullable String adolescentRoleId,
+                                @Nullable String gender) {
     }
 
     public record TraitsView(@Nullable String configId,

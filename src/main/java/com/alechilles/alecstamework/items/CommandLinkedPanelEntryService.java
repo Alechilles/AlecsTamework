@@ -15,6 +15,7 @@ import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
@@ -154,6 +155,11 @@ final class CommandLinkedPanelEntryService {
                             speciesId = resolvedRoleId;
                             speciesLabel = resolvedRoleId;
                         }
+                        displayName = appendGenderLabel(
+                                displayName,
+                                CompanionGenderService.resolveGender(npcRef, store, resolvedRoleId, null),
+                                playerLanguage
+                        );
                         TameworkCommandLinksComponent links =
                                 safeGetComponent(store, npcRef, TameworkCommandLinksComponent.getComponentType());
                         if (links != null && links.hasHome()) {
@@ -342,6 +348,19 @@ final class CommandLinkedPanelEntryService {
                                                                  @Nullable String language) {
         String label = LocalizedText.resolve(language, "tamework.ui.linkedPanel.futureStat.talentPoints");
         return new LinkedNpcEntry.FutureStat(label, Math.max(0, availablePoints), Math.max(1, totalEarnedPoints));
+    }
+
+    private String appendGenderLabel(@Nullable String displayName,
+                                     @Nullable String gender,
+                                     @Nullable String language) {
+        String baseName = displayName == null || displayName.isBlank()
+                ? LocalizedText.resolve(language, "tamework.ui.linkedPanel.subtitle.defaultNpcName")
+                : displayName;
+        String label = CompanionGenderService.toDisplayLabel(gender);
+        if (label == null || label.isBlank()) {
+            return baseName;
+        }
+        return baseName + " (" + label + ")";
     }
 
     @Nullable

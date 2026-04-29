@@ -22,6 +22,7 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     private static final String GENERIC_CAPTURE_CRATE_KEY = "server.items.captureCrate.name";
     private static final String NAME_LINE_PREFIX = "Name: ";
     private static final String ROLE_LINE_PREFIX = "Role: ";
+    private static final String GENDER_LINE_PREFIX = "Gender: ";
 
     private final ItemFeatureRegistry itemFeatureRegistry;
     private final TranslationRegistry translationRegistry;
@@ -80,12 +81,17 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
             mode = ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE;
         }
 
+        String gender = readString(metadataDoc, TameworkMetadataKeys.LIFE_STAGE_GENDER);
         TooltipData.Builder builder = TooltipData.builder()
                 .nameOverride(itemName)
-                .hashInput((mode.name()) + "|" + itemName + "|" + displayName + "|" + (roleDisplay == null ? "" : roleDisplay));
+                .hashInput((mode.name()) + "|" + itemName + "|" + displayName + "|"
+                        + (roleDisplay == null ? "" : roleDisplay) + "|" + (gender == null ? "" : gender));
         appendLine(builder, mode, NAME_LINE_PREFIX + displayName);
         if (roleDisplay != null && !roleDisplay.isBlank()) {
             appendLine(builder, mode, ROLE_LINE_PREFIX + roleDisplay);
+        }
+        if (gender != null && !gender.isBlank()) {
+            appendLine(builder, mode, GENDER_LINE_PREFIX + gender);
         }
         TooltipData data = builder.build();
         return data.isEmpty() ? null : data;

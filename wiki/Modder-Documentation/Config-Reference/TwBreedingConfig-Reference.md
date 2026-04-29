@@ -45,6 +45,7 @@ Use it when you want to control:
   "Cooldowns": { "...": "..." },
   "PassiveBreeding": { "...": "..." },
   "Timing": { "...": "..." },
+  "Gender": { "...": "..." },
   "Inheritance": { "...": "..." },
   "OffspringLifecycle": { "...": "..." },
   "RoleOverrides": {
@@ -109,6 +110,16 @@ Accepted values for both timing sections:
 - `REAL_TIME`
 - `WORLD_TIME_SCALED`
 
+### `Gender`
+Controls optional binary gender assignment and partner filtering. Omit this section, or set `Enabled` to `false`, to preserve existing ungendered behavior.
+
+- `Enabled`: assigns stable `Male` or `Female` gender to companions covered by this breeding config.
+- `RequireDifferentGender`: when enabled, breeding partners must have different assigned genders.
+- `MaleWeight`: relative chance for a generated companion to be assigned `Male`.
+- `FemaleWeight`: relative chance for a generated companion to be assigned `Female`.
+
+When `OffspringLifecycle.Families[].AdultRoles[]` entries include `Gender`, offspring select a matching future adult role when possible. If no matching gendered choice is selectable, Tamework falls back to the normal weighted adult-role list so older mixed configs still work.
+
 ### `Inheritance`
 - `InheritOwner`
 - `InheritTamed`
@@ -163,8 +174,8 @@ Use a family entry when one adult role, or a set of related adult roles, should 
 ```json
 {
   "AdultRoles": [
-    { "RoleId": "Deer_Stag", "Weight": 1.0 },
-    { "RoleId": "Deer_Doe", "Weight": 1.0 }
+    { "RoleId": "Deer_Stag", "Gender": "Male", "Weight": 1.0 },
+    { "RoleId": "Deer_Doe", "Gender": "Female", "Weight": 1.0 }
   ],
   "BabyRoleId": "Deer_Fawn"
 }
@@ -187,6 +198,7 @@ Invalid, blank, or non-positive weighted adult entries are ignored for selection
 - `Cooldowns`
 - `PassiveBreeding`
 - `Timing`
+- `Gender`
 - `Inheritance`
 - `OffspringLifecycle`
 
@@ -296,7 +308,7 @@ Important behavior:
 ```
 
 ## Cross-Role Family Example
-This pattern allows two different adult roles to breed together, produce one shared baby role, and grow into one of the configured adult roles. Use `SameLifecycleFamily` instead when same-role pairs in the family should also be valid.
+This pattern allows two different adult roles to breed together, produce one shared baby role, and grow into one of the configured adult roles. Gender is optional; this example enables it so stag/doe pairs are required and offspring grow into an adult role matching the assigned gender. Use `SameLifecycleFamily` instead when same-role pairs in the family should also be valid.
 
 ```json
 {
@@ -312,14 +324,20 @@ This pattern allows two different adult roles to breed together, produce one sha
     "RequireSameOwner": false,
     "MaxNearbySameType": 8
   },
+  "Gender": {
+    "Enabled": true,
+    "RequireDifferentGender": true,
+    "MaleWeight": 1.0,
+    "FemaleWeight": 1.0
+  },
   "OffspringLifecycle": {
     "Enabled": true,
     "DefaultTimeToFullGrownMinutes": 48,
     "Families": [
       {
         "AdultRoles": [
-          { "RoleId": "Deer_Stag", "Weight": 1.0 },
-          { "RoleId": "Deer_Doe", "Weight": 1.0 }
+          { "RoleId": "Deer_Stag", "Gender": "Male", "Weight": 1.0 },
+          { "RoleId": "Deer_Doe", "Gender": "Female", "Weight": 1.0 }
         ],
         "BabyRoleId": "Deer_Fawn"
       }
@@ -333,6 +351,7 @@ This pattern allows two different adult roles to breed together, produce one sha
 - Explicit `Families` or `RoleMaxNearbySameType` arrays replace the parent list.
 - Keep `Timing.Basis` and `PassiveBreeding.Basis` intentional. They solve different timing problems.
 - New content should prefer minute-based keys where they exist, but old second-based keys remain valid.
+- Gender labels appear in linked companion panels and preserved spawner tooltips for companions covered by an enabled gender config.
 
 ## Related Pages
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)
