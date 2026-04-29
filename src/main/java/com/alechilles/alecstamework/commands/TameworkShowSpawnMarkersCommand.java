@@ -77,7 +77,9 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
         }
         if (parse.mode() == TameworkShowSpawnMarkersCommandSupport.Mode.OFF) {
             TrackingSession removed = ACTIVE_TRACKING.remove(playerUuid);
-            clearDebugForPlayer(playerRef);
+            if (removed != null) {
+                clearDebugForPlayer(playerRef);
+            }
             commandContext.sender().sendMessage(Message.raw(
                     removed != null ? "Spawn marker debug rendering disabled." : "Spawn marker debug rendering was not active."
             ));
