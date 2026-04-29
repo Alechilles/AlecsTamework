@@ -245,6 +245,8 @@ class CrashTelemetryServiceTest {
         Path pendingEvent = sharedRoot.resolve("events").resolve("alecs-tamework").resolve("pending").resolve("event.json");
         Path serverId = sharedRoot.resolve("Settings").resolve("server-id.txt");
         Path tameworkProjectSettings = sharedRoot.resolve("Settings").resolve("projects").resolve("alecs-tamework.json");
+        Path sharedPendingReport = sharedRoot.resolve("crash-reports").resolve("pending").resolve("shared-report.json");
+        Path sharedPendingEvent = sharedRoot.resolve("events").resolve("pending").resolve("shared-event.json");
         Path unrelatedPluginReport = sharedRoot.resolve("crash-reports").resolve("other-project").resolve("pending").resolve("report.json");
         Path unrelatedProjectSettings = sharedRoot.resolve("Settings").resolve("projects").resolve("other-project.json");
         Path unrelatedRootFile = sharedRoot.resolve("unrelated.txt");
@@ -252,12 +254,16 @@ class CrashTelemetryServiceTest {
         Files.createDirectories(pendingEvent.getParent());
         Files.createDirectories(serverId.getParent());
         Files.createDirectories(tameworkProjectSettings.getParent());
+        Files.createDirectories(sharedPendingReport.getParent());
+        Files.createDirectories(sharedPendingEvent.getParent());
         Files.createDirectories(unrelatedPluginReport.getParent());
         Files.createDirectories(unrelatedProjectSettings.getParent());
         Files.writeString(pendingReport, "{}", StandardCharsets.UTF_8);
         Files.writeString(pendingEvent, "{}", StandardCharsets.UTF_8);
         Files.writeString(serverId, "shared-server", StandardCharsets.UTF_8);
         Files.writeString(tameworkProjectSettings, "{}", StandardCharsets.UTF_8);
+        Files.writeString(sharedPendingReport, "{}", StandardCharsets.UTF_8);
+        Files.writeString(sharedPendingEvent, "{}", StandardCharsets.UTF_8);
         Files.writeString(unrelatedPluginReport, "{}", StandardCharsets.UTF_8);
         Files.writeString(unrelatedProjectSettings, "{}", StandardCharsets.UTF_8);
         Files.writeString(unrelatedRootFile, "shared", StandardCharsets.UTF_8);
@@ -268,11 +274,14 @@ class CrashTelemetryServiceTest {
         assertTrue(Files.isRegularFile(target.resolve("events").resolve("alecs-tamework").resolve("pending").resolve("event.json")));
         assertEquals("shared-server", Files.readString(target.resolve("Settings").resolve("server-id.txt"), StandardCharsets.UTF_8));
         assertTrue(Files.isRegularFile(target.resolve("Settings").resolve("projects").resolve("alecs-tamework.json")));
+        assertFalse(Files.exists(target.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("shared-report.json")));
+        assertFalse(Files.exists(target.resolve("events").resolve("alecs-tamework").resolve("pending").resolve("shared-event.json")));
         assertFalse(Files.exists(target.resolve("crash-reports").resolve("other-project")));
         assertFalse(Files.exists(target.resolve("Settings").resolve("projects").resolve("other-project.json")));
         assertFalse(Files.exists(target.resolve("unrelated.txt")));
         assertTrue(Files.isDirectory(sharedRoot));
         assertTrue(Files.isRegularFile(unrelatedPluginReport));
+        assertTrue(Files.isRegularFile(sharedPendingReport));
     }
 
     @Test

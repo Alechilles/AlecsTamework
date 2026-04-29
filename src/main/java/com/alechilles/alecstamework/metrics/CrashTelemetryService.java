@@ -372,7 +372,7 @@ public final class CrashTelemetryService {
             if ((targetHasData && !sameRoot) || !Files.isDirectory(sourceRoot)) {
                 continue;
             }
-            if (copyLegacyTelemetryArtifacts(sourceRoot, targetRoot, logger)) {
+            if (copyLegacyTelemetryArtifacts(sourceRoot, targetRoot, isPluginLocalLegacyRoot(sourceRoot, targetRoot), logger)) {
                 return;
             }
         }
@@ -380,6 +380,7 @@ public final class CrashTelemetryService {
 
     private static boolean copyLegacyTelemetryArtifacts(@Nonnull Path oldTelemetryRoot,
                                                         @Nonnull Path newTelemetryRoot,
+                                                        boolean includeUnprojectedQueues,
                                                         @Nullable HytaleLogger logger) {
         try {
             Path parent = newTelemetryRoot.getParent();
@@ -392,17 +393,19 @@ public final class CrashTelemetryService {
                     newTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID)
             );
             copied += copyDirectoryIfExists(
-                    oldTelemetryRoot.resolve("crash-reports").resolve("pending"),
-                    newTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
-            );
-            copied += copyDirectoryIfExists(
                     oldTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID),
                     newTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID)
             );
-            copied += copyDirectoryIfExists(
-                    oldTelemetryRoot.resolve("events").resolve("pending"),
-                    newTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
-            );
+            if (includeUnprojectedQueues) {
+                copied += copyDirectoryIfExists(
+                        oldTelemetryRoot.resolve("crash-reports").resolve("pending"),
+                        newTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
+                );
+                copied += copyDirectoryIfExists(
+                        oldTelemetryRoot.resolve("events").resolve("pending"),
+                        newTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
+                );
+            }
             copied += copyFileIfExists(
                     oldTelemetryRoot.resolve("Settings").resolve("runtime.json"),
                     newTelemetryRoot.resolve("Settings").resolve("runtime.json")
@@ -432,6 +435,20 @@ public final class CrashTelemetryService {
             logWarning(logger, "Unable to migrate embedded telemetry data from " + oldTelemetryRoot + " to " + newTelemetryRoot + ".", copyFailure);
             return false;
         }
+    }
+
+    private static boolean isPluginLocalLegacyRoot(@Nonnull Path sourceRoot, @Nonnull Path targetRoot) {
+        if (sourceRoot.equals(targetRoot) || isSamePath(sourceRoot, targetRoot)) {
+            return true;
+        }
+        Path sourceParent = sourceRoot.getParent();
+        Path targetParent = targetRoot.getParent();
+        Path sourceFileName = sourceRoot.getFileName();
+        return sourceParent != null
+                && targetParent != null
+                && sourceFileName != null
+                && "telemetry".equalsIgnoreCase(sourceFileName.toString())
+                && (sourceParent.equals(targetParent) || isSamePath(sourceParent, targetParent));
     }
 
     private static int copyDirectoryIfExists(@Nonnull Path source, @Nonnull Path target) throws IOException {
