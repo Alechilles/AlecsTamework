@@ -22,6 +22,7 @@ import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import java.lang.reflect.Field;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -37,7 +38,7 @@ import javax.annotation.Nonnull;
 public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
     private static final long TRACK_INTERVAL_MS = 50L;
     private static final float TRACK_RENDER_SECONDS = 0.15f;
-    private static final int SHAPE_FLAGS = DebugUtils.FLAG_FADE | DebugUtils.FLAG_NO_SOLID;
+    private static final int SHAPE_FLAGS = resolveShapeFlags();
     private static final AtomicLong TRACKING_SEQUENCE = new AtomicLong();
     private static final Map<UUID, TrackingSession> ACTIVE_TRACKING = new ConcurrentHashMap<>();
 
@@ -108,6 +109,19 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
             return DebugUtils.COLOR_CYAN;
         }
         return DebugUtils.COLOR_LIME;
+    }
+
+    static int resolveShapeFlags() {
+        return resolveOptionalDebugFlag("FLAG_FADE") | resolveOptionalDebugFlag("FLAG_NO_SOLID");
+    }
+
+    private static int resolveOptionalDebugFlag(@Nonnull String fieldName) {
+        try {
+            Field field = DebugUtils.class.getField(fieldName);
+            return field.getInt(null);
+        } catch (ReflectiveOperationException | SecurityException ignored) {
+            return 0;
+        }
     }
 
     private static void drawLocalBox(@Nonnull PlayerRef playerRef,

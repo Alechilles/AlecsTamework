@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.npc.actions;
 
-import com.alechilles.alecstamework.npc.progression.TraitModifierService;
+import com.alechilles.alecstamework.npc.progression.CompanionProgressionModifierService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -42,7 +42,7 @@ final class BreedingFertilityOffspringService {
 
     private static double resolveFertilityMultiplier(@Nullable Ref<EntityStore> npcRef,
                                                      @Nullable Store<EntityStore> store) {
-        double value = TraitModifierService.resolveMultiplier(
+        double value = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 FERTILITY_MULTIPLIER_EFFECT_KEY,

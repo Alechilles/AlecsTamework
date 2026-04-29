@@ -28,14 +28,17 @@ import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.damage.DamageTargetMemorySystem;
 import com.alechilles.alecstamework.damage.OwnerDamageFilterSystem;
 import com.alechilles.alecstamework.damage.CompanionHappinessDamageImpulseSystem;
+import com.alechilles.alecstamework.damage.CompanionCombatExperienceSystem;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileComponent;
 import com.alechilles.alecstamework.damage.TameworkLingeringHazardProjectileSpawnSystem;
@@ -43,15 +46,12 @@ import com.alechilles.alecstamework.damage.TameworkLingeringHazardSystem;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectComponent;
 import com.alechilles.alecstamework.damage.TameworkProjectileImpactEffectSystem;
 import com.alechilles.alecstamework.damage.TraitDamageModifierSystem;
-import com.alechilles.alecstamework.effects.PlayerEffectMovementSystem;
 import com.alechilles.alecstamework.interactions.TameworkCommandInteraction;
 import com.alechilles.alecstamework.interactions.TameworkClearFeedTroughWaterInteraction;
 import com.alechilles.alecstamework.interactions.TameworkLaunchProjectileInteraction;
 import com.alechilles.alecstamework.interactions.TameworkNameNpcInteraction;
 import com.alechilles.alecstamework.interactions.TameworkSpawnInteraction;
 import com.alechilles.alecstamework.integration.nameplatebuilder.NameplateBuilderBridgeLoader;
-import com.alechilles.alecstamework.integration.telemetry.AlecsTelemetryBridgeLoader;
-import com.alechilles.alecstamework.integration.telemetry.AlecsTelemetryBridgeLoader.AlecsTelemetryBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridge;
 import com.alechilles.alecstamework.integration.tooltips.SpawnerTooltipBridgeLoader;
 import com.alechilles.alecstamework.items.CommandItemFeatureHandler;
@@ -81,13 +81,16 @@ import com.alechilles.alecstamework.npc.TameworkNpcBuilderRegistrar;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkFlyingCompanionComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
@@ -112,6 +115,7 @@ import com.alechilles.alecstamework.npc.systems.CommandNpcRelocationOnLoadSystem
 import com.alechilles.alecstamework.npc.systems.CompanionNeedsSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTraitStatSyncSystem;
 import com.alechilles.alecstamework.npc.systems.CompanionTranquilizerPeakSystem;
+import com.alechilles.alecstamework.npc.systems.FlyingCompanionControlSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
@@ -128,7 +132,6 @@ import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.entity.entities.player.movement.MovementManager;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
@@ -144,7 +147,6 @@ import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Int
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -157,9 +159,6 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
  * Main entry point for the Alec's Tamework! plugin.
  */
 public class Tamework extends JavaPlugin {
-
-    private static final String ALECS_TELEMETRY_PROJECT_ID = "alecs-tamework";
-
     private static Tamework instance;
 
     private ItemFeatureRegistry itemFeatureRegistry;
@@ -193,7 +192,6 @@ public class Tamework extends JavaPlugin {
     private TameworkHStatsIntegration hStatsIntegration;
     private CrashTelemetryService crashTelemetryService;
     private final TameworkTelemetryEvents telemetryEvents = new TameworkTelemetryEvents();
-    private AlecsTelemetryBridge alecsTelemetryBridge;
     private TameworkSettingsAnnouncementService settingsAnnouncementService;
     private SpawnerTooltipBridge spawnerTooltipBridge;
     private boolean globalAssetsRegistered;
@@ -207,7 +205,9 @@ public class Tamework extends JavaPlugin {
     private boolean happinessAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
+    private boolean levelingAssetsRegistered;
     private boolean traitAssetsRegistered;
+    private boolean talentAssetsRegistered;
     private boolean debugAssetsRegistered;
     private String lastGlobalConfigWarningKey;
     private final Object itemFeatureReloadSuppressionLock = new Object();
@@ -225,7 +225,10 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkHappinessComponent> happinessComponentType;
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
+    private ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingCompanionComponentType;
+    private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
+    private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
     private ComponentType<EntityStore, TameworkTranquilizerPeakComponent> tranquilizerPeakComponentType;
     private ComponentType<EntityStore, TameworkAttachmentsComponent> attachmentsComponentType;
     private ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageComponentType;
@@ -246,6 +249,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugNeedsConsumeDiagnosticsLogs;
     private volatile boolean debugNeedsDamageDiagnosticsLogs;
     private volatile boolean debugNeedsSeekDiagnosticsLogs;
+    private volatile boolean debugFlyingCompanionLogs;
 
     public Tamework(@Nonnull JavaPluginInit init) {
         super(init);
@@ -256,20 +260,70 @@ public class Tamework extends JavaPlugin {
     protected void setup() {
         long startedAtNanos = System.nanoTime();
         initializeCrashTelemetry();
-        alecsTelemetryBridge = AlecsTelemetryBridgeLoader.initialize(getLogger(), ALECS_TELEMETRY_PROJECT_ID);
         try {
             setupInternal();
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_setup", durationMs, true, "Tamework setupInternal completed.");
-            telemetryEvents.recordPerformance("plugin_setup_duration", durationMs, (double) durationMs, "Tamework plugin setup duration.");
-            recordAlecsTelemetryBreadcrumb("lifecycle", "Tamework setup completed.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_setup",
+                    durationMs,
+                    true,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework setupInternal completed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_setup_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework plugin setup duration.")
+                            .build()
+            );
+            if (crashTelemetryService != null) {
+                crashTelemetryService.recordBreadcrumb("lifecycle", "Tamework setup completed.");
+            }
         } catch (Throwable throwable) {
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_setup", durationMs, false, "Tamework setupInternal failed.");
-            telemetryEvents.recordPerformance("plugin_setup_duration", durationMs, (double) durationMs, "Failed Tamework plugin setup duration.");
-            telemetryEvents.recordError("plugin_setup_failed", throwable, "Tamework setupInternal threw an exception.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_setup",
+                    durationMs,
+                    false,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework setupInternal failed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_setup_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Failed Tamework plugin setup duration.")
+                            .detail("result", "failed")
+                            .build()
+            );
+            telemetryEvents.recordError(
+                    "plugin_setup_failed",
+                    throwable,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("setup")
+                            .operation("setupInternal")
+                            .detail("Tamework setupInternal threw an exception.")
+                            .build()
+            );
             captureSetupFailure(throwable);
-            captureAlecsTelemetrySetupFailure(throwable);
             throw throwable;
         }
     }
@@ -315,7 +369,9 @@ public class Tamework extends JavaPlugin {
         registerHappinessAssets();
         registerNeedsAssets();
         registerBreedingAssets();
+        registerLevelingAssets();
         registerTraitAssets();
+        registerTalentAssets();
         registerDebugAssets();
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
@@ -377,10 +433,28 @@ public class Tamework extends JavaPlugin {
                 TameworkBreedingComponent.CODEC
         );
 
+        flyingCompanionComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkFlyingCompanionComponent.class,
+                "TameworkFlyingCompanion",
+                TameworkFlyingCompanionComponent.CODEC
+        );
+
+        levelingComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkLevelingComponent.class,
+                "TameworkLeveling",
+                TameworkLevelingComponent.CODEC
+        );
+
         traitsComponentType = getEntityStoreRegistry().registerComponent(
                 TameworkTraitsComponent.class,
                 "TameworkTraits",
                 TameworkTraitsComponent.CODEC
+        );
+
+        talentsComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkTalentsComponent.class,
+                "TameworkTalents",
+                TameworkTalentsComponent.CODEC
         );
 
         tranquilizerPeakComponentType = getEntityStoreRegistry().registerComponent(
@@ -496,6 +570,7 @@ public class Tamework extends JavaPlugin {
         registerOptionalCommandLinkedRevivableDropSuppressionSystem();
         getEntityStoreRegistry().registerSystem(new CompanionAttachmentSyncSystem());
         getEntityStoreRegistry().registerSystem(new CompanionDespawnProtectionSystem());
+        getEntityStoreRegistry().registerSystem(new FlyingCompanionControlSystem());
         getEntityStoreRegistry().registerSystem(
                 new CompanionDespawnDiagnosticsSystem(
                         NPCEntity.getComponentType(),
@@ -587,13 +662,7 @@ public class Tamework extends JavaPlugin {
         );
         getEntityStoreRegistry().registerSystem(new TraitDamageModifierSystem());
         getEntityStoreRegistry().registerSystem(new CompanionHappinessDamageImpulseSystem());
-        getEntityStoreRegistry().registerSystem(
-                new PlayerEffectMovementSystem(
-                        PlayerRef.getComponentType(),
-                        MovementManager.getComponentType(),
-                        EffectControllerComponent.getComponentType()
-                )
-        );
+        getEntityStoreRegistry().registerSystem(new CompanionCombatExperienceSystem());
         getEntityStoreRegistry().registerSystem(
                 new TameworkProjectileImpactEffectSystem(
                         projectileImpactEffectComponentType,
@@ -737,16 +806,67 @@ public class Tamework extends JavaPlugin {
         try {
             startInternal();
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_start", durationMs, true, "Tamework startInternal completed.");
-            telemetryEvents.recordPerformance("plugin_start_duration", durationMs, (double) durationMs, "Tamework plugin start duration.");
-            recordAlecsTelemetryBreadcrumb("lifecycle", "Tamework start completed.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_start",
+                    durationMs,
+                    true,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework startInternal completed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_start_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework plugin start duration.")
+                            .build()
+            );
+            if (crashTelemetryService != null) {
+                crashTelemetryService.recordBreadcrumb("lifecycle", "Tamework start completed.");
+            }
         } catch (Throwable throwable) {
             int durationMs = telemetryEvents.elapsedMillis(startedAtNanos);
-            telemetryEvents.recordLifecycle("plugin_start", durationMs, false, "Tamework startInternal failed.");
-            telemetryEvents.recordPerformance("plugin_start_duration", durationMs, (double) durationMs, "Failed Tamework plugin start duration.");
-            telemetryEvents.recordError("plugin_start_failed", throwable, "Tamework startInternal threw an exception.");
+            telemetryEvents.recordLifecycle(
+                    "plugin_start",
+                    durationMs,
+                    false,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework startInternal failed.")
+                            .build()
+            );
+            telemetryEvents.recordPerformance(
+                    "plugin_start_duration",
+                    durationMs,
+                    (double) durationMs,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Failed Tamework plugin start duration.")
+                            .detail("result", "failed")
+                            .build()
+            );
+            telemetryEvents.recordError(
+                    "plugin_start_failed",
+                    throwable,
+                    TameworkTelemetryEvents.context()
+                            .subsystem("plugin")
+                            .phase("start")
+                            .operation("startInternal")
+                            .detail("Tamework startInternal threw an exception.")
+                            .build()
+            );
             captureStartFailure(throwable);
-            captureAlecsTelemetryStartFailure(throwable);
             throw throwable;
         }
     }
@@ -791,7 +911,6 @@ public class Tamework extends JavaPlugin {
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
         crashTelemetryService = null;
-        alecsTelemetryBridge = null;
         settingsAnnouncementService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
     }
@@ -804,7 +923,7 @@ public class Tamework extends JavaPlugin {
             crashTelemetryService = CrashTelemetryService.create(this);
         } catch (Exception ex) {
             getLogger().at(Level.WARNING).withCause(ex)
-                    .log("Failed to initialize Tamework crash telemetry; continuing without crash telemetry.");
+                    .log("Failed to initialize Tamework embedded telemetry; continuing without telemetry.");
         }
     }
 
@@ -820,27 +939,6 @@ public class Tamework extends JavaPlugin {
             return;
         }
         crashTelemetryService.captureStartFailure(throwable);
-    }
-
-    private void captureAlecsTelemetrySetupFailure(@Nullable Throwable throwable) {
-        if (alecsTelemetryBridge == null || throwable == null) {
-            return;
-        }
-        alecsTelemetryBridge.captureSetupFailure(throwable);
-    }
-
-    private void captureAlecsTelemetryStartFailure(@Nullable Throwable throwable) {
-        if (alecsTelemetryBridge == null || throwable == null) {
-            return;
-        }
-        alecsTelemetryBridge.captureStartFailure(throwable);
-    }
-
-    private void recordAlecsTelemetryBreadcrumb(@Nonnull String category, @Nonnull String detail) {
-        if (alecsTelemetryBridge == null) {
-            return;
-        }
-        alecsTelemetryBridge.recordBreadcrumb(category, detail);
     }
 
     private void onWorldRemovedForCrashTelemetry(@Nonnull RemoveWorldEvent event) {
@@ -889,11 +987,14 @@ public class Tamework extends JavaPlugin {
             telemetryEvents.recordError(
                     "world_override_reload_errors",
                     null,
-                    "Loaded overrides for world "
-                            + world.getName()
-                            + " with "
-                            + reloadResult.getErrors().size()
-                            + " error(s)."
+                    TameworkTelemetryEvents.context()
+                            .subsystem("config")
+                            .featureKey("config_overrides")
+                            .operation("reload_overrides")
+                            .target("world_overrides")
+                            .detail("Loaded overrides with " + reloadResult.getErrors().size() + " error(s).")
+                            .detail("overrideErrorCount", reloadResult.getErrors().size())
+                            .build()
             );
             getLogger().at(Level.WARNING).log(
                     "Loaded Tamework overrides for world "
@@ -1073,6 +1174,7 @@ public class Tamework extends JavaPlugin {
         setDebugNeedsConsumeDiagnosticsEnabled(commands.isNeedsConsumeDiagnostics());
         setDebugNeedsDamageDiagnosticsEnabled(commands.isNeedsDamageDiagnostics());
         setDebugNeedsSeekDiagnosticsEnabled(commands.isNeedsSeekDiagnostics());
+        setDebugFlyingCompanionEnabled(commands.isFlyingCompanion());
         String roleFilter = commands.getDespawnRoleFilter();
         if (roleFilter == null || roleFilter.isBlank()) {
             clearDebugDespawnRoleFilter();
@@ -1093,6 +1195,7 @@ public class Tamework extends JavaPlugin {
                         + ", needsConsumeDiagnostics=" + isDebugNeedsConsumeDiagnosticsEnabled()
                         + ", needsDamageDiagnostics=" + isDebugNeedsDamageDiagnosticsEnabled()
                         + ", needsSeekDiagnostics=" + isDebugNeedsSeekDiagnosticsEnabled()
+                        + ", flyingCompanion=" + isDebugFlyingCompanionEnabled()
                         + ", despawnRoleFilter="
                         + (getDebugDespawnRoleFilter() == null ? "<none>" : getDebugDespawnRoleFilter())
         );
@@ -1374,6 +1477,22 @@ public class Tamework extends JavaPlugin {
         breedingAssetsRegistered = true;
     }
 
+    private void registerLevelingAssets() {
+        if (levelingAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwLevelingConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Leveling")
+                        .setCodec(TwLevelingConfig.CODEC)
+                        .setKeyFunction(TwLevelingConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwLevelingConfig.class, this::onLevelingAssetsRemoved);
+        levelingAssetsRegistered = true;
+    }
+
     private void registerTraitAssets() {
         if (traitAssetsRegistered) {
             return;
@@ -1388,6 +1507,22 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, TwTraitConfig.class, this::onTraitAssetsRemoved);
         traitAssetsRegistered = true;
+    }
+
+    private void registerTalentAssets() {
+        if (talentAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwTalentConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/Talents")
+                        .setCodec(TwTalentConfig.CODEC)
+                        .setKeyFunction(TwTalentConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(LoadedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsLoaded);
+        getEventRegistry().register(RemovedAssetsEvent.class, TwTalentConfig.class, this::onTalentAssetsRemoved);
+        talentAssetsRegistered = true;
     }
 
     private void registerDebugAssets() {
@@ -1638,6 +1773,20 @@ public class Tamework extends JavaPlugin {
         emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
     }
 
+    private void onLevelingAssetsLoaded(
+            LoadedAssetsEvent<String, TwLevelingConfig, DefaultAssetMap<String, TwLevelingConfig>> event) {
+        TwLevelingConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.LEVELING, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onLevelingAssetsRemoved(
+            RemovedAssetsEvent<String, TwLevelingConfig, DefaultAssetMap<String, TwLevelingConfig>> event) {
+        TwLevelingConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.LEVELING, event.getRemovedAssets());
+    }
+
     private void onTraitAssetsLoaded(
             LoadedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
@@ -1650,6 +1799,20 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwTraitConfig, DefaultAssetMap<String, TwTraitConfig>> event) {
         TwTraitConfig.clearRoleCache();
         emitExperimentalConfigReload(TameworkConfigFamily.TRAIT, event.getRemovedAssets());
+    }
+
+    private void onTalentAssetsLoaded(
+            LoadedAssetsEvent<String, TwTalentConfig, DefaultAssetMap<String, TwTalentConfig>> event) {
+        TwTalentConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.TALENT, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onTalentAssetsRemoved(
+            RemovedAssetsEvent<String, TwTalentConfig, DefaultAssetMap<String, TwTalentConfig>> event) {
+        TwTalentConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.TALENT, event.getRemovedAssets());
     }
 
     private void onDebugAssetsLoaded(
@@ -1806,8 +1969,20 @@ public class Tamework extends JavaPlugin {
         return breedingComponentType;
     }
 
+    public ComponentType<EntityStore, TameworkFlyingCompanionComponent> getFlyingCompanionComponentType() {
+        return flyingCompanionComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {
+        return levelingComponentType;
+    }
+
     public ComponentType<EntityStore, TameworkTraitsComponent> getTraitsComponentType() {
         return traitsComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkTalentsComponent> getTalentsComponentType() {
+        return talentsComponentType;
     }
 
     public ComponentType<EntityStore, TameworkTranquilizerPeakComponent> getTranquilizerPeakComponentType() {
@@ -2034,6 +2209,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugNeedsSeekDiagnosticsEnabled() {
         debugNeedsSeekDiagnosticsLogs = !debugNeedsSeekDiagnosticsLogs;
         return debugNeedsSeekDiagnosticsLogs;
+    }
+
+    public boolean isDebugFlyingCompanionEnabled() {
+        return debugFlyingCompanionLogs;
+    }
+
+    public boolean setDebugFlyingCompanionEnabled(boolean enabled) {
+        debugFlyingCompanionLogs = enabled;
+        return debugFlyingCompanionLogs;
+    }
+
+    public boolean toggleDebugFlyingCompanionEnabled() {
+        debugFlyingCompanionLogs = !debugFlyingCompanionLogs;
+        return debugFlyingCompanionLogs;
     }
 
     // Logs a warning if required global config fields are missing.

@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Interactio
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
+import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -77,6 +78,7 @@ final class InteractionExecutor {
                     ctx,
                     harvestInteraction
             );
+            CommandAutoLinkService.autoLinkNewlyTamedNpc(player, npcRef, store);
             return applied;
         }
         if (entry instanceof FeedInteraction) {

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.sqlite.LostRepository;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
@@ -7,11 +8,14 @@ import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
+import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -413,7 +417,12 @@ public final class CommandLinkedNpcLostService {
                     }
                     snapshotsByNpc.put(snapshot.npcUuid(), snapshot);
                 }
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "lost_snapshot_load_failed",
+                        ex,
+                        "Failed to load lost linked-NPC snapshots from " + persistencePath + "."
+                );
                 // Ignore persistence read issues; runtime updates still track new lost companions.
             }
         }
@@ -447,7 +456,12 @@ public final class CommandLinkedNpcLostService {
                     builder.append(encodeSnapshot(snapshot));
                 }
                 Files.writeString(persistencePath, builder.toString(), StandardCharsets.UTF_8);
-            } catch (Exception ignored) {
+            } catch (Exception ex) {
+                TameworkTelemetryEvents.recordErrorIfAvailable(
+                        "lost_snapshot_persist_failed",
+                        ex,
+                        "Failed to persist lost linked-NPC snapshots to " + persistencePath + "."
+                );
                 // Ignore persistence write issues; runtime tracking remains available.
             }
         }
@@ -482,6 +496,13 @@ public final class CommandLinkedNpcLostService {
             return false;
         }
         lastBlockedMutationLogAtMs = now;
+        TameworkTelemetryEvents.recordErrorIfAvailable(
+                "lost_transition_blocked",
+                null,
+                "Persistence blocked lost transition: "
+                        + (state.reason() != null ? state.reason() : "unknown")
+                        + "."
+        );
         if (logger != null) {
             logger.at(Level.WARNING).log(
                     "Persistence blocked mutation in lost service: "
@@ -679,6 +700,18 @@ public final class CommandLinkedNpcLostService {
             traitsValues = null;
         }
 
+        ComponentType<EntityStore, TameworkLevelingComponent> levelingType = TameworkLevelingComponent.getComponentType();
+        TameworkLevelingComponent levelingComponent = levelingType != null ? store.getComponent(npcRef, levelingType) : null;
+        String levelingConfigId = levelingComponent != null ? levelingComponent.getConfigId() : null;
+        int levelingLevel = levelingComponent != null ? levelingComponent.getLevel() : 1;
+        double levelingTotalXp = levelingComponent != null ? levelingComponent.getTotalXp() : 0.0;
+
+        ComponentType<EntityStore, TameworkTalentsComponent> talentsType = TameworkTalentsComponent.getComponentType();
+        TameworkTalentsComponent talentsComponent = talentsType != null ? store.getComponent(npcRef, talentsType) : null;
+        String talentsConfigId = talentsComponent != null ? talentsComponent.getConfigId() : null;
+        int talentsSpentPoints = talentsComponent != null ? talentsComponent.getSpentPoints() : 0;
+        String purchasedTalentIds = talentsComponent != null ? TalentIdCodec.encode(talentsComponent.getPurchasedTalentIds()) : null;
+
         ComponentType<EntityStore, TameworkLifeStageComponent> lifeStageType = TameworkLifeStageComponent.getComponentType();
         TameworkLifeStageComponent lifeStageComponent = lifeStageType != null
                 ? store.getComponent(npcRef, lifeStageType)
@@ -758,6 +791,12 @@ public final class CommandLinkedNpcLostService {
                 attachmentsConfigId,
                 attachmentsValues,
                 breedingEnabled,
+                levelingConfigId,
+                levelingLevel,
+                levelingTotalXp,
+                talentsConfigId,
+                talentsSpentPoints,
+                purchasedTalentIds,
                 null,
                 null
         );

@@ -1,9 +1,9 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.metrics.AlecsTelemetryBridge;
 import com.alechilles.alecstamework.metrics.CrashTelemetryDiagnostics;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -72,12 +72,26 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                 return;
             }
             String token = Long.toHexString(System.currentTimeMillis());
-            AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordError(
+            boolean recorded = crashTelemetryService.recordError(
                     "debug_command_error",
                     new IllegalStateException("Simulated Tamework telemetry error event (" + token + ")"),
-                    "Triggered by /tw debugcrashtelemetry eventerror (token=" + token + ")"
+                    TameworkTelemetryEvents.commandContext(
+                                    "/tw debugcrashtelemetry",
+                                    "telemetry_debug",
+                                    "crash_telemetry_debug"
+                            )
+                            .operation("eventerror")
+                            .detail("Triggered by /tw debugcrashtelemetry eventerror.")
+                            .detail("source", "debug_command")
+                            .detail("debugAction", "eventerror")
+                            .detail("debugToken", token)
+                            .build()
             );
-            commandContext.sender().sendMessage(Message.raw(result.message()));
+            commandContext.sender().sendMessage(Message.raw(
+                    recorded
+                            ? "Embedded telemetry error event requested."
+                            : "Embedded telemetry error event was not requested (telemetry disabled or event delivery not configured)."
+            ));
         } else if ("eventlifecycle".equals(action)) {
             Player player = store.getComponent(ref, Player.getComponentType());
             UUID playerUuid = player == null ? null : player.getUuid();
@@ -88,13 +102,27 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
                 return;
             }
             String token = Long.toHexString(System.currentTimeMillis());
-            AlecsTelemetryBridge.InvocationResult result = new AlecsTelemetryBridge().recordLifecycle(
+            boolean recorded = crashTelemetryService.recordLifecycle(
                     "debug_command_lifecycle",
                     123,
                     true,
-                    "Triggered by /tw debugcrashtelemetry eventlifecycle (token=" + token + ")"
+                    TameworkTelemetryEvents.commandContext(
+                                    "/tw debugcrashtelemetry",
+                                    "telemetry_debug",
+                                    "crash_telemetry_debug"
+                            )
+                            .operation("eventlifecycle")
+                            .detail("Triggered by /tw debugcrashtelemetry eventlifecycle.")
+                            .detail("source", "debug_command")
+                            .detail("debugAction", "eventlifecycle")
+                            .detail("debugToken", token)
+                            .build()
             );
-            commandContext.sender().sendMessage(Message.raw(result.message()));
+            commandContext.sender().sendMessage(Message.raw(
+                    recorded
+                            ? "Embedded telemetry lifecycle event requested."
+                            : "Embedded telemetry lifecycle event was not requested (telemetry disabled or event delivery not configured)."
+            ));
         } else if ("simulate".equals(action)) {
             Player player = store.getComponent(ref, Player.getComponentType());
             UUID playerUuid = player == null ? null : player.getUuid();

@@ -27,6 +27,12 @@ public final class TameworkMetadataKeys {
     public static final String BREEDING_ENABLED = "Tamework.Breeding.Enabled";
     public static final String BREEDING_COOLDOWN_UNTIL = "Tamework.Breeding.CooldownUntil";
     public static final String BREEDING_LAST_PARTNER_UUID = "Tamework.Breeding.LastPartnerUuid";
+    public static final String LEVELING_CONFIG_ID = "Tamework.Leveling.ConfigId";
+    public static final String LEVELING_LEVEL = "Tamework.Leveling.Level";
+    public static final String LEVELING_TOTAL_XP = "Tamework.Leveling.TotalXp";
+    public static final String TALENTS_CONFIG_ID = "Tamework.Talents.ConfigId";
+    public static final String TALENTS_SPENT_POINTS = "Tamework.Talents.SpentPoints";
+    public static final String TALENTS_PURCHASED_IDS = "Tamework.Talents.PurchasedIds";
     public static final String TRAITS_CONFIG_ID = "Tamework.Traits.ConfigId";
     public static final String TRAITS_ROLL_SEED = "Tamework.Traits.RollSeed";
     public static final String TRAITS_VALUES = "Tamework.Traits.Values";
@@ -42,6 +48,7 @@ public final class TameworkMetadataKeys {
     public static final String LIFE_STAGE_ADULT_SWITCH_SCALE = "Tamework.LifeStage.AdultSwitchScale";
     public static final String LIFE_STAGE_ADULT_SCALE = "Tamework.LifeStage.AdultScale";
     public static final String LIFE_STAGE_GROWTH_SCALING_ENABLED = "Tamework.LifeStage.GrowthScalingEnabled";
+    public static final String LIFE_STAGE_GENDER = "Tamework.LifeStage.Gender";
     public static final String NPC_NAME = "Tamework.NpcName";
     public static final String NPC_NAME_OWNER_UUID = "Tamework.NpcNameOwnerUuid";
     public static final String NPC_NAME_UPDATED_MS = "Tamework.NpcNameUpdatedMs";
@@ -56,6 +63,7 @@ public final class TameworkMetadataKeys {
     public static final String COMMAND_LINKED_NPCS = "Tamework.Command.LinkedNpcs";
     public static final String COMMAND_PANEL_SCHEMA_VERSION = "Tamework.Command.PanelSchemaVersion";
     public static final String COMMAND_PANEL_MODE = "Tamework.Command.PanelMode";
+    public static final String COMMAND_PANEL_AUTO_LINK = "Tamework.Command.PanelAutoLink";
     public static final String COMMAND_PANEL_RADIUS = "Tamework.Command.PanelRadius";
     public static final String COMMAND_PANEL_SORT = "Tamework.Command.PanelSort";
     public static final String COMMAND_PANEL_FILTER_MODE = "Tamework.Command.PanelFilterMode";

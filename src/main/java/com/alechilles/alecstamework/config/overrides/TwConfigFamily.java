@@ -8,10 +8,12 @@ import com.alechilles.alecstamework.config.assets.TwDebugConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.hypixel.hytale.assetstore.AssetMap;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -33,7 +35,9 @@ public enum TwConfigFamily {
     HAPPINESS("happiness", "Happiness", "Tamework/Happiness", true, true),
     NEEDS("needs", "Needs", "Tamework/Needs", true, true),
     BREEDING("breeding", "Breeding", "Tamework/Breeding", true, true),
+    LEVELING("leveling", "Leveling", "Tamework/Leveling", true, true),
     TRAIT("trait", "Traits", "Tamework/Traits", true, true),
+    TALENT("talent", "Talents", "Tamework/Talents", true, true),
     COOP("coop", "Coops", "Tamework/Items/Coops", true, true),
     DEBUG("debug", "Debug", "Tamework/Debug", true, true),
     OTHER("other", "Other", "", false, false);
@@ -126,7 +130,9 @@ public enum TwConfigFamily {
             case HAPPINESS -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwHappinessConfig.getAssetStore();
             case NEEDS -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwNeedsConfig.getAssetStore();
             case BREEDING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwBreedingConfig.getAssetStore();
+            case LEVELING -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwLevelingConfig.getAssetStore();
             case TRAIT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTraitConfig.getAssetStore();
+            case TALENT -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwTalentConfig.getAssetStore();
             case COOP -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwCoopConfig.getAssetStore();
             case DEBUG -> (AssetStore<String, ?, ? extends AssetMap<String, ?>>) TwDebugConfig.getAssetStore();
             case OTHER -> null;

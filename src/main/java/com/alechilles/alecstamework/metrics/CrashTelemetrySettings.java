@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
 public final class CrashTelemetrySettings {
 
     public static final String FILE_NAME = "crash-telemetry.json";
-    public static final String FIXED_ENDPOINT = "https://telemetry.alecsmods.com/tamework/crash-report";
+    public static final String FIXED_ENDPOINT = "https://telemetry.alecsmods.com/ingest/event";
 
     static final boolean DEFAULT_ENABLED = true;
     static final boolean DEFAULT_BREADCRUMBS_ENABLED = true;

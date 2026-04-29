@@ -11,7 +11,10 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
@@ -100,6 +103,10 @@ final class CommandLinkPolicyService {
     }
 
     boolean isRoleAllowed(String roleId, TwCommandItemConfig config) {
+        return isRoleAllowed(roleId, config, false);
+    }
+
+    boolean isRoleAllowed(String roleId, TwCommandItemConfig config, boolean tamed) {
         if (config == null) {
             return true;
         }
@@ -107,11 +114,38 @@ final class CommandLinkPolicyService {
         if (allowed == null || allowed.getMode() == null) {
             return true;
         }
+        String[] roleCandidates = resolveRoleCandidates(roleId, tamed);
         return switch (allowed.getMode()) {
             case AllowAll -> true;
-            case Allowlist -> contains(allowed.getAllowlist(), roleId);
-            case Denylist -> !contains(allowed.getDenylist(), roleId);
+            case Allowlist -> containsAny(allowed.getAllowlist(), roleCandidates);
+            case Denylist -> !containsAny(allowed.getDenylist(), roleCandidates);
         };
+    }
+
+    private String[] resolveRoleCandidates(String roleId, boolean tamed) {
+        if (roleId == null || roleId.isBlank()) {
+            return new String[0];
+        }
+        LinkedHashSet<String> candidates = new LinkedHashSet<>();
+        String trimmed = roleId.trim();
+        candidates.add(trimmed);
+        if (!tamed) {
+            return candidates.toArray(new String[0]);
+        }
+        String lower = trimmed.toLowerCase(Locale.ROOT);
+        if (!lower.endsWith("_pet")) {
+            candidates.add(trimmed + "_Pet");
+        }
+        if (!lower.startsWith("tamed_")) {
+            candidates.add("Tamed_" + trimmed);
+        }
+        if (lower.endsWith("_pet")) {
+            candidates.add(trimmed.substring(0, trimmed.length() - 4));
+        }
+        if (lower.startsWith("tamed_") && trimmed.length() > 6) {
+            candidates.add(trimmed.substring(6));
+        }
+        return candidates.toArray(new String[0]);
     }
 
     private boolean isLinked(Ref<EntityStore> npcRef,
@@ -141,6 +175,18 @@ final class CommandLinkPolicyService {
         }
         for (String value : values) {
             if (expected.equals(value)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean containsAny(String[] values, String[] expectedValues) {
+        if (values == null || values.length == 0 || expectedValues == null || expectedValues.length == 0) {
+            return false;
+        }
+        for (String expected : expectedValues) {
+            if (contains(values, expected)) {
                 return true;
             }
         }

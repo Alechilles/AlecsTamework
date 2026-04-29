@@ -61,7 +61,7 @@ public final class CompanionStatModifierService {
             baseMax = Math.max(1.0, healthValue.getMax());
         }
 
-        double multiplier = TraitModifierService.resolveMultiplier(
+        double multiplier = CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 MAX_HEALTH_MULTIPLIER_EFFECT_KEY,

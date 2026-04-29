@@ -1,15 +1,18 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.items.CommandAutoLinkService;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionAttachmentInheritanceService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -20,6 +23,7 @@ import com.alechilles.alecstamework.npc.progression.TraitRollService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
@@ -31,6 +35,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -57,6 +62,8 @@ final class BreedingOffspringProgressionService {
                              boolean parentBTamed,
                              @Nullable String breedingConfigId,
                              long childCooldownMs,
+                             @Nullable String selectedAdultRoleId,
+                             @Nullable TwBreedingConfig.Gender selectedGender,
                              @Nullable TwBreedingConfig.RoleFamily lifecycleFamily,
                              Store<EntityStore> store) {
         if (childRef == null || !childRef.isValid() || store == null || childRoleId == null || childRoleId.isBlank()) {
@@ -65,6 +72,7 @@ final class BreedingOffspringProgressionService {
         TwBreedingConfig breedingConfig = resolveBreedingConfig(breedingConfigId);
         applyOffspringOwnershipAndTamedState(
                 childRef,
+                parentARef,
                 parentAOwner,
                 parentBOwner,
                 parentATamed,
@@ -94,8 +102,10 @@ final class BreedingOffspringProgressionService {
                 store,
                 childRoleId,
                 breedingConfig,
+                selectedAdultRoleId,
                 lifecycleFamily
         );
+        CompanionGenderService.ensureGender(childRef, store, childRoleId, breedingConfig, selectedGender);
         CompanionLifeStageService.refreshLifeStage(childRef, childNpc, store);
         applyOffspringBreedingLock(childRef, childNpc, childCooldownMs, store);
         boolean familyAssigned = familyFlockService.assignFamilyFlock(childRef, parentARef, parentBRef, store);
@@ -196,6 +206,7 @@ final class BreedingOffspringProgressionService {
     }
 
     private void applyOffspringOwnershipAndTamedState(Ref<EntityStore> childRef,
+                                                      @Nullable Ref<EntityStore> parentARef,
                                                       OwnerSnapshot parentAOwner,
                                                       OwnerSnapshot parentBOwner,
                                                       boolean parentATamed,
@@ -223,6 +234,79 @@ final class BreedingOffspringProgressionService {
         boolean tamed = inheritTamed && (parentATamed || parentBTamed);
         if (tamedType != null) {
             store.putComponent(childRef, tamedType, new TameworkTamedComponent(tamed));
+        }
+
+        String inheritedToolId = resolveInheritedToolId(parentARef, store);
+        if (inheritOwner && inheritTamed && tamed) {
+            applyInheritedCommandLink(childRef, owner.ownerId(), inheritedToolId, store);
+            Player ownerPlayer = resolveOnlineOwner(store, owner.ownerId());
+            if (ownerPlayer != null && inheritedToolId != null && !inheritedToolId.isBlank()) {
+                CommandAutoLinkService.autoLinkNpcToPreferredTool(ownerPlayer, childRef, store, inheritedToolId);
+            }
+        }
+    }
+
+    @Nullable
+    private String resolveInheritedToolId(@Nullable Ref<EntityStore> parentARef,
+                                          @Nullable Store<EntityStore> store) {
+        if (parentARef == null || !parentARef.isValid() || store == null) {
+            return null;
+        }
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        if (linksType == null) {
+            return null;
+        }
+        TameworkCommandLinksComponent links = store.getComponent(parentARef, linksType);
+        if (links == null || links.getToolIds() == null || links.getToolIds().length == 0) {
+            return null;
+        }
+        for (String toolId : links.getToolIds()) {
+            if (toolId != null && !toolId.isBlank()) {
+                return toolId;
+            }
+        }
+        return null;
+    }
+
+    private void applyInheritedCommandLink(@Nullable Ref<EntityStore> childRef,
+                                           @Nullable UUID ownerId,
+                                           @Nullable String toolId,
+                                           @Nullable Store<EntityStore> store) {
+        if (childRef == null || !childRef.isValid() || store == null || toolId == null || toolId.isBlank()) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkCommandLinksComponent> linksType = TameworkCommandLinksComponent.getComponentType();
+        if (linksType == null) {
+            return;
+        }
+        TameworkCommandLinksComponent existing = store.getComponent(childRef, linksType);
+        TameworkCommandLinksComponent updated;
+        if (existing == null) {
+            updated = new TameworkCommandLinksComponent(ownerId, new String[] { toolId });
+        } else {
+            updated = existing.withToolIdAdded(toolId);
+            updated.setOwnerId(ownerId);
+        }
+        store.putComponent(childRef, linksType, updated);
+    }
+
+    @Nullable
+    private Player resolveOnlineOwner(@Nonnull Store<EntityStore> store, @Nullable UUID ownerId) {
+        if (ownerId == null) {
+            return null;
+        }
+        World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
+        if (world == null) {
+            return null;
+        }
+        Ref<EntityStore> playerRef = world.getEntityRef(ownerId);
+        if (playerRef == null || !playerRef.isValid()) {
+            return null;
+        }
+        try {
+            return store.getComponent(playerRef, Player.getComponentType());
+        } catch (IllegalStateException ignored) {
+            return null;
         }
     }
 

@@ -1,20 +1,29 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -35,6 +44,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
@@ -75,19 +85,19 @@ final class CommandRespawnService {
                                    long followRetryDelayMs) {
         if (player == null || playerRef == null || !playerRef.isValid() || store == null || stack == null
                 || stack.isEmpty() || record == null || deadSnapshot == null) {
-            return null;
+            return recordRespawnFailure("invalid_input", deadSnapshot, null);
         }
         String roleId = deadSnapshot.roleId();
         if (roleId == null || roleId.isBlank()) {
-            return null;
+            return recordRespawnFailure("missing_role_id", deadSnapshot, null);
         }
         NPCPlugin npcPlugin = NPCPlugin.get();
         if (npcPlugin == null) {
-            return null;
+            return recordRespawnFailure("npc_plugin_unavailable", deadSnapshot, roleId);
         }
         int roleIndex = npcPlugin.getIndex(roleId);
         if (roleIndex < 0) {
-            return null;
+            return recordRespawnFailure("unknown_role_id", deadSnapshot, roleId);
         }
         Vector3d sourceHint = record.lastKnownPosition != null ? record.lastKnownPosition : deadSnapshot.lastKnownPosition();
         Vector3d destination = companionPlacementService.computeSafeRespawnPosition(
@@ -98,12 +108,12 @@ final class CommandRespawnService {
                 sourceHint
         );
         if (destination == null) {
-            return null;
+            return recordRespawnFailure("safe_position_not_found", deadSnapshot, roleId);
         }
         Vector3f rotation = resolveRespawnRotation(store, playerRef, destination);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, destination, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
-            return null;
+            return recordRespawnFailure("spawn_entity_failed", deadSnapshot, roleId);
         }
         Ref<EntityStore> spawnedRef = spawned.first();
         NPCEntity spawnedNpc = spawned.second();
@@ -136,6 +146,7 @@ final class CommandRespawnService {
         }
         applyRespawnAttachmentState(spawnedRef, spawnedNpc, store, deadSnapshot);
         applyRespawnProgressionState(spawnedRef, store, deadSnapshot);
+        applyRespawnRecoveryState(spawnedRef, store, deadSnapshot);
         if (deadSnapshot.customName() != null && !deadSnapshot.customName().isBlank()) {
             ComponentType<EntityStore, TameworkNpcNameComponent> nameType = TameworkNpcNameComponent.getComponentType();
             if (nameType != null) {
@@ -175,6 +186,24 @@ final class CommandRespawnService {
         return updated;
     }
 
+    @Nullable
+    private ItemStack recordRespawnFailure(@Nonnull String reason,
+                                           @Nullable CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot,
+                                           @Nullable String roleId) {
+        String npcId = snapshot != null && snapshot.npcUuid() != null ? snapshot.npcUuid().toString() : "unknown";
+        String resolvedRoleId = roleId != null && !roleId.isBlank()
+                ? roleId
+                : snapshot != null && snapshot.roleId() != null && !snapshot.roleId().isBlank()
+                ? snapshot.roleId()
+                : "unknown";
+        TameworkTelemetryEvents.recordErrorIfAvailable(
+                "linked_respawn_failed",
+                null,
+                "reason=" + reason + " npc=" + npcId + " role=" + resolvedRoleId
+        );
+        return null;
+    }
+
     private void applyRespawnProgressionState(Ref<EntityStore> spawnedRef,
                                               Store<EntityStore> store,
                                               CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
@@ -183,8 +212,51 @@ final class CommandRespawnService {
         }
         applyRespawnHappinessState(spawnedRef, store, snapshot);
         applyRespawnBreedingState(spawnedRef, store, snapshot);
+        applyRespawnLevelingState(spawnedRef, store, snapshot);
         applyRespawnTraitsState(spawnedRef, store, snapshot);
+        applyRespawnTalentsState(spawnedRef, store, snapshot);
         applyRespawnLifeStageState(spawnedRef, store, snapshot);
+        CompanionStatModifierService.applyTraitModifiers(spawnedRef, store);
+    }
+
+    private void applyRespawnRecoveryState(Ref<EntityStore> spawnedRef,
+                                           Store<EntityStore> store,
+                                           CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        if (spawnedRef == null || !spawnedRef.isValid() || store == null) {
+            return;
+        }
+        CompanionHealthStateService.applyStoredHealthPercent(spawnedRef, store, 100.0);
+
+        ComponentType<EntityStore, TameworkNeedsComponent> needsType = TameworkNeedsComponent.getComponentType();
+        if (needsType == null) {
+            return;
+        }
+        String roleId = snapshot != null && snapshot.roleId() != null && !snapshot.roleId().isBlank()
+                ? snapshot.roleId()
+                : CompanionRoleIdResolver.resolveRoleId(spawnedRef, store);
+        TwNeedsConfig needsConfig = TwNeedsConfig.resolveForRole(roleId);
+        if (needsConfig == null || !needsConfig.isEnabled()) {
+            return;
+        }
+        TameworkNeedsComponent component = createRespawnNeedsComponent(needsConfig, CompanionRuntimeClock.nowMs());
+        store.putComponent(spawnedRef, needsType, component);
+    }
+
+    static TameworkNeedsComponent createRespawnNeedsComponent(TwNeedsConfig needsConfig, long nowMs) {
+        TwNeedsConfig.ValueSettings values = needsConfig.getValues();
+        TameworkNeedsComponent component = new TameworkNeedsComponent(
+                needsConfig.getId(),
+                values.getHungerDefault(),
+                values.getThirstDefault(),
+                0.0,
+                0.0,
+                nowMs,
+                nowMs
+        );
+        component.setRegenSuppressionBaselineHealth(-1.0);
+        component.setRegenSuppressionAllowedHeal(0.0);
+        component.setLastManagedHealth(-1.0);
+        return component;
     }
 
     private void applyRespawnAttachmentState(Ref<EntityStore> spawnedRef,
@@ -309,7 +381,55 @@ final class CommandRespawnService {
                 TraitValueCodec.decode(snapshot.traitsValues())
         );
         store.putComponent(spawnedRef, traitsType, component);
-        CompanionStatModifierService.applyTraitModifiers(spawnedRef, store);
+    }
+
+    private void applyRespawnLevelingState(Ref<EntityStore> spawnedRef,
+                                           Store<EntityStore> store,
+                                           CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        ComponentType<EntityStore, TameworkLevelingComponent> type = TameworkLevelingComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        boolean hasLevelingData = (snapshot.levelingConfigId() != null && !snapshot.levelingConfigId().isBlank())
+                || snapshot.levelingLevel() > 1
+                || snapshot.levelingTotalXp() > 0.0;
+        if (hasLevelingData) {
+            store.putComponent(
+                    spawnedRef,
+                    type,
+                    new TameworkLevelingComponent(
+                            snapshot.levelingConfigId(),
+                            snapshot.levelingLevel(),
+                            0.0,
+                            snapshot.levelingTotalXp()
+                    )
+            );
+        }
+        CompanionLevelingService.ensureLevelingComponent(spawnedRef, store);
+    }
+
+    private void applyRespawnTalentsState(Ref<EntityStore> spawnedRef,
+                                          Store<EntityStore> store,
+                                          CommandLinkedNpcDeathService.DeadLinkedNpcSnapshot snapshot) {
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        boolean hasTalentData = (snapshot.talentsConfigId() != null && !snapshot.talentsConfigId().isBlank())
+                || snapshot.talentsSpentPoints() > 0
+                || (snapshot.purchasedTalentIds() != null && !snapshot.purchasedTalentIds().isBlank());
+        if (!hasTalentData) {
+            return;
+        }
+        store.putComponent(
+                spawnedRef,
+                type,
+                new TameworkTalentsComponent(
+                        snapshot.talentsConfigId(),
+                        snapshot.talentsSpentPoints(),
+                        TalentIdCodec.decode(snapshot.purchasedTalentIds())
+                )
+        );
     }
 
     private void applyRespawnLifeStageState(Ref<EntityStore> spawnedRef,

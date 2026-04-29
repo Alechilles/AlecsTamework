@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.ui.TameworkConfigEditorPage;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -52,7 +53,29 @@ public final class TameworkConfigCommand extends AbstractPlayerCommand {
             return;
         }
 
-        TameworkConfigEditorPage page = new TameworkConfigEditorPage(uiPlayerRef, plugin, world);
-        player.getPageManager().openCustomPage(ref, store, page);
+        try {
+            TameworkConfigEditorPage page = new TameworkConfigEditorPage(uiPlayerRef, plugin, world);
+            player.getPageManager().openCustomPage(ref, store, page);
+            plugin.getTelemetryEvents().recordUsage(
+                    "config_editor_opened",
+                    TameworkTelemetryEvents.commandContext("/tw config", "config_editor", "config_editor")
+                            .operation("open")
+                            .detail("Opened via /tw config.")
+                            .detail("source", "command")
+                            .build()
+            );
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_open_failed",
+                    throwable,
+                    TameworkTelemetryEvents.commandContext("/tw config", "config_editor", "config_editor")
+                            .operation("open")
+                            .target("TameworkConfigEditorPage")
+                            .detail("Failed to open Tamework config editor page.")
+                            .detail("source", "command")
+                            .build()
+            );
+            commandContext.sender().sendMessage(Message.raw("Unable to open the config editor right now."));
+        }
     }
 }

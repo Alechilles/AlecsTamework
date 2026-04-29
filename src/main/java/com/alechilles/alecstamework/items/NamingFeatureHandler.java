@@ -6,7 +6,9 @@ import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNamesConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ui.TameworkNameInputPage;
 import com.hypixel.hytale.codec.Codec;
@@ -123,7 +125,8 @@ public final class NamingFeatureHandler {
         if (playerUuid == null) {
             return false;
         }
-        String[] randomNamePool = resolveRandomNamePool(config);
+        String gender = CompanionGenderService.resolveGender(targetRef, store, roleId, null);
+        String[] randomNamePool = resolveRandomNamePool(config, gender);
         PendingNameRequest uiRequest = new PendingNameRequest(
                 playerUuid,
                 targetRef,
@@ -249,8 +252,17 @@ public final class NamingFeatureHandler {
                         ? () -> handleUiRandomRequested(player, request.playerUuid, request.requestId)
                         : null
         );
-        player.getPageManager().openCustomPage(playerRef, store, page);
-        return true;
+        try {
+            player.getPageManager().openCustomPage(playerRef, store, page);
+            return true;
+        } catch (Throwable throwable) {
+            TameworkTelemetryEvents.recordErrorIfAvailable(
+                    "ui_page_open_failed",
+                    throwable,
+                    "page=TameworkNameInputPage"
+            );
+            return false;
+        }
     }
 
     private void handleUiNameCancelled(Player player, UUID playerUuid, UUID requestId) {
@@ -512,6 +524,11 @@ public final class NamingFeatureHandler {
 
     @Nonnull
     private String[] resolveRandomNamePool(@Nullable TwNameItemConfig config) {
+        return resolveRandomNamePool(config, null);
+    }
+
+    @Nonnull
+    private String[] resolveRandomNamePool(@Nullable TwNameItemConfig config, @Nullable String gender) {
         if (config == null || config.getNaming() == null) {
             return EMPTY_RANDOM_NAME_POOL;
         }
@@ -519,7 +536,7 @@ public final class NamingFeatureHandler {
         if (randomNamesId == null || randomNamesId.isBlank()) {
             return EMPTY_RANDOM_NAME_POOL;
         }
-        String[] resolved = TwNamesConfig.resolveMergedPoolById(randomNamesId);
+        String[] resolved = TwNamesConfig.resolveMergedPoolById(randomNamesId, gender);
         if (resolved.length == 0) {
             return EMPTY_RANDOM_NAME_POOL;
         }

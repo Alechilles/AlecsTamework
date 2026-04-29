@@ -5,12 +5,17 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionNeedsService;
+import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.ComponentType;
@@ -36,7 +41,9 @@ final class SpawnerNpcProgressionMetadataService {
         updated = applyNeedsMetadata(updated, npcRef, store);
         updated = applyHappinessMetadata(updated, npcRef, store);
         updated = applyBreedingMetadata(updated, npcRef, store);
+        updated = applyLevelingMetadata(updated, npcRef, store);
         updated = applyTraitsMetadata(updated, npcRef, store);
+        updated = applyTalentsMetadata(updated, npcRef, store);
         return applyLifeStageMetadata(updated, npcRef, store);
     }
 
@@ -49,7 +56,9 @@ final class SpawnerNpcProgressionMetadataService {
         restoreNeedsComponent(stack, npcRef, store);
         restoreHappinessComponent(stack, npcRef, store);
         restoreBreedingComponent(stack, npcRef, store);
+        restoreLevelingComponent(stack, npcRef, store);
         restoreTraitsComponent(stack, npcRef, store);
+        restoreTalentsComponent(stack, npcRef, store);
         restoreLifeStageComponent(stack, npcRef, store);
     }
 
@@ -62,6 +71,12 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_ENABLED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_COOLDOWN_UNTIL);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.BREEDING_LAST_PARTNER_UUID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_CONFIG_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_LEVEL);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_TOTAL_XP);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_CONFIG_ID);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_SPENT_POINTS);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_PURCHASED_IDS);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_CONFIG_ID);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_ROLL_SEED);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.TRAITS_VALUES);
@@ -77,6 +92,7 @@ final class SpawnerNpcProgressionMetadataService {
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
         updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
+        updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
         return updated;
     }
 
@@ -344,6 +360,61 @@ final class SpawnerNpcProgressionMetadataService {
         return updated;
     }
 
+    private ItemStack applyLevelingMetadata(ItemStack stack,
+                                            Ref<EntityStore> npcRef,
+                                            Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkLevelingComponent> type = TameworkLevelingComponent.getComponentType();
+        if (type == null) {
+            return stack;
+        }
+        TameworkLevelingComponent component = store.getComponent(npcRef, type);
+        if (component == null) {
+            ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.LEVELING_CONFIG_ID);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_LEVEL);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_TOTAL_XP);
+            return updated;
+        }
+        ItemStack updated = stack;
+        if (component.getConfigId() != null && !component.getConfigId().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.LEVELING_CONFIG_ID, Codec.STRING, component.getConfigId());
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LEVELING_CONFIG_ID);
+        }
+        updated = updated.withMetadata(TameworkMetadataKeys.LEVELING_LEVEL, Codec.INTEGER, component.getLevel());
+        updated = updated.withMetadata(TameworkMetadataKeys.LEVELING_TOTAL_XP, Codec.DOUBLE, component.getTotalXp());
+        return updated;
+    }
+
+    private ItemStack applyTalentsMetadata(ItemStack stack,
+                                           Ref<EntityStore> npcRef,
+                                           Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        if (type == null) {
+            return stack;
+        }
+        TameworkTalentsComponent component = store.getComponent(npcRef, type);
+        if (component == null) {
+            ItemStack updated = clearMetadataKey(stack, TameworkMetadataKeys.TALENTS_CONFIG_ID);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_SPENT_POINTS);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_PURCHASED_IDS);
+            return updated;
+        }
+        ItemStack updated = stack;
+        if (component.getConfigId() != null && !component.getConfigId().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.TALENTS_CONFIG_ID, Codec.STRING, component.getConfigId());
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_CONFIG_ID);
+        }
+        updated = updated.withMetadata(TameworkMetadataKeys.TALENTS_SPENT_POINTS, Codec.INTEGER, component.getSpentPoints());
+        String encodedIds = TalentIdCodec.encode(component.getPurchasedTalentIds());
+        if (encodedIds != null && !encodedIds.isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.TALENTS_PURCHASED_IDS, Codec.STRING, encodedIds);
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.TALENTS_PURCHASED_IDS);
+        }
+        return updated;
+    }
+
     private void restoreBreedingComponent(ItemStack stack,
                                           Ref<EntityStore> npcRef,
                                           Store<EntityStore> store) {
@@ -505,6 +576,58 @@ final class SpawnerNpcProgressionMetadataService {
         store.putComponent(npcRef, type, component);
     }
 
+    private void restoreLevelingComponent(ItemStack stack,
+                                          Ref<EntityStore> npcRef,
+                                          Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkLevelingComponent> type = TameworkLevelingComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.LEVELING_CONFIG_ID, Codec.STRING);
+        Integer level = stack.getFromMetadataOrNull(TameworkMetadataKeys.LEVELING_LEVEL, Codec.INTEGER);
+        Double totalXp = stack.getFromMetadataOrNull(TameworkMetadataKeys.LEVELING_TOTAL_XP, Codec.DOUBLE);
+        boolean hasData = (configId != null && !configId.isBlank()) || level != null || totalXp != null;
+        if (!hasData) {
+            return;
+        }
+        TameworkLevelingComponent component = new TameworkLevelingComponent(
+                configId,
+                level != null ? level : 1,
+                0.0,
+                totalXp != null ? totalXp : 0.0
+        );
+        store.putComponent(npcRef, type, component);
+        CompanionLevelingService.ensureLevelingComponent(
+                npcRef,
+                store,
+                CompanionRoleIdResolver.resolveRoleId(npcRef, store)
+        );
+    }
+
+    private void restoreTalentsComponent(ItemStack stack,
+                                         Ref<EntityStore> npcRef,
+                                         Store<EntityStore> store) {
+        ComponentType<EntityStore, TameworkTalentsComponent> type = TameworkTalentsComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+        String configId = stack.getFromMetadataOrNull(TameworkMetadataKeys.TALENTS_CONFIG_ID, Codec.STRING);
+        Integer spentPoints = stack.getFromMetadataOrNull(TameworkMetadataKeys.TALENTS_SPENT_POINTS, Codec.INTEGER);
+        String purchasedIds = stack.getFromMetadataOrNull(TameworkMetadataKeys.TALENTS_PURCHASED_IDS, Codec.STRING);
+        boolean hasData = (configId != null && !configId.isBlank())
+                || spentPoints != null
+                || (purchasedIds != null && !purchasedIds.isBlank());
+        if (!hasData) {
+            return;
+        }
+        TameworkTalentsComponent component = new TameworkTalentsComponent(
+                configId,
+                spentPoints != null ? spentPoints : 0,
+                TalentIdCodec.decode(purchasedIds)
+        );
+        store.putComponent(npcRef, type, component);
+    }
+
     private ItemStack applyLifeStageMetadata(ItemStack stack,
                                              Ref<EntityStore> npcRef,
                                              Store<EntityStore> store) {
@@ -526,6 +649,7 @@ final class SpawnerNpcProgressionMetadataService {
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SWITCH_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_ADULT_SCALE);
             updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED);
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
             return updated;
         }
         ItemStack updated = stack;
@@ -577,6 +701,11 @@ final class SpawnerNpcProgressionMetadataService {
                 Codec.BOOLEAN,
                 component.isGrowthScalingEnabled()
         );
+        if (component.getGender() != null && !component.getGender().isBlank()) {
+            updated = updated.withMetadata(TameworkMetadataKeys.LIFE_STAGE_GENDER, Codec.STRING, component.getGender());
+        } else {
+            updated = clearMetadataKey(updated, TameworkMetadataKeys.LIFE_STAGE_GENDER);
+        }
         return updated;
     }
 
@@ -608,6 +737,7 @@ final class SpawnerNpcProgressionMetadataService {
                 TameworkMetadataKeys.LIFE_STAGE_GROWTH_SCALING_ENABLED,
                 Codec.BOOLEAN
         );
+        String gender = stack.getFromMetadataOrNull(TameworkMetadataKeys.LIFE_STAGE_GENDER, Codec.STRING);
         boolean hasData = (stage != null && !stage.isBlank())
                 || bornAtMs != null
                 || adolescentAtMs != null
@@ -619,7 +749,8 @@ final class SpawnerNpcProgressionMetadataService {
                 || adultStartScale != null
                 || adultSwitchScale != null
                 || adultScale != null
-                || growthScaling != null;
+                || growthScaling != null
+                || (gender != null && !gender.isBlank());
         if (!hasData) {
             return;
         }
@@ -662,6 +793,12 @@ final class SpawnerNpcProgressionMetadataService {
                         ? growthScaling
                         : existing != null && existing.isGrowthScalingEnabled()
         );
+        restored.setAdultRoleId(existing != null ? existing.getAdultRoleId() : null);
+        restored.setBabyRoleId(existing != null ? existing.getBabyRoleId() : null);
+        restored.setAdolescentRoleId(existing != null ? existing.getAdolescentRoleId() : null);
+        restored.setGender(gender != null && !gender.isBlank()
+                ? gender
+                : existing != null ? existing.getGender() : null);
         store.putComponent(npcRef, type, restored);
     }
 

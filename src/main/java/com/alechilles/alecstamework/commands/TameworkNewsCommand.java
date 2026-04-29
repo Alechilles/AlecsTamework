@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.ui.TameworkSettingsAnnouncementService;
 import com.alechilles.alecstamework.ui.TameworkSettingsPageService;
 import com.hypixel.hytale.component.Ref;
@@ -61,10 +62,25 @@ public final class TameworkNewsCommand extends AbstractPlayerCommand {
 
         String error = service.openAnnouncementNow(ref, store, player);
         if (error != null) {
-            plugin.getTelemetryEvents().recordError("news_command_open_failed", null, error);
+            plugin.getTelemetryEvents().recordError(
+                    "news_command_open_failed",
+                    null,
+                    TameworkTelemetryEvents.commandContext("/tw news", "news", "news")
+                            .operation("open")
+                            .detail(error)
+                            .detail("source", "command")
+                            .build()
+            );
             commandContext.sender().sendMessage(Message.raw(error));
             return;
         }
-        plugin.getTelemetryEvents().recordUsage("news_command_opened", "Opened via /tw news.");
+        plugin.getTelemetryEvents().recordUsage(
+                "news_command_opened",
+                TameworkTelemetryEvents.commandContext("/tw news", "news", "news")
+                        .operation("open")
+                        .detail("Opened via /tw news.")
+                        .detail("source", "command")
+                        .build()
+        );
     }
 }

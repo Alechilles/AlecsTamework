@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
 import com.alechilles.alecstamework.metrics.CrashTelemetrySettings;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.codec.KeyedCodec;
@@ -100,9 +101,23 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        commandBuilder.append(UI_PATH);
-        bindStaticEvents(eventBuilder);
-        render(commandBuilder);
+        try {
+            commandBuilder.append(UI_PATH);
+            bindStaticEvents(eventBuilder);
+            render(commandBuilder);
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_build_failed",
+                    throwable,
+                    TameworkTelemetryEvents.featureContext("settings", "settings_page", "/tw settings")
+                            .operation("build")
+                            .target("TameworkSettingsPage")
+                            .detail("Failed to build Tamework settings page.")
+                            .detail("source", "settings_ui")
+                            .build()
+            );
+            throw throwable;
+        }
     }
 
     @Override

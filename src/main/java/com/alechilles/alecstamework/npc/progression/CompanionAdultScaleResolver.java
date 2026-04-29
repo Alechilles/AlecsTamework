@@ -44,7 +44,7 @@ final class CompanionAdultScaleResolver {
             return safeFallback;
         }
 
-        double sizeMultiplier = sanitizeMultiplier(TraitModifierService.resolveMultiplier(
+        double sizeMultiplier = sanitizeMultiplier(CompanionProgressionModifierService.resolveMultiplier(
                 npcRef,
                 store,
                 "SizeMultiplier",

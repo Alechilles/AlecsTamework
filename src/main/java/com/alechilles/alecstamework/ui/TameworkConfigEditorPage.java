@@ -7,6 +7,8 @@ import com.alechilles.alecstamework.config.overrides.TwConfigJsonUtil;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
 import com.alechilles.alecstamework.config.overrides.TwConfigSnapshot;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
+import com.alechilles.alecstelemetry.api.TelemetryEventContext;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -119,9 +121,20 @@ public final class TameworkConfigEditorPage
                       @Nonnull UICommandBuilder commandBuilder,
                       @Nonnull UIEventBuilder eventBuilder,
                       @Nonnull Store<EntityStore> store) {
-        commandBuilder.append(UI_PATH);
-        bindStaticEvents(eventBuilder);
-        render(commandBuilder, eventBuilder);
+        try {
+            commandBuilder.append(UI_PATH);
+            bindStaticEvents(eventBuilder);
+            render(commandBuilder, eventBuilder);
+        } catch (Throwable throwable) {
+            plugin.getTelemetryEvents().recordError(
+                    "ui_page_build_failed",
+                    throwable,
+                    configEditorContext("build", "Failed to build Tamework config editor page.")
+                            .target("TameworkConfigEditorPage")
+                            .build()
+            );
+            throw throwable;
+        }
     }
 
     @Override
@@ -244,6 +257,12 @@ public final class TameworkConfigEditorPage
             statusLine = "";
             return;
         }
+        plugin.getTelemetryEvents().recordUsage(
+                "config_editor_apply_requested",
+                configEditorContext("apply_request", "Apply requested from /tw config.")
+                        .detail("changedFileCount", pendingDraftFileCount())
+                        .build()
+        );
         applyConfirmVisible = false;
         String validationError = firstValidationError();
         if (validationError != null) {
@@ -272,6 +291,7 @@ public final class TameworkConfigEditorPage
 
         TwConfigSnapshot snapshotAtSubmit = snapshot;
         TwConfigAssetDescriptor selectedAtSubmit = selectedDescriptor();
+        int changedFileCountAtSubmit = pendingDraftFileCount();
         LinkedHashMap<TwConfigAssetDescriptor, JsonObject> drafted = new LinkedHashMap<>();
         for (TwConfigAssetDescriptor descriptor : descriptorByKey.values()) {
             drafted.put(descriptor, TwConfigJsonUtil.copyObject(draftByKey.get(descriptor.descriptorKey())));
@@ -288,18 +308,41 @@ public final class TameworkConfigEditorPage
                     applyInProgress = false;
                     if (throwable != null || result == null) {
                         plugin.getLogger().at(Level.WARNING).withCause(throwable).log("TwConfig async apply failed.");
+                        plugin.getTelemetryEvents().recordError(
+                                "config_editor_apply_failed",
+                                throwable,
+                                configEditorContext("apply", "Async /tw config apply failed.")
+                                        .detail("changedFileCount", changedFileCountAtSubmit)
+                                        .detail("result", "failed")
+                                        .build()
+                        );
                         statusLine = "";
                         warningLine = tr("tamework.ui.configEditor.warning.applyFailed");
                         refreshUi();
                         return;
                     }
                     if (result.isSuccess()) {
+                        plugin.getTelemetryEvents().recordUsage(
+                                "config_editor_apply_succeeded",
+                                configEditorContext("apply", "Applied overrides from /tw config.")
+                                        .detail("changedFileCount", changedFileCountAtSubmit)
+                                        .detail("result", "success")
+                                        .build()
+                        );
                         reloadSnapshot(false);
                         statusLine = result.getMessage();
                         warningLine = "";
                         refreshUi();
                         return;
                     }
+                    plugin.getTelemetryEvents().recordError(
+                            "config_editor_apply_failed",
+                            null,
+                            configEditorContext("apply", result.getMessage())
+                                    .detail("changedFileCount", changedFileCountAtSubmit)
+                                    .detail("result", result.isStale() ? "stale" : "failed")
+                                    .build()
+                    );
                     statusLine = "";
                     warningLine = result.getMessage();
                     refreshUi();
@@ -1590,6 +1633,14 @@ public final class TameworkConfigEditorPage
             }
         }
         return count;
+    }
+
+    @Nonnull
+    private TelemetryEventContext.Builder configEditorContext(@Nonnull String operation, @Nonnull String detail) {
+        return TameworkTelemetryEvents.featureContext("config_editor", "config_editor", "/tw config")
+                .operation(operation)
+                .detail(detail)
+                .detail("source", "settings_ui");
     }
 
     @Nullable

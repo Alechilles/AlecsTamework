@@ -2,21 +2,156 @@
   "schemaVersion": 1,
   "projectId": "alecs-tamework",
   "displayName": "Alec's Tamework!",
-  "runtimeMode": "dependency",
+  "runtimeMode": "embedded",
+  "events": {
+    "errors": {
+      "enabled": true
+    },
+    "lifecycle": {
+      "enabled": true
+    },
+    "breadcrumbs": {
+      "enabled": true,
+      "automatic": true
+    }
+  },
   "performance": {
     "enabled": true,
     "sampleRate": 1.0,
-    "thresholdMs": 100
+    "thresholdMs": 100,
+    "details": {
+      "plugin_setup_duration": {
+        "allowedFields": {
+          "result": {
+            "type": "enum",
+            "values": ["failed"]
+          }
+        }
+      },
+      "plugin_start_duration": {
+        "allowedFields": {
+          "result": {
+            "type": "enum",
+            "values": ["failed"]
+          }
+        }
+      },
+      "reload_config_duration": {
+        "allowedFields": {
+          "result": {
+            "type": "enum",
+            "values": ["success", "failed", "partial"]
+          },
+          "itemConfigCount": {
+            "type": "number"
+          },
+          "totalSpawners": {
+            "type": "number"
+          },
+          "totalNaming": {
+            "type": "number"
+          },
+          "overridePacks": {
+            "type": "number"
+          },
+          "overrideDirectories": {
+            "type": "number"
+          },
+          "overrideErrorCount": {
+            "type": "number"
+          }
+        }
+      }
+    }
   },
   "usage": {
     "enabled": true,
     "allowedEvents": [
+      "config_editor_opened",
+      "config_editor_apply_requested",
+      "config_editor_apply_succeeded",
       "reload_config_command_used",
       "settings_page_opened",
       "news_command_opened",
       "settings_announcement_opened",
       "settings_announcement_reviewed"
-    ]
+    ],
+    "details": {
+      "config_editor_opened": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["command"]
+          }
+        }
+      },
+      "config_editor_apply_requested": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["settings_ui"]
+          },
+          "changedFileCount": {
+            "type": "number"
+          }
+        }
+      },
+      "config_editor_apply_succeeded": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["settings_ui"]
+          },
+          "changedFileCount": {
+            "type": "number"
+          },
+          "result": {
+            "type": "enum",
+            "values": ["success"]
+          }
+        }
+      },
+      "reload_config_command_used": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["command"]
+          }
+        }
+      },
+      "settings_page_opened": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["command", "announcement", "api"]
+          }
+        }
+      },
+      "news_command_opened": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["command"]
+          }
+        }
+      },
+      "settings_announcement_opened": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["announcement"]
+          }
+        }
+      },
+      "settings_announcement_reviewed": {
+        "allowedFields": {
+          "source": {
+            "type": "enum",
+            "values": ["announcement"]
+          }
+        }
+      }
+    }
   },
   "ownerPluginIdentifiers": [
     "Alechilles:Alec's Tamework!"
@@ -35,8 +170,8 @@
     "destinationMode": "hosted"
   },
   "hosted": {
-    "endpoint": "https://telemetry.alecsmods.com/ingest/crash",
-    "eventEndpoint": "https://telemetry.alecsmods.com/ingest/event",
-    "projectKey": "dev_tamework_local_test"
+    "endpoint": "https://telemetry-dev.alecsmods.com/ingest/event",
+    "eventEndpoint": "https://telemetry-dev.alecsmods.com/ingest/event",
+    "projectKey": "proj_Oqk6x0Z_fVMUpXarjSyZbOkS"
   }
 }

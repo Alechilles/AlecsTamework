@@ -18,9 +18,11 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig;
+import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.config.assets.TwNameItemConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwSpawnerConfig;
+import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
@@ -221,7 +223,8 @@ final class ApiMapper {
                 component != null ? component.getAdultScale() : 0.0,
                 component != null ? component.getAdultRoleId() : null,
                 component != null ? component.getBabyRoleId() : null,
-                component != null ? component.getAdolescentRoleId() : null
+                component != null ? component.getAdolescentRoleId() : null,
+                component != null ? component.getGender() : null
         );
     }
 
@@ -475,7 +478,31 @@ final class ApiMapper {
     }
 
     @Nonnull
+    static RoleScopedConfigView mapRoleScopedConfig(@Nonnull TwLevelingConfig config, @Nonnull Gson gson) {
+        return new RoleScopedConfigView(
+                config.getId(),
+                config.getParentIdForFallback(),
+                config.isEnabled(),
+                config.getPriority(),
+                toOrderedSet(config.getRoleIds()),
+                safeToJson(gson, config)
+        );
+    }
+
+    @Nonnull
     static RoleScopedConfigView mapRoleScopedConfig(@Nonnull TwTraitConfig config, @Nonnull Gson gson) {
+        return new RoleScopedConfigView(
+                config.getId(),
+                config.getParentIdForFallback(),
+                config.isEnabled(),
+                config.getPriority(),
+                toOrderedSet(config.getRoleIds()),
+                safeToJson(gson, config)
+        );
+    }
+
+    @Nonnull
+    static RoleScopedConfigView mapRoleScopedConfig(@Nonnull TwTalentConfig config, @Nonnull Gson gson) {
         return new RoleScopedConfigView(
                 config.getId(),
                 config.getParentIdForFallback(),

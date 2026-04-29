@@ -252,6 +252,11 @@ final class CommandToolInventoryService {
         return panelPreferenceService.resolveSelectedFilterInput(stack);
     }
 
+    boolean resolvePanelAutoLinkEnabledForTool(Player player, String toolId) {
+        ItemStack stack = findToolStack(player, toolId);
+        return panelPreferenceService.resolveAutoLinkEnabled(stack);
+    }
+
     List<DropdownEntryInfo> resolveGroupDropdownEntriesForTool(Player player, String toolId) {
         ArrayList<DropdownEntryInfo> entries = new ArrayList<>();
         entries.add(new DropdownEntryInfo(LocalizableString.fromString("None"), GROUP_NONE_VALUE));

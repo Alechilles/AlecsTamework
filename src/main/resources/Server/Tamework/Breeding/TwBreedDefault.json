@@ -23,7 +23,7 @@
     "RequireWanderMode": false,
     "RequireSameOwner": false,
     "MaxNearbySameType": 8,
-    "RequireSameRoleId": true
+    "RoleCompatibility": "SameRole"
   },
   "Cooldowns": {
     "BaseCooldownMinutes": 24,

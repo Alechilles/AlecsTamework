@@ -41,6 +41,7 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.time.Instant;
@@ -300,8 +301,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
     @Nonnull
     private ArrayList<ManagedCoopContext> collectManagedCoops(@Nonnull Store<ChunkStore> chunkStore,
-                                                               @Nonnull World world,
-                                                               @Nonnull CoopScanDiagnostics diagnostics) {
+                                                              @Nonnull World world,
+                                                              @Nonnull CoopScanDiagnostics diagnostics) {
         ArrayList<ManagedCoopContext> out = new ArrayList<>();
         ComponentType<ChunkStore, ?> itemContainerType = resolveItemContainerComponentType();
         ComponentType<ChunkStore, ?> coopType = resolveCoopBlockComponentType();
@@ -369,7 +370,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                 diagnostics.missingLocation++;
                 continue;
             }
-                diagnostics.withLocation++;
+            diagnostics.withLocation++;
             String coopAssetId = resolveCoopAssetId(state);
             TwCoopConfig config = resolveCoopConfig(location.blockTypeId(), coopAssetId);
             if (config == null || !config.isEnabled()) {
@@ -581,10 +582,10 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private int releaseResidentsFromRemovedCoops(@Nonnull World world,
-                                                  @Nonnull Store<ChunkStore> chunkStore,
-                                                  @Nonnull Store<EntityStore> entityStore,
-                                                  @Nonnull Set<String> activeCoopKeys,
-                                                  long nowMs) {
+                                                 @Nonnull Store<ChunkStore> chunkStore,
+                                                 @Nonnull Store<EntityStore> entityStore,
+                                                 @Nonnull Set<String> activeCoopKeys,
+                                                 long nowMs) {
         List<CommandLinkedNpcCoopService.CoopSlotContext> housedSlots =
                 coopService.listHousedSlotsForWorld(world.getName());
         if (housedSlots.isEmpty()) {
@@ -654,7 +655,7 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
                     DEBUG_REMOVED_CHECK_LOG_INTERVAL_MS,
                     "removed check deferred chunk_unloaded coop=" + coopId
                             + " slot=" + slotContext.residentSlot()
-                    + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
+                            + " pos=" + coopBlock.x + "," + coopBlock.y + "," + coopBlock.z
             );
             return false;
         }
@@ -952,7 +953,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkHappinessComponent.getComponentType(), snapshot.happiness());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkNeedsComponent.getComponentType(), snapshot.needs());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkBreedingComponent.getComponentType(), snapshot.breeding());
+        safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkLevelingComponent.getComponentType(), snapshot.leveling());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkTraitsComponent.getComponentType(), snapshot.traits());
+        safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkTalentsComponent.getComponentType(), snapshot.talents());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.getComponentType(), snapshot.lifeStage());
         safePutComponent(store, reference, com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent.getComponentType(), snapshot.attachments());
         if (stateSnapshotService != null) {
@@ -1042,8 +1045,8 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private void applyEntitySupportDisplayNameIfPresent(@Nonnull Ref<EntityStore> reference,
-                                                         @Nonnull Store<EntityStore> store,
-                                                         @Nullable String displayName) {
+                                                        @Nonnull Store<EntityStore> store,
+                                                        @Nullable String displayName) {
         if (displayName == null || displayName.isBlank() || !reference.isValid()) {
             return;
         }
@@ -1540,9 +1543,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private <T extends Component<EntityStore>> void safePutComponent(@Nonnull Store<EntityStore> store,
-                                                                      @Nonnull Ref<EntityStore> reference,
-                                                                      @Nullable ComponentType<EntityStore, T> type,
-                                                                      @Nullable T component) {
+                                                                     @Nonnull Ref<EntityStore> reference,
+                                                                     @Nullable ComponentType<EntityStore, T> type,
+                                                                     @Nullable T component) {
         if (type == null || component == null || !reference.isValid()) {
             return;
         }
@@ -1558,9 +1561,9 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
     }
 
     private <T extends Component<EntityStore>> void queueDeferredComponentPut(@Nonnull Store<EntityStore> store,
-                                                                               @Nonnull Ref<EntityStore> reference,
-                                                                               @Nonnull ComponentType<EntityStore, T> type,
-                                                                               @Nonnull T component) {
+                                                                              @Nonnull Ref<EntityStore> reference,
+                                                                              @Nonnull ComponentType<EntityStore, T> type,
+                                                                              @Nonnull T component) {
         World world = store.getExternalData() != null ? store.getExternalData().getWorld() : null;
         if (world == null) {
             return;

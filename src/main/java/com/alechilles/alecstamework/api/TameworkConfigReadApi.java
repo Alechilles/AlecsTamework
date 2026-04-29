@@ -37,8 +37,16 @@ public interface TameworkConfigReadApi {
 
     Optional<RoleScopedConfigView> resolveBreedingConfigForRole(String roleId);
 
+    Optional<RoleScopedConfigView> getLevelingConfigById(String id);
+
+    Optional<RoleScopedConfigView> resolveLevelingConfigForRole(String roleId);
+
     Optional<RoleScopedConfigView> getTraitConfigById(String id);
 
     Optional<RoleScopedConfigView> resolveTraitConfigForRole(String roleId);
+
+    Optional<RoleScopedConfigView> getTalentConfigById(String id);
+
+    Optional<RoleScopedConfigView> resolveTalentConfigForRole(String roleId);
 }
 

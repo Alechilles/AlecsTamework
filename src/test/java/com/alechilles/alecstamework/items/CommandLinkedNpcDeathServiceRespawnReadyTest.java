@@ -95,6 +95,12 @@ class CommandLinkedNpcDeathServiceRespawnReadyTest {
                 null,
                 null,
                 false,
+                null,
+                1,
+                0.0,
+                null,
+                0,
+                null,
                 CommandLinkedNpcDeathService.DeathCauseKind.UNKNOWN,
                 null
         );

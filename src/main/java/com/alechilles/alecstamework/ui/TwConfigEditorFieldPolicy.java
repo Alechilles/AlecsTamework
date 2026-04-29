@@ -30,6 +30,7 @@ final class TwConfigEditorFieldPolicy {
             "timing.basis",
             "passivebreeding.basis"
     );
+    private static final Set<String> BREEDING_ROLE_COMPATIBILITY_PATHS = Set.of("pairing.rolecompatibility");
     private static final Set<String> NEEDS_TIMER_BASIS_PATHS = Set.of("timing.basis");
     private static final Set<String> NEEDS_TICK_POLICY_MODE_PATHS = Set.of("tickpolicy.mode");
     private static final Set<String> NEEDS_DAMAGE_MODEL_PATHS = Set.of("damage.model");
@@ -61,7 +62,7 @@ final class TwConfigEditorFieldPolicy {
         } else {
             resolved = mergeSchemaAndFallbackFields(schemaFields, fallbackFields);
         }
-        return applyKnownOptionInference(descriptor.family(), resolved);
+        return applyKnownOptionInference(descriptor.family(), filterHiddenFields(descriptor.family(), resolved));
     }
 
     @Nonnull
@@ -214,7 +215,10 @@ final class TwConfigEditorFieldPolicy {
         return switch (family) {
             case BREEDING -> BREEDING_TIMER_BASIS_PATHS.contains(normalized)
                     ? enumValues(TwBreedingConfig.TimerBasis.values(), TwBreedingConfig.TimerBasis::toConfigValue)
-                    : List.of();
+                    : breedingRoleCompatibilityPath(normalized)
+                            ? enumValues(TwBreedingConfig.RoleCompatibility.values(), TwBreedingConfig.RoleCompatibility::toConfigValue)
+                            : List.of();
+            case LEVELING, TALENT -> List.of();
             case NEEDS -> {
                 if (NEEDS_TIMER_BASIS_PATHS.contains(normalized)) {
                     yield enumValues(TwNeedsConfig.TimerBasis.values(), TwNeedsConfig.TimerBasis::toConfigValue);
@@ -253,6 +257,37 @@ final class TwConfigEditorFieldPolicy {
             }
         }
         return List.copyOf(out);
+    }
+
+    @Nonnull
+    private static List<EditorFieldSpec> filterHiddenFields(@Nonnull TwConfigFamily family,
+                                                            @Nonnull List<EditorFieldSpec> fields) {
+        if (fields.isEmpty() || family != TwConfigFamily.BREEDING) {
+            return fields;
+        }
+        ArrayList<EditorFieldSpec> out = new ArrayList<>(fields.size());
+        boolean changed = false;
+        for (EditorFieldSpec field : fields) {
+            if (field == null || hiddenBreedingFieldPath(field.path())) {
+                changed = true;
+                continue;
+            }
+            out.add(field);
+        }
+        return changed ? List.copyOf(out) : fields;
+    }
+
+    private static boolean hiddenBreedingFieldPath(@Nullable String path) {
+        String normalized = normalizePath(path);
+        return normalized.equals("pairing.requiresameroleid")
+                || (normalized.startsWith("roleoverrides.")
+                && normalized.endsWith(".pairing.requiresameroleid"));
+    }
+
+    private static boolean breedingRoleCompatibilityPath(@Nonnull String normalizedPath) {
+        return BREEDING_ROLE_COMPATIBILITY_PATHS.contains(normalizedPath)
+                || (normalizedPath.startsWith("roleoverrides.")
+                && normalizedPath.endsWith(".pairing.rolecompatibility"));
     }
 
     private static boolean shouldSuppressSchemaGroupRow(@Nonnull EditorFieldSpec schemaField,

@@ -70,7 +70,8 @@ final class CommandLinkMutationService {
         if (config.isRequireTamed() && !TamedStateResolver.isTamed(targetRef, store)) {
             return LinkToggleResult.notToggled();
         }
-        if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config)) {
+        boolean tamed = TamedStateResolver.isTamed(targetRef, store);
+        if (!linkPolicyService.isRoleAllowed(linkPolicyService.resolveRoleId(npc), config, tamed)) {
             return LinkToggleResult.notToggled();
         }
         TameworkCommandLinksComponent current = store.getComponent(targetRef, TameworkCommandLinksComponent.getComponentType());

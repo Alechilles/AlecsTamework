@@ -5,7 +5,6 @@ import com.hypixel.hytale.assetstore.map.IndexedLookupTableAssetMap;
 import com.hypixel.hytale.component.ComponentAccessor;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.server.core.asset.type.entityeffect.config.ApplicationEffects;
 import com.hypixel.hytale.server.core.asset.type.entityeffect.config.EntityEffect;
 import com.hypixel.hytale.server.core.entity.EntityUtils;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
@@ -63,39 +62,6 @@ public final class TameworkEntityEffectService {
             npcEntity.invalidateCachedHorizontalSpeedMultiplier();
         }
         return added;
-    }
-
-    public static float resolveHorizontalSpeedMultiplier(@Nullable EffectControllerComponent effectController) {
-        if (effectController == null) {
-            return 1.0F;
-        }
-
-        int[] activeIndexes = effectController.getActiveEffectIndexes();
-        if (activeIndexes == null || activeIndexes.length == 0) {
-            return 1.0F;
-        }
-
-        IndexedLookupTableAssetMap<String, EntityEffect> effectAssetMap = EntityEffect.getAssetMap();
-        if (effectAssetMap == null) {
-            return 1.0F;
-        }
-
-        float multiplier = 1.0F;
-        for (int activeIndex : activeIndexes) {
-            EntityEffect effect = effectAssetMap.getAsset(activeIndex);
-            if (effect == null) {
-                continue;
-            }
-            ApplicationEffects applicationEffects = effect.getApplicationEffects();
-            if (applicationEffects == null) {
-                continue;
-            }
-            float effectMultiplier = applicationEffects.getHorizontalSpeedMultiplier();
-            if (Float.isFinite(effectMultiplier) && effectMultiplier > 0.0F) {
-                multiplier *= effectMultiplier;
-            }
-        }
-        return Float.isFinite(multiplier) && multiplier > 0.0F ? multiplier : 1.0F;
     }
 
     public static boolean hasActiveEffect(@Nullable EffectControllerComponent effectController, @Nullable String effectId) {

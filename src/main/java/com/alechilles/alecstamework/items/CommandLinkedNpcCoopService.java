@@ -1270,8 +1270,12 @@ public final class CommandLinkedNpcCoopService {
                     com.alechilles.alecstamework.npc.components.TameworkNeedsComponent.class);
             putComponentJson(payload, "breeding", snapshot.breeding(),
                     com.alechilles.alecstamework.npc.components.TameworkBreedingComponent.class);
+            putComponentJson(payload, "leveling", snapshot.leveling(),
+                    com.alechilles.alecstamework.npc.components.TameworkLevelingComponent.class);
             putComponentJson(payload, "traits", snapshot.traits(),
                     com.alechilles.alecstamework.npc.components.TameworkTraitsComponent.class);
+            putComponentJson(payload, "talents", snapshot.talents(),
+                    com.alechilles.alecstamework.npc.components.TameworkTalentsComponent.class);
             putComponentJson(payload, "lifeStage", snapshot.lifeStage(),
                     com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.class);
             putComponentJson(payload, "attachments", snapshot.attachments(),
@@ -1322,9 +1326,15 @@ public final class CommandLinkedNpcCoopService {
             com.alechilles.alecstamework.npc.components.TameworkBreedingComponent breeding =
                     parseComponent(payload, "breeding",
                             com.alechilles.alecstamework.npc.components.TameworkBreedingComponent.class);
+            com.alechilles.alecstamework.npc.components.TameworkLevelingComponent leveling =
+                    parseComponent(payload, "leveling",
+                            com.alechilles.alecstamework.npc.components.TameworkLevelingComponent.class);
             com.alechilles.alecstamework.npc.components.TameworkTraitsComponent traits =
                     parseComponent(payload, "traits",
                             com.alechilles.alecstamework.npc.components.TameworkTraitsComponent.class);
+            com.alechilles.alecstamework.npc.components.TameworkTalentsComponent talents =
+                    parseComponent(payload, "talents",
+                            com.alechilles.alecstamework.npc.components.TameworkTalentsComponent.class);
             com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent lifeStage =
                     parseComponent(payload, "lifeStage",
                             com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent.class);
@@ -1344,7 +1354,9 @@ public final class CommandLinkedNpcCoopService {
                     happiness,
                     needs,
                     breeding,
+                    leveling,
                     traits,
+                    talents,
                     lifeStage,
                     attachments,
                     healthPercent,

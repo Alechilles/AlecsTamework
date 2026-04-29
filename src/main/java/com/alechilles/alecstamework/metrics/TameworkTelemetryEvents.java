@@ -1,38 +1,99 @@
 package com.alechilles.alecstamework.metrics;
 
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstelemetry.api.TelemetryEventContext;
+
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Small orchestration wrapper for Alec's Telemetry event emission from live Tamework flows.
+ * Small orchestration wrapper for live Tamework telemetry event emission.
  */
 public final class TameworkTelemetryEvents {
 
-    private final AlecsTelemetryBridge bridge = new AlecsTelemetryBridge();
+    @Nonnull
+    public static TelemetryEventContext.Builder context() {
+        return TelemetryEventContext.builder().runtimeSide("server");
+    }
+
+    @Nonnull
+    public static TelemetryEventContext.Builder featureContext(@Nonnull String subsystem,
+                                                              @Nonnull String featureKey,
+                                                              @Nullable String entryPoint) {
+        return context()
+                .subsystem(subsystem)
+                .featureKey(featureKey)
+                .entryPoint(entryPoint);
+    }
+
+    @Nonnull
+    public static TelemetryEventContext.Builder commandContext(@Nonnull String commandName,
+                                                              @Nonnull String subsystem,
+                                                              @Nonnull String featureKey) {
+        return featureContext(subsystem, featureKey, commandName)
+                .commandName(commandName);
+    }
 
     public void recordError(@Nonnull String eventName,
                             @Nullable Throwable throwable,
                             @Nullable String detail) {
-        bridge.recordError(eventName, throwable, detail);
+        recordError(eventName, throwable, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public void recordError(@Nonnull String eventName,
+                            @Nullable Throwable throwable,
+                            @Nullable TelemetryEventContext context) {
+        CrashTelemetryService service = resolveService();
+        if (service != null) {
+            service.recordError(eventName, throwable, context);
+        }
     }
 
     public void recordLifecycle(@Nonnull String eventName,
                                 int durationMs,
                                 boolean success,
                                 @Nullable String detail) {
-        bridge.recordLifecycle(eventName, durationMs, success, detail);
+        recordLifecycle(eventName, durationMs, success, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public void recordLifecycle(@Nonnull String eventName,
+                                int durationMs,
+                                boolean success,
+                                @Nullable TelemetryEventContext context) {
+        CrashTelemetryService service = resolveService();
+        if (service != null) {
+            service.recordLifecycle(eventName, durationMs, success, context);
+        }
     }
 
     public void recordPerformance(@Nonnull String eventName,
                                   int durationMs,
                                   @Nullable Double metricValue,
                                   @Nullable String detail) {
-        bridge.recordPerformance(eventName, durationMs, metricValue, detail);
+        recordPerformance(eventName, durationMs, metricValue, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public void recordPerformance(@Nonnull String eventName,
+                                  int durationMs,
+                                  @Nullable Double metricValue,
+                                  @Nullable TelemetryEventContext context) {
+        CrashTelemetryService service = resolveService();
+        if (service != null) {
+            service.recordPerformance(eventName, durationMs, metricValue, context);
+        }
     }
 
     public void recordUsage(@Nonnull String eventName,
                             @Nullable String detail) {
-        bridge.recordUsage(eventName, detail);
+        recordUsage(eventName, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public void recordUsage(@Nonnull String eventName,
+                            @Nullable TelemetryEventContext context) {
+        CrashTelemetryService service = resolveService();
+        if (service != null) {
+            service.recordUsage(eventName, context);
+        }
     }
 
     public int elapsedMillis(long startedAtNanos) {
@@ -42,5 +103,51 @@ public final class TameworkTelemetryEvents {
         }
         long elapsedMs = elapsedNanos / 1_000_000L;
         return elapsedMs > Integer.MAX_VALUE ? Integer.MAX_VALUE : (int) elapsedMs;
+    }
+
+    public static void recordErrorIfAvailable(@Nonnull String eventName,
+                                              @Nullable Throwable throwable,
+                                              @Nullable String detail) {
+        recordErrorIfAvailable(eventName, throwable, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public static void recordErrorIfAvailable(@Nonnull String eventName,
+                                              @Nullable Throwable throwable,
+                                              @Nullable TelemetryEventContext context) {
+        try {
+            TameworkTelemetryEvents telemetry = resolveAvailable();
+            if (telemetry != null) {
+                telemetry.recordError(eventName, throwable, context);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    public static void recordUsageIfAvailable(@Nonnull String eventName,
+                                              @Nullable String detail) {
+        recordUsageIfAvailable(eventName, TelemetryEventContext.builder().detail(detail).build());
+    }
+
+    public static void recordUsageIfAvailable(@Nonnull String eventName,
+                                              @Nullable TelemetryEventContext context) {
+        try {
+            TameworkTelemetryEvents telemetry = resolveAvailable();
+            if (telemetry != null) {
+                telemetry.recordUsage(eventName, context);
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    @Nullable
+    private CrashTelemetryService resolveService() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin == null ? null : plugin.getCrashTelemetryService();
+    }
+
+    @Nullable
+    private static TameworkTelemetryEvents resolveAvailable() {
+        Tamework plugin = Tamework.getInstance();
+        return plugin != null ? plugin.getTelemetryEvents() : null;
     }
 }

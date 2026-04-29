@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.npc.progression.CompanionAttachmentStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelScaleService;
 import com.google.gson.Gson;
@@ -68,6 +69,8 @@ final class SpawnerAttachmentService {
         }
         if (!CompanionModelAttachmentService.applyAttachments(npcRef, npc, store, attachments)) {
             logger.at(Level.WARNING).log("Spawner stub: failed to apply attachment selections to spawned NPC.");
+            return;
         }
+        CompanionAttachmentStateService.replaceStoredAttachmentsWithCurrent(npcRef, store);
     }
 }
