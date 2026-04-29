@@ -232,8 +232,47 @@ class CrashTelemetryServiceTest {
 
         CrashTelemetryService.migrateLegacyTelemetryData(target, List.of(legacyLowercase), null);
 
-        assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("pending").resolve("report.json")));
+        assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("report.json")));
         assertEquals("legacy-server", Files.readString(target.resolve("Settings").resolve("server-id.txt"), StandardCharsets.UTF_8));
+        assertTrue(Files.isDirectory(legacyLowercase));
+    }
+
+    @Test
+    void copiesOnlyTameworkOwnedFilesFromSharedLegacyTelemetryRoot() throws Exception {
+        Path target = tempDir.resolve("plugin-data").resolve("Telemetry");
+        Path sharedRoot = tempDir.resolve("universe").resolve("Telemetry");
+        Path pendingReport = sharedRoot.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("report.json");
+        Path pendingEvent = sharedRoot.resolve("events").resolve("alecs-tamework").resolve("pending").resolve("event.json");
+        Path serverId = sharedRoot.resolve("Settings").resolve("server-id.txt");
+        Path tameworkProjectSettings = sharedRoot.resolve("Settings").resolve("projects").resolve("alecs-tamework.json");
+        Path unrelatedPluginReport = sharedRoot.resolve("crash-reports").resolve("other-project").resolve("pending").resolve("report.json");
+        Path unrelatedProjectSettings = sharedRoot.resolve("Settings").resolve("projects").resolve("other-project.json");
+        Path unrelatedRootFile = sharedRoot.resolve("unrelated.txt");
+        Files.createDirectories(pendingReport.getParent());
+        Files.createDirectories(pendingEvent.getParent());
+        Files.createDirectories(serverId.getParent());
+        Files.createDirectories(tameworkProjectSettings.getParent());
+        Files.createDirectories(unrelatedPluginReport.getParent());
+        Files.createDirectories(unrelatedProjectSettings.getParent());
+        Files.writeString(pendingReport, "{}", StandardCharsets.UTF_8);
+        Files.writeString(pendingEvent, "{}", StandardCharsets.UTF_8);
+        Files.writeString(serverId, "shared-server", StandardCharsets.UTF_8);
+        Files.writeString(tameworkProjectSettings, "{}", StandardCharsets.UTF_8);
+        Files.writeString(unrelatedPluginReport, "{}", StandardCharsets.UTF_8);
+        Files.writeString(unrelatedProjectSettings, "{}", StandardCharsets.UTF_8);
+        Files.writeString(unrelatedRootFile, "shared", StandardCharsets.UTF_8);
+
+        CrashTelemetryService.migrateLegacyTelemetryData(target, List.of(sharedRoot), null);
+
+        assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("report.json")));
+        assertTrue(Files.isRegularFile(target.resolve("events").resolve("alecs-tamework").resolve("pending").resolve("event.json")));
+        assertEquals("shared-server", Files.readString(target.resolve("Settings").resolve("server-id.txt"), StandardCharsets.UTF_8));
+        assertTrue(Files.isRegularFile(target.resolve("Settings").resolve("projects").resolve("alecs-tamework.json")));
+        assertFalse(Files.exists(target.resolve("crash-reports").resolve("other-project")));
+        assertFalse(Files.exists(target.resolve("Settings").resolve("projects").resolve("other-project.json")));
+        assertFalse(Files.exists(target.resolve("unrelated.txt")));
+        assertTrue(Files.isDirectory(sharedRoot));
+        assertTrue(Files.isRegularFile(unrelatedPluginReport));
     }
 
     @Test

@@ -28,6 +28,8 @@ import java.util.stream.Stream;
  */
 public final class CrashTelemetryService {
 
+    private static final String TAMEWORK_PROJECT_ID = "alecs-tamework";
+
     private final EmbeddedRuntime telemetry;
     private final AtomicBoolean enabled;
     private final AtomicBoolean breadcrumbsEnabled;
@@ -356,57 +358,110 @@ public final class CrashTelemetryService {
                                            @Nonnull List<Path> legacyTelemetryRootCandidates,
                                            @Nullable HytaleLogger logger) {
         Path targetRoot = newTelemetryRoot.toAbsolutePath().normalize();
-        if (isNonEmptyDirectory(targetRoot)) {
+        boolean targetHasData = isNonEmptyDirectory(targetRoot);
+        boolean hasSameLegacyRoot = legacyTelemetryRootCandidates.stream()
+                .map(candidate -> candidate.toAbsolutePath().normalize())
+                .anyMatch(candidate -> Files.isDirectory(candidate)
+                        && (candidate.equals(targetRoot) || isSamePath(candidate, targetRoot)));
+        if (targetHasData && !hasSameLegacyRoot) {
             return;
         }
         for (Path candidate : legacyTelemetryRootCandidates) {
             Path sourceRoot = candidate.toAbsolutePath().normalize();
-            if (sourceRoot.equals(targetRoot) || isSamePath(sourceRoot, targetRoot) || !Files.isDirectory(sourceRoot)) {
+            boolean sameRoot = sourceRoot.equals(targetRoot) || isSamePath(sourceRoot, targetRoot);
+            if ((targetHasData && !sameRoot) || !Files.isDirectory(sourceRoot)) {
                 continue;
             }
-            if (migrateTelemetryDirectory(sourceRoot, targetRoot, logger)) {
+            if (copyLegacyTelemetryArtifacts(sourceRoot, targetRoot, logger)) {
                 return;
             }
         }
     }
 
-    private static boolean migrateTelemetryDirectory(@Nonnull Path oldTelemetryRoot,
-                                                     @Nonnull Path newTelemetryRoot,
-                                                     @Nullable HytaleLogger logger) {
+    private static boolean copyLegacyTelemetryArtifacts(@Nonnull Path oldTelemetryRoot,
+                                                        @Nonnull Path newTelemetryRoot,
+                                                        @Nullable HytaleLogger logger) {
         try {
-            Files.createDirectories(newTelemetryRoot.getParent());
-            if (Files.exists(newTelemetryRoot)) {
-                copyDirectory(oldTelemetryRoot, newTelemetryRoot);
+            Path parent = newTelemetryRoot.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            int copied = 0;
+            copied += copyDirectoryIfExists(
+                    oldTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID),
+                    newTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID)
+            );
+            copied += copyDirectoryIfExists(
+                    oldTelemetryRoot.resolve("crash-reports").resolve("pending"),
+                    newTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
+            );
+            copied += copyDirectoryIfExists(
+                    oldTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID),
+                    newTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID)
+            );
+            copied += copyDirectoryIfExists(
+                    oldTelemetryRoot.resolve("events").resolve("pending"),
+                    newTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve("runtime.json"),
+                    newTelemetryRoot.resolve("Settings").resolve("runtime.json")
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve("server-id.txt"),
+                    newTelemetryRoot.resolve("Settings").resolve("server-id.txt")
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("server-id.txt"),
+                    newTelemetryRoot.resolve("Settings").resolve("server-id.txt")
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME),
+                    newTelemetryRoot.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME)
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve("projects").resolve(TAMEWORK_PROJECT_ID + ".json"),
+                    newTelemetryRoot.resolve("Settings").resolve("projects").resolve(TAMEWORK_PROJECT_ID + ".json")
+            );
+            if (copied > 0) {
                 logInfo(logger, "Copied embedded telemetry data to " + newTelemetryRoot + ".");
                 return true;
             }
-            Files.move(oldTelemetryRoot, newTelemetryRoot);
-            logInfo(logger, "Migrated embedded telemetry data to " + newTelemetryRoot + ".");
-            return true;
-        } catch (Exception moveFailure) {
-            try {
-                copyDirectory(oldTelemetryRoot, newTelemetryRoot);
-                logInfo(logger, "Copied embedded telemetry data to " + newTelemetryRoot + ".");
-                return true;
-            } catch (Exception copyFailure) {
-                logWarning(logger, "Unable to migrate embedded telemetry data from " + oldTelemetryRoot + " to " + newTelemetryRoot + ".", copyFailure);
-                return false;
-            }
+            return false;
+        } catch (Exception copyFailure) {
+            logWarning(logger, "Unable to migrate embedded telemetry data from " + oldTelemetryRoot + " to " + newTelemetryRoot + ".", copyFailure);
+            return false;
         }
     }
 
-    private static void copyDirectory(@Nonnull Path source, @Nonnull Path target) throws IOException {
+    private static int copyDirectoryIfExists(@Nonnull Path source, @Nonnull Path target) throws IOException {
+        if (!Files.isDirectory(source)) {
+            return 0;
+        }
+        int copied = 0;
         try (Stream<Path> stream = Files.walk(source)) {
             for (Path sourcePath : stream.sorted(Comparator.naturalOrder()).toList()) {
                 Path relative = source.relativize(sourcePath);
                 Path targetPath = target.resolve(relative);
                 if (Files.isDirectory(sourcePath)) {
                     Files.createDirectories(targetPath);
-                } else {
+                } else if (!Files.exists(targetPath)) {
+                    Files.createDirectories(targetPath.getParent());
                     Files.copy(sourcePath, targetPath, StandardCopyOption.COPY_ATTRIBUTES);
+                    copied++;
                 }
             }
         }
+        return copied;
+    }
+
+    private static int copyFileIfExists(@Nonnull Path source, @Nonnull Path target) throws IOException {
+        if (!Files.isRegularFile(source) || Files.exists(target)) {
+            return 0;
+        }
+        Files.createDirectories(target.getParent());
+        Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES);
+        return 1;
     }
 
     private static boolean isNonEmptyDirectory(@Nonnull Path directory) {
