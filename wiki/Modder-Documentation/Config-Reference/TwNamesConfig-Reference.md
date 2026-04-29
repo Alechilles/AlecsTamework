@@ -45,6 +45,7 @@ Each top-level key is a pool id. Each value is a string array of candidate names
 Behavior:
 - If the id resolves to a non-empty pool, naming UI randomize is enabled.
 - If it is missing or empty, manual naming still works.
+- When an NPC has gender from an enabled `TwBreedingConfig.Gender` section, randomization prefers matching `...Male` or `...Female` pool sections. Ungendered NPCs keep the existing merged-pool behavior.
 
 ## Minimal Example
 ```json

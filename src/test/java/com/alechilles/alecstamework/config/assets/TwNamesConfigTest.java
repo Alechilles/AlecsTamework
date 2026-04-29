@@ -53,6 +53,18 @@ class TwNamesConfigTest {
         );
     }
 
+    @Test
+    void genderPoolUsesMatchingNameSectionsOnly() throws Exception {
+        TwNamesConfig config = new TwNamesConfig();
+        setField(config, "northAmericaMale", new String[] { "Noah" });
+        setField(config, "northAmericaFemale", new String[] { "Emma" });
+        setField(config, "germanMale", new String[] { "Felix" });
+        setField(config, "germanFemale", new String[] { "Mia" });
+
+        assertArrayEquals(new String[] { "Noah", "Felix" }, config.getMergedPool("Male"));
+        assertArrayEquals(new String[] { "Emma", "Mia" }, config.getMergedPool("Female"));
+    }
+
     private static void setField(Object target, String name, Object value) throws Exception {
         Field field = target.getClass().getDeclaredField(name);
         field.setAccessible(true);

@@ -227,6 +227,40 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
+    private static final BuilderCodec<GenderSettings> GENDER_CODEC = BuilderCodec.builder(
+            GenderSettings.class,
+            GenderSettings::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            (settings, value) -> settings.enabled = value != null && value,
+            settings -> settings.enabled
+        )
+        .documentation("Turns binary gender assignment and gender-aware breeding checks on or off.")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireDifferentGender", Codec.BOOLEAN),
+            (settings, value) -> settings.requireDifferentGender = value == null || value,
+            settings -> settings.requireDifferentGender
+        )
+        .documentation("When gender is enabled, requires breeding partners to have different genders.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MaleWeight", Codec.DOUBLE),
+            (settings, value) -> settings.maleWeight = value,
+            settings -> settings.maleWeight
+        )
+        .documentation("Relative weighted chance for random male assignment.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("FemaleWeight", Codec.DOUBLE),
+            (settings, value) -> settings.femaleWeight = value,
+            settings -> settings.femaleWeight
+        )
+        .documentation("Relative weighted chance for random female assignment.")
+        .add()
+        .build();
+
     private static final BuilderCodec<InheritanceSettings> INHERITANCE_CODEC = BuilderCodec.builder(
             InheritanceSettings.class,
             InheritanceSettings::new
@@ -319,6 +353,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             choice -> choice.roleId
         )
         .documentation("Adult role ID that offspring can grow into.")
+        .add()
+        .<String>append(
+            new KeyedCodec<>("Gender", Codec.STRING),
+            (choice, value) -> choice.gender = Gender.fromConfigValue(value),
+            choice -> choice.gender == null ? null : choice.gender.toConfigValue()
+        )
+        .documentation("Optional binary gender for this adult role: Male or Female.")
         .add()
         .<Double>append(
             new KeyedCodec<>("Weight", Codec.DOUBLE),
@@ -737,6 +778,40 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .add()
         .build();
 
+    private static final BuilderCodec<GenderSettingsOverride> GENDER_OVERRIDE_CODEC = BuilderCodec.builder(
+            GenderSettingsOverride.class,
+            GenderSettingsOverride::new
+    )
+        .<Boolean>append(
+            new KeyedCodec<>("Enabled", Codec.BOOLEAN),
+            (settings, value) -> settings.enabled = value,
+            settings -> settings.enabled
+        )
+        .documentation("Turns binary gender assignment and gender-aware breeding checks on or off.")
+        .add()
+        .<Boolean>append(
+            new KeyedCodec<>("RequireDifferentGender", Codec.BOOLEAN),
+            (settings, value) -> settings.requireDifferentGender = value,
+            settings -> settings.requireDifferentGender
+        )
+        .documentation("When gender is enabled, requires breeding partners to have different genders.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("MaleWeight", Codec.DOUBLE),
+            (settings, value) -> settings.maleWeight = value,
+            settings -> settings.maleWeight
+        )
+        .documentation("Relative weighted chance for random male assignment.")
+        .add()
+        .<Double>append(
+            new KeyedCodec<>("FemaleWeight", Codec.DOUBLE),
+            (settings, value) -> settings.femaleWeight = value,
+            settings -> settings.femaleWeight
+        )
+        .documentation("Relative weighted chance for random female assignment.")
+        .add()
+        .build();
+
     private static final BuilderCodec<AttachmentInheritanceSettingsOverride> ATTACHMENT_INHERITANCE_OVERRIDE_CODEC =
             BuilderCodec.builder(
                 AttachmentInheritanceSettingsOverride.class,
@@ -981,6 +1056,13 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         )
         .documentation("Lifecycle timing and growth progression settings.")
         .add()
+        .<GenderSettingsOverride>append(
+            new KeyedCodec<>("Gender", GENDER_OVERRIDE_CODEC),
+            (settings, value) -> settings.gender = value,
+            settings -> settings.gender
+        )
+        .documentation("Optional binary gender settings for this role.")
+        .add()
         .<InheritanceSettingsOverride>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_OVERRIDE_CODEC),
             (settings, value) -> settings.inheritance = value,
@@ -1080,6 +1162,14 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         .documentation("Breeding timing settings. Inheritance: omitted section inherits from parent; when present, "
                 + "only explicitly defined nested fields override parent.")
         .add()
+        .<GenderSettings>append(
+            new KeyedCodec<>("Gender", GENDER_CODEC),
+            (asset, value) -> asset.gender = value == null ? new GenderSettings() : value,
+            asset -> asset.gender
+        )
+        .documentation("Optional binary gender settings. Inheritance: omitted section inherits from parent; when "
+                + "present, only explicitly defined nested fields override parent.")
+        .add()
         .<InheritanceSettings>append(
             new KeyedCodec<>("Inheritance", INHERITANCE_CODEC),
             (asset, value) -> asset.inheritance = value == null ? new InheritanceSettings() : value,
@@ -1125,6 +1215,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     private CooldownSettings cooldowns = new CooldownSettings();
     private PassiveBreedingSettings passiveBreeding = new PassiveBreedingSettings();
     private TimingSettings timing = new TimingSettings();
+    private GenderSettings gender = new GenderSettings();
     private InheritanceSettings inheritance = new InheritanceSettings();
     private OffspringLifecycleSettings offspringLifecycle = new OffspringLifecycleSettings();
     private Map<String, RoleOverrideSettings> roleOverrides = EMPTY_ROLE_OVERRIDES;
@@ -1322,6 +1413,11 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         } else {
             inheritTimingSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Timing"));
         }
+        if (!explicitTopLevelKeys.contains("Gender")) {
+            gender = parent.gender;
+        } else {
+            inheritGenderSection(parent, nestedKeysForTopLevel(explicitNestedKeysByTopLevel, "Gender"));
+        }
         if (!explicitTopLevelKeys.contains("Inheritance")) {
             inheritance = parent.inheritance;
         } else {
@@ -1466,6 +1562,25 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             return;
         }
         if (!nestedExplicitKeys.contains("Basis")) timing.timerBasis = parent.timing.timerBasis;
+    }
+
+    private void inheritGenderSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
+        if (nestedExplicitKeys == null) {
+            return;
+        }
+        if (gender == null) {
+            gender = parent.gender;
+            return;
+        }
+        if (parent.gender == null) {
+            return;
+        }
+        if (!nestedExplicitKeys.contains("Enabled")) gender.enabled = parent.gender.enabled;
+        if (!nestedExplicitKeys.contains("RequireDifferentGender")) {
+            gender.requireDifferentGender = parent.gender.requireDifferentGender;
+        }
+        if (!nestedExplicitKeys.contains("MaleWeight")) gender.maleWeight = parent.gender.maleWeight;
+        if (!nestedExplicitKeys.contains("FemaleWeight")) gender.femaleWeight = parent.gender.femaleWeight;
     }
 
     private void inheritInheritanceSection(@Nonnull TwBreedingConfig parent, @Nullable Set<String> nestedExplicitKeys) {
@@ -1761,6 +1876,20 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return resolved;
     }
 
+    public GenderSettings getGender() {
+        return gender == null ? new GenderSettings() : gender;
+    }
+
+    public GenderSettings resolveGender(@Nullable String roleId) {
+        RoleOverrideSettings override = resolveRoleOverride(roleId);
+        if (override == null || override.gender == null) {
+            return copyGender(getGender());
+        }
+        GenderSettings resolved = copyGender(getGender());
+        override.gender.applyTo(resolved);
+        return resolved;
+    }
+
     public InheritanceSettings getInheritance() {
         return inheritance == null ? new InheritanceSettings() : inheritance;
     }
@@ -1898,6 +2027,16 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return copy;
     }
 
+    private static GenderSettings copyGender(@Nullable GenderSettings source) {
+        GenderSettings base = source == null ? new GenderSettings() : source;
+        GenderSettings copy = new GenderSettings();
+        copy.enabled = base.enabled;
+        copy.requireDifferentGender = base.requireDifferentGender;
+        copy.maleWeight = base.maleWeight;
+        copy.femaleWeight = base.femaleWeight;
+        return copy;
+    }
+
     private static InheritanceSettings copyInheritance(@Nullable InheritanceSettings source) {
         InheritanceSettings base = source == null ? new InheritanceSettings() : source;
         InheritanceSettings copy = new InheritanceSettings();
@@ -1955,6 +2094,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private CooldownSettingsOverride cooldowns;
         private PassiveBreedingSettingsOverride passiveBreeding;
         private TimingSettingsOverride timing;
+        private GenderSettingsOverride gender;
         private InheritanceSettingsOverride inheritance;
         private OffspringLifecycleSettingsOverride offspringLifecycle;
     }
@@ -2073,6 +2213,29 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         private void applyTo(@Nonnull TimingSettings target) {
             if (timerBasis != null) {
                 target.timerBasis = timerBasis;
+            }
+        }
+    }
+
+    /** Partial gender override patch for a single role. */
+    public static final class GenderSettingsOverride {
+        private Boolean enabled;
+        private Boolean requireDifferentGender;
+        private Double maleWeight;
+        private Double femaleWeight;
+
+        private void applyTo(@Nonnull GenderSettings target) {
+            if (enabled != null) {
+                target.enabled = enabled;
+            }
+            if (requireDifferentGender != null) {
+                target.requireDifferentGender = requireDifferentGender;
+            }
+            if (maleWeight != null) {
+                target.maleWeight = maleWeight;
+            }
+            if (femaleWeight != null) {
+                target.femaleWeight = femaleWeight;
             }
         }
     }
@@ -2456,6 +2619,81 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         }
     }
 
+    /** Binary gender values used by optional breeding gender support. */
+    public enum Gender {
+        Male,
+        Female;
+
+        @Nullable
+        public static Gender fromConfigValue(@Nullable String value) {
+            if (value == null || value.isBlank()) {
+                return null;
+            }
+            for (Gender candidate : values()) {
+                if (candidate.name().equalsIgnoreCase(value.trim())) {
+                    return candidate;
+                }
+            }
+            return null;
+        }
+
+        public String toConfigValue() {
+            return name();
+        }
+    }
+
+    /** Optional binary gender assignment and pairing settings. */
+    public static final class GenderSettings {
+        private boolean enabled;
+        private boolean requireDifferentGender = true;
+        private double maleWeight = 1.0;
+        private double femaleWeight = 1.0;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public boolean isRequireDifferentGender() {
+            return requireDifferentGender;
+        }
+
+        public double getMaleWeight() {
+            return sanitizeWeight(maleWeight, 1.0);
+        }
+
+        public double getFemaleWeight() {
+            return sanitizeWeight(femaleWeight, 1.0);
+        }
+
+        public Gender selectGender(double roll) {
+            double male = getMaleWeight();
+            double female = getFemaleWeight();
+            double total = male + female;
+            if (!Double.isFinite(total) || total <= 0.0) {
+                return Gender.Male;
+            }
+            double target = clampRoll(roll) * total;
+            return target < male ? Gender.Male : Gender.Female;
+        }
+
+        private static double sanitizeWeight(double value, double fallback) {
+            if (!Double.isFinite(value) || value < 0.0) {
+                return fallback;
+            }
+            return value;
+        }
+
+        private static double clampRoll(double roll) {
+            if (!Double.isFinite(roll) || roll <= 0.0) {
+                return 0.0;
+            }
+            if (roll >= 1.0) {
+                return Math.nextDown(1.0);
+            }
+            return roll;
+        }
+    }
+
     /** Lifecycle role family mappings and growth defaults used for offspring progression. */
     public static final class OffspringLifecycleSettings {
         private static final int MIN_TIME_TO_FULL_GROWN_SECONDS = 1;
@@ -2584,11 +2822,17 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
     /** Weighted adult role option for multi-adult breeding families. */
     public static final class AdultRoleChoice {
         private String roleId;
+        private Gender gender;
         private double weight = 1.0;
 
         @Nullable
         public String getRoleId() {
             return roleId;
+        }
+
+        @Nullable
+        public Gender getGender() {
+            return gender;
         }
 
         public double getWeight() {
@@ -2604,6 +2848,10 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
         public boolean matchesRole(@Nullable String targetRoleId) {
             return RoleFamily.matchesRoleId(roleId, targetRoleId);
+        }
+
+        public boolean matchesGender(@Nullable Gender targetGender) {
+            return targetGender == null || gender == null || gender == targetGender;
         }
     }
 
@@ -2716,6 +2964,19 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
                 return false;
             }
             return adultRoleId != null && !adultRoleId.isBlank();
+        }
+
+        @Nullable
+        public Gender resolveGenderForAdultRole(@Nullable String roleId) {
+            if (roleId == null || roleId.isBlank()) {
+                return null;
+            }
+            for (AdultRoleChoice choice : getAdultRoles()) {
+                if (choice != null && choice.matchesRole(roleId)) {
+                    return choice.getGender();
+                }
+            }
+            return null;
         }
 
         @Nullable

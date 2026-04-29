@@ -223,7 +223,8 @@ final class ApiMapper {
                 component != null ? component.getAdultScale() : 0.0,
                 component != null ? component.getAdultRoleId() : null,
                 component != null ? component.getBabyRoleId() : null,
-                component != null ? component.getAdolescentRoleId() : null
+                component != null ? component.getAdolescentRoleId() : null,
+                component != null ? component.getGender() : null
         );
     }
 

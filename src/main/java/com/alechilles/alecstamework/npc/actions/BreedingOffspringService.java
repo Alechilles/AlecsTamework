@@ -816,6 +816,7 @@ final class BreedingOffspringService {
                     context.breedingConfigId(),
                     childCooldown.durationMs(),
                     childSpawnRole.adultRoleId(),
+                    childSpawnRole.gender(),
                     childSpawnRole.lifecycleFamily(),
                     store
             );

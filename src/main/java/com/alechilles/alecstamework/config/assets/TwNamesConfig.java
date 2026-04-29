@@ -134,6 +134,11 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
 
     @Nonnull
     public static String[] resolveMergedPoolById(@Nullable String id) {
+        return resolveMergedPoolById(id, null);
+    }
+
+    @Nonnull
+    public static String[] resolveMergedPoolById(@Nullable String id, @Nullable String gender) {
         if (id == null || id.isBlank()) {
             return new String[0];
         }
@@ -145,7 +150,7 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
         if (asset == null) {
             return new String[0];
         }
-        return asset.getMergedPool();
+        return asset.getMergedPool(gender);
     }
 
     private static void ensureInheritanceFallbackApplied(@Nullable DefaultAssetMap<String, TwNamesConfig> assetMap) {
@@ -243,17 +248,28 @@ public class TwNamesConfig implements JsonAssetWithMap<String, DefaultAssetMap<S
 
     @Nonnull
     public String[] getMergedPool() {
+        return getMergedPool(null);
+    }
+
+    @Nonnull
+    public String[] getMergedPool(@Nullable String gender) {
         ArrayList<String> out = new ArrayList<>();
         HashSet<String> seen = new HashSet<>();
-        appendUnique(out, seen, northAmericaMale);
-        appendUnique(out, seen, northAmericaFemale);
-        appendUnique(out, seen, germanMale);
-        appendUnique(out, seen, germanFemale);
-        appendUnique(out, seen, spanishMale);
-        appendUnique(out, seen, spanishFemale);
-        appendUnique(out, seen, brazilianPortugueseMale);
-        appendUnique(out, seen, brazilianPortugueseFemale);
+        boolean maleOnly = isGender(gender, "Male");
+        boolean femaleOnly = isGender(gender, "Female");
+        if (!femaleOnly) appendUnique(out, seen, northAmericaMale);
+        if (!maleOnly) appendUnique(out, seen, northAmericaFemale);
+        if (!femaleOnly) appendUnique(out, seen, germanMale);
+        if (!maleOnly) appendUnique(out, seen, germanFemale);
+        if (!femaleOnly) appendUnique(out, seen, spanishMale);
+        if (!maleOnly) appendUnique(out, seen, spanishFemale);
+        if (!femaleOnly) appendUnique(out, seen, brazilianPortugueseMale);
+        if (!maleOnly) appendUnique(out, seen, brazilianPortugueseFemale);
         return out.toArray(String[]::new);
+    }
+
+    private static boolean isGender(@Nullable String value, @Nonnull String expected) {
+        return value != null && expected.equalsIgnoreCase(value.trim());
     }
 
     private static void appendUnique(@Nonnull ArrayList<String> out, @Nonnull HashSet<String> seen, @Nullable String[] values) {

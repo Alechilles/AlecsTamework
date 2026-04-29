@@ -53,6 +53,27 @@ class BreedingAdultRoleSelectionServiceTest {
         assertEquals("Legacy_Deer", service.selectAdultRole(family, null, 0.50));
     }
 
+    @Test
+    void genderedAdultSelectionUsesMatchingChoices() throws Exception {
+        TwBreedingConfig.RoleFamily family = weightedFamily(
+                adultRole("Deer_Stag", 1.0, TwBreedingConfig.Gender.Male),
+                adultRole("Deer_Doe", 10.0, TwBreedingConfig.Gender.Female)
+        );
+
+        assertEquals("Deer_Stag", service.selectAdultRole(family, null, 0.99, TwBreedingConfig.Gender.Male));
+        assertEquals("Deer_Doe", service.selectAdultRole(family, null, 0.0, TwBreedingConfig.Gender.Female));
+    }
+
+    @Test
+    void genderedAdultSelectionFallsBackToUngenderedChoicesWhenNeeded() throws Exception {
+        TwBreedingConfig.RoleFamily family = weightedFamily(
+                adultRole("Deer_Stag", 1.0, TwBreedingConfig.Gender.Male),
+                adultRole("Deer_Adult", 1.0)
+        );
+
+        assertEquals("Deer_Adult", service.selectAdultRole(family, null, 0.50, TwBreedingConfig.Gender.Female));
+    }
+
     private static TwBreedingConfig.RoleFamily weightedFamily(TwBreedingConfig.AdultRoleChoice... choices)
             throws Exception {
         TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
@@ -62,9 +83,16 @@ class BreedingAdultRoleSelectionServiceTest {
     }
 
     private static TwBreedingConfig.AdultRoleChoice adultRole(String roleId, double weight) throws Exception {
+        return adultRole(roleId, weight, null);
+    }
+
+    private static TwBreedingConfig.AdultRoleChoice adultRole(String roleId,
+                                                             double weight,
+                                                             TwBreedingConfig.Gender gender) throws Exception {
         TwBreedingConfig.AdultRoleChoice choice = new TwBreedingConfig.AdultRoleChoice();
         setField(choice, "roleId", roleId);
         setField(choice, "weight", weight);
+        setField(choice, "gender", gender);
         return choice;
     }
 

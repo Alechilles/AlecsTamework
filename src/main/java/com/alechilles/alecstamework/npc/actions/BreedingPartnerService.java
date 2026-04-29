@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -58,11 +59,21 @@ final class BreedingPartnerService {
         boolean requireWander = pairing == null || pairing.isRequireWanderMode();
         boolean requireTamed = eligibility == null || eligibility.isRequireTamed();
         boolean requireAdult = eligibility == null || eligibility.isRequireAdult();
+        TwBreedingConfig.GenderSettings genderSettings = config != null ? config.resolveGender(sourceRoleId) : null;
+        boolean requireDifferentGender = genderSettings != null
+                && genderSettings.isEnabled()
+                && genderSettings.isRequireDifferentGender();
+        String sourceGender = requireDifferentGender
+                ? CompanionGenderService.resolveGender(sourceRef, store, sourceRoleId, config)
+                : null;
 
         if (requireWander && !isInWanderState(sourceNpc.getRole())) {
             return null;
         }
         if (requireAdult && !CompanionLifeStageService.isAdult(sourceRef, store, sourceRoleId)) {
+            return null;
+        }
+        if (requireDifferentGender && sourceGender == null) {
             return null;
         }
 
@@ -102,6 +113,17 @@ final class BreedingPartnerService {
                 String candidateRoleId = resolveRoleId(candidateNpc);
                 if (!compatibilityService.canPair(sourceRoleId, candidateRoleId, config, pairing)) {
                     continue;
+                }
+                if (requireDifferentGender) {
+                    String candidateGender = CompanionGenderService.resolveGender(
+                            candidateRef,
+                            store,
+                            candidateRoleId,
+                            config
+                    );
+                    if (!CompanionGenderService.different(sourceGender, candidateGender)) {
+                        continue;
+                    }
                 }
                 if (requireAdult && !CompanionLifeStageService.isAdult(candidateRef, store, candidateRoleId)) {
                     continue;

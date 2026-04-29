@@ -123,6 +123,7 @@ Behavior:
 - Uses effective fertility: `(sharedHappiness * FertilityMultiplier) + FertilityBonus`.
 - When ready pair found: applies parent cooldown, pair movement, hearts, delayed offspring spawn.
 - Pairing can require the same role, require different adult roles in one lifecycle family, allow any adult in one lifecycle family, or explicitly allow any role through `TwBreedingConfig.Pairing.RoleCompatibility`.
+- If `TwBreedingConfig.Gender.Enabled` and `RequireDifferentGender` are enabled, partner selection also requires one male and one female companion.
 - Offspring flow supports baby-role preference, persisted weighted adult-role selection, life-stage initialization, trait/attachment inheritance, and growth timing.
 
 ## Custom interactions
