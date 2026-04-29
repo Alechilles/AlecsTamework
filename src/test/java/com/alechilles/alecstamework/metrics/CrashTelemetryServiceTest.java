@@ -220,6 +220,45 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
+    void importsLegacyTelemetryRootCrashTelemetrySettings() throws Exception {
+        Path pluginData = tempDir.resolve("plugin-data");
+        Path universe = tempDir.resolve("universe");
+        Path preferred = universe.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
+        Path legacy = pluginData.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME);
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(legacy, "{\"enabled\": false}", StandardCharsets.UTF_8);
+
+        CrashTelemetryService.importLegacyCrashTelemetrySettings(
+                preferred,
+                CrashTelemetryService.legacyCrashTelemetrySettingsCandidates(pluginData, universe),
+                null
+        );
+        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
+
+        assertFalse(settings.enabled());
+    }
+
+    @Test
+    void importsLegacyTextCrashTelemetrySettings() throws Exception {
+        Path pluginData = tempDir.resolve("plugin-data");
+        Path universe = tempDir.resolve("universe");
+        Path preferred = universe.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
+        Path legacy = pluginData.resolve("tamework-crash-telemetry.txt");
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(legacy, "enabled=false\nbreadcrumbs_enabled=false", StandardCharsets.UTF_8);
+
+        CrashTelemetryService.importLegacyCrashTelemetrySettings(
+                preferred,
+                CrashTelemetryService.legacyCrashTelemetrySettingsCandidates(pluginData, universe),
+                null
+        );
+        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
+
+        assertFalse(settings.enabled());
+        assertFalse(settings.breadcrumbsEnabled());
+    }
+
+    @Test
     void migratesLegacyLowercaseTelemetryDirectoryIntoStandardEmbeddedDirectory() throws Exception {
         Path target = tempDir.resolve("plugin-data").resolve("Telemetry");
         Path legacyLowercase = tempDir.resolve("plugin-data").resolve("telemetry");
@@ -282,6 +321,24 @@ class CrashTelemetryServiceTest {
         assertTrue(Files.isDirectory(sharedRoot));
         assertTrue(Files.isRegularFile(unrelatedPluginReport));
         assertTrue(Files.isRegularFile(sharedPendingReport));
+    }
+
+    @Test
+    void migratesTelemetryDataAcrossMultipleLegacyRoots() throws Exception {
+        Path target = tempDir.resolve("plugin-data").resolve("Telemetry");
+        Path sharedRoot = tempDir.resolve("universe").resolve("Telemetry");
+        Path pluginLocalRoot = tempDir.resolve("plugin-data").resolve("telemetry");
+        Path sharedReport = sharedRoot.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("shared-report.json");
+        Path localReport = pluginLocalRoot.resolve("crash-reports").resolve("pending").resolve("local-report.json");
+        Files.createDirectories(sharedReport.getParent());
+        Files.createDirectories(localReport.getParent());
+        Files.writeString(sharedReport, "{}", StandardCharsets.UTF_8);
+        Files.writeString(localReport, "{}", StandardCharsets.UTF_8);
+
+        CrashTelemetryService.migrateLegacyTelemetryData(target, List.of(sharedRoot, pluginLocalRoot), null);
+
+        assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("shared-report.json")));
+        assertTrue(Files.isRegularFile(target.resolve("crash-reports").resolve("alecs-tamework").resolve("pending").resolve("local-report.json")));
     }
 
     @Test

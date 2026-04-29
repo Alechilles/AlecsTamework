@@ -313,7 +313,13 @@ public final class CrashTelemetryService {
         return List.of(
                 pluginDataDirectory.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
                 pluginDataDirectory.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
                 pluginDataDirectory.resolve("telemetry").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
                 tameworkUniverseRoot.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize()
         );
     }
@@ -368,13 +374,10 @@ public final class CrashTelemetryService {
         }
         for (Path candidate : legacyTelemetryRootCandidates) {
             Path sourceRoot = candidate.toAbsolutePath().normalize();
-            boolean sameRoot = sourceRoot.equals(targetRoot) || isSamePath(sourceRoot, targetRoot);
-            if ((targetHasData && !sameRoot) || !Files.isDirectory(sourceRoot)) {
+            if (!Files.isDirectory(sourceRoot)) {
                 continue;
             }
-            if (copyLegacyTelemetryArtifacts(sourceRoot, targetRoot, isPluginLocalLegacyRoot(sourceRoot, targetRoot), logger)) {
-                return;
-            }
+            copyLegacyTelemetryArtifacts(sourceRoot, targetRoot, isPluginLocalLegacyRoot(sourceRoot, targetRoot), logger);
         }
     }
 
