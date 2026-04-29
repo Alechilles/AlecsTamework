@@ -45,6 +45,8 @@ public final class TameworkCommandRoot extends AbstractCommandCollection {
         addSubCommand(new TameworkDebugNeedsSeekCommand());
         addSubCommand(new TameworkDebugFlyingCompanionCommand());
         addSubCommand(new TameworkShowHitboxesCommand());
+        addSubCommand(new TameworkShowSpawnMarkersCommand());
+        addSubCommand(new TameworkDeleteSpawnMarkerCommand());
         addSubCommand(new TameworkDebugDbCommand());
         addSubCommand(new TameworkDebugCrashTelemetryCommand());
         addSubCommand(new TameworkDebugReviveReadyCommand());

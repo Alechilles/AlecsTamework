@@ -71,6 +71,6 @@ final class SpawnerAttachmentService {
             logger.at(Level.WARNING).log("Spawner stub: failed to apply attachment selections to spawned NPC.");
             return;
         }
-        CompanionAttachmentStateService.seedStoredAttachments(npcRef, store);
+        CompanionAttachmentStateService.replaceStoredAttachmentsWithCurrent(npcRef, store);
     }
 }

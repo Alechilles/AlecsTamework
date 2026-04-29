@@ -86,6 +86,8 @@ This file maps Tamework's currently registered NPC builders, item interactions, 
 - `/tw debugspawnerlocation [on|off]`
 - `/tw debugdespawn [on|off] [RoleName|all|clear]`
 - `/tw debuglag [on|off]`
+- `/tw showspawnmarkers [radius|off]`
+- `/tw deletespawnmarker [range]`
 
 ## Notes
 - Components persist across reloads.
