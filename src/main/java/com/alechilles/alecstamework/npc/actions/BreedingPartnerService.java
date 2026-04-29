@@ -119,7 +119,7 @@ final class BreedingPartnerService {
                             candidateRef,
                             store,
                             candidateRoleId,
-                            config
+                            resolveCandidateConfig(candidateRoleId, config)
                     );
                     if (!CompanionGenderService.different(sourceGender, candidateGender)) {
                         continue;
@@ -161,6 +161,46 @@ final class BreedingPartnerService {
             return null;
         }
         return new PartnerCandidate(best.ref, best.npc, best.breeding, best.roleId, best.ownerId, best.distanceSq);
+    }
+
+    @Nullable
+    static TwBreedingConfig resolveCandidateConfig(@Nullable String candidateRoleId,
+                                                   @Nullable TwBreedingConfig sourceConfig) {
+        TwBreedingConfig candidateConfig = TwBreedingConfig.resolveForRole(candidateRoleId);
+        if (candidateConfig != null) {
+            return candidateConfig;
+        }
+        return configDeclaresRole(sourceConfig, candidateRoleId) ? sourceConfig : null;
+    }
+
+    private static boolean configDeclaresRole(@Nullable TwBreedingConfig config, @Nullable String roleId) {
+        if (config == null || roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        String normalized = normalizeRoleId(roleId);
+        for (String configuredRoleId : config.getRoleIds()) {
+            if (normalized.equals(normalizeRoleId(configuredRoleId))) {
+                return true;
+            }
+        }
+        for (String overrideRoleId : config.getRoleOverrides().keySet()) {
+            if (normalized.equals(normalizeRoleId(overrideRoleId))) {
+                return true;
+            }
+        }
+        return config.resolveLifecycleFamilyForRole(roleId) != null;
+    }
+
+    private static String normalizeRoleId(@Nullable String roleId) {
+        if (roleId == null) {
+            return "";
+        }
+        String normalized = roleId.trim().toLowerCase(Locale.ROOT);
+        int separator = normalized.lastIndexOf(':');
+        if (separator >= 0 && separator < normalized.length() - 1) {
+            return normalized.substring(separator + 1);
+        }
+        return normalized;
     }
 
     private static boolean sameOwner(@Nullable UUID sourceOwnerId, @Nullable UUID candidateOwnerId) {
