@@ -43,6 +43,31 @@ public final class CompanionAttachmentStateService {
         );
     }
 
+    public static void replaceStoredAttachmentsWithCurrent(@Nullable Ref<EntityStore> npcRef,
+                                                           @Nullable Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return;
+        }
+        ComponentType<EntityStore, TameworkAttachmentsComponent> type = TameworkAttachmentsComponent.getComponentType();
+        if (type == null) {
+            return;
+        }
+
+        Map<String, String> current = resolveCurrentSupportedSelections(npcRef, store);
+        if (current.isEmpty()) {
+            return;
+        }
+        TameworkAttachmentsComponent persisted = store.getComponent(npcRef, type);
+        if (persisted != null && current.equals(persisted.getAttachmentIds())) {
+            return;
+        }
+        store.putComponent(
+                npcRef,
+                type,
+                new TameworkAttachmentsComponent(persisted != null ? persisted.getConfigId() : null, current)
+        );
+    }
+
     public static void syncStoredAttachments(@Nullable Ref<EntityStore> npcRef,
                                              @Nullable Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {

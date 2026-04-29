@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+- Added `/tw showspawnmarkers [radius|off]` to render nearby loaded Hytale spawn markers with bright-pink player-local debug shapes and print marker IDs, NPC options, positions, spawn counts, manual-trigger status, and suppression state.
+- Added `/tw deletespawnmarker [range]` to delete the closest loaded spawn marker in the player's view path, clear the source block marker component when available, and report the marker ID, NPC options, and position.
+
+### Fixed
+- Fixed `/tw npcspawntamed` attachment overrides being replaced by the NPC's initial random attachment choice after the sync system ran.
+
 ## 2.8.6 - Breeding Families + Runtime Compatibility - 2026-04-26
 
 ### Added
