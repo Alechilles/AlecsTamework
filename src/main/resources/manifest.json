@@ -18,8 +18,7 @@
     "OptionalDependencies": {
         "org.herolias:DynamicTooltipsLib": "1.5.x",
         "Frotty27:NameplateBuilder": ">=4.260326.7",
-        "Buuz135:SimpleClaims": "1.0.x",
-        "Alechilles:Alec's Telemetry": ">=0.1.0"
+        "Buuz135:SimpleClaims": "1.0.x"
     },
     "LoadBefore": {},
     "DisabledByDefault": false,
