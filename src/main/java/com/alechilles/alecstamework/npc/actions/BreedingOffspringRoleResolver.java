@@ -51,11 +51,12 @@ final class BreedingOffspringRoleResolver {
                     if (adultRoleId == null || adultRoleId.isBlank()) {
                         return null;
                     }
+                    TwBreedingConfig.Gender selectedGender = resolveSelectedGender(family, adultRoleId, gender);
                     String babyRoleId = family.getBabyRoleId();
                     if (babyRoleId != null && !babyRoleId.isBlank() && npcPlugin.getIndex(babyRoleId) >= 0) {
-                        return new OffspringRoleSelection(babyRoleId, adultRoleId, gender, family);
+                        return new OffspringRoleSelection(babyRoleId, adultRoleId, selectedGender, family);
                     }
-                    return new OffspringRoleSelection(adultRoleId, adultRoleId, gender, family);
+                    return new OffspringRoleSelection(adultRoleId, adultRoleId, selectedGender, family);
                 }
             }
         }
@@ -76,6 +77,16 @@ final class BreedingOffspringRoleResolver {
             return null;
         }
         return settings.selectGender(genderRoll);
+    }
+
+    @Nullable
+    static TwBreedingConfig.Gender resolveSelectedGender(@Nullable TwBreedingConfig.RoleFamily family,
+                                                         @Nullable String adultRoleId,
+                                                         @Nullable TwBreedingConfig.Gender sampledGender) {
+        TwBreedingConfig.Gender adultRoleGender = family != null
+                ? family.resolveGenderForAdultRole(adultRoleId)
+                : null;
+        return adultRoleGender != null ? adultRoleGender : sampledGender;
     }
 
     record OffspringRoleSelection(String roleId,
