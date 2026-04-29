@@ -17,6 +17,7 @@
         <maven.compiler.target>25</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <sqlite.jdbc.version>3.49.1.0</sqlite.jdbc.version>
+        <alecstelemetry.version>0.1.0</alecstelemetry.version>
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
         <hytale.install.path>${hytale.install.path.release}</hytale.install.path>
@@ -55,6 +56,11 @@
             <artifactId>dynamictooltipslib-1459711</artifactId>
             <version>7690478</version>
             <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.alechilles</groupId>
+            <artifactId>alecstelemetry-runtime</artifactId>
+            <version>${alecstelemetry.version}</version>
         </dependency>
         <dependency>
             <groupId>org.xerial</groupId>
@@ -153,6 +159,10 @@
                                 <excludes>
                                     <exclude>com.frotty27:nameplatebuilder</exclude>
                                 </excludes>
+                                <includes>
+                                    <include>com.alechilles:alecstelemetry-runtime</include>
+                                    <include>org.xerial:sqlite-jdbc</include>
+                                </includes>
                             </artifactSet>
                         </configuration>
                     </execution>

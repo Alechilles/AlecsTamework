@@ -1,61 +1,40 @@
 package com.alechilles.alecstamework.metrics;
 
 import com.alechilles.alecstelemetry.api.TelemetryEventContext;
-import com.alechilles.alecstelemetry.core.TelemetryCoreEngine;
-import com.alechilles.alecstelemetry.crash.CrashReportClient;
-import com.alechilles.alecstelemetry.crash.CrashReportEnvelope;
-import com.alechilles.alecstelemetry.crash.HttpCrashReportClient;
-import com.alechilles.alecstelemetry.project.TelemetryProjectDescriptor;
-import com.alechilles.alecstelemetry.project.TelemetryProjectOverride;
-import com.alechilles.alecstelemetry.project.TelemetryProjectRegistration;
-import com.alechilles.alecstelemetry.runtime.TelemetryDataPaths;
-import com.alechilles.alecstelemetry.runtime.TelemetryProjectOverrideStore;
-import com.alechilles.alecstelemetry.runtime.TelemetryRuntimeSettings;
+import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryBootstrap;
+import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryDiagnostics;
+import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryService;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
-import com.hypixel.hytale.common.plugin.PluginIdentifier;
-import com.hypixel.hytale.common.plugin.PluginManifest;
-import com.hypixel.hytale.common.semver.Semver;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.logging.Level;
+import java.util.stream.Stream;
 
 /**
- * Embedded telemetry compatibility layer for Tamework.
- *
- * <p>This keeps Tamework's existing settings/debug contract while routing crash,
- * lifecycle, performance, and usage events through the embedded Alec's Telemetry runtime.
+ * Tamework compatibility layer over the standard embedded Alec's Telemetry runtime.
  */
 public final class CrashTelemetryService {
 
-    private static final String DESCRIPTOR_RESOURCE = "telemetry/project.json";
+    private static final String TAMEWORK_PROJECT_ID = "alecs-tamework";
 
-    private final CrashTelemetrySettings compatibilitySettings;
-    private final TelemetryRuntimeSettings runtimeSettings;
-    private final TelemetryDataPaths dataPaths;
-    private final TelemetryProjectRegistration project;
-    private final CrashReportClient client;
-    private final HytaleLogger logger;
-    private final ScheduledExecutorService executor;
-    private final List<CrashReportEnvelope.LoadedModMetadata> loadedMods;
+    private final EmbeddedRuntime telemetry;
     private final AtomicBoolean enabled;
     private final AtomicBoolean breadcrumbsEnabled;
     private final AtomicBoolean started = new AtomicBoolean(false);
 
-    private volatile TelemetryCoreEngine engine;
     private volatile String lastFlushResult = "No flush attempts yet.";
     private volatile long lastFlushEpochMs;
 
@@ -63,50 +42,33 @@ public final class CrashTelemetryService {
     public static CrashTelemetryService create(@Nonnull Tamework plugin) {
         Objects.requireNonNull(plugin, "plugin");
         HytaleLogger logger = plugin.getLogger();
+        Path pluginDataDirectory = plugin.getDataDirectory().toAbsolutePath().normalize();
+        Path tameworkUniverseRoot = TameworkSettingsStore.resolveTameworkUniverseRoot(plugin).toAbsolutePath().normalize();
         Path compatibilitySettingsPath = TameworkSettingsStore.resolveSettingsDirectory(plugin)
                 .resolve(CrashTelemetrySettings.FILE_NAME)
                 .toAbsolutePath()
                 .normalize();
-        CrashTelemetrySettings compatibilitySettings = CrashTelemetrySettings.load(compatibilitySettingsPath, logger);
-        TelemetryDataPaths dataPaths = resolveEmbeddedDataPaths(plugin);
-        TelemetryRuntimeSettings runtimeSettings = TelemetryRuntimeSettings.load(dataPaths.settingsFile(), logger);
-        TelemetryProjectRegistration project = resolveProjectRegistration(plugin, dataPaths, logger);
-        CrashReportClient client = new HttpCrashReportClient(
-                runtimeSettings.connectTimeoutMs(),
-                runtimeSettings.readTimeoutMs(),
+        importLegacyCrashTelemetrySettings(
+                compatibilitySettingsPath,
+                legacyCrashTelemetrySettingsCandidates(pluginDataDirectory, tameworkUniverseRoot),
                 logger
         );
-        return new CrashTelemetryService(
-                compatibilitySettings,
-                runtimeSettings,
-                dataPaths,
-                project,
-                client,
-                logger,
-                HytaleServer.SCHEDULED_EXECUTOR,
-                List.of(new CrashReportEnvelope.LoadedModMetadata(project.pluginIdentifier(), project.pluginVersion()))
+        CrashTelemetrySettings compatibilitySettings = CrashTelemetrySettings.load(compatibilitySettingsPath, logger);
+        migrateLegacyTelemetryData(
+                pluginDataDirectory.resolve("Telemetry"),
+                legacyTelemetryRootCandidates(pluginDataDirectory, tameworkUniverseRoot),
+                logger
         );
+        EmbeddedTelemetryService embeddedTelemetry = EmbeddedTelemetryBootstrap.bootstrap(plugin);
+        return new CrashTelemetryService(compatibilitySettings, new EmbeddedServiceRuntime(embeddedTelemetry));
     }
 
     CrashTelemetryService(@Nonnull CrashTelemetrySettings compatibilitySettings,
-                          @Nonnull TelemetryRuntimeSettings runtimeSettings,
-                          @Nonnull TelemetryDataPaths dataPaths,
-                          @Nonnull TelemetryProjectRegistration project,
-                          @Nonnull CrashReportClient client,
-                          @Nullable HytaleLogger logger,
-                          @Nullable ScheduledExecutorService executor,
-                          @Nonnull List<CrashReportEnvelope.LoadedModMetadata> loadedMods) {
-        this.compatibilitySettings = Objects.requireNonNull(compatibilitySettings, "compatibilitySettings");
-        this.runtimeSettings = Objects.requireNonNull(runtimeSettings, "runtimeSettings");
-        this.dataPaths = Objects.requireNonNull(dataPaths, "dataPaths");
-        this.project = Objects.requireNonNull(project, "project");
-        this.client = Objects.requireNonNull(client, "client");
-        this.logger = logger;
-        this.executor = executor;
-        this.loadedMods = List.copyOf(Objects.requireNonNull(loadedMods, "loadedMods"));
+                          @Nonnull EmbeddedRuntime telemetry) {
+        this.telemetry = Objects.requireNonNull(telemetry, "telemetry");
         this.enabled = new AtomicBoolean(compatibilitySettings.enabled());
         this.breadcrumbsEnabled = new AtomicBoolean(compatibilitySettings.breadcrumbsEnabled());
-        this.engine = createEngine();
+        syncLastFlushStatus();
     }
 
     public synchronized void start() {
@@ -119,9 +81,9 @@ public final class CrashTelemetryService {
             return;
         }
         if (breadcrumbsEnabled.get()) {
-            engine.recordBreadcrumb(project.projectId(), "lifecycle", "Embedded telemetry started.");
+            telemetry.recordBreadcrumb("lifecycle", "Embedded telemetry started.");
         }
-        engine.start();
+        telemetry.start();
         syncLastFlushStatus();
     }
 
@@ -130,9 +92,9 @@ public final class CrashTelemetryService {
             return;
         }
         if (breadcrumbsEnabled.get()) {
-            engine.recordBreadcrumb(project.projectId(), "lifecycle", "Embedded telemetry shutdown.");
+            telemetry.recordBreadcrumb("lifecycle", "Embedded telemetry shutdown.");
         }
-        engine.shutdown();
+        telemetry.shutdown();
         syncLastFlushStatus();
     }
 
@@ -145,12 +107,12 @@ public final class CrashTelemetryService {
             updateLastFlushStatus("Embedded telemetry enabled.");
             start();
             if (breadcrumbsEnabled.get()) {
-                engine.recordBreadcrumb(project.projectId(), "settings", "Embedded telemetry enabled via runtime setting.");
+                telemetry.recordBreadcrumb("settings", "Embedded telemetry enabled via runtime setting.");
             }
             return;
         }
         if (breadcrumbsEnabled.get()) {
-            engine.recordBreadcrumb(project.projectId(), "settings", "Embedded telemetry disabled via runtime setting.");
+            telemetry.recordBreadcrumb("settings", "Embedded telemetry disabled via runtime setting.");
         }
         shutdown();
         updateLastFlushStatus("Embedded telemetry disabled by settings.");
@@ -163,18 +125,18 @@ public final class CrashTelemetryService {
         }
         if (enabled) {
             if (isRuntimeEnabled()) {
-                engine.recordBreadcrumb(project.projectId(), "settings", "Embedded telemetry breadcrumbs enabled via runtime setting.");
+                telemetry.recordBreadcrumb("settings", "Embedded telemetry breadcrumbs enabled via runtime setting.");
             }
             return;
         }
-        engine.clearBreadcrumbs(project.projectId());
+        telemetry.clearBreadcrumbs();
     }
 
     public void recordBreadcrumb(@Nonnull String category, @Nonnull String detail) {
         if (!isRuntimeEnabled() || !breadcrumbsEnabled.get()) {
             return;
         }
-        engine.recordBreadcrumb(project.projectId(), category, detail);
+        telemetry.recordBreadcrumb(category, detail);
     }
 
     public void captureSetupFailure(@Nullable Throwable throwable) {
@@ -182,7 +144,7 @@ public final class CrashTelemetryService {
             return;
         }
         recordBreadcrumb("capture", "Capturing setup failure.");
-        engine.captureSetupFailure(project.projectId(), throwable);
+        telemetry.captureSetupFailure(throwable);
         syncLastFlushStatus();
     }
 
@@ -191,7 +153,7 @@ public final class CrashTelemetryService {
             return;
         }
         recordBreadcrumb("capture", "Capturing start failure.");
-        engine.captureStartFailure(project.projectId(), throwable);
+        telemetry.captureStartFailure(throwable);
         syncLastFlushStatus();
     }
 
@@ -201,7 +163,7 @@ public final class CrashTelemetryService {
             return;
         }
         recordBreadcrumb("capture", "Capturing exceptional world removal for " + safeWorldName(world) + ".");
-        engine.captureExceptionalWorldRemoval(world, removalReason);
+        telemetry.captureExceptionalWorldRemoval(world, removalReason);
         syncLastFlushStatus();
     }
 
@@ -217,9 +179,9 @@ public final class CrashTelemetryService {
         if (!canRecordEvents()) {
             return false;
         }
-        boolean recorded = engine.recordError(project.projectId(), eventName, throwable, context);
+        telemetry.recordErrorWithContext(eventName, throwable, context);
         syncLastFlushStatus();
-        return recorded;
+        return true;
     }
 
     public boolean recordLifecycle(@Nonnull String eventName,
@@ -236,9 +198,9 @@ public final class CrashTelemetryService {
         if (!canRecordEvents()) {
             return false;
         }
-        boolean recorded = engine.recordLifecycle(project.projectId(), eventName, durationMs, success, context);
+        telemetry.recordLifecycleWithContext(eventName, durationMs, success, context);
         syncLastFlushStatus();
-        return recorded;
+        return true;
     }
 
     public void recordPerformance(@Nonnull String eventName,
@@ -255,7 +217,7 @@ public final class CrashTelemetryService {
         if (!canRecordEvents()) {
             return;
         }
-        engine.recordPerformance(project.projectId(), eventName, durationMs, metricValue, context);
+        telemetry.recordPerformanceWithContext(eventName, durationMs, metricValue, context);
         syncLastFlushStatus();
     }
 
@@ -269,7 +231,7 @@ public final class CrashTelemetryService {
         if (!canRecordEvents()) {
             return;
         }
-        engine.recordUsage(project.projectId(), eventName, context);
+        telemetry.recordUsageWithContext(eventName, context);
         syncLastFlushStatus();
     }
 
@@ -278,7 +240,7 @@ public final class CrashTelemetryService {
             return false;
         }
         recordBreadcrumb("flush", "Manual embedded telemetry flush requested.");
-        boolean scheduled = engine.triggerFlushAsync(project.projectId());
+        boolean scheduled = telemetry.requestFlush();
         syncLastFlushStatus();
         return scheduled;
     }
@@ -286,11 +248,12 @@ public final class CrashTelemetryService {
     @Nonnull
     public CrashTelemetryDiagnostics diagnostics() {
         syncLastFlushStatus();
+        EmbeddedTelemetryDiagnostics diagnostics = telemetry.diagnostics();
         return new CrashTelemetryDiagnostics(
                 isRuntimeEnabled(),
-                resolveEndpoint(),
-                engine.pendingReports(project.projectId()),
-                engine.flushInProgress(),
+                diagnostics.endpoint(),
+                diagnostics.pendingReports(),
+                diagnostics.flushInProgress(),
                 lastFlushResult,
                 lastFlushEpochMs
         );
@@ -298,42 +261,30 @@ public final class CrashTelemetryService {
 
     @Nonnull
     FlushSummary flushPendingReportsNow(@Nonnull String reason) {
-        TelemetryCoreEngine.FlushSummary summary = engine.flushPendingReportsNow(reason, project.projectId());
-        syncLastFlushStatus();
-        return new FlushSummary(summary.attempted(), summary.uploaded(), summary.pendingAfter(), summary.lastFailure());
-    }
-
-    @Nonnull
-    private TelemetryCoreEngine createEngine() {
-        return new TelemetryCoreEngine(
-                runtimeSettings,
-                dataPaths,
-                List.of(project),
-                loadedMods,
-                client,
-                logger,
-                executor
+        boolean requested = triggerFlushAsync();
+        CrashTelemetryDiagnostics diagnostics = diagnostics();
+        return new FlushSummary(
+                requested ? 1 : 0,
+                0,
+                diagnostics.pendingReports(),
+                requested ? null : diagnostics.lastFlushResult()
         );
     }
 
     private boolean isRuntimeEnabled() {
-        return enabled.get() && engine.isProjectEnabled(project.projectId());
+        return enabled.get() && telemetry.isEnabled();
     }
 
     private boolean canRecordEvents() {
-        if (!isRuntimeEnabled()) {
-            return false;
-        }
-        CrashReportClient.DeliveryTarget target = project.resolveEventDeliveryTarget(runtimeSettings);
-        return target != null && !target.endpoint().isBlank();
+        return isRuntimeEnabled() && !"<disabled>".equals(telemetry.diagnostics().endpoint());
     }
 
     private void syncLastFlushStatus() {
-        String engineStatus = engine.lastFlushResult();
-        if (engineStatus == null || engineStatus.isBlank() || engineStatus.equals(lastFlushResult)) {
+        String embeddedStatus = telemetry.diagnostics().lastFlushResult();
+        if (embeddedStatus == null || embeddedStatus.isBlank() || embeddedStatus.equals(lastFlushResult)) {
             return;
         }
-        updateLastFlushStatus(engineStatus);
+        updateLastFlushStatus(embeddedStatus);
     }
 
     private void updateLastFlushStatus(@Nonnull String status) {
@@ -342,26 +293,12 @@ public final class CrashTelemetryService {
     }
 
     @Nonnull
-    private String resolveEndpoint() {
-        CrashReportClient.DeliveryTarget target = project.resolveDeliveryTarget(runtimeSettings);
-        if (target == null || target.endpoint().isBlank()) {
-            return "<disabled>";
-        }
-        return target.endpoint();
-    }
-
-    @Nonnull
     private String disabledReason() {
         if (!enabled.get()) {
             return "Embedded telemetry disabled by Tamework settings.";
         }
-        if (!runtimeSettings.enabled()) {
-            return "Embedded telemetry disabled by runtime settings.";
-        }
-        if (!project.isEnabled()) {
-            return "Embedded telemetry disabled by project override.";
-        }
-        return "Embedded telemetry is unavailable.";
+        String reason = telemetry.disabledReason();
+        return reason == null || reason.isBlank() ? "Embedded telemetry is unavailable." : reason;
     }
 
     @Nonnull
@@ -371,138 +308,326 @@ public final class CrashTelemetryService {
     }
 
     @Nonnull
-    private static TelemetryDataPaths resolveEmbeddedDataPaths(@Nonnull Tamework plugin) {
-        Path telemetryRoot = TameworkSettingsStore.resolveTameworkUniverseRoot(plugin)
-                .resolve("Telemetry")
-                .toAbsolutePath()
-                .normalize();
-        Path settingsRoot = telemetryRoot.resolve("Settings");
-        return new TelemetryDataPaths(
-                telemetryRoot,
-                settingsRoot.resolve("runtime.json"),
-                settingsRoot.resolve("projects"),
-                telemetryRoot,
-                telemetryRoot.resolve("crash-reports"),
-                telemetryRoot.resolve("events"),
-                null
+    static List<Path> legacyCrashTelemetrySettingsCandidates(@Nonnull Path pluginDataDirectory,
+                                                             @Nonnull Path tameworkUniverseRoot) {
+        return List.of(
+                pluginDataDirectory.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize()
         );
     }
 
-    @Nonnull
-    private static TelemetryProjectRegistration resolveProjectRegistration(@Nonnull Tamework plugin,
-                                                                           @Nonnull TelemetryDataPaths dataPaths,
-                                                                           @Nullable HytaleLogger logger) {
-        TelemetryProjectDescriptor descriptor = loadDescriptor(plugin);
-        if (!descriptor.isEmbeddedMode()) {
-            throw new IllegalStateException(
-                    "telemetry/project.json must declare runtimeMode=embedded for Tamework embedded telemetry."
-            );
+    static void importLegacyCrashTelemetrySettings(@Nonnull Path preferredSettingsPath,
+                                                   @Nonnull List<Path> legacySettingsCandidates,
+                                                   @Nullable HytaleLogger logger) {
+        Path preferred = preferredSettingsPath.toAbsolutePath().normalize();
+        if (Files.isRegularFile(preferred)) {
+            return;
         }
-        TelemetryProjectRegistration registration = new TelemetryProjectRegistration(
-                descriptor,
-                resolvePluginIdentifier(plugin),
-                resolvePluginVersion(plugin),
-                resolvePluginSourcePath(plugin)
-        );
-        Map<String, TelemetryProjectOverride> overrides = new TelemetryProjectOverrideStore(logger)
-                .loadAll(dataPaths.projectSettingsDirectory());
-        TelemetryProjectOverride override = overrides.get(registration.projectId().toLowerCase(Locale.ROOT));
-        return override == null ? registration : registration.withOverride(override);
-    }
-
-    @Nonnull
-    private static TelemetryProjectDescriptor loadDescriptor(@Nonnull Tamework plugin) {
-        try (InputStream stream = plugin.getClass().getClassLoader().getResourceAsStream(DESCRIPTOR_RESOURCE)) {
-            if (stream == null) {
-                throw new IllegalStateException("Missing " + DESCRIPTOR_RESOURCE + " for embedded telemetry.");
+        for (Path candidate : legacySettingsCandidates) {
+            Path source = candidate.toAbsolutePath().normalize();
+            if (source.equals(preferred) || !Files.isRegularFile(source)) {
+                continue;
             }
-            String rawJson = new String(stream.readAllBytes(), StandardCharsets.UTF_8);
-            return TelemetryProjectDescriptor.fromJson(rawJson, buildFallbacks(plugin));
-        } catch (Exception ex) {
-            throw new IllegalStateException("Failed to load embedded telemetry descriptor from " + DESCRIPTOR_RESOURCE + ".", ex);
+            try {
+                Path parent = preferred.getParent();
+                if (parent != null) {
+                    Files.createDirectories(parent);
+                }
+                Files.copy(source, preferred);
+                logInfo(logger, "Imported legacy crash telemetry settings from " + source + ".");
+                return;
+            } catch (Exception ex) {
+                logWarning(logger, "Unable to import legacy crash telemetry settings from " + source + ".", ex);
+            }
         }
     }
 
     @Nonnull
-    private static TelemetryProjectDescriptor.Fallbacks buildFallbacks(@Nonnull Tamework plugin) {
-        String pluginIdentifier = resolvePluginIdentifier(plugin);
-        String displayName = resolveDisplayName(plugin, pluginIdentifier);
-        String packagePrefix = plugin.getClass().getPackageName();
-        return new TelemetryProjectDescriptor.Fallbacks(
-                slugify(displayName),
-                displayName,
-                pluginIdentifier,
-                packagePrefix == null || packagePrefix.isBlank() ? List.of() : List.of(packagePrefix)
+    static List<Path> legacyTelemetryRootCandidates(@Nonnull Path pluginDataDirectory,
+                                                   @Nonnull Path tameworkUniverseRoot) {
+        return List.of(
+                tameworkUniverseRoot.resolve("Telemetry").toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("telemetry").toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").toAbsolutePath().normalize()
         );
     }
 
-    @Nonnull
-    private static String resolveDisplayName(@Nonnull Tamework plugin, @Nonnull String pluginIdentifier) {
-        int separatorIndex = pluginIdentifier.indexOf(':');
-        if (separatorIndex >= 0 && separatorIndex < pluginIdentifier.length() - 1) {
-            return pluginIdentifier.substring(separatorIndex + 1).trim();
+    static void migrateLegacyTelemetryData(@Nonnull Path newTelemetryRoot,
+                                           @Nonnull List<Path> legacyTelemetryRootCandidates,
+                                           @Nullable HytaleLogger logger) {
+        Path targetRoot = newTelemetryRoot.toAbsolutePath().normalize();
+        boolean targetHasData = isNonEmptyDirectory(targetRoot);
+        boolean hasSameLegacyRoot = legacyTelemetryRootCandidates.stream()
+                .map(candidate -> candidate.toAbsolutePath().normalize())
+                .anyMatch(candidate -> Files.isDirectory(candidate)
+                        && (candidate.equals(targetRoot) || isSamePath(candidate, targetRoot)));
+        if (targetHasData && !hasSameLegacyRoot) {
+            return;
         }
-        String className = plugin.getClass().getSimpleName();
-        return className == null || className.isBlank() ? "Alec's Tamework!" : className;
+        for (Path candidate : legacyTelemetryRootCandidates) {
+            Path sourceRoot = candidate.toAbsolutePath().normalize();
+            if (!Files.isDirectory(sourceRoot)) {
+                continue;
+            }
+            copyLegacyTelemetryArtifacts(sourceRoot, targetRoot, isPluginLocalLegacyRoot(sourceRoot, targetRoot), logger);
+        }
     }
 
-    @Nonnull
-    private static String resolvePluginIdentifier(@Nonnull Tamework plugin) {
-        PluginIdentifier identifier = plugin.getIdentifier();
-        if (identifier != null) {
-            return identifier.toString();
-        }
-        PluginManifest manifest = plugin.getManifest();
-        if (manifest != null) {
-            return new PluginIdentifier(manifest).toString();
-        }
-        return "Alechilles:Alec's Tamework!";
-    }
-
-    @Nonnull
-    private static String resolvePluginVersion(@Nonnull Tamework plugin) {
-        PluginManifest manifest = plugin.getManifest();
-        if (manifest == null) {
-            return "unknown";
-        }
-        Semver version = manifest.getVersion();
-        return version == null ? "unknown" : version.toString();
-    }
-
-    @Nullable
-    private static Path resolvePluginSourcePath(@Nonnull Tamework plugin) {
+    private static boolean copyLegacyTelemetryArtifacts(@Nonnull Path oldTelemetryRoot,
+                                                        @Nonnull Path newTelemetryRoot,
+                                                        boolean includeUnprojectedQueues,
+                                                        @Nullable HytaleLogger logger) {
         try {
-            return plugin.getFile() == null ? null : plugin.getFile().toAbsolutePath().normalize();
-        } catch (Exception ignored) {
-            return null;
+            Path parent = newTelemetryRoot.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            int copied = 0;
+            copied += copyDirectoryIfExists(
+                    oldTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID),
+                    newTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID)
+            );
+            copied += copyDirectoryIfExists(
+                    oldTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID),
+                    newTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID)
+            );
+            if (includeUnprojectedQueues) {
+                copied += copyDirectoryIfExists(
+                        oldTelemetryRoot.resolve("crash-reports").resolve("pending"),
+                        newTelemetryRoot.resolve("crash-reports").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
+                );
+                copied += copyDirectoryIfExists(
+                        oldTelemetryRoot.resolve("events").resolve("pending"),
+                        newTelemetryRoot.resolve("events").resolve(TAMEWORK_PROJECT_ID).resolve("pending")
+                );
+            }
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve("runtime.json"),
+                    newTelemetryRoot.resolve("Settings").resolve("runtime.json")
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve("server-id.txt"),
+                    newTelemetryRoot.resolve("Settings").resolve("server-id.txt")
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("server-id.txt"),
+                    newTelemetryRoot.resolve("Settings").resolve("server-id.txt")
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME),
+                    newTelemetryRoot.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME)
+            );
+            copied += copyFileIfExists(
+                    oldTelemetryRoot.resolve("Settings").resolve("projects").resolve(TAMEWORK_PROJECT_ID + ".json"),
+                    newTelemetryRoot.resolve("Settings").resolve("projects").resolve(TAMEWORK_PROJECT_ID + ".json")
+            );
+            if (copied > 0) {
+                logInfo(logger, "Copied embedded telemetry data to " + newTelemetryRoot + ".");
+                return true;
+            }
+            return false;
+        } catch (Exception copyFailure) {
+            logWarning(logger, "Unable to migrate embedded telemetry data from " + oldTelemetryRoot + " to " + newTelemetryRoot + ".", copyFailure);
+            return false;
         }
     }
 
-    @Nonnull
-    private static String slugify(@Nonnull String value) {
-        StringBuilder out = new StringBuilder(value.length());
-        boolean previousDash = false;
-        for (int i = 0; i < value.length(); i++) {
-            char c = value.charAt(i);
-            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
-                out.append(c);
-                previousDash = false;
-            } else if (c >= 'A' && c <= 'Z') {
-                out.append(Character.toLowerCase(c));
-                previousDash = false;
-            } else if (!previousDash) {
-                out.append('-');
-                previousDash = true;
+    private static boolean isPluginLocalLegacyRoot(@Nonnull Path sourceRoot, @Nonnull Path targetRoot) {
+        if (sourceRoot.equals(targetRoot) || isSamePath(sourceRoot, targetRoot)) {
+            return true;
+        }
+        Path sourceParent = sourceRoot.getParent();
+        Path targetParent = targetRoot.getParent();
+        Path sourceFileName = sourceRoot.getFileName();
+        return sourceParent != null
+                && targetParent != null
+                && sourceFileName != null
+                && "telemetry".equalsIgnoreCase(sourceFileName.toString())
+                && (sourceParent.equals(targetParent) || isSamePath(sourceParent, targetParent));
+    }
+
+    private static int copyDirectoryIfExists(@Nonnull Path source, @Nonnull Path target) throws IOException {
+        if (!Files.isDirectory(source)) {
+            return 0;
+        }
+        int copied = 0;
+        try (Stream<Path> stream = Files.walk(source)) {
+            for (Path sourcePath : stream.sorted(Comparator.naturalOrder()).toList()) {
+                Path relative = source.relativize(sourcePath);
+                Path targetPath = target.resolve(relative);
+                if (Files.isDirectory(sourcePath)) {
+                    Files.createDirectories(targetPath);
+                } else if (!Files.exists(targetPath)) {
+                    Files.createDirectories(targetPath.getParent());
+                    Files.copy(sourcePath, targetPath, StandardCopyOption.COPY_ATTRIBUTES);
+                    copied++;
+                }
             }
         }
-        String slug = out.toString();
-        while (slug.startsWith("-")) {
-            slug = slug.substring(1);
+        return copied;
+    }
+
+    private static int copyFileIfExists(@Nonnull Path source, @Nonnull Path target) throws IOException {
+        if (!Files.isRegularFile(source) || Files.exists(target)) {
+            return 0;
         }
-        while (slug.endsWith("-")) {
-            slug = slug.substring(0, slug.length() - 1);
+        Files.createDirectories(target.getParent());
+        Files.copy(source, target, StandardCopyOption.COPY_ATTRIBUTES);
+        return 1;
+    }
+
+    private static boolean isNonEmptyDirectory(@Nonnull Path directory) {
+        if (!Files.isDirectory(directory)) {
+            return false;
         }
-        return slug.isBlank() ? "unknown-project" : slug;
+        try (Stream<Path> stream = Files.list(directory)) {
+            return stream.findAny().isPresent();
+        } catch (Exception ignored) {
+            return true;
+        }
+    }
+
+    private static boolean isSamePath(@Nonnull Path first, @Nonnull Path second) {
+        try {
+            return Files.exists(first) && Files.exists(second) && Files.isSameFile(first, second);
+        } catch (Exception ignored) {
+            return false;
+        }
+    }
+
+    private static void logInfo(@Nullable HytaleLogger logger, @Nonnull String message) {
+        if (logger != null) {
+            logger.at(Level.INFO).log(message);
+        }
+    }
+
+    private static void logWarning(@Nullable HytaleLogger logger,
+                                   @Nonnull String message,
+                                   @Nonnull Throwable throwable) {
+        if (logger != null) {
+            logger.at(Level.WARNING).withCause(throwable).log(message);
+        }
+    }
+
+    interface EmbeddedRuntime {
+        boolean isEnabled();
+
+        @Nullable
+        String disabledReason();
+
+        void start();
+
+        void shutdown();
+
+        void recordBreadcrumb(@Nonnull String category, @Nonnull String detail);
+
+        void clearBreadcrumbs();
+
+        void captureSetupFailure(@Nullable Throwable throwable);
+
+        void captureStartFailure(@Nullable Throwable throwable);
+
+        void captureExceptionalWorldRemoval(@Nullable World world, @Nullable RemoveWorldEvent.RemovalReason removalReason);
+
+        void recordErrorWithContext(@Nonnull String eventName, @Nullable Throwable throwable, @Nullable TelemetryEventContext context);
+
+        void recordLifecycleWithContext(@Nonnull String eventName, int durationMs, boolean success, @Nullable TelemetryEventContext context);
+
+        void recordPerformanceWithContext(@Nonnull String eventName, int durationMs, @Nullable Double metricValue, @Nullable TelemetryEventContext context);
+
+        void recordUsageWithContext(@Nonnull String eventName, @Nullable TelemetryEventContext context);
+
+        boolean requestFlush();
+
+        @Nonnull
+        EmbeddedTelemetryDiagnostics diagnostics();
+    }
+
+    private record EmbeddedServiceRuntime(@Nonnull EmbeddedTelemetryService service) implements EmbeddedRuntime {
+        @Override
+        public boolean isEnabled() {
+            return service.isEnabled();
+        }
+
+        @Nullable
+        @Override
+        public String disabledReason() {
+            return service.disabledReason();
+        }
+
+        @Override
+        public void start() {
+            service.start();
+        }
+
+        @Override
+        public void shutdown() {
+            service.shutdown();
+        }
+
+        @Override
+        public void recordBreadcrumb(@Nonnull String category, @Nonnull String detail) {
+            service.recordBreadcrumb(category, detail);
+        }
+
+        @Override
+        public void clearBreadcrumbs() {
+            service.clearBreadcrumbs();
+        }
+
+        @Override
+        public void captureSetupFailure(@Nullable Throwable throwable) {
+            service.captureSetupFailure(throwable);
+        }
+
+        @Override
+        public void captureStartFailure(@Nullable Throwable throwable) {
+            service.captureStartFailure(throwable);
+        }
+
+        @Override
+        public void captureExceptionalWorldRemoval(@Nullable World world, @Nullable RemoveWorldEvent.RemovalReason removalReason) {
+            service.captureExceptionalWorldRemoval(world, removalReason);
+        }
+
+        @Override
+        public void recordErrorWithContext(@Nonnull String eventName, @Nullable Throwable throwable, @Nullable TelemetryEventContext context) {
+            service.recordErrorWithContext(eventName, throwable, context);
+        }
+
+        @Override
+        public void recordLifecycleWithContext(@Nonnull String eventName, int durationMs, boolean success, @Nullable TelemetryEventContext context) {
+            service.recordLifecycleWithContext(eventName, durationMs, success, context);
+        }
+
+        @Override
+        public void recordPerformanceWithContext(@Nonnull String eventName, int durationMs, @Nullable Double metricValue, @Nullable TelemetryEventContext context) {
+            service.recordPerformanceWithContext(eventName, durationMs, metricValue, context);
+        }
+
+        @Override
+        public void recordUsageWithContext(@Nonnull String eventName, @Nullable TelemetryEventContext context) {
+            service.recordUsageWithContext(eventName, context);
+        }
+
+        @Override
+        public boolean requestFlush() {
+            return service.requestFlush();
+        }
+
+        @Nonnull
+        @Override
+        public EmbeddedTelemetryDiagnostics diagnostics() {
+            return service.diagnostics();
+        }
     }
 
     record FlushSummary(int attempted, int uploaded, int pendingAfter, @Nullable String lastFailure) {

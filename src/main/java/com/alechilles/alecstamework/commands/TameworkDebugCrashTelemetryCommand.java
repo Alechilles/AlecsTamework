@@ -89,8 +89,8 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
             );
             commandContext.sender().sendMessage(Message.raw(
                     recorded
-                            ? "Embedded telemetry error event queued."
-                            : "Embedded telemetry error event was not queued (telemetry disabled or event delivery not configured)."
+                            ? "Embedded telemetry error event requested."
+                            : "Embedded telemetry error event was not requested (telemetry disabled or event delivery not configured)."
             ));
         } else if ("eventlifecycle".equals(action)) {
             Player player = store.getComponent(ref, Player.getComponentType());
@@ -120,8 +120,8 @@ public final class TameworkDebugCrashTelemetryCommand extends AbstractPlayerComm
             );
             commandContext.sender().sendMessage(Message.raw(
                     recorded
-                            ? "Embedded telemetry lifecycle event queued."
-                            : "Embedded telemetry lifecycle event was not queued (telemetry disabled or event delivery not configured)."
+                            ? "Embedded telemetry lifecycle event requested."
+                            : "Embedded telemetry lifecycle event was not requested (telemetry disabled or event delivery not configured)."
             ));
         } else if ("simulate".equals(action)) {
             Player player = store.getComponent(ref, Player.getComponentType());
