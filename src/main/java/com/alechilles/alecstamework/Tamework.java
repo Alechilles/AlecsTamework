@@ -10,6 +10,7 @@ import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkConfigFamily;
+import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
@@ -781,6 +782,10 @@ public class Tamework extends JavaPlugin {
                 RemoveWorldEvent.class,
                 this::onWorldRemovedForCrashTelemetry
         );
+        getEventRegistry().registerGlobal(
+                RemoveWorldEvent.class,
+                this::onWorldRemovedForProgressionTiming
+        );
         reconcileTranquilizerRecipeVisibility();
         getLogger().at(Level.INFO).log(
                 "Tamework item configs loaded: spawners="
@@ -948,6 +953,12 @@ public class Tamework extends JavaPlugin {
             return;
         }
         crashTelemetryService.captureExceptionalWorldRemoval(event.getWorld(), event.getRemovalReason());
+    }
+
+    private void onWorldRemovedForProgressionTiming(@Nonnull RemoveWorldEvent event) {
+        if (event != null) {
+            TameworkProgressionTimeScales.clearWorldScale(event.getWorld());
+        }
     }
 
     private void onPlayerAddedToWorldForOverrides(@Nonnull AddPlayerToWorldEvent event) {
