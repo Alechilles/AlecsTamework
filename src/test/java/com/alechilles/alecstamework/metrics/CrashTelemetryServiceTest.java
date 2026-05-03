@@ -186,6 +186,16 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
+    void legacySettingsCandidatesIncludePriorUniverseSettingsPath() {
+        Path pluginData = tempDir.resolve("plugin-data");
+        Path universe = tempDir.resolve("universe").resolve("Tamework");
+
+        List<Path> candidates = CrashTelemetryService.legacyCrashTelemetrySettingsCandidates(pluginData, universe);
+
+        assertTrue(candidates.contains(universe.resolve("Settings").resolve("crash-telemetry.json").toAbsolutePath().normalize()));
+    }
+
+    @Test
     void migratesLegacyLowercaseTelemetryDirectoryIntoStandardEmbeddedDirectory() throws Exception {
         Path target = tempDir.resolve("plugin-data").resolve("Telemetry");
         Path legacyLowercase = tempDir.resolve("plugin-data").resolve("telemetry");

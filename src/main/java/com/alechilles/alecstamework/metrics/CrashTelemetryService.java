@@ -326,6 +326,7 @@ public final class CrashTelemetryService {
                 pluginDataDirectory.resolve("telemetry").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
                 pluginDataDirectory.resolve("telemetry").resolve("Settings").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
                 pluginDataDirectory.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("Settings").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
                 tameworkUniverseRoot.resolve("Telemetry").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
                 tameworkUniverseRoot.resolve("telemetry").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
                 tameworkUniverseRoot.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
