@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-03
+## 2.9.0 - Recall Teleportation Toggles, Gender Breeding, and Embedded Telemetry - 2026-05-03
 
 ### Added
 - Added `/tw showspawnmarkers [radius|off]` to render nearby loaded Hytale spawn markers with bright-pink player-local debug shapes and print marker IDs, NPC options, positions, spawn counts, manual-trigger status, and suppression state.
@@ -12,14 +12,11 @@
 - Added `TameworkProgressionTimeScales` so integrations can apply per-world progression time multipliers for systems such as breeding timers, with cleanup when worlds are removed.
 
 ### Changed
-- Replaced linked-panel gender text suffixes with male/female icons shown to the left of companion names.
 - Switched Tamework to the shared embedded Alec's Telemetry runtime dependency instead of carrying the runtime sources directly in the mod.
+- Moved `/tw settings` telemetry persistence into `universe/Tamework/Settings/tamework-settings.json`, with legacy crash telemetry opt-out files imported without deleting them.
 
 ### Fixed
 - Fixed `/tw npcspawntamed` attachment overrides being replaced by the NPC's initial random attachment choice after the sync system ran.
-- Fixed spawn marker debug cleanup so disabling marker display clears the player-local debug shapes reliably.
-- Fixed linked companion respawn, lost-recovery, and auto-link record writes so Locate keeps the known world name immediately after a replacement link is created.
-- Fixed legacy telemetry migration handling so upgrade data is preserved, stale migration roots are filtered, and shared pending telemetry stays isolated.
 
 ## 2.8.6 - Breeding Families + Runtime Compatibility - 2026-04-26
 
