@@ -160,6 +160,7 @@ public final class CommandAutoLinkService {
                 stack,
                 npc.getUuid(),
                 lastKnown,
+                linkMutationService.resolveWorldName(store, player.getWorld()),
                 homePosition,
                 displayName,
                 nameKey,

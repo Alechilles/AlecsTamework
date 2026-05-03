@@ -285,7 +285,7 @@ final class CommandToolInventoryService {
         return entries;
     }
 
-    private ItemStack findToolStack(Player player, String toolId) {
+    ItemStack findToolStack(Player player, String toolId) {
         if (player == null || toolId == null || toolId.isBlank()) {
             return null;
         }

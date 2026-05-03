@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.api.TameworkProgressionTimeScales;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.time.WorldTimeResource;
@@ -53,14 +54,39 @@ public final class BreedingTimeService {
         TwBreedingConfig.TimerBasis resolvedBasis = timerBasis != null
                 ? timerBasis
                 : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
+        return toGameDurationMs(
+                configuredSeconds,
+                resolvedBasis,
+                resolveCurrentGameSecondsPerRealSecond(store),
+                resolveBaselineGameSecondsPerRealSecond(store),
+                TameworkProgressionTimeScales.resolveWorldScale(store)
+        );
+    }
+
+    static long toGameDurationMs(double configuredSeconds,
+                                 @Nullable TwBreedingConfig.TimerBasis timerBasis,
+                                 double currentGameSecondsPerRealSecond,
+                                 double baselineGameSecondsPerRealSecond,
+                                 double progressionScale) {
+        if (!Double.isFinite(configuredSeconds) || configuredSeconds <= 0.0) {
+            return 0L;
+        }
+        TwBreedingConfig.TimerBasis resolvedBasis = timerBasis != null
+                ? timerBasis
+                : TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED;
         double gameSecondsPerRealSecond = switch (resolvedBasis) {
-            case REAL_TIME -> resolveCurrentGameSecondsPerRealSecond(store);
-            case WORLD_TIME_SCALED -> resolveBaselineGameSecondsPerRealSecond(store);
+            case REAL_TIME -> currentGameSecondsPerRealSecond;
+            case WORLD_TIME_SCALED -> baselineGameSecondsPerRealSecond;
         };
         if (!Double.isFinite(gameSecondsPerRealSecond) || gameSecondsPerRealSecond <= 0.0) {
             gameSecondsPerRealSecond = DEFAULT_BASELINE_RATE;
         }
         double gameMillis = configuredSeconds * gameSecondsPerRealSecond * 1000.0;
+        if (resolvedBasis == TwBreedingConfig.TimerBasis.WORLD_TIME_SCALED
+                && Double.isFinite(progressionScale)
+                && progressionScale > TameworkProgressionTimeScales.DEFAULT_SCALE) {
+            gameMillis /= progressionScale;
+        }
         if (!Double.isFinite(gameMillis) || gameMillis <= 0.0) {
             return 0L;
         }

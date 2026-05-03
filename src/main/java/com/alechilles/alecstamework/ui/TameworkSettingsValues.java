@@ -46,6 +46,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean breedingRequiresHappiness,
                                      boolean traitsEnabled,
                                      boolean reviveSystemEnabled,
+                                     boolean recallTeleportingEnabled,
                                      boolean telemetryEnabled,
                                      boolean telemetryBreadcrumbsEnabled) {
 
@@ -82,7 +83,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 passiveBreedingEnabled,
                 breedingRequiresHappiness,
                 traitsEnabled,
-                reviveSystemEnabled
+                reviveSystemEnabled,
+                recallTeleportingEnabled
         );
     }
 
@@ -126,6 +128,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 breedingRequiresHappiness,
                 traitsEnabled,
                 reviveSystemEnabled,
+                recallTeleportingEnabled,
                 telemetryEnabled,
                 telemetryBreadcrumbsEnabled
         );
@@ -172,6 +175,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         boolean traitsEnabled = overrides != null && overrides.traitsEnabled() != null
                 ? overrides.traitsEnabled()
                 : traitConfig != null && traitConfig.isEnabled();
+        boolean recallTeleportingEnabled = overrides == null
+                || overrides.recallTeleportingEnabled() == null
+                || overrides.recallTeleportingEnabled();
 
         return new TameworkSettingsValues(
                 global.getPopulationLimitPerPlayerOwnedTotal(),
@@ -209,6 +215,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 breedingRequiresHappiness,
                 traitsEnabled,
                 global.isCommandDeadRespawnEnabled(),
+                recallTeleportingEnabled,
                 telemetrySettings.enabled(),
                 telemetrySettings.breadcrumbsEnabled()
         );

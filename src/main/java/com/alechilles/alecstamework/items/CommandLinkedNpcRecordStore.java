@@ -29,6 +29,7 @@ final class CommandLinkedNpcRecordStore {
     private static final String TOKEN_ACTIVE = "ac=";
     private static final String TOKEN_BREEDING_ENABLED = "be=";
     private static final String TOKEN_GROUP_ID = "gid=";
+    private static final String TOKEN_LAST_KNOWN_WORLD = "lw=";
 
     List<LinkedNpcRecord> read(ItemStack stack) {
         if (stack == null || stack.isEmpty()) {
@@ -90,6 +91,9 @@ final class CommandLinkedNpcRecordStore {
             if (record.cachedRoleId != null && !record.cachedRoleId.isBlank()) {
                 builder.append('|').append(TOKEN_ROLE_ID).append(encodeRecordText(record.cachedRoleId));
             }
+            if (record.lastKnownWorldName != null && !record.lastKnownWorldName.isBlank()) {
+                builder.append('|').append(TOKEN_LAST_KNOWN_WORLD).append(encodeRecordText(record.lastKnownWorldName));
+            }
             if (record.cachedCommandState != null && !record.cachedCommandState.isBlank()) {
                 builder.append('|').append(TOKEN_COMMAND_STATE).append(encodeRecordText(record.cachedCommandState));
             }
@@ -117,6 +121,7 @@ final class CommandLinkedNpcRecordStore {
                 stack,
                 npcUuid,
                 position,
+                null,
                 homePosition,
                 cachedDisplayName,
                 cachedNameKey,
@@ -138,6 +143,7 @@ final class CommandLinkedNpcRecordStore {
                 stack,
                 npcUuid,
                 position,
+                null,
                 homePosition,
                 cachedDisplayName,
                 cachedNameKey,
@@ -150,6 +156,30 @@ final class CommandLinkedNpcRecordStore {
     ItemStack upsert(ItemStack stack,
                      UUID npcUuid,
                      Vector3d position,
+                     Vector3d homePosition,
+                     String cachedDisplayName,
+                     String cachedNameKey,
+                     String cachedRoleId,
+                     Boolean activeOverride,
+                     String cachedCommandState) {
+        return upsert(
+                stack,
+                npcUuid,
+                position,
+                null,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                activeOverride,
+                cachedCommandState
+        );
+    }
+
+    ItemStack upsert(ItemStack stack,
+                     UUID npcUuid,
+                     Vector3d position,
+                     String lastKnownWorldName,
                      Vector3d homePosition,
                      String cachedDisplayName,
                      String cachedNameKey,
@@ -171,6 +201,7 @@ final class CommandLinkedNpcRecordStore {
                 continue;
             }
             Vector3d mergedLastKnown = position != null ? position : record.lastKnownPosition;
+            String mergedLastKnownWorldName = firstNonBlank(lastKnownWorldName, record.lastKnownWorldName);
             Vector3d mergedHome = homePosition != null ? homePosition : record.homePosition;
             String mergedDisplayName = firstNonBlank(cachedDisplayName, record.cachedDisplayName);
             String mergedNameKey = firstNonBlank(cachedNameKey, record.cachedNameKey);
@@ -180,6 +211,7 @@ final class CommandLinkedNpcRecordStore {
             records.set(i, new LinkedNpcRecord(
                     npcUuid,
                     mergedLastKnown,
+                    mergedLastKnownWorldName,
                     mergedHome,
                     mergedDisplayName,
                     mergedNameKey,
@@ -196,6 +228,7 @@ final class CommandLinkedNpcRecordStore {
             records.add(new LinkedNpcRecord(
                     npcUuid,
                     position,
+                    lastKnownWorldName,
                     homePosition,
                     firstNonBlank(cachedDisplayName, null),
                     firstNonBlank(cachedNameKey, null),
@@ -230,6 +263,7 @@ final class CommandLinkedNpcRecordStore {
             records.set(i, new LinkedNpcRecord(
                     record.npcUuid,
                     record.lastKnownPosition,
+                    record.lastKnownWorldName,
                     record.homePosition,
                     record.cachedDisplayName,
                     record.cachedNameKey,
@@ -266,6 +300,7 @@ final class CommandLinkedNpcRecordStore {
             records.set(i, new LinkedNpcRecord(
                     record.npcUuid,
                     record.lastKnownPosition,
+                    record.lastKnownWorldName,
                     record.homePosition,
                     record.cachedDisplayName,
                     record.cachedNameKey,
@@ -303,6 +338,7 @@ final class CommandLinkedNpcRecordStore {
             records.set(i, new LinkedNpcRecord(
                     record.npcUuid,
                     record.lastKnownPosition,
+                    record.lastKnownWorldName,
                     record.homePosition,
                     record.cachedDisplayName,
                     record.cachedNameKey,
@@ -376,6 +412,7 @@ final class CommandLinkedNpcRecordStore {
         String cachedNameKey = null;
         String cachedRoleId = null;
         String cachedCommandState = null;
+        String lastKnownWorldName = null;
         boolean active = true;
         boolean breedingEnabled = false;
         String groupId = null;
@@ -422,6 +459,10 @@ final class CommandLinkedNpcRecordStore {
                 cachedRoleId = decodeRecordText(token.substring(TOKEN_ROLE_ID.length()));
                 continue;
             }
+            if (token.startsWith(TOKEN_LAST_KNOWN_WORLD)) {
+                lastKnownWorldName = decodeRecordText(token.substring(TOKEN_LAST_KNOWN_WORLD.length()));
+                continue;
+            }
             if (token.startsWith(TOKEN_COMMAND_STATE)) {
                 cachedCommandState = decodeRecordText(token.substring(TOKEN_COMMAND_STATE.length()));
                 continue;
@@ -443,6 +484,7 @@ final class CommandLinkedNpcRecordStore {
         return new LinkedNpcRecord(
                 uuid,
                 position,
+                lastKnownWorldName,
                 homePosition,
                 cachedDisplayName,
                 cachedNameKey,

@@ -42,6 +42,7 @@ final class LinkedNpcEntrySnapshotMapper {
             out.add(new LinkedNpcEntry(
                     entry.npcUuid(),
                     name,
+                    entry.gender(),
                     current,
                     max,
                     currentHappiness,

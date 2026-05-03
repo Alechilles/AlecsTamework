@@ -288,10 +288,14 @@ public final class CommandCoopManagedWildCaptureSystem extends TickingSystem<Chu
 
     private boolean hasEnabledManagedCoopConfigs() {
         DefaultAssetMap<String, TwCoopConfig> assetMap = TwCoopConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null || assetMap.getAssetMap().isEmpty()) {
+        if (assetMap == null) {
             return false;
         }
-        for (TwCoopConfig config : assetMap.getAssetMap().values()) {
+        Map<String, TwCoopConfig> configs = assetMap.getAssetMap();
+        if (configs == null || configs.isEmpty()) {
+            return false;
+        }
+        for (TwCoopConfig config : configs.values()) {
             if (config != null && config.isEnabled()) {
                 return true;
             }

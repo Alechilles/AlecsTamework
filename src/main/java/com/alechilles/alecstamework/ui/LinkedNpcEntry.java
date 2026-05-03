@@ -11,6 +11,7 @@ import java.util.UUID;
 public final class LinkedNpcEntry {
     private final UUID npcUuid;
     private final String displayName;
+    private final String gender;
     private final int currentHealth;
     private final int maxHealth;
     private final int currentHappiness;
@@ -71,6 +72,7 @@ public final class LinkedNpcEntry {
         this(
                 npcUuid,
                 displayName,
+                null,
                 currentHealth,
                 maxHealth,
                 currentHappiness,
@@ -139,6 +141,7 @@ public final class LinkedNpcEntry {
         this(
                 npcUuid,
                 displayName,
+                null,
                 currentHealth,
                 maxHealth,
                 currentHappiness,
@@ -218,8 +221,93 @@ public final class LinkedNpcEntry {
                           long breedingCooldownRemainingMs,
                           double breedingCooldownRatio,
                           boolean breedingCooldownKnown) {
+        this(
+                npcUuid,
+                displayName,
+                null,
+                currentHealth,
+                maxHealth,
+                currentHappiness,
+                maxHappiness,
+                targetHappinessPercent,
+                happinessModifierBreakdown,
+                currentHunger,
+                maxHunger,
+                currentThirst,
+                maxThirst,
+                loaded,
+                hasHome,
+                dead,
+                captured,
+                inCoop,
+                lost,
+                deadRespawnRemainingMs,
+                deathCauseHint,
+                futureStatA,
+                futureStatB,
+                traitIndicators,
+                traitsActionVisible,
+                traitsActionEnabled,
+                talentsActionVisible,
+                talentsActionEnabled,
+                linked,
+                active,
+                speciesId,
+                speciesLabel,
+                groupId,
+                groupName,
+                groupColorHex,
+                breedingEnabled,
+                breedingCooldownActive,
+                breedingCooldownRemainingMs,
+                breedingCooldownRatio,
+                breedingCooldownKnown
+        );
+    }
+
+    public LinkedNpcEntry(UUID npcUuid,
+                          String displayName,
+                          String gender,
+                          int currentHealth,
+                          int maxHealth,
+                          int currentHappiness,
+                          int maxHappiness,
+                          int targetHappinessPercent,
+                          String happinessModifierBreakdown,
+                          int currentHunger,
+                          int maxHunger,
+                          int currentThirst,
+                          int maxThirst,
+                          boolean loaded,
+                          boolean hasHome,
+                          boolean dead,
+                          boolean captured,
+                          boolean inCoop,
+                          boolean lost,
+                          long deadRespawnRemainingMs,
+                          String deathCauseHint,
+                          FutureStat futureStatA,
+                          FutureStat futureStatB,
+                          LinkedNpcTraitIndicator[] traitIndicators,
+                          boolean traitsActionVisible,
+                          boolean traitsActionEnabled,
+                          boolean talentsActionVisible,
+                          boolean talentsActionEnabled,
+                          boolean linked,
+                          boolean active,
+                          String speciesId,
+                          String speciesLabel,
+                          String groupId,
+                          String groupName,
+                          String groupColorHex,
+                          boolean breedingEnabled,
+                          boolean breedingCooldownActive,
+                          long breedingCooldownRemainingMs,
+                          double breedingCooldownRatio,
+                          boolean breedingCooldownKnown) {
         this.npcUuid = npcUuid;
         this.displayName = displayName;
+        this.gender = normalizeGender(gender);
         this.currentHealth = currentHealth;
         this.maxHealth = maxHealth;
         this.currentHappiness = currentHappiness;
@@ -269,6 +357,18 @@ public final class LinkedNpcEntry {
 
     public String displayName() {
         return displayName;
+    }
+
+    public String gender() {
+        return gender;
+    }
+
+    public boolean isMale() {
+        return "Male".equals(gender);
+    }
+
+    public boolean isFemale() {
+        return "Female".equals(gender);
     }
 
     public int currentHealth() {
@@ -503,6 +603,20 @@ public final class LinkedNpcEntry {
         return Math.max(0, Math.min(100, Math.round((float) (ratio * 100.0))));
     }
 
+    private static String normalizeGender(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if ("male".equalsIgnoreCase(trimmed)) {
+            return "Male";
+        }
+        if ("female".equalsIgnoreCase(trimmed)) {
+            return "Female";
+        }
+        return null;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (this == obj) {
@@ -540,6 +654,7 @@ public final class LinkedNpcEntry {
                 && talentsActionEnabled == other.talentsActionEnabled
                 && Objects.equals(npcUuid, other.npcUuid)
                 && Objects.equals(displayName, other.displayName)
+                && Objects.equals(gender, other.gender)
                 && Objects.equals(happinessModifierBreakdown, other.happinessModifierBreakdown)
                 && Objects.equals(deathCauseHint, other.deathCauseHint)
                 && Objects.equals(speciesId, other.speciesId)
@@ -557,6 +672,7 @@ public final class LinkedNpcEntry {
         int result = Objects.hash(
                 npcUuid,
                 displayName,
+                gender,
                 currentHealth,
                 maxHealth,
                 currentHappiness,

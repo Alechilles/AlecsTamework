@@ -150,6 +150,51 @@ $C.@PageOverlay {
 
               Label {
                 Anchor: (Left: 0, Right: 0, Height: 24);
+                Text: "Recall / Return Home";
+                Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsRecallSectionTooltip {
+                Anchor: (Left: 0, Right: 0, Height: 24);
+                Text: "";
+                TooltipText: "Controls whether recall and return-home commands may teleport companions when normal movement cannot reach them.";
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Recall Teleporting";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsRecallTeleportingTooltip {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "";
+                TooltipText: "When disabled, recall and return-home commands will not teleport unloaded or distant companions. Use Locate to see their last recorded location.";
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsRecallTeleportingEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group { Anchor: (Height: 8); }
+
+            Group {
+              Anchor: (Height: 24);
+
+              Label {
+                Anchor: (Left: 0, Right: 0, Height: 24);
                 Text: "Companion Systems";
                 Style: (FontSize: 16, RenderBold: true, TextColor: #dce9f8, HorizontalAlignment: Start, VerticalAlignment: Center);
               }

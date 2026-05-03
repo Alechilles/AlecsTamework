@@ -32,6 +32,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.lang.reflect.Method;
 import java.util.UUID;
+import javax.annotation.Nullable;
 
 /**
  * Executes command steps against selected NPC recipients.
@@ -304,7 +305,9 @@ final class CommandStepExecutionService {
                     companionSettings.getReturnHomeTeleportDelayMs(),
                     context.returnHomeTeleportDelayMs
             );
-            if (start != null && start.distanceTo(targetPosition) > returnHomeTeleportDistance) {
+            if (CommandTravelSettings.isRecallTeleportingEnabled()
+                    && start != null
+                    && start.distanceTo(targetPosition) > returnHomeTeleportDistance) {
                 Vector3d intermediate = computeIntermediatePoint(start, targetPosition, returnHomePathDistanceBeforeTeleport);
                 RelocationState postRelocationState = resolveRelocationState(context.command, true, false);
                 World world = context.player != null ? context.player.getWorld() : null;
@@ -379,10 +382,13 @@ final class CommandStepExecutionService {
                     context.workingItem,
                     candidate.npc.getUuid(),
                     currentPosition,
+                    resolveWorldName(context),
                     home,
                     npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, context.store),
                     npcNameResolver.resolveNpcNameKey(candidate.npc),
-                    npcNameResolver.resolveNpcRoleId(candidate.npc)
+                    npcNameResolver.resolveNpcRoleId(candidate.npc),
+                    null,
+                    null
             );
             if (updated != context.workingItem) {
                 context.workingItem = updated;
@@ -390,6 +396,15 @@ final class CommandStepExecutionService {
             }
         }
         return true;
+    }
+
+    @Nullable
+    private String resolveWorldName(Context context) {
+        World world = context != null && context.player != null ? context.player.getWorld() : null;
+        if (world == null || world.getName() == null || world.getName().isBlank()) {
+            return null;
+        }
+        return world.getName();
     }
 
     private boolean applyClearCombat(ClearCombatStep step, Context context, Candidate candidate) {

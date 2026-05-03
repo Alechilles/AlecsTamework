@@ -7,6 +7,7 @@ $C = "Common.ui";
 @LinkedActionSetHomeButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_SetHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionReturnHomeButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_ReturnHome_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActionRespawnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Respawn_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
+@LinkedActionLocateButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Default.png"), LabelStyle: @LinkedActionIconLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Hover.png"), LabelStyle: @LinkedActionIconLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Pressed.png"), LabelStyle: @LinkedActionIconLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelAction_Locate_Disabled.png"), LabelStyle: @LinkedActionIconLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActiveStateButtonLabelStyle = LabelStyle(FontSize: 1, TextColor: #000000(0.0));
 @LinkedActiveStateOnButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_On_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
 @LinkedActiveStateOffButtonStyle = TextButtonStyle(Default: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Default.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Hovered: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Hover.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Pressed: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Pressed.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Disabled: (Background: (TexturePath: "Tamework/LinkedPanelToggleActive_Off_Disabled.png"), LabelStyle: @LinkedActiveStateButtonLabelStyle), Sounds: $C.@ButtonSounds);
@@ -35,8 +36,20 @@ Group {
         }
     }
 
+    Group #GenderMaleIcon {
+        Anchor: (Top: 3, Left: 18, Width: 16, Height: 16);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Male.png");
+        Visible: false;
+    }
+
+    Group #GenderFemaleIcon {
+        Anchor: (Top: 3, Left: 18, Width: 16, Height: 16);
+        Background: (TexturePath: "Tamework/LinkedPanelIcons/Gender_Female.png");
+        Visible: false;
+    }
+
     Label #Name {
-        Anchor: (Top: 0, Left: 18, Width: 188, Height: 22);
+        Anchor: (Top: 0, Left: 38, Width: 168, Height: 22);
         Text: %server.tamework.ui.linkedPanel.subtitle.defaultNpcName;
         Style: (FontSize: 16, RenderBold: true, TextColor: #eff4fa, HorizontalAlignment: Start, VerticalAlignment: Center);
     }
@@ -490,6 +503,15 @@ Group {
         Style: @LinkedActionRespawnButtonStyle;
         Text: "";
         TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.respawn;
+        TextTooltipStyle: @LinkedActionTooltipStyle;
+        Visible: false;
+    }
+
+    TextButton #LocateButton {
+        Anchor: (Top: 56, Right: 84, Width: 24, Height: 24);
+        Style: @LinkedActionLocateButtonStyle;
+        Text: "";
+        TooltipText: %server.tamework.ui.linkedPanel.card.tooltip.locate;
         TextTooltipStyle: @LinkedActionTooltipStyle;
         Visible: false;
     }

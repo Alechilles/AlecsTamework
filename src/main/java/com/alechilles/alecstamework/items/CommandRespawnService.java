@@ -170,6 +170,7 @@ final class CommandRespawnService {
                 updated,
                 spawnedNpc.getUuid(),
                 destination,
+                linkMutationService.resolveWorldName(store, player.getWorld()),
                 homePosition,
                 npcNameResolver.resolveNpcDisplayNameFromComponents(spawnedRef, store),
                 npcNameResolver.resolveNpcNameKey(spawnedNpc),
