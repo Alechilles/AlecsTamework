@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 2.9.0 - Recall Teleportation Toggles, Gender Breeding, and Embedded Telemetry - 2026-05-03
+## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-03
 
 ### Added
 - Added `/tw showspawnmarkers [radius|off]` to render nearby loaded Hytale spawn markers with bright-pink player-local debug shapes and print marker IDs, NPC options, positions, spawn counts, manual-trigger status, and suppression state.
