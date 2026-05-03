@@ -14,6 +14,7 @@
 ### Changed
 - Replaced linked-panel gender text suffixes with male/female icons shown to the left of companion names.
 - Switched Tamework to the shared embedded Alec's Telemetry runtime dependency instead of carrying the runtime sources directly in the mod.
+- Moved `/tw settings` telemetry persistence into `universe/Tamework/Settings/tamework-settings.json`, with legacy crash telemetry opt-out files imported without deleting them.
 
 ### Fixed
 - Fixed `/tw npcspawntamed` attachment overrides being replaced by the NPC's initial random attachment choice after the sync system ran.

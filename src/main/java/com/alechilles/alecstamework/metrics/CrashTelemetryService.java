@@ -29,6 +29,7 @@ import java.util.stream.Stream;
 public final class CrashTelemetryService {
 
     private static final String TAMEWORK_PROJECT_ID = "alecs-tamework";
+    private static final String LEGACY_SETTINGS_FILE_NAME = "crash-telemetry.json";
 
     private final EmbeddedRuntime telemetry;
     private final AtomicBoolean enabled;
@@ -44,30 +45,32 @@ public final class CrashTelemetryService {
         HytaleLogger logger = plugin.getLogger();
         Path pluginDataDirectory = plugin.getDataDirectory().toAbsolutePath().normalize();
         Path tameworkUniverseRoot = TameworkSettingsStore.resolveTameworkUniverseRoot(plugin).toAbsolutePath().normalize();
-        Path compatibilitySettingsPath = TameworkSettingsStore.resolveSettingsDirectory(plugin)
-                .resolve(CrashTelemetrySettings.FILE_NAME)
-                .toAbsolutePath()
-                .normalize();
-        importLegacyCrashTelemetrySettings(
-                compatibilitySettingsPath,
+        Path globalSettingsPath = TameworkSettingsStore.resolveGlobalSettingsFile(plugin).toAbsolutePath().normalize();
+        TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(
+                globalSettingsPath,
                 legacyCrashTelemetrySettingsCandidates(pluginDataDirectory, tameworkUniverseRoot),
                 logger
         );
-        CrashTelemetrySettings compatibilitySettings = CrashTelemetrySettings.load(compatibilitySettingsPath, logger);
+        TameworkSettingsStore.GlobalOverrides settings = TameworkSettingsStore.loadGlobalOverrides(globalSettingsPath, logger);
+        boolean telemetryEnabled = settings == null || settings.telemetryEnabled() == null || settings.telemetryEnabled();
+        boolean breadcrumbsEnabled = settings == null || settings.telemetryBreadcrumbsEnabled() == null || settings.telemetryBreadcrumbsEnabled();
         migrateLegacyTelemetryData(
                 pluginDataDirectory.resolve("Telemetry"),
                 legacyTelemetryRootCandidates(pluginDataDirectory, tameworkUniverseRoot),
                 logger
         );
         EmbeddedTelemetryService embeddedTelemetry = EmbeddedTelemetryBootstrap.bootstrap(plugin);
-        return new CrashTelemetryService(compatibilitySettings, new EmbeddedServiceRuntime(embeddedTelemetry));
+        return new CrashTelemetryService(telemetryEnabled, breadcrumbsEnabled, new EmbeddedServiceRuntime(embeddedTelemetry));
     }
 
-    CrashTelemetryService(@Nonnull CrashTelemetrySettings compatibilitySettings,
+    CrashTelemetryService(boolean enabled,
+                          boolean breadcrumbsEnabled,
                           @Nonnull EmbeddedRuntime telemetry) {
         this.telemetry = Objects.requireNonNull(telemetry, "telemetry");
-        this.enabled = new AtomicBoolean(compatibilitySettings.enabled());
-        this.breadcrumbsEnabled = new AtomicBoolean(compatibilitySettings.breadcrumbsEnabled());
+        this.enabled = new AtomicBoolean(enabled);
+        this.breadcrumbsEnabled = new AtomicBoolean(breadcrumbsEnabled);
+        telemetry.setBreadcrumbsEnabled(breadcrumbsEnabled);
+        telemetry.setProjectEnabled(enabled);
         syncLastFlushStatus();
     }
 
@@ -100,6 +103,9 @@ public final class CrashTelemetryService {
 
     public synchronized void applyEnabledSetting(boolean enabled) {
         boolean previous = this.enabled.getAndSet(enabled);
+        if (!telemetry.setProjectEnabled(enabled)) {
+            updateLastFlushStatus("Failed to persist embedded telemetry enabled setting.");
+        }
         if (previous == enabled) {
             return;
         }
@@ -120,6 +126,9 @@ public final class CrashTelemetryService {
 
     public synchronized void applyBreadcrumbsEnabledSetting(boolean enabled) {
         boolean previous = this.breadcrumbsEnabled.getAndSet(enabled);
+        if (!telemetry.setBreadcrumbsEnabled(enabled)) {
+            updateLastFlushStatus("Failed to persist embedded telemetry breadcrumbs setting.");
+        }
         if (previous == enabled) {
             return;
         }
@@ -311,43 +320,18 @@ public final class CrashTelemetryService {
     static List<Path> legacyCrashTelemetrySettingsCandidates(@Nonnull Path pluginDataDirectory,
                                                              @Nonnull Path tameworkUniverseRoot) {
         return List.of(
-                pluginDataDirectory.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
-                pluginDataDirectory.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
-                pluginDataDirectory.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
-                pluginDataDirectory.resolve("telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
-                pluginDataDirectory.resolve("telemetry").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("Settings").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("Telemetry").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
+                pluginDataDirectory.resolve("telemetry").resolve("Settings").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
                 pluginDataDirectory.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
-                tameworkUniverseRoot.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
-                tameworkUniverseRoot.resolve("telemetry").resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("Settings").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("Telemetry").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
+                tameworkUniverseRoot.resolve("telemetry").resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize(),
                 tameworkUniverseRoot.resolve("tamework-crash-telemetry.txt").toAbsolutePath().normalize(),
-                tameworkUniverseRoot.resolve(CrashTelemetrySettings.FILE_NAME).toAbsolutePath().normalize()
+                tameworkUniverseRoot.resolve(LEGACY_SETTINGS_FILE_NAME).toAbsolutePath().normalize()
         );
-    }
-
-    static void importLegacyCrashTelemetrySettings(@Nonnull Path preferredSettingsPath,
-                                                   @Nonnull List<Path> legacySettingsCandidates,
-                                                   @Nullable HytaleLogger logger) {
-        Path preferred = preferredSettingsPath.toAbsolutePath().normalize();
-        if (Files.isRegularFile(preferred)) {
-            return;
-        }
-        for (Path candidate : legacySettingsCandidates) {
-            Path source = candidate.toAbsolutePath().normalize();
-            if (source.equals(preferred) || !Files.isRegularFile(source)) {
-                continue;
-            }
-            try {
-                Path parent = preferred.getParent();
-                if (parent != null) {
-                    Files.createDirectories(parent);
-                }
-                Files.copy(source, preferred);
-                logInfo(logger, "Imported legacy crash telemetry settings from " + source + ".");
-                return;
-            } catch (Exception ex) {
-                logWarning(logger, "Unable to import legacy crash telemetry settings from " + source + ".", ex);
-            }
-        }
     }
 
     @Nonnull
@@ -422,8 +406,8 @@ public final class CrashTelemetryService {
                     newTelemetryRoot.resolve("Settings").resolve("server-id.txt")
             );
             copied += copyFileIfExists(
-                    oldTelemetryRoot.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME),
-                    newTelemetryRoot.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME)
+                    oldTelemetryRoot.resolve("Settings").resolve(LEGACY_SETTINGS_FILE_NAME),
+                    newTelemetryRoot.resolve("Settings").resolve(LEGACY_SETTINGS_FILE_NAME)
             );
             copied += copyFileIfExists(
                     oldTelemetryRoot.resolve("Settings").resolve("projects").resolve(TAMEWORK_PROJECT_ID + ".json"),
@@ -531,6 +515,10 @@ public final class CrashTelemetryService {
 
         void clearBreadcrumbs();
 
+        boolean setProjectEnabled(boolean enabled);
+
+        boolean setBreadcrumbsEnabled(boolean enabled);
+
         void captureSetupFailure(@Nullable Throwable throwable);
 
         void captureStartFailure(@Nullable Throwable throwable);
@@ -581,6 +569,16 @@ public final class CrashTelemetryService {
         @Override
         public void clearBreadcrumbs() {
             service.clearBreadcrumbs();
+        }
+
+        @Override
+        public boolean setProjectEnabled(boolean enabled) {
+            return service.setProjectEnabled(enabled);
+        }
+
+        @Override
+        public boolean setBreadcrumbsEnabled(boolean enabled) {
+            return service.setBreadcrumbsEnabled(enabled);
         }
 
         @Override

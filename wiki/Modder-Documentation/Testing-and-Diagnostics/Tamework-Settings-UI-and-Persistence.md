@@ -38,7 +38,7 @@ Current presets:
 - Universe settings file: `universe/Tamework/Settings/tamework-settings.json`
 - Settings announcement file: `universe/Tamework/Settings/tamework-settings-announcement.json`
 - Settings announcement opt-out state: `universe/Tamework/Settings/tamework-settings-announcement-state.json`
-- Crash telemetry settings file: `universe/Tamework/Settings/crash-telemetry.json`
+- Telemetry settings are stored in the universe settings file under `telemetry`
 
 These files are universe-local runtime settings, not shipped mod assets.
 
@@ -94,13 +94,14 @@ This lets you keep Alec's built-in re-arm behavior while still replacing the vis
 - Revive system enabled toggle
 
 ### Crash Telemetry
-- `enabled`
-- `breadcrumbs_enabled`
+- `telemetry.enabled`
+- `telemetry.breadcrumbsEnabled`
 
 ## Runtime Behavior
 - Applying settings writes updated files and refreshes runtime state.
 - Loading a preset only changes the current UI form; `Apply` persists it.
-- Crash telemetry enablement and breadcrumbs are applied immediately when possible.
+- Crash telemetry enablement and breadcrumbs are applied immediately when possible and mirrored into the embedded Alec's Telemetry project override.
+- Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` values are imported only when the universe settings file does not already contain telemetry values.
 - `/tw settings` is intended for world-level operations and diagnostics, not per-mod content packs.
 - The login popup is shown at most once per player login session, so world changes do not reopen it repeatedly.
 
