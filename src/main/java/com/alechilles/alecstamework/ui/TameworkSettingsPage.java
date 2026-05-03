@@ -4,7 +4,6 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.CrashTelemetryService;
-import com.alechilles.alecstamework.metrics.CrashTelemetrySettings;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.hypixel.hytale.codec.Codec;
@@ -346,10 +345,6 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
 
     @Nonnull
     private String saveTelemetrySettings(boolean enabled, boolean breadcrumbsEnabled) {
-        Path settingsPath = resolveSettingsDirectory().resolve(CrashTelemetrySettings.FILE_NAME);
-        if (!CrashTelemetrySettings.saveToggles(settingsPath, enabled, breadcrumbsEnabled, plugin.getLogger())) {
-            return "Universe settings applied, but crash telemetry setting failed to save.";
-        }
         try {
             CrashTelemetryService service = plugin.getCrashTelemetryService();
             if (service != null) {
@@ -358,6 +353,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
             }
         } catch (Exception ex) {
             plugin.getLogger().at(Level.WARNING).withCause(ex).log("Failed applying crash telemetry setting at runtime.");
+            return "Universe settings applied, but crash telemetry setting failed to apply at runtime.";
         }
         return "";
     }

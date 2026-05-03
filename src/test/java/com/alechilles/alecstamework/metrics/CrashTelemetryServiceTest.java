@@ -42,14 +42,17 @@ class CrashTelemetryServiceTest {
         CrashTelemetryService service = createService(false, true, runtime);
 
         assertFalse(service.diagnostics().enabled());
+        assertEquals(false, runtime.lastProjectEnabled);
 
         service.applyEnabledSetting(true);
         assertTrue(service.diagnostics().enabled());
         assertEquals(1, runtime.startCalls);
+        assertEquals(true, runtime.lastProjectEnabled);
 
         service.applyEnabledSetting(false);
         assertFalse(service.diagnostics().enabled());
         assertEquals(1, runtime.shutdownCalls);
+        assertEquals(false, runtime.lastProjectEnabled);
     }
 
     @Test
@@ -63,6 +66,7 @@ class CrashTelemetryServiceTest {
 
         assertEquals(1, runtime.breadcrumbCalls);
         assertEquals(1, runtime.clearBreadcrumbsCalls);
+        assertEquals(false, runtime.lastBreadcrumbsEnabled);
     }
 
     @Test
@@ -182,80 +186,13 @@ class CrashTelemetryServiceTest {
     }
 
     @Test
-    void importsLegacyCrashTelemetryOptOutBeforeCreatingDefaultSettings() throws Exception {
-        Path preferred = tempDir.resolve("universe").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
-        Path legacy = tempDir.resolve("plugin-data").resolve(CrashTelemetrySettings.FILE_NAME);
-        Files.createDirectories(legacy.getParent());
-        Files.writeString(
-                legacy,
-                """
-                {
-                  "enabled": false,
-                  "breadcrumbsEnabled": false
-                }
-                """,
-                StandardCharsets.UTF_8
-        );
-
-        CrashTelemetryService.importLegacyCrashTelemetrySettings(preferred, List.of(legacy), null);
-        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
-
-        assertFalse(settings.enabled());
-        assertFalse(settings.breadcrumbsEnabled());
-    }
-
-    @Test
-    void doesNotOverwriteExistingCrashTelemetrySettingsWithLegacyFallback() throws Exception {
-        Path preferred = tempDir.resolve("universe").resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
-        Path legacy = tempDir.resolve("plugin-data").resolve(CrashTelemetrySettings.FILE_NAME);
-        Files.createDirectories(preferred.getParent());
-        Files.createDirectories(legacy.getParent());
-        Files.writeString(preferred, "{\"enabled\": true}", StandardCharsets.UTF_8);
-        Files.writeString(legacy, "{\"enabled\": false}", StandardCharsets.UTF_8);
-
-        CrashTelemetryService.importLegacyCrashTelemetrySettings(preferred, List.of(legacy), null);
-        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
-
-        assertTrue(settings.enabled());
-    }
-
-    @Test
-    void importsLegacyTelemetryRootCrashTelemetrySettings() throws Exception {
+    void legacySettingsCandidatesIncludePriorUniverseSettingsPath() {
         Path pluginData = tempDir.resolve("plugin-data");
-        Path universe = tempDir.resolve("universe");
-        Path preferred = universe.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
-        Path legacy = pluginData.resolve("Telemetry").resolve(CrashTelemetrySettings.FILE_NAME);
-        Files.createDirectories(legacy.getParent());
-        Files.writeString(legacy, "{\"enabled\": false}", StandardCharsets.UTF_8);
+        Path universe = tempDir.resolve("universe").resolve("Tamework");
 
-        CrashTelemetryService.importLegacyCrashTelemetrySettings(
-                preferred,
-                CrashTelemetryService.legacyCrashTelemetrySettingsCandidates(pluginData, universe),
-                null
-        );
-        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
+        List<Path> candidates = CrashTelemetryService.legacyCrashTelemetrySettingsCandidates(pluginData, universe);
 
-        assertFalse(settings.enabled());
-    }
-
-    @Test
-    void importsLegacyTextCrashTelemetrySettings() throws Exception {
-        Path pluginData = tempDir.resolve("plugin-data");
-        Path universe = tempDir.resolve("universe");
-        Path preferred = universe.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
-        Path legacy = pluginData.resolve("tamework-crash-telemetry.txt");
-        Files.createDirectories(legacy.getParent());
-        Files.writeString(legacy, "enabled=false\nbreadcrumbs_enabled=false", StandardCharsets.UTF_8);
-
-        CrashTelemetryService.importLegacyCrashTelemetrySettings(
-                preferred,
-                CrashTelemetryService.legacyCrashTelemetrySettingsCandidates(pluginData, universe),
-                null
-        );
-        CrashTelemetrySettings settings = CrashTelemetrySettings.load(preferred, null);
-
-        assertFalse(settings.enabled());
-        assertFalse(settings.breadcrumbsEnabled());
+        assertTrue(candidates.contains(universe.resolve("Settings").resolve("crash-telemetry.json").toAbsolutePath().normalize()));
     }
 
     @Test
@@ -360,14 +297,7 @@ class CrashTelemetryServiceTest {
     private CrashTelemetryService createService(boolean enabled,
                                                 boolean breadcrumbsEnabled,
                                                 @Nonnull FakeEmbeddedRuntime runtime) {
-        Path settingsPath = tempDir.resolve("Settings").resolve(CrashTelemetrySettings.FILE_NAME);
-        CrashTelemetrySettings compatibilitySettings = new CrashTelemetrySettings(
-                settingsPath,
-                enabled,
-                breadcrumbsEnabled,
-                CrashTelemetrySettings.DEFAULT_BREADCRUMBS_CAPACITY
-        );
-        return new CrashTelemetryService(compatibilitySettings, runtime);
+        return new CrashTelemetryService(enabled, breadcrumbsEnabled, runtime);
     }
 
     @Nonnull
@@ -392,11 +322,15 @@ class CrashTelemetryServiceTest {
         private int shutdownCalls;
         private int breadcrumbCalls;
         private int clearBreadcrumbsCalls;
+        private int projectEnabledCalls;
+        private int breadcrumbsEnabledCalls;
         private int setupFailureCalls;
         private int errorCalls;
         private int lifecycleCalls;
         private int flushRequests;
 
+        private Boolean lastProjectEnabled;
+        private Boolean lastBreadcrumbsEnabled;
         private String lastErrorEvent;
         private Throwable lastErrorThrowable;
         private String lastLifecycleEvent;
@@ -434,6 +368,20 @@ class CrashTelemetryServiceTest {
         @Override
         public void clearBreadcrumbs() {
             clearBreadcrumbsCalls++;
+        }
+
+        @Override
+        public boolean setProjectEnabled(boolean enabled) {
+            projectEnabledCalls++;
+            lastProjectEnabled = enabled;
+            return true;
+        }
+
+        @Override
+        public boolean setBreadcrumbsEnabled(boolean enabled) {
+            breadcrumbsEnabledCalls++;
+            lastBreadcrumbsEnabled = enabled;
+            return true;
         }
 
         @Override

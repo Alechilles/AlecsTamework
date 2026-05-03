@@ -3,6 +3,9 @@ package com.alechilles.alecstamework.persistence;
 import com.alechilles.alecstamework.Tamework;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
 import com.google.gson.annotations.SerializedName;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -172,11 +175,53 @@ public final class TameworkSettingsStore {
         document.travel = new TravelSection();
         document.travel.recallTeleportingEnabled = snapshot.recallTeleportingEnabled();
 
+        document.telemetry = new TelemetrySection();
+        document.telemetry.enabled = snapshot.telemetryEnabled();
+        document.telemetry.breadcrumbsEnabled = snapshot.telemetryBreadcrumbsEnabled();
+
         if (!writeDocument(globalSettingsFile, document, logger)) {
             return false;
         }
         updateGlobalCache(globalSettingsFile, document);
         updateRuntimeOverridesCache(globalSettingsFile, toOverrides(document));
+        return true;
+    }
+
+    public static boolean importLegacyTelemetrySettingsIfMissing(@Nonnull Path globalSettingsFile,
+                                                                 @Nonnull java.util.List<Path> legacySettingsCandidates,
+                                                                 @Nullable HytaleLogger logger) {
+        Objects.requireNonNull(globalSettingsFile, "globalSettingsFile");
+        Objects.requireNonNull(legacySettingsCandidates, "legacySettingsCandidates");
+        GlobalSettingsDocument existing = readDocument(globalSettingsFile, logger);
+        if (hasTelemetrySettings(existing)) {
+            return true;
+        }
+        TelemetrySection imported = null;
+        Path importedFrom = null;
+        for (Path candidate : legacySettingsCandidates) {
+            Path source = candidate.toAbsolutePath().normalize();
+            if (!Files.isRegularFile(source)) {
+                continue;
+            }
+            imported = readLegacyTelemetrySettings(source, logger);
+            if (imported != null) {
+                importedFrom = source;
+                break;
+            }
+        }
+        if (imported == null) {
+            return true;
+        }
+        GlobalSettingsDocument document = existing == null ? createDefaultGlobalSettingsDocument() : existing;
+        document.telemetry = imported;
+        if (!writeDocument(globalSettingsFile, document, logger)) {
+            return false;
+        }
+        updateGlobalCache(globalSettingsFile, document);
+        updateRuntimeOverridesCache(globalSettingsFile, toOverrides(document));
+        if (logger != null && importedFrom != null) {
+            logger.at(Level.INFO).log("Imported legacy Tamework telemetry settings from " + importedFrom + ".");
+        }
         return true;
     }
 
@@ -329,6 +374,10 @@ public final class TameworkSettingsStore {
 
         document.travel = new TravelSection();
         document.travel.recallTeleportingEnabled = true;
+
+        document.telemetry = new TelemetrySection();
+        document.telemetry.enabled = true;
+        document.telemetry.breadcrumbsEnabled = true;
         return document;
     }
 
@@ -439,6 +488,7 @@ public final class TameworkSettingsStore {
         TraitsSection traits = document.traits;
         ReviveSection revive = document.revive;
         TravelSection travel = document.travel;
+        TelemetrySection telemetry = document.telemetry;
 
         return new GlobalOverrides(
                 population != null ? population.limitPerPlayerOwnedTotal : null,
@@ -490,8 +540,119 @@ public final class TameworkSettingsStore {
                 breeding != null ? breeding.requiresHappiness : null,
                 traits != null ? traits.enabled : null,
                 revive != null ? revive.enabled : null,
-                travel != null ? travel.recallTeleportingEnabled : null
+                travel != null ? travel.recallTeleportingEnabled : null,
+                telemetry != null ? telemetry.enabled : null,
+                telemetry != null ? telemetry.breadcrumbsEnabled : null
         );
+    }
+
+    private static boolean hasTelemetrySettings(@Nullable GlobalSettingsDocument document) {
+        return document != null
+                && document.telemetry != null
+                && (document.telemetry.enabled != null || document.telemetry.breadcrumbsEnabled != null);
+    }
+
+    @Nullable
+    private static TelemetrySection readLegacyTelemetrySettings(@Nonnull Path file, @Nullable HytaleLogger logger) {
+        try {
+            String raw = Files.readString(file, StandardCharsets.UTF_8);
+            if (raw.isBlank()) {
+                return null;
+            }
+            TelemetrySection section = raw.trim().startsWith("{")
+                    ? parseLegacyTelemetryJson(raw)
+                    : parseLegacyTelemetryText(raw);
+            return hasTelemetryValues(section) ? section : null;
+        } catch (Exception ex) {
+            if (logger != null) {
+                logger.at(Level.WARNING).withCause(ex).log("Unable to read legacy Tamework telemetry settings file " + file + ".");
+            }
+            return null;
+        }
+    }
+
+    @Nullable
+    private static TelemetrySection parseLegacyTelemetryJson(@Nonnull String raw) {
+        JsonElement parsed = JsonParser.parseString(raw);
+        if (parsed == null || !parsed.isJsonObject()) {
+            return null;
+        }
+        JsonObject object = parsed.getAsJsonObject();
+        TelemetrySection section = new TelemetrySection();
+        section.enabled = optionalBoolean(object, "enabled");
+        section.breadcrumbsEnabled = firstBoolean(object, "breadcrumbsEnabled", "breadcrumbs_enabled");
+        return section;
+    }
+
+    @Nonnull
+    private static TelemetrySection parseLegacyTelemetryText(@Nonnull String raw) {
+        TelemetrySection section = new TelemetrySection();
+        for (String line : raw.split("\\R")) {
+            int separator = line.indexOf('=');
+            if (separator < 0) {
+                continue;
+            }
+            String key = line.substring(0, separator).trim();
+            Boolean value = parseBoolean(line.substring(separator + 1));
+            if (value == null) {
+                continue;
+            }
+            if ("enabled".equalsIgnoreCase(key)) {
+                section.enabled = value;
+            } else if ("breadcrumbs_enabled".equalsIgnoreCase(key) || "breadcrumbsEnabled".equalsIgnoreCase(key)) {
+                section.breadcrumbsEnabled = value;
+            }
+        }
+        return section;
+    }
+
+    @Nullable
+    private static Boolean firstBoolean(@Nonnull JsonObject object, @Nonnull String... keys) {
+        for (String key : keys) {
+            Boolean value = optionalBoolean(object, key);
+            if (value != null) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    @Nullable
+    private static Boolean optionalBoolean(@Nonnull JsonObject object, @Nonnull String key) {
+        JsonElement value = object.get(key);
+        if (value == null || !value.isJsonPrimitive()) {
+            return null;
+        }
+        try {
+            return value.getAsBoolean();
+        } catch (Exception ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static Boolean parseBoolean(@Nullable String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String normalized = raw.trim();
+        if ("true".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(normalized)) {
+            return false;
+        }
+        if ("1".equals(normalized) || "on".equalsIgnoreCase(normalized) || "yes".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        if ("0".equals(normalized) || "off".equalsIgnoreCase(normalized) || "no".equalsIgnoreCase(normalized)) {
+            return false;
+        }
+        return null;
+    }
+
+    private static boolean hasTelemetryValues(@Nullable TelemetrySection section) {
+        return section != null && (section.enabled != null || section.breadcrumbsEnabled != null);
     }
 
     /**
@@ -528,7 +689,9 @@ public final class TameworkSettingsStore {
                                           boolean breedingRequiresHappiness,
                                           boolean traitsEnabled,
                                           boolean reviveSystemEnabled,
-                                          boolean recallTeleportingEnabled) {
+                                          boolean recallTeleportingEnabled,
+                                          boolean telemetryEnabled,
+                                          boolean telemetryBreadcrumbsEnabled) {
     }
 
     /**
@@ -565,7 +728,9 @@ public final class TameworkSettingsStore {
                                    @Nullable Boolean breedingRequiresHappiness,
                                    @Nullable Boolean traitsEnabled,
                                    @Nullable Boolean reviveSystemEnabled,
-                                   @Nullable Boolean recallTeleportingEnabled) {
+                                   @Nullable Boolean recallTeleportingEnabled,
+                                   @Nullable Boolean telemetryEnabled,
+                                   @Nullable Boolean telemetryBreadcrumbsEnabled) {
     }
 
     private record CachedGlobalDocument(@Nonnull Path path,
@@ -594,6 +759,7 @@ public final class TameworkSettingsStore {
         private TraitsSection traits;
         private ReviveSection revive;
         private TravelSection travel;
+        private TelemetrySection telemetry;
     }
 
     private static final class PopulationSection {
@@ -670,5 +836,10 @@ public final class TameworkSettingsStore {
 
     private static final class TravelSection {
         private Boolean recallTeleportingEnabled;
+    }
+
+    private static final class TelemetrySection {
+        private Boolean enabled;
+        private Boolean breadcrumbsEnabled;
     }
 }

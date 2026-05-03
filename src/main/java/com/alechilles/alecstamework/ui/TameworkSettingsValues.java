@@ -1,14 +1,11 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
-import com.alechilles.alecstamework.metrics.CrashTelemetrySettings;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
-import java.nio.file.Path;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -84,7 +81,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 breedingRequiresHappiness,
                 traitsEnabled,
                 reviveSystemEnabled,
-                recallTeleportingEnabled
+                recallTeleportingEnabled,
+                telemetryEnabled,
+                telemetryBreadcrumbsEnabled
         );
     }
 
@@ -150,14 +149,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         TwHappinessConfig happinessConfig = resolvePreferredHappinessConfig();
         TwBreedingConfig breedingConfig = resolvePreferredBreedingConfig();
         TwTraitConfig traitConfig = resolvePreferredTraitConfig();
-        Tamework plugin = Tamework.getInstance();
-        Path telemetryPath = plugin != null
-                ? TameworkSettingsStore.resolveSettingsDirectory(plugin).resolve(CrashTelemetrySettings.FILE_NAME)
-                : Path.of(CrashTelemetrySettings.FILE_NAME);
-        CrashTelemetrySettings telemetrySettings = CrashTelemetrySettings.load(
-                telemetryPath,
-                plugin != null ? plugin.getLogger() : null
-        );
         TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
 
         boolean needsEnabled = overrides != null && overrides.needsEnabled() != null
@@ -178,6 +169,12 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         boolean recallTeleportingEnabled = overrides == null
                 || overrides.recallTeleportingEnabled() == null
                 || overrides.recallTeleportingEnabled();
+        boolean telemetryEnabled = overrides == null
+                || overrides.telemetryEnabled() == null
+                || overrides.telemetryEnabled();
+        boolean telemetryBreadcrumbsEnabled = overrides == null
+                || overrides.telemetryBreadcrumbsEnabled() == null
+                || overrides.telemetryBreadcrumbsEnabled();
 
         return new TameworkSettingsValues(
                 global.getPopulationLimitPerPlayerOwnedTotal(),
@@ -216,8 +213,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 traitsEnabled,
                 global.isCommandDeadRespawnEnabled(),
                 recallTeleportingEnabled,
-                telemetrySettings.enabled(),
-                telemetrySettings.breadcrumbsEnabled()
+                telemetryEnabled,
+                telemetryBreadcrumbsEnabled
         );
     }
 
