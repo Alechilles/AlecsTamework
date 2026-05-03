@@ -1,0 +1,74 @@
+$C = "Common.ui";
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer #TameworkLinkedLocationRoot {
+    Anchor: (Width: 540, Height: 260);
+
+    #Title {
+      $C.@Title #TameworkLinkedLocationTitle {
+        @Alignment = Start;
+        @Text = "Companion - Location";
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Left: 10, Right: 10, Top: 8, Bottom: 8);
+
+      Group {
+        Anchor: (Height: 124, Bottom: 14);
+        Background: #13243a;
+        Padding: (Left: 12, Right: 12, Top: 12, Bottom: 12);
+        LayoutMode: Top;
+
+        Group {
+          Anchor: (Height: 32, Bottom: 12);
+
+          Label #TameworkLinkedLocationWorldLabel {
+            Anchor: (Left: 0, Width: 108, Height: 32);
+            Text: %server.tamework.ui.linkedLocation.worldLabel;
+            Style: (FontSize: 14, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          Label #TameworkLinkedLocationWorldValue {
+            Anchor: (Left: 118, Right: 0, Height: 32);
+            Text: "";
+            Style: (FontSize: 14, TextColor: #f2f7ff, HorizontalAlignment: Start, VerticalAlignment: Center, Wrap: true);
+          }
+        }
+
+        Group {
+          Anchor: (Height: 44);
+
+          Label #TameworkLinkedLocationCoordinatesLabel {
+            Anchor: (Left: 0, Width: 108, Height: 44);
+            Text: %server.tamework.ui.linkedLocation.coordinatesLabel;
+            Style: (FontSize: 14, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+          }
+
+          TextField #TameworkLinkedLocationCoordinatesInput {
+            Style: $C.@DefaultInputFieldStyle;
+            PlaceholderStyle: $C.@DefaultInputFieldPlaceholderStyle;
+            Background: $C.@InputBoxBackground;
+            Anchor: (Left: 118, Right: 0, Height: 44);
+            Padding: (Horizontal: 10);
+            Value: "";
+            MaxLength: 96;
+          }
+        }
+      }
+
+      Group {
+        LayoutMode: Right;
+
+        $C.@SmallSecondaryTextButton #TameworkLinkedLocationCloseButton {
+          @Sounds = $C.@ButtonSounds;
+          @Text = %server.tamework.ui.shared.button.close;
+          @Anchor = (Right: 10, MinWidth: 140);
+        }
+      }
+    }
+  }
+}

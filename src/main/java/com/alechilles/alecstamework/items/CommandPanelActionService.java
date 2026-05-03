@@ -434,6 +434,7 @@ final class CommandPanelActionService {
                 updated.add(new LinkedNpcRecord(
                         record.npcUuid,
                         record.lastKnownPosition,
+                        record.lastKnownWorldName,
                         record.homePosition,
                         record.cachedDisplayName,
                         record.cachedNameKey,

@@ -28,6 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 
@@ -56,6 +57,7 @@ public final class TameworkCommandSelectionPage
     private static final String RELEASE_COMMAND_PREFIX = "__release__:";
     private static final String CULL_COMMAND_PREFIX = "__cull__:";
     private static final String RESPAWN_COMMAND_PREFIX = "__respawn__:";
+    private static final String LOCATE_COMMAND_PREFIX = "__locate__:";
     private static final String RECALL_COMMAND_PREFIX = "__recall__:";
     private static final String SET_HOME_COMMAND_PREFIX = "__sethome__:";
     private static final String RETURN_HOME_COMMAND_PREFIX = "__returnhome__:";
@@ -74,25 +76,8 @@ public final class TameworkCommandSelectionPage
     private static final int MAX_COMMAND_BUTTONS = 8;
     private static final long PANEL_FILTER_INPUT_DEBOUNCE_MS = 500L;
     private static final long LINKED_PANEL_REFRESH_INTERVAL_MS = 1000L;
-    private static final LinkedNpcPanelCardBinder.CardBindingConfig CARD_BINDING_CONFIG =
-            new LinkedNpcPanelCardBinder.CardBindingConfig(
-                    LINKED_PANEL_CARD_UI_PATH,
-                    EVENT_COMMAND_ID,
-                    LINK_COMMAND_PREFIX,
-                    UNLINK_COMMAND_PREFIX,
-                    OPEN_GROUP_PICKER_COMMAND_PREFIX,
-                    TOGGLE_ACTIVE_COMMAND_PREFIX,
-                    TOGGLE_BREEDING_COMMAND_PREFIX,
-                    RELEASE_COMMAND_PREFIX,
-                    CULL_COMMAND_PREFIX,
-                    RESPAWN_COMMAND_PREFIX,
-                    RECALL_COMMAND_PREFIX,
-                    SET_HOME_COMMAND_PREFIX,
-                    RETURN_HOME_COMMAND_PREFIX,
-                    OPEN_TALENTS_COMMAND_PREFIX
-            );
-
     private final CommandOption[] options;
+    private final LinkedNpcPanelCardBinder.CardBindingConfig cardBindingConfig;
     private final boolean requireUnlinkConfirm;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcEntriesSupplier;
     private final Supplier<List<LinkedNpcEntry>> linkedNpcBaseEntriesSupplier;
@@ -118,6 +103,7 @@ public final class TameworkCommandSelectionPage
     private final Consumer<UUID> releaseCallback;
     private final Consumer<UUID> cullCallback;
     private final Consumer<UUID> respawnCallback;
+    private final Consumer<UUID> locateCallback;
     private final Consumer<UUID> recallCallback;
     private final Consumer<UUID> setHomeCallback;
     private final Consumer<UUID> returnHomeCallback;
@@ -156,13 +142,16 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull Supplier<String> panelFilterModeValueSupplier,
                                         @Nonnull Supplier<String> panelFilterInputValueSupplier,
                                         @Nonnull Supplier<List<DropdownEntryInfo>> panelGroupAssignEntriesSupplier,
+                                        @Nonnull Predicate<CommandEntry> commandOptionPredicate,
+                                        boolean recallActionEnabled,
                                         @Nonnull Consumer<UUID> linkCallback,
                                         @Nonnull Consumer<UUID> unlinkCallback,
                                         @Nonnull Consumer<UUID> toggleActiveCallback,
                                         @Nonnull Consumer<UUID> toggleBreedingCallback,
-                                        @Nonnull Consumer<UUID> releaseCallback,
-                                        @Nonnull Consumer<UUID> cullCallback,
+                                         @Nonnull Consumer<UUID> releaseCallback,
+                                         @Nonnull Consumer<UUID> cullCallback,
                                          @Nonnull Consumer<UUID> respawnCallback,
+                                         @Nonnull Consumer<UUID> locateCallback,
                                          @Nonnull Consumer<UUID> recallCallback,
                                          @Nonnull Consumer<UUID> setHomeCallback,
                                           @Nonnull Consumer<UUID> returnHomeCallback,
@@ -179,7 +168,8 @@ public final class TameworkCommandSelectionPage
                                         @Nonnull BiConsumer<UUID, String> panelAssignGroupCallback,
                                         @Nonnull Consumer<String> selectionCallback) {
         super(playerRef, CustomPageLifetime.CanDismiss, CommandSelectionEventData.CODEC);
-        this.options = buildOptions(config);
+        this.options = buildOptions(config, commandOptionPredicate);
+        this.cardBindingConfig = buildCardBindingConfig(recallActionEnabled);
         this.requireUnlinkConfirm = requireUnlinkConfirm;
         this.linkedNpcEntriesSupplier = linkedNpcEntriesSupplier;
         this.linkedNpcBaseEntriesSupplier = linkedNpcBaseEntriesSupplier;
@@ -204,6 +194,7 @@ public final class TameworkCommandSelectionPage
         this.releaseCallback = releaseCallback;
         this.cullCallback = cullCallback;
         this.respawnCallback = respawnCallback;
+        this.locateCallback = locateCallback;
         this.recallCallback = recallCallback;
         this.setHomeCallback = setHomeCallback;
         this.returnHomeCallback = returnHomeCallback;
@@ -518,6 +509,17 @@ public final class TameworkCommandSelectionPage
                 pendingUnlinkNpcUuid = null;
                 refreshLinkedNpcEntries();
                 sendCardRefreshUpdate();
+            }
+            return;
+        }
+        if (commandId.startsWith(LOCATE_COMMAND_PREFIX)) {
+            if (locateCallback == null) {
+                return;
+            }
+            UUID npcUuid = CommandUiIdParser.parseNpcUuid(commandId, LOCATE_COMMAND_PREFIX);
+            if (npcUuid != null) {
+                locateCallback.accept(npcUuid);
+                pendingUnlinkNpcUuid = null;
             }
             return;
         }
@@ -929,7 +931,7 @@ public final class TameworkCommandSelectionPage
                 entry,
                 appendCard,
                 pendingUnlink,
-                CARD_BINDING_CONFIG,
+                cardBindingConfig,
                 resolveLanguage()
         );
     }
@@ -1229,13 +1231,37 @@ public final class TameworkCommandSelectionPage
         return CommandSelectionPanelOptions.resolveFilterModeDropdownEntries(resolveLanguage());
     }
 
-    private static CommandOption[] buildOptions(TwCommandItemConfig config) {
+    private static LinkedNpcPanelCardBinder.CardBindingConfig buildCardBindingConfig(boolean recallActionEnabled) {
+        return new LinkedNpcPanelCardBinder.CardBindingConfig(
+                LINKED_PANEL_CARD_UI_PATH,
+                EVENT_COMMAND_ID,
+                LINK_COMMAND_PREFIX,
+                UNLINK_COMMAND_PREFIX,
+                OPEN_GROUP_PICKER_COMMAND_PREFIX,
+                TOGGLE_ACTIVE_COMMAND_PREFIX,
+                TOGGLE_BREEDING_COMMAND_PREFIX,
+                RELEASE_COMMAND_PREFIX,
+                CULL_COMMAND_PREFIX,
+                RESPAWN_COMMAND_PREFIX,
+                LOCATE_COMMAND_PREFIX,
+                RECALL_COMMAND_PREFIX,
+                SET_HOME_COMMAND_PREFIX,
+                RETURN_HOME_COMMAND_PREFIX,
+                OPEN_TALENTS_COMMAND_PREFIX,
+                recallActionEnabled
+        );
+    }
+
+    private static CommandOption[] buildOptions(TwCommandItemConfig config, Predicate<CommandEntry> predicate) {
         if (config == null || config.getCommandList() == null || config.getCommandList().length == 0) {
             return new CommandOption[0];
         }
         List<CommandOption> out = new ArrayList<>(MAX_COMMAND_BUTTONS);
         for (CommandEntry entry : config.getCommandList()) {
             if (entry == null || entry.getId() == null || entry.getId().isBlank()) {
+                continue;
+            }
+            if (predicate != null && !predicate.test(entry)) {
                 continue;
             }
             out.add(new CommandOption(entry.getId(), resolveLabel(entry)));

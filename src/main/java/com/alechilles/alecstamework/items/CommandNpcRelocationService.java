@@ -82,6 +82,21 @@ public final class CommandNpcRelocationService {
         }
     }
 
+    public LastKnownLocation getLastKnownLocation(@Nullable UUID npcUuid,
+                                                  @Nullable Vector3d fallbackPosition,
+                                                  @Nullable String fallbackWorldName) {
+        if (npcUuid == null) {
+            return new LastKnownLocation(normalizeWorldName(fallbackWorldName), copyPosition(fallbackPosition));
+        }
+        Vector3d position = lastKnownByNpc.get(npcUuid);
+        World world = knownWorldByNpc.get(npcUuid);
+        String worldName = world != null ? normalizeWorldName(world.getName()) : normalizeWorldName(fallbackWorldName);
+        return new LastKnownLocation(
+                worldName,
+                position != null ? new Vector3d(position) : copyPosition(fallbackPosition)
+        );
+    }
+
     public void queueRelocation(World world,
                                 UUID npcUuid,
                                 Vector3d destination,
@@ -1069,6 +1084,16 @@ public final class CommandNpcRelocationService {
         return Math.floorDiv((int) Math.floor(coord), CHUNK_SIZE);
     }
 
+    @Nullable
+    private String normalizeWorldName(@Nullable String worldName) {
+        return worldName != null && !worldName.isBlank() ? worldName.trim() : null;
+    }
+
+    @Nullable
+    private Vector3d copyPosition(@Nullable Vector3d position) {
+        return position != null ? new Vector3d(position) : null;
+    }
+
     private long toChunkKey(int chunkX, int chunkZ) {
         return (((long) chunkX) << 32) ^ (chunkZ & 0xffffffffL);
     }
@@ -1136,6 +1161,9 @@ public final class CommandNpcRelocationService {
             this.npcUuid = npcUuid;
             this.position = position;
         }
+    }
+
+    public record LastKnownLocation(@Nullable String worldName, @Nullable Vector3d position) {
     }
 
     private static final class PendingRelocation {

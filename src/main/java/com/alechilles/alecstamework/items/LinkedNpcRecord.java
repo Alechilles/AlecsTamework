@@ -12,6 +12,7 @@ import java.util.UUID;
 final class LinkedNpcRecord {
     final UUID npcUuid;
     final Vector3d lastKnownPosition;
+    final String lastKnownWorldName;
     final Vector3d homePosition;
     final String cachedDisplayName;
     final String cachedNameKey;
@@ -51,8 +52,37 @@ final class LinkedNpcRecord {
                     boolean active,
                     boolean breedingEnabled,
                     String groupId) {
+        this(
+                npcUuid,
+                lastKnownPosition,
+                null,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                cachedCommandState,
+                active,
+                breedingEnabled,
+                groupId
+        );
+    }
+
+    LinkedNpcRecord(UUID npcUuid,
+                    Vector3d lastKnownPosition,
+                    String lastKnownWorldName,
+                    Vector3d homePosition,
+                    String cachedDisplayName,
+                    String cachedNameKey,
+                    String cachedRoleId,
+                    String cachedCommandState,
+                    boolean active,
+                    boolean breedingEnabled,
+                    String groupId) {
         this.npcUuid = npcUuid;
         this.lastKnownPosition = lastKnownPosition != null ? new Vector3d(lastKnownPosition) : null;
+        this.lastKnownWorldName = (lastKnownWorldName != null && !lastKnownWorldName.isBlank())
+                ? lastKnownWorldName.trim()
+                : null;
         this.homePosition = homePosition != null ? new Vector3d(homePosition) : null;
         this.cachedDisplayName = (cachedDisplayName != null && !cachedDisplayName.isBlank()) ? cachedDisplayName : null;
         this.cachedNameKey = (cachedNameKey != null && !cachedNameKey.isBlank()) ? cachedNameKey : null;

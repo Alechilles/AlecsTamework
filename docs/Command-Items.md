@@ -103,7 +103,7 @@ Linked panel supports:
 - Group assignment overlay per row
 - Group manager flow (create/rename/recolor/delete)
 - Status lanes for loaded/unloaded/dead/lost companions
-- Per-row actions: `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
+- Per-row actions: `Locate`, `Recall`, `Set Home`, `Return Home`, `Unlink`, `Revive` (when enabled/ready), plus nearby-only `Release`/`Cull` behind confirm flow
 - Breeding cooldown ring/status and progression vitals/trait indicators
 
 ## Move/home/recall and off-screen relocation
@@ -111,6 +111,7 @@ Loaded flow:
 - `SetHome` stores per-NPC home data.
 - `ReturnHome` can use path + deferred teleport behavior.
 - `Recall` can force-relocate distant companions near the player before follow resumes.
+- `/tw settings` can disable recall/return-home teleporting. When disabled, Recall is hidden from the linked panel and command wheel, loaded companions still receive normal move/home command hooks, and unloaded or distant forced relocation is skipped; use `Locate` to open a copyable current or last recorded world-position page.
 
 Unloaded flow:
 - Relocation commands enqueue pending relocations by NPC uuid.

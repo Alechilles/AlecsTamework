@@ -76,6 +76,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_BREEDING_REQUIRES_HAPPINESS = "@BreedingRequiresHappiness";
     private static final String KEY_TRAITS_ENABLED = "@TraitsEnabled";
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
+    private static final String KEY_RECALL_TELEPORTING_ENABLED = "@RecallTeleportingEnabled";
     private static final String KEY_TELEMETRY_ENABLED = "@TelemetryEnabled";
     private static final String KEY_TELEMETRY_BREADCRUMBS_ENABLED = "@TelemetryBreadcrumbsEnabled";
 
@@ -207,6 +208,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_BREEDING_REQUIRES_HAPPINESS, "#TwSettingsBreedingRequiresHappinessCheck.Value")
                 .append(KEY_TRAITS_ENABLED, "#TwSettingsTraitsEnabledCheck.Value")
                 .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
+                .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value")
                 .append(KEY_TELEMETRY_ENABLED, "#TwSettingsTelemetryEnabledCheck.Value")
                 .append(KEY_TELEMETRY_BREADCRUMBS_ENABLED, "#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value");
     }
@@ -251,6 +253,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsBreedingRequiresHappinessCheck.Value", currentValues.breedingRequiresHappiness());
         commandBuilder.set("#TwSettingsTraitsEnabledCheck.Value", currentValues.traitsEnabled());
         commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
+        commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
         commandBuilder.set("#TwSettingsTelemetryEnabledCheck.Value", currentValues.telemetryEnabled());
         commandBuilder.set("#TwSettingsTelemetryBreadcrumbsEnabledCheck.Value", currentValues.telemetryBreadcrumbsEnabled());
     }
@@ -457,6 +460,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 boolOrDefault(payload.breedingRequiresHappiness, currentValues.breedingRequiresHappiness()),
                 boolOrDefault(payload.traitsEnabled, currentValues.traitsEnabled()),
                 boolOrDefault(payload.reviveSystemEnabled, currentValues.reviveSystemEnabled()),
+                boolOrDefault(payload.recallTeleportingEnabled, currentValues.recallTeleportingEnabled()),
                 boolOrDefault(payload.telemetryEnabled, currentValues.telemetryEnabled()),
                 boolOrDefault(payload.telemetryBreadcrumbsEnabled, currentValues.telemetryBreadcrumbsEnabled())
         );
@@ -620,6 +624,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_REQUIRES_HAPPINESS, Codec.BOOLEAN), (x, v) -> x.breedingRequiresHappiness = v, x -> x.breedingRequiresHappiness).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_TRAITS_ENABLED, Codec.BOOLEAN), (x, v) -> x.traitsEnabled = v, x -> x.traitsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_TELEMETRY_ENABLED, Codec.BOOLEAN), (x, v) -> x.telemetryEnabled = v, x -> x.telemetryEnabled).add()
                 .<Boolean>append(
                         new KeyedCodec<>(KEY_TELEMETRY_BREADCRUMBS_ENABLED, Codec.BOOLEAN),
@@ -662,6 +667,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private Boolean breedingRequiresHappiness;
         private Boolean traitsEnabled;
         private Boolean reviveSystemEnabled;
+        private Boolean recallTeleportingEnabled;
         private Boolean telemetryEnabled;
         private Boolean telemetryBreadcrumbsEnabled;
     }

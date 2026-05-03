@@ -45,6 +45,9 @@ final class CommandRelocationDispatchService {
         if (!returnHome && !recall) {
             return 0;
         }
+        if (!CommandTravelSettings.isRecallTeleportingEnabled()) {
+            return 0;
+        }
         RelocationState postRelocationState = stepExecutionService.resolveRelocationState(context.command, returnHome, recall);
         World world = context.player != null ? context.player.getWorld() : null;
         UUID ownerUuid = context.player != null ? context.player.getUuid() : null;
@@ -140,6 +143,9 @@ final class CommandRelocationDispatchService {
             return;
         }
         if (!resolutionService.isRecallCommand(context.command)) {
+            return;
+        }
+        if (!CommandTravelSettings.isRecallTeleportingEnabled()) {
             return;
         }
         TransformComponent npcTransform = context.store.getComponent(candidate.ref, TransformComponent.getComponentType());

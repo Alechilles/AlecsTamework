@@ -122,6 +122,7 @@ public final class CommandItemFeatureHandler {
     private final CommandRespawnService respawnService;
     private final CommandLostRecoveryService lostRecoveryService;
     private final CommandMenuMoveService menuMoveService;
+    private final CommandLinkedNpcLocateService locateService;
     private final CommandPanelPreferenceService panelPreferenceService;
     private final CommandPanelActionService panelActionService;
     private final CommandGroupManagerPageService groupManagerPageService;
@@ -230,6 +231,13 @@ public final class CommandItemFeatureHandler {
                 HYBRID_TELEPORT_DELAY_MS,
                 RECALL_SAFE_SPAWN_DISTANCE,
                 RECALL_FORCE_RELOCATE_DISTANCE
+        );
+        this.locateService = new CommandLinkedNpcLocateService(
+                linkMutationService,
+                relocationService,
+                feedbackService,
+                npcNameResolver,
+                toolInventoryService
         );
         this.panelActionService = new CommandPanelActionService(
                 linkMutationService,
@@ -713,6 +721,7 @@ public final class CommandItemFeatureHandler {
         }
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
         boolean requireUnlinkConfirm = globalConfig == null || globalConfig.isCommandLinkedPanelRequireUnlinkConfirm();
+        boolean recallTeleportingEnabled = CommandTravelSettings.isRecallTeleportingEnabled();
         TameworkCommandSelectionPage page = new TameworkCommandSelectionPage(
                 uiPlayerRef,
                 config,
@@ -727,6 +736,8 @@ public final class CommandItemFeatureHandler {
                 () -> toolInventoryService.resolvePanelFilterModeValueForTool(player, toolId),
                 () -> toolInventoryService.resolvePanelFilterInputForTool(player, toolId),
                 () -> groupAssignPageService.resolveGroupDropdownEntries(player, toolId),
+                entry -> recallTeleportingEnabled || !resolutionService.isRecallCommand(entry),
+                recallTeleportingEnabled,
                 npcUuid -> panelActionService.applyLink(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuUnlink(player, toolId, npcUuid),
                 npcUuid -> panelActionService.applyToggleActive(player, toolId, config, npcUuid),
@@ -734,6 +745,7 @@ public final class CommandItemFeatureHandler {
                 npcUuid -> applyMenuRelease(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuCull(player, toolId, config, npcUuid),
                 npcUuid -> applyMenuRespawn(player, toolId, npcUuid),
+                npcUuid -> applyMenuLocate(player, toolId, npcUuid),
                 npcUuid -> applyMenuRecall(player, toolId, npcUuid),
                 npcUuid -> applyMenuSetHome(player, toolId, npcUuid),
                 npcUuid -> applyMenuReturnHome(player, toolId, npcUuid),
@@ -1504,6 +1516,7 @@ public final class CommandItemFeatureHandler {
                     stack,
                     npcUuid,
                     home,
+                    world.getName(),
                     home,
                     npcNameResolver.resolveNpcDisplayNameFromComponents(npcRef, store),
                     npcNameResolver.resolveNpcNameKey(npc),
@@ -1526,6 +1539,12 @@ public final class CommandItemFeatureHandler {
         applyMenuMoveCommand(player, toolId, npcUuid, false);
     }
 
+    private void applyMenuLocate(Player player,
+                                 String toolId,
+                                 UUID npcUuid) {
+        locateService.locate(player, toolId, npcUuid);
+    }
+
     private void applyMenuReturnHome(Player player,
                                      String toolId,
                                      UUID npcUuid) {
@@ -1543,6 +1562,17 @@ public final class CommandItemFeatureHandler {
                 returnHome,
                 cmdEntry -> resolveCommandLabel(player, cmdEntry)
         );
+    }
+
+    @Nullable
+    private String resolveWorldName(@Nullable Store<EntityStore> store) {
+        World world = store != null && store.getExternalData() != null
+                ? store.getExternalData().getWorld()
+                : null;
+        if (world == null || world.getName() == null || world.getName().isBlank()) {
+            return null;
+        }
+        return world.getName();
     }
 
     private ItemStack reconcileStaleLinkedNpcRecords(Player player,
@@ -1698,6 +1728,7 @@ public final class CommandItemFeatureHandler {
                         out.add(new LinkedRecordCandidate(
                                 npc.getUuid(),
                                 position,
+                                resolveWorldName(store),
                                 homePosition,
                                 displayName,
                                 nameKey,
@@ -1817,26 +1848,7 @@ public final class CommandItemFeatureHandler {
     }
 
     private ItemStack findCommandToolStack(Player player, String toolId) {
-        if (player == null || toolId == null || toolId.isBlank()) {
-            return null;
-        }
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
-            return null;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
-        short capacity = hotbar.getCapacity();
-        for (short slot = 0; slot < capacity; slot++) {
-            ItemStack stack = hotbar.getItemStack(slot);
-            if (stack == null || stack.isEmpty()) {
-                continue;
-            }
-            String stackToolId = stack.getFromMetadataOrNull(TameworkMetadataKeys.COMMAND_TOOL_ID, Codec.STRING);
-            if (stackToolId != null && stackToolId.equals(toolId)) {
-                return stack;
-            }
-        }
-        return null;
+        return toolInventoryService.findToolStack(player, toolId);
     }
 
     private CommandSelectionResult cycleSelectedCommand(TwCommandItemConfig config, ItemStack stack) {
@@ -1924,6 +1936,7 @@ public final class CommandItemFeatureHandler {
 
     private record LinkedRecordCandidate(UUID npcUuid,
                                          Vector3d lastKnownPosition,
+                                         String lastKnownWorldName,
                                          Vector3d homePosition,
                                          String cachedDisplayName,
                                          String cachedNameKey,
@@ -1934,6 +1947,7 @@ public final class CommandItemFeatureHandler {
                 return new LinkedNpcRecord(
                         npcUuid,
                         lastKnownPosition,
+                        lastKnownWorldName,
                         homePosition,
                         cachedDisplayName,
                         cachedNameKey,
@@ -1947,6 +1961,7 @@ public final class CommandItemFeatureHandler {
             return new LinkedNpcRecord(
                     npcUuid,
                     lastKnownPosition != null ? lastKnownPosition : previous.lastKnownPosition,
+                    firstNonBlank(lastKnownWorldName, previous.lastKnownWorldName),
                     homePosition != null ? homePosition : previous.homePosition,
                     firstNonBlank(cachedDisplayName, previous.cachedDisplayName),
                     firstNonBlank(cachedNameKey, previous.cachedNameKey),

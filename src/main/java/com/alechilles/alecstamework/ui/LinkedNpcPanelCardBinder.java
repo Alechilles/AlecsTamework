@@ -39,6 +39,8 @@ final class LinkedNpcPanelCardBinder {
                      String language) {
         String entrySelector = "#TameworkLinkedPanelList[" + index + "]";
         String nameSelector = entrySelector + " #Name";
+        String maleIconSelector = entrySelector + " #GenderMaleIcon";
+        String femaleIconSelector = entrySelector + " #GenderFemaleIcon";
         String statusUnloadedSelector = entrySelector + " #StatusUnloaded";
         String statusConfirmSelector = entrySelector + " #StatusConfirm";
         String secondaryStatFrameSelector = entrySelector + " #FutureStatAFrame";
@@ -60,6 +62,7 @@ final class LinkedNpcPanelCardBinder {
         String groupTabSelector = entrySelector + " #GroupTab";
         String groupTabButtonSelector = entrySelector + " #GroupTabButton";
         String respawnSelector = entrySelector + " #RespawnButton";
+        String locateSelector = entrySelector + " #LocateButton";
         String recallSelector = entrySelector + " #RecallButton";
         String setHomeSelector = entrySelector + " #SetHomeButton";
         String returnHomeSelector = entrySelector + " #ReturnHomeButton";
@@ -70,12 +73,16 @@ final class LinkedNpcPanelCardBinder {
             commandBuilder.append("#TameworkLinkedPanelList", config.linkedPanelCardUiPath());
         }
         commandBuilder.set(nameSelector + ".Text", entry.displayName());
+        commandBuilder.set(maleIconSelector + ".Visible", entry.isMale());
+        commandBuilder.set(femaleIconSelector + ".Visible", entry.isFemale());
         boolean isLinked = entry.linked();
         boolean showRespawn = isLinked
                 && (entry.dead() || entry.lost())
                 && entry.deadRespawnRemainingMs() == 0L
                 && !pendingUnlink;
+        boolean showLocate = isLinked && !pendingUnlink;
         boolean showRecall = isLinked
+                && config.recallActionEnabled()
                 && !entry.dead()
                 && !entry.captured()
                 && !entry.inCoop()
@@ -142,6 +149,7 @@ final class LinkedNpcPanelCardBinder {
         commandBuilder.set(traitsButtonSelector + ".Visible", entry.isTraitsActionVisible());
         commandBuilder.set(talentsButtonSelector + ".Visible", entry.isTalentsActionVisible());
         commandBuilder.set(respawnSelector + ".Visible", showRespawn);
+        commandBuilder.set(locateSelector + ".Visible", showLocate);
         commandBuilder.set(recallSelector + ".Visible", showRecall);
         commandBuilder.set(setHomeSelector + ".Visible", showSetHome);
         commandBuilder.set(returnHomeSelector + ".Visible", showReturnHome);
@@ -211,6 +219,14 @@ final class LinkedNpcPanelCardBinder {
                     CustomUIEventBindingType.Activating,
                     respawnSelector,
                     EventData.of(config.eventCommandId(), config.respawnCommandPrefix() + entry.npcUuid()),
+                    false
+            );
+        }
+        if (showLocate) {
+            eventBuilder.addEventBinding(
+                    CustomUIEventBindingType.Activating,
+                    locateSelector,
+                    EventData.of(config.eventCommandId(), config.locateCommandPrefix() + entry.npcUuid()),
                     false
             );
         }
@@ -305,9 +321,11 @@ final class LinkedNpcPanelCardBinder {
                              String releaseCommandPrefix,
                              String cullCommandPrefix,
                              String respawnCommandPrefix,
+                             String locateCommandPrefix,
                              String recallCommandPrefix,
                              String setHomeCommandPrefix,
                              String returnHomeCommandPrefix,
-                             String openTalentsCommandPrefix) {
+                             String openTalentsCommandPrefix,
+                             boolean recallActionEnabled) {
     }
 }

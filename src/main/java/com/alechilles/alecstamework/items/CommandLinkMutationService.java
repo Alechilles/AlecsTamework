@@ -104,11 +104,13 @@ final class CommandLinkMutationService {
             if (linked) {
                 TransformComponent transform = store.getComponent(targetRef, TransformComponent.getComponentType());
                 Vector3d lastKnown = transform != null ? new Vector3d(transform.getPosition()) : null;
+                String worldName = resolveWorldName(store, player.getWorld());
                 Vector3d homePosition = updated.hasHome() ? updated.getHomePosition() : null;
                 updatedItem = linkedNpcRecordStore.upsert(
                         updatedItem,
                         npcUuid,
                         lastKnown,
+                        worldName,
                         homePosition,
                         npcNameResolver.resolveNpcDisplayNameFromComponents(targetRef, store),
                         npcNameResolver.resolveNpcNameKey(npc),
@@ -181,6 +183,28 @@ final class CommandLinkMutationService {
         );
     }
 
+    ItemStack upsertLinkedNpcRecord(ItemStack stack,
+                                    UUID npcUuid,
+                                    Vector3d position,
+                                    String lastKnownWorldName,
+                                    Vector3d homePosition,
+                                    String cachedDisplayName,
+                                    String cachedNameKey,
+                                    String cachedRoleId) {
+        return linkedNpcRecordStore.upsert(
+                stack,
+                npcUuid,
+                position,
+                lastKnownWorldName,
+                homePosition,
+                cachedDisplayName,
+                cachedNameKey,
+                cachedRoleId,
+                null,
+                null
+        );
+    }
+
     ItemStack refreshLinkedNpcPositions(ItemStack stack, List<Candidate> recipients, Store<EntityStore> store) {
         if (stack == null || stack.isEmpty() || recipients == null || recipients.isEmpty() || store == null) {
             return stack;
@@ -192,12 +216,14 @@ final class CommandLinkMutationService {
             }
             TransformComponent transform = store.getComponent(candidate.ref, TransformComponent.getComponentType());
             Vector3d position = transform != null ? new Vector3d(transform.getPosition()) : null;
+            String worldName = resolveWorldName(store, null);
             TameworkCommandLinksComponent links = store.getComponent(candidate.ref, TameworkCommandLinksComponent.getComponentType());
             Vector3d homePosition = links != null && links.hasHome() ? links.getHomePosition() : null;
             updated = linkedNpcRecordStore.upsert(
                     updated,
                     candidate.npc.getUuid(),
                     position,
+                    worldName,
                     homePosition,
                     npcNameResolver.resolveNpcDisplayNameFromComponents(candidate.ref, store),
                     npcNameResolver.resolveNpcNameKey(candidate.npc),
@@ -210,6 +236,16 @@ final class CommandLinkMutationService {
             }
         }
         return updated;
+    }
+
+    private String resolveWorldName(Store<EntityStore> store, @Nullable World fallbackWorld) {
+        World world = store != null && store.getExternalData() != null
+                ? store.getExternalData().getWorld()
+                : fallbackWorld;
+        if (world == null || world.getName() == null || world.getName().isBlank()) {
+            return null;
+        }
+        return world.getName();
     }
 
     private String resolveCachedRoleId(NPCEntity npc) {

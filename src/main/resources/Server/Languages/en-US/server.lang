@@ -174,6 +174,7 @@ tamework.ui.linkedPanel.breedingCooldown.remaining=Breeding cooldown: {0}
 tamework.ui.linkedPanel.breedingCooldown.unavailable=Breeding cooldown unavailable
 tamework.ui.linkedPanel.card.button.cull=Cull
 tamework.ui.linkedPanel.card.button.link=Link
+tamework.ui.linkedPanel.card.button.locate=Locate
 tamework.ui.linkedPanel.card.button.release=Release
 tamework.ui.linkedPanel.card.confirmRemove=CONFIRM REMOVE
 tamework.ui.linkedPanel.card.group.setTooltip=Set Group
@@ -185,6 +186,7 @@ tamework.ui.linkedPanel.card.tooltip.breedingDisabled=Breeding: disabled. Click 
 tamework.ui.linkedPanel.card.tooltip.breedingEnabled=Breeding: enabled. Click to disable.
 tamework.ui.linkedPanel.card.tooltip.cull=Animal will be slaughtered and cannot be revived.
 tamework.ui.linkedPanel.card.tooltip.link=Link companion
+tamework.ui.linkedPanel.card.tooltip.locate=Locate
 tamework.ui.linkedPanel.card.tooltip.recall=Recall
 tamework.ui.linkedPanel.card.tooltip.release=Animal will be released to the wild and disappear permanently.
 tamework.ui.linkedPanel.card.tooltip.respawn=Revive
@@ -310,6 +312,11 @@ tamework.ui.nameInput.title=Name Companion
 tamework.ui.nameInput.title.default=Name Companion
 tamework.ui.nameInput.titleForNpc=Name {0}
 
+# ===== Tamework UI: Linked Location =====
+tamework.ui.linkedLocation.coordinatesLabel=Coordinates:
+tamework.ui.linkedLocation.title={0} - Location
+tamework.ui.linkedLocation.worldLabel=World:
+
 # ===== Tamework UI: Message HUD =====
 # (No static localization keys required; message HUD text is runtime-driven.)
 
@@ -350,6 +357,9 @@ tamework.ui.notifications.command.move.returnHome.noHome=No home is set for this
 tamework.ui.notifications.command.move.returnHome.noneMoved=No NPCs were moved home.
 tamework.ui.notifications.command.move.returnHome.notConfigured=Return Home command is not configured.
 tamework.ui.notifications.command.move.unavailable={0} unavailable.
+tamework.ui.notifications.command.locate.location={0}: {1} ({2})
+tamework.ui.notifications.command.locate.noLocation=No recorded location for {0}.
+tamework.ui.notifications.command.locate.unknownWorld=unknown world
 tamework.ui.notifications.command.panel.clearFiltersFailed=Could not clear filters.
 tamework.ui.notifications.command.panel.filterModeUpdateFailed=Could not update filter mode.
 tamework.ui.notifications.command.panel.filterUpdateFailed=Could not update filter.

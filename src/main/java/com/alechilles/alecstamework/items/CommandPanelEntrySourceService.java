@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -134,6 +135,7 @@ final class CommandPanelEntrySourceService {
                 out.add(new LinkedNpcEntry(
                         npc.getUuid(),
                         npcNameResolver.resolveNpcDisplayName(npcRef, store, npc),
+                        CompanionGenderService.resolveGender(npcRef, store, roleId, null),
                         healthSnapshot.current,
                         healthSnapshot.max,
                         0,

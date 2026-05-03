@@ -71,6 +71,7 @@ class TameworkSettingsPresetTest {
                 true,
                 true,
                 true,
+                true,
                 false,
                 false
         );

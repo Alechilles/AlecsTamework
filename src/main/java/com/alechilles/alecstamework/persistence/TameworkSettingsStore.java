@@ -169,6 +169,9 @@ public final class TameworkSettingsStore {
         document.revive = new ReviveSection();
         document.revive.enabled = snapshot.reviveSystemEnabled();
 
+        document.travel = new TravelSection();
+        document.travel.recallTeleportingEnabled = snapshot.recallTeleportingEnabled();
+
         if (!writeDocument(globalSettingsFile, document, logger)) {
             return false;
         }
@@ -323,6 +326,9 @@ public final class TameworkSettingsStore {
 
         document.revive = new ReviveSection();
         document.revive.enabled = true;
+
+        document.travel = new TravelSection();
+        document.travel.recallTeleportingEnabled = true;
         return document;
     }
 
@@ -432,6 +438,7 @@ public final class TameworkSettingsStore {
         BreedingSection breeding = document.breeding;
         TraitsSection traits = document.traits;
         ReviveSection revive = document.revive;
+        TravelSection travel = document.travel;
 
         return new GlobalOverrides(
                 population != null ? population.limitPerPlayerOwnedTotal : null,
@@ -482,7 +489,8 @@ public final class TameworkSettingsStore {
                 breeding != null ? breeding.passiveBreedingEnabled : null,
                 breeding != null ? breeding.requiresHappiness : null,
                 traits != null ? traits.enabled : null,
-                revive != null ? revive.enabled : null
+                revive != null ? revive.enabled : null,
+                travel != null ? travel.recallTeleportingEnabled : null
         );
     }
 
@@ -519,7 +527,8 @@ public final class TameworkSettingsStore {
                                           boolean passiveBreedingEnabled,
                                           boolean breedingRequiresHappiness,
                                           boolean traitsEnabled,
-                                          boolean reviveSystemEnabled) {
+                                          boolean reviveSystemEnabled,
+                                          boolean recallTeleportingEnabled) {
     }
 
     /**
@@ -555,7 +564,8 @@ public final class TameworkSettingsStore {
                                    @Nullable Boolean passiveBreedingEnabled,
                                    @Nullable Boolean breedingRequiresHappiness,
                                    @Nullable Boolean traitsEnabled,
-                                   @Nullable Boolean reviveSystemEnabled) {
+                                   @Nullable Boolean reviveSystemEnabled,
+                                   @Nullable Boolean recallTeleportingEnabled) {
     }
 
     private record CachedGlobalDocument(@Nonnull Path path,
@@ -583,6 +593,7 @@ public final class TameworkSettingsStore {
         private BreedingSection breeding;
         private TraitsSection traits;
         private ReviveSection revive;
+        private TravelSection travel;
     }
 
     private static final class PopulationSection {
@@ -655,5 +666,9 @@ public final class TameworkSettingsStore {
 
     private static final class ReviveSection {
         private Boolean enabled;
+    }
+
+    private static final class TravelSection {
+        private Boolean recallTeleportingEnabled;
     }
 }

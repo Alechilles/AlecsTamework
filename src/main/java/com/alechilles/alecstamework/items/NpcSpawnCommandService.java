@@ -325,6 +325,7 @@ public final class NpcSpawnCommandService {
                 context.stack,
                 npcUuid,
                 lastKnown,
+                resolveWorldName(player),
                 updated.hasHome() ? updated.getHomePosition() : null,
                 npcNameResolver.resolveNpcDisplayNameFromComponents(npcRef, store),
                 npcNameResolver.resolveNpcNameKey(npc),
@@ -349,6 +350,15 @@ public final class NpcSpawnCommandService {
             }
         }
         return activeCount < maxActive;
+    }
+
+    @Nullable
+    private String resolveWorldName(Player player) {
+        World world = player != null ? player.getWorld() : null;
+        if (world == null || world.getName() == null || world.getName().isBlank()) {
+            return null;
+        }
+        return world.getName();
     }
 
     private boolean resolveLinkingRequireOwner() {

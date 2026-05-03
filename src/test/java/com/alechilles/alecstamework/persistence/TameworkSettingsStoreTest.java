@@ -51,6 +51,7 @@ class TameworkSettingsStoreTest {
                 false,
                 false,
                 true,
+                false,
                 false
         );
 
@@ -89,6 +90,7 @@ class TameworkSettingsStoreTest {
         assertEquals(false, overrides.breedingRequiresHappiness());
         assertEquals(true, overrides.traitsEnabled());
         assertEquals(false, overrides.reviveSystemEnabled());
+        assertEquals(false, overrides.recallTeleportingEnabled());
 
         String raw = Files.readString(settingsFile);
         assertTrue(raw.contains("\"population\""));
@@ -106,6 +108,8 @@ class TameworkSettingsStoreTest {
         assertTrue(raw.contains("\"breeding\""));
         assertTrue(raw.contains("\"traits\""));
         assertTrue(raw.contains("\"revive\""));
+        assertTrue(raw.contains("\"travel\""));
+        assertTrue(raw.contains("\"recallTeleportingEnabled\""));
     }
 
     @Test
@@ -149,5 +153,6 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.breedingRequiresHappiness());
         assertEquals(true, overrides.traitsEnabled());
         assertEquals(true, overrides.reviveSystemEnabled());
+        assertEquals(true, overrides.recallTeleportingEnabled());
     }
 }
