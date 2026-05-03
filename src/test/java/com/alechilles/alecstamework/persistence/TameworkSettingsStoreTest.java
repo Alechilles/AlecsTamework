@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.persistence;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -52,6 +54,8 @@ class TameworkSettingsStoreTest {
                 false,
                 true,
                 false,
+                false,
+                true,
                 false
         );
 
@@ -91,6 +95,8 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.traitsEnabled());
         assertEquals(false, overrides.reviveSystemEnabled());
         assertEquals(false, overrides.recallTeleportingEnabled());
+        assertEquals(true, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
 
         String raw = Files.readString(settingsFile);
         assertTrue(raw.contains("\"population\""));
@@ -110,6 +116,8 @@ class TameworkSettingsStoreTest {
         assertTrue(raw.contains("\"revive\""));
         assertTrue(raw.contains("\"travel\""));
         assertTrue(raw.contains("\"recallTeleportingEnabled\""));
+        assertTrue(raw.contains("\"telemetry\""));
+        assertTrue(raw.contains("\"breadcrumbsEnabled\""));
     }
 
     @Test
@@ -154,5 +162,76 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.traitsEnabled());
         assertEquals(true, overrides.reviveSystemEnabled());
         assertEquals(true, overrides.recallTeleportingEnabled());
+        assertEquals(true, overrides.telemetryEnabled());
+        assertEquals(true, overrides.telemetryBreadcrumbsEnabled());
+    }
+
+    @Test
+    void importsLegacyTelemetryJsonIntoGlobalSettings() throws Exception {
+        Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
+        Path legacy = tempDir.resolve("plugin-data").resolve("crash-telemetry.json");
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(
+                legacy,
+                """
+                {
+                  "enabled": false,
+                  "breadcrumbsEnabled": false
+                }
+                """,
+                StandardCharsets.UTF_8
+        );
+
+        assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(settingsFile, List.of(legacy), null));
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+
+        assertNotNull(overrides);
+        assertEquals(false, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+        assertTrue(Files.readString(settingsFile, StandardCharsets.UTF_8).contains("\"telemetry\""));
+    }
+
+    @Test
+    void importsLegacyTelemetryTextIntoGlobalSettings() throws Exception {
+        Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
+        Path legacy = tempDir.resolve("plugin-data").resolve("tamework-crash-telemetry.txt");
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(legacy, "enabled=false\nbreadcrumbs_enabled=false", StandardCharsets.UTF_8);
+
+        assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(settingsFile, List.of(legacy), null));
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+
+        assertNotNull(overrides);
+        assertEquals(false, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
+    }
+
+    @Test
+    void existingGlobalTelemetrySettingsWinOverLegacyFiles() throws Exception {
+        Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
+        Path legacy = tempDir.resolve("plugin-data").resolve("crash-telemetry.json");
+        Files.createDirectories(settingsFile.getParent());
+        Files.createDirectories(legacy.getParent());
+        Files.writeString(
+                settingsFile,
+                """
+                {
+                  "version": 1,
+                  "telemetry": {
+                    "enabled": true,
+                    "breadcrumbsEnabled": false
+                  }
+                }
+                """,
+                StandardCharsets.UTF_8
+        );
+        Files.writeString(legacy, "{\"enabled\": false, \"breadcrumbsEnabled\": true}", StandardCharsets.UTF_8);
+
+        assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(settingsFile, List.of(legacy), null));
+        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
+
+        assertNotNull(overrides);
+        assertEquals(true, overrides.telemetryEnabled());
+        assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
     }
 }

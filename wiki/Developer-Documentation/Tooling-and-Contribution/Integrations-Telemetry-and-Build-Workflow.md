@@ -17,8 +17,10 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - `TameworkHStatsIntegration` boots HStats support
 - `TameworkDependencyMetricsReporter` and related metrics classes detect installed mods and forward tracked data
 - Server owners can opt out through `hstats-server-uuid.txt`
-- Crash telemetry is separate from HStats and uses a store-first, upload-later flow
-- Crash telemetry settings live at `universe/Tamework/Settings/crash-telemetry.json`
+- Crash telemetry is separate from HStats and is handled by the embedded Alec's Telemetry runtime
+- Telemetry settings live in `universe/Tamework/Settings/tamework-settings.json` under `telemetry.enabled` and `telemetry.breadcrumbsEnabled`
+- `/tw settings` persists those values and mirrors them into the embedded runtime project override at `Telemetry/Settings/projects/alecs-tamework.json`
+- Legacy `crash-telemetry.json` and `tamework-crash-telemetry.txt` files are imported once when no global telemetry values exist, then left in place
 - Crash telemetry defaults to enabled and supports runtime opt-out via `/tw settings` or settings-file edits
 - Only Tamework-attributed fatal failures are captured:
   - uncaught exceptions (via chained global default uncaught-exception handler)
@@ -27,14 +29,8 @@ Parent: [Tooling and Contribution](/mod/alecs-tamework/tooling-and-contribution)
 - Attribution gate before capture:
   - `PluginIdentifier.identifyThirdPartyPlugin(throwable)` must match Tamework, or
   - throwable stack trace must contain the Tamework package prefix
-- Reports are written atomically to `universe/Tamework/Telemetry/crash-reports/pending` and deduplicated by crash fingerprint
-- Queue size is bounded by `max_pending_reports` (oldest reports pruned first)
-- Upload behavior:
-  - async startup flush plus periodic background flush
-  - per-pass cap from `max_uploads_per_flush`
-  - successful upload deletes the local pending file
-  - failed upload keeps the file for retry
-  - telemetry never throws into runtime/gameplay threads
+- Crash and event queues, deduplication, attribution, HTTP delivery, breadcrumbs, and persistence are owned by `alecstelemetry-runtime`
+- Upload behavior follows the shared runtime: queued first, flushed asynchronously, and never allowed to throw into runtime/gameplay threads
 - Debug command: `/tw debugcrashtelemetry` (status), `/tw debugcrashtelemetry flush` (manual async upload pass), `/tw debugcrashtelemetry simulate` (manual simulation path for privileged users)
 - Privacy: payload excludes player-identifying gameplay data by default (stack trace + runtime metadata only)
 
