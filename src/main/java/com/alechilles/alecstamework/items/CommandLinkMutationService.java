@@ -161,31 +161,6 @@ final class CommandLinkMutationService {
     ItemStack upsertLinkedNpcRecord(ItemStack stack,
                                     UUID npcUuid,
                                     Vector3d position,
-                                    Vector3d homePosition) {
-        return linkedNpcRecordStore.upsert(stack, npcUuid, position, homePosition, null, null, null);
-    }
-
-    ItemStack upsertLinkedNpcRecord(ItemStack stack,
-                                    UUID npcUuid,
-                                    Vector3d position,
-                                    Vector3d homePosition,
-                                    String cachedDisplayName,
-                                    String cachedNameKey,
-                                    String cachedRoleId) {
-        return linkedNpcRecordStore.upsert(
-                stack,
-                npcUuid,
-                position,
-                homePosition,
-                cachedDisplayName,
-                cachedNameKey,
-                cachedRoleId
-        );
-    }
-
-    ItemStack upsertLinkedNpcRecord(ItemStack stack,
-                                    UUID npcUuid,
-                                    Vector3d position,
                                     String lastKnownWorldName,
                                     Vector3d homePosition,
                                     String cachedDisplayName,
@@ -238,7 +213,7 @@ final class CommandLinkMutationService {
         return updated;
     }
 
-    private String resolveWorldName(Store<EntityStore> store, @Nullable World fallbackWorld) {
+    String resolveWorldName(Store<EntityStore> store, @Nullable World fallbackWorld) {
         World world = store != null && store.getExternalData() != null
                 ? store.getExternalData().getWorld()
                 : fallbackWorld;

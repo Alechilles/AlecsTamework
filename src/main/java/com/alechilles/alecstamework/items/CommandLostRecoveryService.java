@@ -189,6 +189,7 @@ final class CommandLostRecoveryService {
                 updatedStack,
                 spawnedNpc.getUuid(),
                 destination,
+                linkMutationService.resolveWorldName(store, player.getWorld()),
                 homePosition,
                 npcNameResolver.resolveNpcDisplayNameFromComponents(spawnedRef, store),
                 npcNameResolver.resolveNpcNameKey(spawnedNpc),
