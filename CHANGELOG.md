@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- Fixed custom NPC names staying visible while a player is mounted by making mounted-name hiding and restoration self-correct during world ticks.
+
 ## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-03
 
 ### Added

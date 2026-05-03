@@ -31,7 +31,7 @@ Parent: [Runtime Subsystems](/mod/alecs-tamework/runtime-subsystems) | [Develope
 - `CompanionAttachmentSyncSystem`
 
 ## Mounted and nameplate safety
-- `NpcMountedNameplateVisibilitySystem`
+- `NpcMountedNameplateVisibilitySystem` ticks over mounted NPCs and cached hidden-name state so names are hidden while an NPC has an active mount owner and restored after dismount, even when mount component add/remove callbacks are missed.
 - `MountedInteractableSafetySystem`
 - `MountedNpcTeleportSafetySystem`
 - `MountedOwnerReferenceSanitySystem`
