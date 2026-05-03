@@ -196,7 +196,7 @@ class TameworkSettingsStoreTest {
         Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
         Path legacy = tempDir.resolve("plugin-data").resolve("tamework-crash-telemetry.txt");
         Files.createDirectories(legacy.getParent());
-        Files.writeString(legacy, "enabled=false\nbreadcrumbs_enabled=false", StandardCharsets.UTF_8);
+        Files.writeString(legacy, "enabled=0\nbreadcrumbs_enabled=off", StandardCharsets.UTF_8);
 
         assertTrue(TameworkSettingsStore.importLegacyTelemetrySettingsIfMissing(settingsFile, List.of(legacy), null));
         TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);

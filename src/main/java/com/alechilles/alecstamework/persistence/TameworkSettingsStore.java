@@ -642,6 +642,12 @@ public final class TameworkSettingsStore {
         if ("false".equalsIgnoreCase(normalized)) {
             return false;
         }
+        if ("1".equals(normalized) || "on".equalsIgnoreCase(normalized) || "yes".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        if ("0".equals(normalized) || "off".equalsIgnoreCase(normalized) || "no".equalsIgnoreCase(normalized)) {
+            return false;
+        }
         return null;
     }
 
