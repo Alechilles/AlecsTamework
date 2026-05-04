@@ -41,6 +41,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                                      boolean happinessEnabled,
                                      boolean passiveBreedingEnabled,
                                      boolean breedingRequiresHappiness,
+                                     boolean breedingGenderEnabled,
                                      boolean traitsEnabled,
                                      boolean reviveSystemEnabled,
                                      boolean recallTeleportingEnabled,
@@ -79,6 +80,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 happinessEnabled,
                 passiveBreedingEnabled,
                 breedingRequiresHappiness,
+                breedingGenderEnabled,
                 traitsEnabled,
                 reviveSystemEnabled,
                 recallTeleportingEnabled,
@@ -125,6 +127,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 happinessEnabled,
                 passiveBreedingEnabled,
                 breedingRequiresHappiness,
+                breedingGenderEnabled,
                 traitsEnabled,
                 reviveSystemEnabled,
                 recallTeleportingEnabled,
@@ -163,6 +166,9 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         boolean breedingRequiresHappiness = overrides != null && overrides.breedingRequiresHappiness() != null
                 ? overrides.breedingRequiresHappiness() && needsHappinessSystemEnabled(overrides, happinessConfig)
                 : breedingConfig != null && breedingConfig.isHappinessRequired(null);
+        boolean breedingGenderEnabled = overrides == null
+                || overrides.breedingGenderEnabled() == null
+                || overrides.breedingGenderEnabled();
         boolean traitsEnabled = overrides != null && overrides.traitsEnabled() != null
                 ? overrides.traitsEnabled()
                 : traitConfig != null && traitConfig.isEnabled();
@@ -210,6 +216,7 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 happinessEnabled,
                 passiveBreedingEnabled,
                 breedingRequiresHappiness,
+                breedingGenderEnabled,
                 traitsEnabled,
                 global.isCommandDeadRespawnEnabled(),
                 recallTeleportingEnabled,

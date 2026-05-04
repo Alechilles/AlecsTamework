@@ -118,6 +118,8 @@ Controls optional binary gender assignment and partner filtering. Omit this sect
 - `MaleWeight`: relative chance for a generated companion to be assigned `Male`.
 - `FemaleWeight`: relative chance for a generated companion to be assigned `Female`.
 
+Server owners can also turn the whole breeding-gender system off from `/tw settings`. That runtime toggle is enabled by default and acts as a global gate over the config values above.
+
 When `OffspringLifecycle.Families[].AdultRoles[]` entries include `Gender`, offspring select a matching future adult role when possible. If no matching gendered choice is selectable, Tamework falls back to the normal weighted adult-role list so older mixed configs still work.
 
 ### `Inheritance`

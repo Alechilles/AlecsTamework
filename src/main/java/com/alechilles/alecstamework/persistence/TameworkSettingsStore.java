@@ -165,6 +165,7 @@ public final class TameworkSettingsStore {
         document.breeding = new BreedingSection();
         document.breeding.passiveBreedingEnabled = snapshot.passiveBreedingEnabled();
         document.breeding.requiresHappiness = snapshot.breedingRequiresHappiness();
+        document.breeding.genderEnabled = snapshot.breedingGenderEnabled();
 
         document.traits = new TraitsSection();
         document.traits.enabled = snapshot.traitsEnabled();
@@ -365,6 +366,7 @@ public final class TameworkSettingsStore {
         document.breeding = new BreedingSection();
         document.breeding.passiveBreedingEnabled = true;
         document.breeding.requiresHappiness = true;
+        document.breeding.genderEnabled = true;
 
         document.traits = new TraitsSection();
         document.traits.enabled = true;
@@ -538,6 +540,7 @@ public final class TameworkSettingsStore {
                 happiness != null ? happiness.enabled : null,
                 breeding != null ? breeding.passiveBreedingEnabled : null,
                 breeding != null ? breeding.requiresHappiness : null,
+                breeding != null ? breeding.genderEnabled : null,
                 traits != null ? traits.enabled : null,
                 revive != null ? revive.enabled : null,
                 travel != null ? travel.recallTeleportingEnabled : null,
@@ -687,6 +690,7 @@ public final class TameworkSettingsStore {
                                           boolean happinessEnabled,
                                           boolean passiveBreedingEnabled,
                                           boolean breedingRequiresHappiness,
+                                          boolean breedingGenderEnabled,
                                           boolean traitsEnabled,
                                           boolean reviveSystemEnabled,
                                           boolean recallTeleportingEnabled,
@@ -726,6 +730,7 @@ public final class TameworkSettingsStore {
                                    @Nullable Boolean happinessEnabled,
                                    @Nullable Boolean passiveBreedingEnabled,
                                    @Nullable Boolean breedingRequiresHappiness,
+                                   @Nullable Boolean breedingGenderEnabled,
                                    @Nullable Boolean traitsEnabled,
                                    @Nullable Boolean reviveSystemEnabled,
                                    @Nullable Boolean recallTeleportingEnabled,
@@ -809,6 +814,7 @@ public final class TameworkSettingsStore {
     private static final class BreedingSection {
         private Boolean passiveBreedingEnabled;
         private Boolean requiresHappiness;
+        private Boolean genderEnabled;
     }
 
     private static final class TraitsSection {

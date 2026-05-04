@@ -1882,11 +1882,17 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
 
     public GenderSettings resolveGender(@Nullable String roleId) {
         RoleOverrideSettings override = resolveRoleOverride(roleId);
+        GenderSettings resolved;
         if (override == null || override.gender == null) {
-            return copyGender(getGender());
+            resolved = copyGender(getGender());
+        } else {
+            resolved = copyGender(getGender());
+            override.gender.applyTo(resolved);
         }
-        GenderSettings resolved = copyGender(getGender());
-        override.gender.applyTo(resolved);
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && Boolean.FALSE.equals(overrides.breedingGenderEnabled())) {
+            resolved.enabled = false;
+        }
         return resolved;
     }
 

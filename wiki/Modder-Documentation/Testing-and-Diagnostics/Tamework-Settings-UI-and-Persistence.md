@@ -25,6 +25,7 @@ Current presets:
 - `Simplified (Minecraft-like)`: disables needs, needs damage, happiness, passive breeding, breeding happiness requirements, and traits.
 - `Easier`: enables most systems but keeps needs damage off.
 - `Full Experience`: enables the full needs, happiness, passive breeding, breeding happiness, and traits stack.
+- Presets do not change the breeding-gender toggle; that setting remains a manual server policy.
 
 ## Automatic Review Announcement
 - Eligible players can also see a login-time settings review popup before opening `/tw settings` manually.
@@ -90,6 +91,7 @@ This lets you keep Alec's built-in re-arm behavior while still replacing the vis
 - Happiness system enabled toggle
 - Passive breeding enabled toggle
 - Breeding requires happiness toggle
+- Breeding genders enabled toggle
 - Traits system enabled toggle
 - Revive system enabled toggle
 

@@ -20,6 +20,7 @@ class TameworkSettingsPresetTest {
         assertEquals(false, presetValues.happinessEnabled());
         assertEquals(false, presetValues.passiveBreedingEnabled());
         assertEquals(false, presetValues.breedingRequiresHappiness());
+        assertEquals(true, presetValues.breedingGenderEnabled());
         assertEquals(false, presetValues.traitsEnabled());
         assertEquals(TameworkSettingsPreset.SIMPLIFIED, TameworkSettingsPreset.match(presetValues));
         assertEquals(values.simpleClaimsEnabled(), presetValues.simpleClaimsEnabled());
@@ -72,6 +73,7 @@ class TameworkSettingsPresetTest {
                 true,
                 true,
                 true,
+                false,
                 false,
                 false
         );

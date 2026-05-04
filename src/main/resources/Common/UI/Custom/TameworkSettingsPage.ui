@@ -313,6 +313,31 @@ $C.@PageOverlay {
 
               Label {
                 Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "Enable Breeding Genders";
+                Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
+              }
+
+              TextButton #TwSettingsBreedingGenderTooltip {
+                Anchor: (Left: 0, Width: 250, Height: 24);
+                Text: "";
+                TooltipText: "Turns companion gender assignment and gender-aware breeding checks on or off.";
+                TextTooltipStyle: @SettingsLabelTooltipStyle;
+                Style: @SettingsLabelTooltipButtonStyle;
+              }
+
+              CheckBox #TwSettingsBreedingGenderEnabledCheck {
+                Anchor: (Top: 1, Left: 256, Width: 22, Height: 22);
+                Background: (TexturePath: "Common/CheckBoxFrame.png", Border: 7);
+                Padding: (Full: 4);
+                Style: $C.@DefaultCheckBoxStyle;
+              }
+            }
+
+            Group {
+              Anchor: (Height: 26);
+
+              Label {
+                Anchor: (Left: 0, Width: 250, Height: 24);
                 Text: "Enable Traits System";
                 Style: (FontSize: 12, TextColor: #bfd0e5, HorizontalAlignment: Start, VerticalAlignment: Center);
               }

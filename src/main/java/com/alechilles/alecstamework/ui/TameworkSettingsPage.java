@@ -73,6 +73,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
     private static final String KEY_HAPPINESS_ENABLED = "@HappinessEnabled";
     private static final String KEY_PASSIVE_BREEDING_ENABLED = "@PassiveBreedingEnabled";
     private static final String KEY_BREEDING_REQUIRES_HAPPINESS = "@BreedingRequiresHappiness";
+    private static final String KEY_BREEDING_GENDER_ENABLED = "@BreedingGenderEnabled";
     private static final String KEY_TRAITS_ENABLED = "@TraitsEnabled";
     private static final String KEY_REVIVE_SYSTEM_ENABLED = "@ReviveSystemEnabled";
     private static final String KEY_RECALL_TELEPORTING_ENABLED = "@RecallTeleportingEnabled";
@@ -205,6 +206,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .append(KEY_HAPPINESS_ENABLED, "#TwSettingsHappinessEnabledCheck.Value")
                 .append(KEY_PASSIVE_BREEDING_ENABLED, "#TwSettingsPassiveBreedingEnabledCheck.Value")
                 .append(KEY_BREEDING_REQUIRES_HAPPINESS, "#TwSettingsBreedingRequiresHappinessCheck.Value")
+                .append(KEY_BREEDING_GENDER_ENABLED, "#TwSettingsBreedingGenderEnabledCheck.Value")
                 .append(KEY_TRAITS_ENABLED, "#TwSettingsTraitsEnabledCheck.Value")
                 .append(KEY_REVIVE_SYSTEM_ENABLED, "#TwSettingsReviveSystemEnabledCheck.Value")
                 .append(KEY_RECALL_TELEPORTING_ENABLED, "#TwSettingsRecallTeleportingEnabledCheck.Value")
@@ -250,6 +252,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         commandBuilder.set("#TwSettingsHappinessEnabledCheck.Value", currentValues.happinessEnabled());
         commandBuilder.set("#TwSettingsPassiveBreedingEnabledCheck.Value", currentValues.passiveBreedingEnabled());
         commandBuilder.set("#TwSettingsBreedingRequiresHappinessCheck.Value", currentValues.breedingRequiresHappiness());
+        commandBuilder.set("#TwSettingsBreedingGenderEnabledCheck.Value", currentValues.breedingGenderEnabled());
         commandBuilder.set("#TwSettingsTraitsEnabledCheck.Value", currentValues.traitsEnabled());
         commandBuilder.set("#TwSettingsReviveSystemEnabledCheck.Value", currentValues.reviveSystemEnabled());
         commandBuilder.set("#TwSettingsRecallTeleportingEnabledCheck.Value", currentValues.recallTeleportingEnabled());
@@ -454,6 +457,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 boolOrDefault(payload.happinessEnabled, currentValues.happinessEnabled()),
                 boolOrDefault(payload.passiveBreedingEnabled, currentValues.passiveBreedingEnabled()),
                 boolOrDefault(payload.breedingRequiresHappiness, currentValues.breedingRequiresHappiness()),
+                boolOrDefault(payload.breedingGenderEnabled, currentValues.breedingGenderEnabled()),
                 boolOrDefault(payload.traitsEnabled, currentValues.traitsEnabled()),
                 boolOrDefault(payload.reviveSystemEnabled, currentValues.reviveSystemEnabled()),
                 boolOrDefault(payload.recallTeleportingEnabled, currentValues.recallTeleportingEnabled()),
@@ -618,6 +622,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
                 .<Boolean>append(new KeyedCodec<>(KEY_HAPPINESS_ENABLED, Codec.BOOLEAN), (x, v) -> x.happinessEnabled = v, x -> x.happinessEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_PASSIVE_BREEDING_ENABLED, Codec.BOOLEAN), (x, v) -> x.passiveBreedingEnabled = v, x -> x.passiveBreedingEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_REQUIRES_HAPPINESS, Codec.BOOLEAN), (x, v) -> x.breedingRequiresHappiness = v, x -> x.breedingRequiresHappiness).add()
+                .<Boolean>append(new KeyedCodec<>(KEY_BREEDING_GENDER_ENABLED, Codec.BOOLEAN), (x, v) -> x.breedingGenderEnabled = v, x -> x.breedingGenderEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_TRAITS_ENABLED, Codec.BOOLEAN), (x, v) -> x.traitsEnabled = v, x -> x.traitsEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_REVIVE_SYSTEM_ENABLED, Codec.BOOLEAN), (x, v) -> x.reviveSystemEnabled = v, x -> x.reviveSystemEnabled).add()
                 .<Boolean>append(new KeyedCodec<>(KEY_RECALL_TELEPORTING_ENABLED, Codec.BOOLEAN), (x, v) -> x.recallTeleportingEnabled = v, x -> x.recallTeleportingEnabled).add()
@@ -661,6 +666,7 @@ public final class TameworkSettingsPage extends InteractiveCustomUIPage<Tamework
         private Boolean happinessEnabled;
         private Boolean passiveBreedingEnabled;
         private Boolean breedingRequiresHappiness;
+        private Boolean breedingGenderEnabled;
         private Boolean traitsEnabled;
         private Boolean reviveSystemEnabled;
         private Boolean recallTeleportingEnabled;
