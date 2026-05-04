@@ -3,18 +3,18 @@ package com.alechilles.alecstamework.npc.systems;
 import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
-import com.hypixel.hytale.component.AddReason;
 import com.hypixel.hytale.component.Archetype;
+import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.component.system.RefSystem;
+import com.hypixel.hytale.component.system.tick.TickingSystem;
 import com.hypixel.hytale.server.core.entity.nameplate.Nameplate;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import javax.annotation.Nonnull;
@@ -23,7 +23,7 @@ import javax.annotation.Nullable;
 /**
  * Hides mounted NPC nameplates and restores the pre-mount/custom name when dismounted.
  */
-public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityStore> {
+public final class NpcMountedNameplateVisibilitySystem extends TickingSystem<EntityStore> {
     private final ComponentType<EntityStore, NPCEntity> npcType;
     private final ComponentType<EntityStore, NPCMountComponent> mountType;
     private final ComponentType<EntityStore, TameworkMountedNameplateComponent> mountedNameplateType;
@@ -42,54 +42,59 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
     }
 
     @Override
-    public void onEntityAdded(@Nonnull Ref<EntityStore> reference,
-                              @Nonnull AddReason reason,
-                              @Nonnull Store<EntityStore> store,
-                              @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+    public void tick(float dt, int systemIndex, @Nonnull Store<EntityStore> store) {
         if (npcType == null || mountType == null || mountedNameplateType == null) {
             return;
         }
-        if (store.getComponent(reference, npcType) == null || store.getComponent(reference, mountType) == null) {
-            return;
-        }
 
-        String cached = resolveCachedDisplayName(reference, store);
-        String captured = (cached != null && !cached.isBlank()) ? cached : resolveVisibleDisplayName(reference, store);
-        hideMountedNameplate(reference, store, commandBuffer, captured);
+        store.forEachChunk(
+                Query.and(npcType, mountType),
+                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
+                        hideActiveMountedNameplates(chunk, store, commandBuffer)
+        );
+        store.forEachChunk(
+                Query.and(npcType, mountedNameplateType),
+                (ArchetypeChunk<EntityStore> chunk, CommandBuffer<EntityStore> commandBuffer) ->
+                        restoreInactiveMountedNameplates(chunk, store, commandBuffer)
+        );
     }
 
-    @Override
-    public void onEntityRemove(@Nonnull Ref<EntityStore> reference,
-                               @Nonnull RemoveReason reason,
-                               @Nonnull Store<EntityStore> store,
-                               @Nonnull CommandBuffer<EntityStore> commandBuffer) {
-        if (npcType == null || mountType == null || mountedNameplateType == null) {
-            return;
+    private void hideActiveMountedNameplates(@Nonnull ArchetypeChunk<EntityStore> chunk,
+                                             @Nonnull Store<EntityStore> store,
+                                             @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        int size = chunk.size();
+        for (int i = 0; i < size; i++) {
+            Ref<EntityStore> reference = chunk.getReferenceTo(i);
+            if (!hasMountedOwnerReference(reference, store)) {
+                continue;
+            }
+            String captured = resolveNameToCache(reference, store);
+            hideMountedNameplate(reference, store, commandBuffer, captured);
         }
-        boolean hasCachedName = store.getComponent(reference, mountedNameplateType) != null;
-        if (!hasCachedName && !hasCustomName(reference, store)) {
-            return;
-        }
-        restoreNameplateIfDismounted(reference, store, commandBuffer);
     }
 
-    @Override
-    public Query<EntityStore> getQuery() {
-        if (npcType == null || mountType == null) {
-            return Query.any();
+    private void restoreInactiveMountedNameplates(@Nonnull ArchetypeChunk<EntityStore> chunk,
+                                                  @Nonnull Store<EntityStore> store,
+                                                  @Nonnull CommandBuffer<EntityStore> commandBuffer) {
+        int size = chunk.size();
+        for (int i = 0; i < size; i++) {
+            Ref<EntityStore> reference = chunk.getReferenceTo(i);
+            restoreNameplateIfDismounted(reference, store, commandBuffer);
         }
-        return Query.and(npcType, mountType);
     }
 
     private void hideMountedNameplate(Ref<EntityStore> reference,
                                       Store<EntityStore> store,
                                       @Nonnull CommandBuffer<EntityStore> commandBuffer,
                                       @Nullable String capturedName) {
-        if (!isMountedNpc(reference, store)) {
+        if (!hasMountedOwnerReference(reference, store)) {
             return;
         }
         boolean hasVisibleName = capturedName != null && !capturedName.isBlank();
         if (!hasVisibleName && !hasCustomName(reference, store)) {
+            return;
+        }
+        if (resolveCachedDisplayName(reference, store) != null && resolveVisibleDisplayName(reference, store) == null) {
             return;
         }
         if (hasVisibleName) {
@@ -109,7 +114,7 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
         if (reference == null || store == null || !reference.isValid() || mountedNameplateType == null) {
             return;
         }
-        if (store.getComponent(reference, npcType) == null || store.getComponent(reference, mountType) != null) {
+        if (store.getComponent(reference, npcType) == null || hasMountedOwnerReference(reference, store)) {
             return;
         }
         String restoreName = resolveRestoreName(reference, store);
@@ -117,7 +122,7 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
         commandBuffer.run(bufferStore -> bufferStore.tryRemoveComponent(reference, mountedNameplateType));
     }
 
-    private boolean isMountedNpc(Ref<EntityStore> reference, Store<EntityStore> store) {
+    private boolean hasMountedOwnerReference(Ref<EntityStore> reference, Store<EntityStore> store) {
         if (reference == null
                 || store == null
                 || !reference.isValid()
@@ -125,7 +130,19 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
                 || mountType == null) {
             return false;
         }
-        return store.getComponent(reference, npcType) != null && store.getComponent(reference, mountType) != null;
+        if (store.getComponent(reference, npcType) == null) {
+            return false;
+        }
+        NPCMountComponent mountComponent = store.getComponent(reference, mountType);
+        if (mountComponent == null) {
+            return false;
+        }
+        PlayerRef ownerPlayerRef = mountComponent.getOwnerPlayerRef();
+        if (ownerPlayerRef == null) {
+            return false;
+        }
+        Ref<EntityStore> ownerRef = ownerPlayerRef.getReference();
+        return ownerRef != null && ownerRef.isValid() && ownerRef.getStore() == store;
     }
 
     private boolean hasCustomName(Ref<EntityStore> reference, Store<EntityStore> store) {
@@ -137,14 +154,36 @@ public final class NpcMountedNameplateVisibilitySystem extends RefSystem<EntityS
     }
 
     @Nullable
+    private String resolveNameToCache(Ref<EntityStore> reference, Store<EntityStore> store) {
+        String cached = resolveCachedDisplayName(reference, store);
+        if (cached != null && !cached.isBlank()) {
+            return cached;
+        }
+        String visible = resolveVisibleDisplayName(reference, store);
+        if (visible != null && !visible.isBlank()) {
+            return visible;
+        }
+        return resolveCustomName(reference, store);
+    }
+
+    @Nullable
     private String resolveRestoreName(Ref<EntityStore> reference, Store<EntityStore> store) {
+        String custom = resolveCustomName(reference, store);
+        if (custom != null && !custom.isBlank()) {
+            return custom;
+        }
+        return resolveCachedDisplayName(reference, store);
+    }
+
+    @Nullable
+    private String resolveCustomName(Ref<EntityStore> reference, Store<EntityStore> store) {
         if (customNameType != null) {
             TameworkNpcNameComponent custom = store.getComponent(reference, customNameType);
             if (custom != null && custom.getName() != null && !custom.getName().isBlank()) {
                 return custom.getName();
             }
         }
-        return resolveCachedDisplayName(reference, store);
+        return null;
     }
 
     @Nullable
