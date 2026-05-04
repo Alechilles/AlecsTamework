@@ -2,10 +2,7 @@
 
 ## Unreleased
 
-### Fixed
-- Fixed custom NPC names staying visible while a player is mounted by making mounted-name hiding and restoration self-correct during world ticks.
-
-## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-03
+## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-04
 
 ### Added
 - Added `/tw showspawnmarkers [radius|off]` to render nearby loaded Hytale spawn markers with bright-pink player-local debug shapes and print marker IDs, NPC options, positions, spawn counts, manual-trigger status, and suppression state.
@@ -17,9 +14,14 @@
 ### Changed
 - Switched Tamework to the shared embedded Alec's Telemetry runtime dependency instead of carrying the runtime sources directly in the mod.
 - Moved `/tw settings` telemetry persistence into `universe/Tamework/Settings/tamework-settings.json`, with legacy crash telemetry opt-out files imported without deleting them.
+- Replaced linked-panel gender text suffixes with male/female icons shown to the left of companion names.
 
 ### Fixed
 - Fixed `/tw npcspawntamed` attachment overrides being replaced by the NPC's initial random attachment choice after the sync system ran.
+- Fixed spawn marker debug cleanup so disabling marker display clears the player-local debug shapes reliably.
+- Fixed linked companion respawn, lost-recovery, and auto-link record writes so Locate keeps the known world name immediately after a replacement link is created.
+- Fixed legacy telemetry settings imports, including old telemetry paths, migration roots, and text boolean values from earlier builds.
+- Fixed custom NPC names staying visible while a player is mounted by making mounted-name hiding and restoration self-correct during world ticks.
 
 ## 2.8.6 - Breeding Families + Runtime Compatibility - 2026-04-26
 
