@@ -22,7 +22,7 @@ Use the commands in this order:
 Available commands:
 - `/tw api test prepare`
 - `/tw api test status`
-- `/tw api test run [core|profile|command-links|configs|progression|interaction-extensions|policies|diagnostics|all] [verbose]`
+- `/tw api test run [core|profile|command-links|configs|progression|interaction-extensions|trait-effects|policies|diagnostics|all] [verbose]`
 - `/tw api test reset`
 
 These commands are intended for trusted operators and use the `tamework.api.test` permission node with the usual OP/Admin/Operator fallback groups.
@@ -74,6 +74,12 @@ Each fixture is marked with an internal self-test component, linked to the gener
 - id listing and preset lookup behavior
 - unregister behavior via closing returned `AutoCloseable` handles
 - blank-id rejection behavior for requirement/effect/preset registration
+
+`run trait-effects` checks:
+- custom trait effect key registration through the public API
+- normalized key listing behavior
+- unregister behavior via closing the returned `AutoCloseable` handle
+- blank-key rejection behavior
 
 `run policies` checks:
 - ownership reads

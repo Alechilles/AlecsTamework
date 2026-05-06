@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Added a public Trait Effects API so integrations can register custom `TwTraitConfig` effect keys and execute them during Tamework's existing trait-effect resyncs.
+
 ## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-04
 
 ### Added

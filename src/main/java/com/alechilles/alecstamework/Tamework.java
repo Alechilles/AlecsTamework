@@ -15,6 +15,8 @@ import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
+import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
@@ -187,6 +189,7 @@ public class Tamework extends JavaPlugin {
     private TameworkApi api;
     private TameworkEventBus apiEventBus;
     private InteractionExtensionRegistry interactionExtensionRegistry;
+    private TraitEffectRegistry traitEffectRegistry;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
@@ -590,6 +593,7 @@ public class Tamework extends JavaPlugin {
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
         apiEventBus = new TameworkEventBus(getLogger());
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
+        traitEffectRegistry = new TraitEffectRegistry(getLogger(), persistenceRuntime.getNpcProfileRepository());
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
                 persistenceRuntime.getNpcProfileRepository()
@@ -598,7 +602,8 @@ public class Tamework extends JavaPlugin {
                 persistenceRuntime,
                 apiEventBus,
                 commandLinkedNpcStateSnapshotService,
-                interactionExtensionRegistry
+                interactionExtensionRegistry,
+                traitEffectRegistry
         );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(persistenceRuntime);
         apiSelfTestRunner = new ApiSelfTestRunner();
@@ -1074,6 +1079,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public InteractionExtensionRuntime getInteractionExtensionRuntime() {
         return interactionExtensionRegistry;
+    }
+
+    @Nullable
+    public TraitEffectRuntime getTraitEffectRuntime() {
+        return traitEffectRegistry;
     }
 
     @Nullable

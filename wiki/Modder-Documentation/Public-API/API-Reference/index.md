@@ -10,7 +10,7 @@ Parent: [Public API](/mod/alecs-tamework/public-api) | [Modder Documentation](/m
 
 This subsection contains the reference contract for each public API family.
 
-> **Experimental API Contract (`0.4.0`)**
+> **Experimental API Contract (`0.5.0`)**
 > Reference pages describe the current contract and can change while the API remains experimental.
 
 ## Child Pages
@@ -23,6 +23,7 @@ This subsection contains the reference contract for each public API family.
 - [Config Reads API Reference](/mod/alecs-tamework/config-reads-api-reference)
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
+- [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 
 

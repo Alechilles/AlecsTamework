@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.hypixel.hytale.assetstore.map.IndexedLookupTableAssetMap;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -31,6 +32,18 @@ public final class CompanionTraitEffectService {
             return;
         }
         applyMoveSpeedEffect(npcRef, store);
+        applyRegisteredTraitEffects(npcRef, store);
+    }
+
+    private static void applyRegisteredTraitEffects(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null) {
+            return;
+        }
+        TraitEffectRuntime runtime = instance.getTraitEffectRuntime();
+        if (runtime != null) {
+            runtime.applyRegisteredEffects(npcRef, store);
+        }
     }
 
     private static void applyMoveSpeedEffect(Ref<EntityStore> npcRef, Store<EntityStore> store) {

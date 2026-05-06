@@ -17,6 +17,8 @@ public interface TameworkApi {
 
     InteractionExtensionApi interactionExtensions();
 
+    TraitEffectApi traitEffects();
+
     ProfileDataApi profileData();
 
     TameworkEventsApi events();

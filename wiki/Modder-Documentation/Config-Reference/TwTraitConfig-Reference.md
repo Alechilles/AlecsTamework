@@ -186,11 +186,12 @@ Authoring guidance:
 
 ## Gotchas
 - `Traits` is an explicit array. Child assets replace the entire parent list when they author it.
-- `EffectKey` is runtime-coupled. Only keys consumed by Tamework or your own downstream logic will do anything.
+- `EffectKey` is runtime-coupled. Built-in keys work automatically, custom keys only do something when a mod registers a matching Trait Effects API handler, and unregistered keys are inert.
 - Broken or missing `IconPath` values do not stop the trait from working, but the UI will fall back instead of showing the intended icon.
 
 ## Related Pages
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)
+- [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference)
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference)
 

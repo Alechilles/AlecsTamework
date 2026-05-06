@@ -10,7 +10,7 @@ Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/a
 
 Use this page to bootstrap against `TameworkApi`, verify capabilities, and choose the correct family reference page.
 
-> **Experimental API Contract (`0.4.0`)**
+> **Experimental API Contract (`0.5.0`)**
 > The API is named **Public API** in docs and packages, but the contract is still experimental. Keep capability checks and plan for additive changes.
 
 ## Dependency and access pattern
@@ -44,6 +44,7 @@ Root API entrypoints:
 - `progression()`
 - `policies()`
 - `interactionExtensions()`
+- `traitEffects()`
 - `profileData()`
 - `events()`
 - `configs()`
@@ -56,6 +57,7 @@ Current capability set:
 - `PROGRESSION_MUTATIONS`
 - `POLICY`
 - `INTERACTION_EXTENSIONS`
+- `TRAIT_EFFECTS`
 - `PROFILE_DATA`
 - `EVENTS`
 - `CONFIG_READ`
@@ -70,6 +72,7 @@ Current capability set:
 - [Config Reads API Reference](/mod/alecs-tamework/config-reads-api-reference)
 - [Events API Reference](/mod/alecs-tamework/events-api-reference)
 - [Interaction Extensions API Reference](/mod/alecs-tamework/interaction-extensions-api-reference)
+- [Trait Effects API Reference](/mod/alecs-tamework/trait-effects-api-reference)
 - [Diagnostics API Reference](/mod/alecs-tamework/diagnostics-api-reference)
 
 ## Recipes
@@ -89,6 +92,7 @@ Current capability set:
 - [Enforce Ownership before Custom Command or Effect Recipe](/mod/alecs-tamework/enforce-ownership-before-custom-command-or-effect-recipe)
 - [Check Population Cap before Spawning or Taming Recipe](/mod/alecs-tamework/check-population-cap-before-spawning-or-taming-recipe)
 - [Register Interaction Extensions in Plugin Lifecycle Recipe](/mod/alecs-tamework/register-interaction-extensions-in-plugin-lifecycle-recipe)
+- [Register Custom Trait Effect Key Recipe](/mod/alecs-tamework/register-custom-trait-effect-key-recipe)
 - [API Bootstrap and Capability Checks Recipe](/mod/alecs-tamework/api-bootstrap-and-capability-checks-recipe)
 - [Event Subscription Lifecycle Recipe](/mod/alecs-tamework/event-subscription-lifecycle-recipe)
 - [Progression Mutation Status Handling Recipe](/mod/alecs-tamework/progression-mutation-status-handling-recipe)
@@ -107,7 +111,7 @@ See:
 - Do not write directly to `tamework.sqlite`.
 - Do not depend on repository classes like `NpcProfileRepository` or `CaptureRepository`.
 - Do not mutate or cache internal `Tw*Config` instances.
-- Do not assume API version `0.4.0` will match the mod version.
+- Do not assume API version `0.5.0` will match the mod version.
 
 ## Related Pages
 - [Setup and Quick Start](/mod/alecs-tamework/setup-and-quick-start)

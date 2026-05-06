@@ -23,7 +23,7 @@ if (api == null) {
     return; // Tamework not loaded or API unavailable
 }
 
-if (!"0.4.0".equals(api.getApiVersion())) {
+if (!"0.5.0".equals(api.getApiVersion())) {
     // Optional: warn, then continue with capability-based gating
 }
 

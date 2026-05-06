@@ -21,6 +21,7 @@ Goal: run the built-in in-game API smoke flow against a live server.
 ```text
 /tw api test run progression verbose
 /tw api test run interaction-extensions verbose
+/tw api test run trait-effects verbose
 ```
 
 ## Notes

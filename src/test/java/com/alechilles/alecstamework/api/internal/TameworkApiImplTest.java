@@ -43,10 +43,11 @@ class TameworkApiImplTest {
                     runtime,
                     bus,
                     stateSnapshotService,
-                    new InteractionExtensionRegistry(null)
+                    new InteractionExtensionRegistry(null),
+                    new TraitEffectRegistry(null, runtime.getNpcProfileRepository())
             );
 
-            assertEquals("0.4.0", api.getApiVersion());
+            assertEquals("0.5.0", api.getApiVersion());
             assertEquals(
                     EnumSet.of(
                             TameworkApiCapability.PROFILES,
@@ -55,6 +56,7 @@ class TameworkApiImplTest {
                             TameworkApiCapability.PROGRESSION_MUTATIONS,
                             TameworkApiCapability.POLICY,
                             TameworkApiCapability.INTERACTION_EXTENSIONS,
+                            TameworkApiCapability.TRAIT_EFFECTS,
                             TameworkApiCapability.PROFILE_DATA,
                             TameworkApiCapability.EVENTS,
                             TameworkApiCapability.CONFIG_READ,
@@ -88,6 +90,7 @@ class TameworkApiImplTest {
             assertEquals(profileId, byNpcUuid.orElseThrow().profileId());
             assertTrue(api.progression().getByProfileId(profileId).isEmpty());
             assertTrue(api.progression().getByNpcUuid(npcUuid).isEmpty());
+            assertNotNull(api.traitEffects());
             assertEquals(
                     ProgressionMutationStatus.NOT_LOADED,
                     api.progression().setHappiness(profileId, 75.0).status()

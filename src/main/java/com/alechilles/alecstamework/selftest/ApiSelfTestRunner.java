@@ -24,6 +24,7 @@ import com.alechilles.alecstamework.api.SpawnerConfigView;
 import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
+import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.api.Vector3View;
 import com.alechilles.alecstamework.npc.progression.CompanionProgressionBootstrapService;
 import com.hypixel.hytale.component.Ref;
@@ -56,6 +57,7 @@ public final class ApiSelfTestRunner {
         CONFIGS,
         PROGRESSION,
         INTERACTION_EXTENSIONS,
+        TRAIT_EFFECTS,
         POLICIES,
         DIAGNOSTICS,
         ALL;
@@ -86,6 +88,9 @@ public final class ApiSelfTestRunner {
         }
         if (suite == Suite.ALL || suite == Suite.INTERACTION_EXTENSIONS) {
             suites.add(runInteractionExtensions(context));
+        }
+        if (suite == Suite.ALL || suite == Suite.TRAIT_EFFECTS) {
+            suites.add(runTraitEffects(context));
         }
         if (suite == Suite.ALL || suite == Suite.POLICIES) {
             suites.add(runPolicies(context));
@@ -705,6 +710,47 @@ public final class ApiSelfTestRunner {
         }
         assertions.add(check("blank preset id rejected", invalidPresetRejected, Boolean.toString(invalidPresetRejected)));
         return new ApiSelfTestSuiteResult("interaction-extensions", assertions);
+    }
+
+    @Nonnull
+    private ApiSelfTestSuiteResult runTraitEffects(@Nonnull ApiSelfTestContext context) {
+        ArrayList<ApiSelfTestAssertion> assertions = new ArrayList<>();
+        TraitEffectApi traitEffects = context.api().traitEffects();
+        if (traitEffects == null) {
+            assertions.add(fail("trait effect api available", "<null>"));
+            return new ApiSelfTestSuiteResult("trait-effects", assertions);
+        }
+
+        String idSuffix = UUID.randomUUID().toString().replace("-", "");
+        String effectKey = "selftest.trait.effect." + idSuffix;
+        AutoCloseable registration = null;
+        try {
+            registration = traitEffects.registerEffectKey(effectKey.toUpperCase(Locale.ROOT), traitContext -> true);
+            assertions.add(check(
+                    "registered trait effect key is listed",
+                    traitEffects.listEffectKeys().contains(effectKey),
+                    "effects=" + traitEffects.listEffectKeys()
+            ));
+        } catch (Exception ex) {
+            assertions.add(fail("trait effect registration", ex.getClass().getSimpleName() + ": " + ex.getMessage()));
+        } finally {
+            closeQuietly(registration);
+        }
+
+        assertions.add(check(
+                "trait effect key unregistered on close",
+                !traitEffects.listEffectKeys().contains(effectKey),
+                "effects=" + traitEffects.listEffectKeys()
+        ));
+
+        boolean invalidEffectRejected = false;
+        try {
+            traitEffects.registerEffectKey(" ", traitContext -> true);
+        } catch (IllegalArgumentException expected) {
+            invalidEffectRejected = true;
+        }
+        assertions.add(check("blank trait effect key rejected", invalidEffectRejected, Boolean.toString(invalidEffectRejected)));
+        return new ApiSelfTestSuiteResult("trait-effects", assertions);
     }
 
     @Nonnull
