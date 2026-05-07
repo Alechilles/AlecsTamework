@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 2.10.0-Update5-Prerelease - Update 5 Pre-Release Compatibility - 2026-05-07
+
+### Changed
+- Updated Tamework for Hytale Update 5 pre-release APIs, including the renamed vector package, quaternion rotation helpers, projectile/event signatures, and NPC/component access changes used by companion commands, spawners, naming, interactions, needs, breeding, damage, and persistence flows.
+- Updated player hotbar access to read the Update 5 hotbar component, restoring contextual prompts, item-sensitive interactions, command tools, naming items, and spawner item behavior.
+- Updated custom NPC display-name handling to write both persistent and runtime display-name components required by Update 5.
+- Updated release metadata for the 2026.05.07 Update 5 pre-release server build and marked this build as a beta/prerelease release for platform publishing.
+
+### Fixed
+- Fixed startup failure on Update 5 caused by removed `com.hypixel.hytale.math.vector.Vector3d` / `Vector3f` / `Vector3i` classes.
+- Fixed Update 5 command/interaction targeting paths that depended on older inventory, rotation, and display-name APIs.
+- Fixed Maven test configuration so caller-provided Surefire `argLine` values are preserved while still installing the Hytale log manager for tests.
+
 ## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-04
 
 ### Added
