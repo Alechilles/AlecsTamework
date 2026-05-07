@@ -25,6 +25,7 @@
         <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/UserData</hytale.userdata.path>
         <hytale.toolkit.path>C:/Users/22ale/AppData/Local/Hytale-Toolkit</hytale.toolkit.path>
         <hytale.jdk.path>C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot</hytale.jdk.path>
+        <argLine></argLine>
         <hytale.server.jvm.args />
         <hytale.server.extra.args />
     </properties>
@@ -174,7 +175,7 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>3.2.5</version>
                 <configuration>
-                    <argLine>-Djava.util.logging.manager=com.hypixel.hytale.logger.backend.HytaleLogManager</argLine>
+                    <argLine>@{argLine} -Djava.util.logging.manager=com.hypixel.hytale.logger.backend.HytaleLogManager</argLine>
                     <useModulePath>false</useModulePath>
                 </configuration>
             </plugin>
