@@ -3,10 +3,11 @@ package com.alechilles.alecstamework.commands;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.matrix.Matrix4d;
 import com.hypixel.hytale.math.shape.Box;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Matrix4d;
+import org.joml.Vector3d;
+import org.joml.Vector3f;
 import com.hypixel.hytale.protocol.DebugShape;
 import com.hypixel.hytale.protocol.ToClientPacket;
 import com.hypixel.hytale.protocol.packets.player.ClearDebugShapes;
@@ -145,8 +146,8 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
         matrix.scale(width, height, depth);
         DisplayDebug packet = new DisplayDebug(
                 DebugShape.Cube,
-                matrix.asFloatData(),
-                new com.hypixel.hytale.protocol.Vector3f(color.x, color.y, color.z),
+                matrix.get(new float[16]),
+                color,
                 durationSeconds,
                 (byte) SHAPE_FLAGS,
                 null,
@@ -163,7 +164,8 @@ public final class TameworkShowHitboxesCommand extends AbstractPlayerCommand {
                                                  @Nonnull BoundingBox boundingBoxComponent,
                                                  @Nonnull TransformComponent transformComponent) {
         Vector3d entityPosition = new Vector3d(transformComponent.getPosition());
-        float yaw = transformComponent.getRotation().getYaw();
+        Rotation3f rotation = transformComponent.getRotation();
+        float yaw = rotation != null ? rotation.yaw() : 0.0F;
 
         int renderedDetailBoxes = 0;
         int renderedDetailGroups = 0;

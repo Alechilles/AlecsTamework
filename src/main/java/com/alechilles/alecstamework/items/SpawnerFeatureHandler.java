@@ -14,8 +14,8 @@ import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.InteractionType;
 import com.hypixel.hytale.server.core.entity.Entity;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -393,7 +393,7 @@ public final class SpawnerFeatureHandler {
             return false;
         }
         Ref<EntityStore> playerRef = player.getReference();
-        Vector3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
+        Rotation3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
         Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
         if (spawned == null || spawned.first() == null || spawned.second() == null) {
             logSpawnerFlowDebug("spawn denied reason=spawn-entity-failed player=" + playerUuid + " role=" + roleId);

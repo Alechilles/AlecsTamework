@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
@@ -47,15 +48,14 @@ final class SpawnerPlayerInventoryService {
         if (player == null) {
             return false;
         }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
         if (hotbar == null) {
             return false;
         }
-        byte activeSlot = inventory.getActiveHotbarSlot();
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (activeSlot < 0) {
+            return false;
+        }
         hotbar.setItemStackForSlot((short) activeSlot, updated);
         return true;
     }

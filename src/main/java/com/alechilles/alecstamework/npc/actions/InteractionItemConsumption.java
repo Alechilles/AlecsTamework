@@ -1,7 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 
@@ -19,15 +19,11 @@ final class InteractionItemConsumption {
         if (quantity <= 0) {
             return false;
         }
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
+        byte slot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (slot < 0) {
             return false;
         }
-        byte slot = inventory.getActiveHotbarSlot();
-        if (slot == Inventory.INACTIVE_SLOT_INDEX) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
         ItemStack stack = hotbar != null ? hotbar.getItemStack(slot) : null;
         if (stack == null || stack.isEmpty()) {
             return false;

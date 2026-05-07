@@ -15,7 +15,7 @@ import com.hypixel.hytale.codec.schema.config.StringSchema;
 import com.hypixel.hytale.codec.lookup.StringCodecMapCodec;
 import com.hypixel.hytale.common.util.ArrayUtil;
 import com.hypixel.hytale.math.codec.Vector3dArrayCodec;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.protocol.Color;
 import com.hypixel.hytale.server.core.codec.protocol.ColorCodec;
 import java.util.ArrayList;

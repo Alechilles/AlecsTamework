@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -69,7 +70,7 @@ public abstract class TameworkActionBase extends ActionBase {
         if (inventory == null) {
             return null;
         }
-        ItemStack stack = inventory.getActiveHotbarItem();
+        ItemStack stack = PlayerInventoryAccess.getActiveHotbarItem(player);
         if (stack == null || stack.isEmpty()) {
             return null;
         }

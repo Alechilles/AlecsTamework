@@ -152,7 +152,7 @@ public final class TameworkAssetPackCoordinator {
 
         if (assetModule.getAssetPack(packId) == null) {
             try {
-                assetModule.registerPack(packId, plugin.getFile(), plugin.getManifest(), true);
+                assetModule.registerPack(packId, plugin.getFile(), plugin.getManifest(), AssetPack.PackSource.MODS);
             } catch (RuntimeException ex) {
                 plugin.getLogger().at(Level.WARNING).withCause(ex)
                         .log("Tamework asset pack ordering: failed to register missing embedded pack '" + packId + "'.");

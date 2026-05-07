@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Store;
@@ -59,16 +60,12 @@ final class CommandToolInventoryService {
     }
 
     boolean updateHeldItem(Player player, ItemStack updated) {
-        Inventory inventory = player.getInventory();
-        if (inventory == null) {
-            return false;
-        }
-        ItemContainer hotbar = inventory.getHotbar();
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
         if (hotbar == null) {
             return false;
         }
-        byte slot = inventory.getActiveHotbarSlot();
-        if (slot == Inventory.INACTIVE_SLOT_INDEX) {
+        byte slot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (slot < 0) {
             return false;
         }
         hotbar.setItemStackForSlot((short) slot, updated);

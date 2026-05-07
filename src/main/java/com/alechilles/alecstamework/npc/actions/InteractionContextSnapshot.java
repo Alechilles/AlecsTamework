@@ -1,8 +1,9 @@
 package com.alechilles.alecstamework.npc.actions;
 
+import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.protocol.MovementStates;
-import com.alechilles.alecstamework.config.assets.TwInteractionConfig.FeedInteraction;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
@@ -80,7 +81,7 @@ final class InteractionContextSnapshot {
         }
         Inventory inventory = player.getInventory();
         CombinedItemContainer combined = inventory != null ? inventory.getCombinedBackpackStorageHotbar() : null;
-        ItemStack active = inventory != null ? inventory.getActiveHotbarItem() : null;
+        ItemStack active = PlayerInventoryAccess.getActiveHotbarItem(player);
         String activeId = (active != null && !active.isEmpty()) ? active.getItemId() : null;
         return new InteractionContextSnapshot(
                 player,

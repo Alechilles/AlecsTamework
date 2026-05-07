@@ -15,8 +15,8 @@ import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.ParticleUtil;
 import com.hypixel.hytale.server.core.universe.world.World;
@@ -399,8 +399,8 @@ final class BreedingOffspringService {
             Vector3d b = parentBTransform.getPosition();
             double targetY = Math.max(a.y, b.y);
             Vector3d midpoint = new Vector3d((a.x + b.x) * 0.5, targetY, (a.z + b.z) * 0.5);
-            Vector3d axis = new Vector3d(b).subtract(a);
-            if (axis.squaredLength() > 0.00001) {
+            Vector3d axis = new Vector3d(b).sub(a);
+            if (axis.lengthSquared() > 0.00001) {
                 axis.normalize();
                 Vector3d targetA = new Vector3d(
                         midpoint.x - axis.x * APPROACH_SPACING,
@@ -600,7 +600,7 @@ final class BreedingOffspringService {
         if (parentATransform == null || parentBTransform == null) {
             return false;
         }
-        double distance = parentATransform.getPosition().distanceTo(parentBTransform.getPosition());
+        double distance = parentATransform.getPosition().distance(parentBTransform.getPosition());
         return Double.isFinite(distance) && distance <= PAIRING_READY_DISTANCE;
     }
 
@@ -752,7 +752,7 @@ final class BreedingOffspringService {
                 ));
             }
         }
-        Vector3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
+        Rotation3f spawnRotation = resolveSpawnRotation(parentATransform, parentBTransform);
         int spawnedCount = 0;
         for (int i = 0; i < targetSpawnCount; i++) {
             BreedingOffspringSpawnService.ResolvedSpawnRole childSpawnRole = i == 0
@@ -904,19 +904,19 @@ final class BreedingOffspringService {
         return new Vector3d(fallbackAnchor.x, fallbackAnchor.y + OFFSPRING_SPAWN_HEIGHT_OFFSET, fallbackAnchor.z);
     }
 
-    private Vector3f resolveSpawnRotation(@Nullable TransformComponent parentATransform,
-                                          @Nullable TransformComponent parentBTransform) {
+    private Rotation3f resolveSpawnRotation(@Nullable TransformComponent parentATransform,
+                                            @Nullable TransformComponent parentBTransform) {
         if (parentATransform == null && parentBTransform == null) {
-            return new Vector3f();
+            return new Rotation3f();
         }
         if (parentATransform != null && parentBTransform != null) {
-            Vector3d delta = new Vector3d(parentBTransform.getPosition()).subtract(parentATransform.getPosition());
-            if (delta.squaredLength() > 0.00001) {
-                return Vector3f.lookAt(delta);
+            Vector3d delta = new Vector3d(parentBTransform.getPosition()).sub(parentATransform.getPosition());
+            if (delta.lengthSquared() > 0.00001) {
+                return Rotation3f.lookAt(delta);
             }
         }
         TransformComponent fallback = parentATransform != null ? parentATransform : parentBTransform;
-        return new Vector3f(fallback.getRotation());
+        return new Rotation3f(fallback.getRotation());
     }
 
     @Nullable

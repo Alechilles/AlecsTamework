@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -17,10 +18,9 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.model.config.ModelAsset;
-import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.inventory.container.ItemContainer;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
@@ -112,7 +112,7 @@ public final class NpcSpawnCommandService {
             }
 
             Vector3d spawnPosition = offsetSpawnPosition(baseSpawnPosition, index);
-            Vector3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
+            Rotation3f rotation = spawnPositionService.resolveSpawnRotation(store, playerRef, spawnPosition);
             Pair<Ref<EntityStore>, NPCEntity> spawned = npcPlugin.spawnEntity(store, roleIndex, spawnPosition, rotation, null, null);
             if (spawned == null || spawned.first() == null || spawned.second() == null) {
                 stoppedReason = "Spawn failed before completing the requested quantity.";
@@ -248,16 +248,15 @@ public final class NpcSpawnCommandService {
             return null;
         }
 
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
+        if (hotbar == null) {
             return null;
         }
-        byte activeSlot = inventory.getActiveHotbarSlot();
-        if (activeSlot == Inventory.INACTIVE_SLOT_INDEX) {
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (activeSlot < 0) {
             return null;
         }
 
-        ItemContainer hotbar = inventory.getHotbar();
         ItemStack heldStack = hotbar.getItemStack((short) activeSlot);
         if (heldStack == null || heldStack.isEmpty()) {
             return null;
@@ -391,15 +390,15 @@ public final class NpcSpawnCommandService {
     }
 
     private boolean updateHeldItem(Player player, ItemStack updated) {
-        Inventory inventory = player.getInventory();
-        if (inventory == null || inventory.getHotbar() == null) {
+        ItemContainer hotbar = PlayerInventoryAccess.getHotbar(player);
+        if (hotbar == null) {
             return false;
         }
-        byte activeSlot = inventory.getActiveHotbarSlot();
-        if (activeSlot == Inventory.INACTIVE_SLOT_INDEX) {
+        byte activeSlot = PlayerInventoryAccess.getActiveHotbarSlot(player);
+        if (activeSlot < 0) {
             return false;
         }
-        inventory.getHotbar().setItemStackForSlot((short) activeSlot, updated);
+        hotbar.setItemStackForSlot((short) activeSlot, updated);
         return true;
     }
 

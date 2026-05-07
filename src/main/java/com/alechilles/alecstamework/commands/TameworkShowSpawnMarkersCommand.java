@@ -5,9 +5,9 @@ import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.query.Query;
-import com.hypixel.hytale.math.matrix.Matrix4d;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import org.joml.Matrix4d;
+import org.joml.Vector3d;
+import org.joml.Vector3f;
 import com.hypixel.hytale.protocol.DebugShape;
 import com.hypixel.hytale.protocol.ToClientPacket;
 import com.hypixel.hytale.protocol.packets.player.ClearDebugShapes;
@@ -253,8 +253,8 @@ public final class TameworkShowSpawnMarkersCommand extends AbstractPlayerCommand
         matrix.scale(width, height, depth);
         DisplayDebug packet = new DisplayDebug(
                 DebugShape.Cube,
-                matrix.asFloatData(),
-                new com.hypixel.hytale.protocol.Vector3f(color.x, color.y, color.z),
+                matrix.get(new float[16]),
+                color,
                 durationSeconds,
                 (byte) SHAPE_FLAGS,
                 null,

@@ -3,7 +3,7 @@ package com.alechilles.alecstamework.persistence.sqlite;
 import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;

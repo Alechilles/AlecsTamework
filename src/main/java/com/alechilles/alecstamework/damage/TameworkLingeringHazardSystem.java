@@ -92,7 +92,7 @@ public final class TameworkLingeringHazardSystem extends TickingSystem<EntitySto
                             continue;
                         }
                         TransformComponent targetTransform = targets.getComponent(j, transformType);
-                        if (targetTransform == null || targetTransform.getPosition().distanceSquaredTo(transform.getPosition()) > radiusSq) {
+                        if (targetTransform == null || targetTransform.getPosition().distanceSquared(transform.getPosition()) > radiusSq) {
                             continue;
                         }
                         if (hazard.isExcludeSource() && sourceEntityUuid != null && isSourceEntity(targetRef, sourceEntityUuid, store)) {

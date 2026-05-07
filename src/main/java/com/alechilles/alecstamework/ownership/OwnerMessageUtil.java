@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ownership;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.entity.entities.Player;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -32,7 +33,7 @@ public final class OwnerMessageUtil {
                 : (ownerUuid != null ? ownerUuid.toString() : "someone");
         String resolvedVerb = verb != null && !verb.isBlank() ? verb : "interact with";
 
-        player.sendMessage(Message.raw(
+        send(player, Message.raw(
                 "That " + resolvedNpc + " belongs to " + resolvedOwner
                         + ". You cannot " + resolvedVerb
                         + " a pet that does not belong to you."
@@ -54,7 +55,7 @@ public final class OwnerMessageUtil {
         if (foodList != null && !foodList.isBlank()) {
             message += " Try feeding: " + foodList + ".";
         }
-        player.sendMessage(Message.raw(message));
+        send(player, Message.raw(message));
     }
 
     public static void sendPopulationCapReached(Player player,
@@ -72,7 +73,7 @@ public final class OwnerMessageUtil {
         String scopeLabel = safeScope == TwGlobalConfig.PerPlayerLimitScope.GLOBAL
                 ? "across loaded worlds"
                 : "in this world";
-        player.sendMessage(Message.raw(
+        send(player, Message.raw(
                 "You cannot tame more NPCs right now (" + safeCurrent + "/" + safeLimit
                         + " owned " + scopeLabel + ")."
         ));
@@ -94,5 +95,12 @@ public final class OwnerMessageUtil {
         }
         LAST_SENT.put(playerUuid, now);
         return true;
+    }
+
+    private static void send(Player player, Message message) {
+        PlayerRef playerRef = player != null ? player.getPlayerRef() : null;
+        if (playerRef != null) {
+            playerRef.sendMessage(message);
+        }
     }
 }

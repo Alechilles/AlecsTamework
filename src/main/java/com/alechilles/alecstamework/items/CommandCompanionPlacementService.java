@@ -1,11 +1,12 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
+import com.alechilles.alecstamework.math.TameworkRotationUtil;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.asset.type.blocktype.config.BlockType;
 import com.hypixel.hytale.server.core.modules.collision.WorldUtil;
 import com.hypixel.hytale.server.core.modules.entity.component.HeadRotation;
@@ -247,24 +248,21 @@ final class CommandCompanionPlacementService {
         if (playerRef == null || !playerRef.isValid() || store == null) {
             return null;
         }
-        Vector3f rotation = null;
+        Rotation3f rotation = null;
         HeadRotation headRotation = store.getComponent(playerRef, HeadRotation.getComponentType());
         if (headRotation != null) {
-            rotation = new Vector3f(headRotation.getRotation());
+            rotation = TameworkRotationUtil.copyOrDefault(headRotation.getRotation());
         }
         if (rotation == null) {
             TransformComponent transform = store.getComponent(playerRef, TransformComponent.getComponentType());
             if (transform == null) {
                 return null;
             }
-            rotation = new Vector3f(transform.getRotation());
+            rotation = TameworkRotationUtil.copyOrDefault(transform.getRotation());
         }
-        Vector3f forward = new Vector3f(Vector3f.FORWARD);
-        forward.rotateY(rotation.getYaw());
-        forward.rotateX(rotation.getPitch());
-        forward.normalize();
+        Vector3d forward = TameworkRotationUtil.directionFrom(rotation).normalize();
         Vector3d out = new Vector3d(forward.x, 0.0, forward.z);
-        if (out.squaredLength() <= 0.0001) {
+        if (out.lengthSquared() <= 0.0001) {
             return null;
         }
         out.normalize();

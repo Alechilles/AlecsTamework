@@ -7,7 +7,7 @@ import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.ProgressionMutationStatus;
 import com.alechilles.alecstamework.items.CommandLinkedNpcCaptureService;
 import com.alechilles.alecstamework.items.CommandLinkedNpcStateSnapshotService;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
 

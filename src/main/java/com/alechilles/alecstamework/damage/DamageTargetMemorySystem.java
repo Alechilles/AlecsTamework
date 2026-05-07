@@ -1,5 +1,7 @@
 package com.alechilles.alecstamework.damage;
 
+import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
+import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Ref;
@@ -7,7 +9,6 @@ import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.component.SystemGroup;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageEventSystem;
 import com.hypixel.hytale.server.core.modules.entity.damage.DamageModule;
@@ -85,7 +86,7 @@ public final class DamageTargetMemorySystem extends DamageEventSystem {
         PlayerRef attackerPlayerRef = store.getComponent(attackerRef, PlayerRef.getComponentType());
         if (attackerPlayerRef != null && attackerPlayerRef.getUuid() != null) {
             Player attackerPlayer = store.getComponent(attackerRef, Player.getComponentType());
-            String playerName = attackerPlayer != null ? attackerPlayer.getDisplayName() : attackerPlayerRef.getUsername();
+            String playerName = attackerPlayer != null ? OwnerNameUtil.resolve(attackerPlayer) : attackerPlayerRef.getUsername();
             return new DamageTargetMemoryService.RecentAttackerSnapshot(
                     attackerPlayerRef.getUuid(),
                     DamageTargetMemoryService.AttackerKind.PLAYER,
@@ -109,12 +110,9 @@ public final class DamageTargetMemorySystem extends DamageEventSystem {
     private String resolveNpcDisplayName(@Nonnull Ref<EntityStore> npcRef,
                                          @Nonnull Store<EntityStore> store,
                                          @Nonnull NPCEntity npc) {
-        DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
-        if (displayName != null && displayName.getDisplayName() != null) {
-            String ansi = displayName.getDisplayName().getAnsiMessage();
-            if (!isBlank(ansi)) {
-                return ansi;
-            }
+        String componentName = NpcDisplayNameComponentService.resolvePersistentOrRuntimeName(npcRef, store);
+        if (!isBlank(componentName)) {
+            return componentName;
         }
         String legacy = npc.getLegacyDisplayName();
         if (!isBlank(legacy)) {

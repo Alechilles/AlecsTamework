@@ -6,7 +6,7 @@ import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedin
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
-import com.hypixel.hytale.math.vector.Vector3d;
+import org.joml.Vector3d;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import java.util.UUID;

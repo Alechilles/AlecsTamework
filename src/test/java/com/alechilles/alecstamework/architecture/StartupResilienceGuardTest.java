@@ -42,24 +42,6 @@ class StartupResilienceGuardTest {
     }
 
     @Test
-    void commandItemAssetSetupHandlesMissingVector3dGracefully() throws IOException {
-        String content = Files.readString(TAMEWORK_PATH, StandardCharsets.UTF_8);
-
-        assertTrue(
-                content.contains("private static boolean isMissingVector3d"),
-                "Tamework must keep Vector3d runtime-availability guard helper."
-        );
-        assertTrue(
-                content.contains("Skipping command-item asset registration because Vector3d is unavailable"),
-                "Command-item registration must degrade gracefully when Vector3d is absent."
-        );
-        assertTrue(
-                content.contains("Skipping command-item asset loading because Vector3d is unavailable"),
-                "Command-item loading must degrade gracefully when Vector3d is absent."
-        );
-    }
-
-    @Test
     void despawnDiagnosticsHandlesMissingSpawnPluginGracefully() throws IOException {
         String content = Files.readString(TAMEWORK_PATH, StandardCharsets.UTF_8);
 

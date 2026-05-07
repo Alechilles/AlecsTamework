@@ -15,10 +15,10 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Interactio
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ModeCycleInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.MountInteraction;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
+import com.alechilles.alecstamework.inventory.PlayerInventoryAccess;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
-import com.hypixel.hytale.server.core.inventory.Inventory;
 import com.hypixel.hytale.server.core.inventory.ItemStack;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderSupport;
@@ -134,8 +134,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     }
 
     private PromptSelectionFingerprint buildPromptSelectionFingerprint(Player player, Role role) {
-        Inventory inventory = player != null ? player.getInventory() : null;
-        ItemStack activeItem = inventory != null ? inventory.getActiveHotbarItem() : null;
+        ItemStack activeItem = PlayerInventoryAccess.getActiveHotbarItem(player);
         String activeItemId = activeItem != null && !activeItem.isEmpty() ? activeItem.getItemId() : null;
         int activeQuantity = activeItem != null && !activeItem.isEmpty() ? activeItem.getQuantity() : 0;
         int stateIndex = role != null && role.getStateSupport() != null ? role.getStateSupport().getStateIndex() : -1;
