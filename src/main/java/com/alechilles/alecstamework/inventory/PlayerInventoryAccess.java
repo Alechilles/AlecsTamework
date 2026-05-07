@@ -18,19 +18,30 @@ public final class PlayerInventoryAccess {
     }
 
     public static byte getActiveHotbarSlot(@Nullable Player player) {
-        Hotbar hotbar = getHotbarComponent(player);
-        return hotbar != null ? hotbar.getActiveSlot() : -1;
+        return getActiveHotbarSlot(getHotbarComponent(player));
     }
 
     @Nullable
     public static ItemStack getActiveHotbarItem(@Nullable Player player) {
-        Hotbar hotbar = getHotbarComponent(player);
-        return hotbar != null ? hotbar.getActiveItem() : null;
+        return getActiveHotbarItem(getHotbarComponent(player));
     }
 
     @Nullable
     public static ItemContainer getHotbar(@Nullable Player player) {
-        Hotbar hotbar = getHotbarComponent(player);
+        return getHotbar(getHotbarComponent(player));
+    }
+
+    static byte getActiveHotbarSlot(@Nullable Hotbar hotbar) {
+        return hotbar != null ? hotbar.getActiveSlot() : -1;
+    }
+
+    @Nullable
+    static ItemStack getActiveHotbarItem(@Nullable Hotbar hotbar) {
+        return hotbar != null ? hotbar.getActiveItem() : null;
+    }
+
+    @Nullable
+    static ItemContainer getHotbar(@Nullable Hotbar hotbar) {
         return hotbar != null ? hotbar.getInventory() : null;
     }
 

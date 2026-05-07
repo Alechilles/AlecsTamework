@@ -48,11 +48,23 @@ public final class NpcDisplayNameComponentService {
 
     @Nullable
     public static String resolvePersistentOrRuntimeName(Ref<EntityStore> reference, Store<EntityStore> store) {
-        String persistent = resolvePersistentName(reference, store);
+        if (reference == null || !reference.isValid() || store == null) {
+            return null;
+        }
+        return resolvePersistentOrRuntimeName(
+                store.getComponent(reference, PersistentDisplayName.getComponentType()),
+                store.getComponent(reference, DisplayNameComponent.getComponentType())
+        );
+    }
+
+    @Nullable
+    static String resolvePersistentOrRuntimeName(@Nullable PersistentDisplayName persistentDisplayName,
+                                                 @Nullable DisplayNameComponent runtimeDisplayName) {
+        String persistent = persistentDisplayName != null ? read(persistentDisplayName.getDisplayName()) : null;
         if (persistent != null && !persistent.isBlank()) {
             return persistent;
         }
-        return resolveRuntimeName(reference, store);
+        return runtimeDisplayName != null ? read(runtimeDisplayName.getDisplayName()) : null;
     }
 
     @Nullable
