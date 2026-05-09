@@ -93,6 +93,8 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateCompo
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
@@ -122,6 +124,11 @@ import com.alechilles.alecstamework.npc.systems.FlyingCompanionControlSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
+import com.alechilles.alecstamework.npc.systems.MountedRideCleanupSystem;
+import com.alechilles.alecstamework.npc.systems.MountedRideInputCaptureSystem;
+import com.alechilles.alecstamework.npc.systems.MountedRidePacketHandler;
+import com.alechilles.alecstamework.npc.systems.MountedRideRiderCleanupSystem;
+import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
@@ -129,6 +136,7 @@ import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
@@ -136,6 +144,8 @@ import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
+import com.hypixel.hytale.server.core.io.ServerManager;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
@@ -143,7 +153,10 @@ import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -230,6 +243,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingCompanionComponentType;
+    private ComponentType<EntityStore, TameworkRideMountComponent> rideMountComponentType;
+    private ComponentType<EntityStore, TameworkRideRiderComponent> rideRiderComponentType;
     private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
@@ -245,6 +260,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugSpawnerLocationLogs;
     private volatile boolean debugPromptLogs;
+    private volatile boolean debugRideLogs;
     private volatile boolean debugDespawnLogs;
     private volatile String debugDespawnRoleFilter;
     private volatile boolean debugLagLogs;
@@ -343,6 +359,7 @@ public class Tamework extends JavaPlugin {
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
+        ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         // Register the custom item interaction used by naming items.
@@ -441,6 +458,18 @@ public class Tamework extends JavaPlugin {
                 TameworkFlyingCompanionComponent.class,
                 "TameworkFlyingCompanion",
                 TameworkFlyingCompanionComponent.CODEC
+        );
+
+        rideMountComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkRideMountComponent.class,
+                "TameworkRideMount",
+                TameworkRideMountComponent.CODEC
+        );
+
+        rideRiderComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkRideRiderComponent.class,
+                "TameworkRideRider",
+                TameworkRideRiderComponent.CODEC
         );
 
         levelingComponentType = getEntityStoreRegistry().registerComponent(
@@ -544,6 +573,52 @@ public class Tamework extends JavaPlugin {
                     )
             );
             getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
+        }
+        ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
+        if (mountedComponentType == null) {
+            getLogger().at(Level.WARNING).log(
+                    "Mount plugin mounted component type unavailable during setup; skipping Tamework ride systems."
+            );
+        } else {
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideInputCaptureSystem(
+                            mountedComponentType,
+                            PlayerInput.getComponentType(),
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            UUIDComponent.getComponentType(),
+                            MovementStatesComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideCleanupSystem(
+                            mountedComponentType,
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            UUIDComponent.getComponentType(),
+                            NPCEntity.getComponentType(),
+                            TransformComponent.getComponentType(),
+                            DeathComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideRiderFollowSystem(
+                            mountedComponentType,
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            TransformComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideRiderCleanupSystem(
+                            mountedComponentType,
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            UUIDComponent.getComponentType(),
+                            NPCEntity.getComponentType(),
+                            DeathComponent.getComponentType()
+                    )
+            );
         }
         getEntityStoreRegistry().registerSystem(
                 new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType())
@@ -1188,6 +1263,7 @@ public class Tamework extends JavaPlugin {
         setDebugSpawnerEnabled(commands.isSpawner());
         setDebugSpawnerLocationEnabled(commands.isSpawner());
         setDebugPromptEnabled(commands.isPrompt());
+        setDebugRideEnabled(commands.isRide());
         setDebugDespawnEnabled(commands.isDespawn());
         setDebugLagEnabled(commands.isLag());
         setDebugCoopEnabled(commands.isCoop());
@@ -1209,6 +1285,7 @@ public class Tamework extends JavaPlugin {
                         + ", spawner=" + isDebugSpawnerEnabled()
                         + ", spawnerLocation=" + isDebugSpawnerLocationEnabled()
                         + ", prompt=" + isDebugPromptEnabled()
+                        + ", ride=" + isDebugRideEnabled()
                         + ", despawn=" + isDebugDespawnEnabled()
                         + ", lag=" + isDebugLagEnabled()
                         + ", coop=" + isDebugCoopEnabled()
@@ -1994,6 +2071,14 @@ public class Tamework extends JavaPlugin {
         return flyingCompanionComponentType;
     }
 
+    public ComponentType<EntityStore, TameworkRideMountComponent> getRideMountComponentType() {
+        return rideMountComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkRideRiderComponent> getRideRiderComponentType() {
+        return rideRiderComponentType;
+    }
+
     public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {
         return levelingComponentType;
     }
@@ -2092,6 +2177,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugPromptEnabled() {
         debugPromptLogs = !debugPromptLogs;
         return debugPromptLogs;
+    }
+
+    public boolean isDebugRideEnabled() {
+        return debugRideLogs;
+    }
+
+    public boolean setDebugRideEnabled(boolean enabled) {
+        debugRideLogs = enabled;
+        return debugRideLogs;
+    }
+
+    public boolean toggleDebugRideEnabled() {
+        debugRideLogs = !debugRideLogs;
+        return debugRideLogs;
     }
 
     public boolean isDebugLagEnabled() {
@@ -2275,6 +2374,15 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, NPCMountComponent> resolveNpcMountComponentTypeOrNull() {
         try {
             return NPCMountComponent.getComponentType();
+        } catch (Throwable throwable) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private ComponentType<EntityStore, MountedComponent> resolveMountedComponentTypeOrNull() {
+        try {
+            return MountedComponent.getComponentType();
         } catch (Throwable throwable) {
             return null;
         }

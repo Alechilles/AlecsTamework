@@ -43,6 +43,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
     private final Map<UUID, PromptState> lastPrompts = new HashMap<>();
     private final Map<UUID, Long> lastDebugMs = new HashMap<>();
     private final Map<UUID, CachedPromptSelection> cachedPromptSelections = new HashMap<>();
+    private long lastEarlyDebugMs;
 
     public ActionTameworkInteractPrompt(BuilderActionTameworkInteractPrompt builder, BuilderSupport support) {
         super(builder, support);
@@ -55,19 +56,27 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                            double dt,
                            Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || role == null || role.getStateSupport() == null) {
+            maybeLogEarlyPromptDebug("invalid_npc_or_role", role, infoProvider);
             return false;
         }
         Ref<EntityStore> interactionTarget = resolveInteractionTarget(role, infoProvider);
         if (interactionTarget == null || !interactionTarget.isValid() || store == null) {
+            maybeLogEarlyPromptDebug(
+                    store == null ? "missing_store" : "no_interaction_target",
+                    role,
+                    infoProvider
+            );
             return false;
         }
         Player player = store.getComponent(interactionTarget, Player.getComponentType());
         if (player == null) {
+            maybeLogEarlyPromptDebug("interaction_target_not_player", role, infoProvider);
             return false;
         }
 
         UUID playerId = player.getUuid();
         if (playerId == null) {
+            maybeLogEarlyPromptDebug("player_uuid_missing", role, infoProvider);
             return false;
         }
 
@@ -115,7 +124,7 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         boolean changed = !prompt.equals(previous);
         boolean interactable = prompt.interactable;
         if (ctx != null) {
-            maybeLogPromptDebug(resolved, config, npcRef, role, store, ctx, prompt);
+            maybeLogPromptDebug(resolved, config, npcRef, role, infoProvider, store, player, ctx, prompt);
         }
         if (changed) {
             // Force a refresh when the prompt changes so the hint updates on the client.
@@ -263,7 +272,9 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                                      TwInteractionConfig config,
                                      Ref<EntityStore> npcRef,
                                      Role role,
+                                     InfoProvider infoProvider,
                                      Store<EntityStore> store,
+                                     Player player,
                                      InteractionContextSnapshot ctx,
                                      PromptState prompt) {
         Tamework instance = Tamework.getInstance();
@@ -288,6 +299,14 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 : "<none>";
         boolean showPrompt = !prompt.isHidden();
         boolean interactable = prompt.interactable;
+        boolean tamed = isTamed(npcRef, store, ctx);
+        boolean owner = isOwner(npcRef, store, player, ctx);
+        boolean isMountable = resolveIsMountable(role, ctx);
+        boolean crouching = isPlayerCrouching(role, infoProvider, store, ctx);
+        String held = describeHeldItem(ctx);
+        String noMatchSummary = resolved == null && config != null
+                ? buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx)
+                : "";
         InteractionAlarmHelper.AlarmSnapshot alarm = getHarvestAlarmSnapshot(npcRef, store, ctx);
         boolean requireAlarm = false;
         boolean requireContext = false;
@@ -298,14 +317,20 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
         }
 
         instance.getLogger().at(Level.INFO).log(
-                "TameworkPrompt debug: role=%s config=%s entry=%s interactable=%s show=%s alarmName=%s " +
+                "TameworkPrompt debug: role=%s config=%s entry=%s interactable=%s show=%s tamed=%s owner=%s " +
+                        "held=%s isMountable=%s crouching=%s alarmName=%s " +
                         "validName=%s npcResolved=%s storeResolved=%s exists=%s nowAvailable=%s " +
-                        "set=%s unset=%s active=%s passed=%s ready=%s requireAlarm=%s requireContext=%s",
+                        "set=%s unset=%s active=%s passed=%s ready=%s requireAlarm=%s requireContext=%s noMatch=%s",
                 roleName,
                 configId,
                 entryType,
                 interactable,
                 showPrompt,
+                tamed,
+                owner,
+                held,
+                isMountable,
+                crouching,
                 getHarvestAlarmName(),
                 alarm.validName,
                 alarm.npcResolved,
@@ -318,7 +343,38 @@ public final class ActionTameworkInteractPrompt extends ActionTameworkInteract {
                 alarm.passed,
                 alarm.ready,
                 requireAlarm,
-                requireContext
+                requireContext,
+                noMatchSummary
+        );
+    }
+
+    private void maybeLogEarlyPromptDebug(String reason, Role role, InfoProvider infoProvider) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugPromptEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        long now = System.currentTimeMillis();
+        if (now - lastEarlyDebugMs < 1000) {
+            return;
+        }
+        lastEarlyDebugMs = now;
+        String roleName = role != null ? role.getRoleName() : "<null>";
+        boolean hasStateTarget = role != null
+                && role.getStateSupport() != null
+                && role.getStateSupport().getInteractionIterationTarget() != null
+                && role.getStateSupport().getInteractionIterationTarget().isValid();
+        boolean hasPosition = infoProvider != null && infoProvider.hasPosition();
+        String positionProvider = "<none>";
+        if (hasPosition && infoProvider.getPositionProvider() != null) {
+            positionProvider = infoProvider.getPositionProvider().getClass().getName();
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkPrompt debug: skipped role=%s reason=%s hasStateTarget=%s hasPosition=%s positionProvider=%s",
+                roleName,
+                reason,
+                hasStateTarget,
+                hasPosition,
+                positionProvider
         );
     }
 }

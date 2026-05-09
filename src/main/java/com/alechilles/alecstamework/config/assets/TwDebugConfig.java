@@ -46,6 +46,13 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
             .documentation("Debug setting for prompt diagnostics.")
             .add()
             .<Boolean>append(
+                    new KeyedCodec<>("Ride", Codec.BOOLEAN),
+                    (section, value) -> section.ride = value,
+                    section -> section.ride
+            )
+            .documentation("Debug setting for mounted ride diagnostics.")
+            .add()
+            .<Boolean>append(
                     new KeyedCodec<>("Despawn", Codec.BOOLEAN),
                     (section, value) -> section.despawn = value,
                     section -> section.despawn
@@ -315,6 +322,9 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         if (!nestedExplicitKeys.contains("Prompt")) {
             debugCommands.prompt = parent.debugCommands.prompt;
         }
+        if (!nestedExplicitKeys.contains("Ride")) {
+            debugCommands.ride = parent.debugCommands.ride;
+        }
         if (!nestedExplicitKeys.contains("Despawn")) {
             debugCommands.despawn = parent.debugCommands.despawn;
         }
@@ -371,6 +381,7 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
         private boolean hook;
         private boolean spawner;
         private boolean prompt;
+        private boolean ride;
         private boolean despawn;
         private String despawnRoleFilter;
         private boolean lag;
@@ -391,6 +402,10 @@ public final class TwDebugConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public boolean isPrompt() {
             return prompt;
+        }
+
+        public boolean isRide() {
+            return ride;
         }
 
         public boolean isDespawn() {
