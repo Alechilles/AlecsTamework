@@ -189,6 +189,10 @@ public final class TameworkRuntimeSettings {
         return values.breedingGenderEnabled();
     }
 
+    public boolean breedingGenderEnabledForConfig(boolean configEnabled) {
+        return configEnabled && values.breedingGenderEnabled();
+    }
+
     public boolean traitsEnabled() {
         return values.traitsEnabled();
     }
@@ -311,7 +315,7 @@ public final class TameworkRuntimeSettings {
 
     public static boolean breedingGenderEnabled(boolean configEnabled) {
         TameworkRuntimeSettings settings = currentOrNull();
-        return settings != null ? settings.breedingGenderEnabled() : configEnabled;
+        return settings != null ? settings.breedingGenderEnabledForConfig(configEnabled) : configEnabled;
     }
 
     public static double breedingHappinessThreshold(double configThreshold) {

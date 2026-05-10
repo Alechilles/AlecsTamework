@@ -51,21 +51,6 @@ Population caps, ownership requirements/protection, revive enablement, SimpleCla
 - `Enabled`: disables the asset entirely when `false`.
 - `Priority`: used to select the active global config.
 
-### `OwnershipProtection`
-Legacy compatibility only. Use `/tw settings` for these runtime values.
-
-- `BlockOwnerDamage`: blocks damage from the owner to owned NPCs.
-- `BlockAllPlayerDamageIfOwned`: blocks all player damage once the NPC is owned.
-- `InvulnerableIfOwned`: makes owned NPCs fully invulnerable.
-
-### `OwnershipRequirements`
-Legacy compatibility only. Use `/tw settings` for these runtime values.
-
-- `CaptureRequiresOwner`: default capture owner requirement for spawner capture.
-- `SpawnRequiresOwner`: default owner requirement for spawner spawn.
-- `InteractionRequiresOwner`: default owner requirement for interaction entries that do not explicitly set `RequireOwner`.
-- `LinkingRequiresOwner`: default owner requirement for command linking and command recipient checks when command-item config leaves `RequireOwner` unset.
-
 ### `InteractionDefaults`
 These names are part of the optimized interaction contract. If you rename them here, your role params and action overrides must match.
 
@@ -88,7 +73,6 @@ This section holds shared command infrastructure. Revive enablement is controlle
 - `RelocationRetryIntervalMs`: retry interval for queued off-screen relocations.
 - `RelocationMaxWaitMs`: total relocation wait budget before the runtime gives up.
 - `RelocationMaxRetryAttempts`: cap on relocation retry attempts.
-- `DeadRespawnEnabled`: legacy compatibility field; `/tw settings` controls revive/respawn availability.
 - `DeadRespawnCooldownMs`: respawn cooldown in milliseconds.
 - `DeadRespawnCooldownMins`: human-friendly alias for the same cooldown. If both are present, the minutes key wins.
 - `DeadRespawnFollowRetryDelayMs`: delay before follow retry after respawn.
@@ -110,30 +94,13 @@ These toggles opt bundled Tamework assets into the live game. Any loaded active 
 - `HerbivoreFeed`
 - `CarnivoreFeed`
 
-### `Population`
-Legacy compatibility only. Use `/tw settings` for these runtime values.
-
-- `LimitPerPlayerOwnedTotal`: cap on how many owned NPCs one player can have. `0` disables the cap.
-- `PerPlayerLimitScope`: how the cap is counted.
-
-Accepted values:
-- `PerWorld`
-- `Global`
-
 ### `SimpleClaims`
-Most SimpleClaims runtime policy is owned by `/tw settings`. `AllowDamagePermissionKey` remains config-owned so integrations can keep a stable permission contract.
+SimpleClaims runtime policy is owned by `/tw settings`. `AllowDamagePermissionKey` remains config-owned so integrations can keep a stable permission contract.
 
-Top-level fields:
-- `SimpleClaimsEnabled`: master gate for the integration.
+- `Damage.AllowDamagePermissionKey`: SimpleClaims permission key that bypasses the damage restriction.
 
-Nested `Breeding`:
-- `LimitPerClaimChunk`: max tamed breeding residents per claim chunk. `0` disables the limit.
-- `LimitPerClaimTotal`: total max tamed breeding residents across the whole claim. `0` disables the limit.
-- `BreedingRequiresClaim`: requires breeding to happen inside a valid claim.
-
-Nested `Damage`:
-- `ProtectTamedFromNonMembers`: blocks non-members from damaging tamed NPCs in claims.
-- `AllowDamagePermissionKey`: SimpleClaims permission key that bypasses the damage restriction.
+## Legacy Settings-Owned Fields Accepted
+Older packs may still contain ownership protection, ownership requirement, population, revive enablement, and SimpleClaims policy keys in `TwGlobalConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
 
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Global/TwGlobalConfig_Default.json` is the best reference for shipped baseline values.

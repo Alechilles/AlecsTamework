@@ -53,11 +53,17 @@ public final class TameworkSettingsOwnedField {
         return switch (family) {
             case GLOBAL -> matches(normalized, GLOBAL_EXACT_PATHS, GLOBAL_PREFIX_PATHS);
             case NEEDS -> matches(normalized, Set.of(), NEEDS_PREFIX_PATHS);
-            case BREEDING -> matches(normalized, BREEDING_EXACT_PATHS, Set.of());
+            case BREEDING -> matches(normalized, BREEDING_EXACT_PATHS, Set.of())
+                    || roleOverridePassiveBreedingEnabled(normalized);
             case SPAWNER -> matches(normalized, SPAWNER_EXACT_PATHS, Set.of());
             case COMPANION -> matches(normalized, COMPANION_EXACT_PATHS, COMPANION_PREFIX_PATHS);
             default -> false;
         };
+    }
+
+    private static boolean roleOverridePassiveBreedingEnabled(@Nonnull String normalized) {
+        return normalized.startsWith("roleoverrides.")
+                && normalized.endsWith(".passivebreeding.enabled");
     }
 
     private static boolean matches(@Nonnull String normalized,

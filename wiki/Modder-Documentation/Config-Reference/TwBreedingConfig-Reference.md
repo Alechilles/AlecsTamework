@@ -101,7 +101,6 @@ Each `RoleMaxNearbySameType` entry supports:
 If both cooldown keys are present, the minutes key writes the same backing value and should be treated as the preferred authored form.
 
 ### `PassiveBreeding`
-- `Enabled`: legacy compatibility field. New configs should use `/tw settings` to enable or disable passive breeding.
 - `SweepIntervalSeconds`: interval between passive breeding scans.
 - `Basis`: timer basis for the passive scan cadence.
 
@@ -210,6 +209,11 @@ Important behavior:
 - `RoleOverrides` is local-only.
 - Parent assets never contribute `RoleOverrides`.
 - This is intentional and part of Tamework’s inheritance contract.
+
+## Legacy Settings-Owned Fields Accepted
+These legacy fields are still decoded for old packs, but they are hidden from `/tw config` and controlled at runtime by `/tw settings`:
+- `PassiveBreeding.Enabled`
+- `RoleOverrides.*.PassiveBreeding.Enabled`
 
 ## Defaults, Aliases, and Cross-System Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Breeding/TwBreedingConfig_Default.json` is the shipped baseline.

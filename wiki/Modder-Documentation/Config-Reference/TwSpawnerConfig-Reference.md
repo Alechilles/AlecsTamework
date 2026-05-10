@@ -65,7 +65,6 @@ Fields:
 - `Denylist`
 
 ### `Capture`
-- `ClearsOwner`: legacy compatibility field. New configs should use `/tw settings` for capture owner clearing.
 - `RequireTamed`: requires the NPC to be tamed before capture succeeds.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
 - `RequireOwner`: explicit owner-presence requirement for this item flow.
@@ -75,7 +74,6 @@ Fields:
 - `MaxDistance`
 
 ### `Spawn`
-- `AssignsOwner`: legacy compatibility field. New configs should use `/tw settings` for spawn owner assignment.
 - `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
 - `RequireOwner`: explicit owner-presence requirement for this item flow.
 - `ParticleSystem`

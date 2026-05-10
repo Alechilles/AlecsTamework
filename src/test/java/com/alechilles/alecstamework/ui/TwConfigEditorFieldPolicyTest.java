@@ -185,10 +185,18 @@ class TwConfigEditorFieldPolicyTest {
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "SimpleClaims.Breeding.LimitPerClaimChunk"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Damage.StarvationDamagePerMinute"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.BREEDING, "PassiveBreeding.Enabled"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(
+                TwConfigFamily.BREEDING,
+                "RoleOverrides.Deer_Stag.PassiveBreeding.Enabled"
+        ));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.SPAWNER, "Spawn.AssignsOwner"));
         assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.COMPANION, "Command.DeadRespawnEnabled"));
 
         assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.BREEDING, "PassiveBreeding.SweepIntervalSeconds"));
+        assertFalse(TameworkSettingsOwnedField.isSettingsOwned(
+                TwConfigFamily.BREEDING,
+                "RoleOverrides.Deer_Stag.PassiveBreeding.SweepIntervalSeconds"
+        ));
         assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.SPAWNER, "Capture.OwnerRestricted"));
         assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Values.HungerMin"));
     }
@@ -235,13 +243,29 @@ class TwConfigEditorFieldPolicyTest {
         passiveBreeding.addProperty("Enabled", true);
         passiveBreeding.addProperty("SweepIntervalSeconds", 60);
         breeding.add("PassiveBreeding", passiveBreeding);
+        JsonObject roleOverrides = new JsonObject();
+        JsonObject deerOverride = new JsonObject();
+        JsonObject overridePassiveBreeding = new JsonObject();
+        overridePassiveBreeding.addProperty("Enabled", true);
+        overridePassiveBreeding.addProperty("SweepIntervalSeconds", 45);
+        deerOverride.add("PassiveBreeding", overridePassiveBreeding);
+        roleOverrides.add("Deer_Stag", deerOverride);
+        breeding.add("RoleOverrides", roleOverrides);
         List<TwConfigEditorFieldPolicy.EditorFieldSpec> breedingFields = TwConfigEditorFieldPolicy.fieldsFor(
                 descriptor(TwConfigFamily.BREEDING, true, true),
                 null,
                 breeding
         );
         assertNull(TwConfigEditorFieldPolicy.findField(breedingFields, "PassiveBreeding.Enabled"));
+        assertNull(TwConfigEditorFieldPolicy.findField(
+                breedingFields,
+                "RoleOverrides.Deer_Stag.PassiveBreeding.Enabled"
+        ));
         assertNotNull(TwConfigEditorFieldPolicy.findField(breedingFields, "PassiveBreeding.SweepIntervalSeconds"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(
+                breedingFields,
+                "RoleOverrides.Deer_Stag.PassiveBreeding.SweepIntervalSeconds"
+        ));
 
         JsonObject spawner = new JsonObject();
         JsonObject capture = new JsonObject();

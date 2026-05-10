@@ -54,13 +54,6 @@ Do not put global relocation infrastructure here. Retry windows and linked-panel
 - List of NPC role ids this config applies to.
 - Explicit array values replace the parent array.
 
-### `OwnershipProtection`
-Legacy compatibility only. Use `/tw settings` for these runtime values.
-
-- `BlockOwnerDamage`: blocks owner damage to owned NPCs.
-- `BlockAllPlayerDamageIfOwned`: blocks any player damage once the NPC is owned.
-- `InvulnerableIfOwned`: makes owned NPCs invulnerable.
-
 ### `Command`
 These fields control effective companion behavior once the command system targets a matching role.
 
@@ -69,7 +62,6 @@ These fields control effective companion behavior once the command system target
 - `ReturnHomeTeleportDelayMs`: delay before return-home teleport executes.
 - `RecallSafeSpawnDistance`: preferred spawn distance when recalling an unloaded companion.
 - `RecallForceRelocateDistance`: distance beyond which recall can force relocation.
-- `DeadRespawnEnabled`: legacy compatibility field. Use `/tw settings` for revive/respawn enablement.
 - `DeadRespawnCooldownMs`: cooldown in milliseconds before revive is available again.
 - `DeadRespawnCooldownMins`: human-friendly alias for the same cooldown. If both are set, the minutes key wins.
 - `DeadRespawnFollowRetryDelayMs`: follow retry delay after respawn.
@@ -107,6 +99,9 @@ Use `TwGlobalConfig.Command` for shared runtime infrastructure:
 - max relocation wait
 - max retry attempts
 - linked-panel unlink confirmation
+
+## Legacy Settings-Owned Fields Accepted
+Older packs may still contain ownership protection and revive enablement keys in `TwCompanionConfig`. Tamework continues to decode those keys for compatibility, but new configs should not author them, `/tw config` hides them, and `/tw settings` wins at runtime.
 
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Companion/TwCompanionConfig_Default.json` is the shipped baseline.
