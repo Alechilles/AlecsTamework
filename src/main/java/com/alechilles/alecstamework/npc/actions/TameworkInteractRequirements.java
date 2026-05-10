@@ -722,25 +722,10 @@ final class TameworkInteractRequirements {
         if (requireTamed && !owner.isTamed(npcRef, store, ctx)) {
             return false;
         }
-        if (!isBreedingEnabled(npcRef, store)) {
-            return false;
-        }
         if (isBreedingCooldownActive(npcRef, store)) {
             return false;
         }
         return true;
-    }
-
-    private boolean isBreedingEnabled(Ref<EntityStore> npcRef, Store<EntityStore> store) {
-        if (npcRef == null || !npcRef.isValid() || store == null) {
-            return false;
-        }
-        ComponentType<EntityStore, TameworkBreedingComponent> breedingType = TameworkBreedingComponent.getComponentType();
-        if (breedingType == null) {
-            return false;
-        }
-        TameworkBreedingComponent breeding = store.getComponent(npcRef, breedingType);
-        return breeding != null && breeding.isEnabled();
     }
 
     private boolean isBreedingCooldownActive(Ref<EntityStore> npcRef, Store<EntityStore> store) {

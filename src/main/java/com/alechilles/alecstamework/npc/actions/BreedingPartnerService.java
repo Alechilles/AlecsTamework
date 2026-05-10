@@ -36,10 +36,21 @@ final class BreedingPartnerService {
                                         Store<EntityStore> store,
                                         TameworkBreedingComponent sourceBreeding,
                                         @Nullable TwBreedingConfig config) {
+        long now = store != null ? BreedingTimeService.resolveCurrentTimeMs(store) : 0L;
+        return findNearestPartner(sourceRef, store, sourceBreeding, config, BreedingReadinessPolicy.passive(now));
+    }
+
+    @Nullable
+    PartnerCandidate findNearestPartner(Ref<EntityStore> sourceRef,
+                                        Store<EntityStore> store,
+                                        TameworkBreedingComponent sourceBreeding,
+                                        @Nullable TwBreedingConfig config,
+                                        BreedingReadinessPolicy readinessPolicy) {
         if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
             return null;
         }
-        if (!sourceBreeding.isEnabled()) {
+        boolean requireBreedingEnabled = readinessPolicy == null || readinessPolicy.requiresBreedingEnabled();
+        if (requireBreedingEnabled && !sourceBreeding.isEnabled()) {
             return null;
         }
         NPCEntity sourceNpc = store.getComponent(sourceRef, NPCEntity.getComponentType());
@@ -49,7 +60,7 @@ final class BreedingPartnerService {
         }
         String sourceRoleId = resolveRoleId(sourceNpc);
         UUID sourceOwnerId = resolveOwnerId(sourceRef, store);
-        long now = BreedingTimeService.resolveCurrentTimeMs(store);
+        long now = readinessPolicy != null ? readinessPolicy.nowMs() : BreedingTimeService.resolveCurrentTimeMs(store);
 
         TwBreedingConfig.PairingSettings pairing = config != null ? config.resolvePairing(sourceRoleId) : null;
         TwBreedingConfig.EligibilitySettings eligibility = config != null ? config.resolveEligibility(sourceRoleId) : null;
@@ -102,8 +113,8 @@ final class BreedingPartnerService {
                         ? chunk.getComponent(i, breedingType)
                         : null;
                 if (candidateBreeding == null
-                        || !candidateBreeding.isEnabled()
-                        || !candidateBreeding.isReady()
+                        || (requireBreedingEnabled && !candidateBreeding.isEnabled())
+                        || !acceptsReadiness(readinessPolicy, candidateBreeding)
                         || candidateBreeding.isCooldownActive(now)) {
                     continue;
                 }
@@ -161,6 +172,14 @@ final class BreedingPartnerService {
             return null;
         }
         return new PartnerCandidate(best.ref, best.npc, best.breeding, best.roleId, best.ownerId, best.distanceSq);
+    }
+
+    private static boolean acceptsReadiness(@Nullable BreedingReadinessPolicy readinessPolicy,
+                                            TameworkBreedingComponent breeding) {
+        if (readinessPolicy != null) {
+            return readinessPolicy.accepts(breeding);
+        }
+        return breeding.isReady();
     }
 
     @Nullable

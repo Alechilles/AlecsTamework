@@ -282,8 +282,9 @@ final class TameworkInteractEffects {
     boolean applyStartBreeding(BreedInteraction interaction,
                                Ref<EntityStore> npcRef,
                                Role role,
-                               Store<EntityStore> store) {
-        return breedingEffects.applyStartBreeding(interaction, npcRef, role, store);
+                               Store<EntityStore> store,
+                               Player player) {
+        return breedingEffects.applyStartBreeding(interaction, npcRef, role, store, player);
     }
 
     private boolean applyPresetEffects(@Nullable String interactionConfigId,

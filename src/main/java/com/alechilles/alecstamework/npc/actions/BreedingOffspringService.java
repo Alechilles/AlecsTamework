@@ -110,6 +110,44 @@ final class BreedingOffspringService {
                                @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations,
                                @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> pendingPlayerReservations,
                                @Nullable CommandBuffer<EntityStore> commandBuffer) {
+        long now = store != null ? BreedingTimeService.resolveCurrentTimeMs(store) : 0L;
+        return tryCompletePairing(
+                sourceRef,
+                store,
+                sourceBreeding,
+                config,
+                pendingClaimReservations,
+                pendingPlayerReservations,
+                commandBuffer,
+                BreedingReadinessPolicy.passive(now)
+        );
+    }
+
+    boolean tryCompleteManualPairing(Ref<EntityStore> sourceRef,
+                                     Store<EntityStore> store,
+                                     TameworkBreedingComponent sourceBreeding,
+                                     @Nullable TwBreedingConfig config,
+                                     UUID playerUuid) {
+        return tryCompletePairing(
+                sourceRef,
+                store,
+                sourceBreeding,
+                config,
+                null,
+                null,
+                null,
+                BreedingReadinessPolicy.manual(playerUuid, ManualBreedingClock.nowMs())
+        );
+    }
+
+    private boolean tryCompletePairing(Ref<EntityStore> sourceRef,
+                                       Store<EntityStore> store,
+                                       TameworkBreedingComponent sourceBreeding,
+                                       @Nullable TwBreedingConfig config,
+                                       @Nullable Map<BreedingClaimLimitPolicyService.ClaimReservationKey, Integer> pendingClaimReservations,
+                                       @Nullable Map<BreedingClaimLimitPolicyService.PlayerReservationKey, Integer> pendingPlayerReservations,
+                                       @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                       BreedingReadinessPolicy readinessPolicy) {
         if (sourceRef == null || !sourceRef.isValid() || store == null || sourceBreeding == null) {
             return false;
         }
@@ -117,7 +155,8 @@ final class BreedingOffspringService {
                 sourceRef,
                 store,
                 sourceBreeding,
-                config
+                config,
+                readinessPolicy
         );
         if (partner == null || partner.ref == null || !partner.ref.isValid()) {
             return false;
@@ -129,7 +168,7 @@ final class BreedingOffspringService {
             return false;
         }
         TameworkBreedingComponent livePartnerBreeding = getBreedingComponent(partner.ref, store);
-        if (livePartnerBreeding == null || !livePartnerBreeding.isReady()) {
+        if (!acceptsPartnerReadiness(readinessPolicy, livePartnerBreeding)) {
             return false;
         }
         Vector3d spawnAnchor = resolveSpawnAnchor(sourceRef, partner.ref, store);
@@ -224,6 +263,17 @@ final class BreedingOffspringService {
         return true;
     }
 
+    static boolean acceptsPartnerReadiness(@Nullable BreedingReadinessPolicy readinessPolicy,
+                                           @Nullable TameworkBreedingComponent breeding) {
+        if (breeding == null) {
+            return false;
+        }
+        if (readinessPolicy != null) {
+            return readinessPolicy.accepts(breeding);
+        }
+        return breeding.isReady();
+    }
+
     @Nullable
     private TameworkBreedingComponent getBreedingComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
@@ -252,6 +302,7 @@ final class BreedingOffspringService {
         breeding.setCooldownDurationMs(durationMs);
         breeding.setLastPartnerUuid(partnerUuid);
         breeding.setLastHappinessUpdateMs(now);
+        breeding.clearManualBreedingReady();
         ComponentType<EntityStore, TameworkBreedingComponent> type = TameworkBreedingComponent.getComponentType();
         if (type != null) {
             putComponent(npcRef, store, commandBuffer, type, breeding);

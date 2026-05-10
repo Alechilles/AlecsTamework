@@ -72,6 +72,7 @@
     {
       "Type": "Breed",
       "MinHappiness": 70.0,
+      "ManualSelectionSeconds": 120,
       "Requires": {
         "All": {
           "PlayerIsOwner": true,

@@ -385,6 +385,7 @@ final class BreedingOffspringProgressionService {
         breeding.setCooldownStartedAtMs(cooldownDurationMs > 0L ? now : 0L);
         breeding.setCooldownDurationMs(cooldownDurationMs);
         breeding.setLastPartnerUuid(null);
+        breeding.clearManualBreedingReady();
         store.putComponent(childRef, breedingType, breeding);
         applyCooldownAlarm(childRef, childNpc, cooldownUntilMs, store);
     }

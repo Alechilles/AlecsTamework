@@ -4,6 +4,8 @@
 
 ### Added
 - Added a public Trait Effects API so integrations can register custom `TwTraitConfig` effect keys and execute them during Tamework's existing trait-effect resyncs.
+- Added `Breed.ManualSelectionSeconds` for manual breeding interactions; players now manually select both intended parents, and manual breeding remains available even when passive breeding or the per-NPC breeding toggle is disabled.
+- Skipped breeding happiness thresholds for both manual and passive breeding when the happiness system or breeding happiness requirement is disabled.
 
 ## 2.9.0 - Companion Controls, Gender Breeding, and Embedded Telemetry - 2026-05-04
 

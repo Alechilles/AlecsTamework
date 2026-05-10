@@ -28,6 +28,7 @@ class TameworkBreedingComponentTest {
     void clonePreservesBreedingEnabledState() {
         long now = System.currentTimeMillis();
         long durationMs = 123456L;
+        UUID manualPlayerUuid = UUID.randomUUID();
         TameworkBreedingComponent component = new TameworkBreedingComponent(
                 "TestConfig",
                 42.0,
@@ -37,7 +38,9 @@ class TameworkBreedingComponentTest {
                 now + durationMs,
                 UUID.randomUUID(),
                 now,
-                durationMs
+                durationMs,
+                manualPlayerUuid,
+                now + 5000L
         );
 
         TameworkBreedingComponent cloned = component.clone();
@@ -45,5 +48,31 @@ class TameworkBreedingComponentTest {
         assertTrue(cloned.isEnabled());
         assertEquals(now, cloned.getCooldownStartedAtMs());
         assertEquals(durationMs, cloned.getCooldownDurationMs());
+        assertEquals(manualPlayerUuid, cloned.getManualBreedingPlayerUuid());
+        assertEquals(now + 5000L, cloned.getManualBreedingUntilMs());
+    }
+
+    @Test
+    void manualBreedingReadinessRequiresSamePlayerAndUnexpiredSelection() {
+        TameworkBreedingComponent component = new TameworkBreedingComponent();
+        UUID playerUuid = UUID.randomUUID();
+
+        component.markManualBreedingReady(playerUuid, 2000L);
+
+        assertTrue(component.isManualBreedingReadyFor(playerUuid, 1999L));
+        assertFalse(component.isManualBreedingReadyFor(UUID.randomUUID(), 1999L));
+        assertFalse(component.isManualBreedingReadyFor(playerUuid, 2000L));
+    }
+
+    @Test
+    void clearManualBreedingReadinessRemovesSelection() {
+        TameworkBreedingComponent component = new TameworkBreedingComponent();
+        UUID playerUuid = UUID.randomUUID();
+        component.markManualBreedingReady(playerUuid, 2000L);
+
+        component.clearManualBreedingReady();
+
+        assertFalse(component.isManualBreedingReadyFor(playerUuid, 1000L));
+        assertEquals(0L, component.getManualBreedingUntilMs());
     }
 }

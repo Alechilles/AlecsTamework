@@ -1770,7 +1770,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             resolved = copyHappiness(getHappiness());
             override.happiness.applyTo(resolved);
         }
-        if (!isHappinessRequiredByRuntimeOverrides()) {
+        if (!isHappinessRequirementEnabled(roleId)) {
             resolved.threshold = 0.0;
         }
         return resolved;
@@ -1851,15 +1851,20 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         return TameworkSettingsStore.loadRuntimeGlobalOverrides();
     }
 
-    private static boolean isHappinessRequiredByRuntimeOverrides() {
+    public static boolean isHappinessRequirementEnabled(@Nullable String roleId) {
         TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides == null) {
-            return true;
+        if (overrides != null) {
+            if (overrides.happinessEnabled() != null && !overrides.happinessEnabled()) {
+                return false;
+            }
+            if (overrides.breedingRequiresHappiness() != null && !overrides.breedingRequiresHappiness()) {
+                return false;
+            }
+            if (overrides.happinessEnabled() != null && overrides.happinessEnabled()) {
+                return true;
+            }
         }
-        if (overrides.happinessEnabled() != null && !overrides.happinessEnabled()) {
-            return false;
-        }
-        return overrides.breedingRequiresHappiness() == null || overrides.breedingRequiresHappiness();
+        return TwHappinessConfig.isEnabledForRole(roleId);
     }
 
     public TimingSettings getTiming() {

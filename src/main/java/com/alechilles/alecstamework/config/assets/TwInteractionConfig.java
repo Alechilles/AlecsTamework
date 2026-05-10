@@ -519,6 +519,7 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
         Boolean requireTamed;
         Double minHappiness;
         Double fertilityBonus;
+        Integer manualSelectionSeconds;
 
         public Boolean getRequireTamed() {
             return requireTamed;
@@ -530,6 +531,10 @@ public class TwInteractionConfig implements JsonAssetWithMap<String, DefaultAsse
 
         public Double getFertilityBonus() {
             return fertilityBonus;
+        }
+
+        public Integer getManualSelectionSeconds() {
+            return manualSelectionSeconds;
         }
     }
 

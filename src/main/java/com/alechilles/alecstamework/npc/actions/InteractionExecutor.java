@@ -163,7 +163,7 @@ final class InteractionExecutor {
         }
         if (entry instanceof BreedInteraction) {
             BreedInteraction breeding = (BreedInteraction) entry;
-            boolean applied = effects.applyStartBreeding(breeding, npcRef, role, store);
+            boolean applied = effects.applyStartBreeding(breeding, npcRef, role, store, player);
             if (!applied) {
                 return false;
             }
