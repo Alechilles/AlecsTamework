@@ -27,7 +27,7 @@ class TameworkRideMountComponentTest {
         assertEquals("", component.getPreviousSubState());
         assertEquals("", component.getPreviousMotionController());
         assertEquals("Walk", component.getGroundController());
-        assertEquals("TameworkRideFly", component.getFlightController());
+        assertEquals("TameworkFly", component.getFlightController());
         assertEquals("Ridden", component.getRideState());
     }
 

@@ -126,7 +126,7 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         }
         role.setActiveMotionController(ref, npc, controller, componentAccessor);
         MotionController active = role.getActiveMotionController();
-        if (active instanceof MotionControllerTameworkRideFly fly) {
+        if (active instanceof MotionControllerTameworkFly fly) {
             fly.takeOff(ref, Math.max(1.5, active.getMaximumSpeed() * 0.2), componentAccessor);
         } else {
             npc.playAnimation(ref, AnimationSlot.Movement, null, componentAccessor);

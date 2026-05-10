@@ -20,9 +20,9 @@ import java.util.logging.Level;
 import javax.annotation.Nonnull;
 
 /**
- * Rider-oriented flight controller variant that permits low-speed hovering and ground takeoff.
+ * Tamework flight controller that supports autonomous NPC steering and optional rider input tuning.
  */
-public final class MotionControllerTameworkRideFly extends MotionControllerFly {
+public final class MotionControllerTameworkFly extends MotionControllerFly {
     private static final double INPUT_DEAD_ZONE = 0.01;
     private static final double HORIZONTAL_INPUT_DEAD_ZONE = 0.025;
     private static final double SPRINT_HORIZONTAL_SPEED_MULTIPLIER = 1.35;
@@ -42,15 +42,15 @@ public final class MotionControllerTameworkRideFly extends MotionControllerFly {
     private float lastTargetPitch;
     private String lastFlightMovementAnimation = NO_FORCED_MOVEMENT_ANIMATION;
 
-    public MotionControllerTameworkRideFly(@Nonnull BuilderSupport builderSupport,
-                                           @Nonnull BuilderMotionControllerFly builder) {
+    public MotionControllerTameworkFly(@Nonnull BuilderSupport builderSupport,
+                                       @Nonnull BuilderMotionControllerFly builder) {
         super(builderSupport, builder);
     }
 
     @Nonnull
     @Override
     public String getType() {
-        return BuilderMotionControllerTameworkRideFly.BUILDER_ID;
+        return BuilderMotionControllerTameworkFly.BUILDER_ID;
     }
 
     @Override
@@ -62,8 +62,8 @@ public final class MotionControllerTameworkRideFly extends MotionControllerFly {
                 && effectHorizontalSpeedMultiplier != 0.0;
     }
 
-    private boolean canApplyRiderSteering(@Nonnull Ref<EntityStore> ref,
-                                          @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
+    private boolean canApplyTameworkFlySteering(@Nonnull Ref<EntityStore> ref,
+                                                @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         return isAlive(ref, componentAccessor)
                 && forceVelocity.equals(Vector3d.ZERO)
                 && appliedVelocities.isEmpty()
@@ -89,7 +89,7 @@ public final class MotionControllerTameworkRideFly extends MotionControllerFly {
         if (!forceVelocity.equals(Vector3d.ZERO) || !appliedVelocities.isEmpty()) {
             return super.computeMove(ref, role, steering, dt, translation, componentAccessor);
         }
-        if (!canApplyRiderSteering(ref, componentAccessor)) {
+        if (!canApplyTameworkFlySteering(ref, componentAccessor)) {
             steering.setYaw(getYaw());
             steering.setPitch(getPitch());
             steering.setRoll(getRoll());

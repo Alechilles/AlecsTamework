@@ -14,7 +14,7 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
  */
 public final class TameworkRideMountComponent implements Component<EntityStore> {
     public static final String DEFAULT_GROUND_CONTROLLER = "Walk";
-    public static final String DEFAULT_FLIGHT_CONTROLLER = "TameworkRideFly";
+    public static final String DEFAULT_FLIGHT_CONTROLLER = "TameworkFly";
     public static final String DEFAULT_RIDE_STATE = "Ridden";
 
     public static final BuilderCodec<TameworkRideMountComponent> CODEC = BuilderCodec.builder(

@@ -7,21 +7,21 @@ import com.hypixel.hytale.server.npc.movement.controllers.builders.BuilderMotion
 import javax.annotation.Nonnull;
 
 /**
- * Builder for rider-controlled flight using the vanilla fly plumbing.
+ * Builder for Tamework flight using the vanilla fly plumbing with hover-friendly steering.
  */
-public final class BuilderMotionControllerTameworkRideFly extends BuilderMotionControllerFly {
-    public static final String BUILDER_ID = "TameworkRideFly";
+public final class BuilderMotionControllerTameworkFly extends BuilderMotionControllerFly {
+    public static final String BUILDER_ID = "TameworkFly";
 
     @Nonnull
     @Override
-    public MotionControllerTameworkRideFly build(@Nonnull BuilderSupport builderSupport) {
-        return new MotionControllerTameworkRideFly(builderSupport, this);
+    public MotionControllerTameworkFly build(@Nonnull BuilderSupport builderSupport) {
+        return new MotionControllerTameworkFly(builderSupport, this);
     }
 
     @Nonnull
     @Override
     public String getShortDescription() {
-        return "Rider-controlled Tamework flight motion controller.";
+        return "Tamework flight motion controller for autonomous and ridden NPCs.";
     }
 
     @Nonnull
@@ -51,6 +51,6 @@ public final class BuilderMotionControllerTameworkRideFly extends BuilderMotionC
     @Nonnull
     @Override
     public Class<? extends MotionController> getClassType() {
-        return MotionControllerTameworkRideFly.class;
+        return MotionControllerTameworkFly.class;
     }
 }

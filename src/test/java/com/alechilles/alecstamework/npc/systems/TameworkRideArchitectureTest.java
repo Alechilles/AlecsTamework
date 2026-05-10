@@ -59,7 +59,8 @@ class TameworkRideArchitectureTest {
         assertFalse(plugin.contains("MountedRideMountMovementPacketFilter.register()"));
         assertFalse(plugin.contains("PacketAdapters.deregisterInbound(rideMountMovementPacketFilter)"));
         assertTrue(registrar.contains("BuilderBodyMotionTameworkRide.BUILDER_ID"));
-        assertTrue(registrar.contains("BuilderMotionControllerTameworkRideFly.BUILDER_ID"));
+        assertTrue(registrar.contains("BuilderMotionControllerTameworkFly.BUILDER_ID"));
+        assertFalse(registrar.contains("BuilderMotionControllerTameworkRideFly"));
     }
 
     @Test
@@ -163,16 +164,18 @@ class TameworkRideArchitectureTest {
     }
 
     @Test
-    void rideFlightControllerForcesFlyingAnimationStatesWhileAirborne() throws IOException {
+    void tameworkFlyControllerForcesFlyingAnimationStatesWhileAirborne() throws IOException {
         String content = readMain(
                 "com",
                 "alechilles",
                 "alecstamework",
                 "npc",
                 "movement",
-                "MotionControllerTameworkRideFly.java"
+                "MotionControllerTameworkFly.java"
         );
 
+        assertTrue(content.contains("public final class MotionControllerTameworkFly"));
+        assertTrue(content.contains("BuilderMotionControllerTameworkFly.BUILDER_ID"));
         assertTrue(content.contains("updateMovementState"));
         assertTrue(content.contains("updateFlyingStates(movementStates, horizontalIdle, fast)"));
         assertTrue(content.contains("movementStates.horizontalIdle = horizontalIdle"));
@@ -184,6 +187,42 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("ride.isRiderSprinting()"));
         assertTrue(content.contains("lastFlightMovementAnimation"));
         assertTrue(content.contains("SPRINT_HORIZONTAL_SPEED_MULTIPLIER"));
+    }
+
+    @Test
+    void genericTameworkFlyBuilderReplacesRideSpecificFlightId() throws IOException {
+        String builder = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "movement",
+                "BuilderMotionControllerTameworkFly.java"
+        );
+        String controller = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "movement",
+                "MotionControllerTameworkFly.java"
+        );
+        String rideComponent = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "components",
+                "TameworkRideMountComponent.java"
+        );
+
+        assertTrue(builder.contains("BUILDER_ID = \"TameworkFly\""));
+        assertTrue(builder.contains("return new MotionControllerTameworkFly(builderSupport, this)"));
+        assertTrue(controller.contains("return BuilderMotionControllerTameworkFly.BUILDER_ID"));
+        assertTrue(rideComponent.contains("DEFAULT_FLIGHT_CONTROLLER = \"TameworkFly\""));
+        assertFalse(builder.contains("TameworkRideFly"));
+        assertFalse(controller.contains("TameworkRideFly"));
+        assertFalse(rideComponent.contains("\"TameworkRideFly\""));
     }
 
     @Test
