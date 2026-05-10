@@ -7,6 +7,7 @@ import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.math.vector.Vector3d;
 import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.physics.util.PhysicsMath;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -127,6 +128,8 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         MotionController active = role.getActiveMotionController();
         if (active instanceof MotionControllerTameworkRideFly fly) {
             fly.takeOff(ref, Math.max(1.5, active.getMaximumSpeed() * 0.2), componentAccessor);
+        } else {
+            npc.playAnimation(ref, AnimationSlot.Movement, null, componentAccessor);
         }
     }
 
@@ -241,7 +244,7 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         instance.getLogger().at(Level.INFO).log(
                 "TameworkRide debug: bodyMotion role=%s controller=%s grounded=%s flyingActive=%s yaw=%s " +
                         "translation=%s/%s/%s hasYaw=%s hasPitch=%s wish=%s/%s/%s hasWish=%s " +
-                        "body=%s/%s hasBody=%s head=%s/%s hasHead=%s jump=%s crouch=%s flying=%s",
+                        "body=%s/%s hasBody=%s head=%s/%s hasHead=%s jump=%s crouch=%s flying=%s sprinting=%s",
                 role.getRoleName(),
                 controller,
                 grounded,
@@ -264,7 +267,8 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
                 ride.hasHeadRotation(),
                 ride.isRiderJumping(),
                 ride.isRiderCrouching(),
-                ride.isRiderFlying()
+                ride.isRiderFlying(),
+                ride.isRiderSprinting()
         );
     }
 }

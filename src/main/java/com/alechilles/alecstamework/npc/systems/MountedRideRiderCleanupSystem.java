@@ -14,6 +14,7 @@ import com.hypixel.hytale.component.dependency.Order;
 import com.hypixel.hytale.component.dependency.SystemDependency;
 import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.component.system.tick.EntityTickingSystem;
+import com.hypixel.hytale.protocol.AnimationSlot;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
 import com.hypixel.hytale.server.core.modules.entity.player.PlayerSystems;
@@ -141,6 +142,7 @@ public final class MountedRideRiderCleanupSystem extends EntityTickingSystem<Ent
         if (role == null) {
             return;
         }
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
         if (!mount.getPreviousMotionController().isBlank()) {
             role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
         }

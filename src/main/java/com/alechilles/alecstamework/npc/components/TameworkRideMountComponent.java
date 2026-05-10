@@ -628,7 +628,7 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         riderJumping = states.jumping || states.swimJumping;
         riderCrouching = states.crouching || states.forcedCrouching;
         riderFlying = states.flying;
-        riderSprinting = states.sprinting;
+        riderSprinting = states.sprinting || states.running;
     }
 
     public boolean hasAuthoritativePose() {

@@ -99,9 +99,21 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
         double riderX = mountPosition.x + worldX;
         double riderY = mountPosition.y + mount.getAnchorY();
         double riderZ = mountPosition.z + worldZ;
-        if (!rider.isClientCameraApplied() && MountedRideClientAttachment.attach(store, riderRef, mountRef, mount)) {
-            rider.setClientCameraApplied(true);
-            commandBuffer.putComponent(riderRef, rideRiderComponentType, rider);
+        if (!rider.isClientCameraApplied()) {
+            commandBuffer.run(bufferStore -> {
+                if (!riderRef.isValid() || !mountRef.isValid()) {
+                    return;
+                }
+                TameworkRideRiderComponent currentRider = bufferStore.getComponent(riderRef, rideRiderComponentType);
+                TameworkRideMountComponent currentMount = bufferStore.getComponent(mountRef, rideMountComponentType);
+                if (currentRider == null || currentMount == null || currentRider.isClientCameraApplied()) {
+                    return;
+                }
+                if (MountedRideClientAttachment.attach(bufferStore, riderRef, mountRef, currentMount)) {
+                    currentRider.setClientCameraApplied(true);
+                    bufferStore.putComponent(riderRef, rideRiderComponentType, currentRider);
+                }
+            });
         }
         player.moveTo(riderRef, riderX, riderY, riderZ, commandBuffer);
         maybeLogDebug(riderTransform, mountTransform, mount);

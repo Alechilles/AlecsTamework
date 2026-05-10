@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -27,6 +28,7 @@ import com.hypixel.hytale.server.npc.sensorinfo.InfoProvider;
 import com.hypixel.hytale.server.npc.systems.RoleChangeSystem;
 import java.util.UUID;
 import java.util.logging.Level;
+import javax.annotation.Nonnull;
 
 /** Applies mount-related interaction effects. */
 final class InteractionMountEffects {
@@ -233,14 +235,20 @@ final class InteractionMountEffects {
         TameworkRideMountComponent existingMount = existingMountRef == null || !existingMountRef.isValid()
                 ? null
                 : store.getComponent(existingMountRef, rideMountType);
-        boolean stale = mounted == null
-                || existingMountRef == null
+        boolean stale = existingMountRef == null
                 || !existingMountRef.isValid()
                 || existingMount == null
                 || !rideRiderMatchesMount(rider, existingMountRef, store);
         if (!stale) {
             return;
         }
+        if (existingMountRef != null && existingMountRef.isValid() && existingMount != null) {
+            NPCEntity npc = store.getComponent(existingMountRef, NPCEntity.getComponentType());
+            if (npc != null) {
+                restoreTameworkRideNpc(existingMountRef, npc, existingMount, store);
+            }
+        }
+        MountedRideClientAttachment.detach(store, playerRef);
         store.tryRemoveComponent(playerRef, rideRiderType);
         if (mountedType != null) {
             store.tryRemoveComponent(playerRef, mountedType);
@@ -248,6 +256,30 @@ final class InteractionMountEffects {
         if (existingMountRef != null && existingMountRef.isValid()) {
             store.tryRemoveComponent(existingMountRef, rideMountType);
         }
+    }
+
+    private void restoreTameworkRideNpc(@Nonnull Ref<EntityStore> mountRef,
+                                        @Nonnull NPCEntity npc,
+                                        @Nonnull TameworkRideMountComponent mount,
+                                        @Nonnull Store<EntityStore> store) {
+        clearStatusAnimation(mountRef, npc, store);
+        npc.playAnimation(mountRef, AnimationSlot.Movement, null, store);
+        Role role = npc.getRole();
+        if (role == null) {
+            return;
+        }
+        if (!mount.getPreviousMotionController().isBlank()) {
+            role.setActiveMotionController(mountRef, npc, mount.getPreviousMotionController(), store);
+        }
+        if (mount.getPreviousState().isBlank() || role.getStateSupport() == null) {
+            return;
+        }
+        StateSupport support = role.getStateSupport();
+        if (support.getStateHelper() != null
+                && support.getStateHelper().getStateIndex(mount.getPreviousState()) == StateSupport.NO_STATE) {
+            return;
+        }
+        support.setState(mountRef, mount.getPreviousState(), mount.getPreviousSubState(), store);
     }
 
     private Ref<EntityStore> resolveMountRefFromRider(TameworkRideRiderComponent rider, Store<EntityStore> store) {

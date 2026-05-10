@@ -79,6 +79,17 @@ class TameworkRideMountComponentTest {
     }
 
     @Test
+    void runningStateAlsoCountsAsRiderSprintIntent() {
+        TameworkRideMountComponent component = new TameworkRideMountComponent();
+        MovementStates states = new MovementStates();
+        states.running = true;
+
+        component.captureRiderMovementStates(states);
+
+        assertTrue(component.isRiderSprinting());
+    }
+
+    @Test
     void clearInputSnapshotResetsCapturedInputOnly() {
         TameworkRideMountComponent component = new TameworkRideMountComponent();
         component.setLastInputAtMs(123456789L);

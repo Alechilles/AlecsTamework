@@ -101,8 +101,9 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         }
         ensureRideState(mountRef, mount, commandBuffer);
         captureCurrentRiderRotation(mount, index, archetypeChunk);
+        captureCurrentRiderMovementStates(mount, index, archetypeChunk);
         List<PlayerInput.InputUpdate> queue = playerInput.getMovementUpdateQueue();
-        boolean capturedMountMovement = syncAuthoritativePose(mountRef, mount, commandBuffer, queue.isEmpty());
+        boolean capturedMountMovement = syncAuthoritativePose(mountRef, mount, commandBuffer, false);
         if (queue.isEmpty()) {
             boolean hadWishMovement = mount.hasWishMovement();
             if (!capturedMountMovement) {
@@ -234,7 +235,8 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 return;
             }
         }
-        support.setState(mountRef, rideState, null, commandBuffer);
+        String subState = support.getStateHelper() == null ? "" : support.getStateHelper().getDefaultSubState();
+        support.setState(mountRef, rideState, subState == null ? "" : subState, commandBuffer);
     }
 
     private void clearStaleRideState(Ref<EntityStore> riderRef,
@@ -399,6 +401,16 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         }
     }
 
+    private void captureCurrentRiderMovementStates(@Nonnull TameworkRideMountComponent mount,
+                                                   int index,
+                                                   @Nonnull ArchetypeChunk<EntityStore> archetypeChunk) {
+        MovementStatesComponent movementStates =
+                archetypeChunk.getComponent(index, movementStatesComponentType);
+        if (movementStates != null) {
+            mount.captureRiderMovementStates(movementStates.getMovementStates());
+        }
+    }
+
     private String summarizeQueue(@Nonnull List<PlayerInput.InputUpdate> queue) {
         StringBuilder summary = new StringBuilder();
         for (PlayerInput.InputUpdate inputUpdate : queue) {
@@ -439,7 +451,7 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         }
         instance.getLogger().at(Level.INFO).log(
                 "TameworkRide debug: inputCapture state=%s controller=%s bodyMotion=%s queueSize=%s queue=%s wish=%s/%s/%s hasWish=%s " +
-                        "body=%s/%s/%s hasBody=%s head=%s/%s/%s hasHead=%s jump=%s crouch=%s flying=%s",
+                        "body=%s/%s/%s hasBody=%s head=%s/%s/%s hasHead=%s jump=%s crouch=%s flying=%s sprinting=%s",
                 state,
                 controller,
                 bodyMotion,
@@ -459,7 +471,8 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 mount.hasHeadRotation(),
                 mount.isRiderJumping(),
                 mount.isRiderCrouching(),
-                mount.isRiderFlying()
+                mount.isRiderFlying(),
+                mount.isRiderSprinting()
         );
     }
 

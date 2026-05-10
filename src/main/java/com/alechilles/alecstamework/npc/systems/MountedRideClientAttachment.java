@@ -22,14 +22,14 @@ import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
-final class MountedRideClientAttachment {
+public final class MountedRideClientAttachment {
     private MountedRideClientAttachment() {
     }
 
-    static boolean attach(@Nonnull Store<EntityStore> store,
-                          @Nonnull Ref<EntityStore> riderRef,
-                          @Nonnull Ref<EntityStore> mountRef,
-                          @Nonnull TameworkRideMountComponent mount) {
+    public static boolean attach(@Nonnull Store<EntityStore> store,
+                                 @Nonnull Ref<EntityStore> riderRef,
+                                 @Nonnull Ref<EntityStore> mountRef,
+                                 @Nonnull TameworkRideMountComponent mount) {
         return applyCustomRideCamera(store, riderRef, mountRef, mount);
     }
 
@@ -81,7 +81,7 @@ final class MountedRideClientAttachment {
         return true;
     }
 
-    static void detach(@Nonnull Store<EntityStore> store, @Nullable Ref<EntityStore> riderRef) {
+    public static void detach(@Nonnull Store<EntityStore> store, @Nullable Ref<EntityStore> riderRef) {
         if (riderRef == null || !riderRef.isValid()) {
             return;
         }

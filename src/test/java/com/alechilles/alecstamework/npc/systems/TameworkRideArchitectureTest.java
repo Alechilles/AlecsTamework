@@ -34,6 +34,9 @@ class TameworkRideArchitectureTest {
         assertTrue(tameworkRideMount.contains("TameworkRideRiderComponent"));
         assertFalse(tameworkRideMount.contains("NPCMountComponent"));
         assertFalse(tameworkRideMount.contains("EMPTY_ROLE_ID"));
+        assertTrue(content.contains("boolean stale = existingMountRef == null"));
+        assertFalse(content.contains("boolean stale = mounted == null"));
+        assertTrue(content.contains("MountedRideClientAttachment.detach(store, playerRef)"));
     }
 
     @Test
@@ -76,6 +79,8 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("PlayerInput.SetRiderMovementStates"));
         assertTrue(content.contains("applyRiderLocalInput"));
         assertTrue(content.contains("captureCurrentRiderRotation"));
+        assertTrue(content.contains("captureCurrentRiderMovementStates"));
+        assertTrue(content.contains("syncAuthoritativePose(mountRef, mount, commandBuffer, false)"));
         assertTrue(content.contains("captureMountTurnAsStrafe"));
         assertTrue(content.contains("normalizeIntent"));
         assertTrue(content.contains("queue.clear()"));
@@ -97,6 +102,8 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("Player.getComponentType()"));
         assertTrue(content.contains("player.moveTo("));
         assertTrue(content.contains("MountedRideClientAttachment.attach("));
+        assertTrue(content.contains("commandBuffer.run(bufferStore ->"));
+        assertTrue(content.contains("bufferStore.putComponent(riderRef, rideRiderComponentType, currentRider)"));
         assertTrue(content.contains("isClientCameraApplied()"));
         assertFalse(content.contains("tryRemoveComponent(riderRef, mountedComponentType)"));
     }
@@ -123,7 +130,8 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("settings.applyMovementType = ApplyMovementType.CharacterController"));
         assertTrue(content.contains("settings.skipCharacterPhysics = true"));
         assertFalse(content.contains("ApplyMovementType.Position"));
-        assertTrue(content.contains("ClientCameraView.Custom,\n                false,"));
+        assertTrue(content.contains("ClientCameraView.Custom,"));
+        assertTrue(content.contains("false,\n                settings") || content.contains("false,\r\n                settings"));
         assertFalse(content.contains("new MountedUpdate("));
         assertFalse(content.contains("MountController.Minecart"));
         assertFalse(content.contains("MountController.BlockMount"));
@@ -135,27 +143,81 @@ class TameworkRideArchitectureTest {
     @Test
     void tameworkRideDoesNotUseVanillaMountPacketFiltering() throws IOException {
         String plugin = readMain("com", "alechilles", "alecstamework", "Tamework.java");
+        String handler = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "network",
+                "MountedRidePacketHandler.java"
+        );
 
         assertFalse(plugin.contains("PacketFilter"));
         assertFalse(plugin.contains("MountMovement"));
+        assertTrue(handler.contains("DismountNPC.PACKET_ID"));
+        assertFalse(handler.contains("DISMOUNT_NPC_PACKET_ID"));
+        assertFalse(handler.contains("294"));
+        assertTrue(handler.contains("mount.setDismountRequested(true)"));
+        assertTrue(handler.contains("MountedRideClientAttachment.detach(store, riderRef)"));
+        assertTrue(handler.contains("MountPlugin.checkDismountNpc(store, riderRef, player)"));
     }
 
     @Test
-    void ridePacketHandlerConsumesTameworkDismountBeforeVanillaNpcMountPath() throws IOException {
+    void rideFlightControllerForcesFlyingAnimationStatesWhileAirborne() throws IOException {
         String content = readMain(
                 "com",
                 "alechilles",
                 "alecstamework",
                 "npc",
-                "systems",
-                "MountedRidePacketHandler.java"
+                "movement",
+                "MotionControllerTameworkRideFly.java"
         );
 
-        assertTrue(content.contains("DISMOUNT_NPC_PACKET_ID = 294"));
-        assertTrue(content.contains("mount.setDismountRequested(true)"));
-        assertTrue(content.contains("player.setMountEntityId(0)"));
-        assertTrue(content.contains("handleVanillaDismount"));
-        assertTrue(content.contains("MountPlugin.checkDismountNpc"));
+        assertTrue(content.contains("updateMovementState"));
+        assertTrue(content.contains("updateFlyingStates(movementStates, horizontalIdle, fast)"));
+        assertTrue(content.contains("movementStates.horizontalIdle = horizontalIdle"));
+        assertTrue(content.contains("AnimationSlot.Movement"));
+        assertTrue(content.contains("FLY_IDLE_ANIMATION"));
+        assertTrue(content.contains("FLY_ANIMATION"));
+        assertTrue(content.contains("FLY_FAST_ANIMATION"));
+        assertTrue(content.contains("hasHorizontalInputIntent"));
+        assertTrue(content.contains("ride.isRiderSprinting()"));
+        assertTrue(content.contains("lastFlightMovementAnimation"));
+        assertTrue(content.contains("SPRINT_HORIZONTAL_SPEED_MULTIPLIER"));
+    }
+
+    @Test
+    void rideCleanupClearsForcedMovementAnimationAndRestoresState() throws IOException {
+        String mountCleanup = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "systems",
+                "MountedRideCleanupSystem.java"
+        );
+        String riderCleanup = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "systems",
+                "MountedRideRiderCleanupSystem.java"
+        );
+        String inputCapture = readMain(
+                "com",
+                "alechilles",
+                "alecstamework",
+                "npc",
+                "systems",
+                "MountedRideInputCaptureSystem.java"
+        );
+
+        assertTrue(mountCleanup.contains("AnimationSlot.Movement"));
+        assertTrue(mountCleanup.contains("npc.playAnimation(mountRef, AnimationSlot.Movement, null, store)"));
+        assertTrue(riderCleanup.contains("AnimationSlot.Movement"));
+        assertTrue(riderCleanup.contains("npc.playAnimation(mountRef, AnimationSlot.Movement, null, store)"));
+        assertTrue(inputCapture.contains("getDefaultSubState()"));
     }
 
     private static String readMain(String first, String... more) throws IOException {

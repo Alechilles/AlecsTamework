@@ -1,8 +1,9 @@
-package com.alechilles.alecstamework.npc.systems;
+package com.alechilles.alecstamework.npc.network;
 
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.systems.MountedRideClientAttachment;
 import com.hypixel.hytale.builtin.mounts.MountPlugin;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -22,11 +23,9 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Handles vanilla NPC dismount packets for Tamework rides before the vanilla NPCMountComponent path sees them.
+ * Handles NPC dismount packets for Tamework rides before vanilla attempts the NPCMountComponent path.
  */
 public final class MountedRidePacketHandler implements SubPacketHandler {
-    private static final int DISMOUNT_NPC_PACKET_ID = 294;
-
     private final IPacketHandler packetHandler;
 
     public MountedRidePacketHandler(@Nonnull IPacketHandler packetHandler) {
@@ -35,7 +34,7 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
 
     @Override
     public void registerHandlers() {
-        packetHandler.registerHandler(DISMOUNT_NPC_PACKET_ID, packet -> handle((DismountNPC) packet));
+        packetHandler.registerHandler(DismountNPC.PACKET_ID, packet -> handle((DismountNPC) packet));
     }
 
     private void handle(@Nonnull DismountNPC packet) {
@@ -67,10 +66,10 @@ public final class MountedRidePacketHandler implements SubPacketHandler {
         if (mount != null) {
             mount.setDismountRequested(true);
             store.putComponent(mountRef, mountType, mount);
-            player.setMountEntityId(0);
+            MountedRideClientAttachment.detach(store, riderRef);
             PlayerInput playerInput = store.getComponent(riderRef, PlayerInput.getComponentType());
             if (playerInput != null) {
-                playerInput.setMountId(0);
+                playerInput.getMovementUpdateQueue().clear();
             }
             return;
         }
