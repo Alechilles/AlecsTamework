@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -66,8 +67,10 @@ final class BreedingClaimLimitPolicyService {
             simpleClaimsConfig = activeGlobalConfig;
         }
 
-        boolean simpleClaimsEnabled = simpleClaimsConfig.isSimpleClaimsEnabled();
-        int perPlayerLimit = activeGlobalConfig.getPopulationLimitPerPlayerOwnedTotal();
+        boolean simpleClaimsEnabled = TameworkRuntimeSettings.simpleClaimsEnabled(simpleClaimsConfig.isSimpleClaimsEnabled());
+        int perPlayerLimit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
+                activeGlobalConfig.getPopulationLimitPerPlayerOwnedTotal()
+        );
         boolean perPlayerLimitEnabled = perPlayerLimit > 0;
         if (!simpleClaimsEnabled && !perPlayerLimitEnabled) {
             return Decision.allowNoPopulationChecks();
@@ -106,7 +109,9 @@ final class BreedingClaimLimitPolicyService {
                 return Decision.deny("simpleclaims-lookup-error");
             }
             if (resolvedClaim.status() == ClaimResolutionStatus.NO_CLAIM) {
-                if (simpleClaimsConfig.isSimpleClaimsBreedingRequiresClaim()) {
+                if (TameworkRuntimeSettings.simpleClaimsBreedingRequiresClaim(
+                        simpleClaimsConfig.isSimpleClaimsBreedingRequiresClaim()
+                )) {
                     return Decision.deny("claim-required");
                 }
             } else if (resolvedClaim.status() == ClaimResolutionStatus.CLAIM_FOUND) {
@@ -145,7 +150,9 @@ final class BreedingClaimLimitPolicyService {
             boolean inheritOwner = resolveInheritOwner(config, inheritanceRoleId);
             List<UUID> ownerTargets = resolveOwnerTargets(inheritOwner, parentAOwnerId, parentBOwnerId);
             if (!ownerTargets.isEmpty()) {
-                TwGlobalConfig.PerPlayerLimitScope scope = activeGlobalConfig.getPopulationPerPlayerLimitScope();
+                TwGlobalConfig.PerPlayerLimitScope scope = TameworkRuntimeSettings.populationPerPlayerLimitScope(
+                        activeGlobalConfig.getPopulationPerPlayerLimitScope()
+                );
                 if (scope == TwGlobalConfig.PerPlayerLimitScope.PER_WORLD
                         && (worldName == null || worldName.isBlank())) {
                     return Decision.deny("missing-world-name");
@@ -218,7 +225,7 @@ final class BreedingClaimLimitPolicyService {
                                      @Nonnull ResolvedClaim resolvedClaim,
                                      int currentCount,
                                      int pendingReservations) {
-        if (!globalConfig.isSimpleClaimsEnabled()) {
+        if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
             return Decision.allowNoPopulationChecks();
         }
         if (resolvedClaim.status() == ClaimResolutionStatus.UNAVAILABLE
@@ -226,7 +233,9 @@ final class BreedingClaimLimitPolicyService {
             return Decision.deny("simpleclaims-lookup-error");
         }
         if (resolvedClaim.status() == ClaimResolutionStatus.NO_CLAIM) {
-            if (globalConfig.isSimpleClaimsBreedingRequiresClaim()) {
+            if (TameworkRuntimeSettings.simpleClaimsBreedingRequiresClaim(
+                    globalConfig.isSimpleClaimsBreedingRequiresClaim()
+            )) {
                 return Decision.deny("claim-required");
             }
             return Decision.allowWithoutCap(null, List.of(), "outside-claim");
@@ -302,7 +311,7 @@ final class BreedingClaimLimitPolicyService {
                                                            @Nonnull ResolvedClaim resolvedClaim,
                                                            int currentCount,
                                                            int pendingReservations) {
-        if (!globalConfig.isSimpleClaimsEnabled()) {
+        if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
             return null;
         }
         if (resolvedClaim.status() != ClaimResolutionStatus.CLAIM_FOUND || resolvedClaim.key() == null) {
@@ -311,8 +320,15 @@ final class BreedingClaimLimitPolicyService {
         int safeCurrent = Math.max(0, currentCount);
         int safePending = Math.max(0, pendingReservations);
         int claimChunks = Math.max(0, resolvedClaim.claimChunkCount());
-        int chunkCap = globalConfig.resolveSimpleClaimsBreedingLimitPerClaimChunkCap(claimChunks);
-        int totalCap = globalConfig.getSimpleClaimsBreedingLimitPerClaimTotal();
+        int chunkCap = resolveSimpleClaimsBreedingLimitPerClaimChunkCap(
+                TameworkRuntimeSettings.simpleClaimsLimitPerClaimChunk(
+                        globalConfig.getSimpleClaimsBreedingLimitPerClaimChunk()
+                ),
+                claimChunks
+        );
+        int totalCap = TameworkRuntimeSettings.simpleClaimsLimitPerClaimTotal(
+                globalConfig.getSimpleClaimsBreedingLimitPerClaimTotal()
+        );
         boolean chunkCapEnabled = chunkCap > 0;
         boolean totalCapEnabled = totalCap > 0;
         if (!chunkCapEnabled && !totalCapEnabled) {
@@ -336,6 +352,18 @@ final class BreedingClaimLimitPolicyService {
                 safePending,
                 Math.max(0, remaining)
         );
+    }
+
+    private static int resolveSimpleClaimsBreedingLimitPerClaimChunkCap(int perChunk, int claimChunkCount) {
+        if (perChunk <= 0) {
+            return 0;
+        }
+        int safeChunkCount = Math.max(0, claimChunkCount);
+        long multiplied = (long) perChunk * (long) safeChunkCount;
+        if (multiplied > Integer.MAX_VALUE) {
+            return Integer.MAX_VALUE;
+        }
+        return (int) multiplied;
     }
 
     @Nullable

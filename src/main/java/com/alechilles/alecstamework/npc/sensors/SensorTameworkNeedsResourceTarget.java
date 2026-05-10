@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.npc.progression.NeedsSeekDiagnostics;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfo;
 import com.alechilles.alecstamework.npc.sensorinfo.TameworkTargetPositionInfoProvider;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkNeedsResourceTarget;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -365,7 +366,7 @@ public final class SensorTameworkNeedsResourceTarget extends TameworkSensorBase 
             return SearchEligibility.blocked("needs_component_missing", Double.NaN);
         }
         TwNeedsConfig needsConfig = resolveNeedsConfig(ref, store);
-        if (needsConfig == null || !needsConfig.isEnabled()) {
+        if (needsConfig == null || !TameworkRuntimeSettings.needsEnabled(needsConfig.isEnabled())) {
             return SearchEligibility.blocked("needs_config_missing_or_disabled", Double.NaN);
         }
         TwNeedsConfig.ValueSettings values = needsConfig.getValues();

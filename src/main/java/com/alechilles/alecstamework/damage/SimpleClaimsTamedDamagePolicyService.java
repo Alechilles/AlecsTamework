@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.integration.simpleclaims.SimpleClaimsBreedingBridge;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -39,9 +40,14 @@ final class SimpleClaimsTamedDamagePolicyService {
                       @Nullable Vector3d targetPosition,
                       @Nullable UUID attackerPlayerUuid,
                       @Nullable TwGlobalConfig globalConfig) {
-        if (globalConfig == null
-                || !globalConfig.isSimpleClaimsEnabled()
-                || !globalConfig.isSimpleClaimsDamageProtectTamedFromNonMembers()) {
+        if (globalConfig == null) {
+            return Decision.allowSkipped("damage-protection-disabled");
+        }
+        boolean simpleClaimsEnabled = TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled());
+        boolean protectTamedFromNonMembers = TameworkRuntimeSettings.simpleClaimsProtectTamedFromNonMembers(
+                globalConfig.isSimpleClaimsDamageProtectTamedFromNonMembers()
+        );
+        if (!simpleClaimsEnabled || !protectTamedFromNonMembers) {
             return Decision.allowSkipped("damage-protection-disabled");
         }
         if (attackerPlayerUuid == null) {

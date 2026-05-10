@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ownership;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -45,11 +46,15 @@ public final class OwnerPopulationCapService {
             return Decision.allowNoOwner();
         }
         TwGlobalConfig resolved = globalConfig == null ? TwGlobalConfig.defaultConfig() : globalConfig;
-        int limit = resolved.getPopulationLimitPerPlayerOwnedTotal();
+        int limit = TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
+                resolved.getPopulationLimitPerPlayerOwnedTotal()
+        );
+        TwGlobalConfig.PerPlayerLimitScope scope = TameworkRuntimeSettings.populationPerPlayerLimitScope(
+                resolved.getPopulationPerPlayerLimitScope()
+        );
         if (limit <= 0) {
-            return Decision.allowDisabled(resolved.getPopulationPerPlayerLimitScope());
+            return Decision.allowDisabled(scope);
         }
-        TwGlobalConfig.PerPlayerLimitScope scope = resolved.getPopulationPerPlayerLimitScope();
         int currentCount = countOwnedPopulation(scope, store, ownerId);
         return evaluateResolved(limit, currentCount, scope);
     }

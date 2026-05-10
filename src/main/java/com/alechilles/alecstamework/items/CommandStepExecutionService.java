@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkHookComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.math.vector.Vector3d;
@@ -239,8 +240,10 @@ final class CommandStepExecutionService {
                 playerTargetingAllowed,
                 targetPlayerSpawnProtected,
                 targetOwnerId != null,
-                companionSettings.isBlockAllPlayerDamageIfOwned(),
-                companionSettings.isInvulnerableIfOwned()
+                TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(
+                        companionSettings.isBlockAllPlayerDamageIfOwned()
+                ),
+                TameworkRuntimeSettings.invulnerableIfOwned(companionSettings.isInvulnerableIfOwned())
         );
     }
 

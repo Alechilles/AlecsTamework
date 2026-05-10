@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.HappinessConfigResolver;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -102,7 +103,10 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
             }
             if (breedingConfig != null) {
                 String roleId = CompanionRoleIdResolver.resolveRoleId(candidate.ref, store);
-                ready = breeding.isEnabled() && clamped >= breedingConfig.resolveHappiness(roleId).getThreshold();
+                ready = breeding.isEnabled()
+                        && clamped >= TameworkRuntimeSettings.breedingHappinessThreshold(
+                                breedingConfig.resolveHappiness(roleId).getThreshold()
+                        );
                 breeding.setReady(ready);
             }
             store.putComponent(candidate.ref, breedingType, breeding);
@@ -145,7 +149,7 @@ public final class TameworkSetHappinessCommand extends AbstractPlayerCommand {
 
     @Nullable
     private static ClampRules resolveClampRules(@Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig != null && happinessConfig.isEnabled()) {
+        if (happinessConfig != null && TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
             double min = happinessConfig.getValues().getMin();
             double max = happinessConfig.getValues().getMax();
             return normalizeRange(min, max);

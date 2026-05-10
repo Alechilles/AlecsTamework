@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -70,12 +71,12 @@ public final class ActionTameworkDenyInteract extends TameworkActionBase {
         TwGlobalConfig global = TwGlobalConfig.resolveActive();
         TwGlobalConfig resolved = global != null ? global : TwGlobalConfig.defaultConfig();
         if (policy == null) {
-            return resolved.isOwnershipInteractionRequiresOwner();
+            return TameworkRuntimeSettings.interactionRequiresOwner(resolved.isOwnershipInteractionRequiresOwner());
         }
         return switch (policy) {
-            case CAPTURE -> resolved.isOwnershipCaptureRequiresOwner();
-            case LINKING -> resolved.isOwnershipLinkingRequiresOwner();
-            case INTERACTION -> resolved.isOwnershipInteractionRequiresOwner();
+            case CAPTURE -> TameworkRuntimeSettings.captureRequiresOwner(resolved.isOwnershipCaptureRequiresOwner());
+            case LINKING -> TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
+            case INTERACTION -> TameworkRuntimeSettings.interactionRequiresOwner(resolved.isOwnershipInteractionRequiresOwner());
         };
     }
 

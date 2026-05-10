@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -61,7 +62,7 @@ final class BreedingPartnerService {
         boolean requireAdult = eligibility == null || eligibility.isRequireAdult();
         TwBreedingConfig.GenderSettings genderSettings = config != null ? config.resolveGender(sourceRoleId) : null;
         boolean requireDifferentGender = genderSettings != null
-                && genderSettings.isEnabled()
+                && TameworkRuntimeSettings.breedingGenderEnabled(genderSettings.isEnabled())
                 && genderSettings.isRequireDifferentGender();
         String sourceGender = requireDifferentGender
                 ? CompanionGenderService.resolveGender(sourceRef, store, sourceRoleId, config)

@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.progression.BreedingConfigResolver;
 import com.alechilles.alecstamework.npc.progression.BreedingEligibilityService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -99,7 +100,9 @@ public final class PassiveBreedingSweepService {
                 continue;
             }
             TwBreedingConfig config = BreedingConfigResolver.resolveConfig(ref, store, breeding);
-            if (config == null || !config.isEnabled() || !config.resolvePassiveBreeding(roleId).isEnabled()) {
+            if (config == null
+                    || !config.isEnabled()
+                    || !TameworkRuntimeSettings.passiveBreedingEnabled(config.resolvePassiveBreeding(roleId).isEnabled())) {
                 continue;
             }
 
@@ -152,7 +155,9 @@ public final class PassiveBreedingSweepService {
         double happiness = CompanionHappinessService.resolveCurrentValue(candidate.ref(), store, breeding.getHappiness());
         double threshold = BreedingEligibilityService.resolveThreshold(
                 null,
-                candidate.config().resolveHappiness(candidate.roleId()).getThreshold()
+                TameworkRuntimeSettings.breedingHappinessThreshold(
+                        candidate.config().resolveHappiness(candidate.roleId()).getThreshold()
+                )
         );
         double effectiveHappiness = BreedingEligibilityService.resolveEffectiveHappiness(happiness, 1.0, null);
         return BreedingEligibilityService.isEligible(effectiveHappiness, threshold);

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkLifeStageComponent;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -42,7 +43,7 @@ public final class CompanionGenderService {
                 ? configHint
                 : roleId != null ? TwBreedingConfig.resolveForRole(roleId) : null;
         TwBreedingConfig.GenderSettings settings = config != null ? config.resolveGender(roleId) : null;
-        if (settings == null || !settings.isEnabled()) {
+        if (settings == null || !TameworkRuntimeSettings.breedingGenderEnabled(settings.isEnabled())) {
             return null;
         }
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();
@@ -83,7 +84,7 @@ public final class CompanionGenderService {
         TwBreedingConfig.GenderSettings settings = effectiveConfig != null
                 ? effectiveConfig.resolveGender(roleId)
                 : null;
-        if (settings == null || !settings.isEnabled()) {
+        if (settings == null || !TameworkRuntimeSettings.breedingGenderEnabled(settings.isEnabled())) {
             return null;
         }
         ComponentType<EntityStore, TameworkLifeStageComponent> type = TameworkLifeStageComponent.getComponentType();

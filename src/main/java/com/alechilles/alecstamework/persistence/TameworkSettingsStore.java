@@ -155,23 +155,25 @@ public final class TameworkSettingsStore {
         return document == null ? defaultGlobalSettings() : TameworkSettingsResolver.resolve(toOverrides(document));
     }
 
-    public static boolean saveGlobalSettingsIfMissing(@Nonnull Path globalSettingsFile,
-                                                      @Nonnull GlobalSettingsSnapshot snapshot,
-                                                      @Nullable HytaleLogger logger) {
-        Objects.requireNonNull(globalSettingsFile, "globalSettingsFile");
-        Objects.requireNonNull(snapshot, "snapshot");
-        if (Files.isRegularFile(globalSettingsFile)) {
-            return true;
-        }
-        return saveGlobalSettings(globalSettingsFile, snapshot, logger);
-    }
-
     public static boolean saveGlobalSettings(@Nonnull Path globalSettingsFile,
                                              @Nonnull GlobalSettingsSnapshot snapshot,
                                              @Nullable HytaleLogger logger) {
         Objects.requireNonNull(globalSettingsFile, "globalSettingsFile");
         Objects.requireNonNull(snapshot, "snapshot");
 
+        GlobalSettingsDocument document = createDocument(snapshot);
+
+        if (!writeDocument(globalSettingsFile, document, logger)) {
+            return false;
+        }
+        updateGlobalCache(globalSettingsFile, document);
+        updateRuntimeOverridesCache(globalSettingsFile, toOverrides(document));
+        updateRuntimeSettingsCache(globalSettingsFile, TameworkSettingsResolver.resolve(toOverrides(document)));
+        return true;
+    }
+
+    @Nonnull
+    private static GlobalSettingsDocument createDocument(@Nonnull GlobalSettingsSnapshot snapshot) {
         GlobalSettingsDocument document = new GlobalSettingsDocument();
         document.version = CURRENT_VERSION;
 
@@ -233,14 +235,7 @@ public final class TameworkSettingsStore {
         document.telemetry = new TelemetrySection();
         document.telemetry.enabled = snapshot.telemetryEnabled();
         document.telemetry.breadcrumbsEnabled = snapshot.telemetryBreadcrumbsEnabled();
-
-        if (!writeDocument(globalSettingsFile, document, logger)) {
-            return false;
-        }
-        updateGlobalCache(globalSettingsFile, document);
-        updateRuntimeOverridesCache(globalSettingsFile, toOverrides(document));
-        updateRuntimeSettingsCache(globalSettingsFile, TameworkSettingsResolver.resolve(toOverrides(document)));
-        return true;
+        return document;
     }
 
     public static boolean importLegacyTelemetrySettingsIfMissing(@Nonnull Path globalSettingsFile,

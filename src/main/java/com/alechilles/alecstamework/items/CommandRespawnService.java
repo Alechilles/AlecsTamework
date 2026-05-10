@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionRuntimeClock;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.npc.progression.TalentIdCodec;
 import com.alechilles.alecstamework.npc.progression.TraitValueCodec;
 import com.hypixel.hytale.component.ComponentType;
@@ -236,7 +237,7 @@ final class CommandRespawnService {
                 ? snapshot.roleId()
                 : CompanionRoleIdResolver.resolveRoleId(spawnedRef, store);
         TwNeedsConfig needsConfig = TwNeedsConfig.resolveForRole(roleId);
-        if (needsConfig == null || !needsConfig.isEnabled()) {
+        if (needsConfig == null || !TameworkRuntimeSettings.needsEnabled(needsConfig.isEnabled())) {
             return;
         }
         TameworkNeedsComponent component = createRespawnNeedsComponent(needsConfig, CompanionRuntimeClock.nowMs());
@@ -488,7 +489,9 @@ final class CommandRespawnService {
             return false;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-        return happiness >= config.resolveHappiness(roleId).getThreshold();
+        return happiness >= TameworkRuntimeSettings.breedingHappinessThreshold(
+                config.resolveHappiness(roleId).getThreshold()
+        );
     }
 
     @Nullable

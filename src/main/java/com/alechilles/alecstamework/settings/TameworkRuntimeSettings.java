@@ -1,8 +1,9 @@
 package com.alechilles.alecstamework.settings;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
-import java.util.function.Supplier;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -10,8 +11,6 @@ import javax.annotation.Nullable;
  * Non-null runtime view of the server-wide settings owned by `/tw settings`.
  */
 public final class TameworkRuntimeSettings {
-    private static final ThreadLocal<Boolean> SUPPRESS_RUNTIME_SETTINGS = ThreadLocal.withInitial(() -> false);
-
     private final ResolvedTameworkSettings values;
 
     private TameworkRuntimeSettings(@Nonnull ResolvedTameworkSettings values) {
@@ -25,9 +24,6 @@ public final class TameworkRuntimeSettings {
 
     @Nullable
     public static TameworkRuntimeSettings currentOrNull() {
-        if (Boolean.TRUE.equals(SUPPRESS_RUNTIME_SETTINGS.get())) {
-            return null;
-        }
         try {
             if (Tamework.getInstance() == null) {
                 return null;
@@ -36,17 +32,6 @@ public final class TameworkRuntimeSettings {
             return null;
         }
         return current();
-    }
-
-    @Nonnull
-    public static <T> T withoutRuntimeSettings(@Nonnull Supplier<T> supplier) {
-        Boolean previous = SUPPRESS_RUNTIME_SETTINGS.get();
-        SUPPRESS_RUNTIME_SETTINGS.set(true);
-        try {
-            return supplier.get();
-        } finally {
-            SUPPRESS_RUNTIME_SETTINGS.set(previous);
-        }
     }
 
     @Nonnull
@@ -167,6 +152,27 @@ public final class TameworkRuntimeSettings {
         return values.needsDamageLethal();
     }
 
+    @Nonnull
+    public TwNeedsConfig.TickPolicySettings resolveNeedsTickPolicy(@Nullable TwNeedsConfig.TickPolicySettings ignoredBase) {
+        return TwNeedsConfig.TickPolicySettings.of(
+                TwNeedsConfig.TickPolicyMode.fromConfigValue(values.needsTickPolicyMode()),
+                values.needsOwnerOfflineGraceHours(),
+                values.needsOwnerOfflineDecayMultiplier()
+        );
+    }
+
+    @Nonnull
+    public TwNeedsConfig.DamageSettings resolveNeedsDamage(@Nullable TwNeedsConfig.DamageSettings ignoredBase) {
+        return TwNeedsConfig.DamageSettings.of(
+                values.needsDamageEnabled(),
+                TwNeedsConfig.DamageModel.fromConfigValue(values.needsDamageModel()),
+                TwNeedsConfig.DualNeedRule.fromConfigValue(values.needsDamageDualNeedRule()),
+                values.needsStarvationDamagePerMinute(),
+                values.needsDehydrationDamagePerMinute(),
+                values.needsDamageLethal()
+        );
+    }
+
     public boolean happinessEnabled() {
         return values.happinessEnabled();
     }
@@ -201,5 +207,118 @@ public final class TameworkRuntimeSettings {
 
     public boolean telemetryBreadcrumbsEnabled() {
         return values.telemetryBreadcrumbsEnabled();
+    }
+
+    public static int populationLimitPerPlayerOwnedTotal(int configLimit) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.populationLimitPerPlayerOwnedTotal() : configLimit;
+    }
+
+    @Nonnull
+    public static TwGlobalConfig.PerPlayerLimitScope populationPerPlayerLimitScope(
+            @Nullable TwGlobalConfig.PerPlayerLimitScope configScope) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        if (settings != null) {
+            return TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(settings.populationPerPlayerLimitScope());
+        }
+        return configScope != null ? configScope : TwGlobalConfig.PerPlayerLimitScope.PER_WORLD;
+    }
+
+    public static boolean simpleClaimsEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.simpleClaimsEnabled() : configEnabled;
+    }
+
+    public static int simpleClaimsLimitPerClaimChunk(int configLimit) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.simpleClaimsLimitPerClaimChunk() : configLimit;
+    }
+
+    public static int simpleClaimsLimitPerClaimTotal(int configLimit) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.simpleClaimsLimitPerClaimTotal() : configLimit;
+    }
+
+    public static boolean simpleClaimsBreedingRequiresClaim(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.simpleClaimsBreedingRequiresClaim() : configEnabled;
+    }
+
+    public static boolean simpleClaimsProtectTamedFromNonMembers(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.simpleClaimsProtectTamedFromNonMembers() : configEnabled;
+    }
+
+    public static boolean blockOwnerDamage(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.blockOwnerDamage() : configEnabled;
+    }
+
+    public static boolean blockAllPlayerDamageIfOwned(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.blockAllPlayerDamageIfOwned() : configEnabled;
+    }
+
+    public static boolean invulnerableIfOwned(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.invulnerableIfOwned() : configEnabled;
+    }
+
+    public static boolean captureRequiresOwner(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.captureRequiresOwner() : configEnabled;
+    }
+
+    public static boolean spawnRequiresOwner(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.spawnRequiresOwner() : configEnabled;
+    }
+
+    public static boolean interactionRequiresOwner(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.interactionRequiresOwner() : configEnabled;
+    }
+
+    public static boolean linkingRequiresOwner(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.linkingRequiresOwner() : configEnabled;
+    }
+
+    public static boolean reviveSystemEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.reviveSystemEnabled() : configEnabled;
+    }
+
+    public static boolean needsEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.needsEnabled() : configEnabled;
+    }
+
+    public static boolean happinessEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.happinessEnabled() : configEnabled;
+    }
+
+    public static boolean traitsEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.traitsEnabled() : configEnabled;
+    }
+
+    public static boolean passiveBreedingEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.passiveBreedingEnabled() : configEnabled;
+    }
+
+    public static boolean breedingGenderEnabled(boolean configEnabled) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        return settings != null ? settings.breedingGenderEnabled() : configEnabled;
+    }
+
+    public static double breedingHappinessThreshold(double configThreshold) {
+        TameworkRuntimeSettings settings = currentOrNull();
+        if (settings == null || (settings.happinessEnabled() && settings.breedingRequiresHappiness())) {
+            return configThreshold;
+        }
+        return 0.0;
     }
 }

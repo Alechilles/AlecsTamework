@@ -9,6 +9,7 @@ import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.logger.HytaleLogger;
@@ -234,12 +235,12 @@ public final class OwnerInteractionListener {
     static boolean isOwnerRequiredForPolicy(InteractionOwnershipPolicy policy, TwGlobalConfig globalConfig) {
         TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
         if (policy == null) {
-            return resolved.isOwnershipInteractionRequiresOwner();
+            return TameworkRuntimeSettings.interactionRequiresOwner(resolved.isOwnershipInteractionRequiresOwner());
         }
         return switch (policy) {
-            case CAPTURE -> resolved.isOwnershipCaptureRequiresOwner();
-            case LINKING -> resolved.isOwnershipLinkingRequiresOwner();
-            case INTERACTION -> resolved.isOwnershipInteractionRequiresOwner();
+            case CAPTURE -> TameworkRuntimeSettings.captureRequiresOwner(resolved.isOwnershipCaptureRequiresOwner());
+            case LINKING -> TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
+            case INTERACTION -> TameworkRuntimeSettings.interactionRequiresOwner(resolved.isOwnershipInteractionRequiresOwner());
         };
     }
 

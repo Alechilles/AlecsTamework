@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import java.util.UUID;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -40,12 +41,12 @@ final class SpawnerOwnershipPolicyService {
 
     static boolean resolveCaptureRequireOwnerDefault(@Nullable TwGlobalConfig globalConfig) {
         TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
-        return resolved.isOwnershipCaptureRequiresOwner();
+        return TameworkRuntimeSettings.captureRequiresOwner(resolved.isOwnershipCaptureRequiresOwner());
     }
 
     static boolean resolveSpawnRequireOwnerDefault(@Nullable TwGlobalConfig globalConfig) {
         TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
-        return resolved.isOwnershipSpawnRequiresOwner();
+        return TameworkRuntimeSettings.spawnRequiresOwner(resolved.isOwnershipSpawnRequiresOwner());
     }
 
     static boolean isOwnerRequirementSatisfied(boolean requireOwner,

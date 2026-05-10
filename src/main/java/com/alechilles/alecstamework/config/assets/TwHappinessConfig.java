@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -727,8 +726,7 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
     }
 
     public boolean isEnabled() {
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
-        return enabled && (settings == null || settings.happinessEnabled());
+        return enabled;
     }
 
     public boolean isConfiguredEnabled() {

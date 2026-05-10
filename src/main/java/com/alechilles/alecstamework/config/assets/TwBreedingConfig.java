@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -1770,9 +1769,6 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             resolved = copyHappiness(getHappiness());
             override.happiness.applyTo(resolved);
         }
-        if (!isHappinessRequiredByRuntimeOverrides()) {
-            resolved.threshold = 0.0;
-        }
         return resolved;
     }
 
@@ -1839,19 +1835,7 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             resolved = copyPassiveBreeding(getPassiveBreeding());
             override.passiveBreeding.applyTo(resolved);
         }
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
-        if (settings != null) {
-            resolved.enabled = settings.passiveBreedingEnabled();
-        }
         return resolved;
-    }
-
-    private static boolean isHappinessRequiredByRuntimeOverrides() {
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
-        if (settings == null) {
-            return true;
-        }
-        return settings.happinessEnabled() && settings.breedingRequiresHappiness();
     }
 
     public TimingSettings getTiming() {
@@ -1880,10 +1864,6 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
         } else {
             resolved = copyGender(getGender());
             override.gender.applyTo(resolved);
-        }
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
-        if (settings != null && !settings.breedingGenderEnabled()) {
-            resolved.enabled = false;
         }
         return resolved;
     }

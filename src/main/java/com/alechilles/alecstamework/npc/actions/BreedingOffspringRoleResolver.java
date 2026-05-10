@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.npc.actions;
 
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import javax.annotation.Nullable;
 
@@ -73,7 +74,7 @@ final class BreedingOffspringRoleResolver {
         TwBreedingConfig.GenderSettings settings = breedingConfig != null
                 ? breedingConfig.resolveGender(parentRoleId)
                 : null;
-        if (settings == null || !settings.isEnabled()) {
+        if (settings == null || !TameworkRuntimeSettings.breedingGenderEnabled(settings.isEnabled())) {
             return null;
         }
         return settings.selectGender(genderRoll);

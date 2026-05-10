@@ -54,7 +54,7 @@ public final class NeedsConfigResolver {
             return null;
         }
         return new NeedsSensorConfig(
-                base.enabled() && TameworkRuntimeSettings.current().needsEnabled(),
+                TameworkRuntimeSettings.needsEnabled(base.enabled()),
                 base.hungerMin(),
                 base.hungerMax(),
                 base.thirstMin(),

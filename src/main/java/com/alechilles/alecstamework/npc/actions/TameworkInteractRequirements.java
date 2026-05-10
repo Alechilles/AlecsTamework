@@ -930,8 +930,7 @@ final class TameworkInteractRequirements {
 
     static boolean resolveInteractionRequireOwner(@Nullable Boolean ignoredEntryRequireOwner, boolean globalRequireOwner) {
         // /tw settings global ownership requirement always wins for interaction checks.
-        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
-        return settings != null ? settings.interactionRequiresOwner() : globalRequireOwner;
+        return TameworkRuntimeSettings.interactionRequiresOwner(globalRequireOwner);
     }
 
     private boolean matchesHarvestContext(Role role,

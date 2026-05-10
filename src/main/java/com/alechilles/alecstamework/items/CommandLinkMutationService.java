@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
@@ -245,7 +246,7 @@ final class CommandLinkMutationService {
 
     static boolean resolveLinkingRequireOwner(@Nullable TwGlobalConfig globalConfig) {
         TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
-        return resolved.isOwnershipLinkingRequiresOwner();
+        return TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
     }
 
     ItemStack removeLinkedNpcRecord(ItemStack stack, UUID npcUuid) {

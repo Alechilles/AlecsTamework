@@ -1,6 +1,5 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -817,44 +816,32 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
         return priority;
     }
 
-    @Nullable
-    private static TameworkRuntimeSettings runtimeSettings() {
-        return TameworkRuntimeSettings.currentOrNull();
-    }
-
     public boolean isBlockOwnerDamage() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.blockOwnerDamage() : blockOwnerDamage;
+        return blockOwnerDamage;
     }
 
     public boolean isBlockAllPlayerDamageIfOwned() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.blockAllPlayerDamageIfOwned() : blockAllPlayerDamageIfOwned;
+        return blockAllPlayerDamageIfOwned;
     }
 
     public boolean isInvulnerableIfOwned() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.invulnerableIfOwned() : invulnerableIfOwned;
+        return invulnerableIfOwned;
     }
 
     public boolean isOwnershipCaptureRequiresOwner() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.captureRequiresOwner() : ownershipCaptureRequiresOwner;
+        return ownershipCaptureRequiresOwner;
     }
 
     public boolean isOwnershipSpawnRequiresOwner() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.spawnRequiresOwner() : ownershipSpawnRequiresOwner;
+        return ownershipSpawnRequiresOwner;
     }
 
     public boolean isOwnershipInteractionRequiresOwner() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.interactionRequiresOwner() : ownershipInteractionRequiresOwner;
+        return ownershipInteractionRequiresOwner;
     }
 
     public boolean isOwnershipLinkingRequiresOwner() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.linkingRequiresOwner() : ownershipLinkingRequiresOwner;
+        return ownershipLinkingRequiresOwner;
     }
 
     public String getInteractionConfigParam() {
@@ -918,8 +905,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean isCommandDeadRespawnEnabled() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.reviveSystemEnabled() : commandDeadRespawnEnabled;
+        return commandDeadRespawnEnabled;
     }
 
     public int getCommandDeadRespawnCooldownMs() {
@@ -983,18 +969,11 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public int getPopulationLimitPerPlayerOwnedTotal() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null
-                ? settings.populationLimitPerPlayerOwnedTotal()
-                : Math.max(0, populationLimitPerPlayerOwnedTotal);
+        return Math.max(0, populationLimitPerPlayerOwnedTotal);
     }
 
     @Nonnull
     public PerPlayerLimitScope getPopulationPerPlayerLimitScope() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        if (settings != null) {
-            return PerPlayerLimitScope.fromConfigValue(settings.populationPerPlayerLimitScope());
-        }
         if (populationPerPlayerLimitScope == null) {
             return PerPlayerLimitScope.PER_WORLD;
         }
@@ -1002,34 +981,23 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean isSimpleClaimsEnabled() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.simpleClaimsEnabled() : simpleClaimsEnabled;
+        return simpleClaimsEnabled;
     }
 
     public int getSimpleClaimsBreedingLimitPerClaimChunk() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null
-                ? settings.simpleClaimsLimitPerClaimChunk()
-                : Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
+        return Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
     }
 
     public int getSimpleClaimsBreedingLimitPerClaimTotal() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null
-                ? settings.simpleClaimsLimitPerClaimTotal()
-                : Math.max(0, simpleClaimsBreedingLimitPerClaimTotal);
+        return Math.max(0, simpleClaimsBreedingLimitPerClaimTotal);
     }
 
     public boolean isSimpleClaimsBreedingRequiresClaim() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null ? settings.simpleClaimsBreedingRequiresClaim() : simpleClaimsBreedingRequiresClaim;
+        return simpleClaimsBreedingRequiresClaim;
     }
 
     public boolean isSimpleClaimsDamageProtectTamedFromNonMembers() {
-        TameworkRuntimeSettings settings = runtimeSettings();
-        return settings != null
-                ? settings.simpleClaimsProtectTamedFromNonMembers()
-                : simpleClaimsDamageProtectTamedFromNonMembers;
+        return simpleClaimsDamageProtectTamedFromNonMembers;
     }
 
     @Nonnull
@@ -1042,7 +1010,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean hasSimpleClaimsSectionDefined() {
-        return runtimeSettings() != null || simpleClaimsSectionDefined;
+        return simpleClaimsSectionDefined;
     }
 
     public int resolveSimpleClaimsBreedingLimitPerClaimChunkCap(int claimChunkCount) {

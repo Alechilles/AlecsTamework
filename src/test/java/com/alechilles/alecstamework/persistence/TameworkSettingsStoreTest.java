@@ -208,61 +208,6 @@ class TameworkSettingsStoreTest {
     }
 
     @Test
-    void saveGlobalSettingsIfMissingDoesNotOverwriteExistingDocument() throws Exception {
-        Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
-        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tameworkRoot);
-        TameworkSettingsStore.GlobalSettingsSnapshot existing =
-                TameworkSettingsStore.defaultGlobalSettings().toSnapshot();
-        TameworkSettingsStore.GlobalSettingsSnapshot replacement = new TameworkSettingsStore.GlobalSettingsSnapshot(
-                99,
-                "Global",
-                true,
-                1,
-                2,
-                true,
-                true,
-                true,
-                true,
-                true,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                "ANY_LOADED_PLAYER",
-                12.0,
-                0.5,
-                false,
-                "MIN_ONLY_FLAT",
-                "SUM_BOTH",
-                8.0,
-                9.0,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false,
-                false
-        );
-
-        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, existing, null));
-        assertTrue(TameworkSettingsStore.saveGlobalSettingsIfMissing(settingsFile, replacement, null));
-
-        ResolvedTameworkSettings loaded =
-                TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
-        assertEquals(0, loaded.populationLimitPerPlayerOwnedTotal());
-        assertEquals("PerWorld", loaded.populationPerPlayerLimitScope());
-        assertEquals(true, loaded.needsEnabled());
-        assertEquals(true, loaded.telemetryEnabled());
-    }
-
-    @Test
     void importsLegacyTelemetryJsonIntoGlobalSettings() throws Exception {
         Path settingsFile = tempDir.resolve("universe").resolve("Tamework").resolve("Settings").resolve("tamework-settings.json");
         Path legacy = tempDir.resolve("plugin-data").resolve("crash-telemetry.json");
@@ -282,6 +227,18 @@ class TameworkSettingsStoreTest {
         TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadGlobalOverrides(settingsFile, null);
 
         assertNotNull(overrides);
+        assertEquals(0, overrides.populationLimitPerPlayerOwnedTotal());
+        assertEquals("PerWorld", overrides.populationPerPlayerLimitScope());
+        assertEquals(false, overrides.simpleClaimsEnabled());
+        assertEquals(true, overrides.captureRequiresOwner());
+        assertEquals(true, overrides.spawnRequiresOwner());
+        assertEquals(true, overrides.interactionRequiresOwner());
+        assertEquals(true, overrides.linkingRequiresOwner());
+        assertEquals(true, overrides.needsEnabled());
+        assertEquals(true, overrides.happinessEnabled());
+        assertEquals(true, overrides.passiveBreedingEnabled());
+        assertEquals(true, overrides.breedingGenderEnabled());
+        assertEquals(true, overrides.traitsEnabled());
         assertEquals(false, overrides.telemetryEnabled());
         assertEquals(false, overrides.telemetryBreadcrumbsEnabled());
         assertTrue(Files.readString(settingsFile, StandardCharsets.UTF_8).contains("\"telemetry\""));

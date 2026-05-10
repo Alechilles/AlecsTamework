@@ -32,6 +32,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.TameworkCompanionTalentsPage;
 import com.alechilles.alecstamework.ui.TameworkCommandSelectionPage;
 import com.alechilles.alecstamework.ui.TameworkUiMessageService;
@@ -603,8 +604,10 @@ public final class CommandItemFeatureHandler {
                 commandTarget,
                 raycastPosition,
                 working,
-                defaultCompanionSettings.isBlockAllPlayerDamageIfOwned(),
-                defaultCompanionSettings.isInvulnerableIfOwned(),
+                TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(
+                        defaultCompanionSettings.isBlockAllPlayerDamageIfOwned()
+                ),
+                TameworkRuntimeSettings.invulnerableIfOwned(defaultCompanionSettings.isInvulnerableIfOwned()),
                 returnHomeTeleportDistance,
                 returnHomePathDistanceBeforeTeleport,
                 returnHomeTeleportDelayMs,
@@ -1209,9 +1212,8 @@ public final class CommandItemFeatureHandler {
 
     private boolean resolveLinkingRequireOwner() {
         TwGlobalConfig global = TwGlobalConfig.resolveActive();
-        return global != null
-                ? global.isOwnershipLinkingRequiresOwner()
-                : TwGlobalConfig.defaultConfig().isOwnershipLinkingRequiresOwner();
+        TwGlobalConfig resolved = global != null ? global : TwGlobalConfig.defaultConfig();
+        return TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
     }
 
     private void clearNpcTamedOwnershipAndLinks(Ref<EntityStore> npcRef, Store<EntityStore> store) {
@@ -1359,7 +1361,7 @@ public final class CommandItemFeatureHandler {
                     roleId = record.cachedRoleId;
                 }
                 TwCompanionConfig.EffectiveSettings companionSettings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-                if (!companionSettings.isDeadRespawnEnabled()) {
+                if (!TameworkRuntimeSettings.reviveSystemEnabled(companionSettings.isDeadRespawnEnabled())) {
                     feedbackService.showWarningKey(player, "tamework.ui.notifications.command.respawn.disabled");
                     return;
                 }

@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig.MembershipMode;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -272,6 +273,6 @@ final class CommandRecipientService {
 
     static boolean resolveLinkingRequireOwner(TwGlobalConfig globalConfig) {
         TwGlobalConfig resolved = globalConfig != null ? globalConfig : TwGlobalConfig.defaultConfig();
-        return resolved.isOwnershipLinkingRequiresOwner();
+        return TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
     }
 }

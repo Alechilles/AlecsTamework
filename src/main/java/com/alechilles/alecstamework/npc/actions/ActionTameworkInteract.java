@@ -16,6 +16,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.NpcHealthP
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.ParamRequirement;
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.StringRequirement;
 import com.alechilles.alecstamework.ownership.LegacyTamedOwnershipBridge;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -62,6 +63,9 @@ public class ActionTameworkInteract extends TameworkActionBase {
         this.harvestContextOverride = hasHarvestContextOverride ? builder.getHarvestInteractionContext(support) : null;
         this.triggerSource = builder.hasTriggerSourceOverride() ? builder.getTriggerSource(support) : null;
         TwGlobalConfig globalConfig = TwGlobalConfig.resolveActive();
+        if (globalConfig == null) {
+            globalConfig = TwGlobalConfig.defaultConfig();
+        }
         this.configParamName = globalConfig.getInteractionConfigParam();
         this.lovedItemsParamName = globalConfig.getLovedItemsParam();
         this.isHarvestableParamName = globalConfig.getIsHarvestableParam();
@@ -69,7 +73,8 @@ public class ActionTameworkInteract extends TameworkActionBase {
         this.harvestContextParamName = globalConfig.getHarvestContextParam();
         this.harvestAlarmName = globalConfig.getHarvestAlarmName();
         this.cooldownAlarmPrefix = globalConfig.getInteractionCooldownAlarmPrefix();
-        boolean interactionRequireOwnerDefault = globalConfig.isOwnershipInteractionRequiresOwner();
+        boolean interactionRequireOwnerDefault =
+                TameworkRuntimeSettings.interactionRequiresOwner(globalConfig.isOwnershipInteractionRequiresOwner());
         StdScope globalSnapshot = null;
         StdScope execSnapshot = null;
         StdScope sensorSnapshot = null;

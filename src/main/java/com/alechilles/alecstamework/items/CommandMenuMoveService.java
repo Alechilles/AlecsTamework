@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -225,8 +226,8 @@ final class CommandMenuMoveService {
                     commandTarget,
                     raycastPosition,
                     stack,
-                    settings.isBlockAllPlayerDamageIfOwned(),
-                    settings.isInvulnerableIfOwned(),
+                    TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(settings.isBlockAllPlayerDamageIfOwned()),
+                    TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned()),
                     returnHomeTeleportDistance,
                     returnHomePathDistanceBeforeTeleport,
                     returnHomeTeleportDelayMs,

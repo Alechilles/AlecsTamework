@@ -32,6 +32,7 @@ import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessModifierService;
 import com.alechilles.alecstamework.npc.progression.CompanionHappinessService;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceHealthService;
 import com.alechilles.alecstamework.persistence.sqlite.PersistenceWriteQueue;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
@@ -335,15 +336,15 @@ final class ApiMapper {
                 config.isEnabled(),
                 config.getPriority(),
                 new GlobalConfigView.OwnershipProtectionView(
-                        config.isBlockOwnerDamage(),
-                        config.isBlockAllPlayerDamageIfOwned(),
-                        config.isInvulnerableIfOwned()
+                        TameworkRuntimeSettings.blockOwnerDamage(config.isBlockOwnerDamage()),
+                        TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(config.isBlockAllPlayerDamageIfOwned()),
+                        TameworkRuntimeSettings.invulnerableIfOwned(config.isInvulnerableIfOwned())
                 ),
                 new GlobalConfigView.OwnershipRequirementsView(
-                        config.isOwnershipCaptureRequiresOwner(),
-                        config.isOwnershipSpawnRequiresOwner(),
-                        config.isOwnershipInteractionRequiresOwner(),
-                        config.isOwnershipLinkingRequiresOwner()
+                        TameworkRuntimeSettings.captureRequiresOwner(config.isOwnershipCaptureRequiresOwner()),
+                        TameworkRuntimeSettings.spawnRequiresOwner(config.isOwnershipSpawnRequiresOwner()),
+                        TameworkRuntimeSettings.interactionRequiresOwner(config.isOwnershipInteractionRequiresOwner()),
+                        TameworkRuntimeSettings.linkingRequiresOwner(config.isOwnershipLinkingRequiresOwner())
                 ),
                 new GlobalConfigView.InteractionDefaultsView(
                         config.getInteractionConfigParam(),
@@ -363,7 +364,7 @@ final class ApiMapper {
                         config.getCommandRelocationRetryIntervalMs(),
                         config.getCommandRelocationMaxWaitMs(),
                         config.getCommandRelocationMaxRetryAttempts(),
-                        config.isCommandDeadRespawnEnabled(),
+                        TameworkRuntimeSettings.reviveSystemEnabled(config.isCommandDeadRespawnEnabled()),
                         config.getCommandDeadRespawnCooldownMs(),
                         config.getCommandDeadRespawnFollowRetryDelayMs(),
                         config.getCommandDeadRespawnDistanceClose(),
@@ -383,18 +384,30 @@ final class ApiMapper {
                         config.isCarnivoreFeedAssetSetEnabled()
                 ),
                 new GlobalConfigView.PopulationView(
-                        config.getPopulationLimitPerPlayerOwnedTotal(),
-                        config.getPopulationPerPlayerLimitScope().configValue()
+                        TameworkRuntimeSettings.populationLimitPerPlayerOwnedTotal(
+                                config.getPopulationLimitPerPlayerOwnedTotal()
+                        ),
+                        TameworkRuntimeSettings.populationPerPlayerLimitScope(
+                                config.getPopulationPerPlayerLimitScope()
+                        ).configValue()
                 ),
                 new GlobalConfigView.SimpleClaimsView(
-                        config.isSimpleClaimsEnabled(),
+                        TameworkRuntimeSettings.simpleClaimsEnabled(config.isSimpleClaimsEnabled()),
                         new GlobalConfigView.SimpleClaimsView.BreedingView(
-                                config.getSimpleClaimsBreedingLimitPerClaimChunk(),
-                                config.getSimpleClaimsBreedingLimitPerClaimTotal(),
-                                config.isSimpleClaimsBreedingRequiresClaim()
+                                TameworkRuntimeSettings.simpleClaimsLimitPerClaimChunk(
+                                        config.getSimpleClaimsBreedingLimitPerClaimChunk()
+                                ),
+                                TameworkRuntimeSettings.simpleClaimsLimitPerClaimTotal(
+                                        config.getSimpleClaimsBreedingLimitPerClaimTotal()
+                                ),
+                                TameworkRuntimeSettings.simpleClaimsBreedingRequiresClaim(
+                                        config.isSimpleClaimsBreedingRequiresClaim()
+                                )
                         ),
                         new GlobalConfigView.SimpleClaimsView.DamageView(
-                                config.isSimpleClaimsDamageProtectTamedFromNonMembers(),
+                                TameworkRuntimeSettings.simpleClaimsProtectTamedFromNonMembers(
+                                        config.isSimpleClaimsDamageProtectTamedFromNonMembers()
+                                ),
                                 config.getSimpleClaimsDamageAllowDamagePermissionKey()
                         )
                 )

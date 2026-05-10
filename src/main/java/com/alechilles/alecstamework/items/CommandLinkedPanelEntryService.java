@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionGenderService;
 import com.alechilles.alecstamework.npc.progression.CompanionLevelingService;
 import com.alechilles.alecstamework.npc.progression.CompanionTalentService;
 import com.alechilles.alecstamework.npc.progression.NeedsConfigResolver;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.ui.LinkedNpcEntry;
 import com.alechilles.alecstamework.ui.LinkedNpcTraitIndicator;
 import com.hypixel.hytale.component.Component;
@@ -239,8 +240,9 @@ final class CommandLinkedPanelEntryService {
                         speciesId = normalizedRoleId;
                         speciesLabel = normalizedRoleId;
                     }
-                    boolean deadRespawnEnabled =
-                            TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled();
+                    boolean deadRespawnEnabled = TameworkRuntimeSettings.reviveSystemEnabled(
+                            TwCompanionConfig.resolveEffectiveForRole(roleId).isDeadRespawnEnabled()
+                    );
                     if (deadRespawnEnabled) {
                         deadRespawnRemainingMs = Math.max(0L, deadSnapshot.respawnAvailableAtMs() - System.currentTimeMillis());
                     } else {

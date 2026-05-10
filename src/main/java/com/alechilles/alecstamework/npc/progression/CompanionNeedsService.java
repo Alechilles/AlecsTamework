@@ -8,6 +8,7 @@ import com.alechilles.alecstamework.items.CommandLinkedNpcDeathService;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
@@ -245,7 +246,7 @@ public final class CompanionNeedsService {
                 commandBuffer,
                 component,
                 suppressNaturalRegen,
-                !config.getDamage().isLethal()
+                !resolveRuntimeDamage(config).isLethal()
         );
         double healthAfterSuppression = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
         if (suppressionChanged) {
@@ -617,7 +618,7 @@ public final class CompanionNeedsService {
                 commandBuffer,
                 component,
                 suppressNaturalRegen,
-                !config.getDamage().isLethal()
+                !resolveRuntimeDamage(config).isLethal()
         );
         double healthAfterSuppression = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
         double suppressionHealthDelta = resolveHealthDelta(healthBeforeSuppression, healthAfterSuppression);
@@ -637,7 +638,7 @@ public final class CompanionNeedsService {
                 store,
                 commandBuffer,
                 pooledDamageAmount,
-                config.getDamage().isLethal()
+                resolveRuntimeDamage(config).isLethal()
         );
         double healthAfterDamage = diagnosticsEnabled ? resolveCurrentHealth(npcRef, store) : Double.NaN;
         boolean damageApplied = damageResult.applied;
@@ -773,7 +774,7 @@ public final class CompanionNeedsService {
         if (lastUpdateMs <= 0L || nowMs <= lastUpdateMs) {
             return 0L;
         }
-        TwNeedsConfig.TickPolicySettings tickPolicy = config.getTickPolicy();
+        TwNeedsConfig.TickPolicySettings tickPolicy = resolveRuntimeTickPolicy(config);
         if (ownerId == null) {
             return nowMs - lastUpdateMs;
         }
@@ -804,7 +805,7 @@ public final class CompanionNeedsService {
                                               @Nonnull TwNeedsConfig.ValueSettings values,
                                               double hunger,
                                               double thirst) {
-        TwNeedsConfig.DamageSettings damageSettings = config.getDamage();
+        TwNeedsConfig.DamageSettings damageSettings = resolveRuntimeDamage(config);
         if (damageSettings == null || !damageSettings.isEnabled()) {
             return false;
         }
@@ -832,7 +833,7 @@ public final class CompanionNeedsService {
         if (config == null || values == null || effectiveElapsedMs <= 0L) {
             return 0.0;
         }
-        TwNeedsConfig.DamageSettings damageSettings = config.getDamage();
+        TwNeedsConfig.DamageSettings damageSettings = resolveRuntimeDamage(config);
         if (damageSettings == null || !damageSettings.isEnabled()) {
             return 0.0;
         }
@@ -894,6 +895,20 @@ public final class CompanionNeedsService {
         return new NeedsDamagePoolResolution(damageToApply, normalizePendingNeedsDamage(pendingRemainder));
     }
 
+    @Nonnull
+    private static TwNeedsConfig.TickPolicySettings resolveRuntimeTickPolicy(@Nonnull TwNeedsConfig config) {
+        TwNeedsConfig.TickPolicySettings base = config.getTickPolicy();
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        return settings == null ? base : settings.resolveNeedsTickPolicy(base);
+    }
+
+    @Nonnull
+    private static TwNeedsConfig.DamageSettings resolveRuntimeDamage(@Nonnull TwNeedsConfig config) {
+        TwNeedsConfig.DamageSettings base = config.getDamage();
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        return settings == null ? base : settings.resolveNeedsDamage(base);
+    }
+
     static double normalizePendingNeedsDamage(double pendingNeedsDamage) {
         if (!Double.isFinite(pendingNeedsDamage) || pendingNeedsDamage <= 0.0) {
             return 0.0;
@@ -911,7 +926,7 @@ public final class CompanionNeedsService {
         if (config == null || values == null || effectiveElapsedMs <= 0L) {
             return null;
         }
-        TwNeedsConfig.DamageSettings damageSettings = config.getDamage();
+        TwNeedsConfig.DamageSettings damageSettings = resolveRuntimeDamage(config);
         if (damageSettings == null || !damageSettings.isEnabled()) {
             return null;
         }

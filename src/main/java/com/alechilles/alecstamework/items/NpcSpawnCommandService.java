@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
@@ -363,7 +364,8 @@ public final class NpcSpawnCommandService {
 
     private boolean resolveLinkingRequireOwner() {
         TwGlobalConfig config = TwGlobalConfig.resolveActive();
-        return config == null || config.isOwnershipLinkingRequiresOwner();
+        TwGlobalConfig resolved = config != null ? config : TwGlobalConfig.defaultConfig();
+        return TameworkRuntimeSettings.linkingRequiresOwner(resolved.isOwnershipLinkingRequiresOwner());
     }
 
     @Nullable

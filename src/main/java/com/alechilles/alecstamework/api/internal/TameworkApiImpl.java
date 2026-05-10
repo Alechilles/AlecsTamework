@@ -76,6 +76,7 @@ import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
 import com.alechilles.alecstamework.persistence.sqlite.ApiProfileDataRepository;
 import com.alechilles.alecstamework.persistence.sqlite.NpcProfileRepository;
 import com.alechilles.alecstamework.persistence.sqlite.TameworkPersistenceRuntime;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -779,7 +780,7 @@ public final class TameworkApiImpl
             return unavailableClaimDecision("profile-not-found");
         }
         TwGlobalConfig globalConfig = resolveSimpleClaimsConfig();
-        if (!globalConfig.isSimpleClaimsEnabled()) {
+        if (!TameworkRuntimeSettings.simpleClaimsEnabled(globalConfig.isSimpleClaimsEnabled())) {
             return new ClaimAccessDecisionView(
                     false,
                     true,
@@ -1078,7 +1079,10 @@ public final class TameworkApiImpl
                 ? target.store().getComponent(target.reference(), breedingType)
                 : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(target.reference(), target.store(), happiness);
-        if (happiness == null && breeding == null && (happinessConfig == null || !happinessConfig.isEnabled())) {
+        if (happiness == null
+                && breeding == null
+                && (happinessConfig == null
+                        || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled()))) {
             return unsupportedMutation("No happiness progression is configured for this NPC.");
         }
 
@@ -1114,7 +1118,9 @@ public final class TameworkApiImpl
             }
             if (breedingConfig != null) {
                 breeding.setReady(breeding.isEnabled()
-                        && appliedValue >= breedingConfig.resolveHappiness(roleId).getThreshold());
+                        && appliedValue >= TameworkRuntimeSettings.breedingHappinessThreshold(
+                                breedingConfig.resolveHappiness(roleId).getThreshold()
+                        ));
             }
             target.store().putComponent(target.reference(), breedingType, breeding);
         }
@@ -1834,9 +1840,9 @@ public final class TameworkApiImpl
                 !isBlank(profile.coopId()) || profile.coopSlot() != null,
                 profile.coopId(),
                 profile.coopSlot(),
-                settings.isBlockOwnerDamage(),
-                settings.isBlockAllPlayerDamageIfOwned(),
-                settings.isInvulnerableIfOwned()
+                TameworkRuntimeSettings.blockOwnerDamage(settings.isBlockOwnerDamage()),
+                TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(settings.isBlockAllPlayerDamageIfOwned()),
+                TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned())
         );
     }
 

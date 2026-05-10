@@ -7,6 +7,7 @@ import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.progression.CompanionRoleIdResolver;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -84,6 +85,12 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
             }
 
             TwGlobalConfig globalConfig = TwGlobalConfig.resolveSimpleClaimsSettingsConfig();
+            if (globalConfig == null) {
+                globalConfig = TwGlobalConfig.resolveActive();
+            }
+            if (globalConfig == null) {
+                globalConfig = TwGlobalConfig.defaultConfig();
+            }
             SimpleClaimsTamedDamagePolicyService.Decision claimDecision = claimDamagePolicyService.evaluate(
                     targetRef,
                     store,
@@ -112,9 +119,10 @@ public final class OwnerDamageFilterSystem extends DamageEventSystem {
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(targetRef, store);
         TwCompanionConfig.EffectiveSettings settings = TwCompanionConfig.resolveEffectiveForRole(roleId);
-        boolean blockOwnerDamage = settings.isBlockOwnerDamage();
-        boolean blockAllPlayerDamageIfOwned = settings.isBlockAllPlayerDamageIfOwned();
-        boolean invulnerableIfOwned = settings.isInvulnerableIfOwned();
+        boolean blockOwnerDamage = TameworkRuntimeSettings.blockOwnerDamage(settings.isBlockOwnerDamage());
+        boolean blockAllPlayerDamageIfOwned =
+                TameworkRuntimeSettings.blockAllPlayerDamageIfOwned(settings.isBlockAllPlayerDamageIfOwned());
+        boolean invulnerableIfOwned = TameworkRuntimeSettings.invulnerableIfOwned(settings.isInvulnerableIfOwned());
         if (!blockOwnerDamage && !blockAllPlayerDamageIfOwned && !invulnerableIfOwned) {
             return false;
         }

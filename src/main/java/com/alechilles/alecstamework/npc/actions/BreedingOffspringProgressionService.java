@@ -20,6 +20,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService
 import com.alechilles.alecstamework.npc.progression.TraitInheritanceService;
 import com.alechilles.alecstamework.npc.progression.TraitModifierService;
 import com.alechilles.alecstamework.npc.progression.TraitRollService;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -322,7 +323,7 @@ final class BreedingOffspringProgressionService {
             return;
         }
         TwTraitConfig traitConfig = TwTraitConfig.resolveForRole(childRoleId);
-        if (traitConfig == null || !traitConfig.isEnabled()) {
+        if (traitConfig == null || !TameworkRuntimeSettings.traitsEnabled(traitConfig.isEnabled())) {
             return;
         }
         TameworkTraitsComponent parentATraits = parentARef != null && parentARef.isValid()

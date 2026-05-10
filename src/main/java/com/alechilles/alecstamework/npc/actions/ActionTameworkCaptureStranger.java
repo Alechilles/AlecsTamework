@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.entity.entities.Player;
@@ -91,6 +92,6 @@ public final class ActionTameworkCaptureStranger extends TameworkActionBase {
     private boolean resolveCaptureRequiresOwner() {
         TwGlobalConfig global = TwGlobalConfig.resolveActive();
         TwGlobalConfig resolved = global != null ? global : TwGlobalConfig.defaultConfig();
-        return resolved.isOwnershipCaptureRequiresOwner();
+        return TameworkRuntimeSettings.captureRequiresOwner(resolved.isOwnershipCaptureRequiresOwner());
     }
 }

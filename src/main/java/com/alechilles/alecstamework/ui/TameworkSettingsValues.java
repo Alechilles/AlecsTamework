@@ -1,18 +1,10 @@
 package com.alechilles.alecstamework.ui;
 
-import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
-import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
-import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
 import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
-import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 
 /**
  * Immutable form-state snapshot for the curated `/tw settings` page.
@@ -143,7 +135,6 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
 
     @Nonnull
     static TameworkSettingsValues fromRuntime() {
-        seedSettingsFromConfigsIfMissing();
         return fromResolvedSettings(TameworkSettingsStore.loadRuntimeGlobalSettings());
     }
 
@@ -188,190 +179,4 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         );
     }
 
-    private static void seedSettingsFromConfigsIfMissing() {
-        Tamework plugin = runtimePlugin();
-        if (plugin == null) {
-            return;
-        }
-        Path globalSettingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(plugin);
-        if (Files.isRegularFile(globalSettingsFile)) {
-            return;
-        }
-        TameworkSettingsValues values = TameworkRuntimeSettings.withoutRuntimeSettings(TameworkSettingsValues::fromConfigDefaults);
-        TameworkSettingsStore.saveGlobalSettingsIfMissing(
-                globalSettingsFile,
-                values.toGlobalSettingsSnapshot(),
-                plugin.getLogger()
-        );
-    }
-
-    @Nullable
-    private static Tamework runtimePlugin() {
-        try {
-            return Tamework.getInstance();
-        } catch (Throwable ignored) {
-            return null;
-        }
-    }
-
-    @Nonnull
-    private static TameworkSettingsValues fromConfigDefaults() {
-        TwGlobalConfig global = TwGlobalConfig.resolveActive();
-        if (global == null) {
-            global = TwGlobalConfig.defaultConfig();
-        }
-        TwNeedsConfig needsConfig = resolvePreferredNeedsConfig();
-        TwNeedsConfig.TickPolicySettings tickPolicy = needsConfig != null
-                ? needsConfig.getTickPolicy()
-                : new TwNeedsConfig.TickPolicySettings();
-        TwNeedsConfig.DamageSettings needsDamage = needsConfig != null
-                ? needsConfig.getDamage()
-                : new TwNeedsConfig.DamageSettings();
-        TwHappinessConfig happinessConfig = resolvePreferredHappinessConfig();
-        TwBreedingConfig breedingConfig = resolvePreferredBreedingConfig();
-        TwTraitConfig traitConfig = resolvePreferredTraitConfig();
-
-        boolean happinessEnabled = happinessConfig != null && happinessConfig.isEnabled();
-        return new TameworkSettingsValues(
-                global.getPopulationLimitPerPlayerOwnedTotal(),
-                global.getPopulationPerPlayerLimitScope(),
-                global.isSimpleClaimsEnabled(),
-                global.getSimpleClaimsBreedingLimitPerClaimChunk(),
-                global.getSimpleClaimsBreedingLimitPerClaimTotal(),
-                global.isSimpleClaimsBreedingRequiresClaim(),
-                global.isSimpleClaimsDamageProtectTamedFromNonMembers(),
-                global.isBlockOwnerDamage(),
-                global.isBlockAllPlayerDamageIfOwned(),
-                global.isInvulnerableIfOwned(),
-                true,
-                true,
-                global.isOwnershipCaptureRequiresOwner(),
-                global.isOwnershipSpawnRequiresOwner(),
-                global.isOwnershipInteractionRequiresOwner(),
-                global.isOwnershipLinkingRequiresOwner(),
-                needsConfig != null && needsConfig.isEnabled(),
-                needsDamage.isEnabled(),
-                tickPolicy.getMode(),
-                tickPolicy.getOwnerOfflineGraceHours(),
-                tickPolicy.getOwnerOfflineDecayMultiplier(),
-                needsDamage.getModel(),
-                needsDamage.getDualNeedRule(),
-                needsDamage.getStarvationDamagePerMinute(),
-                needsDamage.getDehydrationDamagePerMinute(),
-                needsDamage.isLethal(),
-                happinessEnabled,
-                breedingConfig != null && breedingConfig.resolvePassiveBreeding(null).isEnabled(),
-                breedingConfig != null && breedingConfig.isHappinessRequired(null) && happinessEnabled,
-                true,
-                traitConfig != null && traitConfig.isEnabled(),
-                global.isCommandDeadRespawnEnabled(),
-                true,
-                true,
-                true
-        );
-    }
-
-    @Nullable
-    private static TwNeedsConfig resolvePreferredNeedsConfig() {
-        var assetMap = TwNeedsConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return null;
-        }
-        TwNeedsConfig bestRoleless = null;
-        TwNeedsConfig bestAny = null;
-        for (TwNeedsConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isConfiguredEnabled()) {
-                continue;
-            }
-            if (bestAny == null || candidate.getPriority() > bestAny.getPriority()) {
-                bestAny = candidate;
-            }
-            String[] roleIds = candidate.getRoleIds();
-            if (roleIds != null && roleIds.length > 0) {
-                continue;
-            }
-            if (bestRoleless == null || candidate.getPriority() > bestRoleless.getPriority()) {
-                bestRoleless = candidate;
-            }
-        }
-        return bestRoleless != null ? bestRoleless : bestAny;
-    }
-
-    @Nullable
-    private static TwHappinessConfig resolvePreferredHappinessConfig() {
-        var assetMap = TwHappinessConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return null;
-        }
-        TwHappinessConfig bestRoleless = null;
-        TwHappinessConfig bestAny = null;
-        for (TwHappinessConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isConfiguredEnabled()) {
-                continue;
-            }
-            if (bestAny == null || candidate.getPriority() > bestAny.getPriority()) {
-                bestAny = candidate;
-            }
-            String[] roleIds = candidate.getRoleIds();
-            if (roleIds != null && roleIds.length > 0) {
-                continue;
-            }
-            if (bestRoleless == null || candidate.getPriority() > bestRoleless.getPriority()) {
-                bestRoleless = candidate;
-            }
-        }
-        return bestRoleless != null ? bestRoleless : bestAny;
-    }
-
-    @Nullable
-    private static TwBreedingConfig resolvePreferredBreedingConfig() {
-        var assetMap = TwBreedingConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return null;
-        }
-        TwBreedingConfig bestRoleless = null;
-        TwBreedingConfig bestAny = null;
-        for (TwBreedingConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isEnabled()) {
-                continue;
-            }
-            if (bestAny == null || candidate.getPriority() > bestAny.getPriority()) {
-                bestAny = candidate;
-            }
-            String[] roleIds = candidate.getRoleIds();
-            if (roleIds != null && roleIds.length > 0) {
-                continue;
-            }
-            if (bestRoleless == null || candidate.getPriority() > bestRoleless.getPriority()) {
-                bestRoleless = candidate;
-            }
-        }
-        return bestRoleless != null ? bestRoleless : bestAny;
-    }
-
-    @Nullable
-    private static TwTraitConfig resolvePreferredTraitConfig() {
-        var assetMap = TwTraitConfig.getAssetMap();
-        if (assetMap == null || assetMap.getAssetMap() == null) {
-            return null;
-        }
-        TwTraitConfig bestRoleless = null;
-        TwTraitConfig bestAny = null;
-        for (TwTraitConfig candidate : assetMap.getAssetMap().values()) {
-            if (candidate == null || !candidate.isConfiguredEnabled()) {
-                continue;
-            }
-            if (bestAny == null || candidate.getPriority() > bestAny.getPriority()) {
-                bestAny = candidate;
-            }
-            String[] roleIds = candidate.getRoleIds();
-            if (roleIds != null && roleIds.length > 0) {
-                continue;
-            }
-            if (bestRoleless == null || candidate.getPriority() > bestRoleless.getPriority()) {
-                bestRoleless = candidate;
-            }
-        }
-        return bestRoleless != null ? bestRoleless : bestAny;
-    }
 }

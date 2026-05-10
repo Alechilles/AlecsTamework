@@ -5,6 +5,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkHappinessComponent;
 import com.alechilles.alecstamework.npc.params.StdScopeLookupCache;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import com.hypixel.hytale.server.npc.util.expression.StdScope;
@@ -208,7 +209,9 @@ public final class CompanionHappinessService {
         TameworkHappinessComponent happiness = happinessType != null ? store.getComponent(npcRef, happinessType) : null;
         TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
-        if (happiness == null && breeding == null && (happinessConfig == null || !happinessConfig.isEnabled())) {
+        if (happiness == null
+                && breeding == null
+                && (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled()))) {
             return null;
         }
         HappinessRules rules = resolveRules(happinessConfig);
@@ -275,7 +278,9 @@ public final class CompanionHappinessService {
         TameworkHappinessComponent happiness = store.getComponent(npcRef, happinessType);
         TameworkBreedingComponent breeding = breedingType != null ? store.getComponent(npcRef, breedingType) : null;
         TwHappinessConfig happinessConfig = HappinessConfigResolver.resolveConfig(npcRef, store, happiness);
-        if (happiness == null && breeding == null && (happinessConfig == null || !happinessConfig.isEnabled())) {
+        if (happiness == null
+                && breeding == null
+                && (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled()))) {
             return false;
         }
         TwBreedingConfig breedingConfig = BreedingConfigResolver.resolveConfig(npcRef, store, breeding);
@@ -357,7 +362,9 @@ public final class CompanionHappinessService {
             }
             if (breedingConfig != null) {
                 String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
-                boolean ready = breeding.isEnabled() && next >= breedingConfig.resolveHappiness(roleId).getThreshold();
+                boolean ready = breeding.isEnabled() && next >= TameworkRuntimeSettings.breedingHappinessThreshold(
+                        breedingConfig.resolveHappiness(roleId).getThreshold()
+                );
                 if (breeding.isReady() != ready) {
                     breeding.setReady(ready);
                     breedingChanged = true;
@@ -415,7 +422,7 @@ public final class CompanionHappinessService {
     }
 
     private static HappinessRules resolveRules(@Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig != null && happinessConfig.isEnabled()) {
+        if (happinessConfig != null && TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
             TwHappinessConfig.ValueSettings values = happinessConfig.getValues();
             double min = values.getMin();
             double max = values.getMax();
@@ -467,7 +474,7 @@ public final class CompanionHappinessService {
                                               double fallbackHandFeedGain) {
         double gain = fallbackHandFeedGain;
         double durationMinutes = DEFAULT_FEED_DURATION_MINUTES;
-        if (happinessConfig != null && happinessConfig.isEnabled()) {
+        if (happinessConfig != null && TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
             TwHappinessConfig.ImpulseSettings impulses = happinessConfig.getImpulses();
             gain = impulses.getGainOnFeed();
             durationMinutes = impulses.getHandFeedDurationMinutes();
@@ -512,7 +519,7 @@ public final class CompanionHappinessService {
 
     private static void addPetActivation(@Nonnull List<TimedImpulseActivation> activations,
                                          @Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig == null || !happinessConfig.isEnabled()) {
+        if (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
             return;
         }
         double gain = happinessConfig.getImpulses().getGainOnPet();
@@ -536,7 +543,7 @@ public final class CompanionHappinessService {
 
     private static void addDamageActivation(@Nonnull List<TimedImpulseActivation> activations,
                                             @Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig == null || !happinessConfig.isEnabled()) {
+        if (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
             return;
         }
         double configuredLoss = happinessConfig.getImpulses().getLoseOnDamage();
@@ -564,7 +571,7 @@ public final class CompanionHappinessService {
                                                                      @Nullable Store<EntityStore> store,
                                                                      @Nullable TwHappinessConfig happinessConfig,
                                                                      @Nullable String consumedItemId) {
-        if (happinessConfig == null || !happinessConfig.isEnabled()) {
+        if (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
             return null;
         }
         if (consumedItemId == null || consumedItemId.isBlank()) {

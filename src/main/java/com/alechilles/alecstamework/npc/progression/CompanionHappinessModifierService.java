@@ -4,6 +4,7 @@ import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
 import com.hypixel.hytale.component.ComponentType;
@@ -50,7 +51,7 @@ public final class CompanionHappinessModifierService {
     public static ModifierSnapshot resolve(@Nullable Ref<EntityStore> npcRef,
                                            @Nullable Store<EntityStore> store,
                                            @Nullable TwHappinessConfig happinessConfig) {
-        if (happinessConfig == null || !happinessConfig.isEnabled()) {
+        if (happinessConfig == null || !TameworkRuntimeSettings.happinessEnabled(happinessConfig.isEnabled())) {
             return new ModifierSnapshot(50.0, 50.0, List.of());
         }
         double baseSetpoint = happinessConfig.getEquilibrium().getBaseSetpoint();
@@ -60,7 +61,7 @@ public final class CompanionHappinessModifierService {
 
         TameworkNeedsComponent needs = resolveNeedsComponent(npcRef, store);
         TwNeedsConfig needsConfig = NeedsConfigResolver.resolveConfig(npcRef, store, needs);
-        if (needs != null && needsConfig != null && needsConfig.isEnabled()) {
+        if (needs != null && needsConfig != null && TameworkRuntimeSettings.needsEnabled(needsConfig.isEnabled())) {
             offsetTotal += resolveNeedOffset(
                     "hunger",
                     "Hunger",
