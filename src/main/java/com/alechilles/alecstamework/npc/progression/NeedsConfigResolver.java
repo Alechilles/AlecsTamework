@@ -2,7 +2,7 @@ package com.alechilles.alecstamework.npc.progression;
 
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
@@ -53,12 +53,8 @@ public final class NeedsConfigResolver {
         if (base == null) {
             return null;
         }
-        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
-        if (overrides == null || overrides.needsEnabled() == null) {
-            return base;
-        }
         return new NeedsSensorConfig(
-                overrides.needsEnabled(),
+                base.enabled() && TameworkRuntimeSettings.current().needsEnabled(),
                 base.hungerMin(),
                 base.hungerMax(),
                 base.thirstMin(),

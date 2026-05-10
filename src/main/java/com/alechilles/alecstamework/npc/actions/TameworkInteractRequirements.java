@@ -26,7 +26,7 @@ import com.alechilles.alecstamework.config.assets.TwInteractionConfig.Requiremen
 import com.alechilles.alecstamework.config.assets.TwInteractionConfig.TameInteraction;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -930,11 +930,8 @@ final class TameworkInteractRequirements {
 
     static boolean resolveInteractionRequireOwner(@Nullable Boolean ignoredEntryRequireOwner, boolean globalRequireOwner) {
         // /tw settings global ownership requirement always wins for interaction checks.
-        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
-        if (overrides != null && overrides.interactionRequiresOwner() != null) {
-            return overrides.interactionRequiresOwner();
-        }
-        return globalRequireOwner;
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        return settings != null ? settings.interactionRequiresOwner() : globalRequireOwner;
     }
 
     private boolean matchesHarvestContext(Role role,

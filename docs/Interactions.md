@@ -17,6 +17,8 @@ Tamework replaces large NPC interaction instruction trees with a single action c
 Parameter/alarm names used by the interaction system are defined under `TwGlobalConfig.InteractionDefaults`.
 If you rename these keys, update role params and/or action overrides accordingly.
 
+Owner-requirement policy for interactions is controlled by `/tw settings`. Legacy `RequireOwner` config fields are still readable where they exist, but the settings value is the effective server-wide owner gate.
+
 ## Interaction order
 `Interactions` is evaluated in authored order. The first enabled entry whose requirements pass is executed.
 

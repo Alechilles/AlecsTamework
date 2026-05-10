@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.ui;
 import com.alechilles.alecstamework.config.overrides.TwConfigAssetDescriptor;
 import com.alechilles.alecstamework.config.overrides.TwConfigFamily;
 import com.alechilles.alecstamework.config.overrides.TwConfigSnapshot;
+import com.alechilles.alecstamework.settings.TameworkSettingsOwnedField;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import java.nio.file.Path;
@@ -176,6 +177,97 @@ class TwConfigEditorFieldPolicyTest {
         assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, compatibility.type());
         assertEquals(TwConfigEditorFieldPolicy.EditorFieldType.OPTION, overrideCompatibility.type());
         assertTrue(compatibility.options().contains("DifferentFamilyRole"));
+    }
+
+    @Test
+    void settingsOwnedFieldMatrixNormalizesConfiguredPaths() {
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "OwnershipProtection.BlockOwnerDamage"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.GLOBAL, "SimpleClaims.Breeding.LimitPerClaimChunk"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Damage.StarvationDamagePerMinute"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.BREEDING, "PassiveBreeding.Enabled"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.SPAWNER, "Spawn.AssignsOwner"));
+        assertTrue(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.COMPANION, "Command.DeadRespawnEnabled"));
+
+        assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.BREEDING, "PassiveBreeding.SweepIntervalSeconds"));
+        assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.SPAWNER, "Capture.OwnerRestricted"));
+        assertFalse(TameworkSettingsOwnedField.isSettingsOwned(TwConfigFamily.NEEDS, "Values.HungerMin"));
+    }
+
+    @Test
+    void editorHidesSettingsOwnedFallbackFieldsAcrossFamilies() {
+        JsonObject global = new JsonObject();
+        JsonObject ownershipProtection = new JsonObject();
+        ownershipProtection.addProperty("BlockOwnerDamage", true);
+        global.add("OwnershipProtection", ownershipProtection);
+        JsonObject interactionDefaults = new JsonObject();
+        interactionDefaults.addProperty("HarvestAlarmName", "Harvest");
+        global.add("InteractionDefaults", interactionDefaults);
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> globalFields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.GLOBAL, true, true),
+                null,
+                global
+        );
+        assertNull(TwConfigEditorFieldPolicy.findField(globalFields, "OwnershipProtection.BlockOwnerDamage"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(globalFields, "InteractionDefaults.HarvestAlarmName"));
+
+        JsonObject needs = new JsonObject();
+        JsonObject damage = new JsonObject();
+        damage.addProperty("Enabled", true);
+        needs.add("Damage", damage);
+        JsonObject values = new JsonObject();
+        values.addProperty("HungerMin", 0);
+        needs.add("Values", values);
+
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> needsFields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.NEEDS, true, true),
+                null,
+                needs
+        );
+        assertNull(TwConfigEditorFieldPolicy.findField(needsFields, "Damage.Enabled"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(needsFields, "Values.HungerMin"));
+    }
+
+    @Test
+    void editorHidesSettingsOwnedBreedingSpawnerAndCompanionFields() {
+        JsonObject breeding = new JsonObject();
+        JsonObject passiveBreeding = new JsonObject();
+        passiveBreeding.addProperty("Enabled", true);
+        passiveBreeding.addProperty("SweepIntervalSeconds", 60);
+        breeding.add("PassiveBreeding", passiveBreeding);
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> breedingFields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.BREEDING, true, true),
+                null,
+                breeding
+        );
+        assertNull(TwConfigEditorFieldPolicy.findField(breedingFields, "PassiveBreeding.Enabled"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(breedingFields, "PassiveBreeding.SweepIntervalSeconds"));
+
+        JsonObject spawner = new JsonObject();
+        JsonObject capture = new JsonObject();
+        capture.addProperty("ClearsOwner", true);
+        capture.addProperty("OwnerRestricted", true);
+        spawner.add("Capture", capture);
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> spawnerFields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.SPAWNER, true, true),
+                null,
+                spawner
+        );
+        assertNull(TwConfigEditorFieldPolicy.findField(spawnerFields, "Capture.ClearsOwner"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(spawnerFields, "Capture.OwnerRestricted"));
+
+        JsonObject companion = new JsonObject();
+        JsonObject command = new JsonObject();
+        command.addProperty("DeadRespawnEnabled", true);
+        command.addProperty("DeadRespawnCooldownMs", 5000);
+        companion.add("Command", command);
+        List<TwConfigEditorFieldPolicy.EditorFieldSpec> companionFields = TwConfigEditorFieldPolicy.fieldsFor(
+                descriptor(TwConfigFamily.COMPANION, true, true),
+                null,
+                companion
+        );
+        assertNull(TwConfigEditorFieldPolicy.findField(companionFields, "Command.DeadRespawnEnabled"));
+        assertNotNull(TwConfigEditorFieldPolicy.findField(companionFields, "Command.DeadRespawnCooldownMs"));
     }
 
     @Test

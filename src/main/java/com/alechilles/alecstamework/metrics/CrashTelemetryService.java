@@ -6,6 +6,7 @@ import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryDiagnostics;
 import com.alechilles.alecstelemetry.embedded.EmbeddedTelemetryService;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import com.hypixel.hytale.logger.HytaleLogger;
 import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.events.RemoveWorldEvent;
@@ -51,9 +52,10 @@ public final class CrashTelemetryService {
                 legacyCrashTelemetrySettingsCandidates(pluginDataDirectory, tameworkUniverseRoot),
                 logger
         );
-        TameworkSettingsStore.GlobalOverrides settings = TameworkSettingsStore.loadGlobalOverrides(globalSettingsPath, logger);
-        boolean telemetryEnabled = settings == null || settings.telemetryEnabled() == null || settings.telemetryEnabled();
-        boolean breadcrumbsEnabled = settings == null || settings.telemetryBreadcrumbsEnabled() == null || settings.telemetryBreadcrumbsEnabled();
+        ResolvedTameworkSettings settings =
+                TameworkSettingsStore.loadGlobalSettings(globalSettingsPath, logger);
+        boolean telemetryEnabled = settings.telemetryEnabled();
+        boolean breadcrumbsEnabled = settings.telemetryBreadcrumbsEnabled();
         migrateLegacyTelemetryData(
                 pluginDataDirectory.resolve("Telemetry"),
                 legacyTelemetryRootCandidates(pluginDataDirectory, tameworkUniverseRoot),

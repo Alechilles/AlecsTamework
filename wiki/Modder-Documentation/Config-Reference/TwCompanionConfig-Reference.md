@@ -9,12 +9,13 @@ draft: false
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
-`TwCompanionConfig` is the role-scoped companion policy family. Use it when a specific set of NPC roles should share ownership rules, command behavior, revive policy, and cross-world travel handling.
+`TwCompanionConfig` is the role-scoped companion policy family. Use it when a specific set of NPC roles should share command distances, revive cooldowns, placement behavior, and cross-world travel handling.
 
 Use this family for:
-- ownership protection behavior by role
-- command recall, return-home, and revive policy by role
+- command recall, return-home, and revive placement/cooldown policy by role
 - cross-world follow and transfer-failure policy
+
+Ownership damage protection and revive enablement are controlled by `/tw settings`. Legacy config fields still load for older packs, but new examples and `/tw config` hide them.
 
 Do not put global relocation infrastructure here. Retry windows and linked-panel unlink confirmation stay in [TwGlobalConfig Reference](/mod/alecs-tamework/twglobalconfig-reference).
 
@@ -37,7 +38,6 @@ Do not put global relocation infrastructure here. Retry windows and linked-panel
 {
   "General": { "Enabled": true, "Priority": 0 },
   "RoleIds": [],
-  "OwnershipProtection": { "...": "..." },
   "Command": {
     "...": "...",
     "Travel": { "...": "..." }
@@ -55,6 +55,8 @@ Do not put global relocation infrastructure here. Retry windows and linked-panel
 - Explicit array values replace the parent array.
 
 ### `OwnershipProtection`
+Legacy compatibility only. Use `/tw settings` for these runtime values.
+
 - `BlockOwnerDamage`: blocks owner damage to owned NPCs.
 - `BlockAllPlayerDamageIfOwned`: blocks any player damage once the NPC is owned.
 - `InvulnerableIfOwned`: makes owned NPCs invulnerable.
@@ -67,7 +69,7 @@ These fields control effective companion behavior once the command system target
 - `ReturnHomeTeleportDelayMs`: delay before return-home teleport executes.
 - `RecallSafeSpawnDistance`: preferred spawn distance when recalling an unloaded companion.
 - `RecallForceRelocateDistance`: distance beyond which recall can force relocation.
-- `DeadRespawnEnabled`: enables revive/respawn for this role.
+- `DeadRespawnEnabled`: legacy compatibility field. Use `/tw settings` for revive/respawn enablement.
 - `DeadRespawnCooldownMs`: cooldown in milliseconds before revive is available again.
 - `DeadRespawnCooldownMins`: human-friendly alias for the same cooldown. If both are set, the minutes key wins.
 - `DeadRespawnFollowRetryDelayMs`: follow retry delay after respawn.
@@ -92,10 +94,13 @@ Accepted `OnTransferFailure` values:
 
 ## Global vs Role Boundary
 Use `TwCompanionConfig` for behavior policy:
-- who can damage the NPC
-- whether revive is enabled
 - how far recall or return-home can go
 - whether cross-world travel is allowed
+- revive cooldown and placement tuning
+
+Use `/tw settings` for:
+- who can damage owned NPCs
+- whether revive is enabled
 
 Use `TwGlobalConfig.Command` for shared runtime infrastructure:
 - relocation retry intervals
@@ -106,7 +111,7 @@ Use `TwGlobalConfig.Command` for shared runtime infrastructure:
 ## Defaults, Aliases, and Compatibility Notes
 - The bundled default asset in `src/main/resources/Server/Tamework/Companion/TwCompanionConfig_Default.json` is the shipped baseline.
 - `DeadRespawnCooldownMins` is the preferred human-friendly authoring key and overrides `DeadRespawnCooldownMs` when both are present.
-- If no role-scoped match exists, effective settings fall back to global compatibility values from `TwGlobalConfig`.
+- Settings-owned legacy fields remain readable for old packs, but `/tw settings` wins at runtime and `/tw config` hides those fields.
 - `FollowMasterOnWorldChangeStateFilter` is an explicit array. If you author it in a child asset, it replaces the parent list.
 
 ## Minimal Example
@@ -118,10 +123,7 @@ Use `TwGlobalConfig.Command` for shared runtime infrastructure:
   },
   "RoleIds": [
     "My_Tamed_Wolf"
-  ],
-  "OwnershipProtection": {
-    "BlockOwnerDamage": true
-  }
+  ]
 }
 ```
 
@@ -136,16 +138,10 @@ Use `TwGlobalConfig.Command` for shared runtime infrastructure:
     "My_Tamed_Wolf",
     "My_Tamed_Wolf_Baby"
   ],
-  "OwnershipProtection": {
-    "BlockOwnerDamage": true,
-    "BlockAllPlayerDamageIfOwned": false,
-    "InvulnerableIfOwned": false
-  },
   "Command": {
     "ReturnHomeTeleportDistance": 96.0,
     "RecallSafeSpawnDistance": 20.0,
     "RecallForceRelocateDistance": 80.0,
-    "DeadRespawnEnabled": true,
     "DeadRespawnCooldownMins": 10,
     "PlacementMinRelativeY": -2.0,
     "PlacementMaxRelativeY": 4.0,

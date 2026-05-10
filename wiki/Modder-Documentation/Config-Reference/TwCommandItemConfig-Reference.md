@@ -55,7 +55,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - `LinkEnabled`: allows persistent link and unlink actions for the tool.
 - `LinkUseTogglesMembership`: makes the link action toggle whether the NPC is in the active membership set.
 - `RequireTamed`: requires targets to be tamed.
-- `RequireOwner`: requires the using player to own the target. If omitted, fallback comes from `TwGlobalConfig.OwnershipRequirements.LinkingRequiresOwner`.
+- `RequireOwner`: requires the using player to own the target. If omitted, `/tw settings` provides the global linking owner requirement.
 - `MaxTargets`: max recipients per command dispatch.
 - `MaxActive`: max linked NPCs that can be marked active. `0` means unlimited.
 - `CooldownSeconds`: item cooldown after command use.

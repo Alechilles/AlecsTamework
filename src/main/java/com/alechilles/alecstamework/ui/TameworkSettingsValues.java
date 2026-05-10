@@ -1,11 +1,16 @@
 package com.alechilles.alecstamework.ui;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwHappinessConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -138,6 +143,79 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
 
     @Nonnull
     static TameworkSettingsValues fromRuntime() {
+        seedSettingsFromConfigsIfMissing();
+        return fromResolvedSettings(TameworkSettingsStore.loadRuntimeGlobalSettings());
+    }
+
+    @Nonnull
+    private static TameworkSettingsValues fromResolvedSettings(@Nonnull ResolvedTameworkSettings settings) {
+        return new TameworkSettingsValues(
+                settings.populationLimitPerPlayerOwnedTotal(),
+                TwGlobalConfig.PerPlayerLimitScope.fromConfigValue(settings.populationPerPlayerLimitScope()),
+                settings.simpleClaimsEnabled(),
+                settings.simpleClaimsLimitPerClaimChunk(),
+                settings.simpleClaimsLimitPerClaimTotal(),
+                settings.simpleClaimsBreedingRequiresClaim(),
+                settings.simpleClaimsProtectTamedFromNonMembers(),
+                settings.blockOwnerDamage(),
+                settings.blockAllPlayerDamageIfOwned(),
+                settings.invulnerableIfOwned(),
+                settings.captureClearsOwner(),
+                settings.spawnSetsOwner(),
+                settings.captureRequiresOwner(),
+                settings.spawnRequiresOwner(),
+                settings.interactionRequiresOwner(),
+                settings.linkingRequiresOwner(),
+                settings.needsEnabled(),
+                settings.needsDamageEnabled(),
+                TwNeedsConfig.TickPolicyMode.fromConfigValue(settings.needsTickPolicyMode()),
+                settings.needsOwnerOfflineGraceHours(),
+                settings.needsOwnerOfflineDecayMultiplier(),
+                TwNeedsConfig.DamageModel.fromConfigValue(settings.needsDamageModel()),
+                TwNeedsConfig.DualNeedRule.fromConfigValue(settings.needsDamageDualNeedRule()),
+                settings.needsStarvationDamagePerMinute(),
+                settings.needsDehydrationDamagePerMinute(),
+                settings.needsDamageLethal(),
+                settings.happinessEnabled(),
+                settings.passiveBreedingEnabled(),
+                settings.breedingRequiresHappiness(),
+                settings.breedingGenderEnabled(),
+                settings.traitsEnabled(),
+                settings.reviveSystemEnabled(),
+                settings.recallTeleportingEnabled(),
+                settings.telemetryEnabled(),
+                settings.telemetryBreadcrumbsEnabled()
+        );
+    }
+
+    private static void seedSettingsFromConfigsIfMissing() {
+        Tamework plugin = runtimePlugin();
+        if (plugin == null) {
+            return;
+        }
+        Path globalSettingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(plugin);
+        if (Files.isRegularFile(globalSettingsFile)) {
+            return;
+        }
+        TameworkSettingsValues values = TameworkRuntimeSettings.withoutRuntimeSettings(TameworkSettingsValues::fromConfigDefaults);
+        TameworkSettingsStore.saveGlobalSettingsIfMissing(
+                globalSettingsFile,
+                values.toGlobalSettingsSnapshot(),
+                plugin.getLogger()
+        );
+    }
+
+    @Nullable
+    private static Tamework runtimePlugin() {
+        try {
+            return Tamework.getInstance();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Nonnull
+    private static TameworkSettingsValues fromConfigDefaults() {
         TwGlobalConfig global = TwGlobalConfig.resolveActive();
         if (global == null) {
             global = TwGlobalConfig.defaultConfig();
@@ -152,36 +230,8 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
         TwHappinessConfig happinessConfig = resolvePreferredHappinessConfig();
         TwBreedingConfig breedingConfig = resolvePreferredBreedingConfig();
         TwTraitConfig traitConfig = resolvePreferredTraitConfig();
-        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
 
-        boolean needsEnabled = overrides != null && overrides.needsEnabled() != null
-                ? overrides.needsEnabled()
-                : needsConfig != null && needsConfig.isEnabled();
-        boolean happinessEnabled = overrides != null && overrides.happinessEnabled() != null
-                ? overrides.happinessEnabled()
-                : happinessConfig != null && happinessConfig.isEnabled();
-        boolean passiveBreedingEnabled = overrides != null && overrides.passiveBreedingEnabled() != null
-                ? overrides.passiveBreedingEnabled()
-                : breedingConfig != null && breedingConfig.resolvePassiveBreeding(null).isEnabled();
-        boolean breedingRequiresHappiness = overrides != null && overrides.breedingRequiresHappiness() != null
-                ? overrides.breedingRequiresHappiness() && needsHappinessSystemEnabled(overrides, happinessConfig)
-                : breedingConfig != null && breedingConfig.isHappinessRequired(null);
-        boolean breedingGenderEnabled = overrides == null
-                || overrides.breedingGenderEnabled() == null
-                || overrides.breedingGenderEnabled();
-        boolean traitsEnabled = overrides != null && overrides.traitsEnabled() != null
-                ? overrides.traitsEnabled()
-                : traitConfig != null && traitConfig.isEnabled();
-        boolean recallTeleportingEnabled = overrides == null
-                || overrides.recallTeleportingEnabled() == null
-                || overrides.recallTeleportingEnabled();
-        boolean telemetryEnabled = overrides == null
-                || overrides.telemetryEnabled() == null
-                || overrides.telemetryEnabled();
-        boolean telemetryBreadcrumbsEnabled = overrides == null
-                || overrides.telemetryBreadcrumbsEnabled() == null
-                || overrides.telemetryBreadcrumbsEnabled();
-
+        boolean happinessEnabled = happinessConfig != null && happinessConfig.isEnabled();
         return new TameworkSettingsValues(
                 global.getPopulationLimitPerPlayerOwnedTotal(),
                 global.getPopulationPerPlayerLimitScope(),
@@ -193,17 +243,13 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 global.isBlockOwnerDamage(),
                 global.isBlockAllPlayerDamageIfOwned(),
                 global.isInvulnerableIfOwned(),
-                overrides != null && overrides.captureClearsOwner() != null
-                        ? overrides.captureClearsOwner()
-                        : true,
-                overrides != null && overrides.spawnSetsOwner() != null
-                        ? overrides.spawnSetsOwner()
-                        : true,
+                true,
+                true,
                 global.isOwnershipCaptureRequiresOwner(),
                 global.isOwnershipSpawnRequiresOwner(),
                 global.isOwnershipInteractionRequiresOwner(),
                 global.isOwnershipLinkingRequiresOwner(),
-                needsEnabled,
+                needsConfig != null && needsConfig.isEnabled(),
                 needsDamage.isEnabled(),
                 tickPolicy.getMode(),
                 tickPolicy.getOwnerOfflineGraceHours(),
@@ -214,23 +260,15 @@ public record TameworkSettingsValues(int populationLimitPerPlayerOwnedTotal,
                 needsDamage.getDehydrationDamagePerMinute(),
                 needsDamage.isLethal(),
                 happinessEnabled,
-                passiveBreedingEnabled,
-                breedingRequiresHappiness,
-                breedingGenderEnabled,
-                traitsEnabled,
+                breedingConfig != null && breedingConfig.resolvePassiveBreeding(null).isEnabled(),
+                breedingConfig != null && breedingConfig.isHappinessRequired(null) && happinessEnabled,
+                true,
+                traitConfig != null && traitConfig.isEnabled(),
                 global.isCommandDeadRespawnEnabled(),
-                recallTeleportingEnabled,
-                telemetryEnabled,
-                telemetryBreadcrumbsEnabled
+                true,
+                true,
+                true
         );
-    }
-
-    private static boolean needsHappinessSystemEnabled(@Nullable TameworkSettingsStore.GlobalOverrides overrides,
-                                                       @Nullable TwHappinessConfig happinessConfig) {
-        if (overrides != null && overrides.happinessEnabled() != null) {
-            return overrides.happinessEnabled();
-        }
-        return happinessConfig != null && happinessConfig.isEnabled();
     }
 
     @Nullable

@@ -12,12 +12,6 @@
     "HarvestAlarmName": "Harvest_Ready",
     "InteractionCooldownAlarmPrefix": "TameworkInteract_Cooldown"
   },
-  "OwnershipRequirements": {
-    "CaptureRequiresOwner": false,
-    "SpawnRequiresOwner": false,
-    "InteractionRequiresOwner": true,
-    "LinkingRequiresOwner": true
-  },
   "Command": {
     "RelocationRetryIntervalMs": 2000,
     "RelocationMaxWaitMs": 20000,
@@ -32,19 +26,8 @@
     "HerbivoreFeed": true,
     "CarnivoreFeed": true
   },
-  "Population": {
-    "LimitPerPlayerOwnedTotal": 0,
-    "PerPlayerLimitScope": "PerWorld"
-  },
   "SimpleClaims": {
-    "SimpleClaimsEnabled": false,
-    "Breeding": {
-      "LimitPerClaimChunk": 0,
-      "LimitPerClaimTotal": 0,
-      "BreedingRequiresClaim": false
-    },
     "Damage": {
-      "ProtectTamedFromNonMembers": false,
       "AllowDamagePermissionKey": "tamework.damage_tamed_claim_npc"
     }
   }

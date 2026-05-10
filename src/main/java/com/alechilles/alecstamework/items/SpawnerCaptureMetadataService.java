@@ -199,8 +199,8 @@ final class SpawnerCaptureMetadataService {
         }
         List<ItemFeatureConfig.SpawnerIconOverride> overrides = resolved.getSpawnerIconOverrides();
         boolean hasRoleOverrides = roleOverrides != null && !roleOverrides.isEmpty();
-        boolean hasGlobalOverrides = overrides != null && !overrides.isEmpty();
-        if (!hasRoleOverrides && !hasGlobalOverrides) {
+        boolean hasDefaultIconOverrides = overrides != null && !overrides.isEmpty();
+        if (!hasRoleOverrides && !hasDefaultIconOverrides) {
             return defaultIcon;
         }
         if (attachmentsJson == null || attachmentsJson.isBlank()) {
@@ -236,7 +236,7 @@ final class SpawnerCaptureMetadataService {
             }
         }
 
-        if (hasGlobalOverrides) {
+        if (hasDefaultIconOverrides) {
             for (ItemFeatureConfig.SpawnerIconOverride override : overrides) {
                 if (override == null) {
                     continue;

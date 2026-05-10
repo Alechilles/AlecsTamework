@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -1839,27 +1839,19 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             resolved = copyPassiveBreeding(getPassiveBreeding());
             override.passiveBreeding.applyTo(resolved);
         }
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.passiveBreedingEnabled() != null) {
-            resolved.enabled = overrides.passiveBreedingEnabled();
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        if (settings != null) {
+            resolved.enabled = settings.passiveBreedingEnabled();
         }
         return resolved;
     }
 
-    @Nullable
-    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
-        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
-    }
-
     private static boolean isHappinessRequiredByRuntimeOverrides() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides == null) {
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        if (settings == null) {
             return true;
         }
-        if (overrides.happinessEnabled() != null && !overrides.happinessEnabled()) {
-            return false;
-        }
-        return overrides.breedingRequiresHappiness() == null || overrides.breedingRequiresHappiness();
+        return settings.happinessEnabled() && settings.breedingRequiresHappiness();
     }
 
     public TimingSettings getTiming() {
@@ -1889,8 +1881,8 @@ public final class TwBreedingConfig implements JsonAssetWithMap<String, DefaultA
             resolved = copyGender(getGender());
             override.gender.applyTo(resolved);
         }
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && Boolean.FALSE.equals(overrides.breedingGenderEnabled())) {
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        if (settings != null && !settings.breedingGenderEnabled()) {
             resolved.enabled = false;
         }
         return resolved;

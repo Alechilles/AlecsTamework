@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -818,64 +818,43 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     @Nullable
-    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
-        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
+    private static TameworkRuntimeSettings runtimeSettings() {
+        return TameworkRuntimeSettings.currentOrNull();
     }
 
     public boolean isBlockOwnerDamage() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.blockOwnerDamage() != null) {
-            return overrides.blockOwnerDamage();
-        }
-        return blockOwnerDamage;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.blockOwnerDamage() : blockOwnerDamage;
     }
 
     public boolean isBlockAllPlayerDamageIfOwned() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.blockAllPlayerDamageIfOwned() != null) {
-            return overrides.blockAllPlayerDamageIfOwned();
-        }
-        return blockAllPlayerDamageIfOwned;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.blockAllPlayerDamageIfOwned() : blockAllPlayerDamageIfOwned;
     }
 
     public boolean isInvulnerableIfOwned() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.invulnerableIfOwned() != null) {
-            return overrides.invulnerableIfOwned();
-        }
-        return invulnerableIfOwned;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.invulnerableIfOwned() : invulnerableIfOwned;
     }
 
     public boolean isOwnershipCaptureRequiresOwner() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.captureRequiresOwner() != null) {
-            return overrides.captureRequiresOwner();
-        }
-        return ownershipCaptureRequiresOwner;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.captureRequiresOwner() : ownershipCaptureRequiresOwner;
     }
 
     public boolean isOwnershipSpawnRequiresOwner() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.spawnRequiresOwner() != null) {
-            return overrides.spawnRequiresOwner();
-        }
-        return ownershipSpawnRequiresOwner;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.spawnRequiresOwner() : ownershipSpawnRequiresOwner;
     }
 
     public boolean isOwnershipInteractionRequiresOwner() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.interactionRequiresOwner() != null) {
-            return overrides.interactionRequiresOwner();
-        }
-        return ownershipInteractionRequiresOwner;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.interactionRequiresOwner() : ownershipInteractionRequiresOwner;
     }
 
     public boolean isOwnershipLinkingRequiresOwner() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.linkingRequiresOwner() != null) {
-            return overrides.linkingRequiresOwner();
-        }
-        return ownershipLinkingRequiresOwner;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.linkingRequiresOwner() : ownershipLinkingRequiresOwner;
     }
 
     public String getInteractionConfigParam() {
@@ -939,11 +918,8 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean isCommandDeadRespawnEnabled() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.reviveSystemEnabled() != null) {
-            return overrides.reviveSystemEnabled();
-        }
-        return commandDeadRespawnEnabled;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.reviveSystemEnabled() : commandDeadRespawnEnabled;
     }
 
     public int getCommandDeadRespawnCooldownMs() {
@@ -1007,18 +983,17 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public int getPopulationLimitPerPlayerOwnedTotal() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.populationLimitPerPlayerOwnedTotal() != null) {
-            return Math.max(0, overrides.populationLimitPerPlayerOwnedTotal());
-        }
-        return Math.max(0, populationLimitPerPlayerOwnedTotal);
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null
+                ? settings.populationLimitPerPlayerOwnedTotal()
+                : Math.max(0, populationLimitPerPlayerOwnedTotal);
     }
 
     @Nonnull
     public PerPlayerLimitScope getPopulationPerPlayerLimitScope() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.populationPerPlayerLimitScope() != null) {
-            return PerPlayerLimitScope.fromConfigValue(overrides.populationPerPlayerLimitScope());
+        TameworkRuntimeSettings settings = runtimeSettings();
+        if (settings != null) {
+            return PerPlayerLimitScope.fromConfigValue(settings.populationPerPlayerLimitScope());
         }
         if (populationPerPlayerLimitScope == null) {
             return PerPlayerLimitScope.PER_WORLD;
@@ -1027,43 +1002,34 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean isSimpleClaimsEnabled() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.simpleClaimsEnabled() != null) {
-            return overrides.simpleClaimsEnabled();
-        }
-        return simpleClaimsEnabled;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.simpleClaimsEnabled() : simpleClaimsEnabled;
     }
 
     public int getSimpleClaimsBreedingLimitPerClaimChunk() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.simpleClaimsLimitPerClaimChunk() != null) {
-            return Math.max(0, overrides.simpleClaimsLimitPerClaimChunk());
-        }
-        return Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null
+                ? settings.simpleClaimsLimitPerClaimChunk()
+                : Math.max(0, simpleClaimsBreedingLimitPerClaimChunk);
     }
 
     public int getSimpleClaimsBreedingLimitPerClaimTotal() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.simpleClaimsLimitPerClaimTotal() != null) {
-            return Math.max(0, overrides.simpleClaimsLimitPerClaimTotal());
-        }
-        return Math.max(0, simpleClaimsBreedingLimitPerClaimTotal);
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null
+                ? settings.simpleClaimsLimitPerClaimTotal()
+                : Math.max(0, simpleClaimsBreedingLimitPerClaimTotal);
     }
 
     public boolean isSimpleClaimsBreedingRequiresClaim() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.simpleClaimsBreedingRequiresClaim() != null) {
-            return overrides.simpleClaimsBreedingRequiresClaim();
-        }
-        return simpleClaimsBreedingRequiresClaim;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null ? settings.simpleClaimsBreedingRequiresClaim() : simpleClaimsBreedingRequiresClaim;
     }
 
     public boolean isSimpleClaimsDamageProtectTamedFromNonMembers() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.simpleClaimsProtectTamedFromNonMembers() != null) {
-            return overrides.simpleClaimsProtectTamedFromNonMembers();
-        }
-        return simpleClaimsDamageProtectTamedFromNonMembers;
+        TameworkRuntimeSettings settings = runtimeSettings();
+        return settings != null
+                ? settings.simpleClaimsProtectTamedFromNonMembers()
+                : simpleClaimsDamageProtectTamedFromNonMembers;
     }
 
     @Nonnull
@@ -1076,16 +1042,7 @@ public final class TwGlobalConfig implements JsonAssetWithMap<String, DefaultAss
     }
 
     public boolean hasSimpleClaimsSectionDefined() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null
-                && (overrides.simpleClaimsEnabled() != null
-                || overrides.simpleClaimsLimitPerClaimChunk() != null
-                || overrides.simpleClaimsLimitPerClaimTotal() != null
-                || overrides.simpleClaimsBreedingRequiresClaim() != null
-                || overrides.simpleClaimsProtectTamedFromNonMembers() != null)) {
-            return true;
-        }
-        return simpleClaimsSectionDefined;
+        return runtimeSettings() != null || simpleClaimsSectionDefined;
     }
 
     public int resolveSimpleClaimsBreedingLimitPerClaimChunkCap(int claimChunkCount) {

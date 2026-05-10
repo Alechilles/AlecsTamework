@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -586,20 +586,12 @@ public final class TwTraitConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public boolean isEnabled() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.traitsEnabled() != null) {
-            return overrides.traitsEnabled();
-        }
-        return enabled;
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        return enabled && (settings == null || settings.traitsEnabled());
     }
 
     public boolean isConfiguredEnabled() {
         return enabled;
-    }
-
-    @Nullable
-    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
-        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
     }
 
     public int getPriority() {

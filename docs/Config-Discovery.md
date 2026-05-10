@@ -57,8 +57,9 @@ Behavior summary:
 
 ## Global vs companion policy scope
 - `TwGlobalConfig` contains global defaults and shared infrastructure knobs.
-- `TwCompanionConfig` is the preferred role-scoped location for ownership protection and command behavior policy.
-- Effective role settings fall back to global values when no role-scoped companion policy resolves.
+- `/tw settings` owns high-impact server runtime policy such as population caps, ownership requirements, ownership damage protection, revive enablement, SimpleClaims limits, needs tick/damage policy, passive breeding enablement, and spawner owner transfer defaults.
+- `TwCompanionConfig` is the role-scoped location for command distances, travel policy, cooldowns, placement rings, and other companion command behavior.
+- Legacy config fields for settings-owned values are still decoded for older packs, but new examples and `/tw config` hide them so server owners use `/tw settings`.
 
 ## Asset-set gates
 `TwGlobalConfig.AssetSets` gates optional bundled asset sets:

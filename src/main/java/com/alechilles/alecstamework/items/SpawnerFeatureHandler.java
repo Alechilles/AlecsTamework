@@ -9,7 +9,7 @@ import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
 import com.alechilles.alecstamework.npc.progression.CompanionStatModifierService;
 import com.alechilles.alecstamework.ownership.OwnerMessageUtil;
 import com.alechilles.alecstamework.ownership.OwnerPopulationCapService;
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.codec.Codec;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -495,16 +495,9 @@ public final class SpawnerFeatureHandler {
         if (baseConfig == null) {
             return null;
         }
-        TameworkSettingsStore.GlobalOverrides overrides = TameworkSettingsStore.loadRuntimeGlobalOverrides();
-        boolean captureClearsOwner = overrides != null && overrides.captureClearsOwner() != null
-                ? overrides.captureClearsOwner()
-                : baseConfig.isCaptureClearsOwner();
-        boolean spawnAssignsOwner = spawnAssignsOwnerOverride != null
-                ? spawnAssignsOwnerOverride
-                : baseConfig.isSpawnAssignsOwner();
-        if (overrides != null && overrides.spawnSetsOwner() != null) {
-            spawnAssignsOwner = overrides.spawnSetsOwner();
-        }
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.current();
+        boolean captureClearsOwner = settings.captureClearsOwner();
+        boolean spawnAssignsOwner = settings.spawnSetsOwner();
         return ItemFeatureConfig.builder()
                 .spawnerEnabled(baseConfig.isSpawnerEnabled())
                 .whistleEnabled(baseConfig.isWhistleEnabled())

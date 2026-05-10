@@ -54,18 +54,5 @@
   },
   "Timing": {
     "Basis": "REAL_TIME"
-  },
-  "TickPolicy": {
-    "Mode": "OWNER_ONLINE_GRACE_THEN_DECAY",
-    "OwnerOfflineGraceHours": 72,
-    "OwnerOfflineDecayMultiplier": 1.0
-  },
-  "Damage": {
-    "Enabled": false,
-    "Model": "MIN_ONLY_PERCENT",
-    "DualNeedRule": "USE_HIGHER_ONLY",
-    "StarvationDamagePerMinute": 2.0,
-    "DehydrationDamagePerMinute": 3.0,
-    "Lethal": true
   }
 }

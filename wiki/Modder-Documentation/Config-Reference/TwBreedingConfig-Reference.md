@@ -63,6 +63,8 @@ Use it when you want to control:
 ### `Happiness`
 - `Threshold`: minimum effective happiness required before breeding can proceed.
 
+The global "breeding requires happiness" switch lives in `/tw settings`. When it is off, this threshold is ignored at runtime.
+
 ### `Eligibility`
 - `RequireTamed`
 - `RequireAdult`
@@ -99,7 +101,7 @@ Each `RoleMaxNearbySameType` entry supports:
 If both cooldown keys are present, the minutes key writes the same backing value and should be treated as the preferred authored form.
 
 ### `PassiveBreeding`
-- `Enabled`: allows non-interaction breeding sweeps.
+- `Enabled`: legacy compatibility field. New configs should use `/tw settings` to enable or disable passive breeding.
 - `SweepIntervalSeconds`: interval between passive breeding scans.
 - `Basis`: timer basis for the passive scan cadence.
 
@@ -213,6 +215,7 @@ Important behavior:
 - The bundled default asset in `src/main/resources/Server/Tamework/Breeding/TwBreedingConfig_Default.json` is the shipped baseline.
 - Breed interactions use this family together with `TwHappinessConfig` and any fertility-related trait effects.
 - `BaseCooldownMinutes`, `DefaultTimeToFullGrownMinutes`, `TimeToFullGrownMinutes`, and family-level `TimeToFullGrownMinutes` are author-facing minute aliases for the same stored second-based values.
+- Passive breeding enablement, breeding happiness requirement, and the global breeding-gender gate are settings-owned runtime policy.
 - `InheritTraits` only matters if a compatible [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference) is also present.
 
 ## Minimal Example
@@ -262,7 +265,6 @@ Important behavior:
     "MaxDelaySeconds": 300
   },
   "PassiveBreeding": {
-    "Enabled": true,
     "SweepIntervalSeconds": 30,
     "Basis": "REAL_TIME"
   },

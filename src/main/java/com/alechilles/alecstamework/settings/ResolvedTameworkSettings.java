@@ -1,0 +1,85 @@
+package com.alechilles.alecstamework.settings;
+
+import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import javax.annotation.Nonnull;
+
+/**
+ * Fully resolved non-null runtime settings loaded from `/tw settings`.
+ */
+public record ResolvedTameworkSettings(int populationLimitPerPlayerOwnedTotal,
+                                       @Nonnull String populationPerPlayerLimitScope,
+                                       boolean simpleClaimsEnabled,
+                                       int simpleClaimsLimitPerClaimChunk,
+                                       int simpleClaimsLimitPerClaimTotal,
+                                       boolean simpleClaimsBreedingRequiresClaim,
+                                       boolean simpleClaimsProtectTamedFromNonMembers,
+                                       boolean blockOwnerDamage,
+                                       boolean blockAllPlayerDamageIfOwned,
+                                       boolean invulnerableIfOwned,
+                                       boolean captureClearsOwner,
+                                       boolean spawnSetsOwner,
+                                       boolean captureRequiresOwner,
+                                       boolean spawnRequiresOwner,
+                                       boolean interactionRequiresOwner,
+                                       boolean linkingRequiresOwner,
+                                       boolean needsEnabled,
+                                       @Nonnull String needsTickPolicyMode,
+                                       double needsOwnerOfflineGraceHours,
+                                       double needsOwnerOfflineDecayMultiplier,
+                                       boolean needsDamageEnabled,
+                                       @Nonnull String needsDamageModel,
+                                       @Nonnull String needsDamageDualNeedRule,
+                                       double needsStarvationDamagePerMinute,
+                                       double needsDehydrationDamagePerMinute,
+                                       boolean needsDamageLethal,
+                                       boolean happinessEnabled,
+                                       boolean passiveBreedingEnabled,
+                                       boolean breedingRequiresHappiness,
+                                       boolean breedingGenderEnabled,
+                                       boolean traitsEnabled,
+                                       boolean reviveSystemEnabled,
+                                       boolean recallTeleportingEnabled,
+                                       boolean telemetryEnabled,
+                                       boolean telemetryBreadcrumbsEnabled) {
+
+    @Nonnull
+    public TameworkSettingsStore.GlobalSettingsSnapshot toSnapshot() {
+        return new TameworkSettingsStore.GlobalSettingsSnapshot(
+                populationLimitPerPlayerOwnedTotal,
+                populationPerPlayerLimitScope,
+                simpleClaimsEnabled,
+                simpleClaimsLimitPerClaimChunk,
+                simpleClaimsLimitPerClaimTotal,
+                simpleClaimsBreedingRequiresClaim,
+                simpleClaimsProtectTamedFromNonMembers,
+                blockOwnerDamage,
+                blockAllPlayerDamageIfOwned,
+                invulnerableIfOwned,
+                captureClearsOwner,
+                spawnSetsOwner,
+                captureRequiresOwner,
+                spawnRequiresOwner,
+                interactionRequiresOwner,
+                linkingRequiresOwner,
+                needsEnabled,
+                needsTickPolicyMode,
+                needsOwnerOfflineGraceHours,
+                needsOwnerOfflineDecayMultiplier,
+                needsDamageEnabled,
+                needsDamageModel,
+                needsDamageDualNeedRule,
+                needsStarvationDamagePerMinute,
+                needsDehydrationDamagePerMinute,
+                needsDamageLethal,
+                happinessEnabled,
+                passiveBreedingEnabled,
+                breedingRequiresHappiness,
+                breedingGenderEnabled,
+                traitsEnabled,
+                reviveSystemEnabled,
+                recallTeleportingEnabled,
+                telemetryEnabled,
+                telemetryBreadcrumbsEnabled
+        );
+    }
+}

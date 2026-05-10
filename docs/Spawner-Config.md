@@ -34,7 +34,6 @@ Fields:
 
 ## Capture settings
 Fields:
-- `ClearsOwner` (default true). Clears owner on capture.
 - `RequireTamed` (default true). Only allow capture if NPC is tamed (Tamework tamed component or a role id that starts with `Tamed`).
 - `OwnerRestricted` (default true). If true, only the owner can capture.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
@@ -45,7 +44,6 @@ Fields:
 
 ## Spawn settings
 Fields:
-- `AssignsOwner` (default true). Assigns owner to spawned NPC.
 - `OwnerRestricted` (default true). If true, only the owner can spawn.
 - `RequireOwner` (optional override). If set, explicitly require or skip owner checks.
 - `ParticleSystem` (optional). Particle system to play on spawn.
@@ -54,6 +52,8 @@ Fields:
 - `MaxDistance` (optional). Max distance for spawn.
 
 Captured Tamework NPC names are stored on the spawner item and restored on spawn.
+
+`Capture.ClearsOwner` and `Spawn.AssignsOwner` are controlled by `/tw settings`. Older configs that still contain those fields continue to load, but new item configs should not author them.
 
 ## Icon overrides
 Optional overrides for filled spawner icons based on attachments or role.
@@ -148,7 +148,6 @@ Notes:
     "Allowlist": [ "Mob_Tamework_Interact_Test" ]
   },
   "Capture": {
-    "ClearsOwner": true,
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
@@ -156,7 +155,6 @@ Notes:
     "MaxDistance": 5
   },
   "Spawn": {
-    "AssignsOwner": true,
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",

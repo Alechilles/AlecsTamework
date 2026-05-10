@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.persistence;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
+import com.alechilles.alecstamework.settings.TameworkSettingsResolver;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
@@ -29,12 +31,15 @@ public final class TameworkSettingsStore {
     private static final Gson GSON = new GsonBuilder().disableHtmlEscaping().setPrettyPrinting().create();
     private static final Object GLOBAL_CACHE_LOCK = new Object();
     private static final Object RUNTIME_OVERRIDES_CACHE_LOCK = new Object();
+    private static final Object RUNTIME_SETTINGS_CACHE_LOCK = new Object();
     private static final Object PATH_CACHE_LOCK = new Object();
 
     @Nullable
     private static volatile CachedGlobalDocument cachedGlobalDocument;
     @Nullable
     private static volatile CachedRuntimeOverrides cachedRuntimeOverrides;
+    @Nullable
+    private static volatile CachedRuntimeSettings cachedRuntimeSettings;
     @Nullable
     private static volatile CachedResolvedPaths cachedResolvedPaths;
 
@@ -58,6 +63,33 @@ public final class TameworkSettingsStore {
                 .resolve(SETTINGS_DIRECTORY_NAME)
                 .resolve(GLOBAL_SETTINGS_FILE_NAME)
                 .normalize();
+    }
+
+    @Nonnull
+    public static ResolvedTameworkSettings loadRuntimeGlobalSettings() {
+        final Tamework plugin;
+        try {
+            plugin = Tamework.getInstance();
+        } catch (Throwable ignored) {
+            return defaultGlobalSettings();
+        }
+        if (plugin == null) {
+            return defaultGlobalSettings();
+        }
+        Path globalSettingsFile = resolveGlobalSettingsFile(plugin);
+        CachedRuntimeSettings cached = cachedRuntimeSettings;
+        if (cached != null && cached.path().equals(globalSettingsFile)) {
+            return cached.settings();
+        }
+        synchronized (RUNTIME_SETTINGS_CACHE_LOCK) {
+            cached = cachedRuntimeSettings;
+            if (cached != null && cached.path().equals(globalSettingsFile)) {
+                return cached.settings();
+            }
+            ResolvedTameworkSettings loaded = loadGlobalSettings(globalSettingsFile, plugin.getLogger());
+            cachedRuntimeSettings = new CachedRuntimeSettings(globalSettingsFile, loaded);
+            return loaded;
+        }
     }
 
     @Nullable
@@ -94,6 +126,9 @@ public final class TameworkSettingsStore {
         synchronized (RUNTIME_OVERRIDES_CACHE_LOCK) {
             cachedRuntimeOverrides = null;
         }
+        synchronized (RUNTIME_SETTINGS_CACHE_LOCK) {
+            cachedRuntimeSettings = null;
+        }
         synchronized (GLOBAL_CACHE_LOCK) {
             cachedGlobalDocument = null;
         }
@@ -110,6 +145,25 @@ public final class TameworkSettingsStore {
             return null;
         }
         return toOverrides(document);
+    }
+
+    @Nonnull
+    public static ResolvedTameworkSettings loadGlobalSettings(@Nonnull Path globalSettingsFile,
+                                                              @Nullable HytaleLogger logger) {
+        ensureGlobalTemplateExists(globalSettingsFile, logger);
+        GlobalSettingsDocument document = loadGlobalDocument(globalSettingsFile, logger);
+        return document == null ? defaultGlobalSettings() : TameworkSettingsResolver.resolve(toOverrides(document));
+    }
+
+    public static boolean saveGlobalSettingsIfMissing(@Nonnull Path globalSettingsFile,
+                                                      @Nonnull GlobalSettingsSnapshot snapshot,
+                                                      @Nullable HytaleLogger logger) {
+        Objects.requireNonNull(globalSettingsFile, "globalSettingsFile");
+        Objects.requireNonNull(snapshot, "snapshot");
+        if (Files.isRegularFile(globalSettingsFile)) {
+            return true;
+        }
+        return saveGlobalSettings(globalSettingsFile, snapshot, logger);
     }
 
     public static boolean saveGlobalSettings(@Nonnull Path globalSettingsFile,
@@ -185,6 +239,7 @@ public final class TameworkSettingsStore {
         }
         updateGlobalCache(globalSettingsFile, document);
         updateRuntimeOverridesCache(globalSettingsFile, toOverrides(document));
+        updateRuntimeSettingsCache(globalSettingsFile, TameworkSettingsResolver.resolve(toOverrides(document)));
         return true;
     }
 
@@ -220,6 +275,7 @@ public final class TameworkSettingsStore {
         }
         updateGlobalCache(globalSettingsFile, document);
         updateRuntimeOverridesCache(globalSettingsFile, toOverrides(document));
+        updateRuntimeSettingsCache(globalSettingsFile, TameworkSettingsResolver.resolve(toOverrides(document)));
         if (logger != null && importedFrom != null) {
             logger.at(Level.INFO).log("Imported legacy Tamework telemetry settings from " + importedFrom + ".");
         }
@@ -310,6 +366,13 @@ public final class TameworkSettingsStore {
         }
     }
 
+    private static void updateRuntimeSettingsCache(@Nonnull Path globalSettingsFile,
+                                                   @Nonnull ResolvedTameworkSettings settings) {
+        synchronized (RUNTIME_SETTINGS_CACHE_LOCK) {
+            cachedRuntimeSettings = new CachedRuntimeSettings(globalSettingsFile, settings);
+        }
+    }
+
     private static void ensureGlobalTemplateExists(@Nonnull Path globalSettingsFile, @Nullable HytaleLogger logger) {
         if (Files.isRegularFile(globalSettingsFile)) {
             return;
@@ -381,6 +444,16 @@ public final class TameworkSettingsStore {
         document.telemetry.enabled = true;
         document.telemetry.breadcrumbsEnabled = true;
         return document;
+    }
+
+    @Nonnull
+    public static ResolvedTameworkSettings defaultGlobalSettings() {
+        return TameworkSettingsResolver.defaultSettings();
+    }
+
+    @Nonnull
+    public static GlobalOverrides defaultGlobalOverrides() {
+        return toOverrides(createDefaultGlobalSettingsDocument());
     }
 
     @Nullable
@@ -745,6 +818,10 @@ public final class TameworkSettingsStore {
 
     private record CachedRuntimeOverrides(@Nonnull Path path,
                                           @Nullable GlobalOverrides overrides) {
+    }
+
+    private record CachedRuntimeSettings(@Nonnull Path path,
+                                         @Nonnull ResolvedTameworkSettings settings) {
     }
 
     private record CachedResolvedPaths(@Nonnull Tamework plugin,

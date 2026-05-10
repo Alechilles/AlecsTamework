@@ -1,6 +1,6 @@
 package com.alechilles.alecstamework.config.assets;
 
-import com.alechilles.alecstamework.persistence.TameworkSettingsStore;
+import com.alechilles.alecstamework.settings.TameworkRuntimeSettings;
 import com.hypixel.hytale.assetstore.AssetExtraInfo;
 import com.hypixel.hytale.assetstore.AssetRegistry;
 import com.hypixel.hytale.assetstore.AssetStore;
@@ -861,11 +861,8 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
     }
 
     public boolean isEnabled() {
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides != null && overrides.needsEnabled() != null) {
-            return overrides.needsEnabled();
-        }
-        return enabled;
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        return enabled && (settings == null || settings.needsEnabled());
     }
 
     public boolean isConfiguredEnabled() {
@@ -906,54 +903,31 @@ public final class TwNeedsConfig implements JsonAssetWithMap<String, DefaultAsse
 
     public TickPolicySettings getTickPolicy() {
         TickPolicySettings base = tickPolicy == null ? new TickPolicySettings() : tickPolicy;
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides == null) {
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        if (settings == null) {
             return base;
         }
         TickPolicySettings merged = base.copy();
-        if (overrides.needsTickPolicyMode() != null) {
-            merged.mode = TickPolicyMode.fromConfigValue(overrides.needsTickPolicyMode());
-        }
-        if (overrides.needsOwnerOfflineGraceHours() != null) {
-            merged.ownerOfflineGraceHours = overrides.needsOwnerOfflineGraceHours();
-        }
-        if (overrides.needsOwnerOfflineDecayMultiplier() != null) {
-            merged.ownerOfflineDecayMultiplier = overrides.needsOwnerOfflineDecayMultiplier();
-        }
+        merged.mode = TickPolicyMode.fromConfigValue(settings.needsTickPolicyMode());
+        merged.ownerOfflineGraceHours = settings.needsOwnerOfflineGraceHours();
+        merged.ownerOfflineDecayMultiplier = settings.needsOwnerOfflineDecayMultiplier();
         return merged;
     }
 
     public DamageSettings getDamage() {
         DamageSettings base = damage == null ? new DamageSettings() : damage;
-        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
-        if (overrides == null) {
+        TameworkRuntimeSettings settings = TameworkRuntimeSettings.currentOrNull();
+        if (settings == null) {
             return base;
         }
         DamageSettings merged = base.copy();
-        if (overrides.needsDamageEnabled() != null) {
-            merged.enabled = overrides.needsDamageEnabled();
-        }
-        if (overrides.needsDamageModel() != null) {
-            merged.model = DamageModel.fromConfigValue(overrides.needsDamageModel());
-        }
-        if (overrides.needsDamageDualNeedRule() != null) {
-            merged.dualNeedRule = DualNeedRule.fromConfigValue(overrides.needsDamageDualNeedRule());
-        }
-        if (overrides.needsStarvationDamagePerMinute() != null) {
-            merged.starvationDamagePerMinute = overrides.needsStarvationDamagePerMinute();
-        }
-        if (overrides.needsDehydrationDamagePerMinute() != null) {
-            merged.dehydrationDamagePerMinute = overrides.needsDehydrationDamagePerMinute();
-        }
-        if (overrides.needsDamageLethal() != null) {
-            merged.lethal = overrides.needsDamageLethal();
-        }
+        merged.enabled = settings.needsDamageEnabled();
+        merged.model = DamageModel.fromConfigValue(settings.needsDamageModel());
+        merged.dualNeedRule = DualNeedRule.fromConfigValue(settings.needsDamageDualNeedRule());
+        merged.starvationDamagePerMinute = settings.needsStarvationDamagePerMinute();
+        merged.dehydrationDamagePerMinute = settings.needsDehydrationDamagePerMinute();
+        merged.lethal = settings.needsDamageLethal();
         return merged;
-    }
-
-    @Nullable
-    private static TameworkSettingsStore.GlobalOverrides resolveRuntimeOverrides() {
-        return TameworkSettingsStore.loadRuntimeGlobalOverrides();
     }
 
     /** Bounds and default values for hunger and thirst state. */

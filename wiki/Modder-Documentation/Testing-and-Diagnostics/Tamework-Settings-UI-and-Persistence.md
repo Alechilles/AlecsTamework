@@ -63,6 +63,18 @@ When `useBuiltInText` is `false`, you can still provide raw `title`, `subtitle`,
 This lets you keep Alec's built-in re-arm behavior while still replacing the visible message with server-specific instructions.
 
 ## Settings Covered by the UI
+These values are owned by `/tw settings` at runtime. Legacy config keys may still be accepted for older packs, but new shipped examples and `/tw config` no longer advertise these duplicated fields.
+
+| Area | Settings-owned values |
+| --- | --- |
+| Population | Owned NPC limits and per-player counting scope |
+| SimpleClaims | Enablement, claim limits, breeding-claim requirement, and tamed damage protection |
+| Ownership | Owner damage protection, capture/spawn/interaction/linking owner requirements, capture owner clearing, and spawn owner assignment |
+| Needs | Master enable, owner-offline tick policy, damage model/rates/lethal |
+| Progression | Happiness master enable, passive breeding master enable, breeding happiness requirement, breeding gender master toggle, traits master enable |
+| Commands | Revive system master enable and recall/return-home teleporting master enable |
+| Telemetry | Crash telemetry and breadcrumb enablement |
+
 ### Population
 - `LimitPerPlayerOwnedTotal`
 - `PerPlayerLimitScope`
@@ -108,8 +120,9 @@ This lets you keep Alec's built-in re-arm behavior while still replacing the vis
 - The login popup is shown at most once per player login session, so world changes do not reopen it repeatedly.
 
 ## Relationship to `Tw*Config` Assets
-- `TwGlobalConfig`, `TwNeedsConfig`, and related assets remain the content-authoring path.
-- `/tw settings` provides a curated runtime override layer for common server-owner controls.
+- `TwGlobalConfig`, `TwNeedsConfig`, and related assets remain the content-authoring path for role, item, timing, refill, command-distance, and integration details.
+- `/tw settings` is the runtime source of truth for the common server-owner controls listed above.
+- Settings-owned config fields are legacy compatibility fields. They remain readable so older packs do not break, but the config editor hides them and new examples omit them.
 - `/tw reloadconfig` does not replace or clear settings stored by `/tw settings`.
 
 ## Best Practices

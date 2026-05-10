@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.persistence;
 
+import com.alechilles.alecstamework.settings.ResolvedTameworkSettings;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -168,6 +169,97 @@ class TameworkSettingsStoreTest {
         assertEquals(true, overrides.recallTeleportingEnabled());
         assertEquals(true, overrides.telemetryEnabled());
         assertEquals(true, overrides.telemetryBreadcrumbsEnabled());
+    }
+
+    @Test
+    void loadGlobalSettingsCreatesCompleteResolvedDocumentWhenFileMissing() {
+        Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tameworkRoot);
+
+        assertFalse(Files.exists(settingsFile));
+        ResolvedTameworkSettings settings =
+                TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+
+        assertTrue(Files.isRegularFile(settingsFile));
+        assertEquals(0, settings.populationLimitPerPlayerOwnedTotal());
+        assertEquals("PerWorld", settings.populationPerPlayerLimitScope());
+        assertEquals(false, settings.simpleClaimsEnabled());
+        assertEquals(true, settings.captureClearsOwner());
+        assertEquals(true, settings.spawnSetsOwner());
+        assertEquals(true, settings.captureRequiresOwner());
+        assertEquals(true, settings.spawnRequiresOwner());
+        assertEquals(true, settings.interactionRequiresOwner());
+        assertEquals(true, settings.linkingRequiresOwner());
+        assertEquals(true, settings.needsEnabled());
+        assertEquals("OWNER_ONLINE_GRACE_THEN_DECAY", settings.needsTickPolicyMode());
+        assertEquals(72.0, settings.needsOwnerOfflineGraceHours());
+        assertEquals(true, settings.needsDamageEnabled());
+        assertEquals("MIN_ONLY_PERCENT", settings.needsDamageModel());
+        assertEquals("USE_HIGHER_ONLY", settings.needsDamageDualNeedRule());
+        assertEquals(true, settings.happinessEnabled());
+        assertEquals(true, settings.passiveBreedingEnabled());
+        assertEquals(true, settings.breedingRequiresHappiness());
+        assertEquals(true, settings.breedingGenderEnabled());
+        assertEquals(true, settings.traitsEnabled());
+        assertEquals(true, settings.reviveSystemEnabled());
+        assertEquals(true, settings.recallTeleportingEnabled());
+        assertEquals(true, settings.telemetryEnabled());
+        assertEquals(true, settings.telemetryBreadcrumbsEnabled());
+    }
+
+    @Test
+    void saveGlobalSettingsIfMissingDoesNotOverwriteExistingDocument() throws Exception {
+        Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
+        Path settingsFile = TameworkSettingsStore.resolveGlobalSettingsFile(tameworkRoot);
+        TameworkSettingsStore.GlobalSettingsSnapshot existing =
+                TameworkSettingsStore.defaultGlobalSettings().toSnapshot();
+        TameworkSettingsStore.GlobalSettingsSnapshot replacement = new TameworkSettingsStore.GlobalSettingsSnapshot(
+                99,
+                "Global",
+                true,
+                1,
+                2,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                "ANY_LOADED_PLAYER",
+                12.0,
+                0.5,
+                false,
+                "MIN_ONLY_FLAT",
+                "SUM_BOTH",
+                8.0,
+                9.0,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false,
+                false
+        );
+
+        assertTrue(TameworkSettingsStore.saveGlobalSettings(settingsFile, existing, null));
+        assertTrue(TameworkSettingsStore.saveGlobalSettingsIfMissing(settingsFile, replacement, null));
+
+        ResolvedTameworkSettings loaded =
+                TameworkSettingsStore.loadGlobalSettings(settingsFile, null);
+        assertEquals(0, loaded.populationLimitPerPlayerOwnedTotal());
+        assertEquals("PerWorld", loaded.populationPerPlayerLimitScope());
+        assertEquals(true, loaded.needsEnabled());
+        assertEquals(true, loaded.telemetryEnabled());
     }
 
     @Test

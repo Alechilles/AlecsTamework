@@ -4,11 +4,6 @@
     "Priority": 0
   },
   "RoleIds": [],
-  "OwnershipProtection": {
-    "BlockOwnerDamage": false,
-    "BlockAllPlayerDamageIfOwned": false,
-    "InvulnerableIfOwned": false
-  },
   "Command": {
     "ReturnHomeTeleportDistance": 96.0,
     "ReturnHomePathDistanceBeforeTeleport": 24.0,
@@ -25,7 +20,6 @@
         "Aggressive"
       ]
     },
-    "DeadRespawnEnabled": true,
     "DeadRespawnCooldownMins": 10,
     "DeadRespawnFollowRetryDelayMs": 1250,
     "DeadRespawnDistanceClose": 5.0,

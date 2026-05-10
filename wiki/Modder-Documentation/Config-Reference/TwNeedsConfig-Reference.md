@@ -9,14 +9,14 @@ draft: false
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
-`TwNeedsConfig` controls hunger and thirst progression. It defines decay, passive refill, manual refill, happiness penalties, tick timing, owner-offline behavior, and optional starvation or dehydration damage.
+`TwNeedsConfig` controls role-scoped hunger and thirst content. It defines value ranges, decay, passive refill, manual refill, happiness penalties, and timing basis.
 
 Use it when you want companions to:
 - get hungry or thirsty over time
 - eat from nearby containers or drink near water
 - gain hunger or thirst from player interactions
 - lose happiness when neglected
-- take damage from extreme need depletion
+- tune refill and happiness-pressure behavior per species
 
 ## Asset Location and Resolution
 - Location: `<ModRoot>/Server/Tamework/Needs/*.json`
@@ -41,9 +41,7 @@ Use it when you want companions to:
   "HappinessImpact": { "...": "..." },
   "PassiveRefill": { "...": "..." },
   "ManualRefill": { "...": "..." },
-  "Timing": { "...": "..." },
-  "TickPolicy": { "...": "..." },
-  "Damage": { "...": "..." }
+  "Timing": { "...": "..." }
 }
 ```
 
@@ -103,6 +101,8 @@ Accepted values:
 - `WORLD_TIME_SCALED`
 
 ### `TickPolicy`
+Legacy compatibility only. Owner-offline needs policy is controlled by `/tw settings`.
+
 - `Mode`: how needs progress when the owner is offline.
 - `OwnerOfflineGraceHours`: grace period before offline policy changes apply.
 - `OwnerOfflineDecayMultiplier`: decay multiplier after the grace window.
@@ -111,6 +111,8 @@ Accepted `Mode` values:
 - `OWNER_ONLINE_GRACE_THEN_DECAY`
 
 ### `Damage`
+Legacy compatibility only. Need-driven damage enablement, model, rates, and lethal behavior are controlled by `/tw settings`.
+
 - `Enabled`: master gate for need-driven damage.
 - `Model`: damage calculation model.
 - `DualNeedRule`: how hunger and thirst combine when both are critical.
@@ -130,7 +132,7 @@ Accepted `DualNeedRule` values:
 - Feed interactions and water-bucket interactions can refill needs through `ManualRefill`.
 - Nearby container feeding is how feed-trough style food consumption integrates with the needs system.
 - Need levels also feed the modifier bands in [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference).
-- `Timing.Basis` and `TickPolicy` work together. A world-time basis still respects the owner-offline policy that decides when decay should advance.
+- `Timing.Basis` remains config-owned. Owner-offline tick policy and needs damage are settings-owned runtime policy.
 
 ## Minimal Example
 ```json
@@ -198,19 +200,6 @@ Accepted `DualNeedRule` values:
   },
   "Timing": {
     "Basis": "REAL_TIME"
-  },
-  "TickPolicy": {
-    "Mode": "OWNER_ONLINE_GRACE_THEN_DECAY",
-    "OwnerOfflineGraceHours": 72,
-    "OwnerOfflineDecayMultiplier": 1.0
-  },
-  "Damage": {
-    "Enabled": false,
-    "Model": "MIN_ONLY_PERCENT",
-    "DualNeedRule": "USE_HIGHER_ONLY",
-    "StarvationDamagePerMinute": 2.0,
-    "DehydrationDamagePerMinute": 3.0,
-    "Lethal": true
   }
 }
 ```
@@ -218,7 +207,7 @@ Accepted `DualNeedRule` values:
 ## Gotchas
 - `ContainerFoodItemIds`, `WaterBucketItemIds`, and other arrays replace parent values when authored in a child asset.
 - Needs refill and happiness adjustment are separate systems. Feeding can restore hunger and also add happiness, but the values come from different config families.
-- If you enable damage, confirm your refill paths are reachable for that species or you can create unavoidable death loops.
+- If you enable needs damage in `/tw settings`, confirm refill paths are reachable for each species or you can create unavoidable death loops.
 
 ## Related Pages
 - [Progression Systems Guide](/mod/alecs-tamework/progression-systems-guide)

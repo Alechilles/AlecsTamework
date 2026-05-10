@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.overrides.TwConfigSnapshot;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwGlobalConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
+import com.alechilles.alecstamework.settings.TameworkSettingsOwnedField;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -262,19 +263,24 @@ final class TwConfigEditorFieldPolicy {
     @Nonnull
     private static List<EditorFieldSpec> filterHiddenFields(@Nonnull TwConfigFamily family,
                                                             @Nonnull List<EditorFieldSpec> fields) {
-        if (fields.isEmpty() || family != TwConfigFamily.BREEDING) {
+        if (fields.isEmpty()) {
             return fields;
         }
         ArrayList<EditorFieldSpec> out = new ArrayList<>(fields.size());
         boolean changed = false;
         for (EditorFieldSpec field : fields) {
-            if (field == null || hiddenBreedingFieldPath(field.path())) {
+            if (field == null || hiddenFieldPath(family, field.path())) {
                 changed = true;
                 continue;
             }
             out.add(field);
         }
         return changed ? List.copyOf(out) : fields;
+    }
+
+    private static boolean hiddenFieldPath(@Nonnull TwConfigFamily family, @Nullable String path) {
+        return TameworkSettingsOwnedField.isSettingsOwned(family, path)
+                || (family == TwConfigFamily.BREEDING && hiddenBreedingFieldPath(path));
     }
 
     private static boolean hiddenBreedingFieldPath(@Nullable String path) {

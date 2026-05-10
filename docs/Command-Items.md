@@ -126,7 +126,7 @@ Lost flow:
 
 Dead companions:
 - Death snapshots persist across relog/restart.
-- `Revive` respects role-scoped effective cooldown/enable policy (`TwCompanionConfig`, with global fallback).
+- `Revive` enablement is controlled by `/tw settings`; cooldowns and placement tuning remain in `TwCompanionConfig.Command`.
 
 ## Global tuning
 `TwGlobalConfig.Command` remains the shared relocation infrastructure location:
@@ -145,7 +145,6 @@ Role-scoped behavior tuning belongs in `TwCompanionConfig.Command`:
 - `Travel.OnTransferFailure` (`QueueForRecall`, `MarkLost`, `Ignore`)
 - `Travel.FollowMasterOnWorldChange`
 - `Travel.FollowMasterOnWorldChangeStateFilter`
-- `DeadRespawnEnabled`
 - `DeadRespawnCooldownMs` / `DeadRespawnCooldownMins`
 - `DeadRespawnFollowRetryDelayMs`
 - `DeadRespawnDistanceClose/Near/Mid/Far`

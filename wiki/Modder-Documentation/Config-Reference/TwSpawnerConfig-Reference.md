@@ -9,7 +9,7 @@ draft: false
 Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 
 ## What It Controls
-`TwSpawnerConfig` binds a capture-and-spawn behavior set to a specific spawner item. It controls which roles can be captured, how capture and spawn ownership rules work, item cooldowns and effects, and filled-item icon and tooltip behavior.
+`TwSpawnerConfig` binds a capture-and-spawn behavior set to a specific spawner item. It controls which roles can be captured, local owner restrictions, item cooldowns and effects, and filled-item icon and tooltip behavior.
 
 ## Asset Location and Resolution
 - Location: `<ModRoot>/Server/Tamework/Items/Spawners/*.json`
@@ -65,19 +65,19 @@ Fields:
 - `Denylist`
 
 ### `Capture`
-- `ClearsOwner`: clears owner metadata when the NPC is captured.
+- `ClearsOwner`: legacy compatibility field. New configs should use `/tw settings` for capture owner clearing.
 - `RequireTamed`: requires the NPC to be tamed before capture succeeds.
 - `OwnerRestricted`: restricts capture to the owner when ownership exists.
-- `RequireOwner`: explicit override that requires the NPC to have an owner. If omitted, global default comes from `TwGlobalConfig.OwnershipRequirements.CaptureRequiresOwner`.
+- `RequireOwner`: explicit owner-presence requirement for this item flow.
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
 - `MaxDistance`
 
 ### `Spawn`
-- `AssignsOwner`: assigns the using player as owner when the NPC is spawned.
+- `AssignsOwner`: legacy compatibility field. New configs should use `/tw settings` for spawn owner assignment.
 - `OwnerRestricted`: restricts spawn use to the spawner owner when ownership exists on the item.
-- `RequireOwner`: explicit override that requires the spawner item to have an owner. If omitted, global default comes from `TwGlobalConfig.OwnershipRequirements.SpawnRequiresOwner`.
+- `RequireOwner`: explicit owner-presence requirement for this item flow.
 - `ParticleSystem`
 - `SoundEvent`
 - `CooldownMs`
@@ -103,6 +103,7 @@ Accepted values:
 ## Defaults and Cross-System Notes
 - The shipped example asset is `src/main/resources/Server/Tamework/Items/Spawners/Spawner_Tamework_Example.json`.
 - Captured Tamework names and progression metadata are preserved on the item and restored on spawn.
+- Capture owner clearing and spawn owner assignment are settings-owned runtime policy.
 - Spawner capture and spawn also integrate with linked-companion sync and other runtime systems. This config only defines the author-facing policy.
 
 ## Minimal Example
@@ -116,11 +117,10 @@ Accepted values:
     ]
   },
   "Capture": {
-    "ClearsOwner": true,
     "RequireTamed": true
   },
   "Spawn": {
-    "AssignsOwner": true
+    "OwnerRestricted": true
   }
 }
 ```
@@ -138,7 +138,6 @@ Accepted values:
     ]
   },
   "Capture": {
-    "ClearsOwner": true,
     "RequireTamed": true,
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
@@ -147,7 +146,6 @@ Accepted values:
     "MaxDistance": 5
   },
   "Spawn": {
-    "AssignsOwner": true,
     "OwnerRestricted": true,
     "ParticleSystem": "Poof_Small",
     "SoundEvent": "SFX_Tamework_Poof",
@@ -161,7 +159,7 @@ Accepted values:
 ## Gotchas
 - `EmptyItemId` is the resolution key. If two active configs target the same item, selection becomes a config-resolution problem instead of an item-authoring problem.
 - `RequireOwner` is an explicit override, not the same thing as `OwnerRestricted`.
-- Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
+- Use `/tw settings` for the global capture/spawn owner-transfer defaults.
 - `IconOverrides` and `IconOverridesByRole` are explicit array/map values and replace the parent content when authored in a child asset.
 - `/tw reloadconfig` is required after editing spawner configs during development.
 
