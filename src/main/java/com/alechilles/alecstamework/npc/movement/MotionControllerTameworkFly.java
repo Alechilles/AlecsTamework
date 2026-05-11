@@ -24,7 +24,6 @@ import javax.annotation.Nonnull;
  */
 public final class MotionControllerTameworkFly extends MotionControllerFly {
     private static final double INPUT_DEAD_ZONE = 0.01;
-    private static final double HORIZONTAL_INPUT_DEAD_ZONE = 0.025;
     private static final double SPRINT_HORIZONTAL_SPEED_MULTIPLIER = 1.35;
     private static final String FLY_IDLE_ANIMATION = "FlyIdle";
     private static final String FLY_ANIMATION = "Fly";
@@ -191,8 +190,8 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         }
 
         TameworkRideMountComponent ride = rideMount(ref, componentAccessor);
-        boolean horizontalIdle = ride != null ? !hasHorizontalInputIntent(ride) : isHorizontalIdle(horizontalSpeed());
-        boolean fast = !horizontalIdle && ride != null && ride.isRiderSprinting();
+        boolean horizontalIdle = TameworkFlyAnimationState.resolveHorizontalIdle(ride, horizontalSpeed());
+        boolean fast = TameworkFlyAnimationState.resolveFast(ride, horizontalIdle);
         updateFlyingStates(movementStates, horizontalIdle, fast);
         movementStates.horizontalIdle = horizontalIdle;
         playFlightMovementAnimation(ref, horizontalIdle, fast, componentAccessor);
@@ -210,7 +209,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
 
     @Override
     public boolean isHorizontalIdle(double speed) {
-        return speed < 0.05;
+        return speed < TameworkFlyAnimationState.HORIZONTAL_IDLE_SPEED;
     }
 
     public void clearForcedMovementAnimation(@Nonnull Ref<EntityStore> ref,
@@ -245,14 +244,6 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                                                  @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         ComponentType<EntityStore, TameworkRideMountComponent> type = TameworkRideMountComponent.getComponentType();
         return type == null ? null : componentAccessor.getComponent(ref, type);
-    }
-
-    private boolean hasHorizontalInputIntent(@Nonnull TameworkRideMountComponent ride) {
-        if (!ride.hasWishMovement()) {
-            return false;
-        }
-        double horizontalIntent = Math.sqrt(ride.getWishX() * ride.getWishX() + ride.getWishZ() * ride.getWishZ());
-        return horizontalIntent > HORIZONTAL_INPUT_DEAD_ZONE;
     }
 
     private double horizontalSpeed() {
@@ -305,7 +296,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         }
         lastDebugMs = now;
         instance.getLogger().at(Level.INFO).log(
-                "TameworkRide debug: flyController pos=%s/%s/%s requestedMove=%s/%s/%s lastVelocity=%s/%s/%s " +
+                "TameworkFly debug: flyController pos=%s/%s/%s requestedMove=%s/%s/%s lastVelocity=%s/%s/%s " +
                         "targetVelocity=%s/%s/%s input=%s/%s/%s yaw=%s pitch=%s onGround=%s inWater=%s " +
                         "motionKind=%s remaining=%s sprinting=%s movementAnimation=%s",
                 position.x,

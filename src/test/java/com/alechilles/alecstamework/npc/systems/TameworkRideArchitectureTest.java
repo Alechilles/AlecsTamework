@@ -2,9 +2,11 @@ package com.alechilles.alecstamework.npc.systems;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.MalformedInputException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -183,8 +185,8 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("FLY_IDLE_ANIMATION"));
         assertTrue(content.contains("FLY_ANIMATION"));
         assertTrue(content.contains("FLY_FAST_ANIMATION"));
-        assertTrue(content.contains("hasHorizontalInputIntent"));
-        assertTrue(content.contains("ride.isRiderSprinting()"));
+        assertTrue(content.contains("TameworkFlyAnimationState.resolveHorizontalIdle"));
+        assertTrue(content.contains("TameworkFlyAnimationState.resolveFast"));
         assertTrue(content.contains("lastFlightMovementAnimation"));
         assertTrue(content.contains("SPRINT_HORIZONTAL_SPEED_MULTIPLIER"));
     }
@@ -226,6 +228,13 @@ class TameworkRideArchitectureTest {
     }
 
     @Test
+    void productionCodeAndResourcesDoNotReferenceRideSpecificFlightId() throws IOException {
+        String staleId = "Tamework" + "RideFly";
+        assertFalse(anyFileContains(Paths.get("src", "main", "java"), staleId));
+        assertFalse(anyFileContains(Paths.get("src", "main", "resources"), staleId));
+    }
+
+    @Test
     void rideCleanupClearsForcedMovementAnimationAndRestoresState() throws IOException {
         String mountCleanup = readMain(
                 "com",
@@ -261,6 +270,24 @@ class TameworkRideArchitectureTest {
 
     private static String readMain(String first, String... more) throws IOException {
         return Files.readString(MAIN_JAVA.resolve(Paths.get(first, more)), StandardCharsets.UTF_8);
+    }
+
+    private static boolean anyFileContains(Path root, String value) throws IOException {
+        try (Stream<Path> paths = Files.walk(root)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .anyMatch(path -> contains(path, value));
+        }
+    }
+
+    private static boolean contains(Path path, String value) {
+        try {
+            return Files.readString(path, StandardCharsets.UTF_8).contains(value);
+        } catch (MalformedInputException e) {
+            return false;
+        } catch (IOException e) {
+            throw new IllegalStateException("Failed reading " + path, e);
+        }
     }
 
     private static String methodBody(String content, String startMarker, String endMarker) {
