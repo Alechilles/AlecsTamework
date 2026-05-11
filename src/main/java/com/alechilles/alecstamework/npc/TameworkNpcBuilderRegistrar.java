@@ -21,6 +21,7 @@ import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTame
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
 import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
 import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFly;
+import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkRideWalk;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
@@ -158,6 +159,10 @@ public final class TameworkNpcBuilderRegistrar {
             motionControllerFactory.add(
                     BuilderMotionControllerTameworkFly.BUILDER_ID,
                     BuilderMotionControllerTameworkFly::new
+            );
+            motionControllerFactory.add(
+                    BuilderMotionControllerTameworkRideWalk.BUILDER_ID,
+                    BuilderMotionControllerTameworkRideWalk::new
             );
         }
 

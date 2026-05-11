@@ -21,10 +21,21 @@ class TameworkRideRiderComponentTest {
     void clonePreservesMountUuidAndCameraState() {
         TameworkRideRiderComponent component = new TameworkRideRiderComponent("mount-uuid");
         component.setClientCameraApplied(true);
+        component.setClientSpeedModifier(12.5);
 
         TameworkRideRiderComponent cloned = component.clone();
 
         assertEquals("mount-uuid", cloned.getMountUuid());
         assertTrue(cloned.isClientCameraApplied());
+        assertEquals(12.5, cloned.getClientSpeedModifier());
+    }
+
+    @Test
+    void sanitizesInvalidClientSpeedModifier() {
+        TameworkRideRiderComponent component = new TameworkRideRiderComponent("mount-uuid");
+
+        component.setClientSpeedModifier(0.0);
+
+        assertEquals(-1.0, component.getClientSpeedModifier());
     }
 }

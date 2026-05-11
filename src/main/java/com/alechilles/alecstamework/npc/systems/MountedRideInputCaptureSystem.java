@@ -247,6 +247,7 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
         }
         commandBuffer.run(bufferStore -> {
             if (riderRef.isValid()) {
+                MountedRideClientAttachment.detach(bufferStore, riderRef);
                 bufferStore.tryRemoveComponent(riderRef, rideRiderComponentType);
                 bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
             }
@@ -296,7 +297,8 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
                 mount,
                 absolute.getX() - position.x,
                 absolute.getY() - position.y,
-                absolute.getZ() - position.z
+                absolute.getZ() - position.z,
+                true
         );
     }
 
@@ -306,7 +308,7 @@ public final class MountedRideInputCaptureSystem extends EntityTickingSystem<Ent
             return;
         }
         Vector3d value = velocity.getVelocity();
-        captureWorldMovement(mount, value.x, value.y, value.z);
+        captureWorldMovement(mount, value.x, value.y, value.z, true);
     }
 
     private void captureWorldMovement(@Nonnull TameworkRideMountComponent mount,

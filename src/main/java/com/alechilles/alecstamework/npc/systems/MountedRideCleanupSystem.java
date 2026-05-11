@@ -142,6 +142,9 @@ public final class MountedRideCleanupSystem extends EntityTickingSystem<EntitySt
                 bufferStore.tryRemoveComponent(mountRef, rideMountComponentType);
             }
             if (riderRef != null && riderRef.isValid()) {
+                if (mountRef.isValid()) {
+                    MountedRideClientAttachment.placeRiderAtMountAnchor(bufferStore, riderRef, mountRef, mount);
+                }
                 MountedRideClientAttachment.detach(bufferStore, riderRef);
                 bufferStore.tryRemoveComponent(riderRef, rideRiderComponentType);
                 bufferStore.tryRemoveComponent(riderRef, mountedComponentType);

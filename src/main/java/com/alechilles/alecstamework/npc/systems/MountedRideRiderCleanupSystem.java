@@ -125,6 +125,7 @@ public final class MountedRideRiderCleanupSystem extends EntityTickingSystem<Ent
                 bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
             }
             if (mountRef != null && mountRef.isValid() && mount != null) {
+                MountedRideClientAttachment.placeRiderAtMountAnchor(bufferStore, riderRef, mountRef, mount);
                 NPCEntity npc = bufferStore.getComponent(mountRef, npcComponentType);
                 if (npc != null) {
                     restoreNpcState(mountRef, npc, mount, bufferStore);

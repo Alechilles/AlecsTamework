@@ -185,8 +185,9 @@ final class InteractionMountEffects {
                     npcTransform.getRotation().getRoll()
             );
         }
+        TameworkRideRiderComponent rideRider = new TameworkRideRiderComponent(npcUuid.getUuid().toString());
         store.putComponent(npcRef, rideMountType, rideMount);
-        store.putComponent(playerRef, rideRiderType, new TameworkRideRiderComponent(npcUuid.getUuid().toString()));
+        store.putComponent(playerRef, rideRiderType, rideRider);
         clearStatusAnimation(npcRef, npcComponent, store);
         applyRideState(npcRef, role, store, rideState);
         maybeLogTameworkRideMountDebug(role, rideMount, anchorX, anchorY, anchorZ);

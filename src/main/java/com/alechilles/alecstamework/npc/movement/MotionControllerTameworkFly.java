@@ -14,7 +14,6 @@ import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.movement.MotionKind;
 import com.hypixel.hytale.server.npc.movement.Steering;
 import com.hypixel.hytale.server.npc.movement.controllers.MotionControllerFly;
-import com.hypixel.hytale.server.npc.movement.controllers.builders.BuilderMotionControllerFly;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.util.logging.Level;
 import javax.annotation.Nonnull;
@@ -24,16 +23,27 @@ import javax.annotation.Nonnull;
  */
 public final class MotionControllerTameworkFly extends MotionControllerFly {
     private static final double INPUT_DEAD_ZONE = 0.01;
-    private static final double SPRINT_HORIZONTAL_SPEED_MULTIPLIER = 1.35;
     private static final String FLY_IDLE_ANIMATION = "FlyIdle";
     private static final String FLY_ANIMATION = "Fly";
     private static final String FLY_FAST_ANIMATION = "FlyFast";
     private static final String NO_FORCED_MOVEMENT_ANIMATION = "";
+    private final double mountedMaxHorizontalSpeed;
+    private final double mountedMaxClimbSpeed;
+    private final double mountedMaxSinkSpeed;
+    private final double mountedAcceleration;
+    private final double mountedDeceleration;
+    private final double mountedSprintMultiplier;
     private long lastDebugMs;
     private double lastInputX;
     private double lastInputY;
     private double lastInputZ;
     private boolean lastRiderSprinting;
+    private boolean lastRidden;
+    private double lastHorizontalSpeedLimit;
+    private double lastClimbSpeedLimit;
+    private double lastSinkSpeedLimit;
+    private double lastAccelerationRate;
+    private double lastDecelerationRate;
     private double lastTargetVelocityX;
     private double lastTargetVelocityY;
     private double lastTargetVelocityZ;
@@ -42,8 +52,14 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     private String lastFlightMovementAnimation = NO_FORCED_MOVEMENT_ANIMATION;
 
     public MotionControllerTameworkFly(@Nonnull BuilderSupport builderSupport,
-                                       @Nonnull BuilderMotionControllerFly builder) {
+                                       @Nonnull BuilderMotionControllerTameworkFly builder) {
         super(builderSupport, builder);
+        this.mountedMaxHorizontalSpeed = builder.getMountedMaxHorizontalSpeed(builderSupport, maxHorizontalSpeed);
+        this.mountedMaxClimbSpeed = builder.getMountedMaxClimbSpeed(builderSupport, maxClimbSpeed);
+        this.mountedMaxSinkSpeed = builder.getMountedMaxSinkSpeed(builderSupport, maxSinkSpeed);
+        this.mountedAcceleration = builder.getMountedAcceleration(builderSupport, acceleration);
+        this.mountedDeceleration = builder.getMountedDeceleration(builderSupport, deceleration);
+        this.mountedSprintMultiplier = builder.getMountedSprintMultiplier(builderSupport);
     }
 
     @Nonnull
@@ -114,8 +130,10 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         lastInputZ = translation.z;
         TameworkRideMountComponent ride = rideMount(ref, componentAccessor);
         lastRiderSprinting = ride != null && ride.isRiderSprinting();
+        lastRidden = ride != null;
         double inputLength = steering.hasTranslation() ? translation.length() : 0.0;
         if (inputLength <= INPUT_DEAD_ZONE) {
+            captureActiveLimits();
             setMotionKind(onGround() ? MotionKind.STANDING : MotionKind.FLYING);
             lastVelocity.assign(0.0);
             lastSpeed = 0.0;
@@ -133,18 +151,21 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
             translation.scale(1.0 / inputLength);
         }
 
-        double horizontalSpeedMultiplier = lastRiderSprinting ? SPRINT_HORIZONTAL_SPEED_MULTIPLIER : 1.0;
+        captureActiveLimits();
+        double horizontalSpeedMultiplier = lastRiderSprinting ? mountedSprintMultiplier : 1.0;
         Vector3d targetVelocity = new Vector3d(
-                translation.x * maxHorizontalSpeed * horizontalSpeedMultiplier,
-                translation.y * (translation.y >= 0.0 ? maxClimbSpeed : maxSinkSpeed),
-                translation.z * maxHorizontalSpeed * horizontalSpeedMultiplier
+                translation.x * lastHorizontalSpeedLimit * horizontalSpeedMultiplier,
+                translation.y * (translation.y >= 0.0 ? lastClimbSpeedLimit : lastSinkSpeedLimit),
+                translation.z * lastHorizontalSpeedLimit * horizontalSpeedMultiplier
         );
-        targetVelocity.scale(effectHorizontalSpeedMultiplier);
+        if (!lastRidden) {
+            targetVelocity.scale(effectHorizontalSpeedMultiplier);
+        }
         lastTargetVelocityX = targetVelocity.x;
         lastTargetVelocityY = targetVelocity.y;
         lastTargetVelocityZ = targetVelocity.z;
         double targetSpeed = targetVelocity.length();
-        double maxDelta = (targetSpeed > lastSpeed ? acceleration : deceleration) * dt;
+        double maxDelta = (targetSpeed > lastSpeed ? lastAccelerationRate : lastDecelerationRate) * dt;
         approachVelocity(targetVelocity, maxDelta);
         lastSpeed = lastVelocity.length();
 
@@ -193,8 +214,25 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         boolean horizontalIdle = TameworkFlyAnimationState.resolveHorizontalIdle(ride, horizontalSpeed());
         boolean fast = TameworkFlyAnimationState.resolveFast(ride, horizontalIdle);
         updateFlyingStates(movementStates, horizontalIdle, fast);
+        clearGroundMovementStates(movementStates);
         movementStates.horizontalIdle = horizontalIdle;
         playFlightMovementAnimation(ref, horizontalIdle, fast, componentAccessor);
+    }
+
+    @Override
+    public double getMaximumSpeed() {
+        if (!lastRidden) {
+            return super.getMaximumSpeed();
+        }
+        return getMountedClientSpeed(lastRiderSprinting);
+    }
+
+    public double getMountedClientSpeed(boolean riderSprinting) {
+        double sprintMultiplier = riderSprinting ? mountedSprintMultiplier : 1.0;
+        return Math.max(
+                mountedHorizontalSpeedLimit() * sprintMultiplier,
+                Math.max(mountedMaxClimbSpeed, mountedMaxSinkSpeed)
+        );
     }
 
     @Override
@@ -250,6 +288,34 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         return Math.sqrt(lastVelocity.x * lastVelocity.x + lastVelocity.z * lastVelocity.z);
     }
 
+    private void clearGroundMovementStates(@Nonnull MovementStates movementStates) {
+        movementStates.walking = false;
+        movementStates.running = false;
+        movementStates.sprinting = false;
+        movementStates.onGround = false;
+        movementStates.flying = true;
+    }
+
+    private void captureActiveLimits() {
+        if (lastRidden) {
+            lastHorizontalSpeedLimit = mountedHorizontalSpeedLimit();
+            lastClimbSpeedLimit = mountedMaxClimbSpeed;
+            lastSinkSpeedLimit = mountedMaxSinkSpeed;
+            lastAccelerationRate = mountedAcceleration;
+            lastDecelerationRate = mountedDeceleration;
+            return;
+        }
+        lastHorizontalSpeedLimit = maxHorizontalSpeed;
+        lastClimbSpeedLimit = maxClimbSpeed;
+        lastSinkSpeedLimit = maxSinkSpeed;
+        lastAccelerationRate = acceleration;
+        lastDecelerationRate = deceleration;
+    }
+
+    private double mountedHorizontalSpeedLimit() {
+        return mountedMaxHorizontalSpeed;
+    }
+
     private void approachVelocity(@Nonnull Vector3d targetVelocity, double maxDelta) {
         Vector3d delta = new Vector3d(targetVelocity).subtract(lastVelocity);
         double deltaLength = delta.length();
@@ -298,7 +364,8 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         instance.getLogger().at(Level.INFO).log(
                 "TameworkFly debug: flyController pos=%s/%s/%s requestedMove=%s/%s/%s lastVelocity=%s/%s/%s " +
                         "targetVelocity=%s/%s/%s input=%s/%s/%s yaw=%s pitch=%s onGround=%s inWater=%s " +
-                        "motionKind=%s remaining=%s sprinting=%s movementAnimation=%s",
+                        "motionKind=%s remaining=%s ridden=%s sprinting=%s horizontalLimit=%s climbLimit=%s " +
+                        "sinkLimit=%s acceleration=%s deceleration=%s effectHorizontalSpeedMultiplier=%s movementAnimation=%s",
                 position.x,
                 position.y,
                 position.z,
@@ -320,7 +387,14 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                 inWater(),
                 getMotionKind(),
                 remaining,
+                lastRidden,
                 lastRiderSprinting,
+                lastHorizontalSpeedLimit,
+                lastClimbSpeedLimit,
+                lastSinkSpeedLimit,
+                lastAccelerationRate,
+                lastDecelerationRate,
+                effectHorizontalSpeedMultiplier,
                 lastFlightMovementAnimation
         );
     }

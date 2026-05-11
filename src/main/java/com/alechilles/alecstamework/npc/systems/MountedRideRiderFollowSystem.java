@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.npc.systems;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.movement.MotionControllerTameworkFly;
+import com.alechilles.alecstamework.npc.movement.MotionControllerTameworkRideWalk;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
 import com.hypixel.hytale.component.CommandBuffer;
@@ -19,6 +21,9 @@ import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.entities.NPCEntity;
+import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
+import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.systems.SteeringSystem;
 import java.util.Set;
 import java.util.UUID;
@@ -89,34 +94,36 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
             );
             commandBuffer.putComponent(mountRef, rideMountComponentType, mount);
         }
-        double yaw = mountRotation == null ? 0.0 : mountRotation.getYaw();
-        double sin = Math.sin(yaw);
-        double cos = Math.cos(yaw);
-        double localX = mount.getAnchorX();
-        double localZ = mount.getAnchorZ();
-        double worldX = localX * cos - localZ * sin;
-        double worldZ = localX * sin + localZ * cos;
-        double riderX = mountPosition.x + worldX;
-        double riderY = mountPosition.y + mount.getAnchorY();
-        double riderZ = mountPosition.z + worldZ;
-        if (!rider.isClientCameraApplied()) {
+        double clientSpeedModifier = resolveClientSpeedModifier(mountRef, mount, store);
+        if (!rider.isClientCameraApplied() || shouldUpdateCameraSpeed(rider, clientSpeedModifier)) {
             commandBuffer.run(bufferStore -> {
                 if (!riderRef.isValid() || !mountRef.isValid()) {
                     return;
                 }
                 TameworkRideRiderComponent currentRider = bufferStore.getComponent(riderRef, rideRiderComponentType);
                 TameworkRideMountComponent currentMount = bufferStore.getComponent(mountRef, rideMountComponentType);
-                if (currentRider == null || currentMount == null || currentRider.isClientCameraApplied()) {
+                if (currentRider == null || currentMount == null) {
                     return;
                 }
-                if (MountedRideClientAttachment.attach(bufferStore, riderRef, mountRef, currentMount)) {
+                double currentClientSpeedModifier = resolveClientSpeedModifier(mountRef, currentMount, bufferStore);
+                boolean updated = currentRider.isClientCameraApplied()
+                        ? MountedRideClientAttachment.updateCamera(bufferStore, riderRef, currentClientSpeedModifier)
+                        : MountedRideClientAttachment.attach(
+                                bufferStore,
+                                riderRef,
+                                mountRef,
+                                currentMount,
+                                currentClientSpeedModifier
+                        );
+                if (updated) {
                     currentRider.setClientCameraApplied(true);
+                    currentRider.setClientSpeedModifier(currentClientSpeedModifier);
                     bufferStore.putComponent(riderRef, rideRiderComponentType, currentRider);
                 }
             });
         }
-        player.moveTo(riderRef, riderX, riderY, riderZ, commandBuffer);
-        maybeLogDebug(riderTransform, mountTransform, mount);
+        MountedRideClientAttachment.placeRiderAtMountAnchor(commandBuffer, riderRef, mountRef, mount);
+        maybeLogDebug(riderTransform, mountTransform, mount, clientSpeedModifier);
     }
 
     @Nullable
@@ -137,9 +144,30 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
         }
     }
 
+    private boolean shouldUpdateCameraSpeed(@Nonnull TameworkRideRiderComponent rider, double speedModifier) {
+        double previous = rider.getClientSpeedModifier();
+        return previous <= 0.0 || Math.abs(previous - speedModifier) > 0.01;
+    }
+
+    private double resolveClientSpeedModifier(@Nonnull Ref<EntityStore> mountRef,
+                                              @Nonnull TameworkRideMountComponent mount,
+                                              @Nonnull Store<EntityStore> store) {
+        NPCEntity npc = store.getComponent(mountRef, NPCEntity.getComponentType());
+        Role role = npc == null ? null : npc.getRole();
+        MotionController active = role == null ? null : role.getActiveMotionController();
+        if (active instanceof MotionControllerTameworkFly fly) {
+            return fly.getMountedClientSpeed(mount.isRiderSprinting());
+        }
+        if (active instanceof MotionControllerTameworkRideWalk walk) {
+            return walk.getMountedClientSpeed(mount.isRiderSprinting());
+        }
+        return MountedRideClientAttachment.DEFAULT_RIDE_INPUT_SPEED_MODIFIER;
+    }
+
     private void maybeLogDebug(@Nonnull TransformComponent riderTransform,
                                @Nonnull TransformComponent mountTransform,
-                               @Nonnull TameworkRideMountComponent mount) {
+                               @Nonnull TameworkRideMountComponent mount,
+                               double clientSpeedModifier) {
         Tamework instance = Tamework.getInstance();
         if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
             return;
@@ -152,7 +180,7 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
         Vector3d riderPosition = riderTransform.getPosition();
         Vector3d mountPosition = mountTransform.getPosition();
         instance.getLogger().at(Level.INFO).log(
-                "TameworkRide debug: riderFollow riderPos=%s/%s/%s mountPos=%s/%s/%s anchor=%s/%s/%s",
+                "TameworkRide debug: riderFollow riderPos=%s/%s/%s mountPos=%s/%s/%s anchor=%s/%s/%s clientSpeed=%s",
                 riderPosition.x,
                 riderPosition.y,
                 riderPosition.z,
@@ -161,7 +189,8 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
                 mountPosition.z,
                 mount.getAnchorX(),
                 mount.getAnchorY(),
-                mount.getAnchorZ()
+                mount.getAnchorZ(),
+                clientSpeedModifier
         );
     }
 
