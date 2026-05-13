@@ -31,6 +31,9 @@ final class TwConfigEditorFieldPolicy {
             "passivebreeding.basis"
     );
     private static final Set<String> BREEDING_ROLE_COMPATIBILITY_PATHS = Set.of("pairing.rolecompatibility");
+    private static final Set<String> BREEDING_ROLE_INHERITANCE_MODE_PATHS = Set.of(
+            "offspringlifecycle.roleinheritance.mode"
+    );
     private static final Set<String> NEEDS_TIMER_BASIS_PATHS = Set.of("timing.basis");
     private static final Set<String> NEEDS_TICK_POLICY_MODE_PATHS = Set.of("tickpolicy.mode");
     private static final Set<String> NEEDS_DAMAGE_MODEL_PATHS = Set.of("damage.model");
@@ -217,7 +220,9 @@ final class TwConfigEditorFieldPolicy {
                     ? enumValues(TwBreedingConfig.TimerBasis.values(), TwBreedingConfig.TimerBasis::toConfigValue)
                     : breedingRoleCompatibilityPath(normalized)
                             ? enumValues(TwBreedingConfig.RoleCompatibility.values(), TwBreedingConfig.RoleCompatibility::toConfigValue)
-                            : List.of();
+                            : breedingRoleInheritanceModePath(normalized)
+                                    ? enumValues(TwBreedingConfig.RoleInheritanceMode.values(), TwBreedingConfig.RoleInheritanceMode::toConfigValue)
+                                    : List.of();
             case LEVELING, TALENT -> List.of();
             case NEEDS -> {
                 if (NEEDS_TIMER_BASIS_PATHS.contains(normalized)) {
@@ -288,6 +293,12 @@ final class TwConfigEditorFieldPolicy {
         return BREEDING_ROLE_COMPATIBILITY_PATHS.contains(normalizedPath)
                 || (normalizedPath.startsWith("roleoverrides.")
                 && normalizedPath.endsWith(".pairing.rolecompatibility"));
+    }
+
+    private static boolean breedingRoleInheritanceModePath(@Nonnull String normalizedPath) {
+        return BREEDING_ROLE_INHERITANCE_MODE_PATHS.contains(normalizedPath)
+                || (normalizedPath.startsWith("roleoverrides.")
+                && normalizedPath.endsWith(".offspringlifecycle.roleinheritance.mode"));
     }
 
     private static boolean shouldSuppressSchemaGroupRow(@Nonnull EditorFieldSpec schemaField,
