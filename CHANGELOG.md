@@ -2,10 +2,10 @@
 
 ## Unreleased
 
-## 2.10.0 - Ride Mounts, Role-Line Breeding, and Attachment Migrations - 2026-05-13
+## 2.10.0 - Flying Mounts (Beta), Role-Line Breeding, and Attachment Migrations - 2026-05-13
 
 ### Added
-- Added Tamework ride-mount support with dedicated mount/rider components, Tamework ride body motion, walk ride control, a beta custom flying mount controller, a custom ride camera, dismount cleanup, and wrapped client/mount/mouse input handling.
+- (beta) Added a custom mounted flight controller
 - Added role-line inheritance to `TwBreedingConfig` so offspring can inherit parent body/model variants, use weighted family lines, and optionally mutate into non-parent lines.
 - Added role-scoped `TwAttachmentMigrationConfig` assets so mods can backfill newly split attachment slots from legacy stored selections without overwriting already-randomized values.
 - Added a public Trait Effects API so integrations can register custom `TwTraitConfig` effect keys and execute them during Tamework's existing trait-effect resyncs.
@@ -13,10 +13,6 @@
 - Skipped breeding happiness thresholds for both manual and passive breeding when the happiness system or breeding happiness requirement is disabled.
 
 ### Fixed
-- Fixed Tamework ride flight cleanup, mouse-look capture, velocity intent, backward braking, vertical flight visuals, and custom-camera behavior so ride movement stays responsive without native mount identity.
-- Fixed attachment migration/load repair only running for tamed companions; untamed NPCs with matching attachment migrations now rebuild their visible attachments on load too.
-- Fixed migrated attachment values being persisted without forcing a visible model rebuild, which could leave legacy NPCs missing newly split attachment layers until they were picked up and respawned.
-- Fixed linked companion respawn/recovery applying pre-migration attachment snapshots before `TwAttachmentMigrationConfig` could fill newly split attachment slots.
 - Fixed Tamework-managed attachment sync restoring harvestable fur/wool visuals while a harvested NPC is still on cooldown.
 - Fixed linked companion panels showing generic base-species labels when a role-specific translation exists, such as body-type cat variants.
 
