@@ -730,13 +730,21 @@ final class BreedingOffspringService {
             return;
         }
         String baseRoleId = resolveBaseRoleId(context, parentARef, parentBRef, store);
+        String parentARoleId = firstNonBlank(context.parentARoleId(), resolveRoleId(parentARef, store));
+        String parentBRoleId = firstNonBlank(context.parentBRoleId(), resolveRoleId(parentBRef, store));
+        if (parentARoleId == null || parentARoleId.isBlank()) {
+            parentARoleId = baseRoleId;
+        }
         TwBreedingConfig childBreedingConfig = resolveBreedingConfig(context.breedingConfigId());
         BreedingOffspringSpawnService.ResolvedSpawnRole spawnRole = spawnService.resolveSpawnRole(
-                baseRoleId,
+                parentARoleId,
+                parentBRoleId,
                 childBreedingConfig,
                 context.parentARoleIndex(),
                 context.parentBRoleIndex(),
-                npcPlugin
+                npcPlugin,
+                Math.random(),
+                Math.random()
         );
         if (spawnRole == null) {
             logWarn(String.format(
@@ -809,11 +817,14 @@ final class BreedingOffspringService {
             BreedingOffspringSpawnService.ResolvedSpawnRole childSpawnRole = i == 0
                     ? spawnRole
                     : spawnService.resolveSpawnRole(
-                            baseRoleId,
+                            parentARoleId,
+                            parentBRoleId,
                             childBreedingConfig,
                             context.parentARoleIndex(),
                             context.parentBRoleIndex(),
-                            npcPlugin
+                            npcPlugin,
+                            Math.random(),
+                            Math.random()
                     );
             if (childSpawnRole == null) {
                 logWarn(String.format(
@@ -927,6 +938,14 @@ final class BreedingOffspringService {
             return fromStore;
         }
         return resolveRoleId(parentBRef, store);
+    }
+
+    @Nullable
+    private static String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second != null && !second.isBlank() ? second : null;
     }
 
     @Nullable

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Tests role-scoped MaxNearbySameType resolution on breeding pairing settings. */
@@ -49,6 +50,22 @@ class TwBreedingConfigPairingSettingsTest {
     }
 
     @Test
+    void roleInheritanceModeParsesConfigValues() {
+        assertEquals(
+                TwBreedingConfig.RoleInheritanceMode.PARENT_LINE,
+                TwBreedingConfig.RoleInheritanceMode.fromConfigValue("ParentLine", null)
+        );
+        assertEquals(
+                TwBreedingConfig.RoleInheritanceMode.PARENT_LINE,
+                TwBreedingConfig.RoleInheritanceMode.fromConfigValue("parent_line", null)
+        );
+        assertEquals(
+                TwBreedingConfig.RoleInheritanceMode.FAMILY_WEIGHTED,
+                TwBreedingConfig.RoleInheritanceMode.fromConfigValue("FamilyWeighted", null)
+        );
+    }
+
+    @Test
     void familyMatchesWeightedAdultRolesAndPreservesLegacyAdultFallback() throws Exception {
         TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
         setField(family, "adultRoleId", "Legacy_Deer");
@@ -68,6 +85,25 @@ class TwBreedingConfigPairingSettingsTest {
         setField(legacyFamily, "adultRoleId", "Legacy_Deer");
         assertEquals("Legacy_Deer", legacyFamily.getAdultRoleId());
         assertTrue(legacyFamily.matchesAdultRole("legacy_deer"));
+    }
+
+    @Test
+    void familyLinesMatchVariantRolesAndCreateLineSpecificFamily() throws Exception {
+        TwBreedingConfig.RoleFamily family = new TwBreedingConfig.RoleFamily();
+        TwBreedingConfig.RoleLine standard = roleLine("Standard", "Cat_Pet", "Kitten_Pet");
+        TwBreedingConfig.RoleLine longhair = roleLine("Longhair", "Cat_Longhair_Pet", "Kitten_Longhair_Pet");
+        setField(family, "id", "Cat");
+        setField(family, "lines", new TwBreedingConfig.RoleLine[] { standard, longhair });
+
+        TwBreedingConfig.RoleFamily selected = family.resolveLineFamilyForRole("mods:Cat_Longhair_Pet");
+
+        assertTrue(family.matchesAdultRole("cat_pet"));
+        assertTrue(family.matchesRole("Kitten_Longhair_Pet"));
+        assertNotNull(selected);
+        assertEquals("Cat", selected.getId());
+        assertEquals("Longhair", selected.getSelectedLineId());
+        assertEquals("Cat_Longhair_Pet", selected.getAdultRoleId());
+        assertEquals("Kitten_Longhair_Pet", selected.getBabyRoleId());
     }
 
     @Test
@@ -124,5 +160,14 @@ class TwBreedingConfigPairingSettingsTest {
         setField(choice, "roleId", roleId);
         setField(choice, "weight", weight);
         return choice;
+    }
+
+    private static TwBreedingConfig.RoleLine roleLine(String id, String adultRoleId, String babyRoleId)
+            throws Exception {
+        TwBreedingConfig.RoleLine line = new TwBreedingConfig.RoleLine();
+        setField(line, "id", id);
+        setField(line, "adultRoleId", adultRoleId);
+        setField(line, "babyRoleId", babyRoleId);
+        return line;
     }
 }
