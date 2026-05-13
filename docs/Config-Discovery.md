@@ -13,6 +13,7 @@ This document explains where Tamework config assets live and how each family res
 - `TwHappinessConfig`: `<ModRoot>/Server/Tamework/Happiness/*.json`
 - `TwNeedsConfig`: `<ModRoot>/Server/Tamework/Needs/*.json`
 - `TwBreedingConfig`: `<ModRoot>/Server/Tamework/Breeding/*.json`
+- `TwAttachmentMigrationConfig`: `<ModRoot>/Server/Tamework/AttachmentMigrations/*.json`
 - `TwTraitConfig`: `<ModRoot>/Server/Tamework/Traits/*.json`
 - `TwCoopConfig`: `<ModRoot>/Server/Tamework/Items/Coops/*.json`
 
@@ -27,6 +28,7 @@ Resolved by role id + `Priority`:
 - `TwHappinessConfig`
 - `TwNeedsConfig`
 - `TwBreedingConfig`
+- `TwAttachmentMigrationConfig`
 - `TwTraitConfig`
 
 ### Item-scoped families

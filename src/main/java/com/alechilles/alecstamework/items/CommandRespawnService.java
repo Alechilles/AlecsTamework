@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.metrics.TameworkTelemetryEvents;
@@ -15,6 +16,7 @@ import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTraitsComponent;
+import com.alechilles.alecstamework.npc.progression.CompanionAttachmentMigrationService;
 import com.alechilles.alecstamework.npc.progression.CompanionHealthStateService;
 import com.alechilles.alecstamework.npc.progression.CompanionModelAttachmentService;
 import com.alechilles.alecstamework.npc.progression.CompanionLifeStageService;
@@ -41,6 +43,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.EntitySupport;
 import it.unimi.dsi.fastutil.Pair;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -269,6 +272,15 @@ final class CommandRespawnService {
         }
         Map<String, String> attachmentSelections =
                 CommandLinkedNpcDeathService.decodeAttachmentSelections(snapshot.attachmentsValues());
+        if (attachmentSelections.isEmpty()) {
+            return;
+        }
+        Map<String, Set<String>> attachmentOptions = CompanionModelAttachmentService.resolveAttachmentOptionIds(
+                CompanionModelAttachmentService.resolveModelAsset(spawnedRef, store)
+        );
+        String roleId = firstNonBlank(snapshot.roleId(), CompanionRoleIdResolver.resolveRoleId(spawnedRef, store));
+        TwAttachmentMigrationConfig migrationConfig = TwAttachmentMigrationConfig.resolveForRole(roleId);
+        attachmentSelections = resolveRespawnAttachmentSelections(migrationConfig, attachmentSelections, attachmentOptions);
         if (!attachmentSelections.isEmpty()) {
             CompanionModelAttachmentService.applyAttachments(spawnedRef, spawnedNpc, store, attachmentSelections);
         }
@@ -282,6 +294,25 @@ final class CommandRespawnService {
                 attachmentsType,
                 new TameworkAttachmentsComponent(snapshot.attachmentsConfigId(), attachmentSelections)
         );
+    }
+
+    static Map<String, String> resolveRespawnAttachmentSelections(
+            @Nullable TwAttachmentMigrationConfig migrationConfig,
+            @Nullable Map<String, String> snapshotSelections,
+            @Nullable Map<String, Set<String>> attachmentOptions) {
+        Map<String, String> filtered = CompanionModelAttachmentService.filterAttachmentSelections(
+                snapshotSelections,
+                attachmentOptions
+        );
+        if (filtered.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> migrated = CompanionAttachmentMigrationService.applyConfiguredMigrations(
+                migrationConfig,
+                filtered,
+                attachmentOptions
+        );
+        return CompanionModelAttachmentService.filterAttachmentSelections(migrated, attachmentOptions);
     }
 
     private void applyRespawnHappinessState(Ref<EntityStore> spawnedRef,
@@ -511,6 +542,17 @@ final class CommandRespawnService {
         }
         TameworkHappinessComponent happiness = store.getComponent(spawnedRef, type);
         return happiness != null ? happiness.getLastUpdateMs() : 0L;
+    }
+
+    @Nullable
+    private String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 
     private void applyRespawnFollowBootstrap(Ref<EntityStore> npcRef,

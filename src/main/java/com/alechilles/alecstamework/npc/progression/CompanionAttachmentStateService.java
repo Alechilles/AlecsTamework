@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.npc.progression;
 
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.npc.components.TameworkAttachmentsComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
@@ -20,6 +21,17 @@ public final class CompanionAttachmentStateService {
 
     public static void seedStoredAttachments(@Nullable Ref<EntityStore> npcRef,
                                              @Nullable Store<EntityStore> store) {
+        seedStoredAttachments(npcRef, store, false);
+    }
+
+    public static void seedStoredAttachmentsOnLoad(@Nullable Ref<EntityStore> npcRef,
+                                                   @Nullable Store<EntityStore> store) {
+        seedStoredAttachments(npcRef, store, true);
+    }
+
+    private static void seedStoredAttachments(@Nullable Ref<EntityStore> npcRef,
+                                              @Nullable Store<EntityStore> store,
+                                              boolean forceApplyPersistedSelections) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return;
         }
@@ -29,18 +41,31 @@ public final class CompanionAttachmentStateService {
         }
         TameworkAttachmentsComponent persisted = store.getComponent(npcRef, type);
         if (persisted != null && !persisted.getAttachmentIds().isEmpty()) {
+            Map<String, String> expected = resolveSupportedSelections(npcRef, store, persisted.getAttachmentIds());
+            if (expected.isEmpty()) {
+                return;
+            }
+            boolean persistedChanged = !expected.equals(persisted.getAttachmentIds());
+            if (persistedChanged) {
+                persistAttachments(npcRef, store, type, persisted.getConfigId(), expected);
+            }
+            Map<String, String> current = CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
+            if (forceApplyPersistedSelections
+                    || shouldApplyResolvedSelections(persistedChanged, expected, current)) {
+                applyResolvedSelections(npcRef, store, expected);
+            }
             return;
         }
 
+        Map<String, String> rawCurrent = CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
         Map<String, String> current = resolveCurrentSupportedSelections(npcRef, store);
         if (current.isEmpty()) {
             return;
         }
-        store.putComponent(
-                npcRef,
-                type,
-                new TameworkAttachmentsComponent(persisted != null ? persisted.getConfigId() : null, current)
-        );
+        persistAttachments(npcRef, store, type, persisted != null ? persisted.getConfigId() : null, current);
+        if (!current.equals(rawCurrent)) {
+            applyResolvedSelections(npcRef, store, current);
+        }
     }
 
     public static void replaceStoredAttachmentsWithCurrent(@Nullable Ref<EntityStore> npcRef,
@@ -61,11 +86,8 @@ public final class CompanionAttachmentStateService {
         if (persisted != null && current.equals(persisted.getAttachmentIds())) {
             return;
         }
-        store.putComponent(
-                npcRef,
-                type,
-                new TameworkAttachmentsComponent(persisted != null ? persisted.getConfigId() : null, current)
-        );
+        persistAttachments(npcRef, store, type, persisted != null ? persisted.getConfigId() : null, current);
+        applyResolvedSelections(npcRef, store, current);
     }
 
     public static void syncStoredAttachments(@Nullable Ref<EntityStore> npcRef,
@@ -86,12 +108,24 @@ public final class CompanionAttachmentStateService {
         if (expected.isEmpty()) {
             return;
         }
+        boolean persistedChanged = !expected.equals(persisted.getAttachmentIds());
+        if (persistedChanged) {
+            persistAttachments(npcRef, store, type, persisted.getConfigId(), expected);
+        }
         Map<String, String> current = CompanionModelAttachmentService.resolveCurrentAttachments(npcRef, store);
-        if (current.equals(expected)) {
+        if (!shouldApplyResolvedSelections(persistedChanged, expected, current)) {
             return;
         }
-        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
-        CompanionModelAttachmentService.applyAttachments(npcRef, npc, store, expected);
+        applyResolvedSelections(npcRef, store, expected);
+    }
+
+    static boolean shouldApplyResolvedSelections(boolean persistedChanged,
+                                                 @Nullable Map<String, String> expected,
+                                                 @Nullable Map<String, String> current) {
+        if (expected == null || expected.isEmpty()) {
+            return false;
+        }
+        return persistedChanged || current == null || !expected.equals(current);
     }
 
     @Nonnull
@@ -114,6 +148,29 @@ public final class CompanionAttachmentStateService {
         if (attachmentOptions.isEmpty()) {
             return Map.of();
         }
-        return CompanionModelAttachmentService.filterAttachmentSelections(selections, attachmentOptions);
+        Map<String, String> filtered = CompanionModelAttachmentService.filterAttachmentSelections(selections, attachmentOptions);
+        String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
+        TwAttachmentMigrationConfig migrationConfig = TwAttachmentMigrationConfig.resolveForRole(roleId);
+        Map<String, String> migrated = CompanionAttachmentMigrationService.applyConfiguredMigrations(
+                migrationConfig,
+                filtered,
+                attachmentOptions
+        );
+        return CompanionModelAttachmentService.filterAttachmentSelections(migrated, attachmentOptions);
+    }
+
+    private static void persistAttachments(@Nonnull Ref<EntityStore> npcRef,
+                                           @Nonnull Store<EntityStore> store,
+                                           @Nonnull ComponentType<EntityStore, TameworkAttachmentsComponent> type,
+                                           @Nullable String configId,
+                                           @Nonnull Map<String, String> attachments) {
+        store.putComponent(npcRef, type, new TameworkAttachmentsComponent(configId, attachments));
+    }
+
+    private static void applyResolvedSelections(@Nonnull Ref<EntityStore> npcRef,
+                                                @Nonnull Store<EntityStore> store,
+                                                @Nonnull Map<String, String> attachments) {
+        NPCEntity npc = store.getComponent(npcRef, NPCEntity.getComponentType());
+        CompanionModelAttachmentService.applyAttachments(npcRef, npc, store, attachments);
     }
 }

@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -222,6 +223,7 @@ public class Tamework extends JavaPlugin {
     private boolean happinessAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
+    private boolean attachmentMigrationAssetsRegistered;
     private boolean levelingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private boolean talentAssetsRegistered;
@@ -390,6 +392,7 @@ public class Tamework extends JavaPlugin {
         registerHappinessAssets();
         registerNeedsAssets();
         registerBreedingAssets();
+        registerAttachmentMigrationAssets();
         registerLevelingAssets();
         registerTraitAssets();
         registerTalentAssets();
@@ -1575,6 +1578,30 @@ public class Tamework extends JavaPlugin {
         breedingAssetsRegistered = true;
     }
 
+    private void registerAttachmentMigrationAssets() {
+        if (attachmentMigrationAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwAttachmentMigrationConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/AttachmentMigrations")
+                        .setCodec(TwAttachmentMigrationConfig.CODEC)
+                        .setKeyFunction(TwAttachmentMigrationConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwAttachmentMigrationConfig.class,
+                this::onAttachmentMigrationAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwAttachmentMigrationConfig.class,
+                this::onAttachmentMigrationAssetsRemoved
+        );
+        attachmentMigrationAssetsRegistered = true;
+    }
+
     private void registerLevelingAssets() {
         if (levelingAssetsRegistered) {
             return;
@@ -1869,6 +1896,20 @@ public class Tamework extends JavaPlugin {
         TwBreedingConfig.clearRoleCache();
         CompanionHappinessModifierService.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
+    }
+
+    private void onAttachmentMigrationAssetsLoaded(
+            LoadedAssetsEvent<String, TwAttachmentMigrationConfig, DefaultAssetMap<String, TwAttachmentMigrationConfig>> event) {
+        TwAttachmentMigrationConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_MIGRATION, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onAttachmentMigrationAssetsRemoved(
+            RemovedAssetsEvent<String, TwAttachmentMigrationConfig, DefaultAssetMap<String, TwAttachmentMigrationConfig>> event) {
+        TwAttachmentMigrationConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_MIGRATION, event.getRemovedAssets());
     }
 
     private void onLevelingAssetsLoaded(

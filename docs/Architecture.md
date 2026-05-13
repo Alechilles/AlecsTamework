@@ -11,7 +11,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - NPC action/sensor/filter builder registration (`TameworkNpcBuilderRegistrar`)
 - Optimized interaction pipeline (`TwInteractionConfig` + `TameworkInteract`)
 - Hook bridge (`TriggerNpcHook` + `TameworkHook`)
-- Companion progression (`TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, `TwTraitConfig`, lifecycle/attachment sync)
+- Companion progression (`TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, `TwTraitConfig`, lifecycle/attachment sync, attachment migrations)
 - Role-scoped companion policy (`TwCompanionConfig`) with global fallback
 - Spawner item runtime (`TwSpawnerConfig` + `TameworkSpawn` + spawner services)
 - Naming item runtime (`TwNameItemConfig` + `TameworkNameNpc` + naming services)

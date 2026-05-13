@@ -57,6 +57,10 @@ public final class CompanionAttachmentSyncSystem extends TickingSystem<EntitySto
             if (ref == null || !ref.isValid()) {
                 continue;
             }
+            NPCEntity npc = store.getComponent(ref, npcType);
+            if (CompanionAttachmentSyncGuards.shouldDeferForHarvestCooldown(npc, store)) {
+                continue;
+            }
             CompanionAttachmentStateService.syncStoredAttachments(ref, store);
         }
     }

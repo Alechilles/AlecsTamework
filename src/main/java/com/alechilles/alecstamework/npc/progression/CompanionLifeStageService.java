@@ -154,6 +154,17 @@ public final class CompanionLifeStageService {
         return spawnedRoleId;
     }
 
+    @Nullable
+    private static TwBreedingConfig.RoleFamily resolveLifecycleFamilyForProgression(
+            @Nullable TwBreedingConfig config,
+            @Nullable String roleId) {
+        if (config == null || roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        TwBreedingConfig.RoleFamily lineFamily = config.resolveLifecycleLineFamilyForRole(roleId);
+        return lineFamily != null ? lineFamily : config.resolveLifecycleFamilyForRole(roleId);
+    }
+
     private static TameworkLifeStageComponent createInitialLifeStageComponent(Ref<EntityStore> npcRef,
                                                                               Store<EntityStore> store,
                                                                               @Nullable String roleId) {
@@ -167,7 +178,7 @@ public final class CompanionLifeStageService {
                 TwBreedingConfig.OffspringLifecycleSettings lifecycleSettings =
                         config.resolveOffspringLifecycle(roleId);
                 if (lifecycleSettings != null && lifecycleSettings.isEnabled()) {
-                    family = config.resolveLifecycleFamilyForRole(roleId);
+                    family = resolveLifecycleFamilyForProgression(config, roleId);
                     if (family != null && family.getAdultRoleId() != null && !family.getAdultRoleId().isBlank()) {
                         adultRoleId = family.matchesAdultRole(roleId) ? roleId : family.getAdultRoleId();
                     }
@@ -522,7 +533,7 @@ public final class CompanionLifeStageService {
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
         if (roleId != null && !roleId.isBlank()) {
             TwBreedingConfig config = TwBreedingConfig.resolveForRole(roleId);
-            TwBreedingConfig.RoleFamily family = config != null ? config.resolveLifecycleFamilyForRole(roleId) : null;
+            TwBreedingConfig.RoleFamily family = resolveLifecycleFamilyForProgression(config, roleId);
             if (family != null) {
                 if ((component.getAdultRoleId() == null || component.getAdultRoleId().isBlank())
                         && family.getAdultRoleId() != null
@@ -731,10 +742,10 @@ public final class CompanionLifeStageService {
             if (lifecycle == null || !lifecycle.isEnabled()) {
                 return false;
             }
-            TwBreedingConfig.RoleFamily family = config.resolveLifecycleFamilyForRole(currentRoleId);
+            TwBreedingConfig.RoleFamily family = resolveLifecycleFamilyForProgression(config, currentRoleId);
             targetRoleId = resolveTargetRoleIdForStage(stage, lifeStage, family);
             if (targetRoleId == null || targetRoleId.isBlank()) {
-                family = config.resolveLifecycleFamilyForRole(resolveRoleIdFromIndex(npc));
+                family = resolveLifecycleFamilyForProgression(config, resolveRoleIdFromIndex(npc));
                 targetRoleId = resolveTargetRoleIdForStage(stage, lifeStage, family);
             }
         }
@@ -817,7 +828,7 @@ public final class CompanionLifeStageService {
                 : null;
         TwBreedingConfig.RoleFamily family = preResolvedFamily;
         if (family == null && breedingConfig != null && spawnedRoleId != null && !spawnedRoleId.isBlank()) {
-            family = breedingConfig.resolveLifecycleFamilyForRole(spawnedRoleId);
+            family = resolveLifecycleFamilyForProgression(breedingConfig, spawnedRoleId);
         }
 
         boolean lifecycleEnabled = lifecycle != null && lifecycle.isEnabled();

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.ui;
 
 import com.alechilles.alecstamework.config.overrides.TwConfigAssetDescriptor;
 import com.alechilles.alecstamework.config.overrides.TwConfigFamily;
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -144,6 +145,7 @@ final class TwConfigSchemaAdapter {
             case HAPPINESS -> TwHappinessConfig.CODEC;
             case NEEDS -> TwNeedsConfig.CODEC;
             case BREEDING -> TwBreedingConfig.CODEC;
+            case ATTACHMENT_MIGRATION -> TwAttachmentMigrationConfig.CODEC;
             case LEVELING -> TwLevelingConfig.CODEC;
             case TRAIT -> TwTraitConfig.CODEC;
             case TALENT -> TwTalentConfig.CODEC;

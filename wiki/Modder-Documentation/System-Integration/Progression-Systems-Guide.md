@@ -16,6 +16,7 @@ This guide explains how the progression families fit together and how to roll th
 - [TwHappinessConfig Reference](/mod/alecs-tamework/twhappinessconfig-reference): mood baseline, convergence, and modifiers
 - [TwNeedsConfig Reference](/mod/alecs-tamework/twneedsconfig-reference): hunger and thirst
 - [TwBreedingConfig Reference](/mod/alecs-tamework/twbreedingconfig-reference): breeding readiness, cooldowns, inheritance, and lifecycle
+- [TwAttachmentMigrationConfig Reference](/mod/alecs-tamework/twattachmentmigrationconfig-reference): deterministic upgrades for newly split model attachment slots
 - [TwTraitConfig Reference](/mod/alecs-tamework/twtraitconfig-reference): trait pools and inherited stat variation
 
 ## Recommended Rollout Order
