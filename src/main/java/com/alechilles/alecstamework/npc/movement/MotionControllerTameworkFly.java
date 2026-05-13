@@ -49,6 +49,9 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     private double lastTargetVelocityZ;
     private float lastTargetYaw;
     private float lastTargetPitch;
+    private float lastVisualPitch;
+    private final RiddenBackwardBrake.State riddenBackwardBrakeState = new RiddenBackwardBrake.State();
+    private boolean lastRiddenBackwardBraking;
     private String lastFlightMovementAnimation = NO_FORCED_MOVEMENT_ANIMATION;
 
     public MotionControllerTameworkFly(@Nonnull BuilderSupport builderSupport,
@@ -121,18 +124,28 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         float targetYaw = steering.hasYawOrDirection() ? steering.getYawOrDirection() : getYaw();
         float targetPitch = steering.hasPitchOrDirection() ? steering.getPitchOrDirection() : getPitch();
         targetPitch = clamp(targetPitch, -maxSinkAngle, maxClimbAngle);
-        lastTargetYaw = targetYaw;
-        lastTargetPitch = targetPitch;
+        targetPitch = TameworkFlyVisualState.limitPitch(targetPitch);
 
         translation.assign(steering.getTranslation());
-        lastInputX = translation.x;
-        lastInputY = translation.y;
-        lastInputZ = translation.z;
         TameworkRideMountComponent ride = rideMount(ref, componentAccessor);
         lastRiderSprinting = ride != null && ride.isRiderSprinting();
         lastRidden = ride != null;
+        if (lastRidden && onGround() && translation.y < 0.0) {
+            translation.y = 0.0;
+        }
+        if (lastRidden) {
+            targetYaw = approachAngle(getYaw(), targetYaw, maxTurnSpeed * (float) dt);
+            resolveRiddenTranslation(ride, targetYaw, targetPitch, translation);
+        }
+        lastTargetYaw = targetYaw;
+        lastTargetPitch = targetPitch;
+        lastInputX = translation.x;
+        lastInputY = translation.y;
+        lastInputZ = translation.z;
         double inputLength = steering.hasTranslation() ? translation.length() : 0.0;
-        if (inputLength <= INPUT_DEAD_ZONE) {
+        boolean brakingFromBackwardInput = hasBackwardInput(ride);
+        if (inputLength <= INPUT_DEAD_ZONE && !brakingFromBackwardInput) {
+            resetRiddenBackwardBrake();
             captureActiveLimits();
             setMotionKind(onGround() ? MotionKind.STANDING : MotionKind.FLYING);
             lastVelocity.assign(0.0);
@@ -141,9 +154,11 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
             lastTargetVelocityX = 0.0;
             lastTargetVelocityY = 0.0;
             lastTargetVelocityZ = 0.0;
-            lastRoll = approach(lastRoll, 0.0f, (float) (maxRollSpeed * dt));
+            lastVisualPitch = TameworkFlyVisualState.approachVisualAngle(lastVisualPitch, 0.0f, dt);
+            lastTargetPitch = lastVisualPitch;
+            lastRoll = approach(lastRoll, 0.0f, rollStep(dt));
             steering.setYaw(targetYaw);
-            steering.setPitch(targetPitch);
+            steering.setPitch(lastVisualPitch);
             steering.setRoll(lastRoll);
             return dt;
         }
@@ -158,7 +173,11 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                 translation.y * (translation.y >= 0.0 ? lastClimbSpeedLimit : lastSinkSpeedLimit),
                 translation.z * lastHorizontalSpeedLimit * horizontalSpeedMultiplier
         );
-        if (!lastRidden) {
+        if (lastRidden) {
+            RiddenBackwardBrake.apply(targetVelocity, lastVelocity, riddenBackwardBrakeState, brakingFromBackwardInput, dt);
+            lastRiddenBackwardBraking = riddenBackwardBrakeState.isBraking();
+        } else {
+            resetRiddenBackwardBrake();
             targetVelocity.scale(effectHorizontalSpeedMultiplier);
         }
         lastTargetVelocityX = targetVelocity.x;
@@ -169,16 +188,22 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         approachVelocity(targetVelocity, maxDelta);
         lastSpeed = lastVelocity.length();
 
-        if (lastVelocity.y > INPUT_DEAD_ZONE) {
+        boolean verticalDominantFlight = TameworkFlyVisualState.isVerticalDominantFlight(lastVelocity);
+        if (verticalDominantFlight) {
+            setMotionKind(MotionKind.FLYING);
+        } else if (lastVelocity.y > INPUT_DEAD_ZONE) {
             setMotionKind(MotionKind.ASCENDING);
         } else if (lastVelocity.y < -INPUT_DEAD_ZONE) {
             setMotionKind(MotionKind.DESCENDING);
         }
 
         double strafeRoll = computeStrafeRoll(steering.getTranslation(), targetYaw, targetSpeed);
-        lastRoll = approach(lastRoll, (float) strafeRoll, (float) (maxRollSpeed * dt));
+        lastRoll = approach(lastRoll, (float) strafeRoll, rollStep(dt));
+        float visualPitch = TameworkFlyVisualState.resolveVisualPitch(targetPitch, lastVelocity);
+        lastVisualPitch = TameworkFlyVisualState.approachVisualAngle(lastVisualPitch, visualPitch, dt);
+        lastTargetPitch = lastVisualPitch;
         steering.setYaw(targetYaw);
-        steering.setPitch(targetPitch);
+        steering.setPitch(lastVisualPitch);
         steering.setRoll(lastRoll);
 
         translation.assign(lastVelocity);
@@ -211,7 +236,11 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         }
 
         TameworkRideMountComponent ride = rideMount(ref, componentAccessor);
-        boolean horizontalIdle = TameworkFlyAnimationState.resolveHorizontalIdle(ride, horizontalSpeed());
+        boolean horizontalIdle = TameworkFlyAnimationState.resolveHorizontalIdle(
+                ride,
+                horizontalSpeed(),
+                TameworkFlyVisualState.isVerticalDominantFlight(lastVelocity)
+        );
         boolean fast = TameworkFlyAnimationState.resolveFast(ride, horizontalIdle);
         updateFlyingStates(movementStates, horizontalIdle, fast);
         clearGroundMovementStates(movementStates);
@@ -326,6 +355,20 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         lastVelocity.addScaled(delta, maxDelta / deltaLength);
     }
 
+    private void resetRiddenBackwardBrake() {
+        riddenBackwardBrakeState.reset();
+        lastRiddenBackwardBraking = false;
+    }
+
+    private boolean hasBackwardInput(TameworkRideMountComponent ride) {
+        return ride != null && ride.isRiderBackwardBrakeInput();
+    }
+
+    private float rollStep(double dt) {
+        double speed = maxRollAngle > 0.0f ? Math.min(maxRollSpeed, maxRollAngle) : maxRollSpeed;
+        return (float) Math.max(0.0, speed * dt);
+    }
+
     private double computeStrafeRoll(@Nonnull Vector3d input, float yaw, double targetSpeed) {
         if (targetSpeed <= INPUT_DEAD_ZONE) {
             return 0.0;
@@ -336,11 +379,56 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         return -maxRollAngle * strafe;
     }
 
+    static void resolveRiddenTranslation(@Nonnull TameworkRideMountComponent ride,
+                                         float yaw,
+                                         float pitch,
+                                         @Nonnull Vector3d translation) {
+        if (!ride.hasWishMovement()) {
+            return;
+        }
+        double strafe = ride.getWishX();
+        double forwardAmount = ride.getWishZ();
+        double vertical = translation.y;
+        float movementPitch = forwardAmount > INPUT_DEAD_ZONE ? pitch : 0.0f;
+        double cosPitch = Math.cos(movementPitch);
+        double forwardX = -Math.sin(yaw) * cosPitch;
+        double forwardZ = -Math.cos(yaw) * cosPitch;
+        double rightX = -Math.sin(yaw - Math.PI / 2.0);
+        double rightZ = -Math.cos(yaw - Math.PI / 2.0);
+        translation.assign(
+                forwardX * forwardAmount + rightX * strafe,
+                vertical,
+                forwardZ * forwardAmount + rightZ * strafe
+        );
+        double length = translation.length();
+        if (length > 1.0) {
+            translation.scale(1.0 / length);
+        }
+    }
+
     private static float approach(float value, float target, float maxDelta) {
         if (Math.abs(target - value) <= maxDelta) {
             return target;
         }
         return value + Math.copySign(maxDelta, target - value);
+    }
+
+    static float approachAngle(float value, float target, float maxDelta) {
+        float delta = normalizeAngle(target - value);
+        if (Math.abs(delta) <= maxDelta) {
+            return normalizeAngle(target);
+        }
+        return normalizeAngle(value + Math.copySign(maxDelta, delta));
+    }
+
+    private static float normalizeAngle(float angle) {
+        while (angle <= -Math.PI) {
+            angle += Math.PI * 2.0f;
+        }
+        while (angle > Math.PI) {
+            angle -= Math.PI * 2.0f;
+        }
+        return angle;
     }
 
     private static float clamp(float value, float min, float max) {
@@ -365,7 +453,8 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                 "TameworkFly debug: flyController pos=%s/%s/%s requestedMove=%s/%s/%s lastVelocity=%s/%s/%s " +
                         "targetVelocity=%s/%s/%s input=%s/%s/%s yaw=%s pitch=%s onGround=%s inWater=%s " +
                         "motionKind=%s remaining=%s ridden=%s sprinting=%s horizontalLimit=%s climbLimit=%s " +
-                        "sinkLimit=%s acceleration=%s deceleration=%s effectHorizontalSpeedMultiplier=%s movementAnimation=%s",
+                        "sinkLimit=%s acceleration=%s deceleration=%s backwardAirbrake=%s effectHorizontalSpeedMultiplier=%s " +
+                        "movementAnimation=%s",
                 position.x,
                 position.y,
                 position.z,
@@ -394,6 +483,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
                 lastSinkSpeedLimit,
                 lastAccelerationRate,
                 lastDecelerationRate,
+                lastRiddenBackwardBraking,
                 effectHorizontalSpeedMultiplier,
                 lastFlightMovementAnimation
         );

@@ -90,10 +90,42 @@ class TameworkRideMountComponentTest {
     }
 
     @Test
+    void clearWishMovementOnlyClearsTranslationIntent() {
+        TameworkRideMountComponent component = new TameworkRideMountComponent();
+        component.captureWishMovement(1.0, 2.0, 3.0, true);
+        component.captureHeadRotation(4.0f, 5.0f, 6.0f);
+
+        component.clearWishMovement();
+
+        assertFalse(component.hasWishMovement());
+        assertEquals(0.0, component.getWishX(), 0.0);
+        assertEquals(0.0, component.getWishY(), 0.0);
+        assertEquals(0.0, component.getWishZ(), 0.0);
+        assertFalse(component.isRiderBackwardBrakeInput());
+        assertTrue(component.hasHeadRotation());
+        assertEquals(4.0f, component.getHeadYaw(), 0.0001f);
+    }
+
+    @Test
+    void explicitBackwardWishInputIsTrackedSeparatelyFromProjectedMovement() {
+        TameworkRideMountComponent component = new TameworkRideMountComponent();
+
+        component.captureWishMovement(0.0, 0.0, -1.0);
+        assertFalse(component.isRiderBackwardBrakeInput());
+
+        component.captureWishMovement(0.0, 0.0, -1.0, true);
+        assertTrue(component.isRiderBackwardBrakeInput());
+
+        component.captureWishMovement(0.0, 0.0, -1.0, false);
+        assertFalse(component.isRiderBackwardBrakeInput());
+    }
+
+    @Test
     void clearInputSnapshotResetsCapturedInputOnly() {
         TameworkRideMountComponent component = new TameworkRideMountComponent();
         component.setLastInputAtMs(123456789L);
         component.setGroundedCrouchTicks(3);
+        component.setGroundedCrouchDismountArmed(true);
         component.captureWishMovement(1.0, 2.0, 3.0);
         component.captureBodyRotation(4.0f, 5.0f, 6.0f);
         component.captureHeadRotation(7.0f, 8.0f, 9.0f);
@@ -118,6 +150,7 @@ class TameworkRideMountComponentTest {
         assertFalse(component.isRiderFlying());
         assertFalse(component.isRiderSprinting());
         assertEquals(0, component.getGroundedCrouchTicks());
+        assertFalse(component.isGroundedCrouchDismountArmed());
         assertEquals(0L, component.getLastInputAtMs());
         assertFalse(component.hasAuthoritativePose());
     }
@@ -127,6 +160,7 @@ class TameworkRideMountComponentTest {
         TameworkRideMountComponent component = new TameworkRideMountComponent();
         component.setLastInputAtMs(123456789L);
         component.setGroundedCrouchTicks(3);
+        component.setGroundedCrouchDismountArmed(true);
         component.setDismountRequested(true);
         component.captureWishMovement(1.0, 2.0, 3.0);
         component.captureBodyRotation(4.0f, 5.0f, 6.0f);
@@ -152,6 +186,7 @@ class TameworkRideMountComponentTest {
         assertTrue(component.isRiderFlying());
         assertTrue(component.isRiderSprinting());
         assertEquals(3, component.getGroundedCrouchTicks());
+        assertTrue(component.isGroundedCrouchDismountArmed());
         assertTrue(component.isDismountRequested());
         assertEquals(123456789L, component.getLastInputAtMs());
         assertTrue(component.hasAuthoritativePose());
@@ -192,6 +227,7 @@ class TameworkRideMountComponentTest {
         component.setMountStartMs(111L);
         component.setLastInputAtMs(222L);
         component.setGroundedCrouchTicks(5);
+        component.setGroundedCrouchDismountArmed(true);
         component.setDismountRequested(true);
         MovementStates states = new MovementStates();
         states.jumping = true;
@@ -216,6 +252,7 @@ class TameworkRideMountComponentTest {
         assertEquals(111L, cloned.getMountStartMs());
         assertEquals(222L, cloned.getLastInputAtMs());
         assertEquals(5, cloned.getGroundedCrouchTicks());
+        assertTrue(cloned.isGroundedCrouchDismountArmed());
         assertTrue(cloned.isDismountRequested());
         assertEquals(1.25, cloned.getWishX(), 0.0001);
         assertEquals(10.0f, cloned.getBodyYaw(), 0.0001f);

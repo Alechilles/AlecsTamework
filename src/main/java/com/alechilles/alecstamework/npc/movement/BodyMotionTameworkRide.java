@@ -27,7 +27,7 @@ import javax.annotation.Nullable;
  */
 public final class BodyMotionTameworkRide extends BodyMotionBase {
     private static final double INPUT_DEAD_ZONE = 0.025;
-    private static final int GROUNDED_CROUCH_DISMOUNT_TICKS = 12;
+    private static final double GROUNDED_FLIGHT_ASSIST = 0.35;
     private long lastDebugMs;
 
     public BodyMotionTameworkRide(@Nonnull BuilderBodyMotionBase builderMotionBase) {
@@ -70,6 +70,7 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
 
         float yaw = resolveYaw(ref, ride, componentAccessor);
         Vector3d translation = resolveTranslation(ride, yaw, flyingControllerActive);
+        applyGroundedFlightAssist(ride, translation, grounded, flyingControllerActive);
         desiredSteering.setTranslation(translation);
         desiredSteering.setYaw(yaw);
         desiredSteering.setRelativeTurnSpeed(1.0);
@@ -80,17 +81,25 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
         return true;
     }
 
-    private void updateGroundedCrouchDismount(@Nonnull TameworkRideMountComponent ride, boolean grounded) {
-        if (grounded && ride.isRiderCrouching()) {
-            ride.incrementGroundedCrouchTicks();
-            if (ride.getGroundedCrouchTicks() >= GROUNDED_CROUCH_DISMOUNT_TICKS) {
-                ride.setDismountRequested(true);
-            }
+    static void updateGroundedCrouchDismount(@Nonnull TameworkRideMountComponent ride, boolean grounded) {
+        if (!grounded) {
+            ride.resetGroundedCrouchTicks();
             return;
         }
-        if (!ride.isRiderCrouching() || !grounded) {
+        if (!ride.isRiderCrouching()) {
+            ride.setGroundedCrouchDismountArmed(true);
             ride.resetGroundedCrouchTicks();
+            return;
         }
+        if (ride.hasWishMovement()) {
+            ride.resetGroundedCrouchTicks();
+            return;
+        }
+        if (ride.isGroundedCrouchDismountArmed()) {
+            ride.incrementGroundedCrouchTicks();
+            return;
+        }
+        ride.resetGroundedCrouchTicks();
     }
 
     private boolean shouldUseFlight(@Nonnull TameworkRideMountComponent ride,
@@ -214,6 +223,27 @@ public final class BodyMotionTameworkRide extends BodyMotionBase {
             result.scale(1.0 / length);
         }
         return result;
+    }
+
+    static void applyGroundedFlightAssist(@Nonnull TameworkRideMountComponent ride,
+                                          @Nonnull Vector3d translation,
+                                          boolean grounded,
+                                          boolean flyingControllerActive) {
+        if (!grounded || !flyingControllerActive || ride.isRiderCrouching()) {
+            return;
+        }
+        double horizontal = Math.sqrt(translation.x * translation.x + translation.z * translation.z);
+        boolean takeoffIntent = ride.isRiderJumping()
+                || ride.isRiderFlying()
+                || horizontal > INPUT_DEAD_ZONE;
+        if (!takeoffIntent || translation.y >= GROUNDED_FLIGHT_ASSIST) {
+            return;
+        }
+        translation.y = GROUNDED_FLIGHT_ASSIST;
+        double length = translation.length();
+        if (length > 1.0) {
+            translation.scale(1.0 / length);
+        }
     }
 
     @Nonnull

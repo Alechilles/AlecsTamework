@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.npc.systems;
 
+import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
 import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
+import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
 import com.hypixel.hytale.builtin.mounts.MountSystems;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ArchetypeChunk;
@@ -24,6 +26,7 @@ import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
 import java.util.Set;
 import java.util.UUID;
+import java.util.logging.Level;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
@@ -75,14 +78,23 @@ public final class MountedRideRiderCleanupSystem extends EntityTickingSystem<Ent
         TameworkRideMountComponent mount = mountRef == null || !mountRef.isValid()
                 ? null
                 : store.getComponent(mountRef, rideMountComponentType);
-        boolean invalid = store.getComponent(riderRef, deathComponentType) != null
-                || mountRef == null
-                || !mountRef.isValid()
-                || mount == null
-                || !matchesMountUuid(rider, mountRef, store);
+        boolean riderDead = store.getComponent(riderRef, deathComponentType) != null;
+        boolean mountMissing = mountRef == null;
+        boolean mountInvalid = mountRef != null && !mountRef.isValid();
+        boolean mountComponentMissing = mountRef != null && mountRef.isValid() && mount == null;
+        boolean uuidMismatch = mountRef != null
+                && mountRef.isValid()
+                && mount != null
+                && !matchesMountUuid(rider, mountRef, store);
+        boolean invalid = riderDead
+                || mountMissing
+                || mountInvalid
+                || mountComponentMissing
+                || uuidMismatch;
         if (!invalid) {
             return;
         }
+        logCleanupReason(rider, riderDead, mountMissing, mountInvalid, mountComponentMissing, uuidMismatch);
         cleanupRiderAndMount(riderRef, mountRef, mount, commandBuffer);
     }
 
@@ -90,18 +102,17 @@ public final class MountedRideRiderCleanupSystem extends EntityTickingSystem<Ent
     private Ref<EntityStore> resolveMountRef(@Nonnull TameworkRideRiderComponent rider,
                                              @Nullable MountedComponent mounted,
                                              @Nonnull Store<EntityStore> store) {
-        if (mounted != null && mounted.getMountedToEntity() != null && mounted.getMountedToEntity().isValid()) {
-            return mounted.getMountedToEntity();
-        }
         String mountUuid = rider.getMountUuid();
-        if (mountUuid.isBlank()) {
-            return null;
+        if (!mountUuid.isBlank()) {
+            try {
+                return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid));
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
         }
-        try {
-            return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid));
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
+        return mounted != null && mounted.getMountedToEntity() != null && mounted.getMountedToEntity().isValid()
+                ? mounted.getMountedToEntity()
+                : null;
     }
 
     private boolean matchesMountUuid(@Nonnull TameworkRideRiderComponent rider,
@@ -119,13 +130,19 @@ public final class MountedRideRiderCleanupSystem extends EntityTickingSystem<Ent
                                       @Nullable TameworkRideMountComponent mount,
                                       @Nonnull CommandBuffer<EntityStore> commandBuffer) {
         commandBuffer.run(bufferStore -> {
+            UUIDComponent riderUuid = bufferStore.getComponent(riderRef, uuidComponentType);
+            if (riderUuid != null && riderUuid.getUuid() != null) {
+                MountedRidePacketHandler.unregisterRide(riderUuid.getUuid());
+            }
             if (riderRef.isValid()) {
                 MountedRideClientAttachment.detach(bufferStore, riderRef);
                 bufferStore.tryRemoveComponent(riderRef, rideRiderComponentType);
                 bufferStore.tryRemoveComponent(riderRef, mountedComponentType);
             }
             if (mountRef != null && mountRef.isValid() && mount != null) {
-                MountedRideClientAttachment.placeRiderAtMountAnchor(bufferStore, riderRef, mountRef, mount);
+                if (riderRef.isValid()) {
+                    MountedRideClientAttachment.placeRiderAtMountAnchor(bufferStore, riderRef, mountRef, mount);
+                }
                 NPCEntity npc = bufferStore.getComponent(mountRef, npcComponentType);
                 if (npc != null) {
                     restoreNpcState(mountRef, npc, mount, bufferStore);
@@ -133,6 +150,28 @@ public final class MountedRideRiderCleanupSystem extends EntityTickingSystem<Ent
                 bufferStore.tryRemoveComponent(mountRef, rideMountComponentType);
             }
         });
+    }
+
+    private void logCleanupReason(@Nonnull TameworkRideRiderComponent rider,
+                                  boolean riderDead,
+                                  boolean mountMissing,
+                                  boolean mountInvalid,
+                                  boolean mountComponentMissing,
+                                  boolean uuidMismatch) {
+        Tamework instance = Tamework.getInstance();
+        if (instance == null || !instance.isDebugRideEnabled() || instance.getLogger() == null) {
+            return;
+        }
+        instance.getLogger().at(Level.INFO).log(
+                "TameworkRide debug: cleanup source=riderCleanup mountUuid=%s riderDead=%s mountMissing=%s " +
+                        "mountInvalid=%s mountComponentMissing=%s uuidMismatch=%s",
+                rider.getMountUuid(),
+                riderDead,
+                mountMissing,
+                mountInvalid,
+                mountComponentMissing,
+                uuidMismatch
+        );
     }
 
     private void restoreNpcState(@Nonnull Ref<EntityStore> mountRef,

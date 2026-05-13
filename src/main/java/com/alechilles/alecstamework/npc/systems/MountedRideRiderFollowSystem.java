@@ -32,7 +32,7 @@ import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 
 /**
- * Keeps a rider physically attached to the Tamework-controlled mount without using vanilla mount controllers.
+ * Keeps the rider's client camera attached to the Tamework-controlled mount without moving the real player every tick.
  */
 public final class MountedRideRiderFollowSystem extends EntityTickingSystem<EntityStore> {
     private final ComponentType<EntityStore, MountedComponent> mountedComponentType;
@@ -122,7 +122,6 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
                 }
             });
         }
-        MountedRideClientAttachment.placeRiderAtMountAnchor(commandBuffer, riderRef, mountRef, mount);
         maybeLogDebug(riderTransform, mountTransform, mount, clientSpeedModifier);
     }
 
@@ -130,18 +129,17 @@ public final class MountedRideRiderFollowSystem extends EntityTickingSystem<Enti
     private Ref<EntityStore> resolveMountRef(@Nonnull TameworkRideRiderComponent rider,
                                              @Nullable MountedComponent mounted,
                                              @Nonnull Store<EntityStore> store) {
-        if (mounted != null && mounted.getMountedToEntity() != null && mounted.getMountedToEntity().isValid()) {
-            return mounted.getMountedToEntity();
-        }
         String mountUuid = rider.getMountUuid();
-        if (mountUuid.isBlank()) {
-            return null;
+        if (!mountUuid.isBlank()) {
+            try {
+                return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid));
+            } catch (IllegalArgumentException ignored) {
+                return null;
+            }
         }
-        try {
-            return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid));
-        } catch (IllegalArgumentException ignored) {
-            return null;
-        }
+        return mounted != null && mounted.getMountedToEntity() != null && mounted.getMountedToEntity().isValid()
+                ? mounted.getMountedToEntity()
+                : null;
     }
 
     private boolean shouldUpdateCameraSpeed(@Nonnull TameworkRideRiderComponent rider, double speedModifier) {

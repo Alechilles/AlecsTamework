@@ -118,6 +118,12 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         )
         .add()
         .append(
+            new KeyedCodec<>("RiderBackwardBrakeInput", Codec.BOOLEAN),
+            TameworkRideMountComponent::setRiderBackwardBrakeInput,
+            TameworkRideMountComponent::isRiderBackwardBrakeInput
+        )
+        .add()
+        .append(
             new KeyedCodec<>("HasBodyRotation", Codec.BOOLEAN),
             TameworkRideMountComponent::setHasBodyRotation,
             TameworkRideMountComponent::hasBodyRotation
@@ -196,6 +202,12 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         )
         .add()
         .append(
+            new KeyedCodec<>("GroundedCrouchDismountArmed", Codec.BOOLEAN),
+            TameworkRideMountComponent::setGroundedCrouchDismountArmed,
+            TameworkRideMountComponent::isGroundedCrouchDismountArmed
+        )
+        .add()
+        .append(
             new KeyedCodec<>("DismountRequested", Codec.BOOLEAN),
             TameworkRideMountComponent::setDismountRequested,
             TameworkRideMountComponent::isDismountRequested
@@ -261,6 +273,7 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
     private double wishX;
     private double wishY;
     private double wishZ;
+    private boolean riderBackwardBrakeInput;
     private boolean hasBodyRotation;
     private float bodyYaw;
     private float bodyPitch;
@@ -274,6 +287,7 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
     private boolean riderFlying;
     private boolean riderSprinting;
     private int groundedCrouchTicks;
+    private boolean groundedCrouchDismountArmed;
     private boolean dismountRequested;
     private boolean hasAuthoritativePose;
     private double authoritativeX;
@@ -447,6 +461,14 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         this.wishZ = wishZ;
     }
 
+    public boolean isRiderBackwardBrakeInput() {
+        return riderBackwardBrakeInput;
+    }
+
+    public void setRiderBackwardBrakeInput(boolean riderBackwardBrakeInput) {
+        this.riderBackwardBrakeInput = riderBackwardBrakeInput;
+    }
+
     public boolean hasBodyRotation() {
         return hasBodyRotation;
     }
@@ -561,6 +583,14 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         groundedCrouchTicks = 0;
     }
 
+    public boolean isGroundedCrouchDismountArmed() {
+        return groundedCrouchDismountArmed;
+    }
+
+    public void setGroundedCrouchDismountArmed(boolean groundedCrouchDismountArmed) {
+        this.groundedCrouchDismountArmed = groundedCrouchDismountArmed;
+    }
+
     public boolean isDismountRequested() {
         return dismountRequested;
     }
@@ -576,6 +606,7 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         riderFlying = false;
         riderSprinting = false;
         groundedCrouchTicks = 0;
+        groundedCrouchDismountArmed = false;
         lastInputAtMs = 0L;
         dismountRequested = false;
         clearAuthoritativePose();
@@ -586,6 +617,7 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         wishX = 0.0;
         wishY = 0.0;
         wishZ = 0.0;
+        riderBackwardBrakeInput = false;
         hasBodyRotation = false;
         bodyYaw = 0.0f;
         bodyPitch = 0.0f;
@@ -597,10 +629,23 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
     }
 
     public void captureWishMovement(double wishX, double wishY, double wishZ) {
+        captureWishMovement(wishX, wishY, wishZ, false);
+    }
+
+    public void captureWishMovement(double wishX, double wishY, double wishZ, boolean riderBackwardBrakeInput) {
         this.hasWishMovement = true;
         this.wishX = wishX;
         this.wishY = wishY;
         this.wishZ = wishZ;
+        this.riderBackwardBrakeInput = riderBackwardBrakeInput;
+    }
+
+    public void clearWishMovement() {
+        hasWishMovement = false;
+        wishX = 0.0;
+        wishY = 0.0;
+        wishZ = 0.0;
+        riderBackwardBrakeInput = false;
     }
 
     public void captureBodyRotation(float bodyYaw, float bodyPitch, float bodyRoll) {
@@ -732,6 +777,7 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         clone.wishX = wishX;
         clone.wishY = wishY;
         clone.wishZ = wishZ;
+        clone.riderBackwardBrakeInput = riderBackwardBrakeInput;
         clone.hasBodyRotation = hasBodyRotation;
         clone.bodyYaw = bodyYaw;
         clone.bodyPitch = bodyPitch;
@@ -745,6 +791,7 @@ public final class TameworkRideMountComponent implements Component<EntityStore> 
         clone.riderFlying = riderFlying;
         clone.riderSprinting = riderSprinting;
         clone.groundedCrouchTicks = groundedCrouchTicks;
+        clone.groundedCrouchDismountArmed = groundedCrouchDismountArmed;
         clone.dismountRequested = dismountRequested;
         clone.hasAuthoritativePose = hasAuthoritativePose;
         clone.authoritativeX = authoritativeX;

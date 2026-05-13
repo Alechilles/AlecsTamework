@@ -36,12 +36,17 @@ class TameworkRideArchitectureTest {
         assertTrue(tameworkRideMount.contains("TameworkRideRiderComponent"));
         assertFalse(tameworkRideMount.contains("NPCMountComponent"));
         assertFalse(tameworkRideMount.contains("EMPTY_ROLE_ID"));
+        assertTrue(content.contains("Ref<EntityStore> existingMountRef = resolveMountRefFromRider(rider, store)"));
+        assertTrue(content.contains("if (existingMountRef == null && mounted != null)"));
         assertTrue(content.contains("boolean stale = existingMountRef == null"));
-        assertFalse(content.contains("boolean stale = mounted == null"));
+        assertFalse(content.contains("Ref<EntityStore> existingMountRef = mounted == null"));
         assertTrue(content.contains("MountedRideClientAttachment.detach(store, playerRef)"));
         assertFalse(content.contains("MountedRideClientAttachment.suppressRiderCollision(store, playerRef)"));
         assertFalse(content.contains("MountedRideClientAttachment.restoreRiderCollision(store, playerRef, rider)"));
         assertTrue(content.contains("new TameworkRideRiderComponent(npcUuid.getUuid().toString())"));
+        assertTrue(tameworkRideMount.contains("MountedRideClientAttachment.placeRiderAtMountAnchor(store, playerRef, npcRef, existingNpcRide)"));
+        assertTrue(tameworkRideMount.contains("MountedRideClientAttachment.placeRiderAtMountAnchor(store, playerRef, npcRef, rideMount)"));
+        assertTrue(tameworkRideMount.contains("MountedRideClientAttachment.attach(store, playerRef, npcRef, rideMount)"));
     }
 
     @Test
@@ -83,6 +88,12 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("Order.BEFORE, MountSystems.HandleMountInput.class"));
         assertTrue(content.contains("Order.BEFORE, PlayerSystems.ProcessPlayerInput.class"));
         assertTrue(content.contains("PlayerInput.WishMovement"));
+        assertTrue(content.contains("captureWish(mount, wish.getX(), wish.getY(), wish.getZ())"));
+        assertTrue(content.contains("mount.captureWishMovement(wishX * scale, 0.0, wishZ * scale, wishZ < -0.0001)"));
+        assertTrue(content.contains("mount.captureWishMovement(intent.strafe(), 0.0, intent.forward())"));
+        assertTrue(content.contains("mount.captureWishMovement(strafe, existingVertical, existingForward, existingBackwardBrakeInput)"));
+        assertFalse(content.contains("mount.captureWishMovement(wish.getX(), wish.getY(), wish.getZ())"));
+        assertFalse(content.contains("wishY * scale"));
         assertTrue(content.contains("PlayerInput.SetRiderMovementStates"));
         assertTrue(content.contains("applyRiderLocalInput"));
         assertTrue(content.contains("captureCurrentRiderRotation"));
@@ -90,17 +101,32 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("syncAuthoritativePose(mountRef, mount, commandBuffer, false)"));
         assertTrue(content.contains("captureMountTurnAsStrafe"));
         assertTrue(content.contains("normalizeIntent"));
+        assertTrue(content.contains("return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid))"));
+        assertTrue(content.contains("MountedRidePacketHandler.unregisterRide"));
+        assertTrue(content.contains("restoreNpcState(mountRef, npc, currentMount, bufferStore)"));
+        assertTrue(content.contains("boolean sawMovementIntent = false"));
+        assertTrue(content.contains("playerInput.setMountId(0)"));
+        assertFalse(content.contains("mount.clearControlInputSnapshot();"));
         assertTrue(content.contains("absolute.getZ() - position.z,\n                true")
                 || content.contains("absolute.getZ() - position.z,\r\n                true"));
         assertTrue(content.contains("captureAbsoluteMovement(mount, mountRef, absolute, commandBuffer)"));
-        assertTrue(content.contains("captureWorldMovement(mount, value.x, value.y, value.z, true)"));
+        assertTrue(content.contains("captureVelocityMovement(mount, value.x, value.y, value.z)"));
+        assertTrue(content.contains("TameworkRideVelocityIntent.isVerticalDominant(worldX, worldY, worldZ)"));
+        assertTrue(content.contains("TameworkRideVelocityIntent.hasUsableHorizontalIntent(worldX, worldZ)"));
+        assertTrue(content.contains("mount.captureWishMovement(0.0, TameworkRideVelocityIntent.verticalInput(worldX, worldY, worldZ), 0.0)"));
+        assertTrue(content.contains("shouldPreserveExistingForwardIntent(mount, intent)"));
+        assertTrue(content.contains("VELOCITY_BRAKE_BACKWARD_DEAD_ZONE = -0.25"));
+        assertTrue(content.contains("VELOCITY_BRAKE_BACKWARD_DOMINANCE = 1.35"));
+        assertTrue(content.contains("if (isBackwardBrakeIntent(intent))"));
+        assertTrue(content.contains("captureBackwardBrakeIntent(mount)"));
+        assertTrue(content.contains("mount.captureWishMovement(0.0, 0.0, 0.0, true)"));
         assertTrue(content.contains("queue.clear()"));
         assertTrue(content.contains("mount.setHasWishMovement(false)"));
         assertFalse(content.contains("if (mounted != null && riderRef != null && riderRef.isValid())"));
     }
 
     @Test
-    void riderFollowMovesPlayerAndAppliesCustomRideCameraWithoutVanillaMountedComponent() throws IOException {
+    void riderFollowAppliesCameraWithoutMovingRealPlayerEveryTick() throws IOException {
         String content = readMain(
                 "com",
                 "alechilles",
@@ -111,7 +137,10 @@ class TameworkRideArchitectureTest {
         );
 
         assertTrue(content.contains("Player.getComponentType()"));
-        assertTrue(content.contains("MountedRideClientAttachment.placeRiderAtMountAnchor("));
+        assertFalse(content.contains("RIDER_ANCHOR_CORRECTION_DISTANCE_SQUARED"));
+        assertFalse(content.contains("MountedRideClientAttachment.placeRiderAtMountAnchorIfNeeded("));
+        assertFalse(content.contains("MountedRideClientAttachment.placeRiderAtMountAnchor(commandBuffer"));
+        assertFalse(content.contains("MountedRideClientAttachment.queueRiderAnchorTeleport("));
         assertTrue(content.contains("MountedRideClientAttachment.attach("));
         assertTrue(content.contains("MountedRideClientAttachment.updateCamera("));
         assertTrue(content.contains("resolveClientSpeedModifier"));
@@ -121,11 +150,15 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("commandBuffer.run(bufferStore ->"));
         assertTrue(content.contains("bufferStore.putComponent(riderRef, rideRiderComponentType, currentRider)"));
         assertTrue(content.contains("isClientCameraApplied()"));
+        assertTrue(content.contains("return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid))"));
+        assertTrue(content.contains("return mounted != null && mounted.getMountedToEntity()"));
+        assertTrue(content.indexOf("return store.getExternalData().getWorld().getEntityRef(UUID.fromString(mountUuid))")
+                < content.indexOf("return mounted != null && mounted.getMountedToEntity()"));
         assertFalse(content.contains("tryRemoveComponent(riderRef, mountedComponentType)"));
     }
 
     @Test
-    void rideClientAttachmentUsesServerCameraInsteadOfMountedUpdate() throws IOException {
+    void rideClientAttachmentUsesEntityAttachedCustomCameraWithoutTeleportLoop() throws IOException {
         String content = readMain(
                 "com",
                 "alechilles",
@@ -135,35 +168,61 @@ class TameworkRideArchitectureTest {
                 "MountedRideClientAttachment.java"
         );
 
-        assertTrue(content.contains("new MountNPC("));
         assertTrue(content.contains("new DismountNPC()"));
         assertTrue(content.contains("DEFAULT_RIDE_INPUT_SPEED_MODIFIER = 10.0"));
-        assertTrue(content.contains("sanitizeSpeedModifier"));
-        assertTrue(content.contains("player.setMountEntityId(mountNetworkIdValue)"));
+        assertTrue(content.contains("RIDE_CAMERA_EYE_HEIGHT = 1.6"));
         assertTrue(content.contains("playerInput.setMountId(0)"));
-        assertTrue(content.contains("new SetServerCamera("));
-        assertTrue(content.contains("AttachedToType.LocalPlayer"));
-        assertTrue(content.contains("MovementForceRotationType.CameraRotation"));
-        assertTrue(content.contains("settings.canMoveType = CanMoveType.Always"));
+        assertTrue(content.contains("deliberately avoids all native mount identity"));
+        assertTrue(content.contains("ClientCameraView.Custom"));
+        assertTrue(content.contains("createRideCameraSettings(mountEntityId, mount, speedModifier)"));
+        assertTrue(content.contains("ServerCameraSettings settings = new ServerCameraSettings()"));
+        assertTrue(content.contains("settings.attachedToType = AttachedToType.EntityId"));
+        assertTrue(content.contains("settings.attachedToEntityId = mountEntityId"));
+        assertTrue(content.contains("settings.positionType = PositionType.AttachedToPlusOffset"));
+        assertTrue(content.contains("settings.positionOffset = new com.hypixel.hytale.protocol.Position("));
+        assertTrue(content.contains("mount.getAnchorY() + RIDE_CAMERA_EYE_HEIGHT"));
         assertTrue(content.contains("settings.applyMovementType = ApplyMovementType.CharacterController"));
-        assertTrue(content.contains("settings.speedModifier = sanitizeSpeedModifier(speedModifier)"));
+        assertFalse(content.contains("settings.applyMovementType = ApplyMovementType.Position"));
+        assertFalse(content.contains("settings.movementMultiplier = new Vector3f(0.0f, 0.0f, 0.0f)"));
+        assertFalse(content.contains("settings.applyLookType = ApplyLookType.LocalPlayerLookOrientation"));
+        assertTrue(content.contains("settings.rotationType = RotationType.Custom"));
+        assertTrue(content.contains("settings.rotation = resolveCameraRotation(mount)"));
+        assertTrue(content.contains("settings.applyLookType = ApplyLookType.Rotation"));
+        assertTrue(content.contains("settings.lookMultiplier = new Vector2f(1.0f, 1.0f)"));
+        assertTrue(content.contains("settings.mouseInputType = MouseInputType.LookAtPlane"));
+        assertTrue(content.contains("settings.planeNormal = new Vector3f(0.0f, 1.0f, 0.0f)"));
+        assertTrue(content.contains("private static Direction resolveCameraRotation"));
         assertTrue(content.contains("settings.skipCharacterPhysics = true"));
-        assertFalse(content.contains("ApplyMovementType.Position"));
-        assertFalse(content.contains("settings.movementMultiplier"));
-        assertTrue(content.contains("ClientCameraView.Custom,"));
-        assertTrue(content.contains("false,\n                settings") || content.contains("false,\r\n                settings"));
+        assertTrue(content.contains("settings.isFirstPerson = true"));
+        assertTrue(content.contains("player.moveTo("));
+        assertFalse(content.contains("placeRiderAtMountAnchorIfNeeded"));
+        assertFalse(content.contains("queueRiderAnchorTeleport"));
+        assertFalse(content.contains("queueRiderAnchorTeleportIfClientTooFar"));
+        assertFalse(content.contains("Teleport.createForPlayer"));
+        assertFalse(content.contains("teleport.setHeadRotation"));
+        assertFalse(content.contains("store.putComponent(riderRef, teleportType, teleport)"));
+        assertTrue(content.contains("distanceSquared("));
+        assertTrue(content.contains("NetworkId mountNetworkId"));
+        assertTrue(content.contains("sendRideCamera(player, mountNetworkId.getId(), mount, speedModifier)"));
+        assertFalse(content.contains("new MountNPC("));
+        assertFalse(content.contains("player.setMountEntityId(mountNetworkId.getId())"));
+        assertFalse(content.contains("placeRiderAtMountAnchor(store, riderRef, mountRef, mount)"));
+        assertFalse(content.contains("new ClientTeleport("));
+        assertFalse(content.contains("new ModelTransform("));
+        assertFalse(content.contains("new Position(anchoredPosition.x, anchoredPosition.y, anchoredPosition.z)"));
         assertFalse(content.contains("new MountedUpdate("));
+        assertFalse(content.contains("viewer.queueUpdate(riderRef, update)"));
         assertFalse(content.contains("MountController.Minecart"));
+        assertFalse(content.contains("sendMountPacket"));
         assertFalse(content.contains("MountController.BlockMount"));
         assertTrue(content.contains("viewer.queueRemove(riderRef, ComponentUpdateType.Mounted)"));
         assertFalse(content.contains("suppressRiderCollision"));
         assertFalse(content.contains("Intangible.INSTANCE"));
         assertFalse(content.contains("restoreRiderCollision"));
-        assertFalse(content.contains("new MountedComponent("));
     }
 
     @Test
-    void tameworkRideDoesNotUseVanillaMountPacketFiltering() throws IOException {
+    void tameworkRideWrapsClientAndMountMovementPackets() throws IOException {
         String plugin = readMain("com", "alechilles", "alecstamework", "Tamework.java");
         String handler = readMain(
                 "com",
@@ -175,7 +234,73 @@ class TameworkRideArchitectureTest {
         );
 
         assertFalse(plugin.contains("PacketFilter"));
-        assertFalse(plugin.contains("MountMovement"));
+        assertTrue(handler.contains("ClientMovement.PACKET_ID"));
+        assertTrue(handler.contains("MountMovement.PACKET_ID"));
+        assertTrue(handler.contains("MouseInteraction.PACKET_ID"));
+        assertTrue(handler.contains("findRegisteredHandler(ClientMovement.PACKET_ID)"));
+        assertTrue(handler.contains("findRegisteredHandler(MountMovement.PACKET_ID)"));
+        assertTrue(handler.contains("findRegisteredHandler(MouseInteraction.PACKET_ID)"));
+        assertTrue(handler.contains("ACTIVE_TAMEWORK_RIDES"));
+        assertTrue(handler.contains("public static void registerRide"));
+        assertTrue(handler.contains("public static void unregisterRide"));
+        assertTrue(handler.contains("resolveRegisteredRideSession()"));
+        assertTrue(handler.contains("session.world.execute"));
+        assertFalse(handler.contains("RideContext context = resolveRideContext();"));
+        assertTrue(handler.contains("tryHandleTameworkClientMovement"));
+        assertTrue(handler.contains("tryHandleTameworkMountMovement"));
+        assertTrue(handler.contains("tryHandleTameworkMouseInteraction"));
+        assertTrue(handler.contains("logClientMovementDebug(packet, mount, capturedMovementIntent)"));
+        assertTrue(handler.contains("logMountMovementDebug(packet, mount)"));
+        assertTrue(handler.contains("logMouseMovementDebug(packet, mount)"));
+        assertTrue(handler.contains("packet source=clientMovement"));
+        assertTrue(handler.contains("packet source=mountMovement"));
+        assertTrue(handler.contains("packet source=mouseInteraction"));
+        assertTrue(handler.contains("boolean capturedMovementIntent = false"));
+        assertTrue(handler.contains("mount.clearWishMovement()"));
+        assertFalse(handler.contains("mount.clearControlInputSnapshot();"));
+        assertTrue(handler.contains("if (!tryHandleTameworkClientMovement(packet))"));
+        assertTrue(handler.contains("delegate(clientMovementDelegate, packet)"));
+        assertTrue(handler.contains("delegate(mountMovementDelegate, packet)"));
+        assertTrue(handler.contains("delegate(mouseInteractionDelegate, packet)"));
+        assertTrue(handler.indexOf("if (!tryHandleTameworkClientMovement(packet))")
+                < handler.indexOf("delegate(clientMovementDelegate, packet)"));
+        assertTrue(handler.contains("packet.wishMovement"));
+        assertTrue(handler.contains("mount.captureWishMovement(wishX * scale, 0.0, wishZ * scale, wishZ < -0.0001)"));
+        assertTrue(handler.contains("mount.captureWishMovement(strafe, 0.0, forward)"));
+        assertTrue(handler.contains("packet.velocity.x"));
+        assertTrue(handler.contains("capturedPacketInput"));
+        assertTrue(handler.contains("captureVelocityMovementIntent(mount, packet.velocity.x, packet.velocity.y, packet.velocity.z)"));
+        assertTrue(handler.contains("TameworkRideVelocityIntent.isVerticalDominant(worldX, worldY, worldZ)"));
+        assertTrue(handler.contains("TameworkRideVelocityIntent.hasUsableHorizontalIntent(worldX, worldZ)"));
+        assertTrue(handler.contains("captureVerticalVelocityIntent(mount, worldX, worldY, worldZ)"));
+        assertTrue(handler.contains("mount.captureWishMovement(0.0, TameworkRideVelocityIntent.verticalInput(worldX, worldY, worldZ), 0.0)"));
+        assertTrue(handler.contains("shouldPreserveExistingForwardIntent(mount, intent)"));
+        assertTrue(handler.contains("captureExistingForwardIntent(mount)"));
+        assertTrue(handler.contains("MovementIntent intent = projectWorldMovement(mount, worldX, worldZ, true)"));
+        assertTrue(handler.contains("if (!isForwardDominant(intent))"));
+        assertTrue(handler.contains("if (isBackwardBrakeIntent(intent))"));
+        assertTrue(handler.contains("captureBackwardBrakeIntent(mount)"));
+        assertTrue(handler.contains("mount.captureWishMovement(0.0, 0.0, 0.0, true)"));
+        assertTrue(handler.contains("VELOCITY_LOOK_FORWARD_DEAD_ZONE = 0.25"));
+        assertTrue(handler.contains("VELOCITY_LOOK_FORWARD_DOMINANCE = 1.35"));
+        assertTrue(handler.contains("VELOCITY_BRAKE_BACKWARD_DEAD_ZONE = -0.25"));
+        assertTrue(handler.contains("VELOCITY_BRAKE_BACKWARD_DOMINANCE = 1.35"));
+        assertTrue(handler.contains("if (captureForwardLookFromWorldVector(mount, worldX, worldY, worldZ))"));
+        assertTrue(handler.contains("double yawDelta = Math.abs(normalizeAngle(yaw - currentYaw))"));
+        assertTrue(handler.contains("MAX_VELOCITY_LOOK_YAW_DELTA = Math.toRadians(25.0)"));
+        assertTrue(handler.contains("if (yawDelta > MAX_VELOCITY_LOOK_YAW_DELTA)"));
+        assertFalse(handler.contains("packet.relativePosition.x"));
+        assertFalse(handler.contains("captureAbsoluteMovementFromRider"));
+        assertFalse(handler.contains("maybeQueueClientAnchorCorrection"));
+        assertFalse(handler.contains("CLIENT_ANCHOR_TELEPORT_INTERVAL_MS"));
+        assertFalse(handler.contains("CLIENT_ANCHOR_TELEPORT_DISTANCE_SQUARED"));
+        assertFalse(handler.contains("wishY * scale"));
+        assertTrue(handler.contains("packet.lookOrientation"));
+        assertTrue(handler.contains("captureMouseLook(mount, packet.mouseMotion.relativeMotion.x, packet.mouseMotion.relativeMotion.y)"));
+        assertTrue(handler.contains("MOUSE_LOOK_RADIANS_PER_UNIT"));
+        assertTrue(handler.contains("captureAbsoluteMovementFromMount"));
+        assertFalse(handler.contains("MountedRideClientAttachment.placeRiderAtMountAnchor(\n                    current.store,\n                    current.riderRef,\n                    current.mountRef,\n                    mount\n            )")
+                || handler.contains("MountedRideClientAttachment.placeRiderAtMountAnchor(\r\n                    current.store,\r\n                    current.riderRef,\r\n                    current.mountRef,\r\n                    mount\r\n            )"));
         assertTrue(handler.contains("DismountNPC.PACKET_ID"));
         assertFalse(handler.contains("DISMOUNT_NPC_PACKET_ID"));
         assertFalse(handler.contains("294"));
@@ -208,6 +333,14 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("FLY_ANIMATION"));
         assertTrue(content.contains("FLY_FAST_ANIMATION"));
         assertTrue(content.contains("TameworkFlyAnimationState.resolveHorizontalIdle"));
+        assertTrue(content.contains("TameworkFlyVisualState.isVerticalDominantFlight(lastVelocity)"));
+        assertTrue(content.contains("TameworkFlyVisualState.resolveVisualPitch(targetPitch, lastVelocity)"));
+        assertTrue(content.contains("targetPitch = TameworkFlyVisualState.limitPitch(targetPitch)"));
+        assertTrue(content.contains("lastVisualPitch = TameworkFlyVisualState.approachVisualAngle(lastVisualPitch, visualPitch, dt)"));
+        assertTrue(content.contains("steering.setPitch(lastVisualPitch)"));
+        assertTrue(content.contains("lastRoll = approach(lastRoll, (float) strafeRoll, rollStep(dt))"));
+        assertTrue(content.contains("if (verticalDominantFlight)"));
+        assertTrue(content.contains("setMotionKind(MotionKind.FLYING)"));
         assertTrue(content.contains("TameworkFlyAnimationState.resolveFast"));
         assertTrue(content.contains("lastFlightMovementAnimation"));
         assertTrue(content.contains("mountedMaxHorizontalSpeed"));
@@ -217,6 +350,16 @@ class TameworkRideArchitectureTest {
         assertTrue(content.contains("getMountedClientSpeed"));
         assertTrue(content.contains("public double getMaximumSpeed()"));
         assertTrue(content.contains("lastHorizontalSpeedLimit"));
+        assertTrue(content.contains("targetYaw = approachAngle(getYaw(), targetYaw, maxTurnSpeed * (float) dt)"));
+        assertTrue(content.contains("resolveRiddenTranslation(ride, targetYaw, targetPitch, translation)"));
+        assertTrue(content.contains("forwardX * forwardAmount + rightX * strafe"));
+        assertTrue(content.contains("float delta = normalizeAngle(target - value)"));
+        assertTrue(content.contains("boolean brakingFromBackwardInput = hasBackwardInput(ride)"));
+        assertTrue(content.contains("inputLength <= INPUT_DEAD_ZONE && !brakingFromBackwardInput"));
+        assertTrue(content.contains("RiddenBackwardBrake.apply(targetVelocity, lastVelocity, riddenBackwardBrakeState, brakingFromBackwardInput, dt)"));
+        assertTrue(content.contains("ride.isRiderBackwardBrakeInput()"));
+        assertTrue(content.contains("lastRiddenBackwardBraking"));
+        assertTrue(content.contains("backwardAirbrake=%s"));
         assertTrue(content.contains("if (!lastRidden)"));
         assertTrue(content.contains("targetVelocity.scale(effectHorizontalSpeedMultiplier)"));
         assertFalse(content.contains("collisionResult.disableCharacterCollisions()"));
@@ -345,10 +488,15 @@ class TameworkRideArchitectureTest {
         assertTrue(mountCleanup.contains("npc.playAnimation(mountRef, AnimationSlot.Movement, null, store)"));
         assertTrue(riderCleanup.contains("AnimationSlot.Movement"));
         assertTrue(riderCleanup.contains("npc.playAnimation(mountRef, AnimationSlot.Movement, null, store)"));
+        assertTrue(riderCleanup.contains("if (riderRef.isValid()) {\n                    MountedRideClientAttachment.placeRiderAtMountAnchor")
+                || riderCleanup.contains("if (riderRef.isValid()) {\r\n                    MountedRideClientAttachment.placeRiderAtMountAnchor"));
         assertTrue(inputCapture.contains("getDefaultSubState()"));
         assertFalse(mountCleanup.contains("MountedRideClientAttachment.restoreRiderCollision"));
         assertFalse(riderCleanup.contains("MountedRideClientAttachment.restoreRiderCollision"));
         assertFalse(inputCapture.contains("MountedRideClientAttachment.restoreRiderCollision"));
+        assertFalse(mountCleanup.contains("exceedsSanityDistance"));
+        assertTrue(mountCleanup.contains("TameworkRide debug: cleanup source=%s"));
+        assertTrue(riderCleanup.contains("TameworkRide debug: cleanup source=riderCleanup"));
     }
 
     private static String readMain(String first, String... more) throws IOException {
