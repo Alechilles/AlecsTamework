@@ -5,7 +5,7 @@
 ## 2.10.0 - Ride Mounts, Role-Line Breeding, and Attachment Migrations - 2026-05-13
 
 ### Added
-- Added Tamework ride-mount support with dedicated mount/rider components, Tamework ride body motion, fly/walk ride controllers, a custom ride camera, dismount cleanup, and wrapped client/mount/mouse input handling.
+- Added Tamework ride-mount support with dedicated mount/rider components, Tamework ride body motion, walk ride control, a beta custom flying mount controller, a custom ride camera, dismount cleanup, and wrapped client/mount/mouse input handling.
 - Added role-line inheritance to `TwBreedingConfig` so offspring can inherit parent body/model variants, use weighted family lines, and optionally mutate into non-parent lines.
 - Added role-scoped `TwAttachmentMigrationConfig` assets so mods can backfill newly split attachment slots from legacy stored selections without overwriting already-randomized values.
 - Added a public Trait Effects API so integrations can register custom `TwTraitConfig` effect keys and execute them during Tamework's existing trait-effect resyncs.
