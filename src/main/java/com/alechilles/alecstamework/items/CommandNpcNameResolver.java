@@ -8,11 +8,13 @@ import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.modules.entity.component.DisplayNameComponent;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.entities.NPCEntity;
 import com.hypixel.hytale.server.npc.role.Role;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Resolves NPC-facing names for command item UI and metadata.
@@ -37,22 +39,34 @@ final class CommandNpcNameResolver {
         if (npc == null) {
             return "NPC";
         }
-        String componentDisplayName = resolveNpcDisplayNameFromComponents(npcRef, store);
+        String customName = resolveNpcNameComponent(npcRef, store);
+        if (customName != null && !customName.isBlank()) {
+            return customName;
+        }
+        String nameKey = resolveNpcNameKey(npc);
+        String roleId = resolveNpcRoleId(npc);
+        String componentDisplayName = resolveDisplayNameComponent(npcRef, store);
         if (componentDisplayName != null && !componentDisplayName.isBlank()) {
+            String translated = translateSnapshotName(componentDisplayName, nameKey, roleId);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
             return componentDisplayName;
         }
         String displayName = npc.getLegacyDisplayName();
         if (displayName != null && !displayName.isBlank()) {
+            String translated = translateSnapshotName(displayName, nameKey, roleId);
+            if (translated != null && !translated.isBlank()) {
+                return translated;
+            }
             return displayName;
         }
-        String nameKey = resolveNpcNameKey(npc);
         if (nameKey != null && !nameKey.isBlank()) {
             String translated = translateNpcNameKey(nameKey);
             if (translated != null && !translated.isBlank()) {
                 return translated;
             }
         }
-        String roleId = resolveNpcRoleId(npc);
         if (roleId != null && !roleId.isBlank()) {
             return roleId;
         }
@@ -106,6 +120,14 @@ final class CommandNpcNameResolver {
     }
 
     String resolveNpcDisplayNameFromComponents(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        String customName = resolveNpcNameComponent(npcRef, store);
+        if (customName != null && !customName.isBlank()) {
+            return customName;
+        }
+        return resolveDisplayNameComponent(npcRef, store);
+    }
+
+    private String resolveNpcNameComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
@@ -115,6 +137,13 @@ final class CommandNpcNameResolver {
             if (nameComponent != null && nameComponent.getName() != null && !nameComponent.getName().isBlank()) {
                 return nameComponent.getName();
             }
+        }
+        return null;
+    }
+
+    private String resolveDisplayNameComponent(Ref<EntityStore> npcRef, Store<EntityStore> store) {
+        if (npcRef == null || !npcRef.isValid() || store == null) {
+            return null;
         }
         DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
         if (displayName != null && displayName.getDisplayName() != null) {
@@ -141,22 +170,40 @@ final class CommandNpcNameResolver {
         if (looksLikeTranslationKey(roleId)) {
             return roleId;
         }
-        return "server.npcRole." + roleId + ".name";
+        return "server.npcRoles." + roleId + ".name";
     }
 
     String resolveNpcRoleId(NPCEntity npc) {
         if (npc == null) {
             return null;
         }
+        String registeredRoleId = CommandLinkPolicyService.selectRoleId(
+                null,
+                npc.getRoleIndex(),
+                CommandNpcNameResolver::lookupRegisteredRoleId
+        );
+        if (registeredRoleId != null && !registeredRoleId.isBlank()) {
+            return registeredRoleId;
+        }
         String roleId = readStringGetter(npc, "getRoleId");
         if (roleId != null && !roleId.isBlank()) {
             return roleId;
         }
         Role role = npc.getRole();
-        if (role == null) {
-            return null;
+        roleId = readStringGetter(role, "getId", "getRoleId", "id");
+        if (roleId != null && !roleId.isBlank()) {
+            return roleId;
         }
-        return readStringGetter(role, "getId", "getRoleId", "id");
+        String roleName = npc.getRoleName();
+        if (roleName != null && !roleName.isBlank()) {
+            return roleName;
+        }
+        return null;
+    }
+
+    private static String lookupRegisteredRoleId(int roleIndex) {
+        NPCPlugin plugin = NPCPlugin.get();
+        return plugin != null ? plugin.getName(roleIndex) : null;
     }
 
     private String resolveRoleNameKeyFromParams(Role role) {
@@ -225,16 +272,9 @@ final class CommandNpcNameResolver {
         } else {
             addCandidate(candidates, "server." + nameKey);
         }
-        String canonical = nameKey.replace("npcRoles.", "npcRole.").replace("server.npcRoles.", "server.npcRole.");
-        addCandidate(candidates, canonical);
-        if (canonical.startsWith("server.")) {
-            addCandidate(candidates, canonical.substring("server.".length()));
-        } else {
-            addCandidate(candidates, "server." + canonical);
-        }
-        if (canonical.endsWith(".title")) {
-            addCandidate(candidates, canonical.substring(0, canonical.length() - ".title".length()) + ".name");
-        }
+        addServerVariant(candidates, toSingularNpcRoleKey(nameKey));
+        addServerVariant(candidates, toPluralNpcRoleKey(nameKey));
+        addTitleNameVariants(candidates);
         return candidates;
     }
 
@@ -247,6 +287,39 @@ final class CommandNpcNameResolver {
         }
     }
 
+    private void addServerVariant(List<String> candidates, String key) {
+        addCandidate(candidates, key);
+        if (key == null || key.isBlank()) {
+            return;
+        }
+        if (key.startsWith("server.")) {
+            addCandidate(candidates, key.substring("server.".length()));
+        } else {
+            addCandidate(candidates, "server." + key);
+        }
+    }
+
+    private void addTitleNameVariants(List<String> candidates) {
+        ArrayList<String> snapshot = new ArrayList<>(candidates);
+        for (String candidate : snapshot) {
+            if (candidate != null && candidate.endsWith(".title")) {
+                addCandidate(candidates, candidate.substring(0, candidate.length() - ".title".length()) + ".name");
+            }
+        }
+    }
+
+    private String toSingularNpcRoleKey(String key) {
+        return key
+                .replace("server.npcRoles.", "server.npcRole.")
+                .replace("npcRoles.", "npcRole.");
+    }
+
+    private String toPluralNpcRoleKey(String key) {
+        return key
+                .replace("server.npcRole.", "server.npcRoles.")
+                .replace("npcRole.", "npcRoles.");
+    }
+
     private String translateSnapshotName(String snapshotDisplayName, String nameKey, String roleId) {
         if (snapshotDisplayName != null && !snapshotDisplayName.isBlank()) {
             if (looksLikeTranslationKey(snapshotDisplayName)) {
@@ -255,7 +328,12 @@ final class CommandNpcNameResolver {
                     return translated;
                 }
             }
-            if (roleId != null && !roleId.isBlank() && snapshotDisplayName.equalsIgnoreCase(roleId)) {
+            String roleIdFromNameKey = extractRoleIdFromNameKey(nameKey);
+            String effectiveRoleId = firstNonBlank(roleIdFromNameKey, roleId);
+            if (roleId != null
+                    && !roleId.isBlank()
+                    && snapshotDisplayName.equalsIgnoreCase(roleId)
+                    && sameIdentifier(roleId, effectiveRoleId)) {
                 String translated = translateNpcNameKey(roleId);
                 if (translated != null && !translated.isBlank()) {
                     return translated;
@@ -267,6 +345,13 @@ final class CommandNpcNameResolver {
                     return translated;
                 }
             }
+            String translatedRole = translateNpcNameKey(firstNonBlank(nameKey, effectiveRoleId));
+            if (translatedRole != null
+                    && !translatedRole.isBlank()
+                    && isGenericRoleDisplayName(snapshotDisplayName, effectiveRoleId, translatedRole)) {
+                return translatedRole;
+            }
+            return null;
         }
         if (nameKey != null && !nameKey.isBlank()) {
             String translated = translateNpcNameKey(nameKey);
@@ -275,6 +360,113 @@ final class CommandNpcNameResolver {
             }
         }
         return null;
+    }
+
+    private String extractRoleIdFromNameKey(String nameKey) {
+        if (nameKey == null || nameKey.isBlank()) {
+            return null;
+        }
+        String trimmed = nameKey.trim();
+        String[] prefixes = {
+                "server.npcRole.",
+                "npcRole.",
+                "server.npcRoles.",
+                "npcRoles."
+        };
+        for (String prefix : prefixes) {
+            if (!trimmed.startsWith(prefix)) {
+                continue;
+            }
+            String remainder = trimmed.substring(prefix.length());
+            if (remainder.endsWith(".name")) {
+                remainder = remainder.substring(0, remainder.length() - ".name".length());
+            }
+            return remainder.isBlank() ? null : remainder;
+        }
+        return null;
+    }
+
+    private boolean isGenericRoleDisplayName(String displayName, String roleId, String translatedRoleName) {
+        if (displayName == null || displayName.isBlank() || roleId == null || roleId.isBlank()) {
+            return false;
+        }
+        String normalizedDisplay = displayName.trim();
+        if (translatedRoleName != null && normalizedDisplay.equalsIgnoreCase(translatedRoleName.trim())) {
+            return false;
+        }
+        for (String genericRoleId : buildGenericRoleCandidates(roleId)) {
+            String translated = translateNpcNameKey(genericRoleId);
+            if (translated != null && normalizedDisplay.equalsIgnoreCase(translated.trim())) {
+                return true;
+            }
+            String humanized = humanizeRoleId(genericRoleId);
+            if (humanized != null && normalizedDisplay.equalsIgnoreCase(humanized)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> buildGenericRoleCandidates(String roleId) {
+        ArrayList<String> candidates = new ArrayList<>(4);
+        if (roleId == null || roleId.isBlank()) {
+            return candidates;
+        }
+        String trimmed = roleId.trim();
+        int separator = trimmed.indexOf('_');
+        if (separator <= 0) {
+            return candidates;
+        }
+        String base = trimmed.substring(0, separator);
+        addCandidate(candidates, base);
+        if (trimmed.endsWith("_Pet")) {
+            addCandidate(candidates, base + "_Pet");
+        }
+        if (trimmed.startsWith("Tamed_")) {
+            String withoutTamed = trimmed.substring("Tamed_".length());
+            int tamedSeparator = withoutTamed.indexOf('_');
+            if (tamedSeparator > 0) {
+                addCandidate(candidates, "Tamed_" + withoutTamed.substring(0, tamedSeparator));
+            }
+        }
+        return candidates;
+    }
+
+    private String humanizeRoleId(String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        StringBuilder out = new StringBuilder();
+        for (String part : roleId.trim().split("_")) {
+            if (part == null || part.isBlank()) {
+                continue;
+            }
+            if (!out.isEmpty()) {
+                out.append(' ');
+            }
+            out.append(Character.toUpperCase(part.charAt(0)));
+            if (part.length() > 1) {
+                out.append(part.substring(1).toLowerCase(Locale.ROOT));
+            }
+        }
+        return out.isEmpty() ? null : out.toString();
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
+    }
+
+    private boolean sameIdentifier(String first, String second) {
+        if (first == null || first.isBlank() || second == null || second.isBlank()) {
+            return false;
+        }
+        return first.trim().equalsIgnoreCase(second.trim());
     }
 
     private static String readScopeStringParam(Object scope, String... paramNames) {

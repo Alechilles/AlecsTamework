@@ -17,6 +17,7 @@ import java.util.LinkedHashSet;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.IntFunction;
 
 /**
  * Evaluates command-item link ownership and role policy decisions.
@@ -93,13 +94,29 @@ final class CommandLinkPolicyService {
         if (npc == null) {
             return null;
         }
-        if (npc.getRoleName() != null && !npc.getRoleName().isBlank()) {
-            return npc.getRoleName();
+        return selectRoleId(
+                npc.getRoleName(),
+                npc.getRoleIndex(),
+                CommandLinkPolicyService::lookupRegisteredRoleId
+        );
+    }
+
+    static String selectRoleId(String roleName, int roleIndex, IntFunction<String> registeredRoleLookup) {
+        if (roleIndex >= 0 && registeredRoleLookup != null) {
+            String registeredRoleId = registeredRoleLookup.apply(roleIndex);
+            if (registeredRoleId != null && !registeredRoleId.isBlank()) {
+                return registeredRoleId;
+            }
         }
-        if (npc.getRoleIndex() >= 0 && NPCPlugin.get() != null) {
-            return NPCPlugin.get().getName(npc.getRoleIndex());
+        if (roleName != null && !roleName.isBlank()) {
+            return roleName;
         }
         return null;
+    }
+
+    private static String lookupRegisteredRoleId(int roleIndex) {
+        NPCPlugin plugin = NPCPlugin.get();
+        return plugin != null ? plugin.getName(roleIndex) : null;
     }
 
     boolean isRoleAllowed(String roleId, TwCommandItemConfig config) {
