@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
+
 ### Changed
 - Updated `Glowing Purple Mushroom Spores` crafting to produce two spores per craft, letting one mushroom create two plantable seeds.
 
