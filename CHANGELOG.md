@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- Updated `Glowing Purple Mushroom Spores` crafting to produce two spores per craft, letting one mushroom create two plantable seeds.
+
 ## 2.10.0 - Flying Mounts (Beta), Role-Line Breeding, and Attachment Migrations - 2026-05-13
 
 ### Added
