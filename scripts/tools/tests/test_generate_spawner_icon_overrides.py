@@ -47,7 +47,15 @@ def goat_model() -> dict:
 
 
 class BatchManifestTests(unittest.TestCase):
-    def run_generator(self, cwd: Path, manifest: Path, jobs_out: Path, manifest_out: Path, env=None):
+    def run_generator(
+        self,
+        cwd: Path,
+        manifest: Path,
+        jobs_out: Path,
+        manifest_out: Path,
+        env=None,
+        extra_args=None,
+    ):
         command = [
             sys.executable,
             str(SCRIPT),
@@ -60,6 +68,8 @@ class BatchManifestTests(unittest.TestCase):
             "--manifest-out",
             str(manifest_out),
         ]
+        if extra_args:
+            command.extend(extra_args)
         return subprocess.run(
             command,
             cwd=cwd,
@@ -184,6 +194,63 @@ class BatchManifestTests(unittest.TestCase):
             self.assertTrue(jobs["modelSource"].endswith("models\\Livestock\\Goat.json") or jobs["modelSource"].endswith("models/Livestock/Goat.json"))
             for job in jobs["jobs"]:
                 self.assertEqual(set(job["attachments"].keys()), {"BaseColor", "Horns"})
+
+    def test_replace_icon_overrides_drops_stale_roles(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Goat.json", goat_model())
+            spawner = root / "spawner.json"
+            write_json(
+                spawner,
+                {
+                    "IconOverridesByRole": {
+                        "OldRole": [
+                            {
+                                "Icon": "Icons/ItemsGenerated/Generated/Old.png",
+                                "Attachments": {"BaseColor": "Old"},
+                            }
+                        ]
+                    }
+                },
+            )
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{role}_{set_basecolor}.png"
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "goat_local",
+                            "source": "localModels",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Goat"],
+                            "keepAttachmentSets": ["BaseColor"],
+                        }
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(
+                root,
+                manifest,
+                jobs_out,
+                manifest_out,
+                extra_args=[
+                    "--spawner-config",
+                    str(spawner),
+                    "--in-place",
+                    "--replace-icon-overrides",
+                ],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            updated = json.loads(spawner.read_text(encoding="utf-8"))
+            self.assertEqual(set(updated["IconOverridesByRole"].keys()), {"Goat"})
 
 
 if __name__ == "__main__":
