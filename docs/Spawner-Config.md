@@ -86,6 +86,75 @@ Notes:
 - By default, unknown roles are derived from `AllowedRoles.Allowlist` when `--roles` is omitted.
 - Model sources can be read directly from a zip using `mod.zip!Server/Models/...json`.
 
+### Batch manifest generation
+For larger icon sets, the same generator can read a batch manifest with shared
+source roots and per-entry attachment curation. This keeps mod archive paths in
+one place while each mob entry references only a source id and model-relative
+path.
+
+Example manifest:
+```json
+{
+  "defaults": {
+    "iconTemplate": "Icons/ItemsGenerated/Spawner_{role}_{combo_slug}.png",
+    "rendererName": "Animal Husbandry curated icons",
+    "iconSize": 128,
+    "cameraScale": 1.0,
+    "cameraRotation": [22.5, 45, 22.5],
+    "cameraTranslation": [0, -13.5]
+  },
+  "sources": {
+    "baseGame": {
+      "modelsRoot": "${HYTALE_INSTALL}/release/package/game/latest/Server/Models"
+    },
+    "auresLivestock": {
+      "modelsRoot": "${MANIFEST_DIR}/sources/Aures_Livestock.zip!Server/Models"
+    }
+  },
+  "entries": [
+    {
+      "id": "goat_base",
+      "source": "baseGame",
+      "model": "Livestock/Goat.json",
+      "roles": ["Goat", "Goat_Tamed"],
+      "keepAttachmentSets": ["BaseColor", "Horns"]
+    },
+    {
+      "id": "goat_aures",
+      "source": "auresLivestock",
+      "model": "Livestock/Goat.json",
+      "roles": "Goat,Goat_Tamed",
+      "keepAttachmentSets": ["BaseColor", "Horns"]
+    }
+  ]
+}
+```
+
+Run:
+```bash
+python scripts/tools/generate_spawner_icon_overrides.py \
+  --asset-root src/main/resources \
+  --batch-manifest tools/animal_husbandry_icons.batch.json \
+  --spawner-config Server/Tamework/Items/Spawners/AHSpawnSoulLantern.json \
+  --write-spawner Server/Tamework/Items/Spawners/AHSpawnSoulLantern.generated.json \
+  --manifest-out .tmp/animal_husbandry_icon_manifest.json \
+  --renderer-jobs-out .tmp/animal_husbandry_render_jobs.json
+```
+
+Batch manifest notes:
+- `sources.<id>.modelsRoot` supports normal directories and zip roots such as
+  `Some_Mod.zip!Server/Models`.
+- Source paths can use environment variables like `${HYTALE_INSTALL}`.
+- `${MANIFEST_DIR}` resolves to the directory containing the batch manifest.
+- Relative `modelsRoot` values resolve relative to the manifest file.
+- Entry `model` paths are relative to the chosen source's `modelsRoot`; leading
+  slashes are ignored.
+- `keepAttachmentSets` limits generated combinations to the visual attachment
+  sets that should affect icons. Omit it to generate all sets.
+- Entries can override defaults including `iconTemplate`, `iconSize`,
+  `cameraScale`, `cameraRotation`, `cameraTranslation`, `includeEmptySets`,
+  `emptyValueToken`, and `maxCombos`.
+
 ### Renderer job export
 The same tool writes renderer jobs JSON for external pipelines (for example a
 Blockbench plugin/script worker) with:

@@ -1,0 +1,167 @@
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import unittest
+import zipfile
+from pathlib import Path
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+SCRIPT = REPO_ROOT / "scripts" / "tools" / "generate_spawner_icon_overrides.py"
+
+
+def write_json(path: Path, payload: object) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def goat_model() -> dict:
+    return {
+        "Model": "Models/Livestock/Goat_Base.json",
+        "Texture": "Textures/Livestock/Goat_Base.png",
+        "RandomAttachmentSets": {
+            "BaseColor": {
+                "Brown": {
+                    "Model": "Models/Livestock/Goat_Brown.json",
+                    "Texture": "Textures/Livestock/Goat_Brown.png",
+                    "Weight": 1,
+                },
+                "White": {
+                    "Model": "Models/Livestock/Goat_White.json",
+                    "Texture": "Textures/Livestock/Goat_White.png",
+                    "Weight": 1,
+                },
+            },
+            "Eyes": {
+                "Blue": {"Texture": "Textures/Livestock/Goat_Eyes_Blue.png"},
+                "Gold": {"Texture": "Textures/Livestock/Goat_Eyes_Gold.png"},
+            },
+            "Horns": {
+                "Short": {"Model": "Models/Livestock/Goat_Horns_Short.json"},
+                "Long": {"Model": "Models/Livestock/Goat_Horns_Long.json"},
+            },
+        },
+    }
+
+
+class BatchManifestTests(unittest.TestCase):
+    def run_generator(self, cwd: Path, manifest: Path, jobs_out: Path, manifest_out: Path, env=None):
+        command = [
+            sys.executable,
+            str(SCRIPT),
+            "--asset-root",
+            str(cwd),
+            "--batch-manifest",
+            str(manifest),
+            "--renderer-jobs-out",
+            str(jobs_out),
+            "--manifest-out",
+            str(manifest_out),
+        ]
+        return subprocess.run(
+            command,
+            cwd=cwd,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
+
+    def test_batch_manifest_resolves_source_alias_zip_and_filters_sets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_zip = root / "Aures_Livestock.zip"
+            with zipfile.ZipFile(source_zip, "w") as archive:
+                archive.writestr(
+                    "Server/Models/Livestock/Goat.json",
+                    json.dumps(goat_model()),
+                )
+
+            manifest = root / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{role}_{set_basecolor}.png",
+                        "rendererName": "Animal Husbandry curated icons",
+                    },
+                    "sources": {
+                        "auresLivestock": {
+                            "modelsRoot": "${TEST_AURES_ZIP}!Server/Models"
+                        }
+                    },
+                    "entries": [
+                        {
+                            "id": "goat_aures",
+                            "source": "auresLivestock",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Goat", "Goat_Tamed"],
+                            "keepAttachmentSets": ["BaseColor"],
+                        }
+                    ],
+                },
+            )
+
+            env = os.environ.copy()
+            env["TEST_AURES_ZIP"] = str(source_zip)
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(root, manifest, jobs_out, manifest_out, env=env)
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            jobs = json.loads(jobs_out.read_text(encoding="utf-8"))
+            self.assertEqual(jobs["schema"], "tamework.spawner-icon-render-jobs.v1")
+            self.assertEqual(jobs["renderer"], "Animal Husbandry curated icons")
+            self.assertEqual(jobs["jobCount"], 4)
+            self.assertEqual(len(jobs["jobs"]), 4)
+            self.assertIn("Aures_Livestock.zip!Server/Models/Livestock/Goat.json", jobs["modelSource"])
+            for job in jobs["jobs"]:
+                self.assertEqual(set(job["attachments"].keys()), {"BaseColor"})
+                self.assertNotIn("Eyes", job["outputIcon"])
+                self.assertNotIn("Horns", job["outputIcon"])
+
+    def test_batch_manifest_resolves_manifest_relative_root_and_leading_slash_model_path(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Goat.json", goat_model())
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{role}_{set_basecolor}_{set_horns}.png"
+                    },
+                    "sources": {
+                        "localModels": {
+                            "modelsRoot": "../models"
+                        }
+                    },
+                    "entries": [
+                        {
+                            "id": "goat_local",
+                            "source": "localModels",
+                            "model": "/Livestock/Goat.json",
+                            "roles": "Goat",
+                            "keepAttachmentSets": ["BaseColor", "Horns"],
+                        }
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(root, manifest, jobs_out, manifest_out)
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            jobs = json.loads(jobs_out.read_text(encoding="utf-8"))
+            self.assertEqual(jobs["jobCount"], 4)
+            self.assertTrue(jobs["modelSource"].endswith("models\\Livestock\\Goat.json") or jobs["modelSource"].endswith("models/Livestock/Goat.json"))
+            for job in jobs["jobs"]:
+                self.assertEqual(set(job["attachments"].keys()), {"BaseColor", "Horns"})
+
+
+if __name__ == "__main__":
+    unittest.main()

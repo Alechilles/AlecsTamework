@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import itertools
 import json
+import os
 import re
 import string
 import zipfile
@@ -22,6 +23,7 @@ from typing import Dict, Iterable, List, Mapping, Sequence, Tuple
 
 EMPTY_OPTION_SENTINEL = "__empty__"
 SAFE_KEY_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+ENV_VAR_RE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}")
 
 
 class ConfigError(Exception):
@@ -112,6 +114,21 @@ def parse_csv_or_repeat(values: Sequence[str]) -> List[str]:
     return parsed
 
 
+def parse_string_list_field(raw: object, field_name: str) -> List[str]:
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return parse_csv_or_repeat([raw])
+    if isinstance(raw, list):
+        parsed: List[str] = []
+        for item in raw:
+            if not isinstance(item, str):
+                raise ConfigError(f"{field_name} must contain only strings.")
+            parsed.extend(parse_csv_or_repeat([item]))
+        return parsed
+    raise ConfigError(f"{field_name} must be a string or array of strings.")
+
+
 def parse_float_list(raw: str, expected_count: int, flag: str) -> Tuple[float, ...]:
     parts = [piece.strip() for piece in raw.split(",")]
     if len(parts) != expected_count:
@@ -122,11 +139,87 @@ def parse_float_list(raw: str, expected_count: int, flag: str) -> Tuple[float, .
         raise ConfigError(f"{flag} must contain only numbers.") from exc
 
 
+def parse_float_field(raw: object, expected_count: int, field_name: str) -> Tuple[float, ...]:
+    if isinstance(raw, str):
+        return parse_float_list(raw, expected_count, field_name)
+    if isinstance(raw, list):
+        if len(raw) != expected_count:
+            raise ConfigError(f"{field_name} must contain {expected_count} numbers.")
+        try:
+            return tuple(float(piece) for piece in raw)
+        except ValueError as exc:
+            raise ConfigError(f"{field_name} must contain only numbers.") from exc
+        except TypeError as exc:
+            raise ConfigError(f"{field_name} must contain only numbers.") from exc
+    raise ConfigError(f"{field_name} must be a comma-separated string or number array.")
+
+
 def resolve_asset_path(asset_root: Path, value: str) -> Path:
     candidate = Path(value)
     if candidate.is_absolute():
         return candidate
     return asset_root / value
+
+
+def expand_path_variables(value: str, manifest_dir: Path) -> str:
+    variables = dict(os.environ)
+    variables["MANIFEST_DIR"] = str(manifest_dir)
+
+    def replace(match: re.Match[str]) -> str:
+        name = match.group(1)
+        if name not in variables:
+            raise ConfigError(f"Path references undefined variable ${{{name}}}.")
+        return variables[name]
+
+    return ENV_VAR_RE.sub(replace, value)
+
+
+def resolve_manifest_root_path(manifest_dir: Path, raw_value: str) -> str:
+    value = expand_path_variables(raw_value, manifest_dir)
+    if "!" in value:
+        zip_part, inner_part = value.split("!", 1)
+        zip_path = Path(zip_part)
+        if not zip_path.is_absolute():
+            zip_path = manifest_dir / zip_path
+        inner_path = inner_part.replace("\\", "/").strip("/")
+        return f"{zip_path.resolve()}!{inner_path}" if inner_path else str(zip_path.resolve())
+
+    path = Path(value)
+    if not path.is_absolute():
+        path = manifest_dir / path
+    return str(path.resolve())
+
+
+def join_manifest_model_path(models_root: str, model_path: str) -> str:
+    clean_model = model_path.replace("\\", "/").lstrip("/")
+    if not clean_model:
+        raise ConfigError("Batch manifest entry model path cannot be empty.")
+    if "!" in clean_model:
+        return clean_model
+    if "!" in models_root:
+        zip_part, inner_part = models_root.split("!", 1)
+        clean_inner = inner_part.replace("\\", "/").strip("/")
+        joined_inner = f"{clean_inner}/{clean_model}" if clean_inner else clean_model
+        return f"{zip_part}!{joined_inner}"
+    return str((Path(models_root) / Path(clean_model)).resolve())
+
+
+def read_required_mapping(raw: Mapping[str, object], key: str, context: str) -> Mapping[str, object]:
+    value = raw.get(key)
+    if not isinstance(value, dict):
+        raise ConfigError(f"{context} must define object '{key}'.")
+    return value
+
+
+def get_string(raw: Mapping[str, object], key: str, context: str, default: str | None = None) -> str:
+    value = raw.get(key)
+    if value is None:
+        if default is not None:
+            return default
+        raise ConfigError(f"{context} must define string '{key}'.")
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{context} field '{key}' must be a non-empty string.")
+    return value
 
 
 def extract_set_definitions(
@@ -167,6 +260,35 @@ def extract_set_definitions(
     if not definitions:
         raise ConfigError("RandomAttachmentSets was present but empty.")
     return definitions
+
+
+def filter_set_definitions(
+    set_defs: Sequence[SetDefinition],
+    keep_sets: Sequence[str],
+    context: str,
+) -> List[SetDefinition]:
+    if not keep_sets:
+        return list(set_defs)
+
+    by_name = {set_def.name: set_def for set_def in set_defs}
+    unknown = [set_name for set_name in keep_sets if set_name not in by_name]
+    if unknown:
+        raise ConfigError(
+            f"{context} keepAttachmentSets references unknown set(s): "
+            + ", ".join(unknown)
+            + f". Available: {', '.join(by_name.keys())}"
+        )
+
+    seen = set()
+    filtered: List[SetDefinition] = []
+    for set_name in keep_sets:
+        if set_name in seen:
+            continue
+        seen.add(set_name)
+        filtered.append(by_name[set_name])
+    if not filtered:
+        raise ConfigError(f"{context} keepAttachmentSets did not select any sets.")
+    return filtered
 
 
 def extract_option_visuals(
@@ -469,6 +591,53 @@ def build_renderer_jobs(
     }
 
 
+def combine_renderer_payloads(
+    *,
+    asset_root: Path,
+    renderer_name: str,
+    icon_size: int,
+    camera_scale: float,
+    camera_rotation: Tuple[float, float, float],
+    camera_translation: Tuple[float, float],
+    payloads: Sequence[Mapping[str, object]],
+) -> dict:
+    jobs: List[dict] = []
+    model_sources: List[str] = []
+    models: List[object] = []
+    for payload in payloads:
+        model_source = payload.get("modelSource")
+        if isinstance(model_source, str):
+            model_sources.append(model_source)
+        model = payload.get("model")
+        if model is not None:
+            models.append(model)
+        payload_jobs = payload.get("jobs")
+        if isinstance(payload_jobs, list):
+            jobs.extend(job for job in payload_jobs if isinstance(job, dict))
+
+    first_model_source = model_sources[0] if model_sources else None
+    return {
+        "schema": "tamework.spawner-icon-render-jobs.v1",
+        "generatedAtUtc": datetime.now(timezone.utc).isoformat(),
+        "renderer": renderer_name,
+        "assetRoot": str(asset_root),
+        "modelSource": first_model_source,
+        "modelSources": model_sources,
+        "defaults": {
+            "iconSize": icon_size,
+            "camera": {
+                "scale": camera_scale,
+                "rotation": list(camera_rotation),
+                "translation": list(camera_translation),
+            },
+        },
+        "model": models[0] if len(models) == 1 else None,
+        "models": models,
+        "jobCount": len(jobs),
+        "jobs": jobs,
+    }
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -482,8 +651,14 @@ def parse_args() -> argparse.Namespace:
         help="Asset root containing Server/ and Common/ (default: src/main/resources).",
     )
     parser.add_argument(
+        "--batch-manifest",
+        help=(
+            "Optional batch manifest JSON with shared sources/defaults and entry list. "
+            "When set, --model and --icon-template are read from the manifest."
+        ),
+    )
+    parser.add_argument(
         "--model",
-        required=True,
         help=(
             "Path to model JSON containing RandomAttachmentSets. "
             "Absolute path or relative to --asset-root."
@@ -519,7 +694,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--icon-template",
-        required=True,
         help=(
             "Template for icon path generation. Supports {role}, {combo_index}, "
             "{combo_slug}, and per-set placeholders {set_<set_name_slug>}."
@@ -593,9 +767,12 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def main() -> int:
-    args = parse_args()
-    asset_root = Path(args.asset_root).resolve()
+def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
+    if not args.model:
+        raise ConfigError("--model is required unless --batch-manifest is provided.")
+    if not args.icon_template:
+        raise ConfigError("--icon-template is required unless --batch-manifest is provided.")
+
     model_json, model_source, model_stem = load_json_from_source(asset_root, args.model)
     if not isinstance(model_json, dict):
         raise ConfigError(f"Model JSON must be an object: {model_source}")
@@ -705,6 +882,317 @@ def main() -> int:
 
     print("\n".join(output_lines))
     return 0
+
+
+def resolve_batch_sources(
+    batch_manifest: Mapping[str, object],
+    manifest_dir: Path,
+) -> Dict[str, str]:
+    raw_sources = read_required_mapping(batch_manifest, "sources", "Batch manifest")
+    sources: Dict[str, str] = {}
+    for source_id, raw_source in raw_sources.items():
+        if not isinstance(source_id, str) or not source_id.strip():
+            raise ConfigError("Batch manifest sources must use non-empty string IDs.")
+        if isinstance(raw_source, str):
+            models_root = raw_source
+        elif isinstance(raw_source, dict):
+            models_root = get_string(raw_source, "modelsRoot", f"Source '{source_id}'")
+        else:
+            raise ConfigError(f"Source '{source_id}' must be a string or object.")
+        sources[source_id] = resolve_manifest_root_path(manifest_dir, models_root)
+    if not sources:
+        raise ConfigError("Batch manifest must define at least one source.")
+    return sources
+
+
+def read_batch_entries(batch_manifest: Mapping[str, object]) -> List[Mapping[str, object]]:
+    raw_entries = batch_manifest.get("entries")
+    if not isinstance(raw_entries, list) or not raw_entries:
+        raise ConfigError("Batch manifest must define a non-empty entries array.")
+    entries: List[Mapping[str, object]] = []
+    for index, raw_entry in enumerate(raw_entries, start=1):
+        if not isinstance(raw_entry, dict):
+            raise ConfigError(f"Batch manifest entry #{index} must be an object.")
+        entries.append(raw_entry)
+    return entries
+
+
+def batch_value(
+    entry: Mapping[str, object],
+    defaults: Mapping[str, object],
+    key: str,
+    fallback: object = None,
+) -> object:
+    if key in entry:
+        return entry[key]
+    if key in defaults:
+        return defaults[key]
+    return fallback
+
+
+def batch_string(
+    entry: Mapping[str, object],
+    defaults: Mapping[str, object],
+    key: str,
+    context: str,
+    fallback: str | None = None,
+) -> str:
+    value = batch_value(entry, defaults, key, fallback)
+    if value is None:
+        raise ConfigError(f"{context} must define string '{key}' or defaults.{key}.")
+    if not isinstance(value, str) or not value.strip():
+        raise ConfigError(f"{context} field '{key}' must be a non-empty string.")
+    return value
+
+
+def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
+    manifest_path = Path(args.batch_manifest).resolve()
+    raw_manifest = load_json(manifest_path)
+    if not isinstance(raw_manifest, dict):
+        raise ConfigError(f"Batch manifest JSON must be an object: {manifest_path}")
+
+    manifest_dir = manifest_path.parent
+    defaults = raw_manifest.get("defaults")
+    if defaults is None:
+        defaults = {}
+    if not isinstance(defaults, dict):
+        raise ConfigError("Batch manifest defaults must be an object when provided.")
+
+    sources = resolve_batch_sources(raw_manifest, manifest_dir)
+    entries = read_batch_entries(raw_manifest)
+
+    renderer_name_raw = defaults.get("rendererName", args.renderer_name)
+    if not isinstance(renderer_name_raw, str) or not renderer_name_raw.strip():
+        raise ConfigError("defaults.rendererName must be a non-empty string.")
+    renderer_name = renderer_name_raw
+
+    icon_size = int(defaults.get("iconSize", args.icon_size))
+    camera_scale = float(defaults.get("cameraScale", args.camera_scale))
+    camera_rotation = parse_float_field(
+        defaults.get("cameraRotation", args.camera_rotation), 3, "defaults.cameraRotation"
+    )
+    camera_translation = parse_float_field(
+        defaults.get("cameraTranslation", args.camera_translation),
+        2,
+        "defaults.cameraTranslation",
+    )
+
+    spawner_json = None
+    spawner_path: Path | None = None
+    if args.spawner_config:
+        spawner_path = resolve_asset_path(asset_root, args.spawner_config).resolve()
+        loaded_spawner = load_json(spawner_path)
+        if not isinstance(loaded_spawner, dict):
+            raise ConfigError(f"Spawner config JSON must be an object: {spawner_path}")
+        spawner_json = loaded_spawner
+
+    aggregate_role_overrides: Dict[str, List[dict]] = {}
+    aggregate_combo_manifest: List[dict] = []
+    renderer_payloads: List[Mapping[str, object]] = []
+    report_entries: List[dict] = []
+    total_skipped_empty: List[str] = []
+
+    for index, entry in enumerate(entries, start=1):
+        entry_id = get_string(entry, "id", f"Batch entry #{index}", default=f"entry_{index}")
+        source_id = get_string(entry, "source", f"Batch entry '{entry_id}'")
+        if source_id not in sources:
+            raise ConfigError(
+                f"Batch entry '{entry_id}' references unknown source '{source_id}'. "
+                f"Available: {', '.join(sources.keys())}"
+            )
+        model_path = get_string(entry, "model", f"Batch entry '{entry_id}'")
+        model_source_input = join_manifest_model_path(sources[source_id], model_path)
+        model_json, model_source, model_stem = load_json_from_source(asset_root, model_source_input)
+        if not isinstance(model_json, dict):
+            raise ConfigError(f"Model JSON must be an object: {model_source}")
+
+        roles = parse_string_list_field(entry.get("roles"), f"Batch entry '{entry_id}' roles")
+        if not roles:
+            roles = discover_roles([], spawner_json)
+
+        include_empty_sets = parse_string_list_field(
+            batch_value(entry, defaults, "includeEmptySets", []),
+            f"Batch entry '{entry_id}' includeEmptySets",
+        )
+        keep_sets = parse_string_list_field(
+            entry.get("keepAttachmentSets"),
+            f"Batch entry '{entry_id}' keepAttachmentSets",
+        )
+        icon_template = batch_string(entry, defaults, "iconTemplate", f"Batch entry '{entry_id}'")
+        empty_value_token = batch_string(
+            entry,
+            defaults,
+            "emptyValueToken",
+            f"Batch entry '{entry_id}'",
+            fallback=args.empty_value_token,
+        )
+        max_combos = int(batch_value(entry, defaults, "maxCombos", args.max_combos))
+
+        all_set_defs = extract_set_definitions(model_json, include_empty_sets)
+        set_defs = filter_set_definitions(all_set_defs, keep_sets, f"Batch entry '{entry_id}'")
+        generated_set_names = {set_def.name for set_def in set_defs}
+        unused_empty_sets = sorted(set(include_empty_sets).difference(generated_set_names))
+        if unused_empty_sets:
+            raise ConfigError(
+                f"Batch entry '{entry_id}' includeEmptySets selected set(s) not present "
+                "in keepAttachmentSets: " + ", ".join(unused_empty_sets)
+            )
+
+        option_visuals = extract_option_visuals(model_json)
+        role_overrides, combo_manifest, skipped_empty = build_combo_records(
+            set_defs=set_defs,
+            roles=roles,
+            icon_template=icon_template,
+            empty_value_token=empty_value_token,
+            max_combos=max_combos,
+        )
+
+        for role, overrides in role_overrides.items():
+            aggregate_role_overrides.setdefault(role, []).extend(overrides)
+
+        entry_combo_manifest = []
+        for combo in combo_manifest:
+            combo_with_entry = dict(combo)
+            combo_with_entry["entryId"] = entry_id
+            combo_with_entry["source"] = source_id
+            combo_with_entry["modelPath"] = model_source
+            entry_combo_manifest.append(combo_with_entry)
+        aggregate_combo_manifest.extend(entry_combo_manifest)
+        total_skipped_empty.extend(f"{entry_id}:{combo}" for combo in skipped_empty)
+
+        entry_camera_scale = float(batch_value(entry, defaults, "cameraScale", camera_scale))
+        entry_camera_rotation = parse_float_field(
+            batch_value(entry, defaults, "cameraRotation", list(camera_rotation)),
+            3,
+            f"Batch entry '{entry_id}' cameraRotation",
+        )
+        entry_camera_translation = parse_float_field(
+            batch_value(entry, defaults, "cameraTranslation", list(camera_translation)),
+            2,
+            f"Batch entry '{entry_id}' cameraTranslation",
+        )
+        entry_icon_size = int(batch_value(entry, defaults, "iconSize", icon_size))
+        renderer_payload = build_renderer_jobs(
+            asset_root=asset_root,
+            model_json=model_json,
+            model_source=model_source,
+            roles=roles,
+            combo_manifest=combo_manifest,
+            option_visuals=option_visuals,
+            renderer_name=renderer_name,
+            icon_size=entry_icon_size,
+            camera_scale=entry_camera_scale,
+            camera_rotation=entry_camera_rotation,
+            camera_translation=entry_camera_translation,
+        )
+        for job in renderer_payload.get("jobs", []):
+            if isinstance(job, dict):
+                job["entryId"] = entry_id
+                job["source"] = source_id
+                job["modelSource"] = model_source
+                if entry_icon_size != icon_size:
+                    job["iconSize"] = entry_icon_size
+                if entry_camera_scale != camera_scale or entry_camera_rotation != camera_rotation:
+                    job["camera"] = {
+                        "scale": entry_camera_scale,
+                        "rotation": list(entry_camera_rotation),
+                    }
+                if entry_camera_translation != camera_translation:
+                    job["translation"] = list(entry_camera_translation)
+        renderer_payloads.append(renderer_payload)
+
+        report_entries.append(
+            {
+                "id": entry_id,
+                "source": source_id,
+                "modelPath": model_source,
+                "roles": roles,
+                "keptAttachmentSets": [set_def.name for set_def in set_defs],
+                "comboCount": len(combo_manifest),
+                "overridesGeneratedByRole": {
+                    role: len(overrides) for role, overrides in role_overrides.items()
+                },
+                "skippedEmptyAttachmentCombos": skipped_empty,
+                "modelStem": model_stem,
+            }
+        )
+
+    manifest_out_path = (
+        Path(args.manifest_out).resolve()
+        if args.manifest_out
+        else (Path.cwd() / ".tmp" / "spawner_icon_manifest_batch.json").resolve()
+    )
+    manifest_payload = {
+        "generatedAtUtc": datetime.now(timezone.utc).isoformat(),
+        "assetRoot": str(asset_root),
+        "batchManifest": str(manifest_path),
+        "sources": sources,
+        "entryCount": len(entries),
+        "comboCount": len(aggregate_combo_manifest),
+        "overridesGeneratedByRole": {
+            role: len(overrides) for role, overrides in aggregate_role_overrides.items()
+        },
+        "skippedEmptyAttachmentCombos": total_skipped_empty,
+        "entries": report_entries,
+        "combos": aggregate_combo_manifest,
+    }
+    write_json(manifest_out_path, manifest_payload)
+
+    output_lines = [
+        f"Batch manifest report written: {manifest_out_path}",
+        f"Entries: {len(entries)}",
+        f"Attachment combos: {len(aggregate_combo_manifest)}",
+    ]
+
+    if spawner_json is not None:
+        updated_spawner = apply_overrides_to_spawner(
+            spawner_json=spawner_json,
+            role_overrides=aggregate_role_overrides,
+            icon_default=args.icon_default,
+        )
+        if args.in_place:
+            target_path = spawner_path
+        elif args.write_spawner:
+            target_path = resolve_asset_path(asset_root, args.write_spawner).resolve()
+        else:
+            assert spawner_path is not None
+            target_path = spawner_path.with_suffix(".generated.json")
+        write_json(target_path, updated_spawner)
+        output_lines.append(f"Spawner config written: {target_path}")
+
+    renderer_jobs_path = (
+        Path(args.renderer_jobs_out).resolve()
+        if args.renderer_jobs_out
+        else (Path.cwd() / ".tmp" / "spawner_icon_render_jobs_batch.json").resolve()
+    )
+    renderer_payload = combine_renderer_payloads(
+        asset_root=asset_root,
+        renderer_name=renderer_name,
+        icon_size=icon_size,
+        camera_scale=camera_scale,
+        camera_rotation=camera_rotation,
+        camera_translation=camera_translation,
+        payloads=renderer_payloads,
+    )
+    write_json(renderer_jobs_path, renderer_payload)
+    output_lines.append(f"Renderer jobs written: {renderer_jobs_path}")
+
+    if total_skipped_empty:
+        output_lines.append(
+            "Note: Some combos had no attachments and cannot be represented as overrides. "
+            "Use IconDefault for those states."
+        )
+
+    print("\n".join(output_lines))
+    return 0
+
+
+def main() -> int:
+    args = parse_args()
+    asset_root = Path(args.asset_root).resolve()
+    if args.batch_manifest:
+        return run_batch_manifest(args, asset_root)
+    return run_single_model(args, asset_root)
 
 
 if __name__ == "__main__":
