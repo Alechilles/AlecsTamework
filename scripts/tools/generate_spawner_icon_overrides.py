@@ -141,6 +141,19 @@ def parse_string_list_field(raw: object, field_name: str) -> List[str]:
     raise ConfigError(f"{field_name} must be a string or array of strings.")
 
 
+def parse_string_list_mapping(raw: object, field_name: str) -> Dict[str, List[str]]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{field_name} must be an object mapping set names to strings or string arrays.")
+    parsed: Dict[str, List[str]] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key.strip():
+            raise ConfigError(f"{field_name} keys must be non-empty strings.")
+        parsed[key] = parse_string_list_field(value, f"{field_name}.{key}")
+    return parsed
+
+
 def parse_float_list(raw: str, expected_count: int, flag: str) -> Tuple[float, ...]:
     parts = [piece.strip() for piece in raw.split(",")]
     if len(parts) != expected_count:
@@ -392,6 +405,46 @@ def filter_set_definitions(
         filtered.append(by_name[set_name])
     if not filtered:
         raise ConfigError(f"{context} keepAttachmentSets did not select any sets.")
+    return filtered
+
+
+def exclude_set_options(
+    set_defs: Sequence[SetDefinition],
+    exclude_options: Mapping[str, Sequence[str]],
+    context: str,
+) -> List[SetDefinition]:
+    if not exclude_options:
+        return list(set_defs)
+
+    by_name = {set_def.name: set_def for set_def in set_defs}
+    unknown_sets = sorted(set(exclude_options.keys()).difference(by_name.keys()))
+    if unknown_sets:
+        raise ConfigError(
+            f"{context} excludeAttachmentOptions references unknown set(s): "
+            + ", ".join(unknown_sets)
+        )
+
+    filtered: List[SetDefinition] = []
+    for set_def in set_defs:
+        excluded = set(exclude_options.get(set_def.name, []))
+        unknown_options = sorted(excluded.difference(set_def.options))
+        if unknown_options:
+            raise ConfigError(
+                f"{context} excludeAttachmentOptions.{set_def.name} references unknown option(s): "
+                + ", ".join(unknown_options)
+            )
+        options = tuple(option for option in set_def.options if option not in excluded)
+        if not options:
+            raise ConfigError(
+                f"{context} excludeAttachmentOptions removed every option from set '{set_def.name}'."
+            )
+        filtered.append(
+            SetDefinition(
+                name=set_def.name,
+                options=options,
+                includes_empty=set_def.includes_empty and EMPTY_OPTION_SENTINEL in options,
+            )
+        )
     return filtered
 
 
@@ -1196,6 +1249,10 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
             entry.get("keepAttachmentSets"),
             f"Batch entry '{entry_id}' keepAttachmentSets",
         )
+        exclude_options = parse_string_list_mapping(
+            entry.get("excludeAttachmentOptions"),
+            f"Batch entry '{entry_id}' excludeAttachmentOptions",
+        )
         icon_template = batch_string(entry, defaults, "iconTemplate", f"Batch entry '{entry_id}'")
         empty_value_token = batch_string(
             entry,
@@ -1208,6 +1265,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
 
         all_set_defs = extract_set_definitions(model_json, include_empty_sets)
         set_defs = filter_set_definitions(all_set_defs, keep_sets, f"Batch entry '{entry_id}'")
+        set_defs = exclude_set_options(set_defs, exclude_options, f"Batch entry '{entry_id}'")
         generated_set_names = {set_def.name for set_def in set_defs}
         unused_empty_sets = sorted(set(include_empty_sets).difference(generated_set_names))
         if unused_empty_sets:
@@ -1288,6 +1346,9 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
                 "modelPath": model_source,
                 "roles": roles,
                 "keptAttachmentSets": [set_def.name for set_def in set_defs],
+                "excludedAttachmentOptions": {
+                    set_name: list(options) for set_name, options in exclude_options.items()
+                },
                 "comboCount": len(combo_manifest),
                 "overridesGeneratedByRole": {
                     role: len(overrides) for role, overrides in role_overrides.items()

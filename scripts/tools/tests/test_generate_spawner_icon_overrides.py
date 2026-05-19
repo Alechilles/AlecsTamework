@@ -252,6 +252,40 @@ class BatchManifestTests(unittest.TestCase):
             updated = json.loads(spawner.read_text(encoding="utf-8"))
             self.assertEqual(set(updated["IconOverridesByRole"].keys()), {"Goat"})
 
+    def test_exclude_attachment_options_removes_default_or_empty_variants(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Goat.json", goat_model())
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{role}_{set_basecolor}.png"
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "goat_local",
+                            "source": "localModels",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Goat"],
+                            "keepAttachmentSets": ["BaseColor"],
+                            "excludeAttachmentOptions": {"BaseColor": ["Brown"]},
+                        }
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(root, manifest, jobs_out, manifest_out)
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            jobs = json.loads(jobs_out.read_text(encoding="utf-8"))
+            self.assertEqual(jobs["jobCount"], 1)
+            self.assertEqual(jobs["jobs"][0]["attachments"], {"BaseColor": "White"})
+
 
 if __name__ == "__main__":
     unittest.main()
