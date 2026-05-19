@@ -44,6 +44,18 @@ class OptionVisual:
     weight: float | None
 
 
+@dataclass(frozen=True)
+class BatchSource:
+    models_root: str
+    common_roots: Tuple[str, ...]
+
+    def as_report(self) -> dict:
+        output = {"modelsRoot": self.models_root}
+        if self.common_roots:
+            output["commonRoots"] = list(self.common_roots)
+        return output
+
+
 def load_json(path: Path) -> object:
     try:
         return json.loads(path.read_text(encoding="utf-8"))
@@ -202,6 +214,98 @@ def join_manifest_model_path(models_root: str, model_path: str) -> str:
         joined_inner = f"{clean_inner}/{clean_model}" if clean_inner else clean_model
         return f"{zip_part}!{joined_inner}"
     return str((Path(models_root) / Path(clean_model)).resolve())
+
+
+def infer_common_root_from_models_root(models_root: str) -> str | None:
+    if "!" in models_root:
+        zip_part, inner_part = models_root.split("!", 1)
+        clean_inner = inner_part.replace("\\", "/").strip("/")
+        if clean_inner.endswith("Server/Models"):
+            prefix = clean_inner[: -len("Server/Models")].rstrip("/")
+            common_inner = f"{prefix}/Common" if prefix else "Common"
+            return f"{zip_part}!{common_inner}"
+        return None
+
+    path = Path(models_root)
+    if len(path.parts) >= 2 and path.parts[-2:] == ("Server", "Models"):
+        return str((path.parent.parent / "Common").resolve())
+    return None
+
+
+def extract_zip_asset(common_root: str, asset_path: str, extract_root: Path) -> str:
+    zip_part, inner_part = common_root.split("!", 1)
+    zip_path = Path(zip_part)
+    inner_root = inner_part.replace("\\", "/").strip("/")
+    clean_asset = asset_path.replace("\\", "/").lstrip("/")
+    if not clean_asset or clean_asset.startswith("../") or "/../" in clean_asset:
+        raise ConfigError(f"Unsafe zip asset path: {asset_path}")
+    zip_entry = f"{inner_root}/{clean_asset}" if inner_root else clean_asset
+    output_path = extract_root / Path(*clean_asset.split("/"))
+
+    try:
+        with zipfile.ZipFile(zip_path) as archive:
+            try:
+                data = archive.read(zip_entry)
+            except KeyError as exc:
+                raise ConfigError(f"Zip asset not found: {zip_path}!{zip_entry}") from exc
+    except FileNotFoundError as exc:
+        raise ConfigError(f"Zip file not found: {zip_path}") from exc
+    except zipfile.BadZipFile as exc:
+        raise ConfigError(f"Invalid zip file: {zip_path}") from exc
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_bytes(data)
+    return str(output_path.resolve())
+
+
+def resolve_common_asset_file(
+    asset_root: Path,
+    common_root: str | None,
+    asset_path: str | None,
+    extract_root: Path | None = None,
+) -> str | None:
+    if asset_path is None:
+        return None
+    path = Path(asset_path)
+    if path.is_absolute():
+        return str(path)
+    if common_root is None:
+        return to_common_asset_file(asset_root, asset_path)
+    if "!" in common_root:
+        if extract_root is None:
+            raise ConfigError("Zip-backed commonRoot requires an extraction directory.")
+        return extract_zip_asset(common_root, asset_path, extract_root)
+    return str((Path(common_root) / path).resolve())
+
+
+def resolve_common_asset_file_from_roots(
+    asset_root: Path,
+    common_roots: Sequence[str],
+    asset_path: str | None,
+    extract_root: Path | None = None,
+) -> str | None:
+    if asset_path is None:
+        return None
+    if not common_roots:
+        return to_common_asset_file(asset_root, asset_path)
+
+    errors: List[str] = []
+    for common_root in common_roots:
+        try:
+            resolved = resolve_common_asset_file(asset_root, common_root, asset_path, extract_root)
+        except ConfigError as exc:
+            errors.append(str(exc))
+            continue
+        if resolved is None:
+            return None
+        if Path(resolved).is_file():
+            return resolved
+        errors.append(f"Common asset not found: {resolved}")
+
+    raise ConfigError(
+        f"Could not resolve Common asset '{asset_path}' from configured roots. "
+        + " | ".join(errors)
+    )
 
 
 def read_required_mapping(raw: Mapping[str, object], key: str, context: str) -> Mapping[str, object]:
@@ -482,6 +586,8 @@ def to_common_asset_file(asset_root: Path, asset_path: str | None) -> str | None
 def build_renderer_jobs(
     *,
     asset_root: Path,
+    common_asset_roots: Sequence[str] = (),
+    common_extract_root: Path | None = None,
     model_json: Mapping[str, object],
     model_source: str,
     roles: Sequence[str],
@@ -495,6 +601,19 @@ def build_renderer_jobs(
 ) -> dict:
     base_model = model_json.get("Model") if isinstance(model_json.get("Model"), str) else None
     base_texture = model_json.get("Texture") if isinstance(model_json.get("Texture"), str) else None
+    source_asset_cache: Dict[str | None, str | None] = {}
+
+    def source_asset_file(asset_path: str | None) -> str | None:
+        if asset_path in source_asset_cache:
+            return source_asset_cache[asset_path]
+        resolved = resolve_common_asset_file_from_roots(
+            asset_root,
+            common_asset_roots,
+            asset_path,
+            common_extract_root,
+        )
+        source_asset_cache[asset_path] = resolved
+        return resolved
 
     jobs: List[dict] = []
     for combo in combo_manifest:
@@ -531,8 +650,8 @@ def build_renderer_jobs(
                         "model": visual.model if visual else None,
                         "texture": visual.texture if visual else None,
                         "weight": visual.weight if visual else None,
-                        "modelFile": to_common_asset_file(asset_root, visual.model if visual else None),
-                        "textureFile": to_common_asset_file(asset_root, visual.texture if visual else None),
+                        "modelFile": source_asset_file(visual.model if visual else None),
+                        "textureFile": source_asset_file(visual.texture if visual else None),
                     }
                 )
             jobs.append(
@@ -545,8 +664,8 @@ def build_renderer_jobs(
                     "setValues": set_values,
                     "baseModel": base_model,
                     "baseTexture": base_texture,
-                    "baseModelFile": to_common_asset_file(asset_root, base_model),
-                    "baseTextureFile": to_common_asset_file(asset_root, base_texture),
+                    "baseModelFile": source_asset_file(base_model),
+                    "baseTextureFile": source_asset_file(base_texture),
                     "selectedOptionAssets": selected_assets,
                     "outputIcon": icon_path,
                     "outputIconFile": output_icon_file,
@@ -558,6 +677,8 @@ def build_renderer_jobs(
         "generatedAtUtc": datetime.now(timezone.utc).isoformat(),
         "renderer": renderer_name,
         "assetRoot": str(asset_root),
+        "sourceCommonRoots": list(common_asset_roots),
+        "sourceAssetExtractRoot": str(common_extract_root.resolve()) if common_extract_root else None,
         "modelSource": model_source,
         "defaults": {
             "iconSize": icon_size,
@@ -570,16 +691,16 @@ def build_renderer_jobs(
         "model": {
             "baseModel": base_model,
             "baseTexture": base_texture,
-            "baseModelFile": to_common_asset_file(asset_root, base_model),
-            "baseTextureFile": to_common_asset_file(asset_root, base_texture),
+            "baseModelFile": source_asset_file(base_model),
+            "baseTextureFile": source_asset_file(base_texture),
             "randomAttachmentSets": {
                 set_name: {
                     option_name: {
                         "model": option.model,
                         "texture": option.texture,
                         "weight": option.weight,
-                        "modelFile": to_common_asset_file(asset_root, option.model),
-                        "textureFile": to_common_asset_file(asset_root, option.texture),
+                        "modelFile": source_asset_file(option.model),
+                        "textureFile": source_asset_file(option.texture),
                     }
                     for option_name, option in options.items()
                 }
@@ -603,11 +724,21 @@ def combine_renderer_payloads(
 ) -> dict:
     jobs: List[dict] = []
     model_sources: List[str] = []
+    source_common_roots: List[str] = []
+    source_asset_extract_roots: List[str] = []
     models: List[object] = []
     for payload in payloads:
         model_source = payload.get("modelSource")
         if isinstance(model_source, str):
             model_sources.append(model_source)
+        payload_common_roots = payload.get("sourceCommonRoots")
+        if isinstance(payload_common_roots, list):
+            source_common_roots.extend(
+                root for root in payload_common_roots if isinstance(root, str)
+            )
+        source_asset_extract_root = payload.get("sourceAssetExtractRoot")
+        if isinstance(source_asset_extract_root, str):
+            source_asset_extract_roots.append(source_asset_extract_root)
         model = payload.get("model")
         if model is not None:
             models.append(model)
@@ -623,6 +754,8 @@ def combine_renderer_payloads(
         "assetRoot": str(asset_root),
         "modelSource": first_model_source,
         "modelSources": model_sources,
+        "sourceCommonRoots": source_common_roots,
+        "sourceAssetExtractRoots": source_asset_extract_roots,
         "defaults": {
             "iconSize": icon_size,
             "camera": {
@@ -887,19 +1020,45 @@ def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
 def resolve_batch_sources(
     batch_manifest: Mapping[str, object],
     manifest_dir: Path,
-) -> Dict[str, str]:
+) -> Dict[str, BatchSource]:
     raw_sources = read_required_mapping(batch_manifest, "sources", "Batch manifest")
-    sources: Dict[str, str] = {}
+    sources: Dict[str, BatchSource] = {}
     for source_id, raw_source in raw_sources.items():
         if not isinstance(source_id, str) or not source_id.strip():
             raise ConfigError("Batch manifest sources must use non-empty string IDs.")
         if isinstance(raw_source, str):
             models_root = raw_source
+            raw_common_roots: List[str] = []
         elif isinstance(raw_source, dict):
             models_root = get_string(raw_source, "modelsRoot", f"Source '{source_id}'")
+            raw_common_root = raw_source.get("commonRoot")
+            raw_common_roots = parse_string_list_field(
+                raw_source.get("commonRoots"),
+                f"Source '{source_id}' commonRoots",
+            )
+            if raw_common_root is not None and (
+                not isinstance(raw_common_root, str) or not raw_common_root.strip()
+            ):
+                raise ConfigError(f"Source '{source_id}' field 'commonRoot' must be a non-empty string.")
+            if raw_common_root is not None:
+                raw_common_roots.insert(0, raw_common_root)
         else:
             raise ConfigError(f"Source '{source_id}' must be a string or object.")
-        sources[source_id] = resolve_manifest_root_path(manifest_dir, models_root)
+        resolved_models_root = resolve_manifest_root_path(manifest_dir, models_root)
+        if raw_common_roots:
+            resolved_common_roots = tuple(
+                resolve_manifest_root_path(manifest_dir, common_root)
+                for common_root in raw_common_roots
+            )
+        else:
+            inferred_common_root = infer_common_root_from_models_root(resolved_models_root)
+            resolved_common_roots = (
+                (inferred_common_root,) if inferred_common_root is not None else tuple()
+            )
+        sources[source_id] = BatchSource(
+            models_root=resolved_models_root,
+            common_roots=resolved_common_roots,
+        )
     if not sources:
         raise ConfigError("Batch manifest must define at least one source.")
     return sources
@@ -960,6 +1119,11 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
 
     sources = resolve_batch_sources(raw_manifest, manifest_dir)
     entries = read_batch_entries(raw_manifest)
+    renderer_jobs_path = (
+        Path(args.renderer_jobs_out).resolve()
+        if args.renderer_jobs_out
+        else (Path.cwd() / ".tmp" / "spawner_icon_render_jobs_batch.json").resolve()
+    )
 
     renderer_name_raw = defaults.get("rendererName", args.renderer_name)
     if not isinstance(renderer_name_raw, str) or not renderer_name_raw.strip():
@@ -1000,8 +1164,9 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
                 f"Batch entry '{entry_id}' references unknown source '{source_id}'. "
                 f"Available: {', '.join(sources.keys())}"
             )
+        source = sources[source_id]
         model_path = get_string(entry, "model", f"Batch entry '{entry_id}'")
-        model_source_input = join_manifest_model_path(sources[source_id], model_path)
+        model_source_input = join_manifest_model_path(source.models_root, model_path)
         model_json, model_source, model_stem = load_json_from_source(asset_root, model_source_input)
         if not isinstance(model_json, dict):
             raise ConfigError(f"Model JSON must be an object: {model_source}")
@@ -1074,6 +1239,8 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         entry_icon_size = int(batch_value(entry, defaults, "iconSize", icon_size))
         renderer_payload = build_renderer_jobs(
             asset_root=asset_root,
+            common_asset_roots=source.common_roots,
+            common_extract_root=renderer_jobs_path.parent / "spawner_icon_source_assets" / source_id,
             model_json=model_json,
             model_source=model_source,
             roles=roles,
@@ -1126,7 +1293,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         "generatedAtUtc": datetime.now(timezone.utc).isoformat(),
         "assetRoot": str(asset_root),
         "batchManifest": str(manifest_path),
-        "sources": sources,
+        "sources": {source_id: source.as_report() for source_id, source in sources.items()},
         "entryCount": len(entries),
         "comboCount": len(aggregate_combo_manifest),
         "overridesGeneratedByRole": {
@@ -1160,11 +1327,6 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         write_json(target_path, updated_spawner)
         output_lines.append(f"Spawner config written: {target_path}")
 
-    renderer_jobs_path = (
-        Path(args.renderer_jobs_out).resolve()
-        if args.renderer_jobs_out
-        else (Path.cwd() / ".tmp" / "spawner_icon_render_jobs_batch.json").resolve()
-    )
     renderer_payload = combine_renderer_payloads(
         asset_root=asset_root,
         renderer_name=renderer_name,

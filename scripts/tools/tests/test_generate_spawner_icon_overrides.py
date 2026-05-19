@@ -79,6 +79,19 @@ class BatchManifestTests(unittest.TestCase):
                     "Server/Models/Livestock/Goat.json",
                     json.dumps(goat_model()),
                 )
+                for asset_path in [
+                    "Models/Livestock/Goat_Base.json",
+                    "Textures/Livestock/Goat_Base.png",
+                    "Models/Livestock/Goat_Brown.json",
+                    "Textures/Livestock/Goat_Brown.png",
+                    "Models/Livestock/Goat_White.json",
+                    "Textures/Livestock/Goat_White.png",
+                    "Textures/Livestock/Goat_Eyes_Blue.png",
+                    "Textures/Livestock/Goat_Eyes_Gold.png",
+                    "Models/Livestock/Goat_Horns_Short.json",
+                    "Models/Livestock/Goat_Horns_Long.json",
+                ]:
+                    archive.writestr(f"Common/{asset_path}", b"asset")
 
             manifest = root / "icons.batch.json"
             write_json(
@@ -118,10 +131,20 @@ class BatchManifestTests(unittest.TestCase):
             self.assertEqual(jobs["jobCount"], 4)
             self.assertEqual(len(jobs["jobs"]), 4)
             self.assertIn("Aures_Livestock.zip!Server/Models/Livestock/Goat.json", jobs["modelSource"])
+            self.assertTrue(
+                any("Aures_Livestock.zip!Common" in root for root in jobs["sourceCommonRoots"])
+            )
             for job in jobs["jobs"]:
                 self.assertEqual(set(job["attachments"].keys()), {"BaseColor"})
                 self.assertNotIn("Eyes", job["outputIcon"])
                 self.assertNotIn("Horns", job["outputIcon"])
+                self.assertTrue(Path(job["baseModelFile"]).is_file())
+                self.assertTrue(Path(job["baseTextureFile"]).is_file())
+                for selected_asset in job["selectedOptionAssets"]:
+                    if selected_asset["modelFile"]:
+                        self.assertTrue(Path(selected_asset["modelFile"]).is_file())
+                    if selected_asset["textureFile"]:
+                        self.assertTrue(Path(selected_asset["textureFile"]).is_file())
 
     def test_batch_manifest_resolves_manifest_relative_root_and_leading_slash_model_path(self):
         with tempfile.TemporaryDirectory() as tmp:
