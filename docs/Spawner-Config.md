@@ -21,7 +21,7 @@ When extending spawner behavior, add logic to these service domains instead of c
 - `FilledItemId` (optional). The filled variant item id, if used.
 - `IconDefault` (optional). Default icon override used for filled items.
 - `TooltipMode` (optional, default `Additive`). Controls DynamicTooltipsLib composition for captured-spawner tooltip lines.
-  - `Additive`: appends Tamework lines (`Name`, `Role`) to the base tooltip.
+  - `Additive`: appends Tamework lines (`Name`, `Role`, `Gender`, and resolved attachments) to the base tooltip.
   - `Replace`: writes Tamework lines as override description text.
 
 ## AllowedRoles
@@ -54,6 +54,8 @@ Fields:
 - `MaxDistance` (optional). Max distance for spawn.
 
 Captured Tamework NPC names are stored on the spawner item and restored on spawn.
+Captured attachment IDs are stored on the spawner item and can be displayed with player-friendly labels from
+`TwAttachmentDisplayConfig`.
 
 ## Icon overrides
 Optional overrides for filled spawner icons based on attachments or role.

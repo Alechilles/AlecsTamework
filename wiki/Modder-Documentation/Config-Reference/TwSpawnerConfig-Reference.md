@@ -97,7 +97,7 @@ Map of role id to `IconOverrides` arrays. Use it when icon rules differ per role
 Controls DynamicTooltipsLib composition when that optional integration is present.
 
 Accepted values:
-- `Additive`: append Tamework lines such as `Name` and `Role`
+- `Additive`: append Tamework lines such as `Name`, `Role`, `Gender`, and friendly attachment names from `TwAttachmentDisplayConfig`
 - `Replace`: replace the base description text with Tamework tooltip output
 
 ## Defaults and Cross-System Notes

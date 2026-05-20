@@ -63,6 +63,7 @@ final class SpawnerCaptureMetadataService {
 
     static final class CaptureInfo {
         private final String attachmentsJson;
+        private final String modelId;
         private final Integer roleIndex;
         private final String npcNameKey;
         private final String iconPath;
@@ -70,12 +71,14 @@ final class SpawnerCaptureMetadataService {
         private final String tooltipDisplayName;
 
         private CaptureInfo(String attachmentsJson,
+                            String modelId,
                             Integer roleIndex,
                             String npcNameKey,
                             String iconPath,
                             CapturedName capturedName,
                             String tooltipDisplayName) {
             this.attachmentsJson = attachmentsJson;
+            this.modelId = modelId;
             this.roleIndex = roleIndex;
             this.npcNameKey = npcNameKey;
             this.iconPath = iconPath;
@@ -86,6 +89,11 @@ final class SpawnerCaptureMetadataService {
         @Nullable
         String attachmentsJson() {
             return attachmentsJson;
+        }
+
+        @Nullable
+        String modelId() {
+            return modelId;
         }
 
         @Nullable
@@ -114,20 +122,22 @@ final class SpawnerCaptureMetadataService {
                                  @Nullable Ref<EntityStore> targetRef,
                                  @Nullable NpcDisplayNameResolver displayNameResolver) {
         if (player == null || targetRef == null || !targetRef.isValid()) {
-            return new CaptureInfo(null, null, null, null, null, null);
+            return new CaptureInfo(null, null, null, null, null, null, null);
         }
         World world = player.getWorld();
         if (world == null) {
-            return new CaptureInfo(null, null, null, null, null, null);
+            return new CaptureInfo(null, null, null, null, null, null, null);
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
 
         String attachmentsJson = null;
+        String modelId = null;
         String iconPath = null;
         ModelComponent modelComponent = store.getComponent(targetRef, ModelComponent.getComponentType());
         if (modelComponent != null) {
             Model model = modelComponent.getModel();
             if (model != null) {
+                modelId = model.getModelAssetId();
                 Map<String, String> attachments = model.getRandomAttachmentIds();
                 if (attachments != null) {
                     Map<String, String> snapshot = new HashMap<>(attachments);
@@ -179,7 +189,7 @@ final class SpawnerCaptureMetadataService {
         } else {
             tooltipDisplayName = sanitizeTooltipDisplayName(tooltipDisplayName, npcNameKey);
         }
-        return new CaptureInfo(attachmentsJson, roleIndex, npcNameKey, iconPath, capturedName, tooltipDisplayName);
+        return new CaptureInfo(attachmentsJson, modelId, roleIndex, npcNameKey, iconPath, capturedName, tooltipDisplayName);
     }
 
     @Nullable
@@ -290,6 +300,14 @@ final class SpawnerCaptureMetadataService {
             return updated;
         }
         return updated.withMetadata(CapturedNPCMetadata.KEYED_CODEC, meta);
+    }
+
+    @Nullable
+    ItemStack applyCapturedModelMetadata(@Nullable ItemStack updated, @Nullable CaptureInfo captureInfo) {
+        if (updated == null || captureInfo == null || captureInfo.modelId == null || captureInfo.modelId.isBlank()) {
+            return updated == null ? null : clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_MODEL_ID);
+        }
+        return updated.withMetadata(TameworkMetadataKeys.CAPTURE_MODEL_ID, Codec.STRING, captureInfo.modelId);
     }
 
     @Nullable

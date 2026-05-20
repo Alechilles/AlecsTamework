@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
+
 ## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
 
 ### Changed

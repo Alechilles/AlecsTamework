@@ -645,6 +645,7 @@ public final class SpawnerFeatureHandler {
             updated = itemStackMetadataService.clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
         }
         updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
+        updated = captureMetadataService.applyCapturedModelMetadata(updated, captureInfo);
         updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
         updated = captureMetadataService.applyTooltipDisplayNameMetadata(updated, captureInfo);
         if (worldStore != null) {

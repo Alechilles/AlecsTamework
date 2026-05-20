@@ -4,7 +4,13 @@ import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.npc.attachments.AttachmentDisplayResolver;
+import com.alechilles.alecstamework.npc.attachments.ResolvedAttachmentDisplay;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
 import com.hypixel.hytale.server.core.modules.i18n.I18nModule;
+import java.lang.reflect.Type;
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import org.bson.BsonDocument;
@@ -23,13 +29,25 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     private static final String NAME_LINE_PREFIX = "Name: ";
     private static final String ROLE_LINE_PREFIX = "Role: ";
     private static final String GENDER_LINE_PREFIX = "Gender: ";
+    private static final Gson GSON = new Gson();
+    private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() { }.getType();
 
     private final ItemFeatureRegistry itemFeatureRegistry;
     private final TranslationRegistry translationRegistry;
+    private final AttachmentDisplayResolver attachmentDisplayResolver;
 
     TameworkSpawnerTooltipProvider(ItemFeatureRegistry itemFeatureRegistry, TranslationRegistry translationRegistry) {
+        this(itemFeatureRegistry, translationRegistry, AttachmentDisplayResolver.ASSET_BACKED);
+    }
+
+    TameworkSpawnerTooltipProvider(ItemFeatureRegistry itemFeatureRegistry,
+                                   TranslationRegistry translationRegistry,
+                                   AttachmentDisplayResolver attachmentDisplayResolver) {
         this.itemFeatureRegistry = itemFeatureRegistry;
         this.translationRegistry = translationRegistry;
+        this.attachmentDisplayResolver = attachmentDisplayResolver == null
+                ? AttachmentDisplayResolver.ASSET_BACKED
+                : attachmentDisplayResolver;
     }
 
     @Override
@@ -82,16 +100,21 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         }
 
         String gender = readString(metadataDoc, TameworkMetadataKeys.LIFE_STAGE_GENDER);
+        List<ResolvedAttachmentDisplay> attachmentDisplays = resolveAttachmentDisplays(metadataDoc, roleId);
         TooltipData.Builder builder = TooltipData.builder()
                 .nameOverride(itemName)
                 .hashInput((mode.name()) + "|" + itemName + "|" + displayName + "|"
-                        + (roleDisplay == null ? "" : roleDisplay) + "|" + (gender == null ? "" : gender));
+                        + (roleDisplay == null ? "" : roleDisplay) + "|" + (gender == null ? "" : gender)
+                        + "|" + attachmentDisplays);
         appendLine(builder, mode, NAME_LINE_PREFIX + displayName);
         if (roleDisplay != null && !roleDisplay.isBlank()) {
             appendLine(builder, mode, ROLE_LINE_PREFIX + roleDisplay);
         }
         if (gender != null && !gender.isBlank()) {
             appendLine(builder, mode, GENDER_LINE_PREFIX + gender);
+        }
+        for (ResolvedAttachmentDisplay display : attachmentDisplays) {
+            appendLine(builder, mode, display.toTooltipLine());
         }
         TooltipData data = builder.build();
         return data.isEmpty() ? null : data;
@@ -187,6 +210,28 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
             builder.addLineOverride(line);
         } else {
             builder.addLine(line);
+        }
+    }
+
+    private List<ResolvedAttachmentDisplay> resolveAttachmentDisplays(BsonDocument metadataDoc, @Nullable String roleId) {
+        Map<String, String> attachments = readAttachmentMap(metadataDoc);
+        if (attachments.isEmpty()) {
+            return List.of();
+        }
+        String modelId = readString(metadataDoc, TameworkMetadataKeys.CAPTURE_MODEL_ID);
+        return attachmentDisplayResolver.resolveAll(roleId, modelId, attachments);
+    }
+
+    private static Map<String, String> readAttachmentMap(@Nullable BsonDocument metadataDoc) {
+        String attachmentsJson = readString(metadataDoc, TameworkMetadataKeys.ATTACHMENTS);
+        if (attachmentsJson == null || attachmentsJson.isBlank()) {
+            return Map.of();
+        }
+        try {
+            Map<String, String> parsed = GSON.fromJson(attachmentsJson, ATTACHMENT_MAP_TYPE);
+            return parsed == null ? Map.of() : parsed;
+        } catch (Exception ex) {
+            return Map.of();
         }
     }
 

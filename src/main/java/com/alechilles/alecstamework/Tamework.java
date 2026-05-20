@@ -23,6 +23,7 @@ import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
 import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
@@ -224,6 +225,7 @@ public class Tamework extends JavaPlugin {
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
     private boolean attachmentMigrationAssetsRegistered;
+    private boolean attachmentDisplayAssetsRegistered;
     private boolean levelingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private boolean talentAssetsRegistered;
@@ -393,6 +395,7 @@ public class Tamework extends JavaPlugin {
         registerNeedsAssets();
         registerBreedingAssets();
         registerAttachmentMigrationAssets();
+        registerAttachmentDisplayAssets();
         registerLevelingAssets();
         registerTraitAssets();
         registerTalentAssets();
@@ -1602,6 +1605,30 @@ public class Tamework extends JavaPlugin {
         attachmentMigrationAssetsRegistered = true;
     }
 
+    private void registerAttachmentDisplayAssets() {
+        if (attachmentDisplayAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwAttachmentDisplayConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/AttachmentDisplays")
+                        .setCodec(TwAttachmentDisplayConfig.CODEC)
+                        .setKeyFunction(TwAttachmentDisplayConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwAttachmentDisplayConfig.class,
+                this::onAttachmentDisplayAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwAttachmentDisplayConfig.class,
+                this::onAttachmentDisplayAssetsRemoved
+        );
+        attachmentDisplayAssetsRegistered = true;
+    }
+
     private void registerLevelingAssets() {
         if (levelingAssetsRegistered) {
             return;
@@ -1910,6 +1937,28 @@ public class Tamework extends JavaPlugin {
             RemovedAssetsEvent<String, TwAttachmentMigrationConfig, DefaultAssetMap<String, TwAttachmentMigrationConfig>> event) {
         TwAttachmentMigrationConfig.clearRoleCache();
         emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_MIGRATION, event.getRemovedAssets());
+    }
+
+    private void onAttachmentDisplayAssetsLoaded(
+            LoadedAssetsEvent<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> event) {
+        TwAttachmentDisplayConfig.clearCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getLoadedAssets().keySet());
+            refreshSpawnerTooltipCache();
+        }
+    }
+
+    private void onAttachmentDisplayAssetsRemoved(
+            RemovedAssetsEvent<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> event) {
+        TwAttachmentDisplayConfig.clearCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getRemovedAssets());
+        refreshSpawnerTooltipCache();
+    }
+
+    private void refreshSpawnerTooltipCache() {
+        if (spawnerTooltipBridge != null) {
+            spawnerTooltipBridge.refreshFromItemConfigReload();
+        }
     }
 
     private void onLevelingAssetsLoaded(
