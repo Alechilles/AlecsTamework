@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.hypixel.hytale.component.ComponentType;
@@ -102,7 +103,11 @@ final class CommandNpcNameResolver {
     }
 
     String resolveSnapshotDisplayName(String snapshotDisplayName, String roleId) {
-        String translated = translateSnapshotName(snapshotDisplayName, null, roleId);
+        return resolveSnapshotDisplayName(snapshotDisplayName, null, roleId);
+    }
+
+    String resolveSnapshotDisplayName(String snapshotDisplayName, String nameKey, String roleId) {
+        String translated = translateSnapshotName(snapshotDisplayName, nameKey, roleId);
         if (translated != null && !translated.isBlank()) {
             return translated;
         }
@@ -159,7 +164,7 @@ final class CommandNpcNameResolver {
         if (npc == null) {
             return null;
         }
-        String roleParamNameKey = resolveRoleNameKeyFromParams(npc.getRole());
+        String roleParamNameKey = RoleNameResolver.resolveRoleNameKey(npc.getRole());
         if (roleParamNameKey != null && !roleParamNameKey.isBlank()) {
             return roleParamNameKey;
         }
@@ -170,7 +175,7 @@ final class CommandNpcNameResolver {
         if (looksLikeTranslationKey(roleId)) {
             return roleId;
         }
-        return "server.npcRoles." + roleId + ".name";
+        return RoleNameResolver.defaultRoleNameKey(roleId);
     }
 
     String resolveNpcRoleId(NPCEntity npc) {
@@ -206,31 +211,8 @@ final class CommandNpcNameResolver {
         return plugin != null ? plugin.getName(roleIndex) : null;
     }
 
-    private String resolveRoleNameKeyFromParams(Role role) {
-        if (role == null) {
-            return null;
-        }
-        Object markedSupport = invokeObjectGetter(role, "getMarkedEntitySupport");
-        if (markedSupport == null) {
-            return null;
-        }
-        Object entitySupport = invokeObjectGetter(markedSupport, "getEntitySupport");
-        if (entitySupport == null) {
-            return null;
-        }
-        Object sensorScope = invokeObjectGetter(entitySupport, "getSensorScope");
-        return readScopeStringParam(
-                sensorScope,
-                "NameTranslationKey",
-                "RoleNameTranslationKey",
-                "NameKey",
-                "RoleNameKey",
-                "NpcNameKey"
-        );
-    }
-
     private boolean looksLikeTranslationKey(String value) {
-        return value != null && !value.isBlank() && value.indexOf('.') >= 0;
+        return RoleNameResolver.looksLikeTranslationKey(value);
     }
 
     private String translateNpcNameKey(String nameKey) {
@@ -245,37 +227,7 @@ final class CommandNpcNameResolver {
         if (registry == null) {
             return null;
         }
-        for (String candidate : buildNameKeyCandidates(nameKey)) {
-            if (candidate == null || candidate.isBlank()) {
-                continue;
-            }
-            String translated = registry.get(candidate);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-        }
-        return null;
-    }
-
-    private List<String> buildNameKeyCandidates(String nameKey) {
-        ArrayList<String> candidates = new ArrayList<>(8);
-        addCandidate(candidates, nameKey);
-        if (!nameKey.contains(".")) {
-            addCandidate(candidates, "npcRole." + nameKey + ".name");
-            addCandidate(candidates, "server.npcRole." + nameKey + ".name");
-            addCandidate(candidates, "npcRoles." + nameKey + ".name");
-            addCandidate(candidates, "server.npcRoles." + nameKey + ".name");
-            return candidates;
-        }
-        if (nameKey.startsWith("server.")) {
-            addCandidate(candidates, nameKey.substring("server.".length()));
-        } else {
-            addCandidate(candidates, "server." + nameKey);
-        }
-        addServerVariant(candidates, toSingularNpcRoleKey(nameKey));
-        addServerVariant(candidates, toPluralNpcRoleKey(nameKey));
-        addTitleNameVariants(candidates);
-        return candidates;
+        return RoleNameResolver.translateNameKey(registry::get, nameKey);
     }
 
     private void addCandidate(List<String> candidates, String key) {
@@ -285,39 +237,6 @@ final class CommandNpcNameResolver {
         if (!candidates.contains(key)) {
             candidates.add(key);
         }
-    }
-
-    private void addServerVariant(List<String> candidates, String key) {
-        addCandidate(candidates, key);
-        if (key == null || key.isBlank()) {
-            return;
-        }
-        if (key.startsWith("server.")) {
-            addCandidate(candidates, key.substring("server.".length()));
-        } else {
-            addCandidate(candidates, "server." + key);
-        }
-    }
-
-    private void addTitleNameVariants(List<String> candidates) {
-        ArrayList<String> snapshot = new ArrayList<>(candidates);
-        for (String candidate : snapshot) {
-            if (candidate != null && candidate.endsWith(".title")) {
-                addCandidate(candidates, candidate.substring(0, candidate.length() - ".title".length()) + ".name");
-            }
-        }
-    }
-
-    private String toSingularNpcRoleKey(String key) {
-        return key
-                .replace("server.npcRoles.", "server.npcRole.")
-                .replace("npcRoles.", "npcRole.");
-    }
-
-    private String toPluralNpcRoleKey(String key) {
-        return key
-                .replace("server.npcRole.", "server.npcRoles.")
-                .replace("npcRole.", "npcRoles.");
     }
 
     private String translateSnapshotName(String snapshotDisplayName, String nameKey, String roleId) {
@@ -332,11 +251,14 @@ final class CommandNpcNameResolver {
             String effectiveRoleId = firstNonBlank(roleIdFromNameKey, roleId);
             if (roleId != null
                     && !roleId.isBlank()
-                    && snapshotDisplayName.equalsIgnoreCase(roleId)
-                    && sameIdentifier(roleId, effectiveRoleId)) {
-                String translated = translateNpcNameKey(roleId);
+                    && snapshotDisplayName.equalsIgnoreCase(roleId)) {
+                String translated = translateNpcNameKey(firstNonBlank(nameKey, roleId));
                 if (translated != null && !translated.isBlank()) {
                     return translated;
+                }
+                String fallback = RoleNameResolver.resolveDisplayName(roleId, nameKey, null);
+                if (fallback != null && !fallback.isBlank() && !fallback.equalsIgnoreCase(roleId)) {
+                    return fallback;
                 }
             }
             if (nameKey != null && !nameKey.isBlank() && snapshotDisplayName.equalsIgnoreCase(nameKey)) {
@@ -363,27 +285,7 @@ final class CommandNpcNameResolver {
     }
 
     private String extractRoleIdFromNameKey(String nameKey) {
-        if (nameKey == null || nameKey.isBlank()) {
-            return null;
-        }
-        String trimmed = nameKey.trim();
-        String[] prefixes = {
-                "server.npcRole.",
-                "npcRole.",
-                "server.npcRoles.",
-                "npcRoles."
-        };
-        for (String prefix : prefixes) {
-            if (!trimmed.startsWith(prefix)) {
-                continue;
-            }
-            String remainder = trimmed.substring(prefix.length());
-            if (remainder.endsWith(".name")) {
-                remainder = remainder.substring(0, remainder.length() - ".name".length());
-            }
-            return remainder.isBlank() ? null : remainder;
-        }
-        return null;
+        return RoleNameResolver.extractRoleIdFromNameKey(nameKey);
     }
 
     private boolean isGenericRoleDisplayName(String displayName, String roleId, String translatedRoleName) {
@@ -462,33 +364,6 @@ final class CommandNpcNameResolver {
         return null;
     }
 
-    private boolean sameIdentifier(String first, String second) {
-        if (first == null || first.isBlank() || second == null || second.isBlank()) {
-            return false;
-        }
-        return first.trim().equalsIgnoreCase(second.trim());
-    }
-
-    private static String readScopeStringParam(Object scope, String... paramNames) {
-        if (scope == null || paramNames == null || paramNames.length == 0) {
-            return null;
-        }
-        for (String paramName : paramNames) {
-            if (paramName == null || paramName.isBlank()) {
-                continue;
-            }
-            try {
-                Method method = scope.getClass().getMethod("getStringParamOrNull", String.class);
-                Object value = method.invoke(scope, paramName);
-                if (value instanceof String text && !text.isBlank()) {
-                    return text;
-                }
-            } catch (ReflectiveOperationException ignored) {
-            }
-        }
-        return null;
-    }
-
     private static String readStringGetter(Object target, String... methodNames) {
         if (target == null || methodNames == null) {
             return null;
@@ -517,15 +392,4 @@ final class CommandNpcNameResolver {
         return null;
     }
 
-    private static Object invokeObjectGetter(Object target, String methodName) {
-        if (target == null || methodName == null || methodName.isBlank()) {
-            return null;
-        }
-        try {
-            Method method = target.getClass().getMethod(methodName);
-            return method.invoke(target);
-        } catch (ReflectiveOperationException ignored) {
-            return null;
-        }
-    }
 }

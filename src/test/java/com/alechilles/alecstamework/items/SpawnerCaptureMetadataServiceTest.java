@@ -133,11 +133,12 @@ class SpawnerCaptureMetadataServiceTest {
                         Integer.class,
                         String.class,
                         String.class,
+                        String.class,
                         SpawnerCaptureMetadataService.CapturedName.class,
                         String.class
                 );
         constructor.setAccessible(true);
-        return constructor.newInstance(null, modelId, null, null, null, null, null);
+        return constructor.newInstance(null, modelId, null, null, null, null, null, null);
     }
 
     private static ItemFeatureConfig.SpawnerIconOverride override(String key, String value, String icon) {

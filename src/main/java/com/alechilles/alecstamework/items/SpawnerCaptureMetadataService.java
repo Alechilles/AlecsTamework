@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.items;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -65,7 +66,8 @@ final class SpawnerCaptureMetadataService {
         private final String attachmentsJson;
         private final String modelId;
         private final Integer roleIndex;
-        private final String npcNameKey;
+        private final String roleId;
+        private final String roleNameKey;
         private final String iconPath;
         private final CapturedName capturedName;
         private final String tooltipDisplayName;
@@ -73,14 +75,16 @@ final class SpawnerCaptureMetadataService {
         private CaptureInfo(String attachmentsJson,
                             String modelId,
                             Integer roleIndex,
-                            String npcNameKey,
+                            String roleId,
+                            String roleNameKey,
                             String iconPath,
                             CapturedName capturedName,
                             String tooltipDisplayName) {
             this.attachmentsJson = attachmentsJson;
             this.modelId = modelId;
             this.roleIndex = roleIndex;
-            this.npcNameKey = npcNameKey;
+            this.roleId = roleId;
+            this.roleNameKey = roleNameKey;
             this.iconPath = iconPath;
             this.capturedName = capturedName;
             this.tooltipDisplayName = tooltipDisplayName;
@@ -98,12 +102,22 @@ final class SpawnerCaptureMetadataService {
 
         @Nullable
         String npcNameKey() {
-            return npcNameKey;
+            return roleId;
+        }
+
+        @Nullable
+        String roleNameKey() {
+            return roleNameKey;
         }
 
         @Nullable
         CapturedName capturedName() {
             return capturedName;
+        }
+
+        @Nullable
+        String tooltipDisplayName() {
+            return tooltipDisplayName;
         }
     }
 
@@ -122,11 +136,11 @@ final class SpawnerCaptureMetadataService {
                                  @Nullable Ref<EntityStore> targetRef,
                                  @Nullable NpcDisplayNameResolver displayNameResolver) {
         if (player == null || targetRef == null || !targetRef.isValid()) {
-            return new CaptureInfo(null, null, null, null, null, null, null);
+            return new CaptureInfo(null, null, null, null, null, null, null, null);
         }
         World world = player.getWorld();
         if (world == null) {
-            return new CaptureInfo(null, null, null, null, null, null, null);
+            return new CaptureInfo(null, null, null, null, null, null, null, null);
         }
         Store<EntityStore> store = world.getEntityStore().getStore();
 
@@ -151,7 +165,8 @@ final class SpawnerCaptureMetadataService {
         }
 
         Integer roleIndex = null;
-        String npcNameKey = null;
+        String roleId = null;
+        String roleNameKey = null;
         String tooltipDisplayName = null;
         NPCEntity npc = store.getComponent(targetRef, NPCEntity.getComponentType());
         if (npc != null) {
@@ -160,9 +175,13 @@ final class SpawnerCaptureMetadataService {
                 roleIndex = resolvedRoleIndex;
                 String nameKey = NPCPlugin.get().getName(resolvedRoleIndex);
                 if (nameKey != null && !nameKey.isBlank()) {
-                    npcNameKey = nameKey;
+                    roleId = nameKey;
                 }
             }
+            roleNameKey = firstNonBlank(
+                    RoleNameResolver.resolveRoleNameKey(npc.getRole()),
+                    RoleNameResolver.defaultRoleNameKey(roleId)
+            );
             if (displayNameResolver != null) {
                 tooltipDisplayName = displayNameResolver.resolve(targetRef, store, npc);
             }
@@ -187,9 +206,9 @@ final class SpawnerCaptureMetadataService {
         if (capturedName != null && capturedName.name != null && !capturedName.name.isBlank()) {
             tooltipDisplayName = capturedName.name;
         } else {
-            tooltipDisplayName = sanitizeTooltipDisplayName(tooltipDisplayName, npcNameKey);
+            tooltipDisplayName = sanitizeTooltipDisplayName(tooltipDisplayName, roleId, roleNameKey);
         }
-        return new CaptureInfo(attachmentsJson, modelId, roleIndex, npcNameKey, iconPath, capturedName, tooltipDisplayName);
+        return new CaptureInfo(attachmentsJson, modelId, roleIndex, roleId, roleNameKey, iconPath, capturedName, tooltipDisplayName);
     }
 
     @Nullable
@@ -328,15 +347,18 @@ final class SpawnerCaptureMetadataService {
         if (roleIndex != null && roleIndex >= 0) {
             wrote |= CapturedNpcMetadataCompat.invokeIntSetter(meta, "setRoleIndex", roleIndex);
         }
-        String npcNameKey = captureInfo.npcNameKey;
+        String roleId = captureInfo.roleId;
+        String roleNameKey = captureInfo.roleNameKey;
         String tooltipName = captureInfo.tooltipDisplayName;
         if (tooltipName != null) {
             wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setNpcNameKey", tooltipName);
         }
-        if (npcNameKey != null && !npcNameKey.isBlank()) {
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleNameKey", npcNameKey);
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleId", npcNameKey);
-            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleKey", npcNameKey);
+        if (roleNameKey != null && !roleNameKey.isBlank()) {
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleNameKey", roleNameKey);
+        }
+        if (roleId != null && !roleId.isBlank()) {
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleId", roleId);
+            wrote |= CapturedNpcMetadataCompat.invokeStringSetter(meta, "setRoleKey", roleId);
         }
         String icon = (fullItemIcon != null && !fullItemIcon.isBlank()) ? fullItemIcon : captureInfo.iconPath;
         if (icon != null && !icon.isBlank()) {
@@ -400,6 +422,17 @@ final class SpawnerCaptureMetadataService {
     }
 
     @Nullable
+    ItemStack applyCaptureNameKeyMetadata(@Nullable ItemStack updated, @Nullable CaptureInfo captureInfo) {
+        if (updated == null || captureInfo == null) {
+            return updated;
+        }
+        if (captureInfo.roleNameKey == null || captureInfo.roleNameKey.isBlank()) {
+            return clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_NAME_KEY);
+        }
+        return updated.withMetadata(TameworkMetadataKeys.CAPTURE_NAME_KEY, Codec.STRING, captureInfo.roleNameKey);
+    }
+
+    @Nullable
     ItemStack clearNameMetadata(@Nullable ItemStack updated) {
         ItemStack cleared = clearMetadataKey(updated, TameworkMetadataKeys.NPC_NAME);
         cleared = clearMetadataKey(cleared, TameworkMetadataKeys.NPC_NAME_OWNER_UUID);
@@ -452,7 +485,9 @@ final class SpawnerCaptureMetadataService {
     }
 
     @Nullable
-    private static String sanitizeTooltipDisplayName(@Nullable String candidate, @Nullable String roleId) {
+    private static String sanitizeTooltipDisplayName(@Nullable String candidate,
+                                                     @Nullable String roleId,
+                                                     @Nullable String roleNameKey) {
         if (candidate == null) {
             return null;
         }
@@ -466,7 +501,21 @@ final class SpawnerCaptureMetadataService {
         if (roleId != null && !roleId.isBlank() && trimmed.equalsIgnoreCase(roleId)) {
             return null;
         }
+        if (roleNameKey != null && !roleNameKey.isBlank() && trimmed.equalsIgnoreCase(roleNameKey)) {
+            return null;
+        }
         return trimmed;
+    }
+
+    @Nullable
+    private static String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        if (second != null && !second.isBlank()) {
+            return second;
+        }
+        return null;
     }
 
     @Nullable

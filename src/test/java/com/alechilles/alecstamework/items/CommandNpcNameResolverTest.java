@@ -107,4 +107,21 @@ class CommandNpcNameResolverTest {
 
         assertEquals("Mittens", resolver.resolveCachedUnloadedDisplayName(record));
     }
+
+    @Test
+    void resolvesRawTamedSnapshotThroughCachedRoleNameKey() {
+        TranslationRegistry registry = new TranslationRegistry();
+        registry.put("npcRoles.Bison.name", "Bison");
+
+        CommandNpcNameResolver resolver = new CommandNpcNameResolver(registry);
+
+        assertEquals(
+                "Bison",
+                resolver.resolveSnapshotDisplayName(
+                        "Tamed_Bison",
+                        "server.npcRoles.Bison.name",
+                        "Tamed_Bison"
+                )
+        );
+    }
 }

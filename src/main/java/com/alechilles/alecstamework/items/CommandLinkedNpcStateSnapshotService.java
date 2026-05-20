@@ -330,6 +330,10 @@ public final class CommandLinkedNpcStateSnapshotService {
         if (customName != null && !customName.isBlank()) {
             return customName;
         }
+        String resolvedName = new CommandNpcNameResolver().resolveNpcDisplayName(npcRef, store, npc);
+        if (resolvedName != null && !resolvedName.isBlank()) {
+            return resolvedName;
+        }
         if (npcRef != null && npcRef.isValid() && store != null) {
             DisplayNameComponent displayName = store.getComponent(npcRef, DisplayNameComponent.getComponentType());
             if (displayName != null && displayName.getDisplayName() != null) {

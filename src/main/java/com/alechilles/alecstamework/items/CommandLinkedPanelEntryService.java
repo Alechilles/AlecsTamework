@@ -6,6 +6,7 @@ import com.alechilles.alecstamework.config.assets.TwNeedsConfig;
 import com.alechilles.alecstamework.config.assets.TwTalentConfig;
 import com.alechilles.alecstamework.config.assets.TwTraitConfig;
 import com.alechilles.alecstamework.localization.LocalizedText;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.npc.components.TameworkBreedingComponent;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
@@ -225,6 +226,7 @@ final class CommandLinkedPanelEntryService {
                     dead = true;
                     String deadName = npcNameResolver.resolveSnapshotDisplayName(
                             deadSnapshot.displayName(),
+                            record.cachedNameKey,
                             deadSnapshot.roleId()
                     );
                     if (deadName != null && !deadName.isBlank()) {
@@ -256,6 +258,7 @@ final class CommandLinkedPanelEntryService {
                     captured = true;
                     String capturedName = npcNameResolver.resolveSnapshotDisplayName(
                             capturedSnapshot.displayName(),
+                            record.cachedNameKey,
                             capturedSnapshot.roleId()
                     );
                     if (capturedName != null && !capturedName.isBlank()) {
@@ -270,6 +273,7 @@ final class CommandLinkedPanelEntryService {
                     inCoop = true;
                     String coopName = npcNameResolver.resolveSnapshotDisplayName(
                             coopSnapshot.displayName(),
+                            record.cachedNameKey,
                             coopSnapshot.roleId()
                     );
                     if (coopName != null && !coopName.isBlank()) {
@@ -827,7 +831,7 @@ final class CommandLinkedPanelEntryService {
         }
         String roleId = firstNonBlank(
                 record.cachedRoleId,
-                extractRoleIdFromNameKey(record.cachedNameKey),
+                RoleNameResolver.extractRoleIdFromNameKey(record.cachedNameKey),
                 null
         );
         return normalize(roleId);
@@ -840,32 +844,6 @@ final class CommandLinkedPanelEntryService {
                 fallbackRoleId
         );
         return normalize(roleId);
-    }
-
-    private String extractRoleIdFromNameKey(String nameKey) {
-        if (nameKey == null || nameKey.isBlank()) {
-            return null;
-        }
-        String trimmed = nameKey.trim();
-        String[] prefixes = {
-                "server.npcRole.",
-                "npcRole.",
-                "server.npcRoles.",
-                "npcRoles."
-        };
-        for (String prefix : prefixes) {
-            if (!trimmed.startsWith(prefix)) {
-                continue;
-            }
-            String remainder = trimmed.substring(prefix.length());
-            if (remainder.endsWith(".name")) {
-                remainder = remainder.substring(0, remainder.length() - ".name".length());
-            }
-            if (!remainder.isBlank()) {
-                return remainder;
-            }
-        }
-        return null;
     }
 
     private String normalize(String value) {

@@ -193,6 +193,56 @@ class TameworkSpawnerTooltipProviderTest {
     }
 
     @Test
+    void roleNameKeyMetadataResolvesTamedRoleTooltipDisplay() {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("Spawner_Test", ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerFilledItemId("*Spawner_Test_State_Filled")
+                .build());
+        TranslationRegistry translations = new TranslationRegistry();
+        translations.put("npcRoles.Bison.name", "Bison");
+        TameworkSpawnerTooltipProvider provider = new TameworkSpawnerTooltipProvider(registry, translations);
+
+        BsonDocument metadata = capturedMetadata("Tamed_Bison", "Tamed_Bison", null)
+                .append(TameworkMetadataKeys.CAPTURE_NAME_KEY, new BsonString("server.npcRoles.Bison.name"));
+
+        TooltipData data = provider.getTooltipData(
+                "*Spawner_Test_State_Filled",
+                metadata.toJson(),
+                "en-US"
+        );
+
+        assertNotNull(data);
+        assertEquals("Bison", data.getNameOverride());
+        assertEquals("Name: Bison", data.getLines().get(0));
+        assertEquals("Species: Bison", data.getLines().get(1));
+    }
+
+    @Test
+    void roleNameKeyCandidateHandlesServerPluralAgainstUnprefixedLanguageEntry() {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("Spawner_Test", ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerFilledItemId("*Spawner_Test_State_Filled")
+                .build());
+        TranslationRegistry translations = new TranslationRegistry();
+        translations.put("npcRoles.Bison.name", "Bison");
+        TameworkSpawnerTooltipProvider provider = new TameworkSpawnerTooltipProvider(registry, translations);
+
+        BsonDocument metadata = capturedMetadata(null, "Tamed_Bison", null)
+                .append(TameworkMetadataKeys.CAPTURE_NAME_KEY, new BsonString("server.npcRoles.Bison.name"));
+
+        TooltipData data = provider.getTooltipData(
+                "*Spawner_Test_State_Filled",
+                metadata.toJson(),
+                "en-US"
+        );
+
+        assertNotNull(data);
+        assertEquals("Bison", data.getNameOverride());
+    }
+
+    @Test
     void additiveModeAppendsResolvedAttachmentLines() throws Exception {
         ItemFeatureRegistry registry = registry(ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE);
         TameworkSpawnerTooltipProvider provider = provider(registry, displayConfig(

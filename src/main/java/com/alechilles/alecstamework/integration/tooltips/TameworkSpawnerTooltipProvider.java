@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.integration.tooltips;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.TameworkMetadataKeys;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.localization.TranslationRegistry;
 import com.alechilles.alecstamework.npc.attachments.AttachmentDisplayResolver;
 import com.alechilles.alecstamework.npc.attachments.ResolvedAttachmentDisplay;
@@ -79,11 +80,16 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
                 readString(metadataDoc, TameworkMetadataKeys.CAPTURE_ROLE_ID),
                 readCapturedEntityNpcNameKey(metadataDoc)
         );
-        String roleDisplay = resolveRoleDisplay(roleId, normalizeLanguage(language));
+        String roleNameKey = firstNonBlank(
+                readString(metadataDoc, TameworkMetadataKeys.CAPTURE_NAME_KEY),
+                readCapturedEntityRoleNameKey(metadataDoc)
+        );
+        String roleDisplay = resolveRoleDisplay(roleId, roleNameKey, normalizeLanguage(language));
         String tooltipDisplayName = sanitizeTooltipDisplayName(
                 readString(metadataDoc, TameworkMetadataKeys.CAPTURE_TOOLTIP_DISPLAY_NAME),
                 roleDisplay,
-                roleId
+                roleId,
+                roleNameKey
         );
         String displayName = firstNonBlank(tooltipDisplayName, roleDisplay);
         if (displayName == null || displayName.isBlank()) {
@@ -200,6 +206,23 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         return readString(capturedEntity.asDocument(), CAPTURED_ENTITY_NPC_NAME_KEY);
     }
 
+    @Nullable
+    private static String readCapturedEntityRoleNameKey(@Nullable BsonDocument metadataDoc) {
+        if (metadataDoc == null || !metadataDoc.containsKey(CAPTURED_ENTITY_KEY)) {
+            return null;
+        }
+        BsonValue capturedEntity = metadataDoc.get(CAPTURED_ENTITY_KEY);
+        if (capturedEntity == null || !capturedEntity.isDocument()) {
+            return null;
+        }
+        BsonDocument capturedDoc = capturedEntity.asDocument();
+        return firstNonBlank(
+                readString(capturedDoc, "RoleNameKey"),
+                readString(capturedDoc, "NameTranslationKey"),
+                readString(capturedDoc, "RoleNameTranslationKey")
+        );
+    }
+
     private void appendLine(TooltipData.Builder builder,
                             ItemFeatureConfig.SpawnerTooltipMode mode,
                             @Nullable String line) {
@@ -236,8 +259,8 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     }
 
     @Nullable
-    private String resolveRoleDisplay(@Nullable String roleId, String language) {
-        if (roleId == null || roleId.isBlank()) {
+    private String resolveRoleDisplay(@Nullable String roleId, @Nullable String roleNameKey, String language) {
+        if ((roleId == null || roleId.isBlank()) && (roleNameKey == null || roleNameKey.isBlank())) {
             return null;
         }
         I18nModule i18n = null;
@@ -246,26 +269,18 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         } catch (Throwable ignored) {
             // Unit tests and some startup windows may not have i18n initialized yet.
         }
-        String translated = resolveI18nMessage(i18n, language, roleId);
-        if (translated != null) {
-            return translated;
-        }
-        String derivedKey = "npcRoles." + roleId + ".name";
-        translated = resolveI18nMessage(i18n, language, derivedKey);
-        if (translated != null) {
-            return translated;
-        }
-        if (translationRegistry != null) {
-            translated = translationRegistry.get(roleId);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-            translated = translationRegistry.get(derivedKey);
-            if (translated != null && !translated.isBlank()) {
-                return translated;
-            }
-        }
-        return roleId;
+        I18nModule resolvedI18n = i18n;
+        return RoleNameResolver.resolveDisplayName(
+                roleId,
+                roleNameKey,
+                key -> {
+                    String translated = resolveI18nMessage(resolvedI18n, language, key);
+                    if (translated != null && !translated.isBlank()) {
+                        return translated;
+                    }
+                    return translationRegistry != null ? translationRegistry.get(key) : null;
+                }
+        );
     }
 
     @Nullable
@@ -303,7 +318,8 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     @Nullable
     private static String sanitizeTooltipDisplayName(@Nullable String tooltipDisplayName,
                                                      @Nullable String roleDisplay,
-                                                     @Nullable String roleId) {
+                                                     @Nullable String roleId,
+                                                     @Nullable String roleNameKey) {
         if (tooltipDisplayName == null) {
             return null;
         }
@@ -318,6 +334,9 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
             return null;
         }
         if (roleId != null && !roleId.isBlank() && trimmed.equalsIgnoreCase(roleId)) {
+            return null;
+        }
+        if (roleNameKey != null && !roleNameKey.isBlank() && trimmed.equalsIgnoreCase(roleNameKey)) {
             return null;
         }
         return trimmed;

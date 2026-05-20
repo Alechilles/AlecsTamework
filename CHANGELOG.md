@@ -7,6 +7,7 @@
 
 ### Fixed
 - Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
+- Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
 
 ## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
 

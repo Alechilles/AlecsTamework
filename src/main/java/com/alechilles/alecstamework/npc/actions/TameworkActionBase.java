@@ -3,6 +3,7 @@ package com.alechilles.alecstamework.npc.actions;
 import com.alechilles.alecstamework.Tamework;
 import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -126,37 +127,33 @@ public abstract class TameworkActionBase extends ActionBase {
         }
         NPCPlugin npcPlugin = NPCPlugin.get();
         Tamework instance = Tamework.getInstance();
+        String roleNameKey = RoleNameResolver.resolveRoleNameKey(npc.getRole());
         if (npcPlugin != null) {
             int roleIndex = npc.getRoleIndex();
             if (roleIndex >= 0) {
-                String nameKey = npcPlugin.getName(roleIndex);
-                if (nameKey != null && instance != null && instance.getTranslationRegistry() != null) {
-                    String translated = instance.getTranslationRegistry().get(nameKey);
-                    if (translated != null && !translated.isBlank()) {
-                        return translated;
-                    }
-                    if (!nameKey.contains(".")) {
-                        String derivedKey = "npcRoles." + nameKey + ".name";
-                        translated = instance.getTranslationRegistry().get(derivedKey);
-                        if (translated != null && !translated.isBlank()) {
-                            return translated;
-                        }
-                    }
+                String roleId = npcPlugin.getName(roleIndex);
+                String resolved = resolveRoleDisplayName(roleId, roleNameKey, instance);
+                if (resolved != null && !resolved.isBlank()) {
+                    return resolved;
                 }
             }
         }
         String roleName = npc.getRoleName();
         if (roleName != null && !roleName.isBlank()) {
-            if (instance != null && instance.getTranslationRegistry() != null) {
-                String derivedKey = "npcRoles." + roleName + ".name";
-                String translated = instance.getTranslationRegistry().get(derivedKey);
-                if (translated != null && !translated.isBlank()) {
-                    return translated;
-                }
+            String resolved = resolveRoleDisplayName(roleName, roleNameKey, instance);
+            if (resolved != null && !resolved.isBlank()) {
+                return resolved;
             }
             return roleName;
         }
         return null;
+    }
+
+    private String resolveRoleDisplayName(String roleId, String roleNameKey, Tamework instance) {
+        if (instance != null && instance.getTranslationRegistry() != null) {
+            return RoleNameResolver.resolveDisplayName(roleId, roleNameKey, instance.getTranslationRegistry()::get);
+        }
+        return RoleNameResolver.resolveDisplayName(roleId, roleNameKey, null);
     }
 
     // Empty spawners are identified by having a filled-item target configured.
