@@ -1,9 +1,14 @@
 package com.alechilles.alecstamework.localization;
 
+import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.asset.builder.Builder;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderParameters;
 import com.hypixel.hytale.server.npc.role.Role;
+import com.hypixel.hytale.server.npc.util.expression.StdScope;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Supplier;
 import javax.annotation.Nullable;
 
 /**
@@ -51,6 +56,54 @@ public final class RoleNameResolver {
     }
 
     @Nullable
+    public static String resolveRoleNameKey(@Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return null;
+        }
+        NPCPlugin npcPlugin = getNpcPluginOrNull();
+        if (npcPlugin == null) {
+            return null;
+        }
+        int roleIndex = npcPlugin.getIndex(roleId.trim());
+        return resolveRoleNameKey(roleIndex, npcPlugin);
+    }
+
+    @Nullable
+    public static String resolveRoleNameKey(int roleIndex) {
+        return resolveRoleNameKey(roleIndex, getNpcPluginOrNull());
+    }
+
+    @Nullable
+    private static String resolveRoleNameKey(int roleIndex, @Nullable NPCPlugin npcPlugin) {
+        if (npcPlugin == null || roleIndex < 0) {
+            return null;
+        }
+        Builder<Role> roleBuilder = npcPlugin.tryGetCachedValidRole(roleIndex);
+        if (roleBuilder == null) {
+            return null;
+        }
+        BuilderParameters builderParameters = roleBuilder.getBuilderParameters();
+        if (builderParameters == null) {
+            return null;
+        }
+        try {
+            StdScope scope = builderParameters.createScope();
+            return readScopeStringParam(scope, ROLE_NAME_PARAM_KEYS);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private static NPCPlugin getNpcPluginOrNull() {
+        try {
+            return NPCPlugin.get();
+        } catch (Throwable ignored) {
+            return null;
+        }
+    }
+
+    @Nullable
     public static String resolveDisplayName(@Nullable String roleId,
                                             @Nullable String roleNameKey,
                                             @Nullable TranslationLookup lookup) {
@@ -88,10 +141,8 @@ public final class RoleNameResolver {
         String trimmed = nameKey.trim();
         addCandidate(candidates, trimmed);
         if (!trimmed.contains(".")) {
-            addCandidate(candidates, "npcRole." + trimmed + ".name");
-            addCandidate(candidates, "server.npcRole." + trimmed + ".name");
-            addCandidate(candidates, "npcRoles." + trimmed + ".name");
-            addCandidate(candidates, "server.npcRoles." + trimmed + ".name");
+            addRoleIdNameCandidates(candidates, trimmed);
+            addTamedBaseRoleNameCandidates(candidates, trimmed);
             return candidates;
         }
         if (trimmed.startsWith("server.")) {
@@ -143,6 +194,24 @@ public final class RoleNameResolver {
         if (!candidates.contains(key)) {
             candidates.add(key);
         }
+    }
+
+    private static void addRoleIdNameCandidates(List<String> candidates, @Nullable String roleId) {
+        if (roleId == null || roleId.isBlank()) {
+            return;
+        }
+        addCandidate(candidates, "npcRole." + roleId + ".name");
+        addCandidate(candidates, "server.npcRole." + roleId + ".name");
+        addCandidate(candidates, "npcRoles." + roleId + ".name");
+        addCandidate(candidates, "server.npcRoles." + roleId + ".name");
+    }
+
+    private static void addTamedBaseRoleNameCandidates(List<String> candidates, @Nullable String roleId) {
+        if (roleId == null || roleId.isBlank() || !roleId.startsWith("Tamed_")) {
+            return;
+        }
+        String baseRoleId = roleId.substring("Tamed_".length());
+        addRoleIdNameCandidates(candidates, baseRoleId);
     }
 
     private static void addServerVariant(List<String> candidates, @Nullable String key) {
@@ -205,6 +274,17 @@ public final class RoleNameResolver {
                     return text;
                 }
             } catch (ReflectiveOperationException ignored) {
+            }
+            try {
+                Method method = scope.getClass().getMethod("getStringSupplier", String.class);
+                Object value = method.invoke(scope, paramName);
+                if (value instanceof Supplier<?> supplier) {
+                    Object supplied = supplier.get();
+                    if (supplied instanceof String text && !text.isBlank()) {
+                        return text;
+                    }
+                }
+            } catch (ReflectiveOperationException | IllegalStateException ignored) {
             }
         }
         return null;

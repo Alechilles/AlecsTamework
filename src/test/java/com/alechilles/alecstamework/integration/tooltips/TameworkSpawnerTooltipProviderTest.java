@@ -243,6 +243,31 @@ class TameworkSpawnerTooltipProviderTest {
     }
 
     @Test
+    void legacyTamedRoleIdResolvesBaseSpeciesTranslationWithoutNameKeyMetadata() {
+        ItemFeatureRegistry registry = new ItemFeatureRegistry();
+        registry.register("Spawner_Test", ItemFeatureConfig.builder()
+                .spawnerEnabled(true)
+                .spawnerFilledItemId("*Spawner_Test_State_Filled")
+                .build());
+        TranslationRegistry translations = new TranslationRegistry();
+        translations.put("npcRoles.Armadillo.name", "Armadillo");
+        TameworkSpawnerTooltipProvider provider = new TameworkSpawnerTooltipProvider(registry, translations);
+
+        BsonDocument metadata = capturedMetadata("Tamed_Armadillo", "Tamed_Armadillo", null);
+
+        TooltipData data = provider.getTooltipData(
+                "*Spawner_Test_State_Filled",
+                metadata.toJson(),
+                "en-US"
+        );
+
+        assertNotNull(data);
+        assertEquals("Armadillo", data.getNameOverride());
+        assertEquals("Name: Armadillo", data.getLines().get(0));
+        assertEquals("Species: Armadillo", data.getLines().get(1));
+    }
+
+    @Test
     void additiveModeAppendsResolvedAttachmentLines() throws Exception {
         ItemFeatureRegistry registry = registry(ItemFeatureConfig.SpawnerTooltipMode.ADDITIVE);
         TameworkSpawnerTooltipProvider provider = provider(registry, displayConfig(

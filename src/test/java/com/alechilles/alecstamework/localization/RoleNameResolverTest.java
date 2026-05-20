@@ -14,6 +14,12 @@ class RoleNameResolverTest {
     }
 
     @Test
+    void tamedRoleIdAlsoChecksBaseRoleLanguageKey() {
+        assertTrue(RoleNameResolver.buildNameKeyCandidates("Tamed_Armadillo")
+                .contains("npcRoles.Armadillo.name"));
+    }
+
+    @Test
     void resolvesDisplayNameFromRoleAssetNameKeyBeforeRawRoleId() {
         TranslationRegistry registry = new TranslationRegistry();
         registry.put("npcRoles.Bison.name", "Bison");

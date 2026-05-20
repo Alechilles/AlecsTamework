@@ -82,7 +82,8 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
         );
         String roleNameKey = firstNonBlank(
                 readString(metadataDoc, TameworkMetadataKeys.CAPTURE_NAME_KEY),
-                readCapturedEntityRoleNameKey(metadataDoc)
+                readCapturedEntityRoleNameKey(metadataDoc),
+                RoleNameResolver.resolveRoleNameKey(roleId)
         );
         String roleDisplay = resolveRoleDisplay(roleId, roleNameKey, normalizeLanguage(language));
         String tooltipDisplayName = sanitizeTooltipDisplayName(
