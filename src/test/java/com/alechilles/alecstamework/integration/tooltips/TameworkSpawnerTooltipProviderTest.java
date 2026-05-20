@@ -17,6 +17,7 @@ import org.herolias.tooltips.api.TooltipData;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -41,9 +42,8 @@ class TameworkSpawnerTooltipProviderTest {
 
         assertNotNull(data);
         assertEquals("Fluffy (Mob_Cat)", data.getNameOverride());
-        assertEquals(2, data.getLines().size());
-        assertEquals("Name: Fluffy", data.getLines().get(0));
-        assertTrue(data.getLines().get(1).startsWith("Species: "));
+        assertEquals(1, data.getLines().size());
+        assertTrue(data.getLines().get(0).startsWith("Species: "));
         assertNull(data.getDescriptionOverride());
     }
 
@@ -67,7 +67,7 @@ class TameworkSpawnerTooltipProviderTest {
         assertEquals("Fluffy (Mob_Cat)", data.getNameOverride());
         assertEquals(0, data.getLines().size());
         assertNotNull(data.getDescriptionOverride());
-        assertTrue(data.getDescriptionOverride().contains("Name: Fluffy"));
+        assertFalse(data.getDescriptionOverride().contains("Name: Fluffy"));
         assertTrue(data.getDescriptionOverride().contains("Species: "));
     }
 
@@ -106,7 +106,7 @@ class TameworkSpawnerTooltipProviderTest {
 
         assertNotNull(data);
         assertEquals("Mob_Cat", data.getNameOverride());
-        assertEquals("Name: Mob_Cat", data.getLines().get(0));
+        assertEquals("Species: Mob_Cat", data.getLines().get(0));
     }
 
     @Test
@@ -126,7 +126,7 @@ class TameworkSpawnerTooltipProviderTest {
 
         assertNotNull(data);
         assertEquals("Mob_Cat", data.getNameOverride());
-        assertEquals("Name: Mob_Cat", data.getLines().get(0));
+        assertEquals("Species: Mob_Cat", data.getLines().get(0));
     }
 
     @Test
@@ -146,7 +146,7 @@ class TameworkSpawnerTooltipProviderTest {
 
         assertNotNull(data);
         assertEquals("Mob_Cat", data.getNameOverride());
-        assertEquals("Name: Mob_Cat", data.getLines().get(0));
+        assertEquals("Species: Mob_Cat", data.getLines().get(0));
     }
 
     @Test
@@ -189,7 +189,7 @@ class TameworkSpawnerTooltipProviderTest {
 
         assertNotNull(data);
         assertEquals("Cat", data.getNameOverride());
-        assertEquals("Name: Cat", data.getLines().get(0));
+        assertEquals("Species: Cat", data.getLines().get(0));
     }
 
     @Test
@@ -214,8 +214,7 @@ class TameworkSpawnerTooltipProviderTest {
 
         assertNotNull(data);
         assertEquals("Bison", data.getNameOverride());
-        assertEquals("Name: Bison", data.getLines().get(0));
-        assertEquals("Species: Bison", data.getLines().get(1));
+        assertEquals("Species: Bison", data.getLines().get(0));
     }
 
     @Test
@@ -263,8 +262,7 @@ class TameworkSpawnerTooltipProviderTest {
 
         assertNotNull(data);
         assertEquals("Armadillo", data.getNameOverride());
-        assertEquals("Name: Armadillo", data.getLines().get(0));
-        assertEquals("Species: Armadillo", data.getLines().get(1));
+        assertEquals("Species: Armadillo", data.getLines().get(0));
     }
 
     @Test
@@ -285,8 +283,8 @@ class TameworkSpawnerTooltipProviderTest {
         TooltipData data = provider.getTooltipData("*Spawner_Test_State_Filled", metadata.toJson(), "en-US");
 
         assertNotNull(data);
-        assertEquals(3, data.getLines().size());
-        assertEquals("Coat: Black Coat", data.getLines().get(2));
+        assertEquals(2, data.getLines().size());
+        assertEquals("Coat: Black Coat", data.getLines().get(1));
     }
 
     @Test
@@ -328,7 +326,7 @@ class TameworkSpawnerTooltipProviderTest {
         TooltipData data = provider.getTooltipData("*Spawner_Test_State_Filled", metadata.toJson(), "en-US");
 
         assertNotNull(data);
-        assertEquals(2, data.getLines().size());
+        assertEquals(1, data.getLines().size());
     }
 
     @Test
@@ -372,8 +370,8 @@ class TameworkSpawnerTooltipProviderTest {
         TooltipData data = provider.getTooltipData("*Spawner_Test_State_Filled", metadata.toJson(), "en-US");
 
         assertNotNull(data);
-        assertEquals("Coat: Black", data.getLines().get(2));
-        assertEquals("Horns: Small Horns", data.getLines().get(3));
+        assertEquals("Coat: Black", data.getLines().get(1));
+        assertEquals("Horns: Small Horns", data.getLines().get(2));
     }
 
     private static BsonDocument capturedMetadata(String tooltipName, String roleId, String npcName) {

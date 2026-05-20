@@ -27,7 +27,6 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     private static final String CAPTURED_ENTITY_NPC_NAME_KEY = "NpcNameKey";
     private static final String GENERIC_CAPTURE_CRATE_NAME = "Capture Crate";
     private static final String GENERIC_CAPTURE_CRATE_KEY = "server.items.captureCrate.name";
-    private static final String NAME_LINE_PREFIX = "Name: ";
     private static final String ROLE_LINE_PREFIX = "Species: ";
     private static final String GENDER_LINE_PREFIX = "Gender: ";
     private static final Gson GSON = new Gson();
@@ -113,7 +112,6 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
                 .hashInput((mode.name()) + "|" + itemName + "|" + displayName + "|"
                         + (roleDisplay == null ? "" : roleDisplay) + "|" + (gender == null ? "" : gender)
                         + "|" + attachmentDisplays);
-        appendLine(builder, mode, NAME_LINE_PREFIX + displayName);
         if (roleDisplay != null && !roleDisplay.isBlank()) {
             appendLine(builder, mode, ROLE_LINE_PREFIX + roleDisplay);
         }
