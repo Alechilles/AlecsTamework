@@ -387,6 +387,67 @@ class BatchManifestTests(unittest.TestCase):
             self.assertEqual(jobs["jobs"][0]["comboSlug"], "base")
             self.assertEqual(jobs["jobs"][0]["attachments"], {})
 
+    def test_group_mode_merges_duplicate_role_groups_from_multiple_entries(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Aures" / "Goat.json", goat_model())
+            write_json(root / "models" / "Base" / "Goat.json", goat_model())
+            spawner = root / "spawner.json"
+            write_json(spawner, {"IconOverridesByRole": {}})
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{combo_slug}.png",
+                        "iconOverrideMode": "group",
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "goat_aures",
+                            "source": "localModels",
+                            "model": "Aures/Goat.json",
+                            "roles": ["Goat", "Tamed_Goat"],
+                            "keepAttachmentSets": ["BaseColor"],
+                            "iconTemplate": "Icons/Aures/{combo_slug}.png",
+                        },
+                        {
+                            "id": "goat_base",
+                            "source": "localModels",
+                            "model": "Base/Goat.json",
+                            "roles": ["Goat", "Tamed_Goat"],
+                            "keepAttachmentSets": ["Horns"],
+                            "iconTemplate": "Icons/Base/{combo_slug}.png",
+                        },
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(
+                root,
+                manifest,
+                jobs_out,
+                manifest_out,
+                extra_args=[
+                    "--spawner-config",
+                    str(spawner),
+                    "--in-place",
+                    "--replace-icon-overrides",
+                ],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            updated = json.loads(spawner.read_text(encoding="utf-8"))
+            self.assertEqual(len(updated["IconOverrideGroups"]), 1)
+            group = updated["IconOverrideGroups"][0]
+            self.assertEqual(group["Roles"], ["Goat", "Tamed_Goat"])
+            self.assertEqual(len(group["Overrides"]), 4)
+            self.assertIn("Icons/Aures/basecolor-brown.png", [entry["Icon"] for entry in group["Overrides"]])
+            self.assertIn("Icons/Base/horns-short.png", [entry["Icon"] for entry in group["Overrides"]])
+
     def test_exclude_attachment_options_removes_default_or_empty_variants(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

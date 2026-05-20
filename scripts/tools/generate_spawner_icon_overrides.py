@@ -650,6 +650,33 @@ def build_icon_override_group(roles: Sequence[str], combo_manifest: Sequence[Map
     return group
 
 
+def append_or_merge_icon_override_group(groups: List[dict], group: Mapping[str, object]) -> None:
+    roles = group.get("Roles")
+    if not isinstance(roles, list):
+        return
+    role_key = tuple(role for role in roles if isinstance(role, str))
+    if not role_key:
+        return
+
+    for existing in groups:
+        existing_roles = existing.get("Roles")
+        if not isinstance(existing_roles, list):
+            continue
+        existing_key = tuple(role for role in existing_roles if isinstance(role, str))
+        if existing_key != role_key:
+            continue
+
+        existing_overrides = existing.get("Overrides")
+        incoming_overrides = group.get("Overrides")
+        if isinstance(existing_overrides, list) and isinstance(incoming_overrides, list):
+            existing_overrides.extend(incoming_overrides)
+        if not existing.get("IconDefault") and isinstance(group.get("IconDefault"), str):
+            existing["IconDefault"] = group["IconDefault"]
+        return
+
+    groups.append(dict(group))
+
+
 def apply_overrides_to_spawner(
     spawner_json: Mapping[str, object],
     role_overrides: Mapping[str, List[dict]],
@@ -1387,7 +1414,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         if icon_override_mode == "group":
             icon_override_group = build_icon_override_group(roles, combo_manifest)
             if icon_override_group["Overrides"] or icon_override_group.get("IconDefault"):
-                aggregate_icon_override_groups.append(icon_override_group)
+                append_or_merge_icon_override_group(aggregate_icon_override_groups, icon_override_group)
             role_overrides = {}
         else:
             for role, overrides in role_overrides.items():
