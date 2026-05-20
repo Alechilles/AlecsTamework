@@ -43,7 +43,7 @@ class TameworkSpawnerTooltipProviderTest {
         assertEquals("Fluffy (Mob_Cat)", data.getNameOverride());
         assertEquals(2, data.getLines().size());
         assertEquals("Name: Fluffy", data.getLines().get(0));
-        assertTrue(data.getLines().get(1).startsWith("Role: "));
+        assertTrue(data.getLines().get(1).startsWith("Species: "));
         assertNull(data.getDescriptionOverride());
     }
 
@@ -68,7 +68,7 @@ class TameworkSpawnerTooltipProviderTest {
         assertEquals(0, data.getLines().size());
         assertNotNull(data.getDescriptionOverride());
         assertTrue(data.getDescriptionOverride().contains("Name: Fluffy"));
-        assertTrue(data.getDescriptionOverride().contains("Role: "));
+        assertTrue(data.getDescriptionOverride().contains("Species: "));
     }
 
     @Test

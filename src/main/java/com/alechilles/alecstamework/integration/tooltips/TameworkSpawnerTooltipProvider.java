@@ -27,7 +27,7 @@ final class TameworkSpawnerTooltipProvider implements TooltipProvider {
     private static final String GENERIC_CAPTURE_CRATE_NAME = "Capture Crate";
     private static final String GENERIC_CAPTURE_CRATE_KEY = "server.items.captureCrate.name";
     private static final String NAME_LINE_PREFIX = "Name: ";
-    private static final String ROLE_LINE_PREFIX = "Role: ";
+    private static final String ROLE_LINE_PREFIX = "Species: ";
     private static final String GENDER_LINE_PREFIX = "Gender: ";
     private static final Gson GSON = new Gson();
     private static final Type ATTACHMENT_MAP_TYPE = new TypeToken<Map<String, String>>() { }.getType();
