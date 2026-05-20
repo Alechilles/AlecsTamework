@@ -1,0 +1,75 @@
+package com.alechilles.alecstamework.commands;
+
+import java.util.List;
+
+import javax.annotation.Nonnull;
+
+import com.alechilles.alecstamework.Tamework;
+import com.alechilles.alecstamework.assets.patches.NpcTemplatePatchService;
+import com.alechilles.alecstamework.assets.patches.NpcTemplatePatchStatus;
+import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.Message;
+import com.hypixel.hytale.server.core.command.system.CommandContext;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
+import com.hypixel.hytale.server.core.universe.PlayerRef;
+import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+
+/**
+ * Prints the last optional NPC template patch run.
+ */
+public final class TameworkTemplatePatchesStatusCommand extends AbstractPlayerCommand {
+    private static final int MAX_ROWS = 8;
+
+    public TameworkTemplatePatchesStatusCommand() {
+        super("status", "Show optional NPC template patch status.");
+        requirePermission(TameworkConfigPermission.NODE);
+        setPermissionGroups("OP", "Admin", "Operator");
+    }
+
+    @Override
+    protected void execute(@Nonnull CommandContext commandContext,
+                           @Nonnull Store<EntityStore> store,
+                           @Nonnull Ref<EntityStore> ref,
+                           @Nonnull PlayerRef playerRef,
+                           @Nonnull World world) {
+        NpcTemplatePatchService service = resolveService(commandContext);
+        if (service == null) {
+            return;
+        }
+        NpcTemplatePatchStatus status = service.getLastStatus();
+        commandContext.sender().sendMessage(Message.raw(status.summaryLine()));
+        sendRows(commandContext, "Generated", status.getGeneratedTargets());
+        sendRows(commandContext, "Failed", status.getFailed());
+        sendRows(commandContext, "Skipped", status.getSkipped());
+    }
+
+    private static NpcTemplatePatchService resolveService(@Nonnull CommandContext commandContext) {
+        Tamework plugin = Tamework.getInstance();
+        if (plugin == null || plugin.getNpcTemplatePatchService() == null) {
+            commandContext.sender().sendMessage(Message.raw("Tamework template patch service is not available."));
+            return null;
+        }
+        if (!TameworkConfigPermission.hasAccess(commandContext.sender())) {
+            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw templatepatches."));
+            return null;
+        }
+        return plugin.getNpcTemplatePatchService();
+    }
+
+    private static void sendRows(@Nonnull CommandContext commandContext,
+                                 @Nonnull String label,
+                                 @Nonnull List<String> rows) {
+        if (rows.isEmpty()) {
+            return;
+        }
+        int limit = Math.min(rows.size(), MAX_ROWS);
+        for (int i = 0; i < limit; i++) {
+            commandContext.sender().sendMessage(Message.raw(label + ": " + rows.get(i)));
+        }
+        if (rows.size() > limit) {
+            commandContext.sender().sendMessage(Message.raw(label + ": +" + (rows.size() - limit) + " more."));
+        }
+    }
+}

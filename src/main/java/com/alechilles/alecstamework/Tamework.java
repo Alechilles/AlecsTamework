@@ -18,6 +18,7 @@ import com.alechilles.alecstamework.api.internal.TameworkEventBus;
 import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
+import com.alechilles.alecstamework.assets.patches.NpcTemplatePatchService;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -183,6 +184,7 @@ public class Tamework extends JavaPlugin {
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetPackCoordinator assetPackCoordinator;
+    private NpcTemplatePatchService npcTemplatePatchService;
     private TwConfigOverrideManager configOverrideManager;
     private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
 
@@ -357,12 +359,14 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
+        npcTemplatePatchService = new NpcTemplatePatchService(this);
         configOverrideManager = new TwConfigOverrideManager(this);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
+        npcTemplatePatchService.registerLoadHook();
         ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
@@ -1001,6 +1005,7 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
+        npcTemplatePatchService = null;
         crashTelemetryService = null;
         settingsAnnouncementService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
@@ -1125,6 +1130,11 @@ public class Tamework extends JavaPlugin {
 
     public TwConfigOverrideManager getConfigOverrideManager() {
         return configOverrideManager;
+    }
+
+    @Nullable
+    public NpcTemplatePatchService getNpcTemplatePatchService() {
+        return npcTemplatePatchService;
     }
 
     @Nullable

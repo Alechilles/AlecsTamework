@@ -1,0 +1,69 @@
+{
+  "Id": "Example_AH_Livestock_TameworkOptional",
+  "Target": "Server/NPC/Roles/_Core/Templates/AH_Template_Livestock.json",
+  "Priority": 0,
+  "Enabled": true,
+  "Operations": [
+    {
+      "Id": "follow-state",
+      "Op": "Macro",
+      "Macro": "TameworkStateInstruction",
+      "Path": "/StateInstructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework state anchor"
+      },
+      "Options": {
+        "Component": "Component_Tamework_Instruction_Follow_Simple_TP",
+        "Enabled": {
+          "Compute": "CanFollow"
+        }
+      }
+    },
+    {
+      "Id": "pet-hook",
+      "Op": "Macro",
+      "Macro": "TameworkHookInstruction",
+      "Path": "/HookInstructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework hook anchor"
+      },
+      "Options": {
+        "HookId": "TwHook_Pet",
+        "Consume": true,
+        "Instructions": [
+          {
+            "Component": "Component_AH_PetEffects"
+          }
+        ]
+      }
+    },
+    {
+      "Id": "interaction-bridge",
+      "Op": "Macro",
+      "Macro": "TameworkInteractionBridge",
+      "Path": "/InteractionInstruction/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Vanilla interaction anchor"
+      },
+      "Options": {
+        "ActionFields": {
+          "LovedItems": {
+            "Compute": "AttractiveItemSet"
+          },
+          "IsHarvestable": {
+            "Compute": "IsHarvestable"
+          },
+          "IsMountable": {
+            "Compute": "IsMountable"
+          },
+          "HarvestInteractionContext": {
+            "Compute": "HarvestInteractionContext"
+          }
+        }
+      }
+    }
+  ]
+}

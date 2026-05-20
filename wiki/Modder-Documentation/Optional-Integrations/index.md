@@ -12,5 +12,6 @@ This subsection documents optional hooks and cross-mod bridges that build on top
 
 ## Child Pages
 - [Hooks, Bridges, and Optional Integrations](/mod/alecs-tamework/hooks-bridges-and-optional-integrations)
+- [NPC Template Patches](/mod/alecs-tamework/npc-template-patches)
 
 
