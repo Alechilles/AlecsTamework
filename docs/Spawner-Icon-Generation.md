@@ -40,6 +40,9 @@ JSON from one dialog.
 6. Use `Calculate Combos` before rendering. This shows how many combinations and
    icon files will be produced.
 7. In `Camera & Frame`, tune icon size, zoom, rotation, and screen position.
+   Enable `Auto Frame` when a batch contains differently sized models and the
+   renderer should zoom out and recenter each captured PNG from its visible
+   pixels.
 8. Use `Preview First Combo` to verify framing.
 9. In `Outputs`, choose whether to save jobs/manifest JSON and whether to write
    spawner overrides.
@@ -81,6 +84,7 @@ python scripts/tools/generate_spawner_icon_overrides.py \
   --include-empty-set Fleece \
   --icon-template "Icons/ItemsGenerated/Spawner_Sheep_{set_fleece}_{set_basecolor}.png" \
   --icon-override-mode group \
+  --camera-auto-frame \
   --write-spawner Server/Tamework/Items/Spawners/Spawner_Tamework_Example.generated.json \
   --renderer-jobs-out .tmp/sheep_render_jobs.json
 ```
@@ -98,6 +102,8 @@ Notes:
 - `--icon-override-mode group` writes one `IconOverrideGroups` entry for all
   selected roles. In group mode, use an icon template without `{role}` when the
   roles should reference the same PNG.
+- `--camera-auto-frame` writes renderer metadata that asks the Blockbench
+  plugin to zoom out and recenter each output using screenshot alpha bounds.
 
 ## Batch Manifest Workflow
 Use a batch manifest when a mod needs to maintain a curated matrix of models and
@@ -114,7 +120,10 @@ Example manifest:
     "iconSize": 128,
     "cameraScale": 1.0,
     "cameraRotation": [22.5, 45, 22.5],
-    "cameraTranslation": [0, -13.5]
+    "cameraTranslation": [0, -13.5],
+    "cameraAutoFrame": true,
+    "cameraAutoFramePadding": 4,
+    "cameraAutoFrameMaxAttempts": 6
   },
   "sources": {
     "baseGame": {
@@ -170,7 +179,13 @@ Batch manifest notes:
   sets that should affect icons. Omit it to generate all sets.
 - Entries can override defaults including `iconTemplate`, `iconSize`,
   `cameraScale`, `cameraRotation`, `cameraTranslation`, `includeEmptySets`,
-  `emptyValueToken`, `iconOverrideMode`, and `maxCombos`.
+  `cameraAutoFrame`, `cameraAutoFramePadding`,
+  `cameraAutoFrameMaxAttempts`, `emptyValueToken`, `iconOverrideMode`, and
+  `maxCombos`.
+- `cameraAutoFrame` keeps fixed authored rotation and baseline zoom, then the
+  Blockbench renderer zooms out only when the visible pixels touch the
+  configured padding and recenters the result before applying any explicit
+  screen translation.
 - `iconOverrideMode: "group"` writes one shared `IconOverrideGroups` entry per
   manifest entry and one render job per attachment combo. The default
   `byRole` mode keeps the older `IconOverridesByRole` output.

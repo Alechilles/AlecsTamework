@@ -387,6 +387,59 @@ class BatchManifestTests(unittest.TestCase):
             self.assertEqual(jobs["jobs"][0]["comboSlug"], "base")
             self.assertEqual(jobs["jobs"][0]["attachments"], {})
 
+    def test_batch_manifest_writes_auto_frame_camera_defaults_and_entry_overrides(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Goat.json", goat_model())
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{combo_slug}.png",
+                        "cameraAutoFrame": True,
+                        "cameraAutoFramePadding": 5,
+                        "cameraAutoFrameMaxAttempts": 7,
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "goat_local",
+                            "source": "localModels",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Goat"],
+                            "keepAttachmentSets": ["BaseColor"],
+                        },
+                        {
+                            "id": "goat_tight",
+                            "source": "localModels",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Tamed_Goat"],
+                            "keepAttachmentSets": ["Horns"],
+                            "cameraAutoFramePadding": 2,
+                        },
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(root, manifest, jobs_out, manifest_out)
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            jobs = json.loads(jobs_out.read_text(encoding="utf-8"))
+            camera_defaults = jobs["defaults"]["camera"]
+            self.assertEqual(camera_defaults["autoFrame"], True)
+            self.assertEqual(camera_defaults["autoFramePadding"], 5)
+            self.assertEqual(camera_defaults["autoFrameMaxAttempts"], 7)
+            entry_override_jobs = [
+                job for job in jobs["jobs"] if job.get("entryId") == "goat_tight"
+            ]
+            self.assertTrue(entry_override_jobs)
+            self.assertTrue(all(job["camera"]["autoFrame"] is True for job in entry_override_jobs))
+            self.assertTrue(all(job["camera"]["autoFramePadding"] == 2 for job in entry_override_jobs))
+            self.assertTrue(all(job["camera"]["autoFrameMaxAttempts"] == 7 for job in entry_override_jobs))
+
     def test_group_mode_merges_duplicate_role_groups_from_multiple_entries(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

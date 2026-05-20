@@ -179,6 +179,18 @@ def parse_float_field(raw: object, expected_count: int, field_name: str) -> Tupl
     raise ConfigError(f"{field_name} must be a comma-separated string or number array.")
 
 
+def parse_bool_field(raw: object, field_name: str) -> bool:
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        normalized = raw.strip().lower()
+        if normalized in {"true", "1", "yes", "y", "on"}:
+            return True
+        if normalized in {"false", "0", "no", "n", "off"}:
+            return False
+    raise ConfigError(f"{field_name} must be a boolean.")
+
+
 def resolve_asset_path(asset_root: Path, value: str) -> Path:
     candidate = Path(value)
     if candidate.is_absolute():
@@ -731,6 +743,9 @@ def build_renderer_jobs(
     camera_scale: float,
     camera_rotation: Tuple[float, float, float],
     camera_translation: Tuple[float, float],
+    camera_auto_frame: bool,
+    camera_auto_frame_padding: int,
+    camera_auto_frame_max_attempts: int,
 ) -> dict:
     base_model = model_json.get("Model") if isinstance(model_json.get("Model"), str) else None
     base_texture = model_json.get("Texture") if isinstance(model_json.get("Texture"), str) else None
@@ -824,6 +839,9 @@ def build_renderer_jobs(
                 "scale": camera_scale,
                 "rotation": list(camera_rotation),
                 "translation": list(camera_translation),
+                "autoFrame": camera_auto_frame,
+                "autoFramePadding": camera_auto_frame_padding,
+                "autoFrameMaxAttempts": camera_auto_frame_max_attempts,
             },
         },
         "model": {
@@ -858,6 +876,9 @@ def combine_renderer_payloads(
     camera_scale: float,
     camera_rotation: Tuple[float, float, float],
     camera_translation: Tuple[float, float],
+    camera_auto_frame: bool,
+    camera_auto_frame_padding: int,
+    camera_auto_frame_max_attempts: int,
     payloads: Sequence[Mapping[str, object]],
 ) -> dict:
     jobs: List[dict] = []
@@ -900,6 +921,9 @@ def combine_renderer_payloads(
                 "scale": camera_scale,
                 "rotation": list(camera_rotation),
                 "translation": list(camera_translation),
+                "autoFrame": camera_auto_frame,
+                "autoFramePadding": camera_auto_frame_padding,
+                "autoFrameMaxAttempts": camera_auto_frame_max_attempts,
             },
         },
         "model": models[0] if len(models) == 1 else None,
@@ -1056,6 +1080,23 @@ def parse_args() -> argparse.Namespace:
         default="0,-13.5",
         help="Camera translation metadata X,Y (default: 0,-13.5).",
     )
+    parser.add_argument(
+        "--camera-auto-frame",
+        action="store_true",
+        help="Enable screenshot alpha based auto-framing in renderer jobs.",
+    )
+    parser.add_argument(
+        "--camera-auto-frame-padding",
+        type=int,
+        default=4,
+        help="Minimum transparent pixel padding for auto-framed icons (default: 4).",
+    )
+    parser.add_argument(
+        "--camera-auto-frame-max-attempts",
+        type=int,
+        default=6,
+        help="Maximum screenshot/zoom attempts for auto-framed icons (default: 6).",
+    )
     return parser.parse_args()
 
 
@@ -1179,6 +1220,9 @@ def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
         camera_scale=args.camera_scale,
         camera_rotation=camera_rotation,
         camera_translation=camera_translation,
+        camera_auto_frame=args.camera_auto_frame,
+        camera_auto_frame_padding=max(0, args.camera_auto_frame_padding),
+        camera_auto_frame_max_attempts=max(1, args.camera_auto_frame_max_attempts),
     )
     write_json(renderer_jobs_path, renderer_payload)
     output_lines.append(f"Renderer jobs written: {renderer_jobs_path}")
@@ -1323,6 +1367,18 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         2,
         "defaults.cameraTranslation",
     )
+    camera_auto_frame = parse_bool_field(
+        defaults.get("cameraAutoFrame", args.camera_auto_frame),
+        "defaults.cameraAutoFrame",
+    )
+    camera_auto_frame_padding = max(
+        0,
+        int(defaults.get("cameraAutoFramePadding", args.camera_auto_frame_padding)),
+    )
+    camera_auto_frame_max_attempts = max(
+        1,
+        int(defaults.get("cameraAutoFrameMaxAttempts", args.camera_auto_frame_max_attempts)),
+    )
 
     spawner_json = None
     spawner_path: Path | None = None
@@ -1441,6 +1497,25 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
             2,
             f"Batch entry '{entry_id}' cameraTranslation",
         )
+        entry_camera_auto_frame = parse_bool_field(
+            batch_value(entry, defaults, "cameraAutoFrame", camera_auto_frame),
+            f"Batch entry '{entry_id}' cameraAutoFrame",
+        )
+        entry_camera_auto_frame_padding = max(
+            0,
+            int(batch_value(entry, defaults, "cameraAutoFramePadding", camera_auto_frame_padding)),
+        )
+        entry_camera_auto_frame_max_attempts = max(
+            1,
+            int(
+                batch_value(
+                    entry,
+                    defaults,
+                    "cameraAutoFrameMaxAttempts",
+                    camera_auto_frame_max_attempts,
+                )
+            ),
+        )
         entry_icon_size = int(batch_value(entry, defaults, "iconSize", icon_size))
         renderer_payload = build_renderer_jobs(
             asset_root=asset_root,
@@ -1456,6 +1531,9 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
             camera_scale=entry_camera_scale,
             camera_rotation=entry_camera_rotation,
             camera_translation=entry_camera_translation,
+            camera_auto_frame=entry_camera_auto_frame,
+            camera_auto_frame_padding=entry_camera_auto_frame_padding,
+            camera_auto_frame_max_attempts=entry_camera_auto_frame_max_attempts,
         )
         for job in renderer_payload.get("jobs", []):
             if isinstance(job, dict):
@@ -1464,10 +1542,19 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
                 job["modelSource"] = model_source
                 if entry_icon_size != icon_size:
                     job["iconSize"] = entry_icon_size
-                if entry_camera_scale != camera_scale or entry_camera_rotation != camera_rotation:
+                if (
+                    entry_camera_scale != camera_scale
+                    or entry_camera_rotation != camera_rotation
+                    or entry_camera_auto_frame != camera_auto_frame
+                    or entry_camera_auto_frame_padding != camera_auto_frame_padding
+                    or entry_camera_auto_frame_max_attempts != camera_auto_frame_max_attempts
+                ):
                     job["camera"] = {
                         "scale": entry_camera_scale,
                         "rotation": list(entry_camera_rotation),
+                        "autoFrame": entry_camera_auto_frame,
+                        "autoFramePadding": entry_camera_auto_frame_padding,
+                        "autoFrameMaxAttempts": entry_camera_auto_frame_max_attempts,
                     }
                 if entry_camera_translation != camera_translation:
                     job["translation"] = list(entry_camera_translation)
@@ -1554,6 +1641,9 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         camera_scale=camera_scale,
         camera_rotation=camera_rotation,
         camera_translation=camera_translation,
+        camera_auto_frame=camera_auto_frame,
+        camera_auto_frame_padding=camera_auto_frame_padding,
+        camera_auto_frame_max_attempts=camera_auto_frame_max_attempts,
         payloads=renderer_payloads,
     )
     write_json(renderer_jobs_path, renderer_payload)

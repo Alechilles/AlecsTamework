@@ -1645,7 +1645,10 @@
           camera: {
             scale: config.cameraScale,
             rotation: config.cameraRotation,
-            translation: config.cameraTranslation
+            translation: config.cameraTranslation,
+            autoFrame: config.cameraAutoFrame === true,
+            autoFramePadding: Math.max(0, Math.floor(asNumber(config.cameraAutoFramePadding, 4))),
+            autoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(config.cameraAutoFrameMaxAttempts, 6)))
           }
         },
         model: {
@@ -2139,6 +2142,24 @@
     }
   }
 
+  function scalePreviewCamera(preview, factor) {
+    const scale = Math.max(0.01, asNumber(factor, 1));
+    if (
+      preview &&
+      preview.camera &&
+      preview.camera.position &&
+      typeof preview.camera.position.multiplyScalar === "function"
+    ) {
+      preview.camera.position.multiplyScalar(scale);
+    }
+    if (preview && preview.controls && typeof preview.controls.update === "function") {
+      preview.controls.update();
+    }
+    if (preview && preview.camera && typeof preview.camera.updateProjectionMatrix === "function") {
+      preview.camera.updateProjectionMatrix();
+    }
+  }
+
   function captureScreenshot(preview, iconSize) {
     return new Promise((resolve, reject) => {
       try {
@@ -2314,6 +2335,137 @@
     return canvas.toDataURL("image/png");
   }
 
+  async function analyzeImageAlphaBounds(dataUrl, iconSize) {
+    const image = await loadImage(dataUrl);
+    const canvas = document.createElement("canvas");
+    canvas.width = iconSize;
+    canvas.height = iconSize;
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, iconSize, iconSize);
+    ctx.drawImage(image, 0, 0, iconSize, iconSize);
+    const pixelData = ctx.getImageData(0, 0, iconSize, iconSize).data;
+    let minX = iconSize;
+    let minY = iconSize;
+    let maxX = -1;
+    let maxY = -1;
+    let count = 0;
+    for (let y = 0; y < iconSize; y += 1) {
+      for (let x = 0; x < iconSize; x += 1) {
+        const alpha = pixelData[(y * iconSize + x) * 4 + 3];
+        if (alpha > 8) {
+          minX = Math.min(minX, x);
+          minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x);
+          maxY = Math.max(maxY, y);
+          count += 1;
+        }
+      }
+    }
+    if (count === 0) {
+      return null;
+    }
+    return {
+      minX,
+      minY,
+      maxX,
+      maxY,
+      width: maxX - minX + 1,
+      height: maxY - minY + 1,
+      count
+    };
+  }
+
+  function boundsTouchPadding(bounds, iconSize, padding) {
+    if (!bounds) {
+      return false;
+    }
+    const safePadding = Math.max(0, Math.floor(asNumber(padding, 0)));
+    return (
+      bounds.minX < safePadding ||
+      bounds.minY < safePadding ||
+      bounds.maxX >= iconSize - safePadding ||
+      bounds.maxY >= iconSize - safePadding
+    );
+  }
+
+  async function centerImageByAlphaBounds(dataUrl, iconSize, bounds, padding) {
+    if (!bounds) {
+      return dataUrl;
+    }
+    const safePadding = Math.max(0, Math.floor(asNumber(padding, 0)));
+    const padX = Math.min(safePadding, Math.max(0, Math.floor((iconSize - bounds.width) / 2)));
+    const padY = Math.min(safePadding, Math.max(0, Math.floor((iconSize - bounds.height) / 2)));
+    const centerX = (bounds.minX + bounds.maxX) / 2;
+    const centerY = (bounds.minY + bounds.maxY) / 2;
+    const desiredDx = Math.round(iconSize / 2 - centerX);
+    const desiredDy = Math.round(iconSize / 2 - centerY);
+    const minDx = padX - bounds.minX;
+    const maxDx = iconSize - 1 - padX - bounds.maxX;
+    const minDy = padY - bounds.minY;
+    const maxDy = iconSize - 1 - padY - bounds.maxY;
+    const dx = Math.max(minDx, Math.min(maxDx, desiredDx));
+    const dy = Math.max(minDy, Math.min(maxDy, desiredDy));
+    return applyScreenTranslation(dataUrl, iconSize, [dx, dy]);
+  }
+
+  function resolveAutoFrameSettings(payloadDefaults, job) {
+    const cameraDefaults = payloadDefaults && payloadDefaults.camera && typeof payloadDefaults.camera === "object"
+      ? payloadDefaults.camera
+      : {};
+    const jobCamera = job && job.camera && typeof job.camera === "object" ? job.camera : {};
+    const rawEnabled =
+      Object.prototype.hasOwnProperty.call(jobCamera, "autoFrame")
+        ? jobCamera.autoFrame
+        : cameraDefaults.autoFrame;
+    const enabled = rawEnabled === true || rawEnabled === "true";
+    const rawPadding = Object.prototype.hasOwnProperty.call(jobCamera, "autoFramePadding")
+      ? jobCamera.autoFramePadding
+      : cameraDefaults.autoFramePadding;
+    const rawMaxAttempts = Object.prototype.hasOwnProperty.call(jobCamera, "autoFrameMaxAttempts")
+      ? jobCamera.autoFrameMaxAttempts
+      : cameraDefaults.autoFrameMaxAttempts;
+    const padding = Math.max(
+      0,
+      Math.floor(asNumber(rawPadding, 4))
+    );
+    const maxAttempts = Math.max(
+      1,
+      Math.floor(asNumber(rawMaxAttempts, 6))
+    );
+    return {
+      enabled,
+      padding,
+      maxAttempts
+    };
+  }
+
+  async function captureAutoFramedScreenshot(preview, iconSize, settings) {
+    let imageDataUrl = await captureScreenshot(preview, iconSize);
+    if (!settings.enabled) {
+      return imageDataUrl;
+    }
+    let bounds = await analyzeImageAlphaBounds(imageDataUrl, iconSize);
+    if (!bounds) {
+      return imageDataUrl;
+    }
+    for (let attempt = 1; attempt < settings.maxAttempts; attempt += 1) {
+      if (!boundsTouchPadding(bounds, iconSize, settings.padding)) {
+        break;
+      }
+      scalePreviewCamera(preview, 1.15);
+      await waitFrame();
+      imageDataUrl = await captureScreenshot(preview, iconSize);
+      bounds = await analyzeImageAlphaBounds(imageDataUrl, iconSize);
+      if (!bounds) {
+        break;
+      }
+    }
+    if (bounds && !boundsTouchPadding(bounds, iconSize, 1)) {
+      imageDataUrl = await centerImageByAlphaBounds(imageDataUrl, iconSize, bounds, settings.padding);
+    }
+    return imageDataUrl;
+  }
+
   function buildSceneDiagnostics(preview) {
     const elementCount =
       typeof Outliner !== "undefined" && Array.isArray(Outliner.elements)
@@ -2448,7 +2600,8 @@
       applyCamera(preview, payloadDefaults, job);
       await waitFrame();
 
-      let imageDataUrl = await captureScreenshot(preview, iconSize);
+      const autoFrame = resolveAutoFrameSettings(payloadDefaults, job);
+      let imageDataUrl = await captureAutoFramedScreenshot(preview, iconSize, autoFrame);
       imageDataUrl = await applyScreenTranslation(imageDataUrl, iconSize, translation);
       await assertImageNotFullyTransparent(imageDataUrl, iconSize, buildSceneDiagnostics(preview));
       return {
@@ -2669,6 +2822,9 @@
       cameraRotationZ: 22.5,
       cameraPositionX: 0,
       cameraPositionY: 0,
+      cameraAutoFrame: false,
+      cameraAutoFramePadding: 4,
+      cameraAutoFrameMaxAttempts: 6,
       saveGeneratedJson: true,
       jobsOutPath: "",
       manifestOutPath: "",
@@ -2688,6 +2844,8 @@
     if (!Number.isFinite(Number(defaults.cameraRotationZ))) defaults.cameraRotationZ = legacyRotation[2];
     if (!Number.isFinite(Number(defaults.cameraPositionX))) defaults.cameraPositionX = legacyPosition[0];
     if (!Number.isFinite(Number(defaults.cameraPositionY))) defaults.cameraPositionY = legacyPosition[1];
+    if (!Number.isFinite(Number(defaults.cameraAutoFramePadding))) defaults.cameraAutoFramePadding = 4;
+    if (!Number.isFinite(Number(defaults.cameraAutoFrameMaxAttempts))) defaults.cameraAutoFrameMaxAttempts = 6;
     if (!defaults.modelPath) {
       const projectPath = getCurrentProjectPath();
       if (projectPath) {
@@ -3205,6 +3363,9 @@
       cameraScale,
       cameraRotation,
       cameraTranslation,
+      cameraAutoFrame: values.cameraAutoFrame === true,
+      cameraAutoFramePadding: Math.max(0, Math.floor(asNumber(values.cameraAutoFramePadding, 4))),
+      cameraAutoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(values.cameraAutoFrameMaxAttempts, 6))),
       sharedRoleGroup: values.sharedRoleGroup === true,
       previewOnlyFirstCombo: true
     });
@@ -3430,6 +3591,16 @@
                     <numeric-input v-model.number="values.cameraPositionY" :min="-256" :max="256" :step="1" />
                   </div>
                 </div>
+                <div class="tw-inline-pair">
+                  <div class="tw-check-row">
+                    <input type="checkbox" id="tw_camera_auto_frame" v-model="values.cameraAutoFrame" />
+                    <label for="tw_camera_auto_frame">Auto Frame</label>
+                  </div>
+                  <div class="tw-field">
+                    <label>Auto Frame Padding</label>
+                    <numeric-input v-model.number="values.cameraAutoFramePadding" :min="0" :max="32" :step="1" />
+                  </div>
+                </div>
                 <div class="tw-field">
                   <div class="tw-action-row">
                     <button type="button" class="tool" @click="previewFirstCombo" :disabled="previewBusy">
@@ -3643,6 +3814,9 @@
       cameraScale,
       cameraRotation,
       cameraTranslation,
+      cameraAutoFrame: formResult.cameraAutoFrame === true,
+      cameraAutoFramePadding: Math.max(0, Math.floor(asNumber(formResult.cameraAutoFramePadding, 4))),
+      cameraAutoFrameMaxAttempts: Math.max(1, Math.floor(asNumber(formResult.cameraAutoFrameMaxAttempts, 6))),
       sharedRoleGroup: formResult.sharedRoleGroup === true
     });
     const resolvedBaseModelFile = generated.jobsPayload
