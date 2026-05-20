@@ -63,12 +63,14 @@ Optional overrides for filled spawner icons based on attachments or role.
 Fields:
 - `IconOverrides`: array of overrides with `Icon` and `Attachments` map.
 - `IconOverridesByRole`: map of role id to override arrays.
-- `IconOverrideGroups`: ordered array of shared role groups with `Roles` and
-  `Overrides`.
+- `IconOverrideGroups`: ordered array of shared role groups with `Roles`,
+  optional group `IconDefault`, and `Overrides`.
 
 Attachment maps use the NPC attachment keys as the match criteria.
 Runtime lookup checks exact role overrides first, then the first matching shared
-role group, then global overrides, then `IconDefault`.
+role group, then that group's `IconDefault`, then global overrides, then the
+top-level `IconDefault`. Use group `IconDefault` for roles whose captured NPCs
+have no attachment variants but still need their own base-skin icon.
 
 The easiest way to author icon overrides is the Blockbench UI workflow in
 [Spawner Icon Generation](Spawner-Icon-Generation.md). Use the batch manifest

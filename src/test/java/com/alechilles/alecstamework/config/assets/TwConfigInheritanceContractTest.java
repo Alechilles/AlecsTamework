@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -346,6 +348,23 @@ class TwConfigInheritanceContractTest {
 
         assertSame(parentGroups, getField(childInherit, "iconOverrideGroups"));
         assertSame(childGroups, getField(childReplace, "iconOverrideGroups"));
+    }
+
+    @Test
+    void spawnerIconOverrideGroupsMapGroupDefaultsWithoutOverrides() throws Exception {
+        TwSpawnerConfig config = new TwSpawnerConfig();
+        TwSpawnerConfig.SpawnerIconOverrideGroup group = new TwSpawnerConfig.SpawnerIconOverrideGroup();
+        setField(group, "roles", new String[] { "Cow", "Tamed_Cow" });
+        setField(group, "iconDefault", "Icons/Cow/base.png");
+        setField(config, "iconOverrideGroups", new TwSpawnerConfig.SpawnerIconOverrideGroup[] { group });
+
+        ItemFeatureConfig itemConfig = config.toItemFeatureConfig();
+
+        assertEquals(1, itemConfig.getSpawnerIconOverrideGroups().size());
+        ItemFeatureConfig.SpawnerIconOverrideGroup mapped = itemConfig.getSpawnerIconOverrideGroups().get(0);
+        assertEquals(List.of("Cow", "Tamed_Cow"), mapped.getRoles());
+        assertEquals("Icons/Cow/base.png", mapped.getIconDefault());
+        assertTrue(mapped.getOverrides().isEmpty());
     }
 
     @Test

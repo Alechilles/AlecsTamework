@@ -213,15 +213,17 @@ final class SpawnerCaptureMetadataService {
         );
         List<ItemFeatureConfig.SpawnerIconOverride> groupOverrides =
                 roleGroup != null ? roleGroup.getOverrides() : null;
+        String groupDefaultIcon = roleGroup != null ? roleGroup.getIconDefault() : null;
         List<ItemFeatureConfig.SpawnerIconOverride> overrides = resolved.getSpawnerIconOverrides();
         boolean hasRoleOverrides = roleOverrides != null && !roleOverrides.isEmpty();
         boolean hasGroupOverrides = groupOverrides != null && !groupOverrides.isEmpty();
         boolean hasGlobalOverrides = overrides != null && !overrides.isEmpty();
+        boolean hasGroupDefaultIcon = groupDefaultIcon != null && !groupDefaultIcon.isBlank();
         if (!hasRoleOverrides && !hasGroupOverrides && !hasGlobalOverrides) {
-            return defaultIcon;
+            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
         }
         if (attachmentsJson == null || attachmentsJson.isBlank()) {
-            return defaultIcon;
+            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
         }
 
         Map<String, String> attachments;
@@ -231,10 +233,10 @@ final class SpawnerCaptureMetadataService {
             if (logger != null) {
                 logger.at(Level.WARNING).withCause(ex).log("Spawner icon override: failed to parse attachments.");
             }
-            return defaultIcon;
+            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
         }
         if (attachments == null) {
-            return defaultIcon;
+            return hasGroupDefaultIcon ? groupDefaultIcon : defaultIcon;
         }
 
         if (hasRoleOverrides) {
@@ -275,6 +277,18 @@ final class SpawnerCaptureMetadataService {
                     return icon;
                 }
             }
+        }
+
+        if (hasGroupDefaultIcon) {
+            if (logger != null) {
+                logger.at(Level.FINE).log(
+                        "Spawner icon override (group default): matched item=" + itemId
+                                + " role=" + roleId
+                                + " icon=" + groupDefaultIcon
+                                + " attachments=" + attachmentsJson
+                );
+            }
+            return groupDefaultIcon;
         }
 
         if (hasGlobalOverrides) {

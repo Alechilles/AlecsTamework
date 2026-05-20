@@ -88,8 +88,9 @@ python scripts/tools/generate_spawner_icon_overrides.py \
 Notes:
 - `--include-empty-set <SetName>` adds an explicit empty option for harvested or
   removed attachment states.
-- Empty attachment maps cannot match as an override at runtime. Use
-  `IconDefault` for that state.
+- Models with no `RandomAttachmentSets` generate one `base` render job. In
+  shared group mode, that base icon is written as
+  `IconOverrideGroups[].IconDefault`.
 - If `--roles` is omitted, roles are derived from
   `AllowedRoles.Allowlist` when a spawner config is provided.
 - Model sources can be read directly from a zip using
@@ -173,6 +174,9 @@ Batch manifest notes:
 - `iconOverrideMode: "group"` writes one shared `IconOverrideGroups` entry per
   manifest entry and one render job per attachment combo. The default
   `byRole` mode keeps the older `IconOverridesByRole` output.
+- Entries whose model has no `RandomAttachmentSets` should omit
+  `keepAttachmentSets`; they generate a single `{combo_slug}` value of `base`.
+  In group mode, that icon becomes the group's `IconDefault`.
 
 ## Output Files
 - Icon PNGs are written under the configured output directory relative to
@@ -180,7 +184,8 @@ Batch manifest notes:
 - Manifest JSON records the generated combinations and role mappings.
 - Jobs JSON records the render instructions consumed by the Blockbench plugin.
 - Spawner JSON output contains merged `IconOverridesByRole` entries in default
-  mode, or appended `IconOverrideGroups` entries in shared group mode.
+  mode, or appended `IconOverrideGroups` entries in shared group mode. Shared
+  groups may include `IconDefault` for a base-only role set.
 - During rendering, the Blockbench plugin closes each temporary model project
   after its screenshot is captured so large batches do not accumulate hundreds
   of open Blockbench tabs.

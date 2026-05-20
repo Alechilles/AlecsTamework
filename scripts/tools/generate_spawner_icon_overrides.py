@@ -345,7 +345,12 @@ def extract_set_definitions(
 ) -> List[SetDefinition]:
     raw_sets = model_json.get("RandomAttachmentSets")
     if raw_sets is None:
-        raise ConfigError("Model JSON does not define RandomAttachmentSets.")
+        include_empty = set(include_empty_sets)
+        if include_empty:
+            raise ConfigError(
+                "include-empty-set cannot be used because model JSON does not define RandomAttachmentSets."
+            )
+        return []
     if not isinstance(raw_sets, dict):
         raise ConfigError("RandomAttachmentSets is not a JSON object.")
 
@@ -374,8 +379,6 @@ def extract_set_definitions(
         if includes_empty:
             options.append(EMPTY_OPTION_SENTINEL)
         definitions.append(SetDefinition(set_name, tuple(options), includes_empty))
-    if not definitions:
-        raise ConfigError("RandomAttachmentSets was present but empty.")
     return definitions
 
 
@@ -565,7 +568,7 @@ def build_combo_records(
             set_values[set_def.name] = rendered_value
             slug_parts.append(f"{slugify(set_def.name)}-{slugify(rendered_value)}")
 
-        combo_slug = "__".join(slug_parts)
+        combo_slug = "__".join(slug_parts) if slug_parts else "base"
         common_placeholders: Dict[str, str] = {
             "combo_index": str(combo_index),
             "combo_slug": combo_slug,
@@ -612,10 +615,11 @@ def build_combo_records(
 
 def build_icon_override_group(roles: Sequence[str], combo_manifest: Sequence[Mapping[str, object]]) -> dict:
     overrides: List[dict] = []
+    icon_default = None
     for combo in combo_manifest:
         attachments = combo.get("attachments")
         icons_by_role = combo.get("iconsByRole")
-        if not isinstance(attachments, dict) or not attachments:
+        if not isinstance(attachments, dict):
             continue
         if not isinstance(icons_by_role, dict):
             continue
@@ -627,16 +631,23 @@ def build_icon_override_group(roles: Sequence[str], combo_manifest: Sequence[Map
                 break
         if icon is None:
             continue
+        if not attachments:
+            if icon_default is None:
+                icon_default = icon
+            continue
         overrides.append(
             {
                 "Icon": icon,
                 "Attachments": dict(attachments),
             }
         )
-    return {
+    group = {
         "Roles": list(roles),
         "Overrides": overrides,
     }
+    if icon_default is not None:
+        group["IconDefault"] = icon_default
+    return group
 
 
 def apply_overrides_to_spawner(
@@ -1101,8 +1112,8 @@ def run_single_model(args: argparse.Namespace, asset_root: Path) -> int:
 
     if skipped_empty:
         output_lines.append(
-            "Note: Some combos had no attachments and cannot be represented as overrides. "
-            "Use IconDefault for those states."
+            "Note: Some combos had no attachments. Group mode writes the first one as "
+            "IconOverrideGroups[].IconDefault; byRole mode still needs a separate default."
         )
 
     if spawner_json is not None:
@@ -1375,7 +1386,7 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
         icon_override_group = None
         if icon_override_mode == "group":
             icon_override_group = build_icon_override_group(roles, combo_manifest)
-            if icon_override_group["Overrides"]:
+            if icon_override_group["Overrides"] or icon_override_group.get("IconDefault"):
                 aggregate_icon_override_groups.append(icon_override_group)
             role_overrides = {}
         else:
@@ -1523,8 +1534,8 @@ def run_batch_manifest(args: argparse.Namespace, asset_root: Path) -> int:
 
     if total_skipped_empty:
         output_lines.append(
-            "Note: Some combos had no attachments and cannot be represented as overrides. "
-            "Use IconDefault for those states."
+            "Note: Some combos had no attachments. Group mode writes the first one as "
+            "IconOverrideGroups[].IconDefault; byRole mode still needs a separate default."
         )
 
     print("\n".join(output_lines))

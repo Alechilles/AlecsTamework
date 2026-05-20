@@ -183,6 +183,13 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
         )
         .documentation("Role IDs that share these icon overrides.")
         .add()
+        .<String>append(
+            new KeyedCodec<>("IconDefault", Codec.STRING),
+            (group, iconDefault) -> group.iconDefault = iconDefault,
+            group -> group.iconDefault
+        )
+        .documentation("Fallback icon for the listed roles when no attachment override matches. Use this for base-only models.")
+        .add()
         .<SpawnerIconOverride[]>append(
             new KeyedCodec<>("Overrides", ICON_OVERRIDE_ARRAY_CODEC),
             (group, overrides) -> group.overrides = overrides == null ? EMPTY_OVERRIDES : overrides,
@@ -683,12 +690,13 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
                 continue;
             }
             List<ItemFeatureConfig.SpawnerIconOverride> overrides = toOverrides(group.overrides);
-            if (overrides.isEmpty()) {
+            String iconDefault = group.iconDefault;
+            if (overrides.isEmpty() && (iconDefault == null || iconDefault.isBlank())) {
                 continue;
             }
             List<String> roles = toList(group.roles);
             if (!roles.isEmpty()) {
-                result.add(new ItemFeatureConfig.SpawnerIconOverrideGroup(roles, overrides));
+                result.add(new ItemFeatureConfig.SpawnerIconOverrideGroup(roles, overrides, iconDefault));
             }
         }
         return result.isEmpty() ? List.of() : result;
@@ -781,10 +789,15 @@ public class TwSpawnerConfig implements JsonAssetWithMap<String, DefaultAssetMap
 
     public static final class SpawnerIconOverrideGroup {
         private String[] roles = ArrayUtil.EMPTY_STRING_ARRAY;
+        private String iconDefault;
         private SpawnerIconOverride[] overrides = EMPTY_OVERRIDES;
 
         public String[] getRoles() {
             return roles;
+        }
+
+        public String getIconDefault() {
+            return iconDefault;
         }
 
         public SpawnerIconOverride[] getOverrides() {

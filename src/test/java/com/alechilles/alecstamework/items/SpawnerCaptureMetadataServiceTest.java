@@ -92,6 +92,39 @@ class SpawnerCaptureMetadataServiceTest {
         assertEquals("default.png", service.resolveFullItemIcon(config, "{\"BaseColor\":\"1\"}", "item", "Camel"));
     }
 
+    @Test
+    void sharedGroupDefaultCoversBaseOnlyRoleWithoutAttachments() {
+        SpawnerCaptureMetadataService service = new SpawnerCaptureMetadataService(null, null);
+        ItemFeatureConfig config = ItemFeatureConfig.builder()
+                .spawnerIconDefault("default.png")
+                .spawnerIconOverrideGroups(List.of(
+                        group(List.of("Cow", "Tamed_Cow"), List.of(), "cow-base.png")
+                ))
+                .build();
+
+        assertEquals("cow-base.png", service.resolveFullItemIcon(config, null, "item", "Tamed_Cow"));
+        assertEquals("cow-base.png", service.resolveFullItemIcon(config, "{}", "item", "Cow"));
+    }
+
+    @Test
+    void sharedGroupDefaultWinsBeforeGlobalFallbackAfterGroupMiss() {
+        SpawnerCaptureMetadataService service = new SpawnerCaptureMetadataService(null, null);
+        ItemFeatureConfig config = ItemFeatureConfig.builder()
+                .spawnerIconDefault("default.png")
+                .spawnerIconOverrideGroups(List.of(
+                        group(
+                                List.of("Cow", "Tamed_Cow"),
+                                List.of(override("Fleece", "White", "cow-white.png")),
+                                "cow-base.png"
+                        )
+                ))
+                .spawnerIconOverrides(List.of(override("BaseColor", "0", "global.png")))
+                .build();
+
+        assertEquals("cow-base.png", service.resolveFullItemIcon(config, "{\"BaseColor\":\"0\"}", "item", "Cow"));
+        assertEquals("cow-white.png", service.resolveFullItemIcon(config, "{\"Fleece\":\"White\"}", "item", "Cow"));
+    }
+
     private static SpawnerCaptureMetadataService.CaptureInfo captureInfo(String modelId) throws Exception {
         Constructor<SpawnerCaptureMetadataService.CaptureInfo> constructor =
                 SpawnerCaptureMetadataService.CaptureInfo.class.getDeclaredConstructor(
@@ -115,5 +148,12 @@ class SpawnerCaptureMetadataServiceTest {
             List<String> roles,
             ItemFeatureConfig.SpawnerIconOverride override) {
         return new ItemFeatureConfig.SpawnerIconOverrideGroup(roles, List.of(override));
+    }
+
+    private static ItemFeatureConfig.SpawnerIconOverrideGroup group(
+            List<String> roles,
+            List<ItemFeatureConfig.SpawnerIconOverride> overrides,
+            String iconDefault) {
+        return new ItemFeatureConfig.SpawnerIconOverrideGroup(roles, overrides, iconDefault);
     }
 }

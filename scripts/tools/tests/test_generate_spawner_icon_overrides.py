@@ -46,6 +46,13 @@ def goat_model() -> dict:
     }
 
 
+def cow_model() -> dict:
+    return {
+        "Model": "Models/Livestock/Cow_Base.json",
+        "Texture": "Textures/Livestock/Cow_Base.png",
+    }
+
+
 class BatchManifestTests(unittest.TestCase):
     def run_generator(
         self,
@@ -324,6 +331,61 @@ class BatchManifestTests(unittest.TestCase):
             jobs = json.loads(jobs_out.read_text(encoding="utf-8"))
             self.assertEqual(jobs["jobCount"], 2)
             self.assertEqual(len(jobs["jobs"]), 2)
+
+    def test_group_mode_writes_icon_default_for_model_without_attachment_sets(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Cow.json", cow_model())
+            spawner = root / "spawner.json"
+            write_json(spawner, {"IconOverridesByRole": {}})
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{combo_slug}.png",
+                        "iconOverrideMode": "group",
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "cow_local",
+                            "source": "localModels",
+                            "model": "Livestock/Cow.json",
+                            "roles": ["Cow", "Tamed_Cow"],
+                        }
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(
+                root,
+                manifest,
+                jobs_out,
+                manifest_out,
+                extra_args=[
+                    "--spawner-config",
+                    str(spawner),
+                    "--in-place",
+                    "--replace-icon-overrides",
+                ],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            updated = json.loads(spawner.read_text(encoding="utf-8"))
+            self.assertEqual(updated["IconOverridesByRole"], {})
+            self.assertEqual(len(updated["IconOverrideGroups"]), 1)
+            group = updated["IconOverrideGroups"][0]
+            self.assertEqual(group["Roles"], ["Cow", "Tamed_Cow"])
+            self.assertEqual(group["IconDefault"], "Icons/Generated/base.png")
+            self.assertEqual(group["Overrides"], [])
+
+            jobs = json.loads(jobs_out.read_text(encoding="utf-8"))
+            self.assertEqual(jobs["jobCount"], 1)
+            self.assertEqual(jobs["jobs"][0]["comboSlug"], "base")
+            self.assertEqual(jobs["jobs"][0]["attachments"], {})
 
     def test_exclude_attachment_options_removes_default_or_empty_variants(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -1314,7 +1314,10 @@
   function extractSetDefinitions(modelJson, includeEmptySets, excludeSets) {
     const randomSets = modelJson && modelJson.RandomAttachmentSets;
     if (!randomSets || typeof randomSets !== "object") {
-      throw new Error("Model JSON does not define RandomAttachmentSets.");
+      if ((includeEmptySets && includeEmptySets.length) || (excludeSets && excludeSets.length)) {
+        throw new Error("Model JSON does not define RandomAttachmentSets.");
+      }
+      return [];
     }
     const includeSet = new Set(includeEmptySets || []);
     const excludeSet = new Set(excludeSets || []);
@@ -1483,6 +1486,7 @@
       }
     });
     const sharedOverrides = [];
+    let sharedIconDefault = null;
 
     const jobs = [];
     const jobsByOutputPath = new Map();
@@ -1503,7 +1507,7 @@
           attachments[setDef.name] = selected;
         }
       });
-      const comboSlug = slugParts.join("__");
+      const comboSlug = slugParts.length ? slugParts.join("__") : "base";
 
       const commonPlaceholders = {
         model: modelName,
@@ -1573,6 +1577,8 @@
             Icon: iconRel,
             Attachments: Object.assign({}, attachments)
           });
+        } else if (!sharedIconDefault) {
+          sharedIconDefault = iconRel;
         }
         addRenderJob(sharedIconRole, iconRel, iconFile);
       } else {
@@ -1605,8 +1611,13 @@
     return {
       roleOverrides,
       iconOverrideGroups:
-        sharedRoleGroup && sharedOverrides.length
-          ? [{ Roles: roles.slice(), Overrides: sharedOverrides }]
+        sharedRoleGroup && (sharedOverrides.length || sharedIconDefault)
+          ? [
+              Object.assign(
+                { Roles: roles.slice(), Overrides: sharedOverrides },
+                sharedIconDefault ? { IconDefault: sharedIconDefault } : {}
+              )
+            ]
           : [],
       manifest: {
         schema: "tamework.spawner-icon-manifest.v1",

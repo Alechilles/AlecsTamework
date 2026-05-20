@@ -248,8 +248,13 @@ public final class ItemFeatureConfig {
     public static final class SpawnerIconOverrideGroup {
         private final List<String> roles;
         private final List<SpawnerIconOverride> overrides;
+        private final String iconDefault;
 
         public SpawnerIconOverrideGroup(List<String> roles, List<SpawnerIconOverride> overrides) {
+            this(roles, overrides, null);
+        }
+
+        public SpawnerIconOverrideGroup(List<String> roles, List<SpawnerIconOverride> overrides, String iconDefault) {
             if (roles == null || roles.isEmpty()) {
                 this.roles = Collections.emptyList();
             } else {
@@ -264,6 +269,7 @@ public final class ItemFeatureConfig {
             this.overrides = overrides == null || overrides.isEmpty()
                     ? Collections.emptyList()
                     : List.copyOf(overrides);
+            this.iconDefault = iconDefault;
         }
 
         public List<String> getRoles() {
@@ -272,6 +278,10 @@ public final class ItemFeatureConfig {
 
         public List<SpawnerIconOverride> getOverrides() {
             return overrides;
+        }
+
+        public String getIconDefault() {
+            return iconDefault;
         }
     }
 
@@ -479,7 +489,11 @@ public final class ItemFeatureConfig {
             }
             List<SpawnerIconOverrideGroup> copy = new java.util.ArrayList<>(spawnerIconOverrideGroups.size());
             for (SpawnerIconOverrideGroup group : spawnerIconOverrideGroups) {
-                if (group == null || group.getRoles().isEmpty() || group.getOverrides().isEmpty()) {
+                if (group == null || group.getRoles().isEmpty()) {
+                    continue;
+                }
+                String groupDefault = group.getIconDefault();
+                if (group.getOverrides().isEmpty() && (groupDefault == null || groupDefault.isBlank())) {
                     continue;
                 }
                 copy.add(group);
