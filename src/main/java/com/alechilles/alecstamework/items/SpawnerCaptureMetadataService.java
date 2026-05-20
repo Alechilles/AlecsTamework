@@ -207,10 +207,17 @@ final class SpawnerCaptureMetadataService {
         if (roleId != null && overridesByRole != null && !overridesByRole.isEmpty()) {
             roleOverrides = overridesByRole.get(roleId);
         }
+        ItemFeatureConfig.SpawnerIconOverrideGroup roleGroup = firstIconOverrideGroupForRole(
+                resolved.getSpawnerIconOverrideGroups(),
+                roleId
+        );
+        List<ItemFeatureConfig.SpawnerIconOverride> groupOverrides =
+                roleGroup != null ? roleGroup.getOverrides() : null;
         List<ItemFeatureConfig.SpawnerIconOverride> overrides = resolved.getSpawnerIconOverrides();
         boolean hasRoleOverrides = roleOverrides != null && !roleOverrides.isEmpty();
+        boolean hasGroupOverrides = groupOverrides != null && !groupOverrides.isEmpty();
         boolean hasGlobalOverrides = overrides != null && !overrides.isEmpty();
-        if (!hasRoleOverrides && !hasGlobalOverrides) {
+        if (!hasRoleOverrides && !hasGroupOverrides && !hasGlobalOverrides) {
             return defaultIcon;
         }
         if (attachmentsJson == null || attachmentsJson.isBlank()) {
@@ -221,7 +228,9 @@ final class SpawnerCaptureMetadataService {
         try {
             attachments = GSON.fromJson(attachmentsJson, ATTACHMENT_MAP_TYPE);
         } catch (Exception ex) {
-            logger.at(Level.WARNING).withCause(ex).log("Spawner icon override: failed to parse attachments.");
+            if (logger != null) {
+                logger.at(Level.WARNING).withCause(ex).log("Spawner icon override: failed to parse attachments.");
+            }
             return defaultIcon;
         }
         if (attachments == null) {
@@ -235,12 +244,34 @@ final class SpawnerCaptureMetadataService {
                 }
                 if (matchesAttachments(override.getAttachments(), attachments)) {
                     String icon = override.getIcon();
-                    logger.at(Level.FINE).log(
-                            "Spawner icon override (role): matched item=" + itemId
-                                    + " role=" + roleId
-                                    + " icon=" + icon
-                                    + " attachments=" + attachmentsJson
-                    );
+                    if (logger != null) {
+                        logger.at(Level.FINE).log(
+                                "Spawner icon override (role): matched item=" + itemId
+                                        + " role=" + roleId
+                                        + " icon=" + icon
+                                        + " attachments=" + attachmentsJson
+                        );
+                    }
+                    return icon;
+                }
+            }
+        }
+
+        if (hasGroupOverrides) {
+            for (ItemFeatureConfig.SpawnerIconOverride override : groupOverrides) {
+                if (override == null) {
+                    continue;
+                }
+                if (matchesAttachments(override.getAttachments(), attachments)) {
+                    String icon = override.getIcon();
+                    if (logger != null) {
+                        logger.at(Level.FINE).log(
+                                "Spawner icon override (group): matched item=" + itemId
+                                        + " role=" + roleId
+                                        + " icon=" + icon
+                                        + " attachments=" + attachmentsJson
+                        );
+                    }
                     return icon;
                 }
             }
@@ -253,17 +284,21 @@ final class SpawnerCaptureMetadataService {
                 }
                 if (matchesAttachments(override.getAttachments(), attachments)) {
                     String icon = override.getIcon();
-                    logger.at(Level.FINE).log(
-                            "Spawner icon override: matched item=" + itemId + " icon=" + icon + " attachments=" + attachmentsJson
-                    );
+                    if (logger != null) {
+                        logger.at(Level.FINE).log(
+                                "Spawner icon override: matched item=" + itemId + " icon=" + icon + " attachments=" + attachmentsJson
+                        );
+                    }
                     return icon;
                 }
             }
         }
 
-        logger.at(Level.FINE).log(
-                "Spawner icon override: no match item=" + itemId + " role=" + roleId + " attachments=" + attachmentsJson
-        );
+        if (logger != null) {
+            logger.at(Level.FINE).log(
+                    "Spawner icon override: no match item=" + itemId + " role=" + roleId + " attachments=" + attachmentsJson
+            );
+        }
         return defaultIcon;
     }
 
@@ -369,6 +404,24 @@ final class SpawnerCaptureMetadataService {
         }
         ItemFeatureConfig filledConfig = registry.get(filledId);
         return filledConfig != null ? filledConfig : config;
+    }
+
+    @Nullable
+    private ItemFeatureConfig.SpawnerIconOverrideGroup firstIconOverrideGroupForRole(
+            @Nullable List<ItemFeatureConfig.SpawnerIconOverrideGroup> groups,
+            @Nullable String roleId) {
+        if (roleId == null || roleId.isBlank() || groups == null || groups.isEmpty()) {
+            return null;
+        }
+        for (ItemFeatureConfig.SpawnerIconOverrideGroup group : groups) {
+            if (group == null || group.getRoles().isEmpty()) {
+                continue;
+            }
+            if (group.getRoles().contains(roleId)) {
+                return group;
+            }
+        }
+        return null;
     }
 
     private boolean matchesAttachments(@Nullable Map<String, String> required, @Nullable Map<String, String> actual) {

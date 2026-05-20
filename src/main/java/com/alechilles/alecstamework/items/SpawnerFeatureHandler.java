@@ -531,6 +531,7 @@ public final class SpawnerFeatureHandler {
                 .spawnerIconDefault(baseConfig.getSpawnerIconDefault())
                 .spawnerIconOverrides(baseConfig.getSpawnerIconOverrides())
                 .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
+                .spawnerIconOverrideGroups(baseConfig.getSpawnerIconOverrideGroups())
                 .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
                 .build();
     }

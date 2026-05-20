@@ -210,7 +210,18 @@ class BatchManifestTests(unittest.TestCase):
                                 "Attachments": {"BaseColor": "Old"},
                             }
                         ]
-                    }
+                    },
+                    "IconOverrideGroups": [
+                        {
+                            "Roles": ["OldRole", "OldTamedRole"],
+                            "Overrides": [
+                                {
+                                    "Icon": "Icons/ItemsGenerated/Generated/OldGroup.png",
+                                    "Attachments": {"BaseColor": "Old"},
+                                }
+                            ],
+                        }
+                    ],
                 },
             )
             manifest = root / "batch" / "icons.batch.json"
@@ -251,6 +262,68 @@ class BatchManifestTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout)
             updated = json.loads(spawner.read_text(encoding="utf-8"))
             self.assertEqual(set(updated["IconOverridesByRole"].keys()), {"Goat"})
+            self.assertEqual(updated["IconOverrideGroups"], [])
+
+    def test_group_mode_writes_shared_group_and_one_render_job_per_combo(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Goat.json", goat_model())
+            spawner = root / "spawner.json"
+            write_json(spawner, {"IconOverridesByRole": {}})
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{combo_slug}.png",
+                        "iconOverrideMode": "group",
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "goat_local",
+                            "source": "localModels",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Goat", "Tamed_Goat"],
+                            "keepAttachmentSets": ["BaseColor"],
+                        }
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(
+                root,
+                manifest,
+                jobs_out,
+                manifest_out,
+                extra_args=[
+                    "--spawner-config",
+                    str(spawner),
+                    "--in-place",
+                    "--replace-icon-overrides",
+                ],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            updated = json.loads(spawner.read_text(encoding="utf-8"))
+            self.assertEqual(updated["IconOverridesByRole"], {})
+            self.assertEqual(len(updated["IconOverrideGroups"]), 1)
+            group = updated["IconOverrideGroups"][0]
+            self.assertEqual(group["Roles"], ["Goat", "Tamed_Goat"])
+            self.assertEqual(len(group["Overrides"]), 2)
+            self.assertEqual(
+                sorted(override["Icon"] for override in group["Overrides"]),
+                [
+                    "Icons/Generated/basecolor-brown.png",
+                    "Icons/Generated/basecolor-white.png",
+                ],
+            )
+
+            jobs = json.loads(jobs_out.read_text(encoding="utf-8"))
+            self.assertEqual(jobs["jobCount"], 2)
+            self.assertEqual(len(jobs["jobs"]), 2)
 
     def test_exclude_attachment_options_removes_default_or_empty_variants(self):
         with tempfile.TemporaryDirectory() as tmp:

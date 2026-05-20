@@ -328,6 +328,27 @@ class TwConfigInheritanceContractTest {
     }
 
     @Test
+    void spawnerIconOverrideGroupsInheritWhenOmittedAndReplaceWhenExplicit() throws Exception {
+        TwSpawnerConfig parent = new TwSpawnerConfig();
+        TwSpawnerConfig childInherit = new TwSpawnerConfig();
+        TwSpawnerConfig childReplace = new TwSpawnerConfig();
+
+        TwSpawnerConfig.SpawnerIconOverrideGroup[] parentGroups =
+                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
+        TwSpawnerConfig.SpawnerIconOverrideGroup[] childGroups =
+                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
+        setField(parent, "iconOverrideGroups", parentGroups);
+        setField(childInherit, "iconOverrideGroups", childGroups);
+        setField(childReplace, "iconOverrideGroups", childGroups);
+
+        childInherit.inheritMissingTopLevelFrom(parent, Set.of());
+        childReplace.inheritMissingTopLevelFrom(parent, Set.of("IconOverrideGroups"));
+
+        assertSame(parentGroups, getField(childInherit, "iconOverrideGroups"));
+        assertSame(childGroups, getField(childReplace, "iconOverrideGroups"));
+    }
+
+    @Test
     void traitSelectionNestedMergeAndTraitsReplacementWork() throws Exception {
         TwTraitConfig parent = new TwTraitConfig();
         TwTraitConfig child = new TwTraitConfig();

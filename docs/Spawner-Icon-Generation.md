@@ -1,7 +1,7 @@
 # Spawner Icon Generation
 
 Tamework includes a Blockbench plugin and a Python generator for producing
-filled spawner icons and `IconOverridesByRole` entries from model
+filled spawner icons and spawner icon override entries from model
 `RandomAttachmentSets`.
 
 Use the Blockbench wizard for normal single-model work. Use the batch manifest
@@ -43,11 +43,15 @@ JSON from one dialog.
 8. Use `Preview First Combo` to verify framing.
 9. In `Outputs`, choose whether to save jobs/manifest JSON and whether to write
    spawner overrides.
+   - Enable `Shared Role Group` when multiple selected roles look identical and
+     should share one `IconOverrideGroups` entry and one icon file per
+     attachment combo.
 10. Click `Run Batch`.
 
 The wizard renders the icons, writes any selected JSON outputs, and shows a
 completion summary. If `Write Spawner Overrides` is enabled, it merges generated
-entries into `IconOverridesByRole`.
+entries into `IconOverridesByRole` by default, or into `IconOverrideGroups` when
+`Shared Role Group` is enabled.
 
 ## Jobs JSON Workflow
 Use this flow when renderer jobs already exist, usually from the Python
@@ -75,7 +79,8 @@ python scripts/tools/generate_spawner_icon_overrides.py \
   --spawner-config Server/Tamework/Items/Spawners/Spawner_Tamework_Example.json \
   --roles Sheep,Tamed_Sheep \
   --include-empty-set Fleece \
-  --icon-template "Icons/ItemsGenerated/Spawner_Sheep_{role}_{set_fleece}_{set_basecolor}.png" \
+  --icon-template "Icons/ItemsGenerated/Spawner_Sheep_{set_fleece}_{set_basecolor}.png" \
+  --icon-override-mode group \
   --write-spawner Server/Tamework/Items/Spawners/Spawner_Tamework_Example.generated.json \
   --renderer-jobs-out .tmp/sheep_render_jobs.json
 ```
@@ -89,6 +94,9 @@ Notes:
   `AllowedRoles.Allowlist` when a spawner config is provided.
 - Model sources can be read directly from a zip using
   `mod.zip!Server/Models/...json`.
+- `--icon-override-mode group` writes one `IconOverrideGroups` entry for all
+  selected roles. In group mode, use an icon template without `{role}` when the
+  roles should reference the same PNG.
 
 ## Batch Manifest Workflow
 Use a batch manifest when a mod needs to maintain a curated matrix of models and
@@ -99,7 +107,8 @@ Example manifest:
 ```json
 {
   "defaults": {
-    "iconTemplate": "Icons/ItemsGenerated/Spawner_{role}_{combo_slug}.png",
+    "iconTemplate": "Icons/ItemsGenerated/Spawner_{combo_slug}.png",
+    "iconOverrideMode": "group",
     "rendererName": "Animal Husbandry curated icons",
     "iconSize": 128,
     "cameraScale": 1.0,
@@ -160,15 +169,18 @@ Batch manifest notes:
   sets that should affect icons. Omit it to generate all sets.
 - Entries can override defaults including `iconTemplate`, `iconSize`,
   `cameraScale`, `cameraRotation`, `cameraTranslation`, `includeEmptySets`,
-  `emptyValueToken`, and `maxCombos`.
+  `emptyValueToken`, `iconOverrideMode`, and `maxCombos`.
+- `iconOverrideMode: "group"` writes one shared `IconOverrideGroups` entry per
+  manifest entry and one render job per attachment combo. The default
+  `byRole` mode keeps the older `IconOverridesByRole` output.
 
 ## Output Files
 - Icon PNGs are written under the configured output directory relative to
   `Common/`.
 - Manifest JSON records the generated combinations and role mappings.
 - Jobs JSON records the render instructions consumed by the Blockbench plugin.
-- Spawner JSON output contains merged `IconOverridesByRole` entries when that
-  output is enabled.
+- Spawner JSON output contains merged `IconOverridesByRole` entries in default
+  mode, or appended `IconOverrideGroups` entries in shared group mode.
 - During rendering, the Blockbench plugin closes each temporary model project
   after its screenshot is captured so large batches do not accumulate hundreds
   of open Blockbench tabs.

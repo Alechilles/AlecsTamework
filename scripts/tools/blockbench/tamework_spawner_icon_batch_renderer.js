@@ -1422,7 +1422,7 @@
     return allowed.Allowlist.filter((entry) => typeof entry === "string" && entry.trim().length > 0);
   }
 
-  function mergeOverridesIntoSpawner(spawnerJson, roleOverrides, iconDefault) {
+  function mergeOverridesIntoSpawner(spawnerJson, roleOverrides, iconOverrideGroups, iconDefault) {
     const output = Object.assign({}, spawnerJson || {});
     const existing =
       output.IconOverridesByRole && typeof output.IconOverridesByRole === "object"
@@ -1433,6 +1433,13 @@
       merged[role] = roleOverrides[role];
     });
     output.IconOverridesByRole = merged;
+    const existingGroups = Array.isArray(output.IconOverrideGroups)
+      ? output.IconOverrideGroups.slice()
+      : [];
+    const generatedGroups = Array.isArray(iconOverrideGroups) ? iconOverrideGroups : [];
+    if (generatedGroups.length) {
+      output.IconOverrideGroups = existingGroups.concat(generatedGroups);
+    }
     if (typeof iconDefault === "string" && iconDefault.trim().length) {
       output.IconDefault = iconDefault.trim();
     }
@@ -1458,6 +1465,8 @@
         ? config.assetRoots.slice()
         : [commonRoot];
     const roles = config.roles;
+    const sharedRoleGroup = config.sharedRoleGroup === true && roles.length > 0;
+    const sharedIconRole = roles[0];
     const setDefs = extractSetDefinitions(modelJson, config.includeEmptySets, config.excludeSets);
     const optionVisuals = extractOptionVisuals(modelJson);
     const baseModel = typeof modelJson.Model === "string" ? modelJson.Model : null;
@@ -1469,8 +1478,11 @@
       : cartesianProduct(optionSpace);
     const roleOverrides = {};
     roles.forEach((role) => {
-      roleOverrides[role] = [];
+      if (!sharedRoleGroup) {
+        roleOverrides[role] = [];
+      }
     });
+    const sharedOverrides = [];
 
     const jobs = [];
     const jobsByOutputPath = new Map();
@@ -1524,20 +1536,7 @@
       });
 
       const iconsByRole = {};
-      roles.forEach((role) => {
-        const placeholders = Object.assign({}, commonPlaceholders, { role });
-        const filename = formatTemplate(config.filenameTemplate, placeholders);
-        const iconRel = composeIconRelativePath(config.iconRelDir, filename);
-        const iconFile = resolveCommonAssetFile(commonRoot, iconRel);
-        iconsByRole[role] = iconRel;
-
-        if (Object.keys(attachments).length) {
-          roleOverrides[role].push({
-            Icon: iconRel,
-            Attachments: Object.assign({}, attachments)
-          });
-        }
-
+      const addRenderJob = (role, iconRel, iconFile) => {
         const outputKey = normalizeForCompare(iconFile || iconRel);
         if (!jobsByOutputPath.has(outputKey)) {
           const jobPayload = {
@@ -1558,7 +1557,41 @@
           jobs.push(jobPayload);
           jobsByOutputPath.set(outputKey, jobPayload);
         }
-      });
+      };
+
+      if (sharedRoleGroup) {
+        const placeholders = Object.assign({}, commonPlaceholders, { role: sharedIconRole });
+        const filename = formatTemplate(config.filenameTemplate, placeholders);
+        const iconRel = composeIconRelativePath(config.iconRelDir, filename);
+        const iconFile = resolveCommonAssetFile(commonRoot, iconRel);
+        roles.forEach((role) => {
+          iconsByRole[role] = iconRel;
+        });
+
+        if (Object.keys(attachments).length) {
+          sharedOverrides.push({
+            Icon: iconRel,
+            Attachments: Object.assign({}, attachments)
+          });
+        }
+        addRenderJob(sharedIconRole, iconRel, iconFile);
+      } else {
+        roles.forEach((role) => {
+          const placeholders = Object.assign({}, commonPlaceholders, { role });
+          const filename = formatTemplate(config.filenameTemplate, placeholders);
+          const iconRel = composeIconRelativePath(config.iconRelDir, filename);
+          const iconFile = resolveCommonAssetFile(commonRoot, iconRel);
+          iconsByRole[role] = iconRel;
+
+          if (Object.keys(attachments).length) {
+            roleOverrides[role].push({
+              Icon: iconRel,
+              Attachments: Object.assign({}, attachments)
+            });
+          }
+          addRenderJob(role, iconRel, iconFile);
+        });
+      }
 
       manifestCombos.push({
         index: comboIndex,
@@ -1571,12 +1604,17 @@
 
     return {
       roleOverrides,
+      iconOverrideGroups:
+        sharedRoleGroup && sharedOverrides.length
+          ? [{ Roles: roles.slice(), Overrides: sharedOverrides }]
+          : [],
       manifest: {
         schema: "tamework.spawner-icon-manifest.v1",
         generatedAtUtc: new Date().toISOString(),
         modRoot,
         modelPath,
         roles,
+        iconOverrideMode: sharedRoleGroup ? "group" : "byRole",
         randomAttachmentSets: setDefs.map((def) => ({
           set: def.name,
           options: def.options.slice(),
@@ -2624,6 +2662,7 @@
       jobsOutPath: "",
       manifestOutPath: "",
       writeSpawnerOverrides: true,
+      sharedRoleGroup: false,
       writeSpawnerInPlace: true,
       spawnerOutPath: "",
       iconDefaultOverride: ""
@@ -3048,7 +3087,8 @@
     const filenameUsesRoleToken = filenameTemplate.includes("{role}");
     const templateContainsComboToken =
       filenameTemplate.includes("{combo_slug}") || filenameTemplate.includes("{combo_index}");
-    const roleMultiplier = filenameUsesRoleToken ? BigInt(roles.length) : 1n;
+    const sharedRoleGroup = values.sharedRoleGroup === true;
+    const roleMultiplier = filenameUsesRoleToken && !sharedRoleGroup ? BigInt(roles.length) : 1n;
     const estimatedIconCount = comboCount * roleMultiplier;
 
     return buildComboPreviewText({
@@ -3154,6 +3194,7 @@
       cameraScale,
       cameraRotation,
       cameraTranslation,
+      sharedRoleGroup: values.sharedRoleGroup === true,
       previewOnlyFirstCombo: true
     });
     const firstJob = generated.jobsPayload
@@ -3403,6 +3444,10 @@
                     <input type="checkbox" id="tw_write_spawner" v-model="values.writeSpawnerOverrides" />
                     <label for="tw_write_spawner">Write Spawner Overrides</label>
                   </div>
+                  <div class="tw-check-row">
+                    <input type="checkbox" id="tw_shared_role_group" v-model="values.sharedRoleGroup" />
+                    <label for="tw_shared_role_group">Shared Role Group</label>
+                  </div>
                 </div>
 
                 <div class="tw-field">
@@ -3586,7 +3631,8 @@
       iconSize,
       cameraScale,
       cameraRotation,
-      cameraTranslation
+      cameraTranslation,
+      sharedRoleGroup: formResult.sharedRoleGroup === true
     });
     const resolvedBaseModelFile = generated.jobsPayload
       && generated.jobsPayload.model
@@ -3621,6 +3667,7 @@
       const mergedSpawner = mergeOverridesIntoSpawner(
         spawnerJson,
         generated.roleOverrides,
+        generated.iconOverrideGroups,
         String(formResult.iconDefaultOverride || "")
       );
       if (formResult.writeSpawnerInPlace !== false) {
