@@ -5,6 +5,9 @@
 ### Added
 - Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
 
+### Fixed
+- Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
+
 ## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
 
 ### Changed

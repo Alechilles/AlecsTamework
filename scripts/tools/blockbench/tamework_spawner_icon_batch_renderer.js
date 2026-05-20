@@ -600,6 +600,41 @@
     });
   }
 
+  function getOpenModelProjects() {
+    if (typeof ModelProject === "undefined" || !Array.isArray(ModelProject.all)) {
+      return [];
+    }
+    return ModelProject.all.filter((project) => project && typeof project === "object");
+  }
+
+  function getActiveModelProject() {
+    return typeof Project !== "undefined" && Project && typeof Project === "object" ? Project : null;
+  }
+
+  function getNewModelProject(beforeProjects, previousProject) {
+    const before = new Set(beforeProjects || []);
+    const currentProject = getActiveModelProject();
+    if (currentProject && currentProject !== previousProject && !before.has(currentProject)) {
+      return currentProject;
+    }
+    return getOpenModelProjects().find((project) => !before.has(project)) || null;
+  }
+
+  async function closeManagedModelProject(project) {
+    if (!project || typeof project.close !== "function") {
+      return false;
+    }
+    try {
+      project.saved = true;
+      await project.close(true);
+      await waitFrame();
+      return true;
+    } catch (error) {
+      console.warn(`[${PLUGIN_ID}] Failed to close temporary Blockbench project`, error);
+      return false;
+    }
+  }
+
   function getTextureByPath(texturePath) {
     if (typeof Texture === "undefined" || !Array.isArray(Texture.all)) {
       return null;
@@ -1590,6 +1625,8 @@
     if (!fileExists(modelPath)) {
       throw new Error(`Base model file not found: ${modelPath}`);
     }
+    const beforeProjects = getOpenModelProjects();
+    const previousProject = getActiveModelProject();
     const modelJson = readJsonFromDisk(modelPath);
     codec.load(
       modelJson,
@@ -1615,6 +1652,7 @@
       ensureFacesTextured(texture);
       await waitFrame();
     }
+    return getNewModelProject(beforeProjects, previousProject);
   }
 
   function buildAttachmentCollection(name, content, modelPath, texturePath) {
@@ -2303,70 +2341,74 @@
     );
 
     const effectiveBase = selectEffectiveBase(job, baseModelPath, baseTexturePath, jobsDir);
-    await loadBaseModel(codec, effectiveBase.modelPath, effectiveBase.texturePath);
-    const baseTextureRefPath = effectiveBase.texturePath || baseTexturePath;
-    const primaryTextureKey = detectPrimaryTextureKey(baseTextureRefPath);
-    const baseTextureBeforeOverride = getTextureByPath(baseTextureRefPath);
-    const baseAliasKeys = collectTextureAliasKeys(baseTextureBeforeOverride);
-    const normalizedPrimaryTextureKey = normalizeTextureKey(primaryTextureKey);
-    if (normalizedPrimaryTextureKey) {
-      baseAliasKeys.add(normalizedPrimaryTextureKey);
-    }
-    const baseTextureOverride = await applyAttachments(
-      codec,
-      job,
-      jobsDir,
-      effectiveBase.modelPath,
-      effectiveBase.texturePath,
-      effectiveBase.consumedAssetIndex
-    );
-    if (baseTextureOverride) {
-      const texture = setDefaultTexture(baseTextureOverride);
-      let remappedFaces = 0;
-      if (texture && texture.uuid) {
-        remappedFaces = remapFaceTextureKeys(Array.from(baseAliasKeys), texture.uuid);
+    const managedProject = await loadBaseModel(codec, effectiveBase.modelPath, effectiveBase.texturePath);
+    try {
+      const baseTextureRefPath = effectiveBase.texturePath || baseTexturePath;
+      const primaryTextureKey = detectPrimaryTextureKey(baseTextureRefPath);
+      const baseTextureBeforeOverride = getTextureByPath(baseTextureRefPath);
+      const baseAliasKeys = collectTextureAliasKeys(baseTextureBeforeOverride);
+      const normalizedPrimaryTextureKey = normalizeTextureKey(primaryTextureKey);
+      if (normalizedPrimaryTextureKey) {
+        baseAliasKeys.add(normalizedPrimaryTextureKey);
       }
-      if (remappedFaces === 0) {
-        ensureFacesTextured(texture);
+      const baseTextureOverride = await applyAttachments(
+        codec,
+        job,
+        jobsDir,
+        effectiveBase.modelPath,
+        effectiveBase.texturePath,
+        effectiveBase.consumedAssetIndex
+      );
+      if (baseTextureOverride) {
+        const texture = setDefaultTexture(baseTextureOverride);
+        let remappedFaces = 0;
+        if (texture && texture.uuid) {
+          remappedFaces = remapFaceTextureKeys(Array.from(baseAliasKeys), texture.uuid);
+        }
+        if (remappedFaces === 0) {
+          ensureFacesTextured(texture);
+        }
+        const debugRow = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
+        const jobId = typeof job.id === "string" ? job.id : job.comboSlug || "job";
+        if (debugRow && debugRow.id === jobId) {
+          debugRow.primaryTextureKey = primaryTextureKey;
+          debugRow.baseAliasKeysBeforeOverride = Array.from(baseAliasKeys);
+          debugRow.overrideTexturePath = baseTextureOverride;
+          debugRow.overrideTextureUuid = texture && texture.uuid ? texture.uuid : null;
+          debugRow.remappedFaces = remappedFaces;
+          debugRow.textureCatalogAfterBaseOverride = getTextureCatalog();
+          debugRow.faceTextureUsageAfterBaseOverride = summarizeFaceTextureUsage(null, 24);
+        }
+        await waitFrame();
       }
-      const debugRow = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
-      const jobId = typeof job.id === "string" ? job.id : job.comboSlug || "job";
-      if (debugRow && debugRow.id === jobId) {
-        debugRow.primaryTextureKey = primaryTextureKey;
-        debugRow.baseAliasKeysBeforeOverride = Array.from(baseAliasKeys);
-        debugRow.overrideTexturePath = baseTextureOverride;
-        debugRow.overrideTextureUuid = texture && texture.uuid ? texture.uuid : null;
-        debugRow.remappedFaces = remappedFaces;
-        debugRow.textureCatalogAfterBaseOverride = getTextureCatalog();
-        debugRow.faceTextureUsageAfterBaseOverride = summarizeFaceTextureUsage(null, 24);
+      const zeroUvCleanup = clearZeroAreaUvFaces();
+      const debugRowAfterCleanup = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
+      const debugJobIdAfterCleanup = typeof job.id === "string" ? job.id : job.comboSlug || "job";
+      if (debugRowAfterCleanup && debugRowAfterCleanup.id === debugJobIdAfterCleanup) {
+        debugRowAfterCleanup.zeroUvCleanup = zeroUvCleanup;
+        debugRowAfterCleanup.faceTextureUsageAfterZeroUvCleanup = summarizeFaceTextureUsage(null, 24);
       }
       await waitFrame();
-    }
-    const zeroUvCleanup = clearZeroAreaUvFaces();
-    const debugRowAfterCleanup = runDebugRows.length ? runDebugRows[runDebugRows.length - 1] : null;
-    const debugJobIdAfterCleanup = typeof job.id === "string" ? job.id : job.comboSlug || "job";
-    if (debugRowAfterCleanup && debugRowAfterCleanup.id === debugJobIdAfterCleanup) {
-      debugRowAfterCleanup.zeroUvCleanup = zeroUvCleanup;
-      debugRowAfterCleanup.faceTextureUsageAfterZeroUvCleanup = summarizeFaceTextureUsage(null, 24);
-    }
-    await waitFrame();
-    const preview = choosePreview();
-    if (!preview) {
-      throw new Error("Could not resolve an active Blockbench preview.");
-    }
-    if (typeof preview.resize === "function") {
-      preview.resize(iconSize, iconSize);
-    }
-    applyCamera(preview, payloadDefaults, job);
-    await waitFrame();
+      const preview = choosePreview();
+      if (!preview) {
+        throw new Error("Could not resolve an active Blockbench preview.");
+      }
+      if (typeof preview.resize === "function") {
+        preview.resize(iconSize, iconSize);
+      }
+      applyCamera(preview, payloadDefaults, job);
+      await waitFrame();
 
-    let imageDataUrl = await captureScreenshot(preview, iconSize);
-    imageDataUrl = await applyScreenTranslation(imageDataUrl, iconSize, translation);
-    await assertImageNotFullyTransparent(imageDataUrl, iconSize, buildSceneDiagnostics(preview));
-    return {
-      imageDataUrl,
-      iconSize
-    };
+      let imageDataUrl = await captureScreenshot(preview, iconSize);
+      imageDataUrl = await applyScreenTranslation(imageDataUrl, iconSize, translation);
+      await assertImageNotFullyTransparent(imageDataUrl, iconSize, buildSceneDiagnostics(preview));
+      return {
+        imageDataUrl,
+        iconSize
+      };
+    } finally {
+      await closeManagedModelProject(managedProject);
+    }
   }
 
   async function renderSingleJob(codec, payloadDefaults, job, jobsDir) {

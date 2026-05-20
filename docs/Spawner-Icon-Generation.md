@@ -169,3 +169,6 @@ Batch manifest notes:
 - Jobs JSON records the render instructions consumed by the Blockbench plugin.
 - Spawner JSON output contains merged `IconOverridesByRole` entries when that
   output is enabled.
+- During rendering, the Blockbench plugin closes each temporary model project
+  after its screenshot is captured so large batches do not accumulate hundreds
+  of open Blockbench tabs.
