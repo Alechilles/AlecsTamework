@@ -201,12 +201,66 @@
       }
     },
     {
-      "Id": "needs-sensor",
+      "Id": "validation-state-setters",
       "Op": "Insert",
       "Path": "/Instructions",
       "Position": "After",
       "Find": {
         "$Comment": "Tamework patch: command move state"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: validation-only state setters"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: validation-only state setters",
+        "Enabled": false,
+        "Actions": [
+          {
+            "Type": "State",
+            "State": "Idle"
+          },
+          {
+            "Type": "State",
+            "State": "Follow"
+          },
+          {
+            "Type": "State",
+            "State": "Hold"
+          },
+          {
+            "Type": "State",
+            "State": "CommandMove"
+          },
+          {
+            "Type": "State",
+            "State": "Defend"
+          },
+          {
+            "Type": "State",
+            "State": "BreedPair"
+          },
+          {
+            "Type": "State",
+            "State": "NeedsSeekWater"
+          },
+          {
+            "Type": "State",
+            "State": "NeedsSeekFood"
+          },
+          {
+            "Type": "State",
+            "State": "Sleep"
+          }
+        ]
+      }
+    },
+    {
+      "Id": "needs-sensor",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: validation-only state setters"
       },
       "Existing": {
         "$Comment": "Tamework patch: needs seek sensor"
@@ -467,6 +521,57 @@
               "_ExportStates": [
                 "Idle"
               ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "Id": "sleep-state",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: breed pair state"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: sleep state"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: sleep state",
+        "Continue": true,
+        "Sensor": {
+          "Type": "State",
+          "State": "Sleep"
+        },
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Sleep",
+            "Modify": {
+              "_ExportStates": [
+                "Defend",
+                "Idle",
+                "Idle",
+                "Idle"
+              ],
+              "DayTimePeriod": {
+                "Compute": "DayTimePeriod"
+              },
+              "DayTimeNapWeight": {
+                "Compute": "DayTimeNapWeight"
+              },
+              "DayTimeNapTimeRange": {
+                "Compute": "DayTimeNapTimeRange"
+              },
+              "HearingRange": {
+                "Compute": "HearingRange"
+              },
+              "Attitudes": [
+                "Hostile"
+              ],
+              "FlockArray": {
+                "Compute": "FlockArray"
+              }
             }
           }
         ]

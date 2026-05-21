@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
@@ -281,6 +282,11 @@ final class NpcTemplatePatchEngineTest {
 
     @Test
     void bundledPatchExampleUpgradesBareTemplateWithTameworkBehavior() throws Exception {
+        JsonObject role = object(readResource(
+                "Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Patch.json"
+        ));
+        assertEquals("Tamework_Example_Patch", role.get("Reference").getAsString());
+
         JsonObject template = object(readResource(
                 "Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json"
         ));
@@ -304,7 +310,14 @@ final class NpcTemplatePatchEngineTest {
         assertTrue(patchedJson.contains("Component_Tamework_Instruction_Defend"));
         assertTrue(patchedJson.contains("Component_Tamework_Instruction_Needs_Seek_Resource"));
         assertTrue(patchedJson.contains("Component_Tamework_Instruction_Breeding_Pair"));
-        assertEquals(14, result.status().getApplied().size());
+        assertTrue(patchedJson.contains("Tamework patch: validation-only state setters"));
+        assertTrue(patchedJson.contains("Tamework patch: sleep state"));
+        for (JsonElement transition : result.patched().getAsJsonArray("StateTransitions")) {
+            JsonObject transitionObject = transition.getAsJsonObject();
+            assertTrue(transitionObject.has("States"), "StateTransition is missing States: " + transitionObject);
+            assertTrue(transitionObject.has("Actions"), "StateTransition is missing Actions: " + transitionObject);
+        }
+        assertEquals(16, result.status().getApplied().size());
         assertEquals(0, result.status().getFailed().size());
     }
 
