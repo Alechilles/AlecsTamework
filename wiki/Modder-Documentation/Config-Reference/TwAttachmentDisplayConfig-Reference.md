@@ -18,7 +18,6 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Alec's Tamew
 
 ```json
 {
-  "Type": "TwAttachmentDisplayConfig",
   "Enabled": true,
   "Priority": 0,
   "Entries": [

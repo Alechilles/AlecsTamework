@@ -1435,7 +1435,14 @@
     Object.keys(roleOverrides).forEach((role) => {
       merged[role] = roleOverrides[role];
     });
-    output.IconOverridesByRole = merged;
+    if (
+      Object.keys(merged).length ||
+      Object.prototype.hasOwnProperty.call(output, "IconOverridesByRole")
+    ) {
+      output.IconOverridesByRole = merged;
+    } else {
+      delete output.IconOverridesByRole;
+    }
     const existingGroups = Array.isArray(output.IconOverrideGroups)
       ? output.IconOverrideGroups.slice()
       : [];

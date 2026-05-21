@@ -4,8 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.hypixel.hytale.assetstore.AssetPack;
+import java.util.ArrayList;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 
 import org.junit.jupiter.api.io.TempDir;
@@ -96,5 +99,56 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
         assertFalse(Files.exists(staleTarget));
         assertTrue(Files.exists(currentTarget));
         assertTrue(Files.exists(nonJsonArtifact));
+    }
+
+    @Test
+    void runtimeRefreshUnloadsExistingGeneratedBuildersBeforeCacheFilesArePruned(@TempDir Path tempDir) {
+        RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
+        NpcTemplatePatchGeneratedPackPublisher publisher = new NpcTemplatePatchGeneratedPackPublisher(
+                null,
+                "Generated",
+                reloader
+        );
+        AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
+
+        publisher.unloadExistingGeneratedBuildersBeforeCacheMutation(
+                generatedPack,
+                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK
+        );
+
+        assertEquals(List.of("unload:Generated"), reloader.events);
+    }
+
+    @Test
+    void emptyRuntimeRefreshAlsoUnloadsExistingGeneratedBuilders(@TempDir Path tempDir) {
+        RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
+        NpcTemplatePatchGeneratedPackPublisher publisher = new NpcTemplatePatchGeneratedPackPublisher(
+                null,
+                "Generated",
+                reloader
+        );
+        AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
+
+        publisher.unloadExistingGeneratedBuildersBeforeCacheMutation(
+                generatedPack,
+                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES
+        );
+
+        assertEquals(List.of("unload:Generated"), reloader.events);
+    }
+
+    private static final class RecordingBuilderCacheReloader
+            implements NpcTemplatePatchGeneratedPackPublisher.BuilderCacheReloader {
+        private final List<String> events = new ArrayList<>();
+
+        @Override
+        public void unload(AssetPack generatedPack) {
+            events.add("unload:" + generatedPack.getName());
+        }
+
+        @Override
+        public void load(AssetPack generatedPack) {
+            events.add("load:" + generatedPack.getName());
+        }
     }
 }

@@ -18,6 +18,7 @@ import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetPack;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
+import com.hypixel.hytale.server.npc.NPCPlugin;
 
 /**
  * Publishes generated patched templates as a transient runtime asset pack.
@@ -28,6 +29,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
 
     private final JavaPlugin plugin;
     private final String generatedPackId;
+    private final BuilderCacheReloader builderCacheReloader;
 
     enum RegistrationMode {
         ALLOW_REGISTRATION,
@@ -42,8 +44,15 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
     }
 
     public NpcTemplatePatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin, @Nonnull String generatedPackId) {
+        this(plugin, generatedPackId, new NpcPluginBuilderCacheReloader());
+    }
+
+    NpcTemplatePatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin,
+                                           @Nonnull String generatedPackId,
+                                           @Nonnull BuilderCacheReloader builderCacheReloader) {
         this.plugin = plugin;
         this.generatedPackId = generatedPackId;
+        this.builderCacheReloader = builderCacheReloader;
     }
 
     @Nonnull
@@ -73,6 +82,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
                 registrationMode
         );
         Path root = cacheRoot();
+        unloadExistingGeneratedBuildersBeforeCacheMutation(existingPack, action);
         prepareCache(root, action);
         pruneStaleGeneratedFiles(root, generatedTemplates.keySet());
         for (Map.Entry<String, JsonObject> entry : generatedTemplates.entrySet()) {
@@ -118,6 +128,18 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         return action == PublicationAction.REGISTER_PACK;
     }
 
+    void unloadExistingGeneratedBuildersBeforeCacheMutation(AssetPack existingPack, @Nonnull PublicationAction action) {
+        if (existingPack == null || !shouldUnloadExistingBuildersBeforeCacheMutation(action)) {
+            return;
+        }
+        builderCacheReloader.unload(existingPack);
+    }
+
+    static boolean shouldUnloadExistingBuildersBeforeCacheMutation(@Nonnull PublicationAction action) {
+        return action == PublicationAction.REFRESH_EXISTING_PACK
+                || action == PublicationAction.NO_GENERATED_TEMPLATES;
+    }
+
     static void pruneStaleGeneratedFiles(@Nonnull Path root, @Nonnull Set<String> currentTargets) throws IOException {
         Path normalizedRoot = root.toAbsolutePath().normalize();
         if (!Files.isDirectory(normalizedRoot)) {
@@ -156,10 +178,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
             return;
         }
         try {
-            com.hypixel.hytale.server.npc.NPCPlugin npcPlugin = com.hypixel.hytale.server.npc.NPCPlugin.get();
-            if (npcPlugin != null) {
-                npcPlugin.getBuilderManager().loadBuilders(generatedPack, true);
-            }
+            builderCacheReloader.load(generatedPack);
         } catch (RuntimeException ex) {
             plugin.getLogger().at(Level.WARNING).withCause(ex).log(
                     "Tamework template patches: failed to reload generated NPC builders."
@@ -221,5 +240,32 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         }
         AssetPack generated = packs.remove(currentIndex);
         packs.add(generated);
+    }
+
+    interface BuilderCacheReloader {
+        void unload(@Nonnull AssetPack generatedPack);
+
+        void load(@Nonnull AssetPack generatedPack);
+    }
+
+    private static final class NpcPluginBuilderCacheReloader implements BuilderCacheReloader {
+        private NpcPluginBuilderCacheReloader() {
+        }
+
+        @Override
+        public void unload(@Nonnull AssetPack generatedPack) {
+            NPCPlugin npcPlugin = NPCPlugin.get();
+            if (npcPlugin != null) {
+                npcPlugin.getBuilderManager().unloadBuilders(generatedPack);
+            }
+        }
+
+        @Override
+        public void load(@Nonnull AssetPack generatedPack) {
+            NPCPlugin npcPlugin = NPCPlugin.get();
+            if (npcPlugin != null) {
+                npcPlugin.getBuilderManager().loadBuilders(generatedPack, true);
+            }
+        }
     }
 }

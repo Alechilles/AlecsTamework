@@ -676,6 +676,57 @@ def icon_override_group_role_key(group: Mapping[str, object]) -> Tuple[str, ...]
     return tuple(normalized_roles)
 
 
+def icon_override_attachment_predicate(override: Mapping[str, object]) -> Dict[str, str]:
+    attachments = override.get("Attachments")
+    if not isinstance(attachments, dict):
+        return {}
+    return {
+        str(key): str(value)
+        for key, value in attachments.items()
+        if str(key).strip() and str(value).strip()
+    }
+
+
+def icon_override_predicates_overlap(first: Mapping[str, str], second: Mapping[str, str]) -> bool:
+    if not first or not second:
+        return False
+    for key in set(first).intersection(second):
+        if first[key] != second[key]:
+            return False
+    return True
+
+
+def validate_icon_override_group_predicates(role_key: Tuple[str, ...], overrides: Sequence[object]) -> None:
+    predicates: List[Tuple[int, Dict[str, str]]] = []
+    for index, override in enumerate(overrides):
+        if not isinstance(override, Mapping):
+            continue
+        predicate = icon_override_attachment_predicate(override)
+        if not predicate:
+            continue
+        for existing_index, existing_predicate in predicates:
+            if icon_override_predicates_overlap(existing_predicate, predicate):
+                roles = ", ".join(role_key)
+                raise ConfigError(
+                    "overlapping IconOverrideGroups for roles "
+                    f"{roles}: overrides {existing_index} and {index} can match the same captured NPC. "
+                    "Generate full attachment combinations or split them into separate role groups."
+                )
+        predicates.append((index, predicate))
+
+
+def merged_icon_override_group_overrides(
+    role_key: Tuple[str, ...],
+    existing_overrides: object,
+    incoming_overrides: object,
+) -> List[dict] | None:
+    if not isinstance(existing_overrides, list) or not isinstance(incoming_overrides, list):
+        return None
+    merged = list(existing_overrides) + list(incoming_overrides)
+    validate_icon_override_group_predicates(role_key, merged)
+    return merged
+
+
 def append_or_merge_icon_override_group(groups: List[dict], group: Mapping[str, object]) -> None:
     role_key = icon_override_group_role_key(group)
     if not role_key:
@@ -687,12 +738,16 @@ def append_or_merge_icon_override_group(groups: List[dict], group: Mapping[str, 
 
         existing_overrides = existing.get("Overrides")
         incoming_overrides = group.get("Overrides")
-        if isinstance(existing_overrides, list) and isinstance(incoming_overrides, list):
-            existing_overrides.extend(incoming_overrides)
+        merged_overrides = merged_icon_override_group_overrides(role_key, existing_overrides, incoming_overrides)
+        if merged_overrides is not None:
+            existing["Overrides"] = merged_overrides
         if not existing.get("IconDefault") and isinstance(group.get("IconDefault"), str):
             existing["IconDefault"] = group["IconDefault"]
         return
 
+    incoming_overrides = group.get("Overrides")
+    if isinstance(incoming_overrides, list):
+        validate_icon_override_group_predicates(role_key, incoming_overrides)
     groups.append(dict(group))
 
 
@@ -701,6 +756,9 @@ def replace_or_append_icon_override_group(groups: List[dict], group: Mapping[str
     if not role_key:
         return
     replacement = dict(group)
+    replacement_overrides = replacement.get("Overrides")
+    if isinstance(replacement_overrides, list):
+        validate_icon_override_group_predicates(role_key, replacement_overrides)
     for index, existing in enumerate(groups):
         if icon_override_group_role_key(existing) == role_key:
             groups[index] = replacement
@@ -728,7 +786,10 @@ def apply_overrides_to_spawner(
     merged = dict(existing)
     for role, overrides in role_overrides.items():
         merged[role] = overrides
-    output["IconOverridesByRole"] = merged
+    if merged or replace_icon_overrides or "IconOverridesByRole" in output:
+        output["IconOverridesByRole"] = merged
+    else:
+        output.pop("IconOverridesByRole", None)
     groups = list(existing_groups)
     for group in icon_override_groups:
         if isinstance(group, Mapping):

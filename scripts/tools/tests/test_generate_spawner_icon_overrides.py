@@ -440,7 +440,7 @@ class BatchManifestTests(unittest.TestCase):
             self.assertTrue(all(job["camera"]["autoFramePadding"] == 2 for job in entry_override_jobs))
             self.assertTrue(all(job["camera"]["autoFrameMaxAttempts"] == 7 for job in entry_override_jobs))
 
-    def test_group_mode_merges_duplicate_role_groups_from_multiple_entries(self):
+    def test_group_mode_rejects_overlapping_duplicate_role_groups_from_multiple_entries(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             write_json(root / "models" / "Aures" / "Goat.json", goat_model())
@@ -492,14 +492,54 @@ class BatchManifestTests(unittest.TestCase):
                 ],
             )
 
+            self.assertNotEqual(result.returncode, 0, result.stdout)
+            self.assertIn("overlapping IconOverrideGroups", result.stdout)
+
+    def test_group_mode_does_not_write_empty_by_role_overrides_when_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Goat.json", goat_model())
+            spawner = root / "spawner.json"
+            write_json(spawner, {"Parent": "TwSpawner_Default"})
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/Generated/{combo_slug}.png",
+                        "iconOverrideMode": "group",
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "goat_local",
+                            "source": "localModels",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Goat", "Tamed_Goat"],
+                            "keepAttachmentSets": ["BaseColor"],
+                        }
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(
+                root,
+                manifest,
+                jobs_out,
+                manifest_out,
+                extra_args=[
+                    "--spawner-config",
+                    str(spawner),
+                    "--in-place",
+                ],
+            )
+
             self.assertEqual(result.returncode, 0, result.stdout)
             updated = json.loads(spawner.read_text(encoding="utf-8"))
-            self.assertEqual(len(updated["IconOverrideGroups"]), 1)
-            group = updated["IconOverrideGroups"][0]
-            self.assertEqual(group["Roles"], ["Goat", "Tamed_Goat"])
-            self.assertEqual(len(group["Overrides"]), 4)
-            self.assertIn("Icons/Aures/basecolor-brown.png", [entry["Icon"] for entry in group["Overrides"]])
-            self.assertIn("Icons/Base/horns-short.png", [entry["Icon"] for entry in group["Overrides"]])
+            self.assertIn("IconOverrideGroups", updated)
+            self.assertNotIn("IconOverridesByRole", updated)
 
     def test_group_mode_replaces_existing_same_role_group_instead_of_appending_stale_winner(self):
         with tempfile.TemporaryDirectory() as tmp:

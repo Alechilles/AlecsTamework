@@ -153,7 +153,7 @@ Then open Blockbench and use `Tools -> Run Tamework Spawner Batch (From Jobs JSO
 - `keepAttachmentSets` limits generated combinations to the visual attachment sets that should affect icons. Omit it to generate all sets.
 - Entries can override defaults including `iconTemplate`, `iconSize`, `cameraScale`, `cameraRotation`, `cameraTranslation`, `includeEmptySets`, `cameraAutoFrame`, `cameraAutoFramePadding`, `cameraAutoFrameMaxAttempts`, `emptyValueToken`, `iconOverrideMode`, and `maxCombos`.
 - `cameraAutoFrame` keeps fixed authored rotation and baseline zoom, then the Blockbench renderer zooms out only when the visible pixels touch the configured padding and recenters the result before applying any explicit screen translation.
-- `iconOverrideMode: "group"` writes one shared `IconOverrideGroups` entry per manifest entry and one render job per attachment combo. The default `byRole` mode keeps the older `IconOverridesByRole` output.
+- `iconOverrideMode: "group"` writes shared `IconOverrideGroups` entries and one render job per attachment combo. Entries with the same role set are merged only when their attachment predicates cannot match the same captured NPC.
 - Entries whose model has no `RandomAttachmentSets` should omit `keepAttachmentSets`; they generate a single `{combo_slug}` value of `base`. In group mode, that icon becomes the group's `IconDefault`.
 
 ## Output Files
@@ -161,7 +161,7 @@ Then open Blockbench and use `Tools -> Run Tamework Spawner Batch (From Jobs JSO
 - Icon PNGs are written under the configured output directory relative to `Common/`.
 - Manifest JSON records the generated combinations and role mappings.
 - Jobs JSON records the render instructions consumed by the Blockbench plugin.
-- Spawner JSON output contains merged `IconOverridesByRole` entries in default mode, or appended `IconOverrideGroups` entries in shared group mode. Shared groups may include `IconDefault` for a base-only role set.
+- Spawner JSON output contains merged `IconOverridesByRole` entries in default mode, or replacement/merged `IconOverrideGroups` entries in shared group mode. Shared groups may include `IconDefault` for a base-only role set.
 - During rendering, the Blockbench plugin closes each temporary model project after its screenshot is captured so large batches do not accumulate hundreds of open Blockbench tabs.
 
 ## Related Pages
