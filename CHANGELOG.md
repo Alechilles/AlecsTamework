@@ -11,6 +11,9 @@
 - Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
 - Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
 
+### Removed
+- Removed the outdated third-party patch example assets from the bundled examples now that Tamework has its own optional template patch system.
+
 ## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
 
 ### Changed
@@ -705,12 +708,10 @@
 ### Removed
 - Legacy Server/Tamework/Tamework_Items_Config.json item config system and per-world overrides.
 
-## 1.1.1 - Hytalor Example + Follow Component Split - 2026-02-06
+## 1.1.1 - Follow Component Split - 2026-02-06
 ### Added
-- Hytalor patch example assets (Template/Mob + patch) showing non-destructive Tamework integration.
 - New follow components split: Follow_Simple_TP (teleport/seek), Follow_Simple (basic follow), and Follow_Advanced (old IdleFollow behavior).
 - /tw gettamed and /tw settamed commands to read/flip tamed state.
-- Mount gating for tamed/owner state with crouch-based interaction (Hytalor example).
 
 ## 1.1.0 - Core Systems Update - 2026-02-03
 ### Added
