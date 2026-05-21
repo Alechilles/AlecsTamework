@@ -13,11 +13,9 @@
 - Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
 - Fixed spawner icon generation merging duplicate groups incorrectly and missing batch source assets in larger render sets.
 - Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
-- Fixed captured spawner tooltips showing duplicate custom-name lines when DynamicTooltipsLib metadata is available.
-- Fixed optional template patch reloads dropping the generated patch cache or unregistering the live patch pack while patched templates are still in use.
 
 ### Removed
-- Removed the outdated third-party patch example assets from the bundled examples now that Tamework has its own optional template patch system.
+- Removed the outdated Hytalor patch example assets from the bundled examples now that Tamework has its own optional template patch system.
 
 ## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
 
