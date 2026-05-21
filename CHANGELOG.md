@@ -1,15 +1,20 @@
 # Changelog
 
-## Unreleased
+## 2.11.0 - Optional Template Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
 
 ### Added
 - Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
 - Added optional NPC template patches so third-party mods can ship Tamework role/template integrations without making Tamework a required dependency.
+- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional template patch results and refresh generated patch packs without restarting the server.
 - Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
+- Added spawner icon batch manifests and generator support for shared override groups, group defaults, replacement runs, excluded attachment options, and auto-framed Blockbench renders.
 
 ### Fixed
 - Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
+- Fixed spawner icon generation merging duplicate groups incorrectly and missing batch source assets in larger render sets.
 - Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
+- Fixed captured spawner tooltips showing duplicate custom-name lines when DynamicTooltipsLib metadata is available.
+- Fixed optional template patch reloads dropping the generated patch cache or unregistering the live patch pack while patched templates are still in use.
 
 ### Removed
 - Removed the outdated third-party patch example assets from the bundled examples now that Tamework has its own optional template patch system.
