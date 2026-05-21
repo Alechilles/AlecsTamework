@@ -27,6 +27,18 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
     private final JavaPlugin plugin;
     private final String generatedPackId;
 
+    enum RegistrationMode {
+        ALLOW_REGISTRATION,
+        REFRESH_EXISTING_ONLY
+    }
+
+    enum PublicationAction {
+        NO_GENERATED_TEMPLATES,
+        REFRESH_EXISTING_PACK,
+        REGISTER_PACK,
+        MISSING_RUNTIME_PACK
+    }
+
     public NpcTemplatePatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin, @Nonnull String generatedPackId) {
         this.plugin = plugin;
         this.generatedPackId = generatedPackId;
@@ -44,15 +56,14 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
     }
 
     public void publish(@Nonnull Map<String, JsonObject> generatedTemplates,
-                        @Nonnull NpcTemplatePatchStatus status) throws IOException {
+                        @Nonnull NpcTemplatePatchStatus status,
+                        @Nonnull RegistrationMode registrationMode) throws IOException {
         AssetModule assetModule = AssetModule.get();
         if (assetModule == null) {
             throw new IOException("AssetModule unavailable.");
         }
 
-        if (assetModule.getAssetPack(generatedPackId) != null) {
-            assetModule.unregisterPack(generatedPackId);
-        }
+        AssetPack existingPack = assetModule.getAssetPack(generatedPackId);
 
         Path root = cacheRoot();
         recreateCache(root);
@@ -61,12 +72,43 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
             status.addGeneratedTarget(entry.getKey());
         }
 
-        if (generatedTemplates.isEmpty()) {
-            return;
+        PublicationAction action = publicationAction(
+                existingPack != null,
+                !generatedTemplates.isEmpty(),
+                registrationMode
+        );
+        // Live world commands must not mutate AssetModule pack registration; that can block the world thread.
+        switch (action) {
+            case NO_GENERATED_TEMPLATES -> {
+                return;
+            }
+            case REFRESH_EXISTING_PACK -> {
+                moveGeneratedPackToEnd(assetModule);
+                return;
+            }
+            case REGISTER_PACK -> {
+                assetModule.registerPack(generatedPackId, root, plugin.getManifest(), false);
+                moveGeneratedPackToEnd(assetModule);
+            }
+            case MISSING_RUNTIME_PACK -> status.addFailed(
+                    "Generated Tamework patch pack is not registered; restart the server to register generated patches."
+            );
         }
+    }
 
-        assetModule.registerPack(generatedPackId, root, plugin.getManifest(), false);
-        moveGeneratedPackToEnd(assetModule);
+    static PublicationAction publicationAction(boolean existingPackPresent,
+                                               boolean hasGeneratedTemplates,
+                                               @Nonnull RegistrationMode registrationMode) {
+        if (!hasGeneratedTemplates) {
+            return PublicationAction.NO_GENERATED_TEMPLATES;
+        }
+        if (existingPackPresent) {
+            return PublicationAction.REFRESH_EXISTING_PACK;
+        }
+        if (registrationMode == RegistrationMode.ALLOW_REGISTRATION) {
+            return PublicationAction.REGISTER_PACK;
+        }
+        return PublicationAction.MISSING_RUNTIME_PACK;
     }
 
     public void reloadNpcBuilders() {

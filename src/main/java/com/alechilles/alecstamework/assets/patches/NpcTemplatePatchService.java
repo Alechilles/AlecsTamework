@@ -52,7 +52,9 @@ public final class NpcTemplatePatchService {
 
     @Nonnull
     public NpcTemplatePatchStatus reload() {
-        NpcTemplatePatchStatus status = regenerateAndPublish();
+        NpcTemplatePatchStatus status = regenerateAndPublish(
+                NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
+        );
         publisher.reloadNpcBuilders();
         return status;
     }
@@ -69,7 +71,9 @@ public final class NpcTemplatePatchService {
 
     private void onLoadAssets(@Nonnull LoadAssetEvent event) {
         try {
-            NpcTemplatePatchStatus status = regenerateAndPublish();
+            NpcTemplatePatchStatus status = regenerateAndPublish(
+                    NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
+            );
             if (status.hasFailures()) {
                 event.failed(false, "Tamework patch errors");
             }
@@ -82,7 +86,9 @@ public final class NpcTemplatePatchService {
     }
 
     @Nonnull
-    private NpcTemplatePatchStatus regenerateAndPublish() {
+    private NpcTemplatePatchStatus regenerateAndPublish(
+            @Nonnull NpcTemplatePatchGeneratedPackPublisher.RegistrationMode registrationMode
+    ) {
         NpcTemplatePatchStatus status = new NpcTemplatePatchStatus();
         AssetModule assetModule = AssetModule.get();
         if (assetModule == null) {
@@ -106,7 +112,7 @@ public final class NpcTemplatePatchService {
         }
 
         try {
-            publisher.publish(generatedTemplates, status);
+            publisher.publish(generatedTemplates, status, registrationMode);
         } catch (IOException ex) {
             String message = "Failed to publish generated Tamework patch pack: " + ex.getMessage();
             status.addFailed(message);
