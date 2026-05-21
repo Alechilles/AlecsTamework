@@ -32,7 +32,7 @@ public final class NpcTemplatePatchService {
 
     public NpcTemplatePatchService(@Nonnull JavaPlugin plugin) {
         this.plugin = plugin;
-        this.generatedPackId = new PluginIdentifier(plugin.getManifest()) + "_GeneratedNpcTemplatePatches";
+        this.generatedPackId = new PluginIdentifier(plugin.getManifest()) + "_GeneratedPatches";
         this.scanner = new NpcTemplatePatchScanner(plugin.getLogger());
         this.targetResolver = new NpcTemplatePatchTargetResolver();
         this.patchEngine = new NpcTemplatePatchEngine();
@@ -71,13 +71,13 @@ public final class NpcTemplatePatchService {
         try {
             NpcTemplatePatchStatus status = regenerateAndPublish();
             if (status.hasFailures()) {
-                event.failed(false, "Tamework NPC template patch errors");
+                event.failed(false, "Tamework patch errors");
             }
         } catch (RuntimeException ex) {
             plugin.getLogger().at(Level.WARNING).withCause(ex).log(
                     "Tamework template patches: failed during pre-NPC asset load."
             );
-            event.failed(false, "Tamework NPC template patch generation failed");
+            event.failed(false, "Tamework patch generation failed");
         }
     }
 
@@ -108,7 +108,7 @@ public final class NpcTemplatePatchService {
         try {
             publisher.publish(generatedTemplates, status);
         } catch (IOException ex) {
-            String message = "Failed to publish generated NPC template patch pack: " + ex.getMessage();
+            String message = "Failed to publish generated Tamework patch pack: " + ex.getMessage();
             status.addFailed(message);
             plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
         }
@@ -157,9 +157,9 @@ public final class NpcTemplatePatchService {
 
     private void logStatus(@Nonnull NpcTemplatePatchStatus status) {
         Level level = status.hasFailures() ? Level.WARNING : Level.INFO;
-        plugin.getLogger().at(level).log("Tamework template patches: " + status.summaryLine());
+        plugin.getLogger().at(level).log("Tamework patches: " + status.summaryLine());
         for (String failure : status.getFailed()) {
-            plugin.getLogger().at(Level.WARNING).log("Tamework template patch failure: " + Objects.toString(failure));
+            plugin.getLogger().at(Level.WARNING).log("Tamework patch failure: " + Objects.toString(failure));
         }
     }
 }

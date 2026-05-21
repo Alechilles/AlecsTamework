@@ -19,7 +19,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Command relocation/death snapshot pipeline (`CommandNpcRelocationService`, `CommandLinkedNpcDeathService`, on-load relocation system)
 - Linked companions panel + command radial UI (mode/sort/filter/group management + per-row actions)
 - Managed coop runtime (`TwCoopConfig`)
-- Optional NPC template patch generation (`Server/Tamework/NpcTemplatePatches`) for modders who want Tamework as an optional dependency
+- Optional patch generation (`Server/Tamework/Patches`) for modders who want Tamework as an optional dependency
 - Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
 - Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
 

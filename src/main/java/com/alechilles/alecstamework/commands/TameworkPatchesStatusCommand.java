@@ -17,13 +17,13 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
- * Prints the last optional NPC template patch run.
+ * Prints the last optional patch run.
  */
-public final class TameworkTemplatePatchesStatusCommand extends AbstractPlayerCommand {
+public final class TameworkPatchesStatusCommand extends AbstractPlayerCommand {
     private static final int MAX_ROWS = 8;
 
-    public TameworkTemplatePatchesStatusCommand() {
-        super("status", "Show optional NPC template patch status.");
+    public TameworkPatchesStatusCommand() {
+        super("status", "Show optional Tamework patch status.");
         requirePermission(TameworkConfigPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
     }
@@ -48,11 +48,11 @@ public final class TameworkTemplatePatchesStatusCommand extends AbstractPlayerCo
     private static NpcTemplatePatchService resolveService(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null || plugin.getNpcTemplatePatchService() == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework template patch service is not available."));
+            commandContext.sender().sendMessage(Message.raw("Tamework patch service is not available."));
             return null;
         }
         if (!TameworkConfigPermission.hasAccess(commandContext.sender())) {
-            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw templatepatches."));
+            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw patches."));
             return null;
         }
         return plugin.getNpcTemplatePatchService();

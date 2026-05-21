@@ -20,10 +20,10 @@ import com.hypixel.hytale.assetstore.AssetPack;
 import com.hypixel.hytale.logger.HytaleLogger;
 
 /**
- * Scans registered asset packs for optional NPC template patch definitions.
+ * Scans registered asset packs for optional patch definitions.
  */
 public final class NpcTemplatePatchScanner {
-    public static final String PATCH_DIRECTORY = "Server/Tamework/NpcTemplatePatches";
+    public static final String PATCH_DIRECTORY = "Server/Tamework/Patches";
 
     private static final Gson GSON = new Gson();
 

@@ -277,7 +277,7 @@ final class NpcTemplatePatchEngineTest {
     }
 
     private static NpcTemplatePatchDefinition patch(String json) {
-        return NpcTemplatePatchDefinition.parse(object(json), "TestPack", "Server/Tamework/NpcTemplatePatches/Test.json");
+        return NpcTemplatePatchDefinition.parse(object(json), "TestPack", "Server/Tamework/Patches/Test.json");
     }
 
     private static JsonObject object(String json) {

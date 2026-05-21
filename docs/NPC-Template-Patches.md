@@ -5,12 +5,12 @@ NPC template patches let another mod ship Tamework-powered role/template behavio
 The base mod keeps its normal NPC templates free of `Tamework*` builders. It can then place optional patch files under:
 
 ```text
-Server/Tamework/NpcTemplatePatches/*.json
+Server/Tamework/Patches/**/*.json
 ```
 
-When Tamework is not installed, those files are just inert Tamework assets. When Tamework is installed, it scans them before NPC role validation, applies them to their target templates, writes the patched templates into a disposable generated cache, and registers that cache as a runtime-only asset pack.
+Subdirectories are supported and recommended for grouping patches by integration, mod, or feature. When Tamework is not installed, those files are just inert Tamework assets. When Tamework is installed, it scans them before NPC role validation, applies them to their target templates, writes the patched templates into a disposable generated cache, and registers that cache as a runtime-only asset pack.
 
-Generated patch output is not written into a normal auto-loaded asset location. If Tamework or the source mod is removed, stale generated files are not active; the cache is wiped and rebuilt on startup and on `/tw templatepatches reload`.
+Generated patch output is not written into a normal auto-loaded asset location. If Tamework or the source mod is removed, stale generated files are not active; the cache is wiped and rebuilt on startup and on `/tw patches reload`.
 
 ## Patch File Shape
 
@@ -66,8 +66,8 @@ See `docs/examples/AH_Livestock_TemplatePatch.json` for an AH-livestock-style fi
 Use:
 
 ```text
-/tw templatepatches status
-/tw templatepatches reload
+/tw patches status
+/tw patches reload
 ```
 
 `status` prints the last scan/generation summary, generated targets, skipped operations, and failures.

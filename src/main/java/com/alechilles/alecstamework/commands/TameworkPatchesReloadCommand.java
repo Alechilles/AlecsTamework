@@ -17,11 +17,11 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
- * Regenerates optional NPC template patches and reloads the generated builders.
+ * Regenerates optional patches and reloads the generated builders.
  */
-public final class TameworkTemplatePatchesReloadCommand extends AbstractPlayerCommand {
-    public TameworkTemplatePatchesReloadCommand() {
-        super("reload", "Reload optional NPC template patches.");
+public final class TameworkPatchesReloadCommand extends AbstractPlayerCommand {
+    public TameworkPatchesReloadCommand() {
+        super("reload", "Reload optional Tamework patches.");
         requirePermission(TameworkConfigPermission.NODE);
         setPermissionGroups("OP", "Admin", "Operator");
     }
@@ -34,15 +34,15 @@ public final class TameworkTemplatePatchesReloadCommand extends AbstractPlayerCo
                            @Nonnull World world) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null || plugin.getNpcTemplatePatchService() == null) {
-            commandContext.sender().sendMessage(Message.raw("Tamework template patch service is not available."));
+            commandContext.sender().sendMessage(Message.raw("Tamework patch service is not available."));
             return;
         }
         if (!TameworkConfigPermission.hasAccess(commandContext.sender())) {
-            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw templatepatches."));
+            commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw patches."));
             return;
         }
         NpcTemplatePatchService service = plugin.getNpcTemplatePatchService();
-        commandContext.sender().sendMessage(Message.raw("Reloading Tamework NPC template patches..."));
+        commandContext.sender().sendMessage(Message.raw("Reloading Tamework patches..."));
         try {
             NpcTemplatePatchStatus status = service.reload();
             commandContext.sender().sendMessage(Message.raw(status.summaryLine()));

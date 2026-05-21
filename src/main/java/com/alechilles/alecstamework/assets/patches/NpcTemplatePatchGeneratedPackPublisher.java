@@ -22,7 +22,7 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
  */
 public final class NpcTemplatePatchGeneratedPackPublisher {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
-    private static final String CACHE_DIRECTORY_NAME = "GeneratedNpcTemplatePatches";
+    private static final String CACHE_DIRECTORY_NAME = "GeneratedPatches";
 
     private final JavaPlugin plugin;
     private final String generatedPackId;

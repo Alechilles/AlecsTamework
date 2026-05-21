@@ -56,7 +56,7 @@ public final class NpcTemplatePatchStatus {
 
     @Nonnull
     public String summaryLine() {
-        return "TemplatePatches applied=" + applied.size()
+        return "Patches applied=" + applied.size()
                 + " skipped=" + skipped.size()
                 + " failed=" + failed.size()
                 + " generatedTargets=" + generatedTargets.size();

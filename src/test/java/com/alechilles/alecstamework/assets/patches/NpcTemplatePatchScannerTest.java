@@ -21,7 +21,7 @@ final class NpcTemplatePatchScannerTest {
     @Test
     void scansPatchDefinitionsFromRegisteredPackRoots() throws Exception {
         Path packRoot = tempDir.resolve("patch-pack");
-        Path patchDir = packRoot.resolve(NpcTemplatePatchScanner.PATCH_DIRECTORY);
+        Path patchDir = packRoot.resolve(NpcTemplatePatchScanner.PATCH_DIRECTORY).resolve("AnimalHusbandry/Livestock");
         Files.createDirectories(patchDir);
         Files.writeString(
                 patchDir.resolve("Livestock.json"),
