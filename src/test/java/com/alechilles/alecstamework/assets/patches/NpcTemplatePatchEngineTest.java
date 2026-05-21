@@ -293,6 +293,7 @@ final class NpcTemplatePatchEngineTest {
         String baseJson = template.toString();
         assertFalse(baseJson.contains("TameworkInteract"));
         assertFalse(baseJson.contains("Component_Tamework"));
+        assertFalse(baseJson.contains("\"Sleep\""));
 
         NpcTemplatePatchDefinition patch = NpcTemplatePatchDefinition.parse(
                 object(readResource("Server/Tamework/Patches/Examples/Tamework_Example_Patch.json")),
@@ -311,13 +312,14 @@ final class NpcTemplatePatchEngineTest {
         assertTrue(patchedJson.contains("Component_Tamework_Instruction_Needs_Seek_Resource"));
         assertTrue(patchedJson.contains("Component_Tamework_Instruction_Breeding_Pair"));
         assertTrue(patchedJson.contains("Tamework patch: validation-only state setters"));
+        assertTrue(patchedJson.contains("Tamework patch: sleep transitions"));
         assertTrue(patchedJson.contains("Tamework patch: sleep state"));
         for (JsonElement transition : result.patched().getAsJsonArray("StateTransitions")) {
             JsonObject transitionObject = transition.getAsJsonObject();
             assertTrue(transitionObject.has("States"), "StateTransition is missing States: " + transitionObject);
             assertTrue(transitionObject.has("Actions"), "StateTransition is missing Actions: " + transitionObject);
         }
-        assertEquals(16, result.status().getApplied().size());
+        assertEquals(17, result.status().getApplied().size());
         assertEquals(0, result.status().getFailed().size());
     }
 

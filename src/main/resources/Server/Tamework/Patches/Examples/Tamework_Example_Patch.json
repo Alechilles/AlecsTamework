@@ -73,12 +73,54 @@
       }
     },
     {
-      "Id": "follow-hold-transitions",
+      "Id": "sleep-transitions",
       "Op": "Insert",
       "Path": "/StateTransitions",
       "Position": "After",
       "Find": {
         "$Comment": "Patch anchor: state transitions"
+      },
+      "Existing": {
+        "$Comment": "Tamework patch: sleep transitions"
+      },
+      "Value": {
+        "$Comment": "Tamework patch: sleep transitions",
+        "States": [
+          {
+            "From": [
+              "Idle",
+              "Hold"
+            ],
+            "To": [
+              "Sleep"
+            ]
+          },
+          {
+            "From": [
+              "Sleep"
+            ],
+            "To": [
+              "Idle",
+              "Hold",
+              "Defend"
+            ]
+          }
+        ],
+        "Actions": [
+          {
+            "Type": "PlayAnimation",
+            "Slot": "Status"
+          }
+        ]
+      }
+    },
+    {
+      "Id": "follow-hold-transitions",
+      "Op": "Insert",
+      "Path": "/StateTransitions",
+      "Position": "After",
+      "Find": {
+        "$Comment": "Tamework patch: sleep transitions"
       },
       "Existing": {
         "$Comment": "Tamework patch: follow/hold transitions"

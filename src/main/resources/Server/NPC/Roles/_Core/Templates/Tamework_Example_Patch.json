@@ -202,29 +202,6 @@
       "$Comment": "Patch anchor: state transitions",
       "States": [
         {
-          "From": ["Idle"],
-          "To": ["Sleep"]
-        }
-      ],
-      "Actions": {
-        "Reference": "Component_ActionList_Sleep"
-      }
-    },
-    {
-      "States": [
-        {
-          "From": ["Sleep"],
-          "To": ["Idle"]
-        }
-      ],
-      "Actions": {
-        "Reference": "Component_ActionList_Wake"
-      }
-    },
-    {
-      "$Comment": "Always clear target and reset instructions when going back to idle.",
-      "States": [
-        {
           "To": ["Idle"],
           "From": []
         }
