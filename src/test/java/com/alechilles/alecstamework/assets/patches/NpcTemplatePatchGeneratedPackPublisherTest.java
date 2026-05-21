@@ -1,6 +1,8 @@
 package com.alechilles.alecstamework.assets.patches;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.junit.jupiter.api.Test;
 
@@ -43,6 +45,20 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
                         NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
                 )
         );
+    }
+
+    @Test
+    void startupRegistrationRecreatesCacheBeforeRegisteringPack() {
+        assertTrue(NpcTemplatePatchGeneratedPackPublisher.shouldRecreateCache(
+                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REGISTER_PACK
+        ));
+    }
+
+    @Test
+    void runtimeRefreshPreservesWatchedGeneratedPatchDirectories() {
+        assertFalse(NpcTemplatePatchGeneratedPackPublisher.shouldRecreateCache(
+                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK
+        ));
     }
 
     @Test

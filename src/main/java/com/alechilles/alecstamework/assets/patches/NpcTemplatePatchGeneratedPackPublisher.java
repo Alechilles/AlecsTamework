@@ -65,18 +65,18 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
 
         AssetPack existingPack = assetModule.getAssetPack(generatedPackId);
 
-        Path root = cacheRoot();
-        recreateCache(root);
-        for (Map.Entry<String, JsonObject> entry : generatedTemplates.entrySet()) {
-            writeTemplate(root, entry.getKey(), entry.getValue());
-            status.addGeneratedTarget(entry.getKey());
-        }
-
         PublicationAction action = publicationAction(
                 existingPack != null,
                 !generatedTemplates.isEmpty(),
                 registrationMode
         );
+        Path root = cacheRoot();
+        prepareCache(root, action);
+        for (Map.Entry<String, JsonObject> entry : generatedTemplates.entrySet()) {
+            writeTemplate(root, entry.getKey(), entry.getValue());
+            status.addGeneratedTarget(entry.getKey());
+        }
+
         // Live world commands must not mutate AssetModule pack registration; that can block the world thread.
         switch (action) {
             case NO_GENERATED_TEMPLATES -> {
@@ -109,6 +109,10 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
             return PublicationAction.REGISTER_PACK;
         }
         return PublicationAction.MISSING_RUNTIME_PACK;
+    }
+
+    static boolean shouldRecreateCache(@Nonnull PublicationAction action) {
+        return action == PublicationAction.REGISTER_PACK;
     }
 
     public void reloadNpcBuilders() {
@@ -145,6 +149,14 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
             }
         }
         Files.createDirectories(normalizedRoot);
+    }
+
+    private void prepareCache(@Nonnull Path root, @Nonnull PublicationAction action) throws IOException {
+        if (shouldRecreateCache(action)) {
+            recreateCache(root);
+            return;
+        }
+        Files.createDirectories(root.toAbsolutePath().normalize());
     }
 
     private void writeTemplate(@Nonnull Path root,
