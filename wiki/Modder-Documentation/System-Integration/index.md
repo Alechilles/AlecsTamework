@@ -12,6 +12,7 @@ This subsection covers feature-system implementation guides for core Tamework ga
 
 ## Child Pages
 - [Spawner System Guide](/mod/alecs-tamework/spawner-system-guide)
+- [Spawner Icon Generation](/mod/alecs-tamework/spawner-icon-generation)
 - [Naming System Guide](/mod/alecs-tamework/naming-system-guide)
 - [Command System and Linked Panel Guide](/mod/alecs-tamework/command-system-and-linked-panel-guide)
 - [Ownership Policy and Core Builders](/mod/alecs-tamework/ownership-policy-and-core-builders)

@@ -72,10 +72,8 @@ role group, then that group's `IconDefault`, then global overrides, then the
 top-level `IconDefault`. Use group `IconDefault` for roles whose captured NPCs
 have no attachment variants but still need their own base-skin icon.
 
-The easiest way to author icon overrides is the Blockbench UI workflow in
-[Spawner Icon Generation](Spawner-Icon-Generation.md). Use the batch manifest
-workflow on that page when you need to regenerate a large curated set across
-many models or upstream mod archives.
+The current spawner icon tooling guide lives in the wiki:
+[Spawner Icon Generation](../wiki/Modder-Documentation/System-Integration/Spawner-Icon-Generation.md).
 
 ## Example
 ```json
