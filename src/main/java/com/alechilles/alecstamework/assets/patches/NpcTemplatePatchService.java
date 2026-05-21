@@ -52,11 +52,13 @@ public final class NpcTemplatePatchService {
 
     @Nonnull
     public NpcTemplatePatchStatus reload() {
-        NpcTemplatePatchStatus status = regenerateAndPublish(
+        RegenerationResult result = regenerateAndPublish(
                 NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
         );
-        publisher.reloadNpcBuilders();
-        return status;
+        if (result.reloadNpcBuilders()) {
+            publisher.reloadNpcBuilders();
+        }
+        return result.status();
     }
 
     @Nonnull
@@ -71,10 +73,10 @@ public final class NpcTemplatePatchService {
 
     private void onLoadAssets(@Nonnull LoadAssetEvent event) {
         try {
-            NpcTemplatePatchStatus status = regenerateAndPublish(
+            RegenerationResult result = regenerateAndPublish(
                     NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
             );
-            if (status.hasFailures()) {
+            if (result.status().hasFailures()) {
                 event.failed(false, "Tamework patch errors");
             }
         } catch (RuntimeException ex) {
@@ -86,7 +88,7 @@ public final class NpcTemplatePatchService {
     }
 
     @Nonnull
-    private NpcTemplatePatchStatus regenerateAndPublish(
+    private RegenerationResult regenerateAndPublish(
             @Nonnull NpcTemplatePatchGeneratedPackPublisher.RegistrationMode registrationMode
     ) {
         NpcTemplatePatchStatus status = new NpcTemplatePatchStatus();
@@ -94,7 +96,7 @@ public final class NpcTemplatePatchService {
         if (assetModule == null) {
             status.addFailed("AssetModule unavailable.");
             lastStatus = status;
-            return status;
+            return new RegenerationResult(status, false);
         }
 
         List<NpcTemplatePatchDefinition> definitions =
@@ -111,8 +113,9 @@ public final class NpcTemplatePatchService {
             generateTarget(assetModule, entry.getKey(), entry.getValue(), generatedTemplates, status);
         }
 
+        boolean reloadNpcBuilders = false;
         try {
-            publisher.publish(generatedTemplates, status, registrationMode);
+            reloadNpcBuilders = publisher.publish(generatedTemplates, status, registrationMode);
         } catch (IOException ex) {
             String message = "Failed to publish generated Tamework patch pack: " + ex.getMessage();
             status.addFailed(message);
@@ -121,7 +124,10 @@ public final class NpcTemplatePatchService {
 
         lastStatus = status;
         logStatus(status);
-        return status;
+        return new RegenerationResult(status, reloadNpcBuilders);
+    }
+
+    private record RegenerationResult(@Nonnull NpcTemplatePatchStatus status, boolean reloadNpcBuilders) {
     }
 
     private void generateTarget(@Nonnull AssetModule assetModule,

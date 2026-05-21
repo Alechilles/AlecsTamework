@@ -1435,10 +1435,7 @@
     Object.keys(roleOverrides).forEach((role) => {
       merged[role] = roleOverrides[role];
     });
-    if (
-      Object.keys(merged).length ||
-      Object.prototype.hasOwnProperty.call(output, "IconOverridesByRole")
-    ) {
+    if (Object.keys(merged).length) {
       output.IconOverridesByRole = merged;
     } else {
       delete output.IconOverridesByRole;
@@ -1452,6 +1449,8 @@
         replaceOrAppendIconOverrideGroup(existingGroups, group);
       });
       output.IconOverrideGroups = existingGroups;
+    } else if (!existingGroups.length) {
+      delete output.IconOverrideGroups;
     }
     if (typeof iconDefault === "string" && iconDefault.trim().length) {
       output.IconDefault = iconDefault.trim();

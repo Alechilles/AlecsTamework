@@ -786,7 +786,7 @@ def apply_overrides_to_spawner(
     merged = dict(existing)
     for role, overrides in role_overrides.items():
         merged[role] = overrides
-    if merged or replace_icon_overrides or "IconOverridesByRole" in output:
+    if merged or replace_icon_overrides:
         output["IconOverridesByRole"] = merged
     else:
         output.pop("IconOverridesByRole", None)
@@ -796,6 +796,8 @@ def apply_overrides_to_spawner(
             replace_or_append_icon_override_group(groups, group)
     if groups or replace_icon_overrides:
         output["IconOverrideGroups"] = groups
+    else:
+        output.pop("IconOverrideGroups", None)
     if icon_default is not None:
         output["IconDefault"] = icon_default
     return output

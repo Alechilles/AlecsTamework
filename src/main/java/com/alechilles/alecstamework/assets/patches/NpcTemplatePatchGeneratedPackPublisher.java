@@ -66,47 +66,49 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         return dataDirectory.resolve(CACHE_DIRECTORY_NAME).toAbsolutePath().normalize();
     }
 
-    public void publish(@Nonnull Map<String, JsonObject> generatedTemplates,
-                        @Nonnull NpcTemplatePatchStatus status,
-                        @Nonnull RegistrationMode registrationMode) throws IOException {
+    public boolean publish(@Nonnull Map<String, JsonObject> generatedTemplates,
+                           @Nonnull NpcTemplatePatchStatus status,
+                           @Nonnull RegistrationMode registrationMode) throws IOException {
         AssetModule assetModule = AssetModule.get();
         if (assetModule == null) {
             throw new IOException("AssetModule unavailable.");
         }
 
         AssetPack existingPack = assetModule.getAssetPack(generatedPackId);
+        boolean existingPackPresent = existingPack != null;
 
         PublicationAction action = publicationAction(
-                existingPack != null,
+                existingPackPresent,
                 !generatedTemplates.isEmpty(),
                 registrationMode
         );
         Path root = cacheRoot();
-        unloadExistingGeneratedBuildersBeforeCacheMutation(existingPack, action);
-        prepareCache(root, action);
-        pruneStaleGeneratedFiles(root, generatedTemplates.keySet());
-        for (Map.Entry<String, JsonObject> entry : generatedTemplates.entrySet()) {
-            writeTemplate(root, entry.getKey(), entry.getValue());
-            status.addGeneratedTarget(entry.getKey());
+        if (!mutateCacheForPublication(existingPack, action, root, generatedTemplates, status)) {
+            return false;
         }
 
         // Live world commands must not mutate AssetModule pack registration; that can block the world thread.
         switch (action) {
             case NO_GENERATED_TEMPLATES -> {
-                return;
+                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
             }
             case REFRESH_EXISTING_PACK -> {
                 moveGeneratedPackToEnd(assetModule);
-                return;
+                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
             }
             case REGISTER_PACK -> {
                 assetModule.registerPack(generatedPackId, root, plugin.getManifest(), false);
                 moveGeneratedPackToEnd(assetModule);
+                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
             }
-            case MISSING_RUNTIME_PACK -> status.addFailed(
-                    "Generated Tamework patch pack is not registered; restart the server to register generated patches."
-            );
+            case MISSING_RUNTIME_PACK -> {
+                status.addFailed(
+                        "Generated Tamework patch pack is not registered; restart the server to register generated patches."
+                );
+                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
+            }
         }
+        return false;
     }
 
     static PublicationAction publicationAction(boolean existingPackPresent,
@@ -128,11 +130,50 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         return action == PublicationAction.REGISTER_PACK;
     }
 
-    void unloadExistingGeneratedBuildersBeforeCacheMutation(AssetPack existingPack, @Nonnull PublicationAction action) {
-        if (existingPack == null || !shouldUnloadExistingBuildersBeforeCacheMutation(action)) {
-            return;
+    static boolean shouldReloadNpcBuildersAfterPublication(boolean cacheMutationSucceeded,
+                                                           @Nonnull PublicationAction action,
+                                                           boolean existingPackPresent) {
+        if (!cacheMutationSucceeded) {
+            return false;
         }
-        builderCacheReloader.unload(existingPack);
+        return action == PublicationAction.REFRESH_EXISTING_PACK
+                || (action == PublicationAction.NO_GENERATED_TEMPLATES && existingPackPresent);
+    }
+
+    boolean mutateCacheForPublication(AssetPack existingPack,
+                                      @Nonnull PublicationAction action,
+                                      @Nonnull Path root,
+                                      @Nonnull Map<String, JsonObject> generatedTemplates,
+                                      @Nonnull NpcTemplatePatchStatus status) throws IOException {
+        if (!unloadExistingGeneratedBuildersBeforeCacheMutation(existingPack, action, status)) {
+            return false;
+        }
+        prepareCache(root, action);
+        pruneStaleGeneratedFiles(root, generatedTemplates.keySet());
+        for (Map.Entry<String, JsonObject> entry : generatedTemplates.entrySet()) {
+            writeTemplate(root, entry.getKey(), entry.getValue());
+            status.addGeneratedTarget(entry.getKey());
+        }
+        return true;
+    }
+
+    boolean unloadExistingGeneratedBuildersBeforeCacheMutation(AssetPack existingPack,
+                                                               @Nonnull PublicationAction action,
+                                                               @Nonnull NpcTemplatePatchStatus status) {
+        if (existingPack == null || !shouldUnloadExistingBuildersBeforeCacheMutation(action)) {
+            return true;
+        }
+        try {
+            builderCacheReloader.unload(existingPack);
+            return true;
+        } catch (RuntimeException ex) {
+            String message = "Tamework template patches: failed to unload generated NPC builders before cache refresh.";
+            status.addFailed(message);
+            if (plugin != null && plugin.getLogger() != null) {
+                plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
+            }
+            return false;
+        }
     }
 
     static boolean shouldUnloadExistingBuildersBeforeCacheMutation(@Nonnull PublicationAction action) {

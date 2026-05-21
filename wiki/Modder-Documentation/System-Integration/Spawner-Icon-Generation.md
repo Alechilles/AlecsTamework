@@ -42,7 +42,7 @@ Use this flow when generating icons for one model and when you want to preview t
 11. Enable `Shared Role Group` when multiple selected roles look identical and should share one `IconOverrideGroups` entry and one icon file per attachment combo.
 12. Click `Run Batch`.
 
-The wizard renders the icons, writes any selected JSON outputs, and shows a completion summary. If `Write Spawner Overrides` is enabled, it merges generated entries into `IconOverridesByRole` by default, or into `IconOverrideGroups` when `Shared Role Group` is enabled.
+The wizard renders the icons, writes any selected JSON outputs, and shows a completion summary. If `Write Spawner Overrides` is enabled, it merges generated entries into `IconOverridesByRole` by default, or writes `IconOverrideGroups` when `Shared Role Group` is enabled, replacing an existing matching role group or appending a new one.
 
 ## Jobs JSON Workflow
 
