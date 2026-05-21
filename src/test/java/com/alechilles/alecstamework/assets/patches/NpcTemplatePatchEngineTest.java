@@ -325,6 +325,14 @@ final class NpcTemplatePatchEngineTest {
         assertTrue(patchedJson.contains("Tamework patch: validation-only state setters"));
         assertTrue(patchedJson.contains("Tamework patch: sleep transitions"));
         assertTrue(patchedJson.contains("Tamework patch: sleep state"));
+        assertEquals(
+                "TwIntExamplePatch",
+                actionByType(result.patched(), "TameworkInteractPrompt").get("ConfigId").getAsString()
+        );
+        assertEquals(
+                "TwIntExamplePatch",
+                actionByType(result.patched(), "TameworkInteract").get("ConfigId").getAsString()
+        );
         assertStringArray(
                 exportStates(instructionByComment(result.patched(), "Tamework patch: breed pair state")),
                 "BreedPair",
@@ -347,6 +355,19 @@ final class NpcTemplatePatchEngineTest {
         assertEquals(0, result.status().getFailed().size());
     }
 
+    @Test
+    void patchExampleInteractionConfigUsesFollowStateForFollowingMode() throws Exception {
+        JsonObject patchConfig = object(readResource("Server/Tamework/Interactions/TwIntExamplePatch.json"));
+        JsonObject modeCycle = interactionByType(patchConfig, "ModeCycle");
+        assertEquals("Follow", modeCycle.getAsJsonArray("Cycle").get(0).getAsJsonObject().get("State").getAsString());
+        assertEquals("Following", modeCycle.getAsJsonArray("Cycle").get(0).getAsJsonObject().get("Message").getAsString());
+
+        JsonObject sharedConfig = object(readResource("Server/Tamework/Interactions/TwIntExample.json"));
+        for (JsonElement roleId : sharedConfig.getAsJsonArray("RoleIds")) {
+            assertFalse("Mob_Tamework_Example_Patch".equals(roleId.getAsString()));
+        }
+    }
+
     private static NpcTemplatePatchDefinition patch(String json) {
         return NpcTemplatePatchDefinition.parse(object(json), "TestPack", "Server/Tamework/Patches/Test.json");
     }
@@ -359,6 +380,32 @@ final class NpcTemplatePatchEngineTest {
             }
         }
         throw new AssertionError("Missing instruction comment " + comment);
+    }
+
+    private static JsonObject actionByType(JsonObject root, String type) {
+        for (JsonElement instruction : root.getAsJsonObject("InteractionInstruction").getAsJsonArray("Instructions")) {
+            JsonObject branch = instruction.getAsJsonObject();
+            if (!branch.has("Actions")) {
+                continue;
+            }
+            for (JsonElement action : branch.getAsJsonArray("Actions")) {
+                JsonObject actionObject = action.getAsJsonObject();
+                if (actionObject.has("Type") && type.equals(actionObject.get("Type").getAsString())) {
+                    return actionObject;
+                }
+            }
+        }
+        throw new AssertionError("Missing interaction action type " + type);
+    }
+
+    private static JsonObject interactionByType(JsonObject config, String type) {
+        for (JsonElement interaction : config.getAsJsonArray("Interactions")) {
+            JsonObject interactionObject = interaction.getAsJsonObject();
+            if (interactionObject.has("Type") && type.equals(interactionObject.get("Type").getAsString())) {
+                return interactionObject;
+            }
+        }
+        throw new AssertionError("Missing interaction type " + type);
     }
 
     private static JsonArray exportStates(JsonObject instruction) {

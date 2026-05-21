@@ -632,6 +632,7 @@
       },
       "Options": {
         "ActionFields": {
+          "ConfigId": "TwIntExamplePatch",
           "LovedItems": {
             "Compute": "LovedItems"
           },
