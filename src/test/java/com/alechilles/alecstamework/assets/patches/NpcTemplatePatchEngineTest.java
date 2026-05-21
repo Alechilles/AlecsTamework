@@ -2,9 +2,12 @@ package com.alechilles.alecstamework.assets.patches;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import com.google.gson.JsonObject;
@@ -276,11 +279,48 @@ final class NpcTemplatePatchEngineTest {
         assertEquals(4, result.status().getApplied().size());
     }
 
+    @Test
+    void bundledPatchExampleUpgradesBareTemplateWithTameworkBehavior() throws Exception {
+        JsonObject template = object(readResource(
+                "Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json"
+        ));
+        String baseJson = template.toString();
+        assertFalse(baseJson.contains("TameworkInteract"));
+        assertFalse(baseJson.contains("Component_Tamework"));
+
+        NpcTemplatePatchDefinition patch = NpcTemplatePatchDefinition.parse(
+                object(readResource("Server/Tamework/Patches/Examples/Tamework_Example_Patch.json")),
+                "TestPack",
+                "Server/Tamework/Patches/Examples/Tamework_Example_Patch.json"
+        );
+        NpcTemplatePatchEngine.PatchResult result = engine.apply(template, List.of(patch));
+        String patchedJson = result.patched().toString();
+
+        assertTrue(patchedJson.contains("TameworkInteractPrompt"));
+        assertTrue(patchedJson.contains("TameworkInteract"));
+        assertTrue(patchedJson.contains("Component_Tamework_Instruction_Command_Move"));
+        assertTrue(patchedJson.contains("Component_Tamework_Instruction_Follow_Simple_TP"));
+        assertTrue(patchedJson.contains("Component_Tamework_Instruction_Hold"));
+        assertTrue(patchedJson.contains("Component_Tamework_Instruction_Defend"));
+        assertTrue(patchedJson.contains("Component_Tamework_Instruction_Needs_Seek_Resource"));
+        assertTrue(patchedJson.contains("Component_Tamework_Instruction_Breeding_Pair"));
+        assertEquals(14, result.status().getApplied().size());
+        assertEquals(0, result.status().getFailed().size());
+    }
+
     private static NpcTemplatePatchDefinition patch(String json) {
         return NpcTemplatePatchDefinition.parse(object(json), "TestPack", "Server/Tamework/Patches/Test.json");
     }
 
     private static JsonObject object(String json) {
         return JsonParser.parseString(json).getAsJsonObject();
+    }
+
+    private static String readResource(String path) throws Exception {
+        ClassLoader loader = NpcTemplatePatchEngineTest.class.getClassLoader();
+        try (InputStream stream = loader.getResourceAsStream(path)) {
+            assertNotNull(stream, "Missing test resource " + path);
+            return new String(stream.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }

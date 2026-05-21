@@ -38,6 +38,8 @@ Macros are convenience expansions, not automatic placement. They still require e
 - `TameworkHookInstruction`: inserts a `TameworkHook` sensor branch.
 - `TameworkStateInstruction`: inserts a branch referencing a Tamework instruction component.
 
+Tamework includes a bundled fixture at `Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json`, `Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Patch.json`, and `Server/Tamework/Patches/Examples/Tamework_Example_Patch.json`.
+
 ## Diagnostics
 
 Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to rebuild the generated pack from currently loaded mods.

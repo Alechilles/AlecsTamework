@@ -1,5 +1,6 @@
 npcRoles.Mob_Tamework_Example.name=Tamework Example
 npcRoles.Mob_Tamework_Example_Simple.name=Tamework Example (Simple)
+npcRoles.Mob_Tamework_Example_Patch.name=Tamework Example (Patch)
 items.Spawner_Tamework_Example.name=Tamework Example Spawner
 items.Spawner_Tamework_Example.description=Spawns the Tamework example NPC.
 items.Tamework_Nametag_Example.name=Tamework Example Name Tag

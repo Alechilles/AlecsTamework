@@ -1,0 +1,58 @@
+{
+  "$Comment": "Example NPC role whose base template is intentionally barebones and upgraded by Server/Tamework/Patches/Examples/Tamework_Example_Patch.json.",
+  "Type": "Variant",
+  "Reference": "Tamework_Example_Patch",
+  "Modify": {
+    "Appearance": "Tamework_Example",
+    "NameTranslationKey": "server.npcRoles.Mob_Tamework_Example_Patch.name",
+    "MaxSpeed": 5,
+    "MaxHealth": 80,
+    "AttitudeGroup": "PreyBig",
+    "PlayerDefaultAttitude": "Neutral",
+    "FlockArray": [
+      "Mob_Tamework_Example_Patch"
+    ],
+    "LovedItems": [
+      "Plant_Fruit_Apple"
+    ],
+    "FoodItemIDs": [
+      "Plant_Fruit_Apple"
+    ],
+    "DropList": "Empty",
+    "IsMountable": true,
+    "MountAnchorX": 0,
+    "MountAnchorY": 0.8,
+    "MountAnchorZ": 0.3,
+    "MountMovementConfig": "Mount",
+    "IsHarvestable": true,
+    "HarvestDropList": "Drop_Sheep_Harvest",
+    "HarvestInteractionContext": "Shear",
+    "HarvestParticles": "Sheep_Wool_Shear",
+    "HarvestSound": "SFX_Sheep_Sheared",
+    "MasterTargetSlot": "MasterTarget",
+    "SpawnerEmptyItemID": [
+      "Spawner_Tamework_Example"
+    ],
+    "CanFollow": true,
+    "CanHold": true,
+    "CanDefend": true,
+    "CanAttackTarget": true,
+    "CanMoveToLocation": true,
+    "CanReturnHome": true,
+    "CanRecall": true,
+    "CanSetHome": true,
+    "CanBreedPair": true,
+    "TestTameItemsParam": [
+      "Plant_Fruit_Apple"
+    ],
+    "TestFeedItemsParam": [
+      "Plant_Fruit_Apple"
+    ]
+  },
+  "Parameters": {
+    "NameTranslationKey": {
+      "Value": "server.npcRoles.Mob_Tamework_Example_Patch.name",
+      "Description": "Translation key for NPC name display."
+    }
+  }
+}

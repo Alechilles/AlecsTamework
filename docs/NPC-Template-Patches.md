@@ -61,6 +61,14 @@ Supported v1 macros:
 
 See `docs/examples/AH_Livestock_TemplatePatch.json` for an AH-livestock-style fixture.
 
+Tamework also ships an in-game fixture:
+
+- Base template: `Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json`
+- Role: `Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Patch.json`
+- Patch: `Server/Tamework/Patches/Examples/Tamework_Example_Patch.json`
+
+The base template is intentionally barebones and avoids Tamework builders. The patch adds the Tamework interaction bridge, command states, needs seeking, and breeding-pair movement so the role can be tested with Tamework's existing example spawner and tools.
+
 ## Diagnostics
 
 Use:

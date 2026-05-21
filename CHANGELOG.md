@@ -5,6 +5,7 @@
 ### Added
 - Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
 - Added optional NPC template patches so third-party mods can ship Tamework role/template integrations without making Tamework a required dependency.
+- Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
 
 ### Fixed
 - Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
