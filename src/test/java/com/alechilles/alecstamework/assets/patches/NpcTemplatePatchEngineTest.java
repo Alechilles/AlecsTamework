@@ -278,6 +278,11 @@ final class NpcTemplatePatchEngineTest {
                         .get(2).getAsJsonObject().getAsJsonArray("Actions").get(2).getAsJsonObject()
                         .get("Type").getAsString()
         );
+        assertEquals(
+                "HasInteracted",
+                result.patched().getAsJsonObject("InteractionInstruction").getAsJsonArray("Instructions")
+                        .get(2).getAsJsonObject().getAsJsonObject("Sensor").get("Type").getAsString()
+        );
         assertEquals(4, result.status().getApplied().size());
     }
 

@@ -37,8 +37,14 @@ final class NpcTemplatePatchMacroExpander {
         JsonObject actionFields = objectOption(options, "ActionFields", new JsonObject());
         JsonObject prompt = action("TameworkInteractPrompt", actionFields);
         JsonObject interact = action("TameworkInteract", actionFields);
-        JsonObject promptBranch = branchWithActions(prompt);
-        JsonObject interactBranch = branchWithActions(lockAction("InteractionTarget"), lockAction("MasterTarget"), interact);
+        JsonObject promptBranch = branchWithActions("Any", true, prompt);
+        JsonObject interactBranch = branchWithActions(
+                "HasInteracted",
+                false,
+                lockAction("InteractionTarget"),
+                lockAction("MasterTarget"),
+                interact
+        );
         return List.of(
                 NpcTemplatePatchOperation.raw(
                         operation.getId() + ".prompt",
@@ -152,15 +158,20 @@ final class NpcTemplatePatchMacroExpander {
     }
 
     @Nonnull
-    private static JsonObject branchWithActions(@Nonnull JsonObject... actions) {
+    private static JsonObject branchWithActions(@Nonnull String sensorType,
+                                                boolean continues,
+                                                @Nonnull JsonObject... actions) {
         JsonObject branch = parseObject("""
                 {
                   "Enabled": { "Compute": "true" },
-                  "Continue": true,
-                  "Sensor": { "Type": "Any" },
+                  "Sensor": {},
                   "Actions": []
                 }
                 """);
+        if (continues) {
+            branch.addProperty("Continue", true);
+        }
+        branch.getAsJsonObject("Sensor").addProperty("Type", sensorType);
         for (JsonObject action : actions) {
             branch.getAsJsonArray("Actions").add(action);
         }
