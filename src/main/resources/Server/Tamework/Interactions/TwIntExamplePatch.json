@@ -89,6 +89,10 @@
           "Message": "Following"
         },
         {
+          "State": "Idle",
+          "Message": "Wandering"
+        },
+        {
           "State": "Hold",
           "Message": "Staying"
         },
