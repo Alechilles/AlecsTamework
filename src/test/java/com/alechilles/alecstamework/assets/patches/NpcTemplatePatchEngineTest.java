@@ -290,6 +290,11 @@ final class NpcTemplatePatchEngineTest {
         JsonObject template = object(readResource(
                 "Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json"
         ));
+        JsonObject templateParameters = template.getAsJsonObject("Parameters");
+        for (String modifyKey : role.getAsJsonObject("Modify").keySet()) {
+            assertTrue(templateParameters.has(modifyKey), "Role modifies missing template parameter " + modifyKey);
+        }
+
         String baseJson = template.toString();
         assertFalse(baseJson.contains("TameworkInteract"));
         assertFalse(baseJson.contains("Component_Tamework"));

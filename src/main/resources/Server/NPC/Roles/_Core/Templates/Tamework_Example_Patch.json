@@ -141,6 +141,61 @@
     "BreathesInWater": {
       "Value": true,
       "Description": "Whether this NPC can breathe underwater."
+    },
+    "MasterTargetSlot": {
+      "Value": "MasterTarget",
+      "Description": "Target slot used to store the owner/master after patching."
+    },
+    "SpawnerEmptyItemID": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Item IDs that can pick up this NPC after patching."
+    },
+    "CanFollow": {
+      "Value": false,
+      "Description": "Whether command-driven Follow behavior is enabled after patching."
+    },
+    "CanHold": {
+      "Value": false,
+      "Description": "Whether command-driven Hold behavior is enabled after patching."
+    },
+    "CanDefend": {
+      "Value": false,
+      "Description": "Whether Defend behavior is enabled after patching."
+    },
+    "CanAttackTarget": {
+      "Value": false,
+      "Description": "Whether Attack Target commands are allowed after patching."
+    },
+    "CanMoveToLocation": {
+      "Value": false,
+      "Description": "Whether Move To Location command behavior is enabled after patching."
+    },
+    "CanReturnHome": {
+      "Value": false,
+      "Description": "Whether Return Home command behavior is enabled after patching."
+    },
+    "CanRecall": {
+      "Value": false,
+      "Description": "Whether Recall command behavior is enabled after patching."
+    },
+    "CanSetHome": {
+      "Value": false,
+      "Description": "Whether Set Home commands are available after patching."
+    },
+    "CanBreedPair": {
+      "Value": false,
+      "Description": "Whether breeding pair approach behavior is enabled after patching."
+    },
+    "TestTameItemsParam": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Items accepted by the example Tame interaction after patching."
+    },
+    "TestFeedItemsParam": {
+      "Value": [],
+      "TypeHint": "String",
+      "Description": "Items accepted by the example Feed interaction after patching."
     }
   },
   "IsMemory": false,
