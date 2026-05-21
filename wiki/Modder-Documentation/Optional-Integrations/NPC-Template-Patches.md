@@ -12,7 +12,14 @@ NPC template patches let a mod ship Tamework-powered NPC behavior as an optional
 
 Use subdirectories under `Server/Tamework/Patches` to group patches by mod, integration, or feature.
 
-Tamework scans patch files before NPC validation, applies them to their target role/template JSON, writes the patched output into a disposable generated cache, and registers that cache as a runtime-only asset pack. The generated cache is wiped and rebuilt on startup and `/tw patches reload`, so removing Tamework or the source mod does not leave active generated templates behind.
+Tamework scans patch files before NPC validation, applies them to their target role/template JSON, writes patched copies, and loads those generated copies into the NPC builder manager. At runtime, `/tw patches reload` rescans patch files and refreshes generated files in place.
+
+## Pages
+
+- [NPC Template Patch Operations](/mod/alecs-tamework/npc-template-patch-operations): `Add`, `Merge`, `Replace`, `Remove`, `Insert`, JSON paths, anchors, and idempotency.
+- [NPC Template Patch Macros](/mod/alecs-tamework/npc-template-patch-macros): compact helpers for common Tamework instruction branches.
+- [NPC Template Patch Workflow](/mod/alecs-tamework/npc-template-patch-workflow): how to design patchable templates and test them safely.
+- [NPC Template Patch Troubleshooting](/mod/alecs-tamework/npc-template-patch-troubleshooting): common validation, reload, and spawn failures.
 
 ## Patch Shape
 
@@ -42,6 +49,6 @@ Tamework includes a bundled fixture at `Server/NPC/Roles/_Core/Templates/Tamewor
 
 ## Diagnostics
 
-Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to rebuild the generated pack from currently loaded mods.
+Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods.
 
 If a required anchor is missing, Tamework logs the patch id, operation id, target, and failure reason. The failed target is not published as a partial generated template.

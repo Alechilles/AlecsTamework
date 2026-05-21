@@ -1,16 +1,83 @@
 # NPC Template Patches
 
-NPC template patches let another mod ship Tamework-powered role/template behavior without making Tamework a required dependency.
+NPC template patches let another mod ship Tamework-powered NPC behavior without making Tamework a required dependency.
 
-The base mod keeps its normal NPC templates free of `Tamework*` builders. It can then place optional patch files under:
+The base mod keeps its normal NPC role/template assets valid without Tamework. Optional patch files live under:
 
 ```text
 Server/Tamework/Patches/**/*.json
 ```
 
-Subdirectories are supported and recommended for grouping patches by integration, mod, or feature. When Tamework is not installed, those files are just inert Tamework assets. When Tamework is installed, it scans them before NPC role validation, applies them to their target templates, writes the patched templates into a disposable generated cache, and registers that cache as a runtime-only asset pack.
+When Tamework is not installed, those files are inert because the base game does not load Tamework patch assets. When Tamework is installed, it scans the patch files before NPC validation, applies them to their target JSON assets, writes generated patched copies, and loads those generated copies into the NPC builder manager.
 
-Generated patch output is not written into a normal auto-loaded asset location. If Tamework or the source mod is removed, stale generated files are not active; the cache is wiped and rebuilt on startup and on `/tw patches reload`.
+Use this system when a mod should work in two modes:
+
+- Without Tamework: the NPC uses only base-game-safe behavior.
+- With Tamework: the NPC gains Tamework actions, sensors, states, command behavior, needs, breeding, or other integration behavior.
+
+## Pages
+
+- [Raw Operations](NPC-Template-Patch-Operations.md): `Add`, `Merge`, `Replace`, `Remove`, `Insert`, JSON paths, anchors, and idempotency.
+- [Macros](NPC-Template-Patch-Macros.md): compact helpers for common Tamework instruction branches.
+- [Authoring Workflow](NPC-Template-Patch-Workflow.md): how to design patchable templates and test them safely.
+- [Troubleshooting](NPC-Template-Patch-Troubleshooting.md): common validation, reload, and spawn failures.
+
+## Minimal Example
+
+The target template should include stable anchors where optional behavior can be inserted:
+
+```json
+{
+  "Type": "Abstract",
+  "StartState": "Idle",
+  "Parameters": {
+    "MaxSpeed": { "Value": 4 }
+  },
+  "Instructions": [
+    { "$Comment": "Patch anchor: behaviors" }
+  ]
+}
+```
+
+The patch targets that template and inserts Tamework behavior only when Tamework is present:
+
+```json
+{
+  "Id": "MyCow_Tamework_Follow",
+  "Target": "Server/NPC/Roles/_Core/Templates/MyCow.json",
+  "Operations": [
+    {
+      "Id": "add-follow-flag",
+      "Op": "Merge",
+      "Path": "/Parameters",
+      "Value": {
+        "CanFollow": { "Value": true }
+      }
+    },
+    {
+      "Id": "add-follow-behavior",
+      "Op": "Insert",
+      "Path": "/Instructions",
+      "Position": "After",
+      "Find": { "$Comment": "Patch anchor: behaviors" },
+      "Existing": {
+        "Instructions": {
+          "$Contains": {
+            "Reference": "Component_Tamework_Instruction_Follow"
+          }
+        }
+      },
+      "Value": {
+        "Instructions": [
+          {
+            "Reference": "Component_Tamework_Instruction_Follow"
+          }
+        ]
+      }
+    }
+  ]
+}
+```
 
 ## Patch File Shape
 
@@ -24,62 +91,36 @@ Generated patch output is not written into a normal auto-loaded asset location. 
 }
 ```
 
-- `Id`: stable patch id used in diagnostics.
-- `Target`: NPC role/template JSON path to patch.
-- `Priority`: lower values apply first for the same target.
-- `Enabled`: optional; defaults to `true`.
+Fields:
+
+- `Id`: stable patch id used in logs and `/tw patches status`.
+- `Target`: target JSON asset path. Leading `/` is optional and normalized away.
+- `Priority`: lower values apply first when multiple patches target the same file. Defaults to `0`.
+- `Enabled`: optional switch. Defaults to `true`.
 - `Operations`: ordered raw operations and macro operations.
 
-## Raw Operations
+## Runtime Behavior
 
-Supported raw `Op` values:
+On startup, Tamework scans loaded asset packs, groups patches by `Target`, applies enabled patches by `Priority` then `Id`, and publishes generated targets as a generated runtime pack.
 
-- `Add`: add a field or array item at `Path`.
-- `Merge`: deep-merge an object into an existing object at `Path`.
-- `Replace`: replace an existing value at `Path`.
-- `Remove`: remove an existing value at `Path`.
-- `Insert`: insert into an array at `Path`.
+At runtime, `/tw patches reload` rescans loaded packs and refreshes generated files in place. It does not unregister or delete the generated pack while the server is running, because doing so can cause the NPC builder manager or asset monitor to drop generated builders.
 
-Paths use JSON pointer syntax, such as `/InteractionInstruction/Instructions`.
-
-`Insert` supports:
-
-- `Position`: `Start`, `End`, `Before`, or `After`.
-- `Find`: object matcher for `Before` or `After` anchors.
-- `Existing`: object matcher that skips the insert when the generated value is already present.
-- `Required`: defaults to `true`; set `false` for optional anchors.
-
-## Macros
-
-Macros expand into raw operations. They are convenience helpers, not automatic feature placement. Every macro still needs the same explicit `Path`, `Position`, and `Find` anchor information that a raw insert would need.
-
-Supported v1 macros:
-
-- `TameworkInteractionBridge`: inserts `TameworkInteractPrompt` and `TameworkInteract` branches.
-- `TameworkHookInstruction`: inserts a branch with a `TameworkHook` sensor.
-- `TameworkStateInstruction`: inserts a branch that references a Tamework component instruction.
-
-See `docs/examples/AH_Livestock_TemplatePatch.json` for an AH-livestock-style fixture.
-
-Tamework also ships an in-game fixture:
-
-- Base template: `Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json`
-- Role: `Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Patch.json`
-- Patch: `Server/Tamework/Patches/Examples/Tamework_Example_Patch.json`
-
-The base template is intentionally barebones and avoids Tamework builders. The patch adds the Tamework interaction bridge, command states, needs seeking, and breeding-pair movement so the role can be tested with Tamework's existing example spawner and tools.
-
-## Diagnostics
-
-Use:
+Use diagnostics commands while testing:
 
 ```text
 /tw patches status
 /tw patches reload
 ```
 
-`status` prints the last scan/generation summary, generated targets, skipped operations, and failures.
+`status` prints the last patch run summary plus generated, failed, and skipped rows. `reload` is useful while editing patch files in a running dev server, but a restart is still the safest test when changing which generated targets exist.
 
-`reload` wipes the generated cache, rescans currently loaded packs, republishes generated templates, and asks the NPC builder manager to reload the generated pack.
+## Bundled Fixture
 
-If a required anchor is missing, Tamework logs the patch id, operation id, target, and failure reason. The target is not published as a partial generated template.
+Tamework includes a working fixture:
+
+- Base template: `Server/NPC/Roles/_Core/Templates/Tamework_Example_Patch.json`
+- Role: `Server/NPC/Roles/Creature/Mammal/Mob_Tamework_Example_Patch.json`
+- Patch: `Server/Tamework/Patches/Examples/Tamework_Example_Patch.json`
+- Interaction config: `Server/Tamework/Interactions/TwIntExamplePatch.json`
+
+The base template intentionally avoids Tamework builders. The patch adds the Tamework parameters, states, transitions, interactions, command behavior, needs behavior, and breeding-pair movement.
