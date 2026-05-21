@@ -662,20 +662,27 @@ def build_icon_override_group(roles: Sequence[str], combo_manifest: Sequence[Map
     return group
 
 
-def append_or_merge_icon_override_group(groups: List[dict], group: Mapping[str, object]) -> None:
+def icon_override_group_role_key(group: Mapping[str, object]) -> Tuple[str, ...]:
     roles = group.get("Roles")
     if not isinstance(roles, list):
-        return
-    role_key = tuple(role for role in roles if isinstance(role, str))
+        return ()
+    normalized_roles = sorted(
+        {
+            role.strip().lower()
+            for role in roles
+            if isinstance(role, str) and role.strip()
+        }
+    )
+    return tuple(normalized_roles)
+
+
+def append_or_merge_icon_override_group(groups: List[dict], group: Mapping[str, object]) -> None:
+    role_key = icon_override_group_role_key(group)
     if not role_key:
         return
 
     for existing in groups:
-        existing_roles = existing.get("Roles")
-        if not isinstance(existing_roles, list):
-            continue
-        existing_key = tuple(role for role in existing_roles if isinstance(role, str))
-        if existing_key != role_key:
+        if icon_override_group_role_key(existing) != role_key:
             continue
 
         existing_overrides = existing.get("Overrides")
@@ -687,6 +694,18 @@ def append_or_merge_icon_override_group(groups: List[dict], group: Mapping[str, 
         return
 
     groups.append(dict(group))
+
+
+def replace_or_append_icon_override_group(groups: List[dict], group: Mapping[str, object]) -> None:
+    role_key = icon_override_group_role_key(group)
+    if not role_key:
+        return
+    replacement = dict(group)
+    for index, existing in enumerate(groups):
+        if icon_override_group_role_key(existing) == role_key:
+            groups[index] = replacement
+            return
+    groups.append(replacement)
 
 
 def apply_overrides_to_spawner(
@@ -711,7 +730,9 @@ def apply_overrides_to_spawner(
         merged[role] = overrides
     output["IconOverridesByRole"] = merged
     groups = list(existing_groups)
-    groups.extend(dict(group) for group in icon_override_groups if isinstance(group, Mapping))
+    for group in icon_override_groups:
+        if isinstance(group, Mapping):
+            replace_or_append_icon_override_group(groups, group)
     if groups or replace_icon_overrides:
         output["IconOverrideGroups"] = groups
     if icon_default is not None:

@@ -4,6 +4,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Set;
+
+import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -71,5 +76,25 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
                         NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
                 )
         );
+    }
+
+    @Test
+    void runtimeRefreshPrunesGeneratedJsonTargetsThatAreNoLongerProduced(@TempDir Path tempDir) throws Exception {
+        Path staleTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Stale.json");
+        Path currentTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Current.json");
+        Path nonJsonArtifact = tempDir.resolve("Server/NPC/Roles/_Core/Templates/readme.txt");
+        Files.createDirectories(staleTarget.getParent());
+        Files.writeString(staleTarget, "{}");
+        Files.writeString(currentTarget, "{}");
+        Files.writeString(nonJsonArtifact, "kept");
+
+        NpcTemplatePatchGeneratedPackPublisher.pruneStaleGeneratedFiles(
+                tempDir,
+                Set.of("Server/NPC/Roles/_Core/Templates/Current.json")
+        );
+
+        assertFalse(Files.exists(staleTarget));
+        assertTrue(Files.exists(currentTarget));
+        assertTrue(Files.exists(nonJsonArtifact));
     }
 }

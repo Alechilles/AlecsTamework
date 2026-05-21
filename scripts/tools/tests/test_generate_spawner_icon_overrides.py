@@ -501,6 +501,88 @@ class BatchManifestTests(unittest.TestCase):
             self.assertIn("Icons/Aures/basecolor-brown.png", [entry["Icon"] for entry in group["Overrides"]])
             self.assertIn("Icons/Base/horns-short.png", [entry["Icon"] for entry in group["Overrides"]])
 
+    def test_group_mode_replaces_existing_same_role_group_instead_of_appending_stale_winner(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            write_json(root / "models" / "Livestock" / "Goat.json", goat_model())
+            spawner = root / "spawner.json"
+            write_json(
+                spawner,
+                {
+                    "IconOverridesByRole": {},
+                    "IconOverrideGroups": [
+                        {
+                            "Roles": ["Goat", "Tamed_Goat"],
+                            "Overrides": [
+                                {
+                                    "Icon": "Icons/Old/basecolor-brown.png",
+                                    "Attachments": {"BaseColor": "Brown"},
+                                }
+                            ],
+                            "IconDefault": "Icons/Old/base.png",
+                        },
+                        {
+                            "Roles": ["Cow"],
+                            "Overrides": [
+                                {
+                                    "Icon": "Icons/Cow/base.png",
+                                    "Attachments": {"BaseColor": "Brown"},
+                                }
+                            ],
+                        },
+                    ],
+                },
+            )
+            manifest = root / "batch" / "icons.batch.json"
+            write_json(
+                manifest,
+                {
+                    "defaults": {
+                        "iconTemplate": "Icons/New/{combo_slug}.png",
+                        "iconOverrideMode": "group",
+                    },
+                    "sources": {"localModels": {"modelsRoot": "../models"}},
+                    "entries": [
+                        {
+                            "id": "goat_local",
+                            "source": "localModels",
+                            "model": "Livestock/Goat.json",
+                            "roles": ["Goat", "Tamed_Goat"],
+                            "keepAttachmentSets": ["BaseColor"],
+                        }
+                    ],
+                },
+            )
+
+            jobs_out = root / "jobs.json"
+            manifest_out = root / "report.json"
+            result = self.run_generator(
+                root,
+                manifest,
+                jobs_out,
+                manifest_out,
+                extra_args=[
+                    "--spawner-config",
+                    str(spawner),
+                    "--in-place",
+                ],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout)
+            updated = json.loads(spawner.read_text(encoding="utf-8"))
+            self.assertEqual(len(updated["IconOverrideGroups"]), 2)
+            group = updated["IconOverrideGroups"][0]
+            self.assertEqual(group["Roles"], ["Goat", "Tamed_Goat"])
+            self.assertNotIn("IconDefault", group)
+            self.assertEqual(
+                sorted(override["Icon"] for override in group["Overrides"]),
+                [
+                    "Icons/New/basecolor-brown.png",
+                    "Icons/New/basecolor-white.png",
+                ],
+            )
+            self.assertEqual(updated["IconOverrideGroups"][1]["Roles"], ["Cow"])
+
     def test_exclude_attachment_options_removes_default_or_empty_variants(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

@@ -1441,12 +1441,42 @@
       : [];
     const generatedGroups = Array.isArray(iconOverrideGroups) ? iconOverrideGroups : [];
     if (generatedGroups.length) {
-      output.IconOverrideGroups = existingGroups.concat(generatedGroups);
+      generatedGroups.forEach((group) => {
+        replaceOrAppendIconOverrideGroup(existingGroups, group);
+      });
+      output.IconOverrideGroups = existingGroups;
     }
     if (typeof iconDefault === "string" && iconDefault.trim().length) {
       output.IconDefault = iconDefault.trim();
     }
     return output;
+  }
+
+  function iconOverrideGroupRoleKey(group) {
+    if (!group || !Array.isArray(group.Roles)) {
+      return "";
+    }
+    return group.Roles
+      .filter((role) => typeof role === "string" && role.trim().length)
+      .map((role) => role.trim().toLowerCase())
+      .sort()
+      .join("\u0000");
+  }
+
+  function replaceOrAppendIconOverrideGroup(groups, group) {
+    const roleKey = iconOverrideGroupRoleKey(group);
+    if (!roleKey) {
+      return;
+    }
+    const replacement = Object.assign({}, group);
+    const existingIndex = groups.findIndex(
+      (existing) => iconOverrideGroupRoleKey(existing) === roleKey
+    );
+    if (existingIndex >= 0) {
+      groups[existingIndex] = replacement;
+      return;
+    }
+    groups.push(replacement);
   }
 
   function composeIconRelativePath(iconRelDir, filename) {

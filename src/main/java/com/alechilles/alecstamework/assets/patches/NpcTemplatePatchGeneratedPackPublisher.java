@@ -6,6 +6,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
@@ -72,6 +74,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         );
         Path root = cacheRoot();
         prepareCache(root, action);
+        pruneStaleGeneratedFiles(root, generatedTemplates.keySet());
         for (Map.Entry<String, JsonObject> entry : generatedTemplates.entrySet()) {
             writeTemplate(root, entry.getKey(), entry.getValue());
             status.addGeneratedTarget(entry.getKey());
@@ -113,6 +116,34 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
 
     static boolean shouldRecreateCache(@Nonnull PublicationAction action) {
         return action == PublicationAction.REGISTER_PACK;
+    }
+
+    static void pruneStaleGeneratedFiles(@Nonnull Path root, @Nonnull Set<String> currentTargets) throws IOException {
+        Path normalizedRoot = root.toAbsolutePath().normalize();
+        if (!Files.isDirectory(normalizedRoot)) {
+            return;
+        }
+        Set<Path> keep = currentTargets.stream()
+                .map(NpcTemplatePatchDefinition::normalizeAssetPath)
+                .map(normalizedRoot::resolve)
+                .map(path -> path.toAbsolutePath().normalize())
+                .filter(path -> path.startsWith(normalizedRoot))
+                .collect(Collectors.toUnmodifiableSet());
+        try (var stream = Files.walk(normalizedRoot)) {
+            for (Path path : stream
+                    .filter(Files::isRegularFile)
+                    .filter(NpcTemplatePatchGeneratedPackPublisher::isJsonFile)
+                    .sorted(Comparator.reverseOrder())
+                    .toList()) {
+                Path normalized = path.toAbsolutePath().normalize();
+                if (!normalized.startsWith(normalizedRoot)) {
+                    throw new IOException("Refusing to delete path outside generated cache: " + path);
+                }
+                if (!keep.contains(normalized)) {
+                    Files.deleteIfExists(normalized);
+                }
+            }
+        }
     }
 
     public void reloadNpcBuilders() {
@@ -168,6 +199,11 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         }
         Files.createDirectories(output.getParent());
         Files.writeString(output, GSON.toJson(template), StandardCharsets.UTF_8);
+    }
+
+    private static boolean isJsonFile(@Nonnull Path path) {
+        Path fileName = path.getFileName();
+        return fileName != null && fileName.toString().endsWith(".json");
     }
 
     private void moveGeneratedPackToEnd(@Nonnull AssetModule assetModule) {
