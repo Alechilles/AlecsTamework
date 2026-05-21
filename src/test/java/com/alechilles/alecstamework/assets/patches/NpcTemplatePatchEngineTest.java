@@ -10,6 +10,7 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
@@ -319,6 +320,19 @@ final class NpcTemplatePatchEngineTest {
         assertTrue(patchedJson.contains("Tamework patch: validation-only state setters"));
         assertTrue(patchedJson.contains("Tamework patch: sleep transitions"));
         assertTrue(patchedJson.contains("Tamework patch: sleep state"));
+        assertStringArray(
+                exportStates(instructionByComment(result.patched(), "Tamework patch: breed pair state")),
+                "BreedPair",
+                "Idle"
+        );
+        assertStringArray(
+                exportStates(instructionByComment(result.patched(), "Tamework patch: sleep state")),
+                "Defend",
+                "Defend",
+                "Idle",
+                "Idle",
+                "Idle"
+        );
         for (JsonElement transition : result.patched().getAsJsonArray("StateTransitions")) {
             JsonObject transitionObject = transition.getAsJsonObject();
             assertTrue(transitionObject.has("States"), "StateTransition is missing States: " + transitionObject);
@@ -330,6 +344,28 @@ final class NpcTemplatePatchEngineTest {
 
     private static NpcTemplatePatchDefinition patch(String json) {
         return NpcTemplatePatchDefinition.parse(object(json), "TestPack", "Server/Tamework/Patches/Test.json");
+    }
+
+    private static JsonObject instructionByComment(JsonObject root, String comment) {
+        for (JsonElement instruction : root.getAsJsonArray("Instructions")) {
+            JsonObject instructionObject = instruction.getAsJsonObject();
+            if (instructionObject.has("$Comment") && comment.equals(instructionObject.get("$Comment").getAsString())) {
+                return instructionObject;
+            }
+        }
+        throw new AssertionError("Missing instruction comment " + comment);
+    }
+
+    private static JsonArray exportStates(JsonObject instruction) {
+        JsonObject component = instruction.getAsJsonArray("Instructions").get(0).getAsJsonObject();
+        return component.getAsJsonObject("Modify").getAsJsonArray("_ExportStates");
+    }
+
+    private static void assertStringArray(JsonArray actual, String... expected) {
+        assertEquals(expected.length, actual.size());
+        for (int index = 0; index < expected.length; index++) {
+            assertEquals(expected[index], actual.get(index).getAsString());
+        }
     }
 
     private static JsonObject object(String json) {

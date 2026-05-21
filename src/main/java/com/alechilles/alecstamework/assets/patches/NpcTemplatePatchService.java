@@ -44,7 +44,7 @@ public final class NpcTemplatePatchService {
             return;
         }
         plugin.getEventRegistry().register(
-                (short) (NPCPlugin.PRIORITY_LOAD_NPC - 1),
+                (short) (NPCPlugin.PRIORITY_LOAD_NPC + 1),
                 LoadAssetEvent.class,
                 this::onLoadAssets
         );

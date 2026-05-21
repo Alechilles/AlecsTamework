@@ -561,6 +561,7 @@
             "Reference": "Component_Tamework_Instruction_Breeding_Pair",
             "Modify": {
               "_ExportStates": [
+                "BreedPair",
                 "Idle"
               ]
             }
@@ -591,6 +592,7 @@
             "Reference": "Component_Tamework_Instruction_Sleep",
             "Modify": {
               "_ExportStates": [
+                "Defend",
                 "Defend",
                 "Idle",
                 "Idle",
