@@ -171,7 +171,7 @@ final class AssetPatchGeneratedPackPublisherTest {
                 tempDir,
                 generatedTemplates,
                 status
-        ));
+        ).succeeded());
 
         assertEquals(List.of("unload:Generated:staleExists=true"), reloader.events);
         assertFalse(Files.exists(staleTarget));
@@ -200,7 +200,7 @@ final class AssetPatchGeneratedPackPublisherTest {
                 tempDir,
                 Map.<String, JsonObject>of(),
                 new AssetPatchStatus()
-        ));
+        ).succeeded());
 
         assertEquals(List.of("unload:Generated:staleExists=true"), reloader.events);
         assertFalse(Files.exists(staleTarget));
@@ -228,7 +228,7 @@ final class AssetPatchGeneratedPackPublisherTest {
                 tempDir,
                 Map.<String, JsonObject>of(),
                 status
-        ));
+        ).succeeded());
 
         assertTrue(Files.exists(staleTarget));
         assertTrue(status.hasFailures());
@@ -237,27 +237,27 @@ final class AssetPatchGeneratedPackPublisherTest {
 
     @Test
     void runtimeReloadOnlyReloadsNpcBuildersAfterSuccessfulExistingPackPublication() {
-        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 false,
                 AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
                 true
         ));
-        assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 true,
                 AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
                 true
         ));
-        assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 true,
                 AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
                 true
         ));
-        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 true,
                 AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
                 false
         ));
-        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 true,
                 AssetPatchGeneratedPackPublisher.PublicationAction.MISSING_RUNTIME_PACK,
                 false

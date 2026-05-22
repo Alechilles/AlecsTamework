@@ -13,6 +13,8 @@ public final class AssetPatchStatus {
     private final List<String> skipped = new ArrayList<>();
     private final List<String> failed = new ArrayList<>();
     private final List<String> generatedTargets = new ArrayList<>();
+    private final List<String> removedGeneratedTargets = new ArrayList<>();
+    private final List<String> hotReloadedTargets = new ArrayList<>();
     private final List<String> restartRequiredTargets = new ArrayList<>();
 
     public void addApplied(@Nonnull String message) {
@@ -29,6 +31,14 @@ public final class AssetPatchStatus {
 
     public void addGeneratedTarget(@Nonnull String target) {
         generatedTargets.add(target);
+    }
+
+    public void addRemovedGeneratedTarget(@Nonnull String target) {
+        removedGeneratedTargets.add(target);
+    }
+
+    public void addHotReloadedTarget(@Nonnull String target) {
+        hotReloadedTargets.add(target);
     }
 
     public void addRestartRequiredTarget(@Nonnull String target) {
@@ -56,6 +66,16 @@ public final class AssetPatchStatus {
     }
 
     @Nonnull
+    public List<String> getRemovedGeneratedTargets() {
+        return List.copyOf(removedGeneratedTargets);
+    }
+
+    @Nonnull
+    public List<String> getHotReloadedTargets() {
+        return List.copyOf(hotReloadedTargets);
+    }
+
+    @Nonnull
     public List<String> getRestartRequiredTargets() {
         return List.copyOf(restartRequiredTargets);
     }
@@ -70,6 +90,8 @@ public final class AssetPatchStatus {
                 + " skipped=" + skipped.size()
                 + " failed=" + failed.size()
                 + " generatedTargets=" + generatedTargets.size()
+                + " removedGeneratedTargets=" + removedGeneratedTargets.size()
+                + " hotReloadedTargets=" + hotReloadedTargets.size()
                 + " restartRequiredTargets=" + restartRequiredTargets.size();
     }
 }

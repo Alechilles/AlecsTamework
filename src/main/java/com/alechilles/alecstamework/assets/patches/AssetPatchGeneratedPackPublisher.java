@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -66,9 +67,10 @@ public final class AssetPatchGeneratedPackPublisher {
         return dataDirectory.resolve(CACHE_DIRECTORY_NAME).toAbsolutePath().normalize();
     }
 
-    public boolean publish(@Nonnull Map<String, JsonObject> generatedAssets,
-                           @Nonnull AssetPatchStatus status,
-                           @Nonnull RegistrationMode registrationMode) throws IOException {
+    @Nonnull
+    public PublicationResult publish(@Nonnull Map<String, JsonObject> generatedAssets,
+                                     @Nonnull AssetPatchStatus status,
+                                     @Nonnull RegistrationMode registrationMode) throws IOException {
         AssetModule assetModule = AssetModule.get();
         if (assetModule == null) {
             throw new IOException("AssetModule unavailable.");
@@ -83,32 +85,51 @@ public final class AssetPatchGeneratedPackPublisher {
                 registrationMode
         );
         Path root = cacheRoot();
-        if (!mutateCacheForPublication(existingPack, action, root, generatedAssets, status)) {
-            return false;
+        CacheMutationResult mutation = mutateCacheForPublication(existingPack, action, root, generatedAssets, status);
+        if (!mutation.succeeded()) {
+            return new PublicationResult(false, action, existingPackPresent, Set.of(), Set.of());
         }
 
         // Live world commands must not mutate AssetModule pack registration; that can block the world thread.
         switch (action) {
             case NO_GENERATED_TEMPLATES -> {
-                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
+                return new PublicationResult(true, action, existingPackPresent, Set.of(), mutation.removedTargets());
             }
             case REFRESH_EXISTING_PACK -> {
                 moveGeneratedPackToEnd(assetModule);
-                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
+                return new PublicationResult(
+                        true,
+                        action,
+                        existingPackPresent,
+                        Set.copyOf(generatedAssets.keySet()),
+                        mutation.removedTargets()
+                );
             }
             case REGISTER_PACK -> {
                 assetModule.registerPack(generatedPackId, root, plugin.getManifest(), false);
                 moveGeneratedPackToEnd(assetModule);
-                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
+                return new PublicationResult(
+                        true,
+                        action,
+                        existingPackPresent,
+                        Set.copyOf(generatedAssets.keySet()),
+                        mutation.removedTargets()
+                );
             }
             case MISSING_RUNTIME_PACK -> {
                 status.addFailed(
                         "Generated Tamework patch pack is not registered; restart the server to register generated patches."
                 );
-                return shouldReloadNpcBuildersAfterPublication(true, action, existingPackPresent);
+                return new PublicationResult(
+                        true,
+                        action,
+                        existingPackPresent,
+                        Set.copyOf(generatedAssets.keySet()),
+                        mutation.removedTargets()
+                );
             }
         }
-        return false;
+        return new PublicationResult(false, action, existingPackPresent, Set.of(), Set.of());
     }
 
     static PublicationAction publicationAction(boolean existingPackPresent,
@@ -130,9 +151,9 @@ public final class AssetPatchGeneratedPackPublisher {
         return action == PublicationAction.REGISTER_PACK;
     }
 
-    static boolean shouldReloadNpcBuildersAfterPublication(boolean cacheMutationSucceeded,
-                                                           @Nonnull PublicationAction action,
-                                                           boolean existingPackPresent) {
+    static boolean shouldReloadRuntimeTargetsAfterPublication(boolean cacheMutationSucceeded,
+                                                              @Nonnull PublicationAction action,
+                                                              boolean existingPackPresent) {
         if (!cacheMutationSucceeded) {
             return false;
         }
@@ -140,21 +161,23 @@ public final class AssetPatchGeneratedPackPublisher {
                 || (action == PublicationAction.NO_GENERATED_TEMPLATES && existingPackPresent);
     }
 
-    boolean mutateCacheForPublication(AssetPack existingPack,
-                                      @Nonnull PublicationAction action,
-                                      @Nonnull Path root,
-                                      @Nonnull Map<String, JsonObject> generatedAssets,
-                                      @Nonnull AssetPatchStatus status) throws IOException {
+    @Nonnull
+    CacheMutationResult mutateCacheForPublication(AssetPack existingPack,
+                                                  @Nonnull PublicationAction action,
+                                                  @Nonnull Path root,
+                                                  @Nonnull Map<String, JsonObject> generatedAssets,
+                                                  @Nonnull AssetPatchStatus status) throws IOException {
         if (!unloadExistingGeneratedBuildersBeforeCacheMutation(existingPack, action, status)) {
-            return false;
+            return CacheMutationResult.failed();
         }
         prepareCache(root, action);
-        pruneStaleGeneratedFiles(root, generatedAssets.keySet());
+        Set<String> removedTargets = pruneStaleGeneratedFiles(root, generatedAssets.keySet());
+        removedTargets.forEach(status::addRemovedGeneratedTarget);
         for (Map.Entry<String, JsonObject> entry : generatedAssets.entrySet()) {
             writeAsset(root, entry.getKey(), entry.getValue());
             status.addGeneratedTarget(entry.getKey());
         }
-        return true;
+        return new CacheMutationResult(true, removedTargets);
     }
 
     boolean unloadExistingGeneratedBuildersBeforeCacheMutation(AssetPack existingPack,
@@ -181,10 +204,12 @@ public final class AssetPatchGeneratedPackPublisher {
                 || action == PublicationAction.NO_GENERATED_TEMPLATES;
     }
 
-    static void pruneStaleGeneratedFiles(@Nonnull Path root, @Nonnull Set<String> currentTargets) throws IOException {
+    @Nonnull
+    static Set<String> pruneStaleGeneratedFiles(@Nonnull Path root, @Nonnull Set<String> currentTargets)
+            throws IOException {
         Path normalizedRoot = root.toAbsolutePath().normalize();
         if (!Files.isDirectory(normalizedRoot)) {
-            return;
+            return Set.of();
         }
         Set<Path> keep = currentTargets.stream()
                 .map(AssetPatchDefinition::normalizeAssetPath)
@@ -192,6 +217,7 @@ public final class AssetPatchGeneratedPackPublisher {
                 .map(path -> path.toAbsolutePath().normalize())
                 .filter(path -> path.startsWith(normalizedRoot))
                 .collect(Collectors.toUnmodifiableSet());
+        Set<String> removedTargets = new LinkedHashSet<>();
         try (var stream = Files.walk(normalizedRoot)) {
             for (Path path : stream
                     .filter(Files::isRegularFile)
@@ -203,28 +229,25 @@ public final class AssetPatchGeneratedPackPublisher {
                     throw new IOException("Refusing to delete path outside generated cache: " + path);
                 }
                 if (!keep.contains(normalized)) {
+                    removedTargets.add(toAssetTarget(normalizedRoot, normalized));
                     Files.deleteIfExists(normalized);
                 }
             }
         }
+        return Set.copyOf(removedTargets);
     }
 
-    public void reloadNpcBuilders() {
+    @Nonnull
+    public AssetPack getGeneratedPack() throws IOException {
         AssetModule assetModule = AssetModule.get();
         if (assetModule == null) {
-            return;
+            throw new IOException("AssetModule unavailable.");
         }
         AssetPack generatedPack = assetModule.getAssetPack(generatedPackId);
         if (generatedPack == null) {
-            return;
+            throw new IOException("Generated Tamework patch pack is not registered.");
         }
-        try {
-            builderCacheReloader.load(generatedPack);
-        } catch (RuntimeException ex) {
-            plugin.getLogger().at(Level.WARNING).withCause(ex).log(
-                    "Tamework asset patches: failed to reload generated NPC builders."
-            );
-        }
+        return generatedPack;
     }
 
     private void recreateCache(@Nonnull Path root) throws IOException {
@@ -272,6 +295,11 @@ public final class AssetPatchGeneratedPackPublisher {
                 || name.endsWith(".particlespawner");
     }
 
+    @Nonnull
+    private static String toAssetTarget(@Nonnull Path root, @Nonnull Path file) {
+        return root.relativize(file).toString().replace('\\', '/');
+    }
+
     private void moveGeneratedPackToEnd(@Nonnull AssetModule assetModule) {
         var packs = assetModule.getAssetPacks();
         int currentIndex = -1;
@@ -293,6 +321,36 @@ public final class AssetPatchGeneratedPackPublisher {
         void unload(@Nonnull AssetPack generatedPack);
 
         void load(@Nonnull AssetPack generatedPack);
+    }
+
+    record PublicationResult(boolean cacheMutationSucceeded,
+                             @Nonnull PublicationAction action,
+                             boolean existingPackPresent,
+                             @Nonnull Set<String> generatedTargets,
+                             @Nonnull Set<String> removedTargets) {
+        @Nonnull
+        static PublicationResult empty() {
+            return new PublicationResult(false, PublicationAction.NO_GENERATED_TEMPLATES, false, Set.of(), Set.of());
+        }
+
+        boolean shouldReloadRuntimeTargets() {
+            return shouldReloadRuntimeTargetsAfterPublication(cacheMutationSucceeded, action, existingPackPresent);
+        }
+
+        @Nonnull
+        Set<String> affectedTargets() {
+            LinkedHashSet<String> affected = new LinkedHashSet<>();
+            affected.addAll(generatedTargets);
+            affected.addAll(removedTargets);
+            return Set.copyOf(affected);
+        }
+    }
+
+    record CacheMutationResult(boolean succeeded, @Nonnull Set<String> removedTargets) {
+        @Nonnull
+        static CacheMutationResult failed() {
+            return new CacheMutationResult(false, Set.of());
+        }
     }
 
     private static final class NpcPluginBuilderCacheReloader implements BuilderCacheReloader {

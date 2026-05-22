@@ -41,6 +41,9 @@ public final class TameworkPatchesStatusCommand extends AbstractPlayerCommand {
         AssetPatchStatus status = service.getLastStatus();
         commandContext.sender().sendMessage(Message.raw(status.summaryLine()));
         sendRows(commandContext, "Generated", status.getGeneratedTargets());
+        sendRows(commandContext, "Removed generated", status.getRemovedGeneratedTargets());
+        sendRows(commandContext, "Hot reloaded", status.getHotReloadedTargets());
+        sendRows(commandContext, "Restart required", status.getRestartRequiredTargets());
         sendRows(commandContext, "Failed", status.getFailed());
         sendRows(commandContext, "Skipped", status.getSkipped());
     }

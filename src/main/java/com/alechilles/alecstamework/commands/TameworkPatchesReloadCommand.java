@@ -17,7 +17,7 @@ import com.hypixel.hytale.server.core.universe.world.World;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 /**
- * Regenerates optional patches and reloads the generated builders.
+ * Regenerates optional patches and reloads generated targets when a safe runtime route exists.
  */
 public final class TameworkPatchesReloadCommand extends AbstractPlayerCommand {
     public TameworkPatchesReloadCommand() {
@@ -49,8 +49,13 @@ public final class TameworkPatchesReloadCommand extends AbstractPlayerCommand {
             if (status.hasFailures()) {
                 commandContext.sender().sendMessage(Message.raw("Asset patch reload reported failures. See server log."));
             }
+            if (!status.getRestartRequiredTargets().isEmpty()) {
+                commandContext.sender().sendMessage(Message.raw(
+                        "Some generated patch targets require a server restart. Use /tw patches status for details."
+                ));
+            }
         } catch (RuntimeException ex) {
-            plugin.getLogger().at(Level.WARNING).withCause(ex).log("Tamework template patch reload command failed.");
+            plugin.getLogger().at(Level.WARNING).withCause(ex).log("Tamework asset patch reload command failed.");
             commandContext.sender().sendMessage(Message.raw("Asset patch reload failed. See server log."));
         }
     }

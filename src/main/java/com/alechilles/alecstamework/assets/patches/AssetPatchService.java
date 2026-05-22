@@ -28,6 +28,7 @@ public final class AssetPatchService {
     private final AssetPatchTargetResolver targetResolver;
     private final AssetPatchEngine patchEngine;
     private final AssetPatchGeneratedPackPublisher publisher;
+    private final AssetPatchReloadCoordinator reloadCoordinator;
 
     private volatile AssetPatchStatus lastStatus = new AssetPatchStatus();
 
@@ -38,6 +39,7 @@ public final class AssetPatchService {
         this.targetResolver = new AssetPatchTargetResolver();
         this.patchEngine = new AssetPatchEngine();
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
+        this.reloadCoordinator = new AssetPatchReloadCoordinator(plugin);
     }
 
     public void registerLoadHook() {
@@ -56,8 +58,18 @@ public final class AssetPatchService {
         RegenerationResult result = regenerateAndPublish(
                 AssetPatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
         );
-        if (result.reloadNpcBuilders()) {
-            publisher.reloadNpcBuilders();
+        if (result.publicationResult().shouldReloadRuntimeTargets()) {
+            try {
+                reloadCoordinator.reloadPublishedTargets(
+                        publisher.getGeneratedPack(),
+                        result.publicationResult().affectedTargets(),
+                        result.status()
+                );
+            } catch (IOException ex) {
+                String message = "Generated Tamework patch pack could not be hot-reloaded: " + ex.getMessage();
+                result.status().addFailed(message);
+                plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
+            }
         }
         return result.status();
     }
@@ -97,7 +109,7 @@ public final class AssetPatchService {
         if (assetModule == null) {
             status.addFailed("AssetModule unavailable.");
             lastStatus = status;
-            return new RegenerationResult(status, false);
+            return new RegenerationResult(status, AssetPatchGeneratedPackPublisher.PublicationResult.empty());
         }
 
         List<AssetPatchDefinition> definitions =
@@ -114,9 +126,10 @@ public final class AssetPatchService {
             generateTarget(assetModule, entry.getKey(), entry.getValue(), generatedAssets, status);
         }
 
-        boolean reloadNpcBuilders = false;
+        AssetPatchGeneratedPackPublisher.PublicationResult publicationResult =
+                AssetPatchGeneratedPackPublisher.PublicationResult.empty();
         try {
-            reloadNpcBuilders = publisher.publish(generatedAssets, status, registrationMode);
+            publicationResult = publisher.publish(generatedAssets, status, registrationMode);
         } catch (IOException ex) {
             String message = "Failed to publish generated Tamework patch pack: " + ex.getMessage();
             status.addFailed(message);
@@ -125,10 +138,11 @@ public final class AssetPatchService {
 
         lastStatus = status;
         logStatus(status);
-        return new RegenerationResult(status, reloadNpcBuilders);
+        return new RegenerationResult(status, publicationResult);
     }
 
-    private record RegenerationResult(@Nonnull AssetPatchStatus status, boolean reloadNpcBuilders) {
+    private record RegenerationResult(@Nonnull AssetPatchStatus status,
+                                      @Nonnull AssetPatchGeneratedPackPublisher.PublicationResult publicationResult) {
     }
 
     private void generateTarget(@Nonnull AssetModule assetModule,
@@ -166,6 +180,9 @@ public final class AssetPatchService {
         source.getSkipped().forEach(target::addSkipped);
         source.getFailed().forEach(target::addFailed);
         source.getGeneratedTargets().forEach(target::addGeneratedTarget);
+        source.getRemovedGeneratedTargets().forEach(target::addRemovedGeneratedTarget);
+        source.getHotReloadedTargets().forEach(target::addHotReloadedTarget);
+        source.getRestartRequiredTargets().forEach(target::addRestartRequiredTarget);
     }
 
     private void logStatus(@Nonnull AssetPatchStatus status) {
