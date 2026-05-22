@@ -15,7 +15,6 @@
 ### Fixed
 - Optional asset patches now generate before server JSON asset validation so vanilla-safe downstream assets can receive Tamework-only actions and configs when Tamework is installed.
 - Non-`.json` JSON-like targets such as `.particlesystem` assets are now published safely into the generated patch pack.
-- Patch self-test fixtures, validation checks, generated output pruning, common-asset reload confirmation, and review hardening now produce clearer pass/fail and restart-required results.
 
 ## 2.11.0 - Optional Template Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
 
