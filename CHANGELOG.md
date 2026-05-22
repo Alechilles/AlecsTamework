@@ -5,8 +5,8 @@
 ### Added
 - Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
 - Added optional asset patches so third-party mods can keep base JSON-like assets vanilla-safe, then patch in Tamework NPC behavior, item actions, item configs, particles, projectiles, drops, and other server JSON assets only when Tamework is installed.
-- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional asset patch results, hot-reload targets with a safe runtime route, and see which generated targets still require a server restart.
-- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can generate isolated patch fixtures, exercise the live reload path, and verify which targets hot-reload or require a restart.
+- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional asset patch results, hot-reload NPC role/template targets, and see which generated targets still require a server restart.
+- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can generate isolated patch fixtures, exercise the live reload path, and verify which targets hot-reload or require a restart. NPC role/template fixtures hot-reload; item, config, particle, and common fixtures are reported as restart-required to avoid unsafe live asset-store reloads.
 - Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
 - Added spawner icon batch manifests and generator support for shared override groups, group defaults, replacement runs, excluded attachment options, and auto-framed Blockbench renders.
 

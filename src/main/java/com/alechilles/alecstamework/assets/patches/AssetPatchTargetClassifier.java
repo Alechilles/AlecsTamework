@@ -21,13 +21,13 @@ public final class AssetPatchTargetClassifier {
         if (normalized.startsWith("Server/Tamework/") && !normalized.startsWith("Server/Tamework/Patches/")) {
             return new AssetPatchTargetClassification(
                     AssetPatchTargetKind.TAMEWORK_CONFIG,
-                    AssetPatchReloadMode.TAMEWORK_CONFIG
+                    AssetPatchReloadMode.RESTART_REQUIRED
             );
         }
         if (normalized.startsWith("Server/") && isServerJsonLikeTarget(normalized)) {
             return new AssetPatchTargetClassification(
                     AssetPatchTargetKind.HYTALE_ASSET_STORE,
-                    AssetPatchReloadMode.HYTALE_ASSET_STORE
+                    AssetPatchReloadMode.RESTART_REQUIRED
             );
         }
         if (normalized.startsWith("Common/")) {

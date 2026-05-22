@@ -6,9 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import com.hypixel.hytale.assetstore.AssetPack;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
-import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -18,9 +16,7 @@ final class AssetPatchReloadCoordinatorTest {
     @Test
     void reloadsNpcRoleTargetsThroughBuilderCache(@TempDir Path tempDir) {
         RecordingNpcReloadAdapter npc = new RecordingNpcReloadAdapter();
-        RecordingAssetStoreReloadAdapter assetStore = new RecordingAssetStoreReloadAdapter(true);
-        RecordingTameworkConfigReloadAdapter tameworkConfig = new RecordingTameworkConfigReloadAdapter();
-        AssetPatchReloadCoordinator coordinator = coordinator(npc, assetStore, tameworkConfig);
+        AssetPatchReloadCoordinator coordinator = coordinator(npc);
         AssetPatchStatus status = new AssetPatchStatus();
 
         coordinator.reloadPublishedTargets(
@@ -34,12 +30,9 @@ final class AssetPatchReloadCoordinatorTest {
     }
 
     @Test
-    void reloadsItemTargetsThroughAssetStore(@TempDir Path tempDir) {
-        RecordingAssetStoreReloadAdapter assetStore = new RecordingAssetStoreReloadAdapter(true);
+    void reportsItemTargetsAsRestartRequired(@TempDir Path tempDir) {
         AssetPatchReloadCoordinator coordinator = coordinator(
-                new RecordingNpcReloadAdapter(),
-                assetStore,
-                new RecordingTameworkConfigReloadAdapter()
+                new RecordingNpcReloadAdapter()
         );
         AssetPatchStatus status = new AssetPatchStatus();
 
@@ -49,17 +42,13 @@ final class AssetPatchReloadCoordinatorTest {
                 status
         );
 
-        assertEquals(List.of("Server/Item/Items/Commands/MyCommand.json"), assetStore.targets);
-        assertEquals(List.of("Server/Item/Items/Commands/MyCommand.json"), status.getHotReloadedTargets());
+        assertEquals(List.of("Server/Item/Items/Commands/MyCommand.json"), status.getRestartRequiredTargets());
     }
 
     @Test
-    void reloadsJsonLikeParticleTargetsThroughAssetStore(@TempDir Path tempDir) {
-        RecordingAssetStoreReloadAdapter assetStore = new RecordingAssetStoreReloadAdapter(true);
+    void reportsJsonLikeParticleTargetsAsRestartRequired(@TempDir Path tempDir) {
         AssetPatchReloadCoordinator coordinator = coordinator(
-                new RecordingNpcReloadAdapter(),
-                assetStore,
-                new RecordingTameworkConfigReloadAdapter()
+                new RecordingNpcReloadAdapter()
         );
         AssetPatchStatus status = new AssetPatchStatus();
 
@@ -69,18 +58,13 @@ final class AssetPatchReloadCoordinatorTest {
                 status
         );
 
-        assertEquals(List.of("Server/Particles/Trail.particlesystem"), assetStore.targets);
-        assertEquals(List.of("Server/Particles/Trail.particlesystem"), status.getHotReloadedTargets());
+        assertEquals(List.of("Server/Particles/Trail.particlesystem"), status.getRestartRequiredTargets());
     }
 
     @Test
-    void reloadsTameworkItemFeatureConfigsAfterAssetStoreUpdate(@TempDir Path tempDir) {
-        RecordingAssetStoreReloadAdapter assetStore = new RecordingAssetStoreReloadAdapter(true);
-        RecordingTameworkConfigReloadAdapter tameworkConfig = new RecordingTameworkConfigReloadAdapter();
+    void reportsTameworkItemFeatureConfigsAsRestartRequired(@TempDir Path tempDir) {
         AssetPatchReloadCoordinator coordinator = coordinator(
-                new RecordingNpcReloadAdapter(),
-                assetStore,
-                tameworkConfig
+                new RecordingNpcReloadAdapter()
         );
         AssetPatchStatus status = new AssetPatchStatus();
 
@@ -90,19 +74,14 @@ final class AssetPatchReloadCoordinatorTest {
                 status
         );
 
-        assertEquals(List.of("Server/Tamework/Items/Spawners/TwSpawnerConfig_MyEgg.json"), assetStore.targets);
-        assertEquals(List.of(Set.of("Server/Tamework/Items/Spawners/TwSpawnerConfig_MyEgg.json")),
-                tameworkConfig.reloads);
-        assertTrue(status.getHotReloadedTargets().contains("Server/Tamework/Items/*"));
+        assertEquals(List.of("Server/Tamework/Items/Spawners/TwSpawnerConfig_MyEgg.json"),
+                status.getRestartRequiredTargets());
     }
 
     @Test
-    void reportsRestartRequiredWhenNoAssetStoreReloadRouteExists(@TempDir Path tempDir) {
-        RecordingAssetStoreReloadAdapter assetStore = new RecordingAssetStoreReloadAdapter(false);
+    void reportsRestartRequiredWithoutCallingGenericAssetStoreReload(@TempDir Path tempDir) {
         AssetPatchReloadCoordinator coordinator = coordinator(
-                new RecordingNpcReloadAdapter(),
-                assetStore,
-                new RecordingTameworkConfigReloadAdapter()
+                new RecordingNpcReloadAdapter()
         );
         AssetPatchStatus status = new AssetPatchStatus();
 
@@ -118,9 +97,7 @@ final class AssetPatchReloadCoordinatorTest {
     @Test
     void reportsCommonTargetsAsRestartRequired(@TempDir Path tempDir) {
         AssetPatchReloadCoordinator coordinator = coordinator(
-                new RecordingNpcReloadAdapter(),
-                new RecordingAssetStoreReloadAdapter(true),
-                new RecordingTameworkConfigReloadAdapter()
+                new RecordingNpcReloadAdapter()
         );
         AssetPatchStatus status = new AssetPatchStatus();
 
@@ -129,11 +106,8 @@ final class AssetPatchReloadCoordinatorTest {
         assertEquals(List.of("Common/Models/Test.blockymodel"), status.getRestartRequiredTargets());
     }
 
-    private static AssetPatchReloadCoordinator coordinator(
-            RecordingNpcReloadAdapter npc,
-            RecordingAssetStoreReloadAdapter assetStore,
-            RecordingTameworkConfigReloadAdapter tameworkConfig) {
-        return new AssetPatchReloadCoordinator(null, npc, assetStore, tameworkConfig);
+    private static AssetPatchReloadCoordinator coordinator(RecordingNpcReloadAdapter npc) {
+        return new AssetPatchReloadCoordinator(null, npc);
     }
 
     private static AssetPack pack(Path tempDir) {
@@ -146,40 +120,6 @@ final class AssetPatchReloadCoordinatorTest {
         @Override
         public void load(AssetPack generatedPack) {
             loadedPacks.add(generatedPack.getName());
-        }
-    }
-
-    private static final class RecordingAssetStoreReloadAdapter
-            implements AssetPatchReloadCoordinator.AssetStoreReloadAdapter {
-        private final boolean reloadResult;
-        private final List<String> targets = new ArrayList<>();
-
-        private RecordingAssetStoreReloadAdapter(boolean reloadResult) {
-            this.reloadResult = reloadResult;
-        }
-
-        @Override
-        public boolean reload(AssetPack generatedPack, String target) {
-            targets.add(target);
-            return reloadResult;
-        }
-    }
-
-    private static final class RecordingTameworkConfigReloadAdapter
-            implements AssetPatchReloadCoordinator.TameworkConfigReloadAdapter {
-        private final List<Set<String>> reloads = new ArrayList<>();
-
-        @Override
-        public boolean supportsItemFeatureConfig(String target) {
-            return target.startsWith("Server/Tamework/Items/Spawners/")
-                    || target.startsWith("Server/Tamework/Items/Naming/")
-                    || target.startsWith("Server/Tamework/Items/Commands/");
-        }
-
-        @Override
-        public boolean reloadItemFeatureConfigs(Collection<String> targets) {
-            reloads.add(Set.copyOf(targets));
-            return true;
         }
     }
 }

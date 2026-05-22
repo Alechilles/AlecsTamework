@@ -164,9 +164,9 @@ If startup works but spawning after reload fails:
 Check:
 
 - The base item is the patch target, not the generated output.
-- The patch inserts into the action array the item actually uses, such as `/RootItemInteraction/Actions`.
+- The patch inserts into the action array the item actually uses, such as `/Interactions/Primary/Interactions`.
 - `/tw patches status` lists the item target as generated.
-- The item target is hot-reloaded or the status output says a restart is required.
+- The status output says a restart is required, then the server has been restarted.
 - The patched action type and config id match the Tamework feature, such as `TameworkSpawn`, `TameworkCommand`, or `TameworkNameNpc`.
 
 ## Restart Required After Reload
@@ -176,12 +176,10 @@ This is expected for asset families without a known safe runtime reload path. Ta
 Known hot-reload routes:
 
 - NPC role/template targets reload through the NPC builder manager.
-- Tamework item-feature configs reload through the item-feature config path used by `/tw reloadconfig`.
-- Other server JSON-like targets reload when Hytale exposes a matching asset store.
 
-Common assets and unknown target paths require a restart.
+Item assets, Tamework config assets, particles, projectiles, drops, common assets, and unknown target paths require a restart. Tamework does not call Hytale's generic asset-store reload path from live patch commands because that path can block the world thread.
 
-`/tw patches selftest` intentionally includes one restart-required fixture so operators can confirm that restart-required reporting is working instead of being mistaken for a hot reload.
+`/tw patches selftest` intentionally includes several restart-required fixtures so operators can confirm that restart-required reporting is working instead of being mistaken for a hot reload.
 
 ## Macro Fails
 

@@ -16,30 +16,30 @@ final class AssetPatchTargetClassifierTest {
     }
 
     @Test
-    void classifiesItemTargetsAsAssetStoreReloadable() {
+    void classifiesItemTargetsAsRestartRequired() {
         AssetPatchTargetClassification result =
                 AssetPatchTargetClassifier.classify("Server/Item/Items/Commands/MyCommand.json");
 
         assertEquals(AssetPatchTargetKind.HYTALE_ASSET_STORE, result.kind());
-        assertEquals(AssetPatchReloadMode.HYTALE_ASSET_STORE, result.reloadMode());
+        assertEquals(AssetPatchReloadMode.RESTART_REQUIRED, result.reloadMode());
     }
 
     @Test
-    void classifiesTameworkConfigTargetsAsTameworkConfig() {
+    void classifiesTameworkConfigTargetsAsRestartRequired() {
         AssetPatchTargetClassification result =
                 AssetPatchTargetClassifier.classify("Server/Tamework/Items/Commands/MyCommandConfig.json");
 
         assertEquals(AssetPatchTargetKind.TAMEWORK_CONFIG, result.kind());
-        assertEquals(AssetPatchReloadMode.TAMEWORK_CONFIG, result.reloadMode());
+        assertEquals(AssetPatchReloadMode.RESTART_REQUIRED, result.reloadMode());
     }
 
     @Test
-    void classifiesJsonLikeParticleFilesAsAssetStoreTargets() {
+    void classifiesJsonLikeParticleFilesAsRestartRequired() {
         AssetPatchTargetClassification result =
                 AssetPatchTargetClassifier.classify("Server/Particles/MyParticle.particlesystem");
 
         assertEquals(AssetPatchTargetKind.HYTALE_ASSET_STORE, result.kind());
-        assertEquals(AssetPatchReloadMode.HYTALE_ASSET_STORE, result.reloadMode());
+        assertEquals(AssetPatchReloadMode.RESTART_REQUIRED, result.reloadMode());
     }
 
     @Test

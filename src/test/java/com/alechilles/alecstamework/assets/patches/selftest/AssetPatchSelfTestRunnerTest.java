@@ -42,8 +42,8 @@ final class AssetPatchSelfTestRunnerTest {
 
         assertTrue(result.passed());
         assertEquals(5, result.generatedCount());
-        assertEquals(2, result.hotReloadedCount());
-        assertEquals(3, result.restartRequiredCount());
+        assertEquals(1, result.hotReloadedCount());
+        assertEquals(4, result.restartRequiredCount());
         assertTrue(result.cases().stream().anyMatch(caseResult ->
                 caseResult.id().equals("npc-template")
                         && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
@@ -204,10 +204,6 @@ final class AssetPatchSelfTestRunnerTest {
                                              @Nonnull AssetPatchStatus status) {
             if (selfTestCase.expectedReloadMode() == AssetPatchReloadMode.NPC_BUILDERS) {
                 status.addHotReloadedTarget("Server/NPC/Roles/*");
-                return;
-            }
-            if (selfTestCase.expectedReloadMode() == AssetPatchReloadMode.TAMEWORK_CONFIG) {
-                status.addHotReloadedTarget("Server/Tamework/Items/*");
                 return;
             }
             status.addRestartRequiredTarget(selfTestCase.sourcePath());

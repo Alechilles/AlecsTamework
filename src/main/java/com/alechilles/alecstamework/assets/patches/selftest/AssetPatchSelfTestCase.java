@@ -336,7 +336,7 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                   ]
                                 }
                                 """,
-                        AssetPatchReloadMode.HYTALE_ASSET_STORE,
+                        AssetPatchReloadMode.RESTART_REQUIRED,
                         ReloadRequirement.HOT_RELOAD_OR_RESTART_REQUIRED,
                         List.of(
                                 checkString("/Interactions/Primary/Interactions/0/Type", "TameworkCommand"),
@@ -374,9 +374,9 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                     }
                                   ]
                                 }
-                                """,
-                        AssetPatchReloadMode.TAMEWORK_CONFIG,
-                        ReloadRequirement.REQUIRED_HOT_RELOAD,
+                        """,
+                        AssetPatchReloadMode.RESTART_REQUIRED,
+                        ReloadRequirement.HOT_RELOAD_OR_RESTART_REQUIRED,
                         List.of(
                                 checkString("/CommandList/0/Id", "SelfTest"),
                                 checkString("/CommandList/0/DisplayName", "Self Test")
@@ -416,7 +416,7 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                   ]
                                 }
                                 """,
-                        AssetPatchReloadMode.HYTALE_ASSET_STORE,
+                        AssetPatchReloadMode.RESTART_REQUIRED,
                         ReloadRequirement.HOT_RELOAD_OR_RESTART_REQUIRED,
                         List.of(check("/Spawners/0/StartDelay", "0.25"))
                 ),

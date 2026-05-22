@@ -37,7 +37,7 @@ Operators can validate the full optional-patch pipeline from a live server:
 /tw patches selftest
 ```
 
-The command writes isolated fixtures into Tamework's self-test asset pack, generates patches through the same reload path as `/tw patches reload`, and reports each target as generated successfully, hot-reloaded successfully, restart required, or failed. The fixtures cover an NPC role/template, a vanilla-safe command item patched with `TameworkCommand`, a Tamework item-feature config, a `.particlesystem` target, and a restart-required common asset target.
+The command writes isolated fixtures into Tamework's self-test asset pack, generates patches through the same reload path as `/tw patches reload`, and reports each target as generated successfully, hot-reloaded successfully, restart required, or failed. The fixtures cover an NPC role/template, a vanilla-safe command item patched with `TameworkCommand`, a Tamework item-feature config, a `.particlesystem` target, and a common asset target. NPC role/template fixtures hot-reload; the other fixture families are expected to report restart-required.
 
 Clean up the fixtures after testing:
 
@@ -82,6 +82,6 @@ Tamework includes a bundled NPC fixture at `Server/NPC/Roles/_Core/Templates/Tam
 
 ## Diagnostics
 
-Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Use `/tw patches selftest` when you need an end-to-end live check of generation and reload classification. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart.
+Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Use `/tw patches selftest` when you need an end-to-end live check of generation and reload classification. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart. Runtime hot reload is currently limited to NPC role/template targets; item assets, particles, projectiles, drops, and Tamework config patches are generated for the next server start.
 
 If a required anchor is missing, Tamework logs the patch id, operation id, target, and failure reason. The failed target is not published as a partial generated asset.
