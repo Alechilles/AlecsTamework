@@ -106,6 +106,38 @@ class TwBreedingConfigInheritanceTest {
     }
 
     @Test
+    void offspringLifecycleRoleInheritanceInheritsMissingNestedKeys() throws Exception {
+        TwBreedingConfig parent = new TwBreedingConfig();
+        TwBreedingConfig child = new TwBreedingConfig();
+
+        TwBreedingConfig.OffspringLifecycleSettings parentLifecycle =
+                new TwBreedingConfig.OffspringLifecycleSettings();
+        TwBreedingConfig.OffspringLifecycleSettings childLifecycle =
+                new TwBreedingConfig.OffspringLifecycleSettings();
+        TwBreedingConfig.RoleInheritanceSettings parentInheritance =
+                new TwBreedingConfig.RoleInheritanceSettings();
+        TwBreedingConfig.RoleInheritanceSettings childInheritance =
+                new TwBreedingConfig.RoleInheritanceSettings();
+        setField(parentInheritance, "mode", TwBreedingConfig.RoleInheritanceMode.PARENT_LINE);
+        setField(parentInheritance, "parentWeight", 2.0);
+        setField(parentInheritance, "mutationChance", 0.25);
+        setField(childInheritance, "parentWeight", 4.0);
+        setField(parentLifecycle, "roleInheritance", parentInheritance);
+        setField(childLifecycle, "roleInheritance", childInheritance);
+        setField(parent, "offspringLifecycle", parentLifecycle);
+        setField(child, "offspringLifecycle", childLifecycle);
+
+        Map<String, Set<String>> nested = new HashMap<>();
+        nested.put("OffspringLifecycle", Set.of("RoleInheritance", "RoleInheritance.ParentWeight"));
+        child.inheritMissingTopLevelFrom(parent, Set.of("OffspringLifecycle"), nested);
+
+        assertEquals(TwBreedingConfig.RoleInheritanceMode.PARENT_LINE,
+                child.getOffspringLifecycle().getRoleInheritance().getMode());
+        assertEquals(4.0, child.getOffspringLifecycle().getRoleInheritance().getParentWeight(), 0.000001);
+        assertEquals(0.25, child.getOffspringLifecycle().getRoleInheritance().getMutationChance(), 0.000001);
+    }
+
+    @Test
     void genderCanBeOverriddenPerRole() throws Exception {
         TwBreedingConfig config = new TwBreedingConfig();
         TwBreedingConfig.GenderSettings gender = new TwBreedingConfig.GenderSettings();

@@ -14,15 +14,19 @@ import com.alechilles.alecstamework.npc.progression.BreedingTimeService;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.role.Role;
 import com.hypixel.hytale.server.npc.role.support.StateSupport;
+import java.util.UUID;
 import javax.annotation.Nullable;
 
 /**
  * Handles breeding interaction state changes without coupling to broader interaction orchestration.
  */
 final class InteractionBreedingEffects {
+    private static final int DEFAULT_MANUAL_SELECTION_SECONDS = 120;
+
     private final ActionTameworkInteract owner;
     private final BreedingOffspringService offspringService;
 
@@ -34,8 +38,14 @@ final class InteractionBreedingEffects {
     boolean applyStartBreeding(@Nullable BreedInteraction interaction,
                                @Nullable Ref<EntityStore> npcRef,
                                @Nullable Role role,
-                               @Nullable Store<EntityStore> store) {
+                               @Nullable Store<EntityStore> store,
+                               @Nullable Player player) {
         if (interaction == null || npcRef == null || !npcRef.isValid() || store == null) {
+            return false;
+        }
+        UUID playerUuid = player != null ? player.getUuid() : null;
+        if (playerUuid == null) {
+            owner.logDebug("TameworkInteract: breeding blocked. No interacting player UUID resolved.");
             return false;
         }
         CompanionProgressionBootstrapService.ensureProgressionComponents(npcRef, store);
@@ -49,16 +59,10 @@ final class InteractionBreedingEffects {
             owner.logDebug("TameworkInteract: no breeding component found for NPC.");
             return false;
         }
-        if (!breeding.isEnabled()) {
-            owner.logDebug("TameworkInteract: breeding blocked. NPC breeding toggle is disabled.");
-            if (breeding.isReady()) {
-                breeding.setReady(false);
-                store.putComponent(npcRef, breedingType, breeding);
-            }
-            return false;
-        }
-        long now = BreedingTimeService.resolveCurrentTimeMs(store);
-        if (breeding.isCooldownActive(now)) {
+        long breedingNowMs = BreedingTimeService.resolveCurrentTimeMs(store);
+        if (breeding.isCooldownActive(breedingNowMs)) {
+            breeding.clearManualBreedingReady();
+            store.putComponent(npcRef, breedingType, breeding);
             return false;
         }
         String roleId = CompanionRoleIdResolver.resolveRoleId(npcRef, store);
@@ -83,8 +87,9 @@ final class InteractionBreedingEffects {
                 interaction != null ? interaction.getFertilityBonus() : null
         );
         if (!BreedingEligibilityService.isEligible(effectiveHappiness, threshold)) {
-            if (breeding.isReady()) {
+            if (breeding.isReady() || breeding.getManualBreedingUntilMs() != 0L) {
                 breeding.setReady(false);
+                breeding.clearManualBreedingReady();
                 store.putComponent(npcRef, breedingType, breeding);
             }
             owner.logDebug(String.format(
@@ -95,15 +100,24 @@ final class InteractionBreedingEffects {
             ));
             return false;
         }
-        breeding.setReady(true);
-        breeding.setLastHappinessUpdateMs(now);
+        long manualSelectionUntilMs = ManualBreedingClock.nowMs() + (long) resolveManualSelectionSeconds(interaction) * 1000L;
+        breeding.markManualBreedingReady(playerUuid, manualSelectionUntilMs);
+        breeding.setLastHappinessUpdateMs(breedingNowMs);
         store.putComponent(npcRef, breedingType, breeding);
-        if (offspringService.tryCompletePairing(npcRef, store, breeding, config)) {
+        if (offspringService.tryCompleteManualPairing(npcRef, store, breeding, config, playerUuid)) {
             owner.logDebug("TameworkInteract: breeding pair matched and offspring spawn queued.");
         } else {
-            owner.logDebug("TameworkInteract: breeding ready; waiting for nearby partner.");
+            owner.logDebug("TameworkInteract: manual breeding selection marked; waiting for second selected partner.");
         }
         return true;
+    }
+
+    private int resolveManualSelectionSeconds(@Nullable BreedInteraction interaction) {
+        Integer configured = interaction != null ? interaction.getManualSelectionSeconds() : null;
+        if (configured == null || configured <= 0) {
+            return DEFAULT_MANUAL_SELECTION_SECONDS;
+        }
+        return configured;
     }
 
     private boolean passesEligibilityGates(@Nullable TwBreedingConfig config,
@@ -158,7 +172,8 @@ final class InteractionBreedingEffects {
                 : 0.0;
         return BreedingEligibilityService.resolveThreshold(
                 interaction != null ? interaction.getMinHappiness() : null,
-                fallback
+                fallback,
+                TwBreedingConfig.isHappinessRequirementEnabled(roleId)
         );
     }
 }

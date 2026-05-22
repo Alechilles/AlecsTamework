@@ -433,6 +433,52 @@ public final class TwHappinessConfig implements JsonAssetWithMap<String, Default
         return cache.get(roleId.trim().toLowerCase(Locale.ROOT));
     }
 
+    public static boolean isEnabledForRole(@Nullable String roleId) {
+        TameworkSettingsStore.GlobalOverrides overrides = resolveRuntimeOverrides();
+        if (overrides != null && overrides.happinessEnabled() != null) {
+            return overrides.happinessEnabled();
+        }
+        DefaultAssetMap<String, TwHappinessConfig> assetMap = getAssetMap();
+        if (assetMap == null || assetMap.getAssetMap() == null || assetMap.getAssetMap().isEmpty()) {
+            return true;
+        }
+        TwHappinessConfig configured = resolveConfiguredForRole(roleId, assetMap);
+        return configured == null || configured.isConfiguredEnabled();
+    }
+
+    @Nullable
+    private static TwHappinessConfig resolveConfiguredForRole(@Nullable String roleId,
+                                                              @Nonnull DefaultAssetMap<String, TwHappinessConfig> assetMap) {
+        TwHappinessConfig bestRoleMatch = null;
+        TwHappinessConfig bestRoleless = null;
+        String normalizedRoleId = roleId == null ? "" : roleId.trim().toLowerCase(Locale.ROOT);
+        for (TwHappinessConfig candidate : assetMap.getAssetMap().values()) {
+            if (candidate == null) {
+                continue;
+            }
+            String[] roleIds = candidate.getRoleIds();
+            if (roleIds.length == 0) {
+                if (shouldReplaceCandidate(candidate, bestRoleless)) {
+                    bestRoleless = candidate;
+                }
+                continue;
+            }
+            if (normalizedRoleId.isBlank()) {
+                continue;
+            }
+            for (String candidateRoleId : roleIds) {
+                if (candidateRoleId == null || candidateRoleId.isBlank()) {
+                    continue;
+                }
+                if (normalizedRoleId.equals(candidateRoleId.trim().toLowerCase(Locale.ROOT))
+                        && shouldReplaceCandidate(candidate, bestRoleMatch)) {
+                    bestRoleMatch = candidate;
+                }
+            }
+        }
+        return bestRoleMatch != null ? bestRoleMatch : bestRoleless;
+    }
+
     @Nullable
     public static TwHappinessConfig resolveById(@Nullable String configId) {
         if (configId == null || configId.isBlank()) {

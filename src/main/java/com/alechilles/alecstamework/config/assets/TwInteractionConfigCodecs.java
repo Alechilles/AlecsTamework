@@ -1776,6 +1776,13 @@ public final class TwInteractionConfigCodecs {
         )
         .documentation("Additive fertility bonus. Default: none.")
         .add()
+        .<Integer>append(
+            new KeyedCodec<>("ManualSelectionSeconds", Codec.INTEGER),
+            (entry, value) -> entry.manualSelectionSeconds = value,
+            entry -> entry.manualSelectionSeconds
+        )
+        .documentation("How long a manual Breed interaction marks this NPC as selected for that player. Default: 120 seconds.")
+        .add()
         .<RequirementGroup>append(
             new KeyedCodec<>("Requires", REQUIREMENT_GROUP_CODEC),
             (entry, value) -> entry.requires = value,

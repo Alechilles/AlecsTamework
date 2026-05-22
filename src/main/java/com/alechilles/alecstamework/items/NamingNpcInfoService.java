@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.items;
 
 import com.alechilles.alecstamework.localization.TranslationRegistry;
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.npc.NpcDisplayNameComponentService;
 import com.alechilles.alecstamework.npc.TamedStateResolver;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -107,21 +108,19 @@ public final class NamingNpcInfoService {
             return displayName;
         }
         NPCPlugin npcPlugin = NPCPlugin.get();
+        String roleNameKey = RoleNameResolver.resolveRoleNameKey(npc.getRole());
         if (npcPlugin != null) {
             int roleIndex = npc.getRoleIndex();
             if (roleIndex >= 0) {
                 String nameKey = npcPlugin.getName(roleIndex);
                 if (nameKey != null && translationRegistry != null) {
-                    String translated = translationRegistry.get(nameKey);
+                    String translated = RoleNameResolver.resolveDisplayName(
+                            nameKey,
+                            roleNameKey,
+                            translationRegistry::get
+                    );
                     if (translated != null && !translated.isBlank()) {
                         return translated;
-                    }
-                    if (!nameKey.contains(".")) {
-                        String derivedKey = "npcRoles." + nameKey + ".name";
-                        translated = translationRegistry.get(derivedKey);
-                        if (translated != null && !translated.isBlank()) {
-                            return translated;
-                        }
                     }
                 }
             }
@@ -129,8 +128,11 @@ public final class NamingNpcInfoService {
         String roleName = npc.getRoleName();
         if (roleName != null && !roleName.isBlank()) {
             if (translationRegistry != null) {
-                String derivedKey = "npcRoles." + roleName + ".name";
-                String translated = translationRegistry.get(derivedKey);
+                String translated = RoleNameResolver.resolveDisplayName(
+                        roleName,
+                        roleNameKey,
+                        translationRegistry::get
+                );
                 if (translated != null && !translated.isBlank()) {
                     return translated;
                 }

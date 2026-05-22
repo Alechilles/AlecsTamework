@@ -72,6 +72,18 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
             TameworkBreedingComponent::getLastPartnerUuid
         )
         .add()
+        .append(
+            new KeyedCodec<>("ManualBreedingPlayerUuid", new UUIDBinaryCodec()),
+            TameworkBreedingComponent::setManualBreedingPlayerUuid,
+            TameworkBreedingComponent::getManualBreedingPlayerUuid
+        )
+        .add()
+        .append(
+            new KeyedCodec<>("ManualBreedingUntilMs", Codec.LONG),
+            TameworkBreedingComponent::setManualBreedingUntilMs,
+            TameworkBreedingComponent::getManualBreedingUntilMs
+        )
+        .add()
         .build();
 
     private String configId;
@@ -83,6 +95,8 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
     private long cooldownStartedAtMs;
     private long cooldownDurationMs;
     private UUID lastPartnerUuid;
+    private UUID manualBreedingPlayerUuid;
+    private long manualBreedingUntilMs;
 
     public TameworkBreedingComponent() {
     }
@@ -115,6 +129,32 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
                                      UUID lastPartnerUuid,
                                      long cooldownStartedAtMs,
                                      long cooldownDurationMs) {
+        this(
+                configId,
+                happiness,
+                lastHappinessUpdateMs,
+                ready,
+                enabled,
+                cooldownUntilMs,
+                lastPartnerUuid,
+                cooldownStartedAtMs,
+                cooldownDurationMs,
+                null,
+                0L
+        );
+    }
+
+    public TameworkBreedingComponent(String configId,
+                                     double happiness,
+                                     long lastHappinessUpdateMs,
+                                     boolean ready,
+                                     boolean enabled,
+                                     long cooldownUntilMs,
+                                     UUID lastPartnerUuid,
+                                     long cooldownStartedAtMs,
+                                     long cooldownDurationMs,
+                                     UUID manualBreedingPlayerUuid,
+                                     long manualBreedingUntilMs) {
         this.configId = configId;
         this.happiness = happiness;
         this.lastHappinessUpdateMs = lastHappinessUpdateMs;
@@ -124,6 +164,8 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
         this.cooldownStartedAtMs = Math.max(0L, cooldownStartedAtMs);
         this.cooldownDurationMs = Math.max(0L, cooldownDurationMs);
         this.lastPartnerUuid = lastPartnerUuid;
+        this.manualBreedingPlayerUuid = manualBreedingPlayerUuid;
+        this.manualBreedingUntilMs = manualBreedingUntilMs;
     }
 
     public static ComponentType<EntityStore, TameworkBreedingComponent> getComponentType() {
@@ -203,6 +245,40 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
         this.lastPartnerUuid = lastPartnerUuid;
     }
 
+    public UUID getManualBreedingPlayerUuid() {
+        return manualBreedingPlayerUuid;
+    }
+
+    public void setManualBreedingPlayerUuid(UUID manualBreedingPlayerUuid) {
+        this.manualBreedingPlayerUuid = manualBreedingPlayerUuid;
+    }
+
+    public long getManualBreedingUntilMs() {
+        return manualBreedingUntilMs;
+    }
+
+    public void setManualBreedingUntilMs(long manualBreedingUntilMs) {
+        this.manualBreedingUntilMs = manualBreedingUntilMs;
+    }
+
+    public void markManualBreedingReady(UUID playerUuid, long untilMs) {
+        this.manualBreedingPlayerUuid = playerUuid;
+        this.manualBreedingUntilMs = untilMs;
+    }
+
+    public void clearManualBreedingReady() {
+        this.manualBreedingPlayerUuid = null;
+        this.manualBreedingUntilMs = 0L;
+    }
+
+    public boolean isManualBreedingReadyFor(UUID playerUuid, long nowMs) {
+        return playerUuid != null
+                && manualBreedingPlayerUuid != null
+                && manualBreedingUntilMs != 0L
+                && nowMs < manualBreedingUntilMs
+                && manualBreedingPlayerUuid.equals(playerUuid);
+    }
+
     public boolean isCooldownActive(long nowMs) {
         return cooldownUntilMs != 0L && nowMs < cooldownUntilMs;
     }
@@ -218,7 +294,9 @@ public final class TameworkBreedingComponent implements Component<EntityStore> {
                 cooldownUntilMs,
                 lastPartnerUuid,
                 cooldownStartedAtMs,
-                cooldownDurationMs
+                cooldownDurationMs,
+                manualBreedingPlayerUuid,
+                manualBreedingUntilMs
         );
     }
 }

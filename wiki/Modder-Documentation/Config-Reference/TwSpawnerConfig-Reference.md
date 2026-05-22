@@ -22,7 +22,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
 - Omitted top-level object sections inherit from the parent.
 - Explicit object sections inherit missing nested keys from the parent.
 - Explicit arrays and maps replace the parent value.
-- `AllowedRoles.Allowlist`, `AllowedRoles.Denylist`, `IconOverrides`, and `IconOverridesByRole` all replace the parent value when explicitly authored.
+- `AllowedRoles.Allowlist`, `AllowedRoles.Denylist`, `IconOverrides`, `IconOverridesByRole`, and `IconOverrideGroups` all replace the parent value when explicitly authored.
 
 ## Top-Level Structure
 ```json
@@ -35,6 +35,7 @@ Parent: [Config Reference](/mod/alecs-tamework/config-reference) | [Modder Docum
   "Spawn": { "...": "..." },
   "IconOverrides": [],
   "IconOverridesByRole": {},
+  "IconOverrideGroups": [],
   "TooltipMode": "Additive"
 }
 ```
@@ -93,11 +94,22 @@ Array of conditional icon overrides. Each entry supports:
 ### `IconOverridesByRole`
 Map of role id to `IconOverrides` arrays. Use it when icon rules differ per role instead of only by attachment combination.
 
+### `IconOverrideGroups`
+Ordered array of shared role groups. Use it when multiple roles should share one icon rule set.
+
+Each group supports:
+
+- `Roles`: role ids covered by the group.
+- `IconDefault`: optional default icon for roles in the group.
+- `Overrides`: attachment-based icon overrides shared by those roles.
+
+Runtime icon lookup checks exact role overrides first, then the first matching shared role group, then that group's `IconDefault`, then global overrides, then top-level `IconDefault`.
+
 ### `TooltipMode`
 Controls DynamicTooltipsLib composition when that optional integration is present.
 
 Accepted values:
-- `Additive`: append Tamework lines such as `Name` and `Role`
+- `Additive`: append Tamework lines such as `Name`, `Role`, `Gender`, and friendly attachment names from `TwAttachmentDisplayConfig`
 - `Replace`: replace the base description text with Tamework tooltip output
 
 ## Defaults and Cross-System Notes
@@ -162,11 +174,12 @@ Accepted values:
 - `EmptyItemId` is the resolution key. If two active configs target the same item, selection becomes a config-resolution problem instead of an item-authoring problem.
 - `RequireOwner` is an explicit override, not the same thing as `OwnerRestricted`.
 - Unset `RequireOwner` values are not equivalent to `false`; they defer to global ownership-requirement defaults.
-- `IconOverrides` and `IconOverridesByRole` are explicit array/map values and replace the parent content when authored in a child asset.
+- `IconOverrides`, `IconOverridesByRole`, and `IconOverrideGroups` are explicit array/map values and replace the parent content when authored in a child asset.
 - `/tw reloadconfig` is required after editing spawner configs during development.
 
 ## Related Pages
 - [Spawner System Guide](/mod/alecs-tamework/spawner-system-guide)
+- [Spawner Icon Generation](/mod/alecs-tamework/spawner-icon-generation)
 - [TwNameItemConfig Reference](/mod/alecs-tamework/twnameitemconfig-reference)
 - [TwCommandItemConfig Reference](/mod/alecs-tamework/twcommanditemconfig-reference)
 

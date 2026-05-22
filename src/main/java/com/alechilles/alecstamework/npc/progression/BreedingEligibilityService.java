@@ -17,6 +17,15 @@ public final class BreedingEligibilityService {
         return Double.isFinite(fallbackThreshold) ? fallbackThreshold : 0.0;
     }
 
+    public static double resolveThreshold(@Nullable Double interactionMinHappiness,
+                                          double fallbackThreshold,
+                                          boolean happinessRequirementEnabled) {
+        if (!happinessRequirementEnabled) {
+            return 0.0;
+        }
+        return resolveThreshold(interactionMinHappiness, fallbackThreshold);
+    }
+
     public static double resolveEffectiveHappiness(double baseHappiness,
                                                    double fertilityMultiplier,
                                                    @Nullable Double fertilityBonus) {

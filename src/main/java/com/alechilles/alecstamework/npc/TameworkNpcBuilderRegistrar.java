@@ -19,6 +19,9 @@ import com.alechilles.alecstamework.npc.actions.BuilderActionTameworkSetTamed;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttackedTargetSlotRecently;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkAttitudeFromTargetSlot;
 import com.alechilles.alecstamework.npc.filters.builders.BuilderEntityFilterTameworkIsOwner;
+import com.alechilles.alecstamework.npc.movement.BuilderBodyMotionTameworkRide;
+import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkFly;
+import com.alechilles.alecstamework.npc.movement.BuilderMotionControllerTameworkRideWalk;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkEffectActive;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHasOwner;
 import com.alechilles.alecstamework.npc.sensors.builders.BuilderSensorTameworkHook;
@@ -33,7 +36,9 @@ import com.hypixel.hytale.server.npc.NPCPlugin;
 import com.hypixel.hytale.server.npc.asset.builder.BuilderFactory;
 import com.hypixel.hytale.server.npc.corecomponents.IEntityFilter;
 import com.hypixel.hytale.server.npc.instructions.Action;
+import com.hypixel.hytale.server.npc.instructions.BodyMotion;
 import com.hypixel.hytale.server.npc.instructions.Sensor;
+import com.hypixel.hytale.server.npc.movement.controllers.MotionController;
 
 /**
  * Registers Tamework NPC action/sensor/filter builders once NPCPlugin is ready.
@@ -135,6 +140,30 @@ public final class TameworkNpcBuilderRegistrar {
                     BuilderEntityFilterTameworkAttackedTargetSlotRecently::new
             );
             filterFactory.add(BuilderEntityFilterTameworkIsOwner.BUILDER_ID, BuilderEntityFilterTameworkIsOwner::new);
+        }
+
+        BuilderFactory<BodyMotion> bodyMotionFactory = npcPlugin.getBuilderManager().getFactory(BodyMotion.class);
+        if (bodyMotionFactory == null) {
+            plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Body motion factory missing.");
+        } else {
+            plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Body motion factory ready.");
+            bodyMotionFactory.add(BuilderBodyMotionTameworkRide.BUILDER_ID, BuilderBodyMotionTameworkRide::new);
+        }
+
+        BuilderFactory<MotionController> motionControllerFactory =
+                npcPlugin.getBuilderManager().getFactory(MotionController.class);
+        if (motionControllerFactory == null) {
+            plugin.getLogger().at(Level.WARNING).log("Tamework NPC builder registration: Motion controller factory missing.");
+        } else {
+            plugin.getLogger().at(Level.INFO).log("Tamework NPC builder registration: Motion controller factory ready.");
+            motionControllerFactory.add(
+                    BuilderMotionControllerTameworkFly.BUILDER_ID,
+                    BuilderMotionControllerTameworkFly::new
+            );
+            motionControllerFactory.add(
+                    BuilderMotionControllerTameworkRideWalk.BUILDER_ID,
+                    BuilderMotionControllerTameworkRideWalk::new
+            );
         }
 
         npcActionsRegistered = true;

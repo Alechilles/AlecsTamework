@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.items;
 
+import com.alechilles.alecstamework.localization.RoleNameResolver;
 import com.alechilles.alecstamework.ownership.OwnerNameUtil;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
@@ -303,24 +304,9 @@ final class CommandLostRecoveryService {
             return record.cachedRoleId;
         }
         if (record.cachedNameKey != null && !record.cachedNameKey.isBlank()) {
-            String nameKey = record.cachedNameKey.trim();
-            String[] prefixes = {
-                    "server.npcRole.",
-                    "npcRole.",
-                    "server.npcRoles.",
-                    "npcRoles."
-            };
-            for (String prefix : prefixes) {
-                if (!nameKey.startsWith(prefix)) {
-                    continue;
-                }
-                String remainder = nameKey.substring(prefix.length());
-                if (remainder.endsWith(".name")) {
-                    remainder = remainder.substring(0, remainder.length() - ".name".length());
-                }
-                if (!remainder.isBlank()) {
-                    return remainder;
-                }
+            String roleId = RoleNameResolver.extractRoleIdFromNameKey(record.cachedNameKey);
+            if (roleId != null && !roleId.isBlank()) {
+                return roleId;
             }
         }
         return null;

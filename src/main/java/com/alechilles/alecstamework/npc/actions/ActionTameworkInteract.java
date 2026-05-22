@@ -241,6 +241,20 @@ public class ActionTameworkInteract extends TameworkActionBase {
         return selection.selectInteractionForPrompt(config, npcRef, role, infoProvider, store, player, ctx);
     }
 
+    String describeHeldItem(InteractionContextSnapshot ctx) {
+        return selection.describeHeldItem(ctx);
+    }
+
+    String buildNoMatchSummary(TwInteractionConfig config,
+                               Ref<EntityStore> npcRef,
+                               Role role,
+                               InfoProvider infoProvider,
+                               Store<EntityStore> store,
+                               Player player,
+                               InteractionContextSnapshot ctx) {
+        return selection.buildNoMatchSummary(config, npcRef, role, infoProvider, store, player, ctx);
+    }
+
     boolean isTamed(Ref<EntityStore> npcRef, Store<EntityStore> store, InteractionContextSnapshot ctx) {
         return selection.isTamed(npcRef, store, ctx);
     }

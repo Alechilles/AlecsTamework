@@ -1,6 +1,42 @@
 # Changelog
 
-## Unreleased
+## 2.11.0 - Optional Asset Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
+
+### Added
+- Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
+- Added optional asset patches so third-party mods can keep base JSON-like assets vanilla-safe, then patch in Tamework NPC behavior, item actions, item configs, particles, projectiles, drops, and other server JSON assets only when Tamework is installed.
+- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional asset patch results, regenerate patched outputs, and see which generated targets still require a server restart.
+- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can generate isolated patch fixtures, exercise the live reload path, and verify which targets hot-reload or require a restart. The self-test now observes Hytale's generated-pack asset reload events for NPC role/template, item, Tamework config, particle, and common targets without using the unsafe synchronous asset-store reload path.
+- Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
+- Added spawner icon batch manifests and generator support for shared override groups, group defaults, replacement runs, excluded attachment options, and auto-framed Blockbench renders.
+
+### Fixed
+- Optional asset patch reloads now rely on Hytale's generated-pack watcher for NPC role/template targets instead of manually unloading and reloading generated NPC builders during `/tw patches reload`.
+- Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
+- Fixed spawner icon generation merging duplicate groups incorrectly and missing batch source assets in larger render sets.
+- Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
+
+### Removed
+- Removed the outdated Hytalor patch example assets from the bundled examples now that Tamework has its own optional asset patch system.
+
+## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
+
+### Changed
+- Updated `Glowing Purple Mushroom Spores` crafting to produce two spores per craft, letting one mushroom create two plantable seeds.
+
+## 2.10.0 - Flying Mounts (Beta), Role-Line Breeding, and Attachment Migrations - 2026-05-13
+
+### Added
+- (beta) Added a custom mounted flight controller
+- Added role-line inheritance to `TwBreedingConfig` so offspring can inherit parent body/model variants, use weighted family lines, and optionally mutate into non-parent lines.
+- Added role-scoped `TwAttachmentMigrationConfig` assets so mods can backfill newly split attachment slots from legacy stored selections without overwriting already-randomized values.
+- Added a public Trait Effects API so integrations can register custom `TwTraitConfig` effect keys and execute them during Tamework's existing trait-effect resyncs.
+- Added `Breed.ManualSelectionSeconds` for manual breeding interactions; players now manually select both intended parents, and manual breeding remains available even when passive breeding or the per-NPC breeding toggle is disabled.
+- Skipped breeding happiness thresholds for both manual and passive breeding when the happiness system or breeding happiness requirement is disabled.
+
+### Fixed
+- Fixed Tamework-managed attachment sync restoring harvestable fur/wool visuals while a harvested NPC is still on cooldown.
+- Fixed linked companion panels showing generic base-species labels when a role-specific translation exists, such as body-type cat variants.
 
 ## 2.10.0-Update5-Prerelease - Update 5 Pre-Release Compatibility - 2026-05-07
 
@@ -690,12 +726,10 @@
 ### Removed
 - Legacy Server/Tamework/Tamework_Items_Config.json item config system and per-world overrides.
 
-## 1.1.1 - Hytalor Example + Follow Component Split - 2026-02-06
+## 1.1.1 - Follow Component Split - 2026-02-06
 ### Added
-- Hytalor patch example assets (Template/Mob + patch) showing non-destructive Tamework integration.
 - New follow components split: Follow_Simple_TP (teleport/seek), Follow_Simple (basic follow), and Follow_Advanced (old IdleFollow behavior).
 - /tw gettamed and /tw settamed commands to read/flip tamed state.
-- Mount gating for tamed/owner state with crouch-based interaction (Hytalor example).
 
 ## 1.1.0 - Core Systems Update - 2026-02-03
 ### Added

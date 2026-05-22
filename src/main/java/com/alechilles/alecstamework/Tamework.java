@@ -15,12 +15,18 @@ import com.alechilles.alecstamework.api.internal.InteractionExtensionRegistry;
 import com.alechilles.alecstamework.api.internal.InteractionExtensionRuntime;
 import com.alechilles.alecstamework.api.internal.TameworkApiImpl;
 import com.alechilles.alecstamework.api.internal.TameworkEventBus;
+import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
+import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
+import com.alechilles.alecstamework.assets.patches.AssetPatchService;
+import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.NameItemRegistry;
 import com.alechilles.alecstamework.config.overrides.TwConfigOverrideManager;
+import com.alechilles.alecstamework.config.assets.TwAttachmentDisplayConfig;
+import com.alechilles.alecstamework.config.assets.TwAttachmentMigrationConfig;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.alechilles.alecstamework.config.assets.TwCompanionConfig;
@@ -91,6 +97,8 @@ import com.alechilles.alecstamework.npc.components.TameworkMountedNameplateCompo
 import com.alechilles.alecstamework.npc.components.TameworkNeedsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkNpcNameComponent;
 import com.alechilles.alecstamework.npc.components.TameworkOwnerComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideMountComponent;
+import com.alechilles.alecstamework.npc.components.TameworkRideRiderComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTalentsComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTamedComponent;
 import com.alechilles.alecstamework.npc.components.TameworkTranquilizerPeakComponent;
@@ -120,28 +128,44 @@ import com.alechilles.alecstamework.npc.systems.FlyingCompanionControlSystem;
 import com.alechilles.alecstamework.npc.systems.MountedInteractableSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedNpcTeleportSafetySystem;
 import com.alechilles.alecstamework.npc.systems.MountedOwnerReferenceSanitySystem;
+import com.alechilles.alecstamework.npc.systems.MountedRideCleanupSystem;
+import com.alechilles.alecstamework.npc.systems.MountedRideInputCaptureSystem;
+import com.alechilles.alecstamework.npc.network.MountedRidePacketHandler;
+import com.alechilles.alecstamework.npc.systems.MountedRideRiderCleanupSystem;
+import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
+import com.hypixel.hytale.assetstore.AssetMap;
+import com.hypixel.hytale.assetstore.event.AssetStoreMonitorEvent;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
 import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
+import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
+import com.hypixel.hytale.server.core.asset.common.events.CommonAssetMonitorEvent;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
+import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
+import com.hypixel.hytale.server.core.entity.movement.MovementStatesComponent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerChatEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerConnectEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerDisconnectEvent;
+import com.hypixel.hytale.server.core.io.ServerManager;
 import com.hypixel.hytale.server.core.event.events.player.PlayerInteractEvent;
 import com.hypixel.hytale.server.core.event.events.player.AddPlayerToWorldEvent;
 import com.hypixel.hytale.server.core.event.events.player.PlayerReadyEvent;
 import com.hypixel.hytale.server.core.modules.entity.component.Interactable;
+import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.modules.entity.damage.Damage;
+import com.hypixel.hytale.server.core.modules.entity.damage.DeathComponent;
+import com.hypixel.hytale.server.core.modules.entity.player.PlayerInput;
 import com.hypixel.hytale.server.core.modules.entity.teleport.Teleport;
 import com.hypixel.hytale.server.core.modules.entitystats.EntityStatMap;
 import com.hypixel.hytale.server.core.modules.interaction.interaction.config.Interaction;
@@ -166,6 +190,8 @@ public class Tamework extends JavaPlugin {
     private NameItemRegistry nameItemRegistry;
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetPackCoordinator assetPackCoordinator;
+    private AssetPatchService assetPatchService;
+    private AssetPatchSelfTestPack assetPatchSelfTestPack;
     private TwConfigOverrideManager configOverrideManager;
     private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
 
@@ -187,6 +213,7 @@ public class Tamework extends JavaPlugin {
     private TameworkApi api;
     private TameworkEventBus apiEventBus;
     private InteractionExtensionRegistry interactionExtensionRegistry;
+    private TraitEffectRegistry traitEffectRegistry;
     private ApiSelfTestFixtureManager apiSelfTestFixtureManager;
     private ApiSelfTestRunner apiSelfTestRunner;
     private TameworkNpcBuilderRegistrar npcBuilderRegistrar;
@@ -206,6 +233,8 @@ public class Tamework extends JavaPlugin {
     private boolean happinessAssetsRegistered;
     private boolean needsAssetsRegistered;
     private boolean breedingAssetsRegistered;
+    private boolean attachmentMigrationAssetsRegistered;
+    private boolean attachmentDisplayAssetsRegistered;
     private boolean levelingAssetsRegistered;
     private boolean traitAssetsRegistered;
     private boolean talentAssetsRegistered;
@@ -227,6 +256,8 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, TameworkNeedsComponent> needsComponentType;
     private ComponentType<EntityStore, TameworkBreedingComponent> breedingComponentType;
     private ComponentType<EntityStore, TameworkFlyingCompanionComponent> flyingCompanionComponentType;
+    private ComponentType<EntityStore, TameworkRideMountComponent> rideMountComponentType;
+    private ComponentType<EntityStore, TameworkRideRiderComponent> rideRiderComponentType;
     private ComponentType<EntityStore, TameworkLevelingComponent> levelingComponentType;
     private ComponentType<EntityStore, TameworkTraitsComponent> traitsComponentType;
     private ComponentType<EntityStore, TameworkTalentsComponent> talentsComponentType;
@@ -242,6 +273,7 @@ public class Tamework extends JavaPlugin {
     private volatile boolean debugSpawnerLogs;
     private volatile boolean debugSpawnerLocationLogs;
     private volatile boolean debugPromptLogs;
+    private volatile boolean debugRideLogs;
     private volatile boolean debugDespawnLogs;
     private volatile String debugDespawnRoleFilter;
     private volatile boolean debugLagLogs;
@@ -334,12 +366,16 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
+        assetPatchSelfTestPack = new AssetPatchSelfTestPack(getDataDirectory(), getManifest(), getLogger());
+        assetPatchService = new AssetPatchService(this, assetPatchSelfTestPack);
         configOverrideManager = new TwConfigOverrideManager(this);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
         npcBuilderRegistrar = new TameworkNpcBuilderRegistrar(this);
         hStatsIntegration = new TameworkHStatsIntegration(this);
         assetPackCoordinator.registerEarlyAssetPackOrderingHook();
+        assetPatchService.registerLoadHook();
+        ServerManager.get().registerSubPacketHandlers(MountedRidePacketHandler::new);
         // Register the custom item interaction used by spawner items.
         Interaction.CODEC.register("TameworkSpawn", TameworkSpawnInteraction.class, TameworkSpawnInteraction.CODEC);
         // Register the custom item interaction used by naming items.
@@ -370,12 +406,18 @@ public class Tamework extends JavaPlugin {
         registerHappinessAssets();
         registerNeedsAssets();
         registerBreedingAssets();
+        registerAttachmentMigrationAssets();
+        registerAttachmentDisplayAssets();
         registerLevelingAssets();
         registerTraitAssets();
         registerTalentAssets();
         registerDebugAssets();
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
+        getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
+        getEventRegistry().register(LoadedAssetsEvent.class, ParticleSystem.class, this::onParticleSystemAssetsLoaded);
+        getEventRegistry().register(AssetStoreMonitorEvent.class, this::onAssetStoreMonitor);
+        getEventRegistry().register(CommonAssetMonitorEvent.class, this::onCommonAssetMonitor);
         getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
@@ -438,6 +480,18 @@ public class Tamework extends JavaPlugin {
                 TameworkFlyingCompanionComponent.class,
                 "TameworkFlyingCompanion",
                 TameworkFlyingCompanionComponent.CODEC
+        );
+
+        rideMountComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkRideMountComponent.class,
+                "TameworkRideMount",
+                TameworkRideMountComponent.CODEC
+        );
+
+        rideRiderComponentType = getEntityStoreRegistry().registerComponent(
+                TameworkRideRiderComponent.class,
+                "TameworkRideRider",
+                TameworkRideRiderComponent.CODEC
         );
 
         levelingComponentType = getEntityStoreRegistry().registerComponent(
@@ -542,6 +596,52 @@ public class Tamework extends JavaPlugin {
             );
             getEntityStoreRegistry().registerSystem(new MountedInteractableSafetySystem());
         }
+        ComponentType<EntityStore, MountedComponent> mountedComponentType = resolveMountedComponentTypeOrNull();
+        if (mountedComponentType == null) {
+            getLogger().at(Level.WARNING).log(
+                    "Mount plugin mounted component type unavailable during setup; skipping Tamework ride systems."
+            );
+        } else {
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideInputCaptureSystem(
+                            mountedComponentType,
+                            PlayerInput.getComponentType(),
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            UUIDComponent.getComponentType(),
+                            MovementStatesComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideCleanupSystem(
+                            mountedComponentType,
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            UUIDComponent.getComponentType(),
+                            NPCEntity.getComponentType(),
+                            TransformComponent.getComponentType(),
+                            DeathComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideRiderFollowSystem(
+                            mountedComponentType,
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            TransformComponent.getComponentType()
+                    )
+            );
+            getEntityStoreRegistry().registerSystem(
+                    new MountedRideRiderCleanupSystem(
+                            mountedComponentType,
+                            rideRiderComponentType,
+                            rideMountComponentType,
+                            UUIDComponent.getComponentType(),
+                            NPCEntity.getComponentType(),
+                            DeathComponent.getComponentType()
+                    )
+            );
+        }
         getEntityStoreRegistry().registerSystem(
                 new NpcDebugDisplayResumeOnLoadSystem(NPCEntity.getComponentType())
         );
@@ -590,6 +690,7 @@ public class Tamework extends JavaPlugin {
         persistenceRuntime = TameworkPersistenceRuntime.initialize(runtimeDataDirectory, getLogger());
         apiEventBus = new TameworkEventBus(getLogger());
         interactionExtensionRegistry = new InteractionExtensionRegistry(getLogger());
+        traitEffectRegistry = new TraitEffectRegistry(getLogger(), persistenceRuntime.getNpcProfileRepository());
         persistenceRuntime.getNpcProfileRepository().setChangeObserver(apiEventBus);
         commandLinkedNpcStateSnapshotService = new CommandLinkedNpcStateSnapshotService(
                 persistenceRuntime.getNpcProfileRepository()
@@ -598,7 +699,8 @@ public class Tamework extends JavaPlugin {
                 persistenceRuntime,
                 apiEventBus,
                 commandLinkedNpcStateSnapshotService,
-                interactionExtensionRegistry
+                interactionExtensionRegistry,
+                traitEffectRegistry
         );
         apiSelfTestFixtureManager = new ApiSelfTestFixtureManager(persistenceRuntime);
         apiSelfTestRunner = new ApiSelfTestRunner();
@@ -915,6 +1017,7 @@ public class Tamework extends JavaPlugin {
         runtimeDataDirectory = null;
         apiSelfTestFixtureManager = null;
         apiSelfTestRunner = null;
+        assetPatchService = null;
         crashTelemetryService = null;
         settingsAnnouncementService = null;
         getLogger().at(Level.INFO).log("Alec's Tamework! has been disabled!");
@@ -1042,6 +1145,16 @@ public class Tamework extends JavaPlugin {
     }
 
     @Nullable
+    public AssetPatchService getAssetPatchService() {
+        return assetPatchService;
+    }
+
+    @Nullable
+    public AssetPatchSelfTestPack getAssetPatchSelfTestPack() {
+        return assetPatchSelfTestPack;
+    }
+
+    @Nullable
     public Path getRuntimeDataDirectory() {
         return runtimeDataDirectory;
     }
@@ -1074,6 +1187,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public InteractionExtensionRuntime getInteractionExtensionRuntime() {
         return interactionExtensionRegistry;
+    }
+
+    @Nullable
+    public TraitEffectRuntime getTraitEffectRuntime() {
+        return traitEffectRegistry;
     }
 
     @Nullable
@@ -1178,6 +1296,7 @@ public class Tamework extends JavaPlugin {
         setDebugSpawnerEnabled(commands.isSpawner());
         setDebugSpawnerLocationEnabled(commands.isSpawner());
         setDebugPromptEnabled(commands.isPrompt());
+        setDebugRideEnabled(commands.isRide());
         setDebugDespawnEnabled(commands.isDespawn());
         setDebugLagEnabled(commands.isLag());
         setDebugCoopEnabled(commands.isCoop());
@@ -1199,6 +1318,7 @@ public class Tamework extends JavaPlugin {
                         + ", spawner=" + isDebugSpawnerEnabled()
                         + ", spawnerLocation=" + isDebugSpawnerLocationEnabled()
                         + ", prompt=" + isDebugPromptEnabled()
+                        + ", ride=" + isDebugRideEnabled()
                         + ", despawn=" + isDebugDespawnEnabled()
                         + ", lag=" + isDebugLagEnabled()
                         + ", coop=" + isDebugCoopEnabled()
@@ -1465,6 +1585,54 @@ public class Tamework extends JavaPlugin {
         breedingAssetsRegistered = true;
     }
 
+    private void registerAttachmentMigrationAssets() {
+        if (attachmentMigrationAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwAttachmentMigrationConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/AttachmentMigrations")
+                        .setCodec(TwAttachmentMigrationConfig.CODEC)
+                        .setKeyFunction(TwAttachmentMigrationConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwAttachmentMigrationConfig.class,
+                this::onAttachmentMigrationAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwAttachmentMigrationConfig.class,
+                this::onAttachmentMigrationAssetsRemoved
+        );
+        attachmentMigrationAssetsRegistered = true;
+    }
+
+    private void registerAttachmentDisplayAssets() {
+        if (attachmentDisplayAssetsRegistered) {
+            return;
+        }
+        getAssetRegistry().register(
+                HytaleAssetStore.builder(TwAttachmentDisplayConfig.class, new DefaultAssetMap<>())
+                        .setPath("Tamework/AttachmentDisplays")
+                        .setCodec(TwAttachmentDisplayConfig.CODEC)
+                        .setKeyFunction(TwAttachmentDisplayConfig::getId)
+                        .build()
+        );
+        getEventRegistry().register(
+                LoadedAssetsEvent.class,
+                TwAttachmentDisplayConfig.class,
+                this::onAttachmentDisplayAssetsLoaded
+        );
+        getEventRegistry().register(
+                RemovedAssetsEvent.class,
+                TwAttachmentDisplayConfig.class,
+                this::onAttachmentDisplayAssetsRemoved
+        );
+        attachmentDisplayAssetsRegistered = true;
+    }
+
     private void registerLevelingAssets() {
         if (levelingAssetsRegistered) {
             return;
@@ -1578,6 +1746,7 @@ public class Tamework extends JavaPlugin {
     private void onCommandAssetsLoaded(
             LoadedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
+        recordAssetPatchHotReload(TwCommandItemConfig.class, event.getAssetMap(), event.getLoadedAssets().keySet());
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.COMMAND_ITEM, event.getLoadedAssets().keySet());
         }
@@ -1633,6 +1802,37 @@ public class Tamework extends JavaPlugin {
         reconcileFeedTroughWaterChargeDroplistCompat();
     }
 
+    private void onItemAssetsLoaded(
+            LoadedAssetsEvent<String, Item, DefaultAssetMap<String, Item>> event) {
+        recordAssetPatchHotReload(Item.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+    }
+
+    private void onParticleSystemAssetsLoaded(
+            LoadedAssetsEvent<String, ParticleSystem, DefaultAssetMap<String, ParticleSystem>> event) {
+        recordAssetPatchHotReload(ParticleSystem.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+    }
+
+    private void onAssetStoreMonitor(@Nonnull AssetStoreMonitorEvent event) {
+        if (assetPatchService == null || event.getAssetStore() == null) {
+            return;
+        }
+        assetPatchService.recordGeneratedAssetStoreMonitor(
+                event.getAssetStore().getAssetClass(),
+                event.getAssetPack(),
+                event.getCreatedOrModifiedFilesToLoad()
+        );
+    }
+
+    private void onCommonAssetMonitor(@Nonnull CommonAssetMonitorEvent event) {
+        if (assetPatchService == null) {
+            return;
+        }
+        assetPatchService.recordGeneratedCommonAssetMonitor(
+                event.getAssetPack(),
+                event.getCreatedOrModifiedFilesToLoad()
+        );
+    }
+
     private void onItemDropListAssetsLoaded(
             LoadedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
@@ -1641,6 +1841,14 @@ public class Tamework extends JavaPlugin {
     private void onItemDropListAssetsRemoved(
             RemovedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
+    }
+
+    private void recordAssetPatchHotReload(@Nonnull Class<?> assetClass,
+                                           @Nullable AssetMap<?, ?> assetMap,
+                                           @Nonnull Iterable<?> keys) {
+        if (assetPatchService != null) {
+            assetPatchService.recordHotReloadedAssets(assetClass, assetMap, keys);
+        }
     }
 
     private void reconcileTranquilizerRecipeVisibility() {
@@ -1759,6 +1967,42 @@ public class Tamework extends JavaPlugin {
         TwBreedingConfig.clearRoleCache();
         CompanionHappinessModifierService.clearCache();
         emitExperimentalConfigReload(TameworkConfigFamily.BREEDING, event.getRemovedAssets());
+    }
+
+    private void onAttachmentMigrationAssetsLoaded(
+            LoadedAssetsEvent<String, TwAttachmentMigrationConfig, DefaultAssetMap<String, TwAttachmentMigrationConfig>> event) {
+        TwAttachmentMigrationConfig.clearRoleCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_MIGRATION, event.getLoadedAssets().keySet());
+        }
+    }
+
+    private void onAttachmentMigrationAssetsRemoved(
+            RemovedAssetsEvent<String, TwAttachmentMigrationConfig, DefaultAssetMap<String, TwAttachmentMigrationConfig>> event) {
+        TwAttachmentMigrationConfig.clearRoleCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_MIGRATION, event.getRemovedAssets());
+    }
+
+    private void onAttachmentDisplayAssetsLoaded(
+            LoadedAssetsEvent<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> event) {
+        TwAttachmentDisplayConfig.clearCache();
+        if (!event.isInitial()) {
+            emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getLoadedAssets().keySet());
+            refreshSpawnerTooltipCache();
+        }
+    }
+
+    private void onAttachmentDisplayAssetsRemoved(
+            RemovedAssetsEvent<String, TwAttachmentDisplayConfig, DefaultAssetMap<String, TwAttachmentDisplayConfig>> event) {
+        TwAttachmentDisplayConfig.clearCache();
+        emitExperimentalConfigReload(TameworkConfigFamily.ATTACHMENT_DISPLAY, event.getRemovedAssets());
+        refreshSpawnerTooltipCache();
+    }
+
+    private void refreshSpawnerTooltipCache() {
+        if (spawnerTooltipBridge != null) {
+            spawnerTooltipBridge.refreshFromItemConfigReload();
+        }
     }
 
     private void onLevelingAssetsLoaded(
@@ -1950,6 +2194,14 @@ public class Tamework extends JavaPlugin {
         return flyingCompanionComponentType;
     }
 
+    public ComponentType<EntityStore, TameworkRideMountComponent> getRideMountComponentType() {
+        return rideMountComponentType;
+    }
+
+    public ComponentType<EntityStore, TameworkRideRiderComponent> getRideRiderComponentType() {
+        return rideRiderComponentType;
+    }
+
     public ComponentType<EntityStore, TameworkLevelingComponent> getLevelingComponentType() {
         return levelingComponentType;
     }
@@ -2048,6 +2300,20 @@ public class Tamework extends JavaPlugin {
     public boolean toggleDebugPromptEnabled() {
         debugPromptLogs = !debugPromptLogs;
         return debugPromptLogs;
+    }
+
+    public boolean isDebugRideEnabled() {
+        return debugRideLogs;
+    }
+
+    public boolean setDebugRideEnabled(boolean enabled) {
+        debugRideLogs = enabled;
+        return debugRideLogs;
+    }
+
+    public boolean toggleDebugRideEnabled() {
+        debugRideLogs = !debugRideLogs;
+        return debugRideLogs;
     }
 
     public boolean isDebugLagEnabled() {
@@ -2231,6 +2497,15 @@ public class Tamework extends JavaPlugin {
     private ComponentType<EntityStore, NPCMountComponent> resolveNpcMountComponentTypeOrNull() {
         try {
             return NPCMountComponent.getComponentType();
+        } catch (Throwable throwable) {
+            return null;
+        }
+    }
+
+    @Nullable
+    private ComponentType<EntityStore, MountedComponent> resolveMountedComponentTypeOrNull() {
+        try {
+            return MountedComponent.getComponentType();
         } catch (Throwable throwable) {
             return null;
         }

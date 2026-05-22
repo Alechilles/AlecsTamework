@@ -1,7 +1,9 @@
 package com.alechilles.alecstamework.config.assets;
 
+import com.alechilles.alecstamework.config.ItemFeatureConfig;
 import java.lang.reflect.Field;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
@@ -325,6 +327,44 @@ class TwConfigInheritanceContractTest {
         assertEquals(Boolean.TRUE, requireOwnerField.get(childCapture));
         assertEquals(3.0d, getDoubleField(childCapture, "maxDistance"), 0.00001d);
         assertSame(childByRole, getField(child, "iconOverridesByRole"));
+    }
+
+    @Test
+    void spawnerIconOverrideGroupsInheritWhenOmittedAndReplaceWhenExplicit() throws Exception {
+        TwSpawnerConfig parent = new TwSpawnerConfig();
+        TwSpawnerConfig childInherit = new TwSpawnerConfig();
+        TwSpawnerConfig childReplace = new TwSpawnerConfig();
+
+        TwSpawnerConfig.SpawnerIconOverrideGroup[] parentGroups =
+                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
+        TwSpawnerConfig.SpawnerIconOverrideGroup[] childGroups =
+                new TwSpawnerConfig.SpawnerIconOverrideGroup[] { new TwSpawnerConfig.SpawnerIconOverrideGroup() };
+        setField(parent, "iconOverrideGroups", parentGroups);
+        setField(childInherit, "iconOverrideGroups", childGroups);
+        setField(childReplace, "iconOverrideGroups", childGroups);
+
+        childInherit.inheritMissingTopLevelFrom(parent, Set.of());
+        childReplace.inheritMissingTopLevelFrom(parent, Set.of("IconOverrideGroups"));
+
+        assertSame(parentGroups, getField(childInherit, "iconOverrideGroups"));
+        assertSame(childGroups, getField(childReplace, "iconOverrideGroups"));
+    }
+
+    @Test
+    void spawnerIconOverrideGroupsMapGroupDefaultsWithoutOverrides() throws Exception {
+        TwSpawnerConfig config = new TwSpawnerConfig();
+        TwSpawnerConfig.SpawnerIconOverrideGroup group = new TwSpawnerConfig.SpawnerIconOverrideGroup();
+        setField(group, "roles", new String[] { "Cow", "Tamed_Cow" });
+        setField(group, "iconDefault", "Icons/Cow/base.png");
+        setField(config, "iconOverrideGroups", new TwSpawnerConfig.SpawnerIconOverrideGroup[] { group });
+
+        ItemFeatureConfig itemConfig = config.toItemFeatureConfig();
+
+        assertEquals(1, itemConfig.getSpawnerIconOverrideGroups().size());
+        ItemFeatureConfig.SpawnerIconOverrideGroup mapped = itemConfig.getSpawnerIconOverrideGroups().get(0);
+        assertEquals(List.of("Cow", "Tamed_Cow"), mapped.getRoles());
+        assertEquals("Icons/Cow/base.png", mapped.getIconDefault());
+        assertTrue(mapped.getOverrides().isEmpty());
     }
 
     @Test

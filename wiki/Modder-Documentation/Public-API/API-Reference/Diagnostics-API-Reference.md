@@ -1,6 +1,6 @@
 ---
 title: "Diagnostics API Reference"
-order: 11
+order: 12
 published: true
 draft: false
 ---
@@ -8,7 +8,7 @@ draft: false
 
 Parent: [API Reference](/mod/alecs-tamework/api-reference) | [Public API](/mod/alecs-tamework/public-api)
 
-> **Experimental API Contract (`0.4.0`)**
+> **Experimental API Contract (`0.5.0`)**
 > This reference tracks the current `diagnostics()` contract in `TameworkApi`.
 
 Capability: `DIAGNOSTICS`

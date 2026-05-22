@@ -11,7 +11,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - NPC action/sensor/filter builder registration (`TameworkNpcBuilderRegistrar`)
 - Optimized interaction pipeline (`TwInteractionConfig` + `TameworkInteract`)
 - Hook bridge (`TriggerNpcHook` + `TameworkHook`)
-- Companion progression (`TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, `TwTraitConfig`, lifecycle/attachment sync)
+- Companion progression (`TwHappinessConfig`, `TwNeedsConfig`, `TwBreedingConfig`, `TwTraitConfig`, lifecycle/attachment sync, attachment migrations)
 - Role-scoped companion policy (`TwCompanionConfig`) with global fallback
 - Spawner item runtime (`TwSpawnerConfig` + `TameworkSpawn` + spawner services)
 - Naming item runtime (`TwNameItemConfig` + `TameworkNameNpc` + naming services)
@@ -19,6 +19,7 @@ This document is a high-level map of how Alec's Tamework is organized and where 
 - Command relocation/death snapshot pipeline (`CommandNpcRelocationService`, `CommandLinkedNpcDeathService`, on-load relocation system)
 - Linked companions panel + command radial UI (mode/sort/filter/group management + per-row actions)
 - Managed coop runtime (`TwCoopConfig`)
+- Optional asset patch generation (`Server/Tamework/Patches`) for JSON-like server assets that should stay valid when Tamework is absent
 - Asset-set gates and tranquilizer recipe visibility reconciliation (`TwGlobalConfig.AssetSets`)
 - Metrics telemetry bootstrap + dependency forwarding (`TameworkHStatsIntegration`)
 

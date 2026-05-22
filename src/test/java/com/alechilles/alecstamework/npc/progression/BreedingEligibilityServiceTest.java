@@ -22,6 +22,18 @@ class BreedingEligibilityServiceTest {
     }
 
     @Test
+    void resolveThresholdIgnoresInteractionOverrideWhenHappinessRequirementDisabled() {
+        double threshold = BreedingEligibilityService.resolveThreshold(82.5, 70.0, false);
+        assertEquals(0.0, threshold);
+    }
+
+    @Test
+    void resolveThresholdUsesInteractionOverrideWhenHappinessRequirementEnabled() {
+        double threshold = BreedingEligibilityService.resolveThreshold(82.5, 70.0, true);
+        assertEquals(82.5, threshold);
+    }
+
+    @Test
     void resolveEffectiveHappinessAppliesMultiplierAndBonus() {
         double effective = BreedingEligibilityService.resolveEffectiveHappiness(40.0, 1.2, 10.0);
         assertEquals(58.0, effective, 0.000001);

@@ -152,7 +152,8 @@ public final class PassiveBreedingSweepService {
         double happiness = CompanionHappinessService.resolveCurrentValue(candidate.ref(), store, breeding.getHappiness());
         double threshold = BreedingEligibilityService.resolveThreshold(
                 null,
-                candidate.config().resolveHappiness(candidate.roleId()).getThreshold()
+                candidate.config().resolveHappiness(candidate.roleId()).getThreshold(),
+                TwBreedingConfig.isHappinessRequirementEnabled(candidate.roleId())
         );
         double effectiveHappiness = BreedingEligibilityService.resolveEffectiveHappiness(happiness, 1.0, null);
         return BreedingEligibilityService.isEligible(effectiveHappiness, threshold);

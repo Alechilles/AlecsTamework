@@ -56,6 +56,7 @@ final class BreedingOffspringSpawnService {
                                        @Nullable NPCPlugin npcPlugin) {
         return resolveSpawnRole(
                 baseRoleId,
+                null,
                 breedingConfig,
                 parentARoleIndex,
                 parentBRoleIndex,
@@ -74,6 +75,7 @@ final class BreedingOffspringSpawnService {
                                        double adultRoleRoll) {
         return resolveSpawnRole(
                 baseRoleId,
+                null,
                 breedingConfig,
                 parentARoleIndex,
                 parentBRoleIndex,
@@ -91,29 +93,51 @@ final class BreedingOffspringSpawnService {
                                        @Nullable NPCPlugin npcPlugin,
                                        double adultRoleRoll,
                                        double genderRoll) {
-        ResolvedSpawnRole fromBaseRole = resolveSpawnRoleFromBaseRoleId(
+        return resolveSpawnRole(
                 baseRoleId,
+                null,
+                breedingConfig,
+                parentARoleIndex,
+                parentBRoleIndex,
+                npcPlugin,
+                adultRoleRoll,
+                genderRoll
+        );
+    }
+
+    @Nullable
+    ResolvedSpawnRole resolveSpawnRole(@Nullable String parentARoleId,
+                                       @Nullable String parentBRoleId,
+                                       @Nullable TwBreedingConfig breedingConfig,
+                                       int parentARoleIndex,
+                                       int parentBRoleIndex,
+                                       @Nullable NPCPlugin npcPlugin,
+                                       double adultRoleRoll,
+                                       double genderRoll) {
+        if (npcPlugin == null) {
+            return null;
+        }
+        String resolvedParentARoleId = firstNonBlank(parentARoleId, resolveRoleIdFromIndex(parentARoleIndex, npcPlugin));
+        String resolvedParentBRoleId = firstNonBlank(parentBRoleId, resolveRoleIdFromIndex(parentBRoleIndex, npcPlugin));
+        ResolvedSpawnRole fromParentRoles = resolveSpawnRoleFromParentRoleIds(
+                resolvedParentARoleId,
+                resolvedParentBRoleId,
                 breedingConfig,
                 npcPlugin,
                 adultRoleRoll,
                 genderRoll
         );
-        if (fromBaseRole != null) {
-            return fromBaseRole;
+        if (fromParentRoles != null) {
+            return fromParentRoles;
         }
-        String parentARoleId = resolveRoleIdFromIndex(parentARoleIndex, npcPlugin);
-        ResolvedSpawnRole fromParentAIndex = resolveSpawnRoleFromBaseRoleId(
-                parentARoleId,
+        return resolveSpawnRoleFromParentRoleIds(
+                resolvedParentBRoleId,
+                resolvedParentARoleId,
                 breedingConfig,
                 npcPlugin,
                 adultRoleRoll,
                 genderRoll
         );
-        if (fromParentAIndex != null) {
-            return fromParentAIndex;
-        }
-        String parentBRoleId = resolveRoleIdFromIndex(parentBRoleIndex, npcPlugin);
-        return resolveSpawnRoleFromBaseRoleId(parentBRoleId, breedingConfig, npcPlugin, adultRoleRoll, genderRoll);
     }
 
     @Nullable
@@ -152,16 +176,28 @@ final class BreedingOffspringSpawnService {
     }
 
     @Nullable
-    private ResolvedSpawnRole resolveSpawnRoleFromBaseRoleId(@Nullable String baseRoleId,
-                                                             @Nullable TwBreedingConfig breedingConfig,
-                                                             @Nullable NPCPlugin npcPlugin,
-                                                             double adultRoleRoll,
-                                                             double genderRoll) {
-        if (baseRoleId == null || baseRoleId.isBlank() || npcPlugin == null) {
+    private ResolvedSpawnRole resolveSpawnRoleFromParentRoleIds(@Nullable String parentARoleId,
+                                                                @Nullable String parentBRoleId,
+                                                                @Nullable TwBreedingConfig breedingConfig,
+                                                                @Nullable NPCPlugin npcPlugin,
+                                                                double adultRoleRoll,
+                                                                double genderRoll) {
+        boolean hasParentA = parentARoleId != null && !parentARoleId.isBlank();
+        boolean hasParentB = parentBRoleId != null && !parentBRoleId.isBlank();
+        if ((!hasParentA && !hasParentB) || npcPlugin == null) {
             return null;
         }
         BreedingOffspringRoleResolver.OffspringRoleSelection selection =
-                roleResolver.selectOffspringRole(baseRoleId, breedingConfig, npcPlugin, adultRoleRoll, genderRoll);
+                roleResolver.selectOffspringRole(
+                        parentARoleId,
+                        parentBRoleId,
+                        breedingConfig,
+                        npcPlugin,
+                        Math.random(),
+                        Math.random(),
+                        adultRoleRoll,
+                        genderRoll
+                );
         if (selection == null || selection.roleId() == null || selection.roleId().isBlank()) {
             return null;
         }
@@ -315,6 +351,14 @@ final class BreedingOffspringSpawnService {
             return null;
         }
         return roleId;
+    }
+
+    @Nullable
+    private static String firstNonBlank(@Nullable String first, @Nullable String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second != null && !second.isBlank() ? second : null;
     }
 
     record ResolvedSpawnRole(String roleId,

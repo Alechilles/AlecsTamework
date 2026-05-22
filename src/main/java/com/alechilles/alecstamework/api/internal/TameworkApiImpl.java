@@ -27,6 +27,7 @@ import com.alechilles.alecstamework.api.TameworkApi;
 import com.alechilles.alecstamework.api.TameworkApiCapability;
 import com.alechilles.alecstamework.api.TameworkConfigReadApi;
 import com.alechilles.alecstamework.api.TameworkEventsApi;
+import com.alechilles.alecstamework.api.TraitEffectApi;
 import com.alechilles.alecstamework.api.Vector3View;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
 import com.alechilles.alecstamework.config.assets.TwBreedingConfig;
@@ -105,7 +106,7 @@ import javax.annotation.Nullable;
 
 public final class TameworkApiImpl
         implements TameworkApi, NpcProfilesApi, ProfileDataApi, TameworkConfigReadApi, PolicyApi, DiagnosticsApi {
-    static final String API_VERSION = "0.4.0";
+    static final String API_VERSION = "0.5.0";
     static final String RESERVED_NAMESPACE = "Alechilles:Tamework";
     private static final String SNAPSHOT_CAPTURE = "capture";
     private static final String SNAPSHOT_DEATH = "death";
@@ -120,6 +121,7 @@ public final class TameworkApiImpl
     private final CommandLinkedNpcStateSnapshotService stateSnapshotService;
     private final SimpleClaimsBreedingBridge simpleClaimsBridge;
     private final InteractionExtensionApi interactionExtensionApi;
+    private final TraitEffectApi traitEffectApi;
     private final CommandLinksApi commandLinksApi = new CommandLinksApi() {
         @Override
         public Optional<CommandLinkView> getByProfileId(String profileId) {
@@ -254,6 +256,7 @@ public final class TameworkApiImpl
             TameworkApiCapability.PROGRESSION_MUTATIONS,
             TameworkApiCapability.POLICY,
             TameworkApiCapability.INTERACTION_EXTENSIONS,
+            TameworkApiCapability.TRAIT_EFFECTS,
             TameworkApiCapability.PROFILE_DATA,
             TameworkApiCapability.EVENTS,
             TameworkApiCapability.CONFIG_READ,
@@ -264,7 +267,8 @@ public final class TameworkApiImpl
     public TameworkApiImpl(@Nonnull TameworkPersistenceRuntime persistenceRuntime,
                            @Nonnull TameworkEventBus eventBus,
                            @Nullable CommandLinkedNpcStateSnapshotService stateSnapshotService,
-                           @Nonnull InteractionExtensionApi interactionExtensionApi) {
+                           @Nonnull InteractionExtensionApi interactionExtensionApi,
+                           @Nonnull TraitEffectApi traitEffectApi) {
         this.persistenceRuntime = Objects.requireNonNull(persistenceRuntime);
         this.profileRepository = Objects.requireNonNull(persistenceRuntime.getNpcProfileRepository());
         this.profileDataRepository = Objects.requireNonNull(persistenceRuntime.getApiProfileDataRepository());
@@ -272,6 +276,7 @@ public final class TameworkApiImpl
         this.stateSnapshotService = stateSnapshotService;
         this.simpleClaimsBridge = SimpleClaimsBreedingBridge.initialize();
         this.interactionExtensionApi = Objects.requireNonNull(interactionExtensionApi);
+        this.traitEffectApi = Objects.requireNonNull(traitEffectApi);
     }
 
     @Override
@@ -307,6 +312,11 @@ public final class TameworkApiImpl
     @Override
     public InteractionExtensionApi interactionExtensions() {
         return interactionExtensionApi;
+    }
+
+    @Override
+    public TraitEffectApi traitEffects() {
+        return traitEffectApi;
     }
 
     @Override

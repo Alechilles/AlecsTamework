@@ -12,6 +12,8 @@ public enum TameworkConfigFamily {
     HAPPINESS,
     NEEDS,
     BREEDING,
+    ATTACHMENT_MIGRATION,
+    ATTACHMENT_DISPLAY,
     LEVELING,
     TRAIT,
     TALENT,

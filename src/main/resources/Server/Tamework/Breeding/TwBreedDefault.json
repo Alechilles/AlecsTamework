@@ -7,7 +7,7 @@
     "Mob_Tamework_Example_Vanilla",
     "Mob_Tamework_Example_Simple",
     "Mob_Tamework_Example_Simple_Vanilla",
-    "Mob_Tamework_Example_Hytalor"
+    "Mob_Tamework_Example_Patch"
   ],
   "Happiness": {
     "Threshold": 70.0
@@ -64,6 +64,17 @@
         "Families": [
           {
             "AdultRoleId": "Mob_Tamework_Example",
+            "BabyRoleId": "Mob_Tamework_Example_Baby",
+            "TimeToFullGrownMinutes": 48
+          }
+        ]
+      }
+    },
+    "Mob_Tamework_Example_Patch": {
+      "OffspringLifecycle": {
+        "Families": [
+          {
+            "AdultRoleId": "Mob_Tamework_Example_Patch",
             "BabyRoleId": "Mob_Tamework_Example_Baby",
             "TimeToFullGrownMinutes": 48
           }

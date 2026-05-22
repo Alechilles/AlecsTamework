@@ -531,6 +531,7 @@ public final class SpawnerFeatureHandler {
                 .spawnerIconDefault(baseConfig.getSpawnerIconDefault())
                 .spawnerIconOverrides(baseConfig.getSpawnerIconOverrides())
                 .spawnerIconOverridesByRole(baseConfig.getSpawnerIconOverridesByRole())
+                .spawnerIconOverrideGroups(baseConfig.getSpawnerIconOverrideGroups())
                 .spawnerTooltipMode(baseConfig.getSpawnerTooltipMode())
                 .build();
     }
@@ -597,6 +598,11 @@ public final class SpawnerFeatureHandler {
                 && !captureInfo.capturedName().name().isBlank())
                 ? captureInfo.capturedName().name()
                 : null;
+        if ((snapshotDisplayName == null || snapshotDisplayName.isBlank())
+                && captureInfo.tooltipDisplayName() != null
+                && !captureInfo.tooltipDisplayName().isBlank()) {
+            snapshotDisplayName = captureInfo.tooltipDisplayName();
+        }
         String snapshotRoleId = null;
         if (worldStore != null) {
             NPCEntity npc = worldStore.getComponent(targetRef, NPCEntity.getComponentType());
@@ -644,7 +650,9 @@ public final class SpawnerFeatureHandler {
         } else {
             updated = itemStackMetadataService.clearMetadataKey(updated, TameworkMetadataKeys.CAPTURE_ROLE_ID);
         }
+        updated = captureMetadataService.applyCaptureNameKeyMetadata(updated, captureInfo);
         updated = captureMetadataService.applyCapturedMetadata(updated, captureInfo, fullItemIcon);
+        updated = captureMetadataService.applyCapturedModelMetadata(updated, captureInfo);
         updated = captureMetadataService.applyCapturedNameMetadata(updated, captureInfo);
         updated = captureMetadataService.applyTooltipDisplayNameMetadata(updated, captureInfo);
         if (worldStore != null) {
