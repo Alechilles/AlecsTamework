@@ -8,8 +8,14 @@
 
 [![Sponsored By HytaleModding Grant Program](https://github.com/user-attachments/assets/a03709e3-445a-4e58-8ec5-591688490c5d)](https://hytalemodding.dev/en/grants)
 
+## Now Includes a Universal, Non-Destructive Asset Patcher!
+- Add, merge, and insert JSON into *any* Hytale asset at runtime
+- Supports hot-reloading
+- Inspired by Hytalor
+- [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/npc-template-patches)
+
 # Alec's Tamework!
-Alec's Tamework is a modular taming framework for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It is designed to empower artists, designers, and less technical modders who want advanced companion behavior without first building their own framework.
+Alec's Tamework is a modular NPC framework and asset patcher for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It is designed to empower artists, designers, and less technical modders who want advanced companion behavior without first building their own framework.
 
 Tamework also aims to establish a shared standard for tameable NPCs in Hytale so different mods can work on top of similar ownership, naming, command, progression, and companion-management systems instead of forcing players to learn a different workflow for every mod.
 
