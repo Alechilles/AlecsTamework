@@ -136,6 +136,9 @@ public final class AssetPatchGeneratedPackPublisher {
                                                boolean hasGeneratedAssets,
                                                @Nonnull RegistrationMode registrationMode) {
         if (!hasGeneratedAssets) {
+            if (!existingPackPresent && registrationMode == RegistrationMode.ALLOW_REGISTRATION) {
+                return PublicationAction.REGISTER_PACK;
+            }
             return PublicationAction.NO_GENERATED_ASSETS;
         }
         if (existingPackPresent) {

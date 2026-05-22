@@ -10,5 +10,6 @@ public final class TameworkPatchesCommand extends AbstractCommandCollection {
         super("patches", "Inspect and reload optional Tamework patches.");
         addSubCommand(new TameworkPatchesStatusCommand());
         addSubCommand(new TameworkPatchesReloadCommand());
+        addSubCommand(new TameworkPatchesSelfTestCommand());
     }
 }

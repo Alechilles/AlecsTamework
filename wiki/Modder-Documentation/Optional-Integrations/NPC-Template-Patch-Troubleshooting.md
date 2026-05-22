@@ -20,6 +20,14 @@ Run:
 
 Then check the server log for the patch id, operation id, target path, and failure reason.
 
+For an end-to-end live check, run:
+
+```text
+/tw patches selftest
+```
+
+This creates isolated fixtures in Tamework's self-test asset pack, applies real optional patches, and reports per-target results as generated successfully, hot-reloaded successfully, restart required, or failed. After testing, run `/tw patches selftest cleanup` to remove the fixtures and prune generated self-test outputs.
+
 ## Patch File Is Not Found
 
 Likely causes:
@@ -172,6 +180,8 @@ Known hot-reload routes:
 - Other server JSON-like targets reload when Hytale exposes a matching asset store.
 
 Common assets and unknown target paths require a restart.
+
+`/tw patches selftest` intentionally includes one restart-required fixture so operators can confirm that restart-required reporting is working instead of being mistaken for a hot reload.
 
 ## Macro Fails
 

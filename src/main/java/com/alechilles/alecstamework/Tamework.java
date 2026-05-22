@@ -19,6 +19,7 @@ import com.alechilles.alecstamework.api.internal.TraitEffectRegistry;
 import com.alechilles.alecstamework.api.internal.TraitEffectRuntime;
 import com.alechilles.alecstamework.assets.TameworkAssetPackCoordinator;
 import com.alechilles.alecstamework.assets.patches.AssetPatchService;
+import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.alechilles.alecstamework.commands.TameworkCommandRoot;
 import com.alechilles.alecstamework.config.CommandItemRegistry;
 import com.alechilles.alecstamework.config.ItemFeatureRegistry;
@@ -185,6 +186,7 @@ public class Tamework extends JavaPlugin {
     private CommandItemRegistry commandItemRegistry;
     private TameworkAssetPackCoordinator assetPackCoordinator;
     private AssetPatchService assetPatchService;
+    private AssetPatchSelfTestPack assetPatchSelfTestPack;
     private TwConfigOverrideManager configOverrideManager;
     private final Set<String> overrideInitializedScopeKeys = ConcurrentHashMap.newKeySet();
 
@@ -359,7 +361,8 @@ public class Tamework extends JavaPlugin {
         nameItemRegistry = new NameItemRegistry();
         commandItemRegistry = new CommandItemRegistry();
         assetPackCoordinator = new TameworkAssetPackCoordinator(this);
-        assetPatchService = new AssetPatchService(this);
+        assetPatchSelfTestPack = new AssetPatchSelfTestPack(getDataDirectory(), getManifest(), getLogger());
+        assetPatchService = new AssetPatchService(this, assetPatchSelfTestPack);
         configOverrideManager = new TwConfigOverrideManager(this);
         tranquilizerRecipeVisibilityService = new TranquilizerRecipeVisibilityService();
         feedTroughWaterChargeDroplistCompatService = new FeedTroughWaterChargeDroplistCompatService();
@@ -1135,6 +1138,11 @@ public class Tamework extends JavaPlugin {
     @Nullable
     public AssetPatchService getAssetPatchService() {
         return assetPatchService;
+    }
+
+    @Nullable
+    public AssetPatchSelfTestPack getAssetPatchSelfTestPack() {
+        return assetPatchSelfTestPack;
     }
 
     @Nullable

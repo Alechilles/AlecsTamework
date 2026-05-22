@@ -29,6 +29,24 @@ Runtime reload is target-specific:
 
 Targets reported as restart-required are still regenerated on disk, but they need a server restart before the generated asset takes runtime effect.
 
+## In-Game Self-Test
+
+Operators can validate the full optional-patch pipeline from a live server:
+
+```text
+/tw patches selftest
+```
+
+The command writes isolated fixtures into Tamework's self-test asset pack, generates patches through the same reload path as `/tw patches reload`, and reports each target as generated successfully, hot-reloaded successfully, restart required, or failed. The fixtures cover an NPC role/template, a vanilla-safe command item patched with `TameworkCommand`, a Tamework item-feature config, a `.particlesystem` target, and a restart-required common asset target.
+
+Clean up the fixtures after testing:
+
+```text
+/tw patches selftest cleanup
+```
+
+Cleanup removes the self-test source and patch files, regenerates/prunes generated outputs, and reports whether each generated self-test target was removed or was already absent. The self-test pack is registered during Tamework startup, so the command does not add asset packs dynamically at runtime.
+
 ## Pages
 
 - [NPC Template Patch Operations](/mod/alecs-tamework/npc-template-patch-operations): `Add`, `Merge`, `Replace`, `Remove`, `Insert`, JSON paths, anchors, and idempotency.
@@ -64,6 +82,6 @@ Tamework includes a bundled NPC fixture at `Server/NPC/Roles/_Core/Templates/Tam
 
 ## Diagnostics
 
-Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart.
+Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Use `/tw patches selftest` when you need an end-to-end live check of generation and reload classification. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart.
 
 If a required anchor is missing, Tamework logs the patch id, operation id, target, and failure reason. The failed target is not published as a partial generated asset.

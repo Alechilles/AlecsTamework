@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.assets.patches;
 
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -10,6 +11,9 @@ import java.util.stream.Collectors;
 
 import javax.annotation.Nonnull;
 
+import javax.annotation.Nullable;
+
+import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.google.gson.JsonObject;
 import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import com.hypixel.hytale.server.core.asset.AssetModule;
@@ -29,10 +33,15 @@ public final class AssetPatchService {
     private final AssetPatchEngine patchEngine;
     private final AssetPatchGeneratedPackPublisher publisher;
     private final AssetPatchReloadCoordinator reloadCoordinator;
+    private final AssetPatchSelfTestPack selfTestPack;
 
     private volatile AssetPatchStatus lastStatus = new AssetPatchStatus();
 
     public AssetPatchService(@Nonnull JavaPlugin plugin) {
+        this(plugin, null);
+    }
+
+    public AssetPatchService(@Nonnull JavaPlugin plugin, @Nullable AssetPatchSelfTestPack selfTestPack) {
         this.plugin = plugin;
         this.generatedPackId = new PluginIdentifier(plugin.getManifest()) + "_GeneratedPatches";
         this.scanner = new AssetPatchScanner(plugin.getLogger());
@@ -40,6 +49,7 @@ public final class AssetPatchService {
         this.patchEngine = new AssetPatchEngine();
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
         this.reloadCoordinator = new AssetPatchReloadCoordinator(plugin);
+        this.selfTestPack = selfTestPack;
     }
 
     public void registerLoadHook() {
@@ -84,8 +94,17 @@ public final class AssetPatchService {
         return generatedPackId;
     }
 
+    @Nonnull
+    public Path getGeneratedPatchCacheRoot() {
+        return publisher.cacheRoot();
+    }
+
     private void onLoadAssets(@Nonnull LoadAssetEvent event) {
         try {
+            AssetModule assetModule = AssetModule.get();
+            if (selfTestPack != null) {
+                selfTestPack.registerIfMissing(assetModule);
+            }
             RegenerationResult result = regenerateAndPublish(
                     AssetPatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
             );
