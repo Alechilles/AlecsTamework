@@ -45,8 +45,8 @@ final class AssetPatchSelfTestRunnerTest {
 
         assertTrue(result.passed());
         assertEquals(5, result.generatedCount());
-        assertEquals(4, result.hotReloadedCount());
-        assertEquals(1, result.restartRequiredCount());
+        assertEquals(5, result.hotReloadedCount());
+        assertEquals(0, result.restartRequiredCount());
         assertTrue(result.cases().stream().anyMatch(caseResult ->
                 caseResult.id().equals("npc-template")
                         && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
@@ -64,8 +64,8 @@ final class AssetPatchSelfTestRunnerTest {
                         && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
         ));
         assertTrue(result.cases().stream().anyMatch(caseResult ->
-                caseResult.id().equals("common-restart-required")
-                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.RESTART_REQUIRED
+                caseResult.id().equals("common-asset")
+                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
         ));
     }
 
@@ -144,7 +144,8 @@ final class AssetPatchSelfTestRunnerTest {
         private final AssetPatchEngine engine = new AssetPatchEngine();
         private Set<String> skippedCaseIds = Set.of();
         private Set<String> failedReloadCaseIds = Set.of();
-        private Set<String> observedHotReloadCaseIds = Set.of("item-action", "tamework-config", "particle-system");
+        private Set<String> observedHotReloadCaseIds =
+                Set.of("item-action", "tamework-config", "particle-system", "common-asset");
 
         private FakeReloadHandle(@Nonnull Path generatedRoot, @Nonnull AssetPatchSelfTestPack pack) {
             this.generatedRoot = generatedRoot.toAbsolutePath().normalize();

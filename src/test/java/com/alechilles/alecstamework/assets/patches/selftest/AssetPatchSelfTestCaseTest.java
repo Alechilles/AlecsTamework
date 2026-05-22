@@ -44,7 +44,7 @@ final class AssetPatchSelfTestCaseTest {
         assertTrue(ids.contains("item-action"));
         assertTrue(ids.contains("tamework-config"));
         assertTrue(ids.contains("particle-system"));
-        assertTrue(ids.contains("common-restart-required"));
+        assertTrue(ids.contains("common-asset"));
     }
 
     @Test

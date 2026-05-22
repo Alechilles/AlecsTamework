@@ -177,10 +177,11 @@ Known hot-reload routes:
 
 - NPC role/template targets reload through the NPC builder manager.
 - `/tw patches selftest` observes Hytale generated-pack reload events for item, Tamework config, and particle fixtures.
+- `/tw patches selftest` confirms common fixtures when Hytale's server-side common asset registry exposes the generated file with the expected hash. This confirms the active server registry asset, not a client acknowledgment.
 
-Common assets, unknown target paths, and target families without observed generated-pack reload events require a restart. Tamework does not call Hytale's generic asset-store reload path from live patch commands because that path can block the world thread.
+Unknown target paths and target families without observed generated-pack reload events require a restart. Tamework does not call Hytale's generic asset-store reload path from live patch commands because that path can block the world thread.
 
-`/tw patches selftest` intentionally includes a restart-required common fixture so operators can confirm that restart-required reporting is working instead of being mistaken for a hot reload.
+`/tw patches selftest` intentionally includes a common fixture so operators can confirm whether this Hytale build activates generated common assets through the normal watcher path.
 
 ## Macro Fails
 

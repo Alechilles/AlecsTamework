@@ -123,6 +123,15 @@ public final class AssetPatchService {
         hotReloadTracker.recordGeneratedAssetStoreMonitor(assetClass, assetPack, pathList);
     }
 
+    public void recordGeneratedCommonAssetMonitor(@Nullable String assetPack,
+                                                  @Nonnull Iterable<Path> paths) {
+        List<Path> pathList = new ArrayList<>();
+        for (Path path : paths) {
+            pathList.add(path);
+        }
+        hotReloadTracker.recordGeneratedCommonAssetMonitor(assetPack, pathList);
+    }
+
     @Nonnull
     public Path getGeneratedPatchCacheRoot() {
         return publisher.cacheRoot();

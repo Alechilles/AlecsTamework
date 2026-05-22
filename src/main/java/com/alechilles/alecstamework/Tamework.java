@@ -145,6 +145,7 @@ import com.hypixel.hytale.builtin.mounts.NPCMountComponent;
 import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
+import com.hypixel.hytale.server.core.asset.common.events.CommonAssetMonitorEvent;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
@@ -416,6 +417,7 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
         getEventRegistry().register(LoadedAssetsEvent.class, ParticleSystem.class, this::onParticleSystemAssetsLoaded);
         getEventRegistry().register(AssetStoreMonitorEvent.class, this::onAssetStoreMonitor);
+        getEventRegistry().register(CommonAssetMonitorEvent.class, this::onCommonAssetMonitor);
         getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
@@ -1839,6 +1841,16 @@ public class Tamework extends JavaPlugin {
         }
         assetPatchService.recordGeneratedAssetStoreMonitor(
                 event.getAssetStore().getAssetClass(),
+                event.getAssetPack(),
+                event.getCreatedOrModifiedFilesToLoad()
+        );
+    }
+
+    private void onCommonAssetMonitor(@Nonnull CommonAssetMonitorEvent event) {
+        if (assetPatchService == null) {
+            return;
+        }
+        assetPatchService.recordGeneratedCommonAssetMonitor(
                 event.getAssetPack(),
                 event.getCreatedOrModifiedFilesToLoad()
         );

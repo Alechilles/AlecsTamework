@@ -421,17 +421,17 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                         List.of(check("/Spawners/0/StartDelay", "0.25"))
                 ),
                 new AssetPatchSelfTestCase(
-                        "common-restart-required",
+                        "common-asset",
                         "Common/Tamework/SelfTest/TwPatchSelfTest_Common.json",
                         """
                                 {
                                   "PatchApplied": false
                                 }
                                 """,
-                        PATCH_ROOT + "90_CommonRestartRequired.json",
+                        PATCH_ROOT + "90_Common.json",
                         """
                                 {
-                                  "Id": "TwPatchSelfTest_CommonRestartRequired",
+                                  "Id": "TwPatchSelfTest_Common",
                                   "Target": "Common/Tamework/SelfTest/TwPatchSelfTest_Common.json",
                                   "Operations": [
                                     {
@@ -444,7 +444,7 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                 }
                                 """,
                         AssetPatchReloadMode.RESTART_REQUIRED,
-                        ReloadRequirement.RESTART_REQUIRED_EXPECTED,
+                        ReloadRequirement.HOT_RELOAD_OR_RESTART_REQUIRED,
                         List.of(check("/PatchApplied", "true"))
                 )
         );

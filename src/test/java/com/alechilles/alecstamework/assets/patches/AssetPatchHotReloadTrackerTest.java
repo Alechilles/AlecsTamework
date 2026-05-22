@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.assets.patches;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
@@ -10,8 +12,11 @@ import java.util.Map;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import com.hypixel.hytale.assetstore.AssetMap;
+import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
+import com.hypixel.hytale.server.core.asset.common.asset.FileCommonAsset;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 
@@ -96,6 +101,54 @@ final class AssetPatchHotReloadTrackerTest {
                 Duration.ZERO
         );
         assertTrue(observed.contains("Server/Particles/Tamework/TwPatchSelfTest.particlesystem"));
+    }
+
+    @Test
+    void recordsCommonAssetsOnlyAfterGeneratedFileIsActive(@TempDir Path tempDir) throws Exception {
+        AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated");
+        Path generated = tempDir.resolve(
+                "GeneratedPatches/Common/Tamework/SelfTest/TwPatchSelfTest_Common.json"
+        );
+        Files.createDirectories(generated.getParent());
+        byte[] bytes = "{\"PatchApplied\":true}".getBytes(StandardCharsets.UTF_8);
+        Files.write(generated, bytes);
+        String commonName = "Tamework/SelfTest/TwPatchSelfTest_Common.json";
+        long mark = tracker.mark();
+
+        try {
+            tracker.recordGeneratedCommonAssetMonitor("generated", List.of(generated));
+            CommonAssetRegistry.addCommonAsset("generated", new FileCommonAsset(generated, commonName, bytes));
+
+            Set<String> observed = tracker.awaitHotReloadedTargets(
+                    List.of("Common/Tamework/SelfTest/TwPatchSelfTest_Common.json"),
+                    mark,
+                    Duration.ZERO
+            );
+
+            assertEquals(Set.of("Common/Tamework/SelfTest/TwPatchSelfTest_Common.json"), observed);
+        } finally {
+            CommonAssetRegistry.removeCommonAssetByName("generated", commonName);
+        }
+    }
+
+    @Test
+    void ignoresCommonAssetsUntilRegistryActivatesGeneratedFile(@TempDir Path tempDir) throws Exception {
+        AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated");
+        Path generated = tempDir.resolve(
+                "GeneratedPatches/Common/Tamework/SelfTest/TwPatchSelfTest_Common.json"
+        );
+        Files.createDirectories(generated.getParent());
+        Files.writeString(generated, "{\"PatchApplied\":true}", StandardCharsets.UTF_8);
+        long mark = tracker.mark();
+
+        tracker.recordGeneratedCommonAssetMonitor("generated", List.of(generated));
+
+        Set<String> observed = tracker.awaitHotReloadedTargets(
+                List.of("Common/Tamework/SelfTest/TwPatchSelfTest_Common.json"),
+                mark,
+                Duration.ZERO
+        );
+        assertEquals(Set.of(), observed);
     }
 
     private static final class TestAssetMap<T extends com.hypixel.hytale.assetstore.JsonAsset<String>>

@@ -1,10 +1,15 @@
 package com.alechilles.alecstamework.assets.patches;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nonnull;
@@ -12,6 +17,9 @@ import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.config.assets.TwCommandItemConfig;
 import com.hypixel.hytale.assetstore.AssetMap;
+import com.hypixel.hytale.server.core.asset.common.CommonAsset;
+import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
+import com.hypixel.hytale.server.core.asset.common.asset.FileCommonAsset;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 
@@ -24,6 +32,7 @@ public final class AssetPatchHotReloadTracker {
     private long sequence;
     private final Set<Observation> pendingGeneratedLoads = new LinkedHashSet<>();
     private final Set<Observation> observations = new LinkedHashSet<>();
+    private final Map<String, PendingCommonObservation> pendingGeneratedCommonLoads = new LinkedHashMap<>();
 
     public AssetPatchHotReloadTracker(@Nonnull String generatedPackId) {
         this.generatedPackId = generatedPackId;
@@ -78,6 +87,32 @@ public final class AssetPatchHotReloadTracker {
         }
     }
 
+    public void recordGeneratedCommonAssetMonitor(@Nullable String assetPack,
+                                                  @Nonnull Collection<Path> paths) {
+        if (!generatedPackId.equals(assetPack) || paths.isEmpty()) {
+            return;
+        }
+        ArrayList<PendingCommonObservation> pending = new ArrayList<>();
+        for (Path path : paths) {
+            PendingCommonObservation observation = pendingCommonObservation(path);
+            if (observation != null) {
+                pending.add(observation);
+            }
+        }
+        if (pending.isEmpty()) {
+            return;
+        }
+        synchronized (lock) {
+            for (PendingCommonObservation observation : pending) {
+                pendingGeneratedCommonLoads.put(
+                        observation.target(),
+                        observation.withSequence(++sequence)
+                );
+            }
+            lock.notifyAll();
+        }
+    }
+
     @Nonnull
     public Set<String> awaitHotReloadedTargets(@Nonnull Collection<String> targets,
                                                long sinceSequence,
@@ -85,7 +120,8 @@ public final class AssetPatchHotReloadTracker {
         long deadline = System.nanoTime() + timeout.toNanos();
         LinkedHashSet<String> remaining = new LinkedHashSet<>();
         for (String target : targets) {
-            if (targetObservation(target) != null) {
+            String normalized = AssetPatchDefinition.normalizeAssetPath(target);
+            if (targetObservation(normalized) != null || isCommonTarget(normalized)) {
                 remaining.add(AssetPatchDefinition.normalizeAssetPath(target));
             }
         }
@@ -101,7 +137,7 @@ public final class AssetPatchHotReloadTracker {
                     break;
                 }
                 try {
-                    long millis = Math.max(1L, remainingNanos / 1_000_000L);
+                    long millis = Math.min(100L, Math.max(1L, remainingNanos / 1_000_000L));
                     lock.wait(millis);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
@@ -118,14 +154,22 @@ public final class AssetPatchHotReloadTracker {
         LinkedHashSet<String> observed = new LinkedHashSet<>();
         for (String target : targets) {
             TargetObservation expected = targetObservation(target);
-            if (expected == null) {
+            if (expected != null) {
+                for (Observation observation : observations) {
+                    if (observation.sequence() > sinceSequence && observation.matches(expected)) {
+                        observed.add(target);
+                        break;
+                    }
+                }
+            }
+            if (observed.contains(target)) {
                 continue;
             }
-            for (Observation observation : observations) {
-                if (observation.sequence() > sinceSequence && observation.matches(expected)) {
-                    observed.add(target);
-                    break;
-                }
+            PendingCommonObservation commonObservation = pendingGeneratedCommonLoads.get(target);
+            if (commonObservation != null
+                    && commonObservation.sequence() > sinceSequence
+                    && isGeneratedCommonActive(commonObservation)) {
+                observed.add(target);
             }
         }
         return observed;
@@ -148,6 +192,40 @@ public final class AssetPatchHotReloadTracker {
             return new TargetObservation(TwCommandItemConfig.class.getName(), key);
         }
         return null;
+    }
+
+    @Nullable
+    private static PendingCommonObservation pendingCommonObservation(@Nonnull Path path) {
+        String normalizedPath = path.toAbsolutePath().normalize().toString().replace('\\', '/');
+        String marker = "/GeneratedPatches/";
+        int generatedRoot = normalizedPath.lastIndexOf(marker);
+        if (generatedRoot < 0) {
+            marker = "GeneratedPatches/";
+            generatedRoot = normalizedPath.indexOf(marker);
+            if (generatedRoot < 0) {
+                return null;
+            }
+        }
+        String target = AssetPatchDefinition.normalizeAssetPath(normalizedPath.substring(generatedRoot + marker.length()));
+        if (!isCommonTarget(target)) {
+            return null;
+        }
+        try {
+            byte[] bytes = Files.readAllBytes(path);
+            return new PendingCommonObservation(
+                    0L,
+                    target,
+                    target.substring("Common/".length()),
+                    path.toAbsolutePath().normalize(),
+                    CommonAsset.hash(bytes)
+            );
+        } catch (IOException ex) {
+            return null;
+        }
+    }
+
+    private static boolean isCommonTarget(@Nonnull String target) {
+        return AssetPatchDefinition.normalizeAssetPath(target).startsWith("Common/");
     }
 
     @Nullable
@@ -201,6 +279,25 @@ public final class AssetPatchHotReloadTracker {
         }
     }
 
+    private static boolean isGeneratedCommonActive(@Nonnull PendingCommonObservation pending) {
+        CommonAsset asset = CommonAssetRegistry.getByName(pending.commonName());
+        if (!(asset instanceof FileCommonAsset fileAsset)) {
+            return false;
+        }
+        if (!pending.expectedHash().equals(asset.getHash())) {
+            return false;
+        }
+        Path activePath = fileAsset.getFile().toAbsolutePath().normalize();
+        if (activePath.equals(pending.generatedPath())) {
+            return true;
+        }
+        try {
+            return Files.isSameFile(activePath, pending.generatedPath());
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+
     private record Observation(long sequence, @Nonnull String assetClassName, @Nonnull String key) {
         boolean matches(@Nonnull TargetObservation expected) {
             return assetClassName.equals(expected.assetClassName()) && key.equals(expected.key());
@@ -208,5 +305,16 @@ public final class AssetPatchHotReloadTracker {
     }
 
     private record TargetObservation(@Nonnull String assetClassName, @Nonnull String key) {
+    }
+
+    private record PendingCommonObservation(long sequence,
+                                            @Nonnull String target,
+                                            @Nonnull String commonName,
+                                            @Nonnull Path generatedPath,
+                                            @Nonnull String expectedHash) {
+        @Nonnull
+        PendingCommonObservation withSequence(long newSequence) {
+            return new PendingCommonObservation(newSequence, target, commonName, generatedPath, expectedHash);
+        }
     }
 }
