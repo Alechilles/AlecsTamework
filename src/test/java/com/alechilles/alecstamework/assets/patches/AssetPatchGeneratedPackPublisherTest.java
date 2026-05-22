@@ -75,7 +75,7 @@ final class AssetPatchGeneratedPackPublisherTest {
     @Test
     void emptyGenerationDoesNotMutatePackRegistration() {
         assertEquals(
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 AssetPatchGeneratedPackPublisher.publicationAction(
                         true,
                         false,
@@ -196,7 +196,7 @@ final class AssetPatchGeneratedPackPublisherTest {
 
         assertTrue(publisher.mutateCacheForPublication(
                 generatedPack,
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 tempDir,
                 Map.<String, JsonObject>of(),
                 new AssetPatchStatus()
@@ -224,7 +224,7 @@ final class AssetPatchGeneratedPackPublisherTest {
 
         assertFalse(publisher.mutateCacheForPublication(
                 generatedPack,
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 tempDir,
                 Map.<String, JsonObject>of(),
                 status
@@ -249,12 +249,12 @@ final class AssetPatchGeneratedPackPublisherTest {
         ));
         assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 true,
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 true
         ));
         assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 true,
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 false
         ));
         assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
@@ -276,7 +276,7 @@ final class AssetPatchGeneratedPackPublisherTest {
 
         publisher.unloadExistingGeneratedBuildersBeforeCacheMutation(
                 generatedPack,
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 new AssetPatchStatus()
         );
 

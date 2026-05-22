@@ -1,11 +1,11 @@
 # Changelog
 
-## 2.11.0 - Optional Template Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
+## 2.11.0 - Optional Asset Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
 
 ### Added
 - Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
-- Added optional NPC template patches so third-party mods can ship Tamework role/template integrations without making Tamework a required dependency.
-- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional template patch results and refresh generated patch packs without restarting the server.
+- Added optional asset patches so third-party mods can keep base JSON-like assets vanilla-safe, then patch in Tamework NPC behavior, item actions, item configs, particles, projectiles, drops, and other server JSON assets only when Tamework is installed.
+- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional asset patch results, hot-reload targets with a safe runtime route, and see which generated targets still require a server restart.
 - Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
 - Added spawner icon batch manifests and generator support for shared override groups, group defaults, replacement runs, excluded attachment options, and auto-framed Blockbench renders.
 
@@ -15,7 +15,7 @@
 - Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
 
 ### Removed
-- Removed the outdated Hytalor patch example assets from the bundled examples now that Tamework has its own optional template patch system.
+- Removed the outdated Hytalor patch example assets from the bundled examples now that Tamework has its own optional asset patch system.
 
 ## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
 

@@ -6,9 +6,9 @@ draft: false
 ---
 # NPC Template Patch Troubleshooting
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [NPC Template Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
 
-Use this page when a patch does not apply, validation fails, or an NPC behaves differently after `/tw patches reload`.
+Use this page when a patch does not apply, validation fails, or a patched NPC, item, config, particle, or other JSON-like asset behaves differently after `/tw patches reload`.
 
 ## First Checks
 
@@ -141,14 +141,37 @@ Macros add their own idempotency matchers for generated branches. Raw inserts sh
 
 ## Spawn Fails After Reload
 
-Runtime reload refreshes generated patch files in place. It does not safely unregister the generated pack while the server is running, because NPC validation can still hold references to loaded builders.
+Runtime reload regenerates generated patch files in place. It does not promise that every asset family can be safely reloaded while the server is running.
 
 If startup works but spawning after reload fails:
 
 - Run `/tw patches status`.
 - Check whether the target failed during the reload run.
 - Verify the generated target still exists in the generated patch output.
+- Check whether the target is listed as restart-required.
 - Restart the server after changing target identities, target paths, or asset names.
+
+## Patched Item Still Uses Vanilla Behavior
+
+Check:
+
+- The base item is the patch target, not the generated output.
+- The patch inserts into the action array the item actually uses, such as `/RootItemInteraction/Actions`.
+- `/tw patches status` lists the item target as generated.
+- The item target is hot-reloaded or the status output says a restart is required.
+- The patched action type and config id match the Tamework feature, such as `TameworkSpawn`, `TameworkCommand`, or `TameworkNameNpc`.
+
+## Restart Required After Reload
+
+This is expected for asset families without a known safe runtime reload path. Tamework regenerates the generated file and reports the target clearly instead of pretending it took effect.
+
+Known hot-reload routes:
+
+- NPC role/template targets reload through the NPC builder manager.
+- Tamework item-feature configs reload through the item-feature config path used by `/tw reloadconfig`.
+- Other server JSON-like targets reload when Hytale exposes a matching asset store.
+
+Common assets and unknown target paths require a restart.
 
 ## Macro Fails
 

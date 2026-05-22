@@ -6,7 +6,7 @@ draft: false
 ---
 # NPC Template Patch Macros
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [NPC Template Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
 
 Macros are shortcuts for common Tamework behavior branches. They keep patch files readable, but they still need explicit placement.
 

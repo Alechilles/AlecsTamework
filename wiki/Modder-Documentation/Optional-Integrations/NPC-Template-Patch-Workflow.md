@@ -6,9 +6,11 @@ draft: false
 ---
 # NPC Template Patch Workflow
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [NPC Template Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
 
 The safest patchable template is a normal base-game template first and a Tamework template second. Build the unpatched version so it validates and plays correctly without Tamework, then add optional patches that upgrade it when Tamework is installed.
+
+The same rule applies to every optional asset patch target. Keep the base item, projectile, particle, drop table, entity effect, or Tamework config valid on its own, then let `Server/Tamework/Patches` add Tamework-only fields when the framework is present.
 
 ## 1. Keep the Base Template Valid
 
@@ -71,6 +73,30 @@ Server/Tamework/Patches/MyMod/Livestock/MyCow.json
   "Priority": 0,
   "Enabled": true,
   "Operations": []
+}
+```
+
+For item assets, target the base item and insert Tamework-only actions into the relevant action array:
+
+```json
+{
+  "Id": "MyMod_CommandItem_Tamework",
+  "Target": "Server/Item/Items/Commands/MyCommandItem.json",
+  "Operations": [
+    {
+      "Id": "add-command-action",
+      "Op": "Insert",
+      "Path": "/RootItemInteraction/Actions",
+      "Position": "End",
+      "Existing": {
+        "Type": "TameworkCommand"
+      },
+      "Value": {
+        "Type": "TameworkCommand",
+        "ConfigId": "TwCommandItem_MyCommandItem"
+      }
+    }
+  ]
 }
 ```
 
@@ -167,7 +193,8 @@ With Tamework:
 4. Spawn the NPC.
 5. Verify the Tamework behavior.
 6. Run `/tw patches reload`.
-7. Spawn again and verify there are no duplicate interactions or missing builders.
+7. Spawn or use the patched target again and verify there are no duplicate interactions, missing builders, or stale item actions.
+8. Run `/tw patches status` and check whether any generated target is listed as restart-required.
 
 ## Checklist
 
@@ -178,3 +205,4 @@ With Tamework:
 - Inserts use stable anchors instead of indexes.
 - Inserts include `Existing` unless duplication is impossible.
 - Runtime reload is tested after startup validation.
+- Restart-required targets are documented for users or server operators.

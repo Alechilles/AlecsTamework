@@ -6,7 +6,7 @@ draft: false
 ---
 # NPC Template Patch Operations
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [NPC Template Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
 
 Raw operations edit JSON directly with explicit paths and values. Use them for setup, custom branches, and anything that does not fit a macro.
 

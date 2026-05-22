@@ -38,7 +38,7 @@ public final class AssetPatchGeneratedPackPublisher {
     }
 
     enum PublicationAction {
-        NO_GENERATED_TEMPLATES,
+        NO_GENERATED_ASSETS,
         REFRESH_EXISTING_PACK,
         REGISTER_PACK,
         MISSING_RUNTIME_PACK
@@ -92,7 +92,7 @@ public final class AssetPatchGeneratedPackPublisher {
 
         // Live world commands must not mutate AssetModule pack registration; that can block the world thread.
         switch (action) {
-            case NO_GENERATED_TEMPLATES -> {
+            case NO_GENERATED_ASSETS -> {
                 return new PublicationResult(true, action, existingPackPresent, Set.of(), mutation.removedTargets());
             }
             case REFRESH_EXISTING_PACK -> {
@@ -136,7 +136,7 @@ public final class AssetPatchGeneratedPackPublisher {
                                                boolean hasGeneratedAssets,
                                                @Nonnull RegistrationMode registrationMode) {
         if (!hasGeneratedAssets) {
-            return PublicationAction.NO_GENERATED_TEMPLATES;
+            return PublicationAction.NO_GENERATED_ASSETS;
         }
         if (existingPackPresent) {
             return PublicationAction.REFRESH_EXISTING_PACK;
@@ -158,7 +158,7 @@ public final class AssetPatchGeneratedPackPublisher {
             return false;
         }
         return action == PublicationAction.REFRESH_EXISTING_PACK
-                || (action == PublicationAction.NO_GENERATED_TEMPLATES && existingPackPresent);
+                || (action == PublicationAction.NO_GENERATED_ASSETS && existingPackPresent);
     }
 
     @Nonnull
@@ -201,7 +201,7 @@ public final class AssetPatchGeneratedPackPublisher {
 
     static boolean shouldUnloadExistingBuildersBeforeCacheMutation(@Nonnull PublicationAction action) {
         return action == PublicationAction.REFRESH_EXISTING_PACK
-                || action == PublicationAction.NO_GENERATED_TEMPLATES;
+                || action == PublicationAction.NO_GENERATED_ASSETS;
     }
 
     @Nonnull
@@ -330,7 +330,7 @@ public final class AssetPatchGeneratedPackPublisher {
                              @Nonnull Set<String> removedTargets) {
         @Nonnull
         static PublicationResult empty() {
-            return new PublicationResult(false, PublicationAction.NO_GENERATED_TEMPLATES, false, Set.of(), Set.of());
+            return new PublicationResult(false, PublicationAction.NO_GENERATED_ASSETS, false, Set.of(), Set.of());
         }
 
         boolean shouldReloadRuntimeTargets() {
