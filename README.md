@@ -36,15 +36,12 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 - **Advanced extension points when needed**: bridge into custom logic through hooks and optional integrations without giving up the higher-level framework.
 
 ## What Integration Looks Like
-Integrating Tamework is usually a content-authoring workflow, not a programming workflow. In practice, modders typically:
+Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:
 
-1. Add Tamework as a dependency and include its asset pack.
-2. Copy and adapt example templates, roles, items, and config assets.
-3. Wire Tamework builders and interactions into their NPC roles and item assets.
-4. Enable the systems they want through `TwInteractionConfig`, companion policy, item configs, and progression configs.
-5. Add prompts, translations, and polish, then test the resulting NPC behavior in-game.
+- **Required dependency**: add Tamework as a dependency, include its asset pack, and wire Tamework builders, interactions, item configs, and progression configs directly into your NPC and item assets.
+- **Optional dependency**: keep your base assets vanilla-safe, then ship Tamework patches under `Server/Tamework/Patches` that add Tamework actions, configs, interactions, and other JSON-based behavior only when Tamework is installed.
 
-For many mods, that work can stay entirely in JSON and asset authoring. The full setup and implementation details live in the modder wiki.
+In both cases, most work can stay in JSON and asset authoring: copy and adapt examples, enable the systems you want through `TwInteractionConfig`, companion policy, item configs, and progression configs, then add prompts, translations, and polish. The full setup and implementation details live in the modder wiki.
 
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)
