@@ -285,7 +285,7 @@ public final class FlyingCompanionControlSystem extends TickingSystem<EntityStor
         );
         double velocityY = -easedVerticalSpeed;
 
-        role.forceVelocity(new Vector3d(velocityX, velocityY, velocityZ), (VelocityConfig) null, true);
+        role.setVelocity(new Vector3d(velocityX, velocityY, velocityZ), (VelocityConfig) null, true);
     }
 
     @Nullable

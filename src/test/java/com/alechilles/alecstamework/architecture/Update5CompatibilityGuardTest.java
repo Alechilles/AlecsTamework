@@ -43,6 +43,25 @@ class Update5CompatibilityGuardTest {
                             ".subtract("
                     ),
                     List.of()
+            ),
+            new ForbiddenUsage(
+                    "Update 5 Part 9 renamed force APIs to velocity APIs.",
+                    List.of(
+                            ".forceVelocity(",
+                            ".addForce(",
+                            ".getForce("
+                    ),
+                    List.of()
+            ),
+            new ForbiddenUsage(
+                    "Update 5 Part 9 removed unkeyed CustomUIHud APIs.",
+                    List.of(
+                            "super(playerRef)",
+                            ".setCustomHud(",
+                            ".getCustomHud()",
+                            "CustomUIHud.DEFAULT_KEY"
+                    ),
+                    List.of()
             )
     );
 

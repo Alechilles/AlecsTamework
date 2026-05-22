@@ -194,6 +194,7 @@
             </activation>
             <properties>
                 <hytale.install.path>${hytale.install.path.prerelease}</hytale.install.path>
+                <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/data/pre-release</hytale.userdata.path>
             </properties>
         </profile>
         <!-- Run the Hytale server with the plugin installed -->

@@ -75,7 +75,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     public boolean canSteer(@Nonnull Ref<EntityStore> ref, @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         return isAlive(ref, componentAccessor)
                 && role.couldBreatheCached()
-                && forceVelocity.lengthSquared() == 0.0
+                && externalVelocity.lengthSquared() == 0.0
                 && appliedVelocities.isEmpty()
                 && effectHorizontalSpeedMultiplier != 0.0;
     }
@@ -83,7 +83,7 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
     private boolean canApplyTameworkFlySteering(@Nonnull Ref<EntityStore> ref,
                                                 @Nonnull ComponentAccessor<EntityStore> componentAccessor) {
         return isAlive(ref, componentAccessor)
-                && forceVelocity.lengthSquared() == 0.0
+                && externalVelocity.lengthSquared() == 0.0
                 && appliedVelocities.isEmpty()
                 && effectHorizontalSpeedMultiplier != 0.0;
     }
@@ -101,10 +101,10 @@ public final class MotionControllerTameworkFly extends MotionControllerFly {
         currentRelativeSpeed = steering.getSpeed();
 
         if (!isAlive(ref, componentAccessor)) {
-            forceVelocity.set(0.0);
+            clearExternalVelocity();
             appliedVelocities.clear();
         }
-        if (forceVelocity.lengthSquared() != 0.0 || !appliedVelocities.isEmpty()) {
+        if (externalVelocity.lengthSquared() != 0.0 || !appliedVelocities.isEmpty()) {
             return super.computeMove(ref, role, steering, dt, translation, componentAccessor);
         }
         if (!canApplyTameworkFlySteering(ref, componentAccessor)) {
