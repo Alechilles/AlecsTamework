@@ -94,6 +94,120 @@ final class AssetPatchEngineTest {
     }
 
     @Test
+    void patchesVanillaSafeItemAssetWithTameworkCommandAction() {
+        JsonObject item = object("""
+                {
+                  "Id": "VanillaSafeCommandWhistle",
+                  "DisplayName": "Command Whistle",
+                  "RootItemInteraction": {
+                    "Actions": [
+                      { "Type": "Inspect" }
+                    ]
+                  }
+                }
+                """);
+        assertFalse(item.toString().contains("TameworkCommand"));
+        AssetPatchDefinition patch = patch("""
+                {
+                  "Id": "CommandItemActionPatch",
+                  "Target": "Server/Item/Items/Commands/Command_Whistle.json",
+                  "Operations": [
+                    {
+                      "Id": "command-action",
+                      "Op": "Insert",
+                      "Path": "/RootItemInteraction/Actions",
+                      "Position": "End",
+                      "Existing": { "Type": "TameworkCommand" },
+                      "Value": {
+                        "Type": "TameworkCommand",
+                        "ConfigId": "TwCommandItem_CommandWhistle"
+                      }
+                    }
+                  ]
+                }
+                """);
+
+        AssetPatchEngine.PatchResult result = engine.apply(item, List.of(patch));
+
+        JsonObject commandAction = result.patched().getAsJsonObject("RootItemInteraction")
+                .getAsJsonArray("Actions")
+                .get(1)
+                .getAsJsonObject();
+        assertEquals("TameworkCommand", commandAction.get("Type").getAsString());
+        assertEquals("TwCommandItem_CommandWhistle", commandAction.get("ConfigId").getAsString());
+        assertEquals(1, result.status().getApplied().size());
+    }
+
+    @Test
+    void patchesTameworkConfigAssets() {
+        JsonObject config = object("""
+                {
+                  "Id": "TwSpawnerConfig_TestEgg",
+                  "EmptyItemId": "Test_Egg",
+                  "AllowedRoles": {
+                    "Mode": "Allowlist",
+                    "Allowlist": []
+                  }
+                }
+                """);
+        AssetPatchDefinition patch = patch("""
+                {
+                  "Id": "SpawnerConfigPatch",
+                  "Target": "Server/Tamework/Items/Spawners/TwSpawnerConfig_TestEgg.json",
+                  "Operations": [
+                    {
+                      "Id": "allow-role",
+                      "Op": "Add",
+                      "Path": "/AllowedRoles/Allowlist/0",
+                      "Value": "Mob_Test"
+                    }
+                  ]
+                }
+                """);
+
+        AssetPatchEngine.PatchResult result = engine.apply(config, List.of(patch));
+
+        assertEquals(
+                "Mob_Test",
+                result.patched().getAsJsonObject("AllowedRoles").getAsJsonArray("Allowlist").get(0).getAsString()
+        );
+        assertEquals(1, result.status().getApplied().size());
+    }
+
+    @Test
+    void patchesNonJsonJsonLikeParticleSystemAssets() {
+        JsonObject particleSystem = object("""
+                {
+                  "Emitters": [
+                    {
+                      "Id": "spark",
+                      "Rate": 1
+                    }
+                  ]
+                }
+                """);
+        AssetPatchDefinition patch = patch("""
+                {
+                  "Id": "ParticlePatch",
+                  "Target": "Server/Particles/TameworkSpark.particlesystem",
+                  "Operations": [
+                    {
+                      "Id": "rate",
+                      "Op": "Replace",
+                      "Path": "/Emitters/0/Rate",
+                      "Value": 4
+                    }
+                  ]
+                }
+                """);
+
+        AssetPatchEngine.PatchResult result = engine.apply(particleSystem, List.of(patch));
+
+        assertEquals(4, result.patched().getAsJsonArray("Emitters").get(0).getAsJsonObject().get("Rate").getAsInt());
+        assertEquals(1, result.status().getApplied().size());
+    }
+
+    @Test
     void requiredMissingAnchorFailsPatch() {
         JsonObject template = object("""
                 {
