@@ -12,7 +12,7 @@
 - Add, merge, and insert JSON into *any* Hytale asset at runtime
 - Supports hot-reloading
 - Inspired by Hytalor
-- [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/npc-template-patches)
+- [Learn More](https://wiki.hytalemodding.dev/mod/alecs-tamework/asset-patches)
 
 # Alec's Tamework!
 Alec's Tamework is a modular taming framework for Hytale built to let modders add rich NPC features through assets, templates, and config-driven systems instead of writing custom Java code. It is designed to empower artists, designers, and less technical modders who want advanced companion behavior without first building their own framework.
@@ -39,17 +39,17 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:
 
 ### Required Dependency
-- Wire your desired Tamework behavior components directly into your NPC templates.
-- Add configs for the Tamework systems you want to support. 
+- Wire your desired Tamework behavior directly into your NPC, item, config, and other server-side assets.
+- Add configs for the Tamework systems you want to support.
 - Add Alec's Tamework as a required dependency when deploying to CurseForge.
 
 ### Optional Dependency
 - Keep your base assets clean of any references to Tamework functionality.
-- Create asset patches under `Server/Tamework/Patches` that add Tamework actions, interactions, etc. to your NPC templates at runtime only when Tamework is installed. 
+- Create asset patches under `Server/Tamework/Patches` that add Tamework actions, interactions, configs, and other JSON-based behavior at runtime only when Tamework is installed.
 - Add configs for the Tamework systems you want to support.
 - Add Alec's Tamework as an optional dependency when deploying to CurseForge.
 
-In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details live can be found in the wiki.
+In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details can be found in the wiki.
 
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)

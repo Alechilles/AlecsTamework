@@ -1,12 +1,12 @@
 ---
-title: "NPC Template Patch Operations"
+title: "Asset Patch Operations"
 order: 13
 published: true
 draft: false
 ---
-# NPC Template Patch Operations
+# Asset Patch Operations
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/asset-patches)
 
 Raw operations edit JSON directly with explicit paths and values. Use them for setup, custom branches, and anything that does not fit a macro.
 
@@ -31,7 +31,7 @@ Raw operations edit JSON directly with explicit paths and values. Use them for s
 - `~1` means `/` inside a path token.
 - `~0` means `~` inside a path token.
 
-Parent paths must already exist. Patches are meant to modify known template structure, not create an entire template from nothing.
+Parent paths must already exist. Patches are meant to modify known asset structure, not create an entire asset from nothing.
 
 ## Required
 
@@ -123,7 +123,7 @@ Prefer anchor-based replacement patterns over index-based removes when possible.
 
 ## Insert
 
-`Insert` inserts a value into an array. It is the most important operation for NPC behavior patches because it can place a branch near a stable anchor.
+`Insert` inserts a value into an array. It is the most useful operation for behavior and interaction patches because it can place a branch near a stable anchor.
 
 ```json
 {

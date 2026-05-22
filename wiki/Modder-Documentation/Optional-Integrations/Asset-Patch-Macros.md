@@ -1,12 +1,12 @@
 ---
-title: "NPC Template Patch Macros"
+title: "Asset Patch Macros"
 order: 14
 published: true
 draft: false
 ---
-# NPC Template Patch Macros
+# Asset Patch Macros
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/asset-patches)
 
 Macros are shortcuts for common Tamework behavior branches. They keep patch files readable, but they still need explicit placement.
 
@@ -116,4 +116,4 @@ It inserts:
 
 Use raw `Insert` when the branch needs several sensors, actions, motions, state transitions, or custom ordering that does not match a macro.
 
-Do not put Tamework-only action or sensor references in the base template. Keep the base template valid without Tamework and add Tamework references only through patch files.
+Do not put Tamework-only action or sensor references in the base asset. Keep the base asset valid without Tamework and add Tamework references only through patch files.
