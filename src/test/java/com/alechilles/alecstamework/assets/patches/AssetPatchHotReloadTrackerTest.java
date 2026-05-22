@@ -1,0 +1,155 @@
+package com.alechilles.alecstamework.assets.patches;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.junit.jupiter.api.Test;
+
+import com.hypixel.hytale.assetstore.AssetMap;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
+import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
+
+final class AssetPatchHotReloadTrackerTest {
+    @Test
+    void recordsOnlyGeneratedPackAssets() {
+        AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated");
+        long mark = tracker.mark();
+        TestAssetMap<Item> map = new TestAssetMap<>(Map.of(
+                "TwPatchSelfTest_CommandItem", "generated",
+                "OtherItem", "source"
+        ));
+
+        tracker.recordLoadedAssets(Item.class, map, List.of("TwPatchSelfTest_CommandItem", "OtherItem"));
+
+        Set<String> observed = tracker.awaitHotReloadedTargets(
+                List.of(
+                        "Server/Item/Items/Tamework/SelfTest/TwPatchSelfTest_CommandItem.json",
+                        "Server/Item/Items/Tamework/SelfTest/OtherItem.json"
+                ),
+                mark,
+                Duration.ZERO
+        );
+        assertEquals(Set.of("Server/Item/Items/Tamework/SelfTest/TwPatchSelfTest_CommandItem.json"), observed);
+    }
+
+    @Test
+    void mapsParticleSystemTargetsByFileName() {
+        AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated");
+        long mark = tracker.mark();
+
+        tracker.recordLoadedAssets(
+                ParticleSystem.class,
+                new TestAssetMap<>(Map.of("TwPatchSelfTest", "generated")),
+                List.of("TwPatchSelfTest")
+        );
+
+        Set<String> observed = tracker.awaitHotReloadedTargets(
+                List.of("Server/Particles/Tamework/TwPatchSelfTest.particlesystem"),
+                mark,
+                Duration.ZERO
+        );
+        assertTrue(observed.contains("Server/Particles/Tamework/TwPatchSelfTest.particlesystem"));
+    }
+
+    private static final class TestAssetMap<T extends com.hypixel.hytale.assetstore.JsonAsset<String>>
+            extends AssetMap<String, T> {
+        private final Map<String, String> packs;
+
+        private TestAssetMap(Map<String, String> packs) {
+            this.packs = packs;
+        }
+
+        @Override
+        public T getAsset(String key) {
+            return null;
+        }
+
+        @Override
+        public T getAsset(String pack, String key) {
+            return null;
+        }
+
+        @Override
+        public Path getPath(String key) {
+            return null;
+        }
+
+        @Override
+        public String getAssetPack(String key) {
+            return packs.get(key);
+        }
+
+        @Override
+        public Set<String> getKeys(Path path) {
+            return Set.of();
+        }
+
+        @Override
+        public Set<String> getChildren(String key) {
+            return Set.of();
+        }
+
+        @Override
+        public int getAssetCount() {
+            return packs.size();
+        }
+
+        @Override
+        public Map<String, T> getAssetMap() {
+            return Map.of();
+        }
+
+        @Override
+        public Map<String, Path> getPathMap(String pack) {
+            return Map.of();
+        }
+
+        @Override
+        public Set<String> getKeysForTag(int tag) {
+            return Set.of();
+        }
+
+        @Override
+        public it.unimi.dsi.fastutil.ints.IntSet getTagIndexes() {
+            return it.unimi.dsi.fastutil.ints.IntSets.emptySet();
+        }
+
+        @Override
+        public int getTagCount() {
+            return 0;
+        }
+
+        @Override
+        protected void clear() {
+        }
+
+        @Override
+        protected void putAll(String pack,
+                              com.hypixel.hytale.assetstore.codec.AssetCodec<String, T> codec,
+                              Map<String, T> assets,
+                              Map<String, Path> paths,
+                              Map<String, Set<String>> children) {
+        }
+
+        @Override
+        protected Set<String> remove(Set<String> keys) {
+            return Set.of();
+        }
+
+        @Override
+        protected Set<String> remove(String pack, Set<String> keys, List<Map.Entry<String, Object>> replacements) {
+            return Set.of();
+        }
+
+        @Override
+        public Set<String> getKeysForPack(String pack) {
+            return Set.of();
+        }
+    }
+}

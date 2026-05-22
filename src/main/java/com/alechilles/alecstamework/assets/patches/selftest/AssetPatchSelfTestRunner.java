@@ -4,8 +4,11 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
@@ -25,6 +28,9 @@ import com.hypixel.hytale.logger.HytaleLogger;
  * Runs the live optional asset patch self-test by writing fixtures and invoking the real patch reload path.
  */
 public final class AssetPatchSelfTestRunner {
+    private static final Duration HOT_RELOAD_WAIT = Duration.ofSeconds(4);
+    private static final Duration CLEANUP_WATCHER_DRAIN_WAIT = Duration.ofSeconds(2);
+
     private final AssetPatchSelfTestPack pack;
     private final AssetPatchSelfTestReloadHandle reloadHandle;
     private final List<AssetPatchSelfTestCase> cases;
@@ -55,8 +61,14 @@ public final class AssetPatchSelfTestRunner {
         } catch (IOException ex) {
             return setupFailure("Failed to write self-test fixtures: " + ex.getMessage(), ex, false);
         }
+        long observationStart = reloadHandle.markHotReloadObservationStart();
         AssetPatchStatus status = reloadHandle.reload();
-        AssetPatchSelfTestResult result = verifyRun(runId, status);
+        Set<String> observedHotReloads = reloadHandle.awaitHotReloadedTargets(
+                cases.stream().map(AssetPatchSelfTestCase::sourcePath).toList(),
+                observationStart,
+                HOT_RELOAD_WAIT
+        );
+        AssetPatchSelfTestResult result = verifyRun(runId, status, observedHotReloads);
         logResult(result);
         return result;
     }
@@ -68,6 +80,7 @@ public final class AssetPatchSelfTestRunner {
         } catch (IOException ex) {
             return setupFailure("Failed to clean self-test fixtures: " + ex.getMessage(), ex, true);
         }
+        reloadHandle.pauseBeforeCleanupReload();
         AssetPatchStatus status = reloadHandle.reload();
         List<AssetPatchSelfTestResult.CaseResult> results = new ArrayList<>();
         Set<String> removedTargets = Set.copyOf(status.getRemovedGeneratedTargets());
@@ -88,8 +101,10 @@ public final class AssetPatchSelfTestRunner {
     }
 
     @Nonnull
-    private AssetPatchSelfTestResult verifyRun(@Nonnull String runId, @Nonnull AssetPatchStatus status) {
-        Set<String> hotReloaded = Set.copyOf(status.getHotReloadedTargets());
+    private AssetPatchSelfTestResult verifyRun(@Nonnull String runId,
+                                               @Nonnull AssetPatchStatus status,
+                                               @Nonnull Set<String> observedHotReloads) {
+        Set<String> hotReloaded = mergedHotReloads(status, observedHotReloads);
         Set<String> restartRequired = Set.copyOf(status.getRestartRequiredTargets());
         List<String> failures = status.getFailed();
         List<AssetPatchSelfTestResult.CaseResult> results = new ArrayList<>();
@@ -97,6 +112,14 @@ public final class AssetPatchSelfTestRunner {
             results.add(verifyCase(selfTestCase, runId, hotReloaded, restartRequired, failures));
         }
         return new AssetPatchSelfTestResult(results, false);
+    }
+
+    @Nonnull
+    private static Set<String> mergedHotReloads(@Nonnull AssetPatchStatus status,
+                                                @Nonnull Set<String> observedHotReloads) {
+        LinkedHashSet<String> merged = new LinkedHashSet<>(status.getHotReloadedTargets());
+        merged.addAll(observedHotReloads);
+        return Set.copyOf(merged);
     }
 
     @Nonnull
@@ -288,6 +311,28 @@ public final class AssetPatchSelfTestRunner {
         @Nonnull
         public Path generatedPatchCacheRoot() {
             return service.getGeneratedPatchCacheRoot();
+        }
+
+        @Override
+        public long markHotReloadObservationStart() {
+            return service.getHotReloadTracker().mark();
+        }
+
+        @Override
+        @Nonnull
+        public Set<String> awaitHotReloadedTargets(@Nonnull Collection<String> targets,
+                                                   long sinceSequence,
+                                                   @Nonnull Duration timeout) {
+            return service.getHotReloadTracker().awaitHotReloadedTargets(targets, sinceSequence, timeout);
+        }
+
+        @Override
+        public void pauseBeforeCleanupReload() {
+            try {
+                Thread.sleep(CLEANUP_WATCHER_DRAIN_WAIT.toMillis());
+            } catch (InterruptedException ex) {
+                Thread.currentThread().interrupt();
+            }
         }
     }
 }

@@ -136,6 +136,7 @@ import com.alechilles.alecstamework.npc.systems.MountedRideRiderFollowSystem;
 import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSystem;
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
+import com.hypixel.hytale.assetstore.AssetMap;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -144,7 +145,9 @@ import com.hypixel.hytale.builtin.mounts.MountedComponent;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.server.core.asset.HytaleAssetStore;
 import com.hypixel.hytale.server.core.asset.type.item.config.CraftingRecipe;
+import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.item.config.ItemDropList;
+import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 import com.hypixel.hytale.server.core.entity.UUIDComponent;
 import com.hypixel.hytale.server.core.entity.entities.Player;
 import com.hypixel.hytale.server.core.entity.effect.EffectControllerComponent;
@@ -409,6 +412,8 @@ public class Tamework extends JavaPlugin {
         registerDebugAssets();
         getEventRegistry().register(LoadedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
+        getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
+        getEventRegistry().register(LoadedAssetsEvent.class, ParticleSystem.class, this::onParticleSystemAssetsLoaded);
         getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
@@ -1760,6 +1765,7 @@ public class Tamework extends JavaPlugin {
     private void onCommandAssetsLoaded(
             LoadedAssetsEvent<String, TwCommandItemConfig, DefaultAssetMap<String, TwCommandItemConfig>> event) {
         TwCommandItemConfig.clearInheritanceFallbackCache();
+        recordAssetPatchHotReload(TwCommandItemConfig.class, event.getAssetMap(), event.getLoadedAssets().keySet());
         if (!event.isInitial()) {
             emitExperimentalConfigReload(TameworkConfigFamily.COMMAND_ITEM, event.getLoadedAssets().keySet());
         }
@@ -1815,6 +1821,16 @@ public class Tamework extends JavaPlugin {
         reconcileFeedTroughWaterChargeDroplistCompat();
     }
 
+    private void onItemAssetsLoaded(
+            LoadedAssetsEvent<String, Item, DefaultAssetMap<String, Item>> event) {
+        recordAssetPatchHotReload(Item.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+    }
+
+    private void onParticleSystemAssetsLoaded(
+            LoadedAssetsEvent<String, ParticleSystem, DefaultAssetMap<String, ParticleSystem>> event) {
+        recordAssetPatchHotReload(ParticleSystem.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+    }
+
     private void onItemDropListAssetsLoaded(
             LoadedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
@@ -1823,6 +1839,14 @@ public class Tamework extends JavaPlugin {
     private void onItemDropListAssetsRemoved(
             RemovedAssetsEvent<String, ItemDropList, DefaultAssetMap<String, ItemDropList>> event) {
         reconcileFeedTroughWaterChargeDroplistCompat();
+    }
+
+    private void recordAssetPatchHotReload(@Nonnull Class<?> assetClass,
+                                           @Nullable AssetMap<?, ?> assetMap,
+                                           @Nonnull Iterable<?> keys) {
+        if (assetPatchService != null) {
+            assetPatchService.recordHotReloadedAssets(assetClass, assetMap, keys);
+        }
     }
 
     private void reconcileTranquilizerRecipeVisibility() {

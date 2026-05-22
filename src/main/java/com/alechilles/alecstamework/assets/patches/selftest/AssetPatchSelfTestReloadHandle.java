@@ -1,6 +1,9 @@
 package com.alechilles.alecstamework.assets.patches.selftest;
 
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Set;
 
 import javax.annotation.Nonnull;
 
@@ -15,4 +18,18 @@ interface AssetPatchSelfTestReloadHandle {
 
     @Nonnull
     Path generatedPatchCacheRoot();
+
+    default long markHotReloadObservationStart() {
+        return 0L;
+    }
+
+    @Nonnull
+    default Set<String> awaitHotReloadedTargets(@Nonnull Collection<String> targets,
+                                                long sinceSequence,
+                                                @Nonnull Duration timeout) {
+        return Set.of();
+    }
+
+    default void pauseBeforeCleanupReload() {
+    }
 }

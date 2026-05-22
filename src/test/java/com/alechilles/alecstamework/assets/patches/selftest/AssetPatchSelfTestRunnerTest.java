@@ -7,6 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -42,10 +45,22 @@ final class AssetPatchSelfTestRunnerTest {
 
         assertTrue(result.passed());
         assertEquals(5, result.generatedCount());
-        assertEquals(1, result.hotReloadedCount());
-        assertEquals(4, result.restartRequiredCount());
+        assertEquals(4, result.hotReloadedCount());
+        assertEquals(1, result.restartRequiredCount());
         assertTrue(result.cases().stream().anyMatch(caseResult ->
                 caseResult.id().equals("npc-template")
+                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
+        ));
+        assertTrue(result.cases().stream().anyMatch(caseResult ->
+                caseResult.id().equals("item-action")
+                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
+        ));
+        assertTrue(result.cases().stream().anyMatch(caseResult ->
+                caseResult.id().equals("tamework-config")
+                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
+        ));
+        assertTrue(result.cases().stream().anyMatch(caseResult ->
+                caseResult.id().equals("particle-system")
                         && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
         ));
         assertTrue(result.cases().stream().anyMatch(caseResult ->
@@ -95,7 +110,7 @@ final class AssetPatchSelfTestRunnerTest {
         assertTrue(result.cases().stream().anyMatch(caseResult ->
                 caseResult.id().equals("item-action")
                         && !caseResult.passed()
-                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.RESTART_REQUIRED
+                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.HOT_RELOADED
                         && caseResult.detail().contains("reload failed")
         ));
     }
@@ -129,6 +144,7 @@ final class AssetPatchSelfTestRunnerTest {
         private final AssetPatchEngine engine = new AssetPatchEngine();
         private Set<String> skippedCaseIds = Set.of();
         private Set<String> failedReloadCaseIds = Set.of();
+        private Set<String> observedHotReloadCaseIds = Set.of("item-action", "tamework-config", "particle-system");
 
         private FakeReloadHandle(@Nonnull Path generatedRoot, @Nonnull AssetPatchSelfTestPack pack) {
             this.generatedRoot = generatedRoot.toAbsolutePath().normalize();
@@ -176,6 +192,21 @@ final class AssetPatchSelfTestRunnerTest {
         @Nonnull
         public Path generatedPatchCacheRoot() {
             return generatedRoot;
+        }
+
+        @Override
+        @Nonnull
+        public Set<String> awaitHotReloadedTargets(@Nonnull Collection<String> targets,
+                                                   long sinceSequence,
+                                                   @Nonnull Duration timeout) {
+            LinkedHashSet<String> observed = new LinkedHashSet<>();
+            for (AssetPatchSelfTestCase selfTestCase : AssetPatchSelfTestCase.defaultCases()) {
+                if (observedHotReloadCaseIds.contains(selfTestCase.id())
+                        && targets.contains(selfTestCase.sourcePath())) {
+                    observed.add(selfTestCase.sourcePath());
+                }
+            }
+            return Set.copyOf(observed);
         }
 
         private void writeGenerated(@Nonnull Path source,

@@ -2,6 +2,7 @@ package com.alechilles.alecstamework.assets.patches;
 
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -15,6 +16,7 @@ import javax.annotation.Nullable;
 
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.google.gson.JsonObject;
+import com.hypixel.hytale.assetstore.AssetMap;
 import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.asset.LoadAssetEvent;
@@ -34,6 +36,7 @@ public final class AssetPatchService {
     private final AssetPatchGeneratedPackPublisher publisher;
     private final AssetPatchReloadCoordinator reloadCoordinator;
     private final AssetPatchSelfTestPack selfTestPack;
+    private final AssetPatchHotReloadTracker hotReloadTracker;
 
     private volatile AssetPatchStatus lastStatus = new AssetPatchStatus();
 
@@ -50,6 +53,7 @@ public final class AssetPatchService {
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
         this.reloadCoordinator = new AssetPatchReloadCoordinator(plugin);
         this.selfTestPack = selfTestPack;
+        this.hotReloadTracker = new AssetPatchHotReloadTracker(generatedPackId);
     }
 
     public void registerLoadHook() {
@@ -92,6 +96,21 @@ public final class AssetPatchService {
     @Nonnull
     public String getGeneratedPackId() {
         return generatedPackId;
+    }
+
+    @Nonnull
+    public AssetPatchHotReloadTracker getHotReloadTracker() {
+        return hotReloadTracker;
+    }
+
+    public void recordHotReloadedAssets(@Nonnull Class<?> assetClass,
+                                        @Nullable AssetMap<?, ?> assetMap,
+                                        @Nonnull Iterable<?> keys) {
+        List<Object> keyList = new ArrayList<>();
+        for (Object key : keys) {
+            keyList.add(key);
+        }
+        hotReloadTracker.recordLoadedAssets(assetClass, assetMap, keyList);
     }
 
     @Nonnull

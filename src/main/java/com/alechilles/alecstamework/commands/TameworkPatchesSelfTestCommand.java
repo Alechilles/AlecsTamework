@@ -1,6 +1,7 @@
 package com.alechilles.alecstamework.commands;
 
 import java.util.Locale;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
@@ -11,19 +12,14 @@ import com.alechilles.alecstamework.assets.patches.AssetPatchService;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestPack;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestResult;
 import com.alechilles.alecstamework.assets.patches.selftest.AssetPatchSelfTestRunner;
-import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.basecommands.AbstractPlayerCommand;
-import com.hypixel.hytale.server.core.universe.PlayerRef;
-import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractAsyncCommand;
 
 /**
  * Runs isolated optional asset patch fixtures through the live patch reload path.
  */
-public final class TameworkPatchesSelfTestCommand extends AbstractPlayerCommand {
+public final class TameworkPatchesSelfTestCommand extends AbstractAsyncCommand {
     public TameworkPatchesSelfTestCommand() {
         super("selftest", "Run optional Tamework patch self-tests.");
         requirePermission(TameworkConfigPermission.NODE);
@@ -32,25 +28,22 @@ public final class TameworkPatchesSelfTestCommand extends AbstractPlayerCommand 
     }
 
     @Override
-    protected void execute(@Nonnull CommandContext commandContext,
-                           @Nonnull Store<EntityStore> store,
-                           @Nonnull Ref<EntityStore> ref,
-                           @Nonnull PlayerRef playerRef,
-                           @Nonnull World world) {
+    @Nonnull
+    protected CompletableFuture<Void> executeAsync(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
         if (plugin == null) {
             commandContext.sender().sendMessage(Message.raw("Tamework plugin not available."));
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         if (!TameworkConfigPermission.hasAccess(commandContext.sender())) {
             commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw patches."));
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         AssetPatchService service = plugin.getAssetPatchService();
         AssetPatchSelfTestPack pack = plugin.getAssetPatchSelfTestPack();
         if (service == null || pack == null) {
             commandContext.sender().sendMessage(Message.raw("Tamework patch self-test service is not available."));
-            return;
+            return CompletableFuture.completedFuture(null);
         }
         boolean cleanup = isCleanup(commandContext.getInputString());
         AssetPatchSelfTestRunner runner = new AssetPatchSelfTestRunner(pack, service, plugin.getLogger());
@@ -65,6 +58,7 @@ public final class TameworkPatchesSelfTestCommand extends AbstractPlayerCommand 
             plugin.getLogger().at(Level.WARNING).withCause(ex).log("Tamework patch self-test command failed.");
             commandContext.sender().sendMessage(Message.raw("Tamework patch self-test failed. See server log."));
         }
+        return CompletableFuture.completedFuture(null);
     }
 
     private static boolean isCleanup(@Nullable String input) {

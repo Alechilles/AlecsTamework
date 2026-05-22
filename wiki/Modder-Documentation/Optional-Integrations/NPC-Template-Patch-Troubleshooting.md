@@ -26,7 +26,7 @@ For an end-to-end live check, run:
 /tw patches selftest
 ```
 
-This creates isolated fixtures in Tamework's self-test asset pack, applies real optional patches, and reports per-target results as generated successfully, hot-reloaded successfully, restart required, or failed. After testing, run `/tw patches selftest cleanup` to remove the fixtures and prune generated self-test outputs.
+This creates isolated fixtures in Tamework's self-test asset pack, applies real optional patches, waits briefly for Hytale's generated-pack reload events, and reports per-target results as generated successfully, hot-reloaded successfully, restart required, or failed. After testing, run `/tw patches selftest cleanup` to remove the fixtures and prune generated self-test outputs.
 
 ## Patch File Is Not Found
 
@@ -166,20 +166,21 @@ Check:
 - The base item is the patch target, not the generated output.
 - The patch inserts into the action array the item actually uses, such as `/Interactions/Primary/Interactions`.
 - `/tw patches status` lists the item target as generated.
-- The status output says a restart is required, then the server has been restarted.
+- `/tw patches selftest` can observe generated-pack item reloads on this Hytale build. If a real item patch still behaves as vanilla, check the generated JSON and restart the server to rule out asset-family-specific runtime state.
 - The patched action type and config id match the Tamework feature, such as `TameworkSpawn`, `TameworkCommand`, or `TameworkNameNpc`.
 
 ## Restart Required After Reload
 
-This is expected for asset families without a known safe runtime reload path. Tamework regenerates the generated file and reports the target clearly instead of pretending it took effect.
+This is expected for asset families without a known safe runtime reload path or without an observed Hytale generated-pack reload event. Tamework regenerates the generated file and reports the target clearly instead of pretending it took effect.
 
 Known hot-reload routes:
 
 - NPC role/template targets reload through the NPC builder manager.
+- `/tw patches selftest` observes Hytale generated-pack reload events for item, Tamework config, and particle fixtures.
 
-Item assets, Tamework config assets, particles, projectiles, drops, common assets, and unknown target paths require a restart. Tamework does not call Hytale's generic asset-store reload path from live patch commands because that path can block the world thread.
+Common assets, unknown target paths, and target families without observed generated-pack reload events require a restart. Tamework does not call Hytale's generic asset-store reload path from live patch commands because that path can block the world thread.
 
-`/tw patches selftest` intentionally includes several restart-required fixtures so operators can confirm that restart-required reporting is working instead of being mistaken for a hot reload.
+`/tw patches selftest` intentionally includes a restart-required common fixture so operators can confirm that restart-required reporting is working instead of being mistaken for a hot reload.
 
 ## Macro Fails
 

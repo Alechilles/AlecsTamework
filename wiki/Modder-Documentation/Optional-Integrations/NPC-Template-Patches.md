@@ -23,11 +23,11 @@ Startup generation happens before server-side JSON asset validation, so generate
 Runtime reload is target-specific:
 
 - NPC role/template targets reload through the NPC builder manager.
-- Tamework item-feature configs under `Server/Tamework/Items/Spawners`, `Server/Tamework/Items/Naming`, and `Server/Tamework/Items/Commands` refresh through the same item-feature reload path as `/tw reloadconfig`.
-- Other server JSON-like targets reload when Hytale exposes a matching asset store for that path and extension.
+- Tamework does not call Hytale's generic asset-store reload path from live commands because that path can block the world thread.
+- Hytale can still pick up generated-pack file changes through its normal asset watcher. `/tw patches selftest` observes generated-pack reload events for item, Tamework config, and particle fixtures.
 - Common assets and unknown paths are reported as restart-required.
 
-Targets reported as restart-required are still regenerated on disk, but they need a server restart before the generated asset takes runtime effect.
+Targets reported as restart-required are still regenerated on disk, but Tamework did not observe a safe hot-reload completion for that target.
 
 ## In-Game Self-Test
 
@@ -37,7 +37,7 @@ Operators can validate the full optional-patch pipeline from a live server:
 /tw patches selftest
 ```
 
-The command writes isolated fixtures into Tamework's self-test asset pack, generates patches through the same reload path as `/tw patches reload`, and reports each target as generated successfully, hot-reloaded successfully, restart required, or failed. The fixtures cover an NPC role/template, a vanilla-safe command item patched with `TameworkCommand`, a Tamework item-feature config, a `.particlesystem` target, and a common asset target. NPC role/template fixtures hot-reload; the other fixture families are expected to report restart-required.
+The command writes isolated fixtures into Tamework's self-test asset pack, generates patches through the same reload path as `/tw patches reload`, waits briefly for Hytale's generated-pack asset watcher events, and reports each target as generated successfully, hot-reloaded successfully, restart required, or failed. The fixtures cover an NPC role/template, a vanilla-safe command item patched with `TameworkCommand`, a Tamework item-feature config, a `.particlesystem` target, and a common asset target. NPC role/template fixtures hot-reload through Tamework; item, config, and particle fixtures hot-reload when Hytale reports generated-pack reload events; the common fixture remains restart-required.
 
 Clean up the fixtures after testing:
 
@@ -82,6 +82,6 @@ Tamework includes a bundled NPC fixture at `Server/NPC/Roles/_Core/Templates/Tam
 
 ## Diagnostics
 
-Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Use `/tw patches selftest` when you need an end-to-end live check of generation and reload classification. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart. Runtime hot reload is currently limited to NPC role/template targets; item assets, particles, projectiles, drops, and Tamework config patches are generated for the next server start.
+Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Use `/tw patches selftest` when you need an end-to-end live check of generation and reload classification. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart. `/tw patches reload` reports only Tamework's synchronous reload path; `/tw patches selftest` additionally waits for Hytale's asynchronous generated-pack reload events.
 
 If a required anchor is missing, Tamework logs the patch id, operation id, target, and failure reason. The failed target is not published as a partial generated asset.
