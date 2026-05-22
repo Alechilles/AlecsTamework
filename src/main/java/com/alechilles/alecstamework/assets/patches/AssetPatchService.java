@@ -15,12 +15,13 @@ import com.hypixel.hytale.common.plugin.PluginIdentifier;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.asset.LoadAssetEvent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
-import com.hypixel.hytale.server.npc.NPCPlugin;
 
 /**
  * Coordinates discovery, generation, publication, and diagnostics for optional asset patches.
  */
 public final class AssetPatchService {
+    static final short EARLY_PATCH_GENERATION_PRIORITY = -39;
+
     private final JavaPlugin plugin;
     private final String generatedPackId;
     private final AssetPatchScanner scanner;
@@ -44,7 +45,7 @@ public final class AssetPatchService {
             return;
         }
         plugin.getEventRegistry().register(
-                (short) (NPCPlugin.PRIORITY_LOAD_NPC + 1),
+                EARLY_PATCH_GENERATION_PRIORITY,
                 LoadAssetEvent.class,
                 this::onLoadAssets
         );
