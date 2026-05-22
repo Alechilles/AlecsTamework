@@ -9,7 +9,6 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
-import java.util.logging.Level;
 
 import javax.annotation.Nonnull;
 
@@ -19,7 +18,6 @@ import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetPack;
 import com.hypixel.hytale.server.core.asset.AssetModule;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
-import com.hypixel.hytale.server.npc.NPCPlugin;
 
 /**
  * Publishes generated patched assets as a transient runtime asset pack.
@@ -30,7 +28,6 @@ public final class AssetPatchGeneratedPackPublisher {
 
     private final JavaPlugin plugin;
     private final String generatedPackId;
-    private final BuilderCacheReloader builderCacheReloader;
 
     enum RegistrationMode {
         ALLOW_REGISTRATION,
@@ -45,15 +42,8 @@ public final class AssetPatchGeneratedPackPublisher {
     }
 
     public AssetPatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin, @Nonnull String generatedPackId) {
-        this(plugin, generatedPackId, new NpcPluginBuilderCacheReloader());
-    }
-
-    AssetPatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin,
-                                           @Nonnull String generatedPackId,
-                                           @Nonnull BuilderCacheReloader builderCacheReloader) {
         this.plugin = plugin;
         this.generatedPackId = generatedPackId;
-        this.builderCacheReloader = builderCacheReloader;
     }
 
     @Nonnull
@@ -170,9 +160,6 @@ public final class AssetPatchGeneratedPackPublisher {
                                                   @Nonnull Path root,
                                                   @Nonnull Map<String, JsonObject> generatedAssets,
                                                   @Nonnull AssetPatchStatus status) throws IOException {
-        if (!unloadExistingGeneratedBuildersBeforeCacheMutation(existingPack, action, status)) {
-            return CacheMutationResult.failed();
-        }
         prepareCache(root, action);
         Set<String> removedTargets = pruneStaleGeneratedFiles(root, generatedAssets.keySet());
         removedTargets.forEach(status::addRemovedGeneratedTarget);
@@ -181,30 +168,6 @@ public final class AssetPatchGeneratedPackPublisher {
             status.addGeneratedTarget(entry.getKey());
         }
         return new CacheMutationResult(true, removedTargets);
-    }
-
-    boolean unloadExistingGeneratedBuildersBeforeCacheMutation(AssetPack existingPack,
-                                                               @Nonnull PublicationAction action,
-                                                               @Nonnull AssetPatchStatus status) {
-        if (existingPack == null || !shouldUnloadExistingBuildersBeforeCacheMutation(action)) {
-            return true;
-        }
-        try {
-            builderCacheReloader.unload(existingPack);
-            return true;
-        } catch (RuntimeException ex) {
-            String message = "Tamework asset patches: failed to unload generated NPC builders before cache refresh.";
-            status.addFailed(message);
-            if (plugin != null && plugin.getLogger() != null) {
-                plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
-            }
-            return false;
-        }
-    }
-
-    static boolean shouldUnloadExistingBuildersBeforeCacheMutation(@Nonnull PublicationAction action) {
-        return action == PublicationAction.REFRESH_EXISTING_PACK
-                || action == PublicationAction.NO_GENERATED_ASSETS;
     }
 
     @Nonnull
@@ -320,12 +283,6 @@ public final class AssetPatchGeneratedPackPublisher {
         packs.add(generated);
     }
 
-    interface BuilderCacheReloader {
-        void unload(@Nonnull AssetPack generatedPack);
-
-        void load(@Nonnull AssetPack generatedPack);
-    }
-
     record PublicationResult(boolean cacheMutationSucceeded,
                              @Nonnull PublicationAction action,
                              boolean existingPackPresent,
@@ -353,27 +310,6 @@ public final class AssetPatchGeneratedPackPublisher {
         @Nonnull
         static CacheMutationResult failed() {
             return new CacheMutationResult(false, Set.of());
-        }
-    }
-
-    private static final class NpcPluginBuilderCacheReloader implements BuilderCacheReloader {
-        private NpcPluginBuilderCacheReloader() {
-        }
-
-        @Override
-        public void unload(@Nonnull AssetPack generatedPack) {
-            NPCPlugin npcPlugin = NPCPlugin.get();
-            if (npcPlugin != null) {
-                npcPlugin.getBuilderManager().unloadBuilders(generatedPack);
-            }
-        }
-
-        @Override
-        public void load(@Nonnull AssetPack generatedPack) {
-            NPCPlugin npcPlugin = NPCPlugin.get();
-            if (npcPlugin != null) {
-                npcPlugin.getBuilderManager().loadBuilders(generatedPack, true);
-            }
         }
     }
 }

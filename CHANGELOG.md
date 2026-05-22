@@ -5,12 +5,13 @@
 ### Added
 - Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
 - Added optional asset patches so third-party mods can keep base JSON-like assets vanilla-safe, then patch in Tamework NPC behavior, item actions, item configs, particles, projectiles, drops, and other server JSON assets only when Tamework is installed.
-- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional asset patch results, hot-reload NPC role/template targets directly, and see which generated targets still require a server restart.
-- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can generate isolated patch fixtures, exercise the live reload path, and verify which targets hot-reload or require a restart. The self-test now observes Hytale's generated-pack asset reload events for item, Tamework config, particle, and common targets without using the unsafe synchronous asset-store reload path.
+- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional asset patch results, regenerate patched outputs, and see which generated targets still require a server restart.
+- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can generate isolated patch fixtures, exercise the live reload path, and verify which targets hot-reload or require a restart. The self-test now observes Hytale's generated-pack asset reload events for NPC role/template, item, Tamework config, particle, and common targets without using the unsafe synchronous asset-store reload path.
 - Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
 - Added spawner icon batch manifests and generator support for shared override groups, group defaults, replacement runs, excluded attachment options, and auto-framed Blockbench renders.
 
 ### Fixed
+- Optional asset patch reloads now rely on Hytale's generated-pack watcher for NPC role/template targets instead of manually unloading and reloading generated NPC builders during `/tw patches reload`.
 - Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
 - Fixed spawner icon generation merging duplicate groups incorrectly and missing batch source assets in larger render sets.
 - Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.

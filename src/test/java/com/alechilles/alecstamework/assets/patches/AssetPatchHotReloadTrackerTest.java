@@ -7,6 +7,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -151,6 +152,33 @@ final class AssetPatchHotReloadTrackerTest {
         assertEquals(Set.of(), observed);
     }
 
+    @Test
+    void recordsNpcTargetsOnlyAfterGeneratedBuilderPathIsActive(@TempDir Path tempDir) throws Exception {
+        Path generatedRoot = tempDir.resolve("GeneratedPatches");
+        Path generated = generatedRoot.resolve("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json");
+        Files.createDirectories(generated.getParent());
+        Files.writeString(generated, "{\"Id\":\"TwPatchSelfTest_Template\"}", StandardCharsets.UTF_8);
+        TestNpcBuilderProbe probe = new TestNpcBuilderProbe();
+        AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated", generatedRoot, probe);
+        long mark = tracker.mark();
+
+        tracker.recordGeneratedNpcTargets(List.of("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json"));
+        assertEquals(Set.of(), tracker.awaitHotReloadedTargets(
+                List.of("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json"),
+                mark,
+                Duration.ZERO
+        ));
+
+        probe.paths.put("TwPatchSelfTest_Template", generated);
+
+        Set<String> observed = tracker.awaitHotReloadedTargets(
+                List.of("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json"),
+                mark,
+                Duration.ZERO
+        );
+        assertEquals(Set.of("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json"), observed);
+    }
+
     private static final class TestAssetMap<T extends com.hypixel.hytale.assetstore.JsonAsset<String>>
             extends AssetMap<String, T> {
         private final Map<String, String> packs;
@@ -246,6 +274,15 @@ final class AssetPatchHotReloadTrackerTest {
         @Override
         public Set<String> getKeysForPack(String pack) {
             return Set.of();
+        }
+    }
+
+    private static final class TestNpcBuilderProbe implements AssetPatchHotReloadTracker.NpcBuilderProbe {
+        private final Map<String, Path> paths = new HashMap<>();
+
+        @Override
+        public Path builderPath(String key) {
+            return paths.get(key);
         }
     }
 }

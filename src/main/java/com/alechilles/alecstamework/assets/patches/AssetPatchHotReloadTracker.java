@@ -22,6 +22,8 @@ import com.hypixel.hytale.server.core.asset.common.CommonAssetRegistry;
 import com.hypixel.hytale.server.core.asset.common.asset.FileCommonAsset;
 import com.hypixel.hytale.server.core.asset.type.item.config.Item;
 import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
+import com.hypixel.hytale.server.npc.NPCPlugin;
+import com.hypixel.hytale.server.npc.asset.builder.BuilderInfo;
 
 /**
  * Tracks asynchronous Hytale file-watcher reloads for generated patch-pack assets.
@@ -29,13 +31,29 @@ import com.hypixel.hytale.server.core.asset.type.particle.config.ParticleSystem;
 public final class AssetPatchHotReloadTracker {
     private final Object lock = new Object();
     private final String generatedPackId;
+    @Nullable
+    private final Path generatedPatchRoot;
+    private final NpcBuilderProbe npcBuilderProbe;
     private long sequence;
     private final Set<Observation> pendingGeneratedLoads = new LinkedHashSet<>();
     private final Set<Observation> observations = new LinkedHashSet<>();
     private final Map<String, PendingCommonObservation> pendingGeneratedCommonLoads = new LinkedHashMap<>();
+    private final Map<String, PendingNpcObservation> pendingGeneratedNpcLoads = new LinkedHashMap<>();
 
     public AssetPatchHotReloadTracker(@Nonnull String generatedPackId) {
+        this(generatedPackId, null);
+    }
+
+    public AssetPatchHotReloadTracker(@Nonnull String generatedPackId, @Nullable Path generatedPatchRoot) {
+        this(generatedPackId, generatedPatchRoot, new HytaleNpcBuilderProbe());
+    }
+
+    AssetPatchHotReloadTracker(@Nonnull String generatedPackId,
+                               @Nullable Path generatedPatchRoot,
+                               @Nonnull NpcBuilderProbe npcBuilderProbe) {
         this.generatedPackId = generatedPackId;
+        this.generatedPatchRoot = generatedPatchRoot == null ? null : generatedPatchRoot.toAbsolutePath().normalize();
+        this.npcBuilderProbe = npcBuilderProbe;
     }
 
     public long mark() {
@@ -113,6 +131,26 @@ public final class AssetPatchHotReloadTracker {
         }
     }
 
+    public void recordGeneratedNpcTargets(@Nonnull Collection<String> targets) {
+        if (generatedPatchRoot == null || targets.isEmpty()) {
+            return;
+        }
+        synchronized (lock) {
+            boolean changed = false;
+            for (String target : targets) {
+                PendingNpcObservation observation = pendingNpcObservation(target);
+                if (observation == null) {
+                    continue;
+                }
+                pendingGeneratedNpcLoads.put(observation.target(), observation.withSequence(++sequence));
+                changed = true;
+            }
+            if (changed) {
+                lock.notifyAll();
+            }
+        }
+    }
+
     @Nonnull
     public Set<String> awaitHotReloadedTargets(@Nonnull Collection<String> targets,
                                                long sinceSequence,
@@ -121,7 +159,7 @@ public final class AssetPatchHotReloadTracker {
         LinkedHashSet<String> remaining = new LinkedHashSet<>();
         for (String target : targets) {
             String normalized = AssetPatchDefinition.normalizeAssetPath(target);
-            if (targetObservation(normalized) != null || isCommonTarget(normalized)) {
+            if (targetObservation(normalized) != null || isCommonTarget(normalized) || isNpcTarget(normalized)) {
                 remaining.add(AssetPatchDefinition.normalizeAssetPath(target));
             }
         }
@@ -169,6 +207,13 @@ public final class AssetPatchHotReloadTracker {
             if (commonObservation != null
                     && commonObservation.sequence() > sinceSequence
                     && isGeneratedCommonActive(commonObservation)) {
+                observed.add(target);
+                continue;
+            }
+            PendingNpcObservation npcObservation = pendingGeneratedNpcLoads.get(target);
+            if (npcObservation != null
+                    && npcObservation.sequence() > sinceSequence
+                    && isGeneratedNpcActive(npcObservation)) {
                 observed.add(target);
             }
         }
@@ -226,6 +271,39 @@ public final class AssetPatchHotReloadTracker {
 
     private static boolean isCommonTarget(@Nonnull String target) {
         return AssetPatchDefinition.normalizeAssetPath(target).startsWith("Common/");
+    }
+
+    private static boolean isNpcTarget(@Nonnull String target) {
+        String normalized = AssetPatchDefinition.normalizeAssetPath(target);
+        return normalized.startsWith("Server/NPC/Roles/") && normalized.endsWith(".json");
+    }
+
+    @Nullable
+    private PendingNpcObservation pendingNpcObservation(@Nonnull String target) {
+        String normalized = AssetPatchDefinition.normalizeAssetPath(target);
+        if (!isNpcTarget(normalized) || generatedPatchRoot == null) {
+            return null;
+        }
+        Path generatedPath = generatedPatchRoot.resolve(normalized).toAbsolutePath().normalize();
+        String key = npcBuilderKey(generatedPath, normalized);
+        if (key == null) {
+            return null;
+        }
+        return new PendingNpcObservation(0L, normalized, key, generatedPath);
+    }
+
+    @Nullable
+    private static String npcBuilderKey(@Nonnull Path generatedPath, @Nonnull String target) {
+        try {
+            String json = Files.readString(generatedPath);
+            com.google.gson.JsonElement parsed = com.google.gson.JsonParser.parseString(json);
+            if (parsed.isJsonObject() && parsed.getAsJsonObject().has("Id")) {
+                return parsed.getAsJsonObject().get("Id").getAsString();
+            }
+        } catch (IOException | RuntimeException ignored) {
+            // Fall back to the target file name below.
+        }
+        return assetKey(target);
     }
 
     @Nullable
@@ -298,6 +376,22 @@ public final class AssetPatchHotReloadTracker {
         }
     }
 
+    private boolean isGeneratedNpcActive(@Nonnull PendingNpcObservation pending) {
+        Path activePath = npcBuilderProbe.builderPath(pending.key());
+        if (activePath == null) {
+            return false;
+        }
+        Path normalizedActivePath = activePath.toAbsolutePath().normalize();
+        if (normalizedActivePath.equals(pending.generatedPath())) {
+            return true;
+        }
+        try {
+            return Files.isSameFile(normalizedActivePath, pending.generatedPath());
+        } catch (IOException ex) {
+            return false;
+        }
+    }
+
     private record Observation(long sequence, @Nonnull String assetClassName, @Nonnull String key) {
         boolean matches(@Nonnull TargetObservation expected) {
             return assetClassName.equals(expected.assetClassName()) && key.equals(expected.key());
@@ -315,6 +409,38 @@ public final class AssetPatchHotReloadTracker {
         @Nonnull
         PendingCommonObservation withSequence(long newSequence) {
             return new PendingCommonObservation(newSequence, target, commonName, generatedPath, expectedHash);
+        }
+    }
+
+    private record PendingNpcObservation(long sequence,
+                                         @Nonnull String target,
+                                         @Nonnull String key,
+                                         @Nonnull Path generatedPath) {
+        @Nonnull
+        PendingNpcObservation withSequence(long newSequence) {
+            return new PendingNpcObservation(newSequence, target, key, generatedPath);
+        }
+    }
+
+    interface NpcBuilderProbe {
+        @Nullable
+        Path builderPath(@Nonnull String key);
+    }
+
+    private static final class HytaleNpcBuilderProbe implements NpcBuilderProbe {
+        @Override
+        @Nullable
+        public Path builderPath(@Nonnull String key) {
+            NPCPlugin npcPlugin = NPCPlugin.get();
+            if (npcPlugin == null) {
+                return null;
+            }
+            int index = npcPlugin.getBuilderManager().getIndex(key);
+            if (index < 0) {
+                return null;
+            }
+            BuilderInfo builderInfo = npcPlugin.getBuilderManager().tryGetBuilderInfo(index);
+            return builderInfo == null ? null : builderInfo.getPath();
         }
     }
 }

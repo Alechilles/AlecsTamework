@@ -8,7 +8,6 @@ import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetPack;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -128,37 +127,11 @@ final class AssetPatchGeneratedPackPublisherTest {
     }
 
     @Test
-    void runtimeRefreshUnloadsExistingGeneratedBuildersBeforeCacheFilesArePruned(@TempDir Path tempDir) {
-        RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
-        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
-                null,
-                "Generated",
-                reloader
-        );
-        AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
-
-        publisher.unloadExistingGeneratedBuildersBeforeCacheMutation(
-                generatedPack,
-                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
-                new AssetPatchStatus()
-        );
-
-        assertEquals(List.of("unload:Generated"), reloader.events);
-    }
-
-    @Test
-    void runtimeRefreshUnloadsExistingGeneratedBuildersWhileStaleFilesStillExist(@TempDir Path tempDir)
-            throws Exception {
+    void runtimeRefreshMutatesGeneratedCacheWithoutNpcBuilderUnload(@TempDir Path tempDir) throws Exception {
         Path staleTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Stale.json");
         Files.createDirectories(staleTarget.getParent());
         Files.writeString(staleTarget, "{}");
-        RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
-        reloader.staleTargetToCheck = staleTarget;
-        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
-                null,
-                "Generated",
-                reloader
-        );
+        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(null, "Generated");
         AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
 
         Map<String, JsonObject> generatedTemplates = new LinkedHashMap<>();
@@ -173,25 +146,19 @@ final class AssetPatchGeneratedPackPublisherTest {
                 status
         ).succeeded());
 
-        assertEquals(List.of("unload:Generated:staleExists=true"), reloader.events);
         assertFalse(Files.exists(staleTarget));
         assertTrue(Files.exists(tempDir.resolve("Server/NPC/Roles/_Core/Templates/Current.json")));
         assertEquals(List.of("Server/NPC/Roles/_Core/Templates/Current.json"), status.getGeneratedTargets());
+        assertTrue(status.getFailed().isEmpty());
     }
 
     @Test
-    void emptyRuntimeRefreshUnloadsExistingGeneratedBuildersBeforePruningAllJson(@TempDir Path tempDir)
+    void emptyRuntimeRefreshPrunesAllGeneratedJsonWithoutNpcBuilderUnload(@TempDir Path tempDir)
             throws Exception {
         Path staleTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Stale.json");
         Files.createDirectories(staleTarget.getParent());
         Files.writeString(staleTarget, "{}");
-        RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
-        reloader.staleTargetToCheck = staleTarget;
-        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
-                null,
-                "Generated",
-                reloader
-        );
+        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(null, "Generated");
         AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
 
         assertTrue(publisher.mutateCacheForPublication(
@@ -202,41 +169,11 @@ final class AssetPatchGeneratedPackPublisherTest {
                 new AssetPatchStatus()
         ).succeeded());
 
-        assertEquals(List.of("unload:Generated:staleExists=true"), reloader.events);
         assertFalse(Files.exists(staleTarget));
     }
 
     @Test
-    void runtimeRefreshAbortCacheMutationWhenGeneratedBuilderUnloadFails(@TempDir Path tempDir)
-            throws Exception {
-        Path staleTarget = tempDir.resolve("Server/NPC/Roles/_Core/Templates/Stale.json");
-        Files.createDirectories(staleTarget.getParent());
-        Files.writeString(staleTarget, "{}");
-        RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
-        reloader.throwOnUnload = true;
-        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
-                null,
-                "Generated",
-                reloader
-        );
-        AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
-        AssetPatchStatus status = new AssetPatchStatus();
-
-        assertFalse(publisher.mutateCacheForPublication(
-                generatedPack,
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
-                tempDir,
-                Map.<String, JsonObject>of(),
-                status
-        ).succeeded());
-
-        assertTrue(Files.exists(staleTarget));
-        assertTrue(status.hasFailures());
-        assertTrue(status.getFailed().getFirst().contains("failed to unload generated NPC builders"));
-    }
-
-    @Test
-    void runtimeReloadOnlyReloadsNpcBuildersAfterSuccessfulExistingPackPublication() {
+    void runtimeReloadStillReturnsAffectedTargetsForWatcherObservation() {
         assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadRuntimeTargetsAfterPublication(
                 false,
                 AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
@@ -262,48 +199,5 @@ final class AssetPatchGeneratedPackPublisherTest {
                 AssetPatchGeneratedPackPublisher.PublicationAction.MISSING_RUNTIME_PACK,
                 false
         ));
-    }
-
-    @Test
-    void emptyRuntimeRefreshAlsoUnloadsExistingGeneratedBuilders(@TempDir Path tempDir) {
-        RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
-        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
-                null,
-                "Generated",
-                reloader
-        );
-        AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
-
-        publisher.unloadExistingGeneratedBuildersBeforeCacheMutation(
-                generatedPack,
-                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
-                new AssetPatchStatus()
-        );
-
-        assertEquals(List.of("unload:Generated"), reloader.events);
-    }
-
-    private static final class RecordingBuilderCacheReloader
-            implements AssetPatchGeneratedPackPublisher.BuilderCacheReloader {
-        private final List<String> events = new ArrayList<>();
-        private Path staleTargetToCheck;
-        private boolean throwOnUnload;
-
-        @Override
-        public void unload(AssetPack generatedPack) {
-            if (throwOnUnload) {
-                throw new IllegalStateException("boom");
-            }
-            if (staleTargetToCheck != null) {
-                events.add("unload:" + generatedPack.getName() + ":staleExists=" + Files.exists(staleTargetToCheck));
-                return;
-            }
-            events.add("unload:" + generatedPack.getName());
-        }
-
-        @Override
-        public void load(AssetPack generatedPack) {
-            events.add("load:" + generatedPack.getName());
-        }
     }
 }

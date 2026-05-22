@@ -53,7 +53,7 @@ public final class AssetPatchService {
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
         this.reloadCoordinator = new AssetPatchReloadCoordinator(plugin);
         this.selfTestPack = selfTestPack;
-        this.hotReloadTracker = new AssetPatchHotReloadTracker(generatedPackId);
+        this.hotReloadTracker = new AssetPatchHotReloadTracker(generatedPackId, publisher.cacheRoot());
     }
 
     public void registerLoadHook() {
@@ -187,6 +187,7 @@ public final class AssetPatchService {
                 AssetPatchGeneratedPackPublisher.PublicationResult.empty();
         try {
             publicationResult = publisher.publish(generatedAssets, status, registrationMode);
+            hotReloadTracker.recordGeneratedNpcTargets(publicationResult.generatedTargets());
         } catch (IOException ex) {
             String message = "Failed to publish generated Tamework patch pack: " + ex.getMessage();
             status.addFailed(message);

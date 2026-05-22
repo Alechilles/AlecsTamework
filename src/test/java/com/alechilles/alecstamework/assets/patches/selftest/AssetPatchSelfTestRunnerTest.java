@@ -20,7 +20,6 @@ import org.junit.jupiter.api.io.TempDir;
 
 import com.alechilles.alecstamework.assets.patches.AssetPatchDefinition;
 import com.alechilles.alecstamework.assets.patches.AssetPatchEngine;
-import com.alechilles.alecstamework.assets.patches.AssetPatchReloadMode;
 import com.alechilles.alecstamework.assets.patches.AssetPatchStatus;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -145,7 +144,7 @@ final class AssetPatchSelfTestRunnerTest {
         private Set<String> skippedCaseIds = Set.of();
         private Set<String> failedReloadCaseIds = Set.of();
         private Set<String> observedHotReloadCaseIds =
-                Set.of("item-action", "tamework-config", "particle-system", "common-asset");
+                Set.of("npc-template", "item-action", "tamework-config", "particle-system", "common-asset");
 
         private FakeReloadHandle(@Nonnull Path generatedRoot, @Nonnull AssetPatchSelfTestPack pack) {
             this.generatedRoot = generatedRoot.toAbsolutePath().normalize();
@@ -234,10 +233,6 @@ final class AssetPatchSelfTestRunnerTest {
 
         private static void addReloadOutcome(@Nonnull AssetPatchSelfTestCase selfTestCase,
                                              @Nonnull AssetPatchStatus status) {
-            if (selfTestCase.expectedReloadMode() == AssetPatchReloadMode.NPC_BUILDERS) {
-                status.addHotReloadedTarget("Server/NPC/Roles/*");
-                return;
-            }
             status.addRestartRequiredTarget(selfTestCase.sourcePath());
         }
 

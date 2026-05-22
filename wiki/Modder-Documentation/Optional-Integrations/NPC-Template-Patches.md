@@ -22,9 +22,8 @@ Startup generation happens before server-side JSON asset validation, so generate
 
 Runtime reload is target-specific:
 
-- NPC role/template targets reload through the NPC builder manager.
 - Tamework does not call Hytale's generic asset-store reload path from live commands because that path can block the world thread.
-- Hytale can still pick up generated-pack file changes through its normal asset watcher. `/tw patches selftest` observes generated-pack reload events for item, Tamework config, particle, and common fixtures.
+- Hytale can still pick up generated-pack file changes through its normal asset watcher. `/tw patches selftest` observes generated-pack reload events for NPC role/template, item, Tamework config, particle, and common fixtures.
 - Common asset hot-reload confirmation means the generated file is active in Hytale's server-side common asset registry with the expected hash. It is not a client acknowledgment.
 - Unknown paths are reported as restart-required.
 
@@ -83,6 +82,6 @@ Tamework includes a bundled NPC fixture at `Server/NPC/Roles/_Core/Templates/Tam
 
 ## Diagnostics
 
-Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Use `/tw patches selftest` when you need an end-to-end live check of generation and reload classification. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart. `/tw patches reload` reports only Tamework's synchronous reload path; `/tw patches selftest` additionally waits for Hytale's asynchronous generated-pack reload events.
+Use `/tw patches status` to inspect the last patch run and `/tw patches reload` to refresh generated files from currently loaded mods. Use `/tw patches selftest` when you need an end-to-end live check of generation and reload classification. Status output lists generated targets, removed generated targets, hot-reloaded targets, failures, skipped operations, and targets that require a restart. `/tw patches reload` regenerates files; `/tw patches selftest` additionally waits for Hytale's asynchronous generated-pack reload events.
 
 If a required anchor is missing, Tamework logs the patch id, operation id, target, and failure reason. The failed target is not published as a partial generated asset.
