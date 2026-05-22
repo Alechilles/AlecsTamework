@@ -13,6 +13,7 @@ public final class AssetPatchStatus {
     private final List<String> skipped = new ArrayList<>();
     private final List<String> failed = new ArrayList<>();
     private final List<String> generatedTargets = new ArrayList<>();
+    private final List<String> restartRequiredTargets = new ArrayList<>();
 
     public void addApplied(@Nonnull String message) {
         applied.add(message);
@@ -28,6 +29,10 @@ public final class AssetPatchStatus {
 
     public void addGeneratedTarget(@Nonnull String target) {
         generatedTargets.add(target);
+    }
+
+    public void addRestartRequiredTarget(@Nonnull String target) {
+        restartRequiredTargets.add(target);
     }
 
     @Nonnull
@@ -50,6 +55,11 @@ public final class AssetPatchStatus {
         return List.copyOf(generatedTargets);
     }
 
+    @Nonnull
+    public List<String> getRestartRequiredTargets() {
+        return List.copyOf(restartRequiredTargets);
+    }
+
     public boolean hasFailures() {
         return !failed.isEmpty();
     }
@@ -59,6 +69,7 @@ public final class AssetPatchStatus {
         return "Patches applied=" + applied.size()
                 + " skipped=" + skipped.size()
                 + " failed=" + failed.size()
-                + " generatedTargets=" + generatedTargets.size();
+                + " generatedTargets=" + generatedTargets.size()
+                + " restartRequiredTargets=" + restartRequiredTargets.size();
     }
 }
