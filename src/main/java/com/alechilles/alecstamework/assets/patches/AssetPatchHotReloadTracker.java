@@ -377,7 +377,12 @@ public final class AssetPatchHotReloadTracker {
     }
 
     private boolean isGeneratedNpcActive(@Nonnull PendingNpcObservation pending) {
-        Path activePath = npcBuilderProbe.builderPath(pending.key());
+        Path activePath;
+        try {
+            activePath = npcBuilderProbe.builderPath(pending.key());
+        } catch (RuntimeException ex) {
+            return false;
+        }
         if (activePath == null) {
             return false;
         }

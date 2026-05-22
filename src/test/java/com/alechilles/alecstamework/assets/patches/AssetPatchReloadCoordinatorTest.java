@@ -14,7 +14,7 @@ final class AssetPatchReloadCoordinatorTest {
 
     @Test
     void leavesNpcRoleTargetsForHytaleWatcher(@TempDir Path tempDir) {
-        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator(null);
+        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator();
         AssetPatchStatus status = new AssetPatchStatus();
 
         coordinator.reloadPublishedTargets(
@@ -30,7 +30,7 @@ final class AssetPatchReloadCoordinatorTest {
 
     @Test
     void reportsItemTargetsAsRestartRequired(@TempDir Path tempDir) {
-        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator(null);
+        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator();
         AssetPatchStatus status = new AssetPatchStatus();
 
         coordinator.reloadPublishedTargets(
@@ -44,7 +44,7 @@ final class AssetPatchReloadCoordinatorTest {
 
     @Test
     void reportsJsonLikeParticleTargetsAsRestartRequired(@TempDir Path tempDir) {
-        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator(null);
+        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator();
         AssetPatchStatus status = new AssetPatchStatus();
 
         coordinator.reloadPublishedTargets(
@@ -58,7 +58,7 @@ final class AssetPatchReloadCoordinatorTest {
 
     @Test
     void reportsTameworkItemFeatureConfigsAsRestartRequired(@TempDir Path tempDir) {
-        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator(null);
+        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator();
         AssetPatchStatus status = new AssetPatchStatus();
 
         coordinator.reloadPublishedTargets(
@@ -73,7 +73,7 @@ final class AssetPatchReloadCoordinatorTest {
 
     @Test
     void reportsRestartRequiredWithoutCallingGenericAssetStoreReload(@TempDir Path tempDir) {
-        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator(null);
+        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator();
         AssetPatchStatus status = new AssetPatchStatus();
 
         coordinator.reloadPublishedTargets(
@@ -87,7 +87,7 @@ final class AssetPatchReloadCoordinatorTest {
 
     @Test
     void reportsCommonTargetsAsRestartRequired(@TempDir Path tempDir) {
-        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator(null);
+        AssetPatchReloadCoordinator coordinator = new AssetPatchReloadCoordinator();
         AssetPatchStatus status = new AssetPatchStatus();
 
         coordinator.reloadPublishedTargets(pack(tempDir), List.of("Common/Models/Test.blockymodel"), status);

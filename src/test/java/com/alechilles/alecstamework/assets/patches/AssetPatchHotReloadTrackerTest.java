@@ -179,6 +179,26 @@ final class AssetPatchHotReloadTrackerTest {
         assertEquals(Set.of("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json"), observed);
     }
 
+    @Test
+    void treatsNpcProbeFailureAsNotYetReloaded(@TempDir Path tempDir) throws Exception {
+        Path generatedRoot = tempDir.resolve("GeneratedPatches");
+        Path generated = generatedRoot.resolve("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json");
+        Files.createDirectories(generated.getParent());
+        Files.writeString(generated, "{\"Id\":\"TwPatchSelfTest_Template\"}", StandardCharsets.UTF_8);
+        TestNpcBuilderProbe probe = new TestNpcBuilderProbe();
+        probe.throwOnLookup = true;
+        AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated", generatedRoot, probe);
+        long mark = tracker.mark();
+
+        tracker.recordGeneratedNpcTargets(List.of("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json"));
+
+        assertEquals(Set.of(), tracker.awaitHotReloadedTargets(
+                List.of("Server/NPC/Roles/_Core/Templates/TwPatchSelfTest_Template.json"),
+                mark,
+                Duration.ZERO
+        ));
+    }
+
     private static final class TestAssetMap<T extends com.hypixel.hytale.assetstore.JsonAsset<String>>
             extends AssetMap<String, T> {
         private final Map<String, String> packs;
@@ -279,9 +299,13 @@ final class AssetPatchHotReloadTrackerTest {
 
     private static final class TestNpcBuilderProbe implements AssetPatchHotReloadTracker.NpcBuilderProbe {
         private final Map<String, Path> paths = new HashMap<>();
+        private boolean throwOnLookup;
 
         @Override
         public Path builderPath(String key) {
+            if (throwOnLookup) {
+                throw new IllegalStateException("builder manager not ready");
+            }
             return paths.get(key);
         }
     }

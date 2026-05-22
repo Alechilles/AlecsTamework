@@ -51,7 +51,7 @@ public final class AssetPatchService {
         this.targetResolver = new AssetPatchTargetResolver();
         this.patchEngine = new AssetPatchEngine();
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
-        this.reloadCoordinator = new AssetPatchReloadCoordinator(plugin);
+        this.reloadCoordinator = new AssetPatchReloadCoordinator();
         this.selfTestPack = selfTestPack;
         this.hotReloadTracker = new AssetPatchHotReloadTracker(generatedPackId, publisher.cacheRoot());
     }

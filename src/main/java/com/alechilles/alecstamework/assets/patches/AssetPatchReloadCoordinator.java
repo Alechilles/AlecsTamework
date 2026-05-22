@@ -6,14 +6,12 @@ import java.util.LinkedHashSet;
 import javax.annotation.Nonnull;
 
 import com.hypixel.hytale.assetstore.AssetPack;
-import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 
 /**
  * Classifies generated optional asset patch outputs that still require explicit restart reporting.
  */
 public final class AssetPatchReloadCoordinator {
-    public AssetPatchReloadCoordinator(@Nonnull JavaPlugin plugin) {
-        // Kept for constructor compatibility with AssetPatchService; no explicit reload adapter is used here.
+    public AssetPatchReloadCoordinator() {
     }
 
     public void reloadPublishedTargets(@Nonnull AssetPack generatedPack,

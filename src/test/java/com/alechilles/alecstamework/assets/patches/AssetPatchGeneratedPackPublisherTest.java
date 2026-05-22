@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.google.gson.JsonObject;
-import com.hypixel.hytale.assetstore.AssetPack;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -132,14 +131,12 @@ final class AssetPatchGeneratedPackPublisherTest {
         Files.createDirectories(staleTarget.getParent());
         Files.writeString(staleTarget, "{}");
         AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(null, "Generated");
-        AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
 
         Map<String, JsonObject> generatedTemplates = new LinkedHashMap<>();
         generatedTemplates.put("Server/NPC/Roles/_Core/Templates/Current.json", new JsonObject());
         AssetPatchStatus status = new AssetPatchStatus();
 
         assertTrue(publisher.mutateCacheForPublication(
-                generatedPack,
                 AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
                 tempDir,
                 generatedTemplates,
@@ -159,10 +156,8 @@ final class AssetPatchGeneratedPackPublisherTest {
         Files.createDirectories(staleTarget.getParent());
         Files.writeString(staleTarget, "{}");
         AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(null, "Generated");
-        AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
 
         assertTrue(publisher.mutateCacheForPublication(
-                generatedPack,
                 AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_ASSETS,
                 tempDir,
                 Map.<String, JsonObject>of(),

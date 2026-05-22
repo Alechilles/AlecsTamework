@@ -75,7 +75,7 @@ public final class AssetPatchGeneratedPackPublisher {
                 registrationMode
         );
         Path root = cacheRoot();
-        CacheMutationResult mutation = mutateCacheForPublication(existingPack, action, root, generatedAssets, status);
+        CacheMutationResult mutation = mutateCacheForPublication(action, root, generatedAssets, status);
         if (!mutation.succeeded()) {
             return new PublicationResult(false, action, existingPackPresent, Set.of(), Set.of());
         }
@@ -155,8 +155,7 @@ public final class AssetPatchGeneratedPackPublisher {
     }
 
     @Nonnull
-    CacheMutationResult mutateCacheForPublication(AssetPack existingPack,
-                                                  @Nonnull PublicationAction action,
+    CacheMutationResult mutateCacheForPublication(@Nonnull PublicationAction action,
                                                   @Nonnull Path root,
                                                   @Nonnull Map<String, JsonObject> generatedAssets,
                                                   @Nonnull AssetPatchStatus status) throws IOException {
@@ -307,9 +306,5 @@ public final class AssetPatchGeneratedPackPublisher {
     }
 
     record CacheMutationResult(boolean succeeded, @Nonnull Set<String> removedTargets) {
-        @Nonnull
-        static CacheMutationResult failed() {
-            return new CacheMutationResult(false, Set.of());
-        }
     }
 }
