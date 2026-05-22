@@ -38,10 +38,18 @@ If you are a player looking for gameplay built on Tamework, start with [Alec's A
 ## What Integration Looks Like
 Integrating Tamework is usually a content-authoring workflow, not a programming workflow. Mods can use it in two ways:
 
-- **Required dependency**: add Tamework as a dependency, include its asset pack, and wire Tamework builders, interactions, item configs, and progression configs directly into your NPC and item assets.
-- **Optional dependency**: keep your base assets vanilla-safe, then ship Tamework patches under `Server/Tamework/Patches` that add Tamework actions, configs, interactions, and other JSON-based behavior only when Tamework is installed.
+### Required Dependency
+- Wire your desired Tamework behavior components directly into your NPC templates.
+- Add configs for the Tamework systems you want to support. 
+- Add Alec's Tamework as a required dependency when deploying to CurseForge.
 
-In both cases, most work can stay in JSON and asset authoring: copy and adapt examples, enable the systems you want through `TwInteractionConfig`, companion policy, item configs, and progression configs, then add prompts, translations, and polish. The full setup and implementation details live in the modder wiki.
+### Optional Dependency
+- Keep your base assets clean of any references to Tamework functionality.
+- Create asset patches under `Server/Tamework/Patches` that add Tamework actions, interactions, etc. to your NPC templates at runtime only when Tamework is installed. 
+- Add configs for the Tamework systems you want to support.
+- Add Alec's Tamework as an optional dependency when deploying to CurseForge.
+
+In both cases, no Java is required: copy and adapt examples, enable the systems you want through comprehensive configs, and polish. The full setup and implementation details live can be found in the wiki.
 
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)
