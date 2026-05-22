@@ -23,6 +23,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.hypixel.hytale.logger.HytaleLogger;
+import com.hypixel.hytale.server.core.asset.AssetModule;
 
 /**
  * Runs the live optional asset patch self-test by writing fixtures and invoking the real patch reload path.
@@ -57,6 +58,7 @@ public final class AssetPatchSelfTestRunner {
     public AssetPatchSelfTestResult run() {
         String runId = Instant.now().toString();
         try {
+            pack.registerIfMissing(AssetModule.get());
             pack.writeRunFixtures(runId, cases);
         } catch (IOException ex) {
             return setupFailure("Failed to write self-test fixtures: " + ex.getMessage(), ex, false);

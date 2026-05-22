@@ -35,7 +35,6 @@ public final class AssetPatchService {
     private final AssetPatchEngine patchEngine;
     private final AssetPatchGeneratedPackPublisher publisher;
     private final AssetPatchReloadCoordinator reloadCoordinator;
-    private final AssetPatchSelfTestPack selfTestPack;
     private final AssetPatchHotReloadTracker hotReloadTracker;
 
     private volatile AssetPatchStatus lastStatus = new AssetPatchStatus();
@@ -46,14 +45,19 @@ public final class AssetPatchService {
 
     public AssetPatchService(@Nonnull JavaPlugin plugin, @Nullable AssetPatchSelfTestPack selfTestPack) {
         this.plugin = plugin;
-        this.generatedPackId = new PluginIdentifier(plugin.getManifest()) + "_GeneratedPatches";
+        this.generatedPackId = createGeneratedPackId(plugin);
         this.scanner = new AssetPatchScanner(plugin.getLogger());
         this.targetResolver = new AssetPatchTargetResolver();
         this.patchEngine = new AssetPatchEngine();
         this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
         this.reloadCoordinator = new AssetPatchReloadCoordinator();
-        this.selfTestPack = selfTestPack;
         this.hotReloadTracker = new AssetPatchHotReloadTracker(generatedPackId, publisher.cacheRoot());
+    }
+
+    @Nonnull
+    private static String createGeneratedPackId(@Nonnull JavaPlugin plugin) {
+        PluginIdentifier pluginId = new PluginIdentifier(plugin.getManifest());
+        return pluginId.getGroup() + ":" + pluginId.getName() + "_GeneratedPatches";
     }
 
     public void registerLoadHook() {
@@ -139,10 +143,6 @@ public final class AssetPatchService {
 
     private void onLoadAssets(@Nonnull LoadAssetEvent event) {
         try {
-            AssetModule assetModule = AssetModule.get();
-            if (selfTestPack != null) {
-                selfTestPack.registerIfMissing(assetModule);
-            }
             RegenerationResult result = regenerateAndPublish(
                     AssetPatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
             );
