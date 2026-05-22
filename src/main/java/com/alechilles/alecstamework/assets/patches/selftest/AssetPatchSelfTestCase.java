@@ -181,7 +181,7 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                   "ItemIds": [
                                     "TwPatchSelfTest_CommandItem"
                                   ],
-                                  "Commands": []
+                                  "CommandList": []
                                 }
                                 """,
                         PATCH_ROOT + "30_CommandConfig.json",
@@ -193,10 +193,10 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                     {
                                       "Id": "add-selftest-command",
                                       "Op": "Add",
-                                      "Path": "/Commands/0",
+                                      "Path": "/CommandList/0",
                                       "Value": {
                                         "Id": "SelfTest",
-                                        "Label": "Self Test",
+                                        "DisplayName": "Self Test",
                                         "Steps": []
                                       }
                                     }
@@ -205,7 +205,10 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                 """,
                         AssetPatchReloadMode.TAMEWORK_CONFIG,
                         ReloadRequirement.REQUIRED_HOT_RELOAD,
-                        List.of(checkString("/Commands/0/Id", "SelfTest"))
+                        List.of(
+                                checkString("/CommandList/0/Id", "SelfTest"),
+                                checkString("/CommandList/0/DisplayName", "Self Test")
+                        )
                 ),
                 new AssetPatchSelfTestCase(
                         "particle-system",

@@ -91,9 +91,10 @@ public final class AssetPatchSelfTestRunner {
     private AssetPatchSelfTestResult verifyRun(@Nonnull String runId, @Nonnull AssetPatchStatus status) {
         Set<String> hotReloaded = Set.copyOf(status.getHotReloadedTargets());
         Set<String> restartRequired = Set.copyOf(status.getRestartRequiredTargets());
+        List<String> failures = status.getFailed();
         List<AssetPatchSelfTestResult.CaseResult> results = new ArrayList<>();
         for (AssetPatchSelfTestCase selfTestCase : cases) {
-            results.add(verifyCase(selfTestCase, runId, hotReloaded, restartRequired));
+            results.add(verifyCase(selfTestCase, runId, hotReloaded, restartRequired, failures));
         }
         return new AssetPatchSelfTestResult(results, false);
     }
@@ -102,7 +103,8 @@ public final class AssetPatchSelfTestRunner {
     private AssetPatchSelfTestResult.CaseResult verifyCase(@Nonnull AssetPatchSelfTestCase selfTestCase,
                                                           @Nonnull String runId,
                                                           @Nonnull Set<String> hotReloaded,
-                                                          @Nonnull Set<String> restartRequired) {
+                                                          @Nonnull Set<String> restartRequired,
+                                                          @Nonnull List<String> failures) {
         JsonObject generated;
         try {
             generated = readGeneratedOutput(selfTestCase);
@@ -118,14 +120,18 @@ public final class AssetPatchSelfTestRunner {
         }
 
         String checkFailure = firstCheckFailure(selfTestCase, runId, generated);
+        String reloadFailure = firstReloadFailure(selfTestCase, failures);
         AssetPatchSelfTestResult.ReloadOutcome reloadOutcome = reloadOutcome(selfTestCase, hotReloaded, restartRequired);
         boolean reloadPass = switch (reloadOutcome) {
             case HOT_RELOADED -> true;
             case RESTART_REQUIRED -> selfTestCase.acceptsRestartRequired();
             case NOT_APPLICABLE, FAILED -> false;
         };
-        boolean passed = checkFailure == null && reloadPass;
+        boolean passed = checkFailure == null && reloadFailure == null && reloadPass;
         String detail = checkFailure == null ? "generated checks passed" : checkFailure;
+        if (reloadFailure != null) {
+            detail += "; reload failed: " + reloadFailure;
+        }
         if (!reloadPass) {
             detail += "; reload expectation failed";
         }
@@ -186,6 +192,24 @@ public final class AssetPatchSelfTestRunner {
             JsonElement expected = replaceRunId(check.expectedValue(), runId);
             if (actual == null || !actual.equals(expected)) {
                 return "expected " + check.path() + "=" + expected + " but found " + actual;
+            }
+        }
+        return null;
+    }
+
+    private static String firstReloadFailure(@Nonnull AssetPatchSelfTestCase selfTestCase,
+                                             @Nonnull List<String> failures) {
+        for (String failure : failures) {
+            if (failure.contains(selfTestCase.sourcePath())) {
+                return failure;
+            }
+            if (selfTestCase.expectedReloadMode() == AssetPatchReloadMode.NPC_BUILDERS
+                    && failure.contains("Server/NPC/Roles/*")) {
+                return failure;
+            }
+            if (selfTestCase.expectedReloadMode() == AssetPatchReloadMode.TAMEWORK_CONFIG
+                    && failure.contains("Tamework item feature configs")) {
+                return failure;
             }
         }
         return null;

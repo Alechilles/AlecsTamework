@@ -78,6 +78,29 @@ final class AssetPatchSelfTestRunnerTest {
     }
 
     @Test
+    void runReportsReloadFailureEvenWhenRestartRequiredIsAccepted(@TempDir Path tempDir) {
+        AssetPatchSelfTestPack pack = new AssetPatchSelfTestPack(tempDir.resolve("data"), null, null);
+        FakeReloadHandle reloadHandle = new FakeReloadHandle(tempDir.resolve("generated"), pack);
+        reloadHandle.failReloadTargets(Set.of("item-action"));
+        AssetPatchSelfTestRunner runner = new AssetPatchSelfTestRunner(
+                pack,
+                reloadHandle,
+                AssetPatchSelfTestCase.defaultCases(),
+                null
+        );
+
+        AssetPatchSelfTestResult result = runner.run();
+
+        assertFalse(result.passed());
+        assertTrue(result.cases().stream().anyMatch(caseResult ->
+                caseResult.id().equals("item-action")
+                        && !caseResult.passed()
+                        && caseResult.reloadOutcome() == AssetPatchSelfTestResult.ReloadOutcome.RESTART_REQUIRED
+                        && caseResult.detail().contains("reload failed")
+        ));
+    }
+
+    @Test
     void cleanupRemovesFixturesAndReportsGeneratedOutputsRemoved(@TempDir Path tempDir) throws Exception {
         AssetPatchSelfTestPack pack = new AssetPatchSelfTestPack(tempDir.resolve("data"), null, null);
         FakeReloadHandle reloadHandle = new FakeReloadHandle(tempDir.resolve("generated"), pack);
@@ -105,6 +128,7 @@ final class AssetPatchSelfTestRunnerTest {
         private final AssetPatchSelfTestPack pack;
         private final AssetPatchEngine engine = new AssetPatchEngine();
         private Set<String> skippedCaseIds = Set.of();
+        private Set<String> failedReloadCaseIds = Set.of();
 
         private FakeReloadHandle(@Nonnull Path generatedRoot, @Nonnull AssetPatchSelfTestPack pack) {
             this.generatedRoot = generatedRoot.toAbsolutePath().normalize();
@@ -113,6 +137,10 @@ final class AssetPatchSelfTestRunnerTest {
 
         void skipGeneratedTargets(@Nonnull Set<String> skippedCaseIds) {
             this.skippedCaseIds = Set.copyOf(skippedCaseIds);
+        }
+
+        void failReloadTargets(@Nonnull Set<String> failedReloadCaseIds) {
+            this.failedReloadCaseIds = Set.copyOf(failedReloadCaseIds);
         }
 
         @Override
@@ -135,6 +163,11 @@ final class AssetPatchSelfTestRunnerTest {
                     status.addFailed(selfTestCase.id() + ": " + ex.getMessage());
                 }
                 addReloadOutcome(selfTestCase, status);
+                if (failedReloadCaseIds.contains(selfTestCase.id())) {
+                    status.addFailed("Failed to hot-reload generated patch target "
+                            + selfTestCase.sourcePath()
+                            + "; restart required.");
+                }
             }
             return status;
         }

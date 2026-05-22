@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.alechilles.alecstamework.assets.patches.AssetPatchDefinition;
 import com.alechilles.alecstamework.assets.patches.AssetPatchTargetClassifier;
+import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
@@ -42,5 +43,21 @@ final class AssetPatchSelfTestCaseTest {
         assertTrue(ids.contains("tamework-config"));
         assertTrue(ids.contains("particle-system"));
         assertTrue(ids.contains("common-restart-required"));
+    }
+
+    @Test
+    void tameworkConfigFixtureUsesCommandItemConfigFieldNames() {
+        AssetPatchSelfTestCase selfTestCase = AssetPatchSelfTestCase.defaultCases().stream()
+                .filter(candidate -> candidate.id().equals("tamework-config"))
+                .findFirst()
+                .orElseThrow();
+
+        JsonObject source = JsonParser.parseString(selfTestCase.sourceJson("run-1")).getAsJsonObject();
+        JsonObject patch = JsonParser.parseString(selfTestCase.patchJson("run-1")).getAsJsonObject();
+
+        assertTrue(source.has("CommandList"));
+        assertFalse(source.has("Commands"));
+        assertTrue(patch.toString().contains("\"Path\":\"/CommandList/0\""));
+        assertTrue(patch.toString().contains("\"DisplayName\":\"Self Test\""));
     }
 }
