@@ -195,7 +195,7 @@ public final class AssetPatchGeneratedPackPublisher {
         try (var stream = Files.walk(normalizedRoot)) {
             for (Path path : stream
                     .filter(Files::isRegularFile)
-                    .filter(AssetPatchGeneratedPackPublisher::isJsonFile)
+                    .filter(AssetPatchGeneratedPackPublisher::isGeneratedPatchTargetFile)
                     .sorted(Comparator.reverseOrder())
                     .toList()) {
                 Path normalized = path.toAbsolutePath().normalize();
@@ -261,9 +261,15 @@ public final class AssetPatchGeneratedPackPublisher {
         Files.writeString(output, GSON.toJson(asset), StandardCharsets.UTF_8);
     }
 
-    private static boolean isJsonFile(@Nonnull Path path) {
+    static boolean isGeneratedPatchTargetFile(@Nonnull Path path) {
         Path fileName = path.getFileName();
-        return fileName != null && fileName.toString().endsWith(".json");
+        if (fileName == null) {
+            return false;
+        }
+        String name = fileName.toString();
+        return name.endsWith(".json")
+                || name.endsWith(".particlesystem")
+                || name.endsWith(".particlespawner");
     }
 
     private void moveGeneratedPackToEnd(@Nonnull AssetModule assetModule) {

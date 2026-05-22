@@ -105,6 +105,29 @@ final class AssetPatchGeneratedPackPublisherTest {
     }
 
     @Test
+    void runtimeRefreshPrunesGeneratedJsonLikeTargetsThatAreNoLongerProduced(@TempDir Path tempDir) throws Exception {
+        Path staleParticle = tempDir.resolve("Server/Particles/Old.particlesystem");
+        Path staleSpawner = tempDir.resolve("Server/Particles/Spawners/Old.particlespawner");
+        Path currentParticle = tempDir.resolve("Server/Particles/Current.particlesystem");
+        Path unrelatedText = tempDir.resolve("Server/Particles/readme.txt");
+        Files.createDirectories(staleSpawner.getParent());
+        Files.writeString(staleParticle, "{}");
+        Files.writeString(staleSpawner, "{}");
+        Files.writeString(currentParticle, "{}");
+        Files.writeString(unrelatedText, "kept");
+
+        AssetPatchGeneratedPackPublisher.pruneStaleGeneratedFiles(
+                tempDir,
+                Set.of("Server/Particles/Current.particlesystem")
+        );
+
+        assertFalse(Files.exists(staleParticle));
+        assertFalse(Files.exists(staleSpawner));
+        assertTrue(Files.exists(currentParticle));
+        assertTrue(Files.exists(unrelatedText));
+    }
+
+    @Test
     void runtimeRefreshUnloadsExistingGeneratedBuildersBeforeCacheFilesArePruned(@TempDir Path tempDir) {
         RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
         AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
