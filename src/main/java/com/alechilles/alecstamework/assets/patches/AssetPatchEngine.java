@@ -14,34 +14,34 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * Applies optional NPC template patch operations to parsed JSON templates.
+ * Applies optional asset patch operations to parsed JSON-like assets.
  */
-public final class NpcTemplatePatchEngine {
-    private final NpcTemplatePatchMacroExpander macroExpander;
+public final class AssetPatchEngine {
+    private final AssetPatchMacroExpander macroExpander;
 
-    public NpcTemplatePatchEngine() {
-        this(new NpcTemplatePatchMacroExpander());
+    public AssetPatchEngine() {
+        this(new AssetPatchMacroExpander());
     }
 
-    NpcTemplatePatchEngine(@Nonnull NpcTemplatePatchMacroExpander macroExpander) {
+    AssetPatchEngine(@Nonnull AssetPatchMacroExpander macroExpander) {
         this.macroExpander = macroExpander;
     }
 
     @Nonnull
     public PatchResult apply(@Nonnull JsonObject source,
-                             @Nonnull List<NpcTemplatePatchDefinition> definitions) {
+                             @Nonnull List<AssetPatchDefinition> definitions) {
         JsonObject working = source.deepCopy();
-        NpcTemplatePatchStatus status = new NpcTemplatePatchStatus();
-        List<NpcTemplatePatchDefinition> sorted = definitions.stream()
-                .filter(NpcTemplatePatchDefinition::isEnabled)
-                .sorted(Comparator.comparingInt(NpcTemplatePatchDefinition::getPriority)
-                        .thenComparing(NpcTemplatePatchDefinition::getId))
+        AssetPatchStatus status = new AssetPatchStatus();
+        List<AssetPatchDefinition> sorted = definitions.stream()
+                .filter(AssetPatchDefinition::isEnabled)
+                .sorted(Comparator.comparingInt(AssetPatchDefinition::getPriority)
+                        .thenComparing(AssetPatchDefinition::getId))
                 .toList();
 
-        for (NpcTemplatePatchDefinition definition : sorted) {
-            for (NpcTemplatePatchOperation operation : definition.getOperations()) {
-                List<NpcTemplatePatchOperation> expanded = macroExpander.expand(operation);
-                for (NpcTemplatePatchOperation rawOperation : expanded) {
+        for (AssetPatchDefinition definition : sorted) {
+            for (AssetPatchOperation operation : definition.getOperations()) {
+                List<AssetPatchOperation> expanded = macroExpander.expand(operation);
+                for (AssetPatchOperation rawOperation : expanded) {
                     applyOperation(working, definition, rawOperation, status);
                 }
             }
@@ -50,9 +50,9 @@ public final class NpcTemplatePatchEngine {
     }
 
     private void applyOperation(@Nonnull JsonObject root,
-                                @Nonnull NpcTemplatePatchDefinition definition,
-                                @Nonnull NpcTemplatePatchOperation operation,
-                                @Nonnull NpcTemplatePatchStatus status) {
+                                @Nonnull AssetPatchDefinition definition,
+                                @Nonnull AssetPatchOperation operation,
+                                @Nonnull AssetPatchStatus status) {
         try {
             OperationOutcome outcome = applyRawOperation(root, operation);
             String label = definition.getId() + ":" + operation.getId();
@@ -73,7 +73,7 @@ public final class NpcTemplatePatchEngine {
 
     @Nonnull
     private OperationOutcome applyRawOperation(@Nonnull JsonObject root,
-                                               @Nonnull NpcTemplatePatchOperation operation) {
+                                               @Nonnull AssetPatchOperation operation) {
         String op = operation.getOp().toLowerCase(Locale.ROOT);
         return switch (op) {
             case "add" -> add(root, operation);
@@ -86,7 +86,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     @Nonnull
-    private OperationOutcome add(@Nonnull JsonObject root, @Nonnull NpcTemplatePatchOperation operation) {
+    private OperationOutcome add(@Nonnull JsonObject root, @Nonnull AssetPatchOperation operation) {
         JsonElement value = requiredValue(operation);
         PathTarget target = resolveParent(root, requiredPath(operation), true);
         if (target.parent().isJsonObject()) {
@@ -101,7 +101,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     @Nonnull
-    private OperationOutcome merge(@Nonnull JsonObject root, @Nonnull NpcTemplatePatchOperation operation) {
+    private OperationOutcome merge(@Nonnull JsonObject root, @Nonnull AssetPatchOperation operation) {
         JsonElement value = requiredValue(operation);
         if (!value.isJsonObject()) {
             throw new IllegalArgumentException("Merge value must be an object.");
@@ -115,7 +115,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     @Nonnull
-    private OperationOutcome replace(@Nonnull JsonObject root, @Nonnull NpcTemplatePatchOperation operation) {
+    private OperationOutcome replace(@Nonnull JsonObject root, @Nonnull AssetPatchOperation operation) {
         JsonElement value = requiredValue(operation);
         PathTarget target = resolveParent(root, requiredPath(operation), false);
         if (target.parent().isJsonObject()) {
@@ -136,7 +136,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     @Nonnull
-    private OperationOutcome remove(@Nonnull JsonObject root, @Nonnull NpcTemplatePatchOperation operation) {
+    private OperationOutcome remove(@Nonnull JsonObject root, @Nonnull AssetPatchOperation operation) {
         PathTarget target = resolveParent(root, requiredPath(operation), false);
         if (target.parent().isJsonObject()) {
             JsonElement removed = target.parent().getAsJsonObject().remove(target.leaf());
@@ -155,7 +155,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     @Nonnull
-    private OperationOutcome insert(@Nonnull JsonObject root, @Nonnull NpcTemplatePatchOperation operation) {
+    private OperationOutcome insert(@Nonnull JsonObject root, @Nonnull AssetPatchOperation operation) {
         JsonElement value = requiredValue(operation);
         JsonElement target = resolve(root, requiredPath(operation));
         if (target == null || !target.isJsonArray()) {
@@ -180,7 +180,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     private int anchorIndex(@Nonnull JsonArray array,
-                            @Nonnull NpcTemplatePatchOperation operation,
+                            @Nonnull AssetPatchOperation operation,
                             boolean after) {
         JsonObject find = operation.getFind();
         if (find == null) {
@@ -347,7 +347,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     @Nonnull
-    private static String requiredPath(@Nonnull NpcTemplatePatchOperation operation) {
+    private static String requiredPath(@Nonnull AssetPatchOperation operation) {
         String path = operation.getPath();
         if (path == null || path.isBlank()) {
             throw new IllegalArgumentException("Operation " + operation.getId() + " requires Path.");
@@ -356,7 +356,7 @@ public final class NpcTemplatePatchEngine {
     }
 
     @Nonnull
-    private static JsonElement requiredValue(@Nonnull NpcTemplatePatchOperation operation) {
+    private static JsonElement requiredValue(@Nonnull AssetPatchOperation operation) {
         JsonElement value = operation.getValue();
         if (value == null) {
             throw new IllegalArgumentException("Operation " + operation.getId() + " requires Value.");
@@ -367,7 +367,7 @@ public final class NpcTemplatePatchEngine {
     /**
      * Patched JSON plus diagnostics from a patch run.
      */
-    public record PatchResult(@Nonnull JsonObject patched, @Nonnull NpcTemplatePatchStatus status) {
+    public record PatchResult(@Nonnull JsonObject patched, @Nonnull AssetPatchStatus status) {
     }
 
     private record PathTarget(@Nonnull JsonElement parent, @Nonnull String leaf) {

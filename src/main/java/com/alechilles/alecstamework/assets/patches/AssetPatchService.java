@@ -18,25 +18,25 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 
 /**
- * Coordinates discovery, generation, publication, and diagnostics for optional NPC template patches.
+ * Coordinates discovery, generation, publication, and diagnostics for optional asset patches.
  */
-public final class NpcTemplatePatchService {
+public final class AssetPatchService {
     private final JavaPlugin plugin;
     private final String generatedPackId;
-    private final NpcTemplatePatchScanner scanner;
-    private final NpcTemplatePatchTargetResolver targetResolver;
-    private final NpcTemplatePatchEngine patchEngine;
-    private final NpcTemplatePatchGeneratedPackPublisher publisher;
+    private final AssetPatchScanner scanner;
+    private final AssetPatchTargetResolver targetResolver;
+    private final AssetPatchEngine patchEngine;
+    private final AssetPatchGeneratedPackPublisher publisher;
 
-    private volatile NpcTemplatePatchStatus lastStatus = new NpcTemplatePatchStatus();
+    private volatile AssetPatchStatus lastStatus = new AssetPatchStatus();
 
-    public NpcTemplatePatchService(@Nonnull JavaPlugin plugin) {
+    public AssetPatchService(@Nonnull JavaPlugin plugin) {
         this.plugin = plugin;
         this.generatedPackId = new PluginIdentifier(plugin.getManifest()) + "_GeneratedPatches";
-        this.scanner = new NpcTemplatePatchScanner(plugin.getLogger());
-        this.targetResolver = new NpcTemplatePatchTargetResolver();
-        this.patchEngine = new NpcTemplatePatchEngine();
-        this.publisher = new NpcTemplatePatchGeneratedPackPublisher(plugin, generatedPackId);
+        this.scanner = new AssetPatchScanner(plugin.getLogger());
+        this.targetResolver = new AssetPatchTargetResolver();
+        this.patchEngine = new AssetPatchEngine();
+        this.publisher = new AssetPatchGeneratedPackPublisher(plugin, generatedPackId);
     }
 
     public void registerLoadHook() {
@@ -51,9 +51,9 @@ public final class NpcTemplatePatchService {
     }
 
     @Nonnull
-    public NpcTemplatePatchStatus reload() {
+    public AssetPatchStatus reload() {
         RegenerationResult result = regenerateAndPublish(
-                NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
+                AssetPatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
         );
         if (result.reloadNpcBuilders()) {
             publisher.reloadNpcBuilders();
@@ -62,7 +62,7 @@ public final class NpcTemplatePatchService {
     }
 
     @Nonnull
-    public NpcTemplatePatchStatus getLastStatus() {
+    public AssetPatchStatus getLastStatus() {
         return lastStatus;
     }
 
@@ -74,14 +74,14 @@ public final class NpcTemplatePatchService {
     private void onLoadAssets(@Nonnull LoadAssetEvent event) {
         try {
             RegenerationResult result = regenerateAndPublish(
-                    NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
+                    AssetPatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
             );
             if (result.status().hasFailures()) {
                 event.failed(false, "Tamework patch errors");
             }
         } catch (RuntimeException ex) {
             plugin.getLogger().at(Level.WARNING).withCause(ex).log(
-                    "Tamework template patches: failed during pre-NPC asset load."
+                    "Tamework asset patches: failed during asset load."
             );
             event.failed(false, "Tamework patch generation failed");
         }
@@ -89,9 +89,9 @@ public final class NpcTemplatePatchService {
 
     @Nonnull
     private RegenerationResult regenerateAndPublish(
-            @Nonnull NpcTemplatePatchGeneratedPackPublisher.RegistrationMode registrationMode
+            @Nonnull AssetPatchGeneratedPackPublisher.RegistrationMode registrationMode
     ) {
-        NpcTemplatePatchStatus status = new NpcTemplatePatchStatus();
+        AssetPatchStatus status = new AssetPatchStatus();
         AssetModule assetModule = AssetModule.get();
         if (assetModule == null) {
             status.addFailed("AssetModule unavailable.");
@@ -99,23 +99,23 @@ public final class NpcTemplatePatchService {
             return new RegenerationResult(status, false);
         }
 
-        List<NpcTemplatePatchDefinition> definitions =
+        List<AssetPatchDefinition> definitions =
                 scanner.scan(assetModule.getAssetPacks(), generatedPackId, status);
-        Map<String, List<NpcTemplatePatchDefinition>> byTarget = definitions.stream()
+        Map<String, List<AssetPatchDefinition>> byTarget = definitions.stream()
                 .collect(Collectors.groupingBy(
-                        NpcTemplatePatchDefinition::getTarget,
+                        AssetPatchDefinition::getTarget,
                         LinkedHashMap::new,
                         Collectors.toList()
                 ));
 
-        Map<String, JsonObject> generatedTemplates = new LinkedHashMap<>();
-        for (Map.Entry<String, List<NpcTemplatePatchDefinition>> entry : byTarget.entrySet()) {
-            generateTarget(assetModule, entry.getKey(), entry.getValue(), generatedTemplates, status);
+        Map<String, JsonObject> generatedAssets = new LinkedHashMap<>();
+        for (Map.Entry<String, List<AssetPatchDefinition>> entry : byTarget.entrySet()) {
+            generateTarget(assetModule, entry.getKey(), entry.getValue(), generatedAssets, status);
         }
 
         boolean reloadNpcBuilders = false;
         try {
-            reloadNpcBuilders = publisher.publish(generatedTemplates, status, registrationMode);
+            reloadNpcBuilders = publisher.publish(generatedAssets, status, registrationMode);
         } catch (IOException ex) {
             String message = "Failed to publish generated Tamework patch pack: " + ex.getMessage();
             status.addFailed(message);
@@ -127,31 +127,31 @@ public final class NpcTemplatePatchService {
         return new RegenerationResult(status, reloadNpcBuilders);
     }
 
-    private record RegenerationResult(@Nonnull NpcTemplatePatchStatus status, boolean reloadNpcBuilders) {
+    private record RegenerationResult(@Nonnull AssetPatchStatus status, boolean reloadNpcBuilders) {
     }
 
     private void generateTarget(@Nonnull AssetModule assetModule,
                                 @Nonnull String target,
-                                @Nonnull List<NpcTemplatePatchDefinition> definitions,
-                                @Nonnull Map<String, JsonObject> generatedTemplates,
-                                @Nonnull NpcTemplatePatchStatus status) {
-        NpcTemplatePatchTargetResolver.TargetSource source =
+                                @Nonnull List<AssetPatchDefinition> definitions,
+                                @Nonnull Map<String, JsonObject> generatedAssets,
+                                @Nonnull AssetPatchStatus status) {
+        AssetPatchTargetResolver.TargetSource source =
                 targetResolver.resolve(assetModule.getAssetPacks(), generatedPackId, target);
         if (source == null) {
-            status.addFailed("No source template found for target " + target + ".");
+            status.addFailed("No source asset found for target " + target + ".");
             return;
         }
         try {
-            JsonObject sourceJson = targetResolver.readTemplate(source);
-            NpcTemplatePatchEngine.PatchResult result = patchEngine.apply(sourceJson, definitions);
+            JsonObject sourceJson = targetResolver.readAsset(source);
+            AssetPatchEngine.PatchResult result = patchEngine.apply(sourceJson, definitions);
             mergeStatus(status, result.status());
             if (!result.status().hasFailures()) {
-                generatedTemplates.put(target, result.patched());
+                generatedAssets.put(target, result.patched());
             }
-        } catch (NpcTemplatePatchEngine.PatchFailureException ex) {
+        } catch (AssetPatchEngine.PatchFailureException ex) {
             status.addFailed(ex.getMessage());
             plugin.getLogger().at(Level.WARNING).withCause(ex).log(
-                    "Tamework template patches: failed target " + target + "."
+                    "Tamework asset patches: failed target " + target + "."
             );
         } catch (Exception ex) {
             String message = "Failed to patch target " + target + " from " + source.packId() + ": " + ex.getMessage();
@@ -160,14 +160,14 @@ public final class NpcTemplatePatchService {
         }
     }
 
-    private void mergeStatus(@Nonnull NpcTemplatePatchStatus target, @Nonnull NpcTemplatePatchStatus source) {
+    private void mergeStatus(@Nonnull AssetPatchStatus target, @Nonnull AssetPatchStatus source) {
         source.getApplied().forEach(target::addApplied);
         source.getSkipped().forEach(target::addSkipped);
         source.getFailed().forEach(target::addFailed);
         source.getGeneratedTargets().forEach(target::addGeneratedTarget);
     }
 
-    private void logStatus(@Nonnull NpcTemplatePatchStatus status) {
+    private void logStatus(@Nonnull AssetPatchStatus status) {
         Level level = status.hasFailures() ? Level.WARNING : Level.INFO;
         plugin.getLogger().at(level).log("Tamework patches: " + status.summaryLine());
         for (String failure : status.getFailed()) {

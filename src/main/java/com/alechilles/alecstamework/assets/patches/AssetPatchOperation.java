@@ -7,9 +7,9 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * One raw or macro operation inside an optional NPC template patch.
+ * One raw or macro operation inside an optional asset patch.
  */
-public final class NpcTemplatePatchOperation {
+public final class AssetPatchOperation {
     private final String id;
     private final String op;
     private final String path;
@@ -21,7 +21,7 @@ public final class NpcTemplatePatchOperation {
     private final JsonObject existing;
     private final JsonObject options;
 
-    private NpcTemplatePatchOperation(@Nonnull String id,
+    private AssetPatchOperation(@Nonnull String id,
                                       @Nonnull String op,
                                       @Nullable String path,
                                       @Nullable String position,
@@ -44,14 +44,14 @@ public final class NpcTemplatePatchOperation {
     }
 
     @Nonnull
-    static NpcTemplatePatchOperation parse(@Nonnull JsonObject object, @Nonnull String patchId, int index) {
-        String op = NpcTemplatePatchDefinition.readRequiredString(object, "Op", patchId + " operation " + index);
-        String id = NpcTemplatePatchDefinition.readString(object, "Id", patchId + "#" + index);
-        String path = NpcTemplatePatchDefinition.readString(object, "Path", null);
-        String position = NpcTemplatePatchDefinition.readString(object, "Position", null);
-        String macro = NpcTemplatePatchDefinition.readString(object, "Macro", null);
-        boolean required = NpcTemplatePatchDefinition.readBoolean(object, "Required", true);
-        return new NpcTemplatePatchOperation(
+    static AssetPatchOperation parse(@Nonnull JsonObject object, @Nonnull String patchId, int index) {
+        String op = AssetPatchDefinition.readRequiredString(object, "Op", patchId + " operation " + index);
+        String id = AssetPatchDefinition.readString(object, "Id", patchId + "#" + index);
+        String path = AssetPatchDefinition.readString(object, "Path", null);
+        String position = AssetPatchDefinition.readString(object, "Position", null);
+        String macro = AssetPatchDefinition.readString(object, "Macro", null);
+        boolean required = AssetPatchDefinition.readBoolean(object, "Required", true);
+        return new AssetPatchOperation(
                 id,
                 op,
                 path,
@@ -66,7 +66,7 @@ public final class NpcTemplatePatchOperation {
     }
 
     @Nonnull
-    public static NpcTemplatePatchOperation raw(@Nonnull String id,
+    public static AssetPatchOperation raw(@Nonnull String id,
                                                 @Nonnull String op,
                                                 @Nullable String path,
                                                 @Nullable String position,
@@ -74,7 +74,7 @@ public final class NpcTemplatePatchOperation {
                                                 @Nullable JsonElement value,
                                                 @Nullable JsonObject find,
                                                 @Nullable JsonObject existing) {
-        return new NpcTemplatePatchOperation(id, op, path, position, null, required, value, find, existing, null);
+        return new AssetPatchOperation(id, op, path, position, null, required, value, find, existing, null);
     }
 
     @Nonnull

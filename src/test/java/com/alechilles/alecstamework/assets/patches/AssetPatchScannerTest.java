@@ -13,7 +13,7 @@ import com.hypixel.hytale.assetstore.AssetPack;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
-final class NpcTemplatePatchScannerTest {
+final class AssetPatchScannerTest {
 
     @TempDir
     private Path tempDir;
@@ -21,7 +21,7 @@ final class NpcTemplatePatchScannerTest {
     @Test
     void scansPatchDefinitionsFromRegisteredPackRoots() throws Exception {
         Path packRoot = tempDir.resolve("patch-pack");
-        Path patchDir = packRoot.resolve(NpcTemplatePatchScanner.PATCH_DIRECTORY).resolve("AnimalHusbandry/Livestock");
+        Path patchDir = packRoot.resolve(AssetPatchScanner.PATCH_DIRECTORY).resolve("AnimalHusbandry/Livestock");
         Files.createDirectories(patchDir);
         Files.writeString(
                 patchDir.resolve("Livestock.json"),
@@ -42,8 +42,8 @@ final class NpcTemplatePatchScannerTest {
                 StandardCharsets.UTF_8
         );
 
-        NpcTemplatePatchStatus status = new NpcTemplatePatchStatus();
-        List<NpcTemplatePatchDefinition> definitions = new NpcTemplatePatchScanner(null)
+        AssetPatchStatus status = new AssetPatchStatus();
+        List<AssetPatchDefinition> definitions = new AssetPatchScanner(null)
                 .scan(List.of(pack("ModPack", packRoot)), "GeneratedPack", status);
 
         assertEquals(1, definitions.size());
@@ -60,8 +60,8 @@ final class NpcTemplatePatchScannerTest {
         writeTemplate(baseRoot, target, "Base");
         writeTemplate(overrideRoot, target, "Override");
 
-        NpcTemplatePatchTargetResolver resolver = new NpcTemplatePatchTargetResolver();
-        NpcTemplatePatchTargetResolver.TargetSource source = resolver.resolve(
+        AssetPatchTargetResolver resolver = new AssetPatchTargetResolver();
+        AssetPatchTargetResolver.TargetSource source = resolver.resolve(
                 List.of(pack("Base", baseRoot), pack("Override", overrideRoot)),
                 "GeneratedPack",
                 target
@@ -69,7 +69,7 @@ final class NpcTemplatePatchScannerTest {
 
         assertNotNull(source);
         assertEquals("Override", source.packId());
-        assertEquals("Override", resolver.readTemplate(source).get("Name").getAsString());
+        assertEquals("Override", resolver.readAsset(source).get("Name").getAsString());
     }
 
     private static void writeTemplate(Path root, String target, String name) throws Exception {

@@ -16,9 +16,9 @@ import com.google.gson.JsonObject;
 import com.hypixel.hytale.assetstore.AssetPack;
 
 /**
- * Resolves the currently winning source template for a target asset path.
+ * Resolves the currently winning source asset for a target asset path.
  */
-public final class NpcTemplatePatchTargetResolver {
+public final class AssetPatchTargetResolver {
     private static final Gson GSON = new Gson();
 
     @Nullable
@@ -26,7 +26,7 @@ public final class NpcTemplatePatchTargetResolver {
                                 @Nonnull String generatedPackId,
                                 @Nonnull String target) {
         TargetSource result = null;
-        String normalizedTarget = NpcTemplatePatchDefinition.normalizeAssetPath(target);
+        String normalizedTarget = AssetPatchDefinition.normalizeAssetPath(target);
         for (AssetPack pack : packs) {
             if (pack == null || generatedPackId.equals(pack.getName()) || pack.getRoot() == null) {
                 continue;
@@ -44,18 +44,18 @@ public final class NpcTemplatePatchTargetResolver {
     }
 
     @Nonnull
-    public JsonObject readTemplate(@Nonnull TargetSource source) throws IOException {
+    public JsonObject readAsset(@Nonnull TargetSource source) throws IOException {
         try (Reader reader = Files.newBufferedReader(source.path(), StandardCharsets.UTF_8)) {
             JsonElement element = GSON.fromJson(reader, JsonElement.class);
             if (element == null || !element.isJsonObject()) {
-                throw new IOException("Template source is not a JSON object: " + source.path());
+                throw new IOException("Asset source is not a JSON object: " + source.path());
             }
             return element.getAsJsonObject();
         }
     }
 
     /**
-     * Winning source file for a target template.
+     * Winning source file for a target asset.
      */
     public record TargetSource(@Nonnull String packId, @Nonnull Path path) {
     }

@@ -20,16 +20,16 @@ import org.junit.jupiter.api.Test;
 /**
  * Covers generated patch pack publication decisions without mutating the live AssetModule in tests.
  */
-final class NpcTemplatePatchGeneratedPackPublisherTest {
+final class AssetPatchGeneratedPackPublisherTest {
 
     @Test
     void startupRegistersGeneratedPackWhenMissing() {
         assertEquals(
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REGISTER_PACK,
-                NpcTemplatePatchGeneratedPackPublisher.publicationAction(
+                AssetPatchGeneratedPackPublisher.PublicationAction.REGISTER_PACK,
+                AssetPatchGeneratedPackPublisher.publicationAction(
                         false,
                         true,
-                        NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
+                        AssetPatchGeneratedPackPublisher.RegistrationMode.ALLOW_REGISTRATION
                 )
         );
     }
@@ -37,11 +37,11 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
     @Test
     void runtimeReloadRefreshesExistingGeneratedPackWithoutRegistrationMutation() {
         assertEquals(
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
-                NpcTemplatePatchGeneratedPackPublisher.publicationAction(
+                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
+                AssetPatchGeneratedPackPublisher.publicationAction(
                         true,
                         true,
-                        NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
+                        AssetPatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
                 )
         );
     }
@@ -49,37 +49,37 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
     @Test
     void runtimeReloadDoesNotRegisterMissingGeneratedPackFromWorldThread() {
         assertEquals(
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.MISSING_RUNTIME_PACK,
-                NpcTemplatePatchGeneratedPackPublisher.publicationAction(
+                AssetPatchGeneratedPackPublisher.PublicationAction.MISSING_RUNTIME_PACK,
+                AssetPatchGeneratedPackPublisher.publicationAction(
                         false,
                         true,
-                        NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
+                        AssetPatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
                 )
         );
     }
 
     @Test
     void startupRegistrationRecreatesCacheBeforeRegisteringPack() {
-        assertTrue(NpcTemplatePatchGeneratedPackPublisher.shouldRecreateCache(
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REGISTER_PACK
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldRecreateCache(
+                AssetPatchGeneratedPackPublisher.PublicationAction.REGISTER_PACK
         ));
     }
 
     @Test
     void runtimeRefreshPreservesWatchedGeneratedPatchDirectories() {
-        assertFalse(NpcTemplatePatchGeneratedPackPublisher.shouldRecreateCache(
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldRecreateCache(
+                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK
         ));
     }
 
     @Test
     void emptyGenerationDoesNotMutatePackRegistration() {
         assertEquals(
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
-                NpcTemplatePatchGeneratedPackPublisher.publicationAction(
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.publicationAction(
                         true,
                         false,
-                        NpcTemplatePatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
+                        AssetPatchGeneratedPackPublisher.RegistrationMode.REFRESH_EXISTING_ONLY
                 )
         );
     }
@@ -94,7 +94,7 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
         Files.writeString(currentTarget, "{}");
         Files.writeString(nonJsonArtifact, "kept");
 
-        NpcTemplatePatchGeneratedPackPublisher.pruneStaleGeneratedFiles(
+        AssetPatchGeneratedPackPublisher.pruneStaleGeneratedFiles(
                 tempDir,
                 Set.of("Server/NPC/Roles/_Core/Templates/Current.json")
         );
@@ -107,7 +107,7 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
     @Test
     void runtimeRefreshUnloadsExistingGeneratedBuildersBeforeCacheFilesArePruned(@TempDir Path tempDir) {
         RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
-        NpcTemplatePatchGeneratedPackPublisher publisher = new NpcTemplatePatchGeneratedPackPublisher(
+        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
                 null,
                 "Generated",
                 reloader
@@ -116,8 +116,8 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
 
         publisher.unloadExistingGeneratedBuildersBeforeCacheMutation(
                 generatedPack,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
-                new NpcTemplatePatchStatus()
+                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
+                new AssetPatchStatus()
         );
 
         assertEquals(List.of("unload:Generated"), reloader.events);
@@ -131,7 +131,7 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
         Files.writeString(staleTarget, "{}");
         RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
         reloader.staleTargetToCheck = staleTarget;
-        NpcTemplatePatchGeneratedPackPublisher publisher = new NpcTemplatePatchGeneratedPackPublisher(
+        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
                 null,
                 "Generated",
                 reloader
@@ -140,11 +140,11 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
 
         Map<String, JsonObject> generatedTemplates = new LinkedHashMap<>();
         generatedTemplates.put("Server/NPC/Roles/_Core/Templates/Current.json", new JsonObject());
-        NpcTemplatePatchStatus status = new NpcTemplatePatchStatus();
+        AssetPatchStatus status = new AssetPatchStatus();
 
         assertTrue(publisher.mutateCacheForPublication(
                 generatedPack,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
+                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
                 tempDir,
                 generatedTemplates,
                 status
@@ -164,7 +164,7 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
         Files.writeString(staleTarget, "{}");
         RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
         reloader.staleTargetToCheck = staleTarget;
-        NpcTemplatePatchGeneratedPackPublisher publisher = new NpcTemplatePatchGeneratedPackPublisher(
+        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
                 null,
                 "Generated",
                 reloader
@@ -173,10 +173,10 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
 
         assertTrue(publisher.mutateCacheForPublication(
                 generatedPack,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
                 tempDir,
                 Map.<String, JsonObject>of(),
-                new NpcTemplatePatchStatus()
+                new AssetPatchStatus()
         ));
 
         assertEquals(List.of("unload:Generated:staleExists=true"), reloader.events);
@@ -191,17 +191,17 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
         Files.writeString(staleTarget, "{}");
         RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
         reloader.throwOnUnload = true;
-        NpcTemplatePatchGeneratedPackPublisher publisher = new NpcTemplatePatchGeneratedPackPublisher(
+        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
                 null,
                 "Generated",
                 reloader
         );
         AssetPack generatedPack = new AssetPack(tempDir, "Generated", tempDir, null, false, null);
-        NpcTemplatePatchStatus status = new NpcTemplatePatchStatus();
+        AssetPatchStatus status = new AssetPatchStatus();
 
         assertFalse(publisher.mutateCacheForPublication(
                 generatedPack,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
                 tempDir,
                 Map.<String, JsonObject>of(),
                 status
@@ -214,29 +214,29 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
 
     @Test
     void runtimeReloadOnlyReloadsNpcBuildersAfterSuccessfulExistingPackPublication() {
-        assertFalse(NpcTemplatePatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
                 false,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
+                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
                 true
         ));
-        assertTrue(NpcTemplatePatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
                 true,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
+                AssetPatchGeneratedPackPublisher.PublicationAction.REFRESH_EXISTING_PACK,
                 true
         ));
-        assertTrue(NpcTemplatePatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertTrue(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
                 true,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
                 true
         ));
-        assertFalse(NpcTemplatePatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
                 true,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
                 false
         ));
-        assertFalse(NpcTemplatePatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
+        assertFalse(AssetPatchGeneratedPackPublisher.shouldReloadNpcBuildersAfterPublication(
                 true,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.MISSING_RUNTIME_PACK,
+                AssetPatchGeneratedPackPublisher.PublicationAction.MISSING_RUNTIME_PACK,
                 false
         ));
     }
@@ -244,7 +244,7 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
     @Test
     void emptyRuntimeRefreshAlsoUnloadsExistingGeneratedBuilders(@TempDir Path tempDir) {
         RecordingBuilderCacheReloader reloader = new RecordingBuilderCacheReloader();
-        NpcTemplatePatchGeneratedPackPublisher publisher = new NpcTemplatePatchGeneratedPackPublisher(
+        AssetPatchGeneratedPackPublisher publisher = new AssetPatchGeneratedPackPublisher(
                 null,
                 "Generated",
                 reloader
@@ -253,15 +253,15 @@ final class NpcTemplatePatchGeneratedPackPublisherTest {
 
         publisher.unloadExistingGeneratedBuildersBeforeCacheMutation(
                 generatedPack,
-                NpcTemplatePatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
-                new NpcTemplatePatchStatus()
+                AssetPatchGeneratedPackPublisher.PublicationAction.NO_GENERATED_TEMPLATES,
+                new AssetPatchStatus()
         );
 
         assertEquals(List.of("unload:Generated"), reloader.events);
     }
 
     private static final class RecordingBuilderCacheReloader
-            implements NpcTemplatePatchGeneratedPackPublisher.BuilderCacheReloader {
+            implements AssetPatchGeneratedPackPublisher.BuilderCacheReloader {
         private final List<String> events = new ArrayList<>();
         private Path staleTargetToCheck;
         private boolean throwOnUnload;

@@ -22,22 +22,22 @@ import com.hypixel.hytale.logger.HytaleLogger;
 /**
  * Scans registered asset packs for optional patch definitions.
  */
-public final class NpcTemplatePatchScanner {
+public final class AssetPatchScanner {
     public static final String PATCH_DIRECTORY = "Server/Tamework/Patches";
 
     private static final Gson GSON = new Gson();
 
     private final HytaleLogger logger;
 
-    public NpcTemplatePatchScanner(@Nullable HytaleLogger logger) {
+    public AssetPatchScanner(@Nullable HytaleLogger logger) {
         this.logger = logger;
     }
 
     @Nonnull
-    public List<NpcTemplatePatchDefinition> scan(@Nonnull List<AssetPack> packs,
+    public List<AssetPatchDefinition> scan(@Nonnull List<AssetPack> packs,
                                                  @Nonnull String generatedPackId,
-                                                 @Nonnull NpcTemplatePatchStatus status) {
-        List<NpcTemplatePatchDefinition> definitions = new ArrayList<>();
+                                                 @Nonnull AssetPatchStatus status) {
+        List<AssetPatchDefinition> definitions = new ArrayList<>();
         for (AssetPack pack : packs) {
             if (pack == null || generatedPackId.equals(pack.getName())) {
                 continue;
@@ -52,16 +52,16 @@ public final class NpcTemplatePatchScanner {
             }
             scanPack(pack, patchRoot, definitions, status);
         }
-        definitions.sort(Comparator.comparing(NpcTemplatePatchDefinition::getTarget)
-                .thenComparingInt(NpcTemplatePatchDefinition::getPriority)
-                .thenComparing(NpcTemplatePatchDefinition::getId));
+        definitions.sort(Comparator.comparing(AssetPatchDefinition::getTarget)
+                .thenComparingInt(AssetPatchDefinition::getPriority)
+                .thenComparing(AssetPatchDefinition::getId));
         return definitions;
     }
 
     private void scanPack(@Nonnull AssetPack pack,
                           @Nonnull Path patchRoot,
-                          @Nonnull List<NpcTemplatePatchDefinition> definitions,
-                          @Nonnull NpcTemplatePatchStatus status) {
+                          @Nonnull List<AssetPatchDefinition> definitions,
+                          @Nonnull AssetPatchStatus status) {
         try (var stream = Files.walk(patchRoot)) {
             List<Path> files = stream
                     .filter(Files::isRegularFile)
@@ -72,7 +72,7 @@ public final class NpcTemplatePatchScanner {
                 parsePatchFile(pack, patchRoot, file, definitions, status);
             }
         } catch (IOException ex) {
-            String message = "Failed to scan template patches in pack '" + pack.getName() + "': " + ex.getMessage();
+            String message = "Failed to scan asset patches in pack '" + pack.getName() + "': " + ex.getMessage();
             status.addFailed(message);
             logWarning(message, ex);
         }
@@ -81,24 +81,24 @@ public final class NpcTemplatePatchScanner {
     private void parsePatchFile(@Nonnull AssetPack pack,
                                 @Nonnull Path patchRoot,
                                 @Nonnull Path file,
-                                @Nonnull List<NpcTemplatePatchDefinition> definitions,
-                                @Nonnull NpcTemplatePatchStatus status) {
-        String sourcePath = NpcTemplatePatchDefinition.normalizeAssetPath(PATCH_DIRECTORY + "/"
+                                @Nonnull List<AssetPatchDefinition> definitions,
+                                @Nonnull AssetPatchStatus status) {
+        String sourcePath = AssetPatchDefinition.normalizeAssetPath(PATCH_DIRECTORY + "/"
                 + patchRoot.relativize(file).toString());
         try (Reader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
             JsonElement element = GSON.fromJson(reader, JsonElement.class);
             if (element == null || !element.isJsonObject()) {
                 throw new IllegalArgumentException("Patch file must contain a JSON object.");
             }
-            NpcTemplatePatchDefinition definition =
-                    NpcTemplatePatchDefinition.parse((JsonObject) element, pack.getName(), sourcePath);
+            AssetPatchDefinition definition =
+                    AssetPatchDefinition.parse((JsonObject) element, pack.getName(), sourcePath);
             if (definition.isEnabled()) {
                 definitions.add(definition);
             } else {
                 status.addSkipped(definition.getId() + " disabled");
             }
         } catch (Exception ex) {
-            String message = "Failed to parse template patch " + pack.getName() + ":" + sourcePath + ": " + ex.getMessage();
+            String message = "Failed to parse asset patch " + pack.getName() + ":" + sourcePath + ": " + ex.getMessage();
             status.addFailed(message);
             logWarning(message, ex);
         }

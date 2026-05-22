@@ -12,10 +12,10 @@ import com.google.gson.JsonParser;
 /**
  * Expands compact Tamework-specific patch macros into explicit raw JSON operations.
  */
-final class NpcTemplatePatchMacroExpander {
+final class AssetPatchMacroExpander {
 
     @Nonnull
-    List<NpcTemplatePatchOperation> expand(@Nonnull NpcTemplatePatchOperation operation) {
+    List<AssetPatchOperation> expand(@Nonnull AssetPatchOperation operation) {
         if (!"macro".equalsIgnoreCase(operation.getOp())) {
             return List.of(operation);
         }
@@ -32,7 +32,7 @@ final class NpcTemplatePatchMacroExpander {
     }
 
     @Nonnull
-    private List<NpcTemplatePatchOperation> interactionBridge(@Nonnull NpcTemplatePatchOperation operation) {
+    private List<AssetPatchOperation> interactionBridge(@Nonnull AssetPatchOperation operation) {
         JsonObject options = options(operation);
         JsonObject actionFields = objectOption(options, "ActionFields", new JsonObject());
         JsonObject prompt = action("TameworkInteractPrompt", actionFields);
@@ -46,7 +46,7 @@ final class NpcTemplatePatchMacroExpander {
                 interact
         );
         return List.of(
-                NpcTemplatePatchOperation.raw(
+                AssetPatchOperation.raw(
                         operation.getId() + ".prompt",
                         "Insert",
                         operation.getPath(),
@@ -56,7 +56,7 @@ final class NpcTemplatePatchMacroExpander {
                         operation.getFind(),
                         matcherForAction("TameworkInteractPrompt")
                 ),
-                NpcTemplatePatchOperation.raw(
+                AssetPatchOperation.raw(
                         operation.getId() + ".interact",
                         "Insert",
                         operation.getPath(),
@@ -70,7 +70,7 @@ final class NpcTemplatePatchMacroExpander {
     }
 
     @Nonnull
-    private List<NpcTemplatePatchOperation> hookInstruction(@Nonnull NpcTemplatePatchOperation operation) {
+    private List<AssetPatchOperation> hookInstruction(@Nonnull AssetPatchOperation operation) {
         JsonObject options = options(operation);
         String hookId = requiredStringOption(options, "HookId", operation.getId());
         boolean consume = booleanOption(options, "Consume", true);
@@ -90,7 +90,7 @@ final class NpcTemplatePatchMacroExpander {
         if (instructions != null && instructions.isJsonArray()) {
             branch.add("Instructions", instructions.deepCopy());
         }
-        return List.of(NpcTemplatePatchOperation.raw(
+        return List.of(AssetPatchOperation.raw(
                 operation.getId() + ".hook",
                 "Insert",
                 operation.getPath(),
@@ -103,7 +103,7 @@ final class NpcTemplatePatchMacroExpander {
     }
 
     @Nonnull
-    private List<NpcTemplatePatchOperation> stateInstruction(@Nonnull NpcTemplatePatchOperation operation) {
+    private List<AssetPatchOperation> stateInstruction(@Nonnull AssetPatchOperation operation) {
         JsonObject options = options(operation);
         String component = requiredStringOption(options, "Component", operation.getId());
         JsonObject branch = parseObject("""
@@ -124,7 +124,7 @@ final class NpcTemplatePatchMacroExpander {
         if (sensor != null) {
             branch.add("Sensor", sensor.deepCopy());
         }
-        return List.of(NpcTemplatePatchOperation.raw(
+        return List.of(AssetPatchOperation.raw(
                 operation.getId() + ".state",
                 "Insert",
                 operation.getPath(),
@@ -137,7 +137,7 @@ final class NpcTemplatePatchMacroExpander {
     }
 
     @Nonnull
-    private static JsonObject options(@Nonnull NpcTemplatePatchOperation operation) {
+    private static JsonObject options(@Nonnull AssetPatchOperation operation) {
         JsonObject options = operation.getOptions();
         return options == null ? new JsonObject() : options;
     }

@@ -16,9 +16,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import org.junit.jupiter.api.Test;
 
-final class NpcTemplatePatchEngineTest {
+final class AssetPatchEngineTest {
 
-    private final NpcTemplatePatchEngine engine = new NpcTemplatePatchEngine();
+    private final AssetPatchEngine engine = new AssetPatchEngine();
 
     @Test
     void appliesRawObjectAndArrayOperations() {
@@ -35,7 +35,7 @@ final class NpcTemplatePatchEngineTest {
                   "Obsolete": true
                 }
                 """);
-        NpcTemplatePatchDefinition patch = patch("""
+        AssetPatchDefinition patch = patch("""
                 {
                   "Id": "TestPatch",
                   "Target": "Server/NPC/Roles/_Core/Templates/Test.json",
@@ -77,7 +77,7 @@ final class NpcTemplatePatchEngineTest {
                 }
                 """);
 
-        NpcTemplatePatchEngine.PatchResult result = engine.apply(template, List.of(patch));
+        AssetPatchEngine.PatchResult result = engine.apply(template, List.of(patch));
 
         assertEquals(2, result.patched().getAsJsonObject("Role").getAsJsonObject("Parameters").get("Speed").getAsInt());
         assertEquals(
@@ -100,7 +100,7 @@ final class NpcTemplatePatchEngineTest {
                   "Instructions": []
                 }
                 """);
-        NpcTemplatePatchDefinition patch = patch("""
+        AssetPatchDefinition patch = patch("""
                 {
                   "Id": "BrokenPatch",
                   "Target": "Server/NPC/Roles/_Core/Templates/Test.json",
@@ -117,7 +117,7 @@ final class NpcTemplatePatchEngineTest {
                 }
                 """);
 
-        assertThrows(NpcTemplatePatchEngine.PatchFailureException.class, () -> engine.apply(template, List.of(patch)));
+        assertThrows(AssetPatchEngine.PatchFailureException.class, () -> engine.apply(template, List.of(patch)));
     }
 
     @Test
@@ -127,7 +127,7 @@ final class NpcTemplatePatchEngineTest {
                   "Instructions": []
                 }
                 """);
-        NpcTemplatePatchDefinition patch = patch("""
+        AssetPatchDefinition patch = patch("""
                 {
                   "Id": "OptionalPatch",
                   "Target": "Server/NPC/Roles/_Core/Templates/Test.json",
@@ -145,7 +145,7 @@ final class NpcTemplatePatchEngineTest {
                 }
                 """);
 
-        NpcTemplatePatchEngine.PatchResult result = engine.apply(template, List.of(patch));
+        AssetPatchEngine.PatchResult result = engine.apply(template, List.of(patch));
 
         assertEquals(0, result.patched().getAsJsonArray("Instructions").size());
         assertEquals(1, result.status().getSkipped().size());
@@ -161,7 +161,7 @@ final class NpcTemplatePatchEngineTest {
                   ]
                 }
                 """);
-        NpcTemplatePatchDefinition patch = patch("""
+        AssetPatchDefinition patch = patch("""
                 {
                   "Id": "IdempotentPatch",
                   "Target": "Server/NPC/Roles/_Core/Templates/Test.json",
@@ -179,7 +179,7 @@ final class NpcTemplatePatchEngineTest {
                 }
                 """);
 
-        NpcTemplatePatchEngine.PatchResult result = engine.apply(template, List.of(patch));
+        AssetPatchEngine.PatchResult result = engine.apply(template, List.of(patch));
 
         assertEquals(2, result.patched().getAsJsonArray("Instructions").size());
         assertEquals(1, result.status().getSkipped().size());
@@ -202,7 +202,7 @@ final class NpcTemplatePatchEngineTest {
                   }
                 }
                 """);
-        NpcTemplatePatchDefinition patch = patch("""
+        AssetPatchDefinition patch = patch("""
                 {
                   "Id": "AHStyleLivestockPatch",
                   "Target": "Server/NPC/Roles/_Core/Templates/AH_Template_Livestock.json",
@@ -254,7 +254,7 @@ final class NpcTemplatePatchEngineTest {
                 }
                 """);
 
-        NpcTemplatePatchEngine.PatchResult result = engine.apply(template, List.of(patch));
+        AssetPatchEngine.PatchResult result = engine.apply(template, List.of(patch));
 
         assertEquals(
                 "Component_Tamework_Instruction_Follow_Simple_TP",
@@ -306,12 +306,12 @@ final class NpcTemplatePatchEngineTest {
         assertFalse(baseJson.contains("Component_Tamework"));
         assertFalse(baseJson.contains("\"Sleep\""));
 
-        NpcTemplatePatchDefinition patch = NpcTemplatePatchDefinition.parse(
+        AssetPatchDefinition patch = AssetPatchDefinition.parse(
                 object(readResource("Server/Tamework/Patches/Examples/Tamework_Example_Patch.json")),
                 "TestPack",
                 "Server/Tamework/Patches/Examples/Tamework_Example_Patch.json"
         );
-        NpcTemplatePatchEngine.PatchResult result = engine.apply(template, List.of(patch));
+        AssetPatchEngine.PatchResult result = engine.apply(template, List.of(patch));
         String patchedJson = result.patched().toString();
 
         assertTrue(patchedJson.contains("TameworkInteractPrompt"));
@@ -370,8 +370,8 @@ final class NpcTemplatePatchEngineTest {
         }
     }
 
-    private static NpcTemplatePatchDefinition patch(String json) {
-        return NpcTemplatePatchDefinition.parse(object(json), "TestPack", "Server/Tamework/Patches/Test.json");
+    private static AssetPatchDefinition patch(String json) {
+        return AssetPatchDefinition.parse(object(json), "TestPack", "Server/Tamework/Patches/Test.json");
     }
 
     private static JsonObject instructionByComment(JsonObject root, String comment) {
@@ -427,7 +427,7 @@ final class NpcTemplatePatchEngineTest {
     }
 
     private static String readResource(String path) throws Exception {
-        ClassLoader loader = NpcTemplatePatchEngineTest.class.getClassLoader();
+        ClassLoader loader = AssetPatchEngineTest.class.getClassLoader();
         try (InputStream stream = loader.getResourceAsStream(path)) {
             assertNotNull(stream, "Missing test resource " + path);
             return new String(stream.readAllBytes(), StandardCharsets.UTF_8);

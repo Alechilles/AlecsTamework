@@ -6,9 +6,9 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 /**
- * Captures the last optional NPC template patch run for commands and logs.
+ * Captures the last optional asset patch run for commands and logs.
  */
-public final class NpcTemplatePatchStatus {
+public final class AssetPatchStatus {
     private final List<String> applied = new ArrayList<>();
     private final List<String> skipped = new ArrayList<>();
     private final List<String> failed = new ArrayList<>();

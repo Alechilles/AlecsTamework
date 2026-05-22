@@ -12,22 +12,22 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * Parsed optional integration patch that targets one NPC role/template JSON asset.
+ * Parsed optional integration patch that targets one JSON-like asset.
  */
-public final class NpcTemplatePatchDefinition {
+public final class AssetPatchDefinition {
     private final String id;
     private final String target;
     private final int priority;
     private final boolean enabled;
-    private final List<NpcTemplatePatchOperation> operations;
+    private final List<AssetPatchOperation> operations;
     private final String sourcePack;
     private final String sourcePath;
 
-    private NpcTemplatePatchDefinition(@Nonnull String id,
+    private AssetPatchDefinition(@Nonnull String id,
                                        @Nonnull String target,
                                        int priority,
                                        boolean enabled,
-                                       @Nonnull List<NpcTemplatePatchOperation> operations,
+                                       @Nonnull List<AssetPatchOperation> operations,
                                        @Nonnull String sourcePack,
                                        @Nonnull String sourcePath) {
         this.id = id;
@@ -40,7 +40,7 @@ public final class NpcTemplatePatchDefinition {
     }
 
     @Nonnull
-    public static NpcTemplatePatchDefinition parse(@Nonnull JsonObject root,
+    public static AssetPatchDefinition parse(@Nonnull JsonObject root,
                                                    @Nonnull String sourcePack,
                                                    @Nonnull String sourcePath) {
         String fallbackId = sourcePack + ":" + sourcePath;
@@ -48,8 +48,8 @@ public final class NpcTemplatePatchDefinition {
         String target = readRequiredString(root, "Target", id);
         int priority = readInt(root, "Priority", 0);
         boolean enabled = readBoolean(root, "Enabled", true);
-        List<NpcTemplatePatchOperation> operations = readOperations(root, id);
-        return new NpcTemplatePatchDefinition(id, normalizeAssetPath(target), priority, enabled, operations, sourcePack, sourcePath);
+        List<AssetPatchOperation> operations = readOperations(root, id);
+        return new AssetPatchDefinition(id, normalizeAssetPath(target), priority, enabled, operations, sourcePack, sourcePath);
     }
 
     @Nonnull
@@ -71,7 +71,7 @@ public final class NpcTemplatePatchDefinition {
     }
 
     @Nonnull
-    public List<NpcTemplatePatchOperation> getOperations() {
+    public List<AssetPatchOperation> getOperations() {
         return operations;
     }
 
@@ -95,7 +95,7 @@ public final class NpcTemplatePatchDefinition {
     }
 
     @Nonnull
-    private static List<NpcTemplatePatchOperation> readOperations(@Nonnull JsonObject root, @Nonnull String patchId) {
+    private static List<AssetPatchOperation> readOperations(@Nonnull JsonObject root, @Nonnull String patchId) {
         JsonElement rawOperations = root.get("Operations");
         if (rawOperations == null || !rawOperations.isJsonArray()) {
             throw new IllegalArgumentException("Patch '" + patchId + "' must define an Operations array.");
@@ -104,13 +104,13 @@ public final class NpcTemplatePatchDefinition {
         if (array.isEmpty()) {
             return Collections.emptyList();
         }
-        List<NpcTemplatePatchOperation> operations = new ArrayList<>();
+        List<AssetPatchOperation> operations = new ArrayList<>();
         for (int i = 0; i < array.size(); i++) {
             JsonElement element = array.get(i);
             if (element == null || !element.isJsonObject()) {
                 throw new IllegalArgumentException("Patch '" + patchId + "' operation " + i + " must be an object.");
             }
-            operations.add(NpcTemplatePatchOperation.parse(element.getAsJsonObject(), patchId, i));
+            operations.add(AssetPatchOperation.parse(element.getAsJsonObject(), patchId, i));
         }
         return operations;
     }

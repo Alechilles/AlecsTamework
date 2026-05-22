@@ -21,9 +21,9 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 
 /**
- * Publishes generated patched templates as a transient runtime asset pack.
+ * Publishes generated patched assets as a transient runtime asset pack.
  */
-public final class NpcTemplatePatchGeneratedPackPublisher {
+public final class AssetPatchGeneratedPackPublisher {
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final String CACHE_DIRECTORY_NAME = "GeneratedPatches";
 
@@ -43,11 +43,11 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         MISSING_RUNTIME_PACK
     }
 
-    public NpcTemplatePatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin, @Nonnull String generatedPackId) {
+    public AssetPatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin, @Nonnull String generatedPackId) {
         this(plugin, generatedPackId, new NpcPluginBuilderCacheReloader());
     }
 
-    NpcTemplatePatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin,
+    AssetPatchGeneratedPackPublisher(@Nonnull JavaPlugin plugin,
                                            @Nonnull String generatedPackId,
                                            @Nonnull BuilderCacheReloader builderCacheReloader) {
         this.plugin = plugin;
@@ -66,8 +66,8 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         return dataDirectory.resolve(CACHE_DIRECTORY_NAME).toAbsolutePath().normalize();
     }
 
-    public boolean publish(@Nonnull Map<String, JsonObject> generatedTemplates,
-                           @Nonnull NpcTemplatePatchStatus status,
+    public boolean publish(@Nonnull Map<String, JsonObject> generatedAssets,
+                           @Nonnull AssetPatchStatus status,
                            @Nonnull RegistrationMode registrationMode) throws IOException {
         AssetModule assetModule = AssetModule.get();
         if (assetModule == null) {
@@ -79,11 +79,11 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
 
         PublicationAction action = publicationAction(
                 existingPackPresent,
-                !generatedTemplates.isEmpty(),
+                !generatedAssets.isEmpty(),
                 registrationMode
         );
         Path root = cacheRoot();
-        if (!mutateCacheForPublication(existingPack, action, root, generatedTemplates, status)) {
+        if (!mutateCacheForPublication(existingPack, action, root, generatedAssets, status)) {
             return false;
         }
 
@@ -112,9 +112,9 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
     }
 
     static PublicationAction publicationAction(boolean existingPackPresent,
-                                               boolean hasGeneratedTemplates,
+                                               boolean hasGeneratedAssets,
                                                @Nonnull RegistrationMode registrationMode) {
-        if (!hasGeneratedTemplates) {
+        if (!hasGeneratedAssets) {
             return PublicationAction.NO_GENERATED_TEMPLATES;
         }
         if (existingPackPresent) {
@@ -143,15 +143,15 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
     boolean mutateCacheForPublication(AssetPack existingPack,
                                       @Nonnull PublicationAction action,
                                       @Nonnull Path root,
-                                      @Nonnull Map<String, JsonObject> generatedTemplates,
-                                      @Nonnull NpcTemplatePatchStatus status) throws IOException {
+                                      @Nonnull Map<String, JsonObject> generatedAssets,
+                                      @Nonnull AssetPatchStatus status) throws IOException {
         if (!unloadExistingGeneratedBuildersBeforeCacheMutation(existingPack, action, status)) {
             return false;
         }
         prepareCache(root, action);
-        pruneStaleGeneratedFiles(root, generatedTemplates.keySet());
-        for (Map.Entry<String, JsonObject> entry : generatedTemplates.entrySet()) {
-            writeTemplate(root, entry.getKey(), entry.getValue());
+        pruneStaleGeneratedFiles(root, generatedAssets.keySet());
+        for (Map.Entry<String, JsonObject> entry : generatedAssets.entrySet()) {
+            writeAsset(root, entry.getKey(), entry.getValue());
             status.addGeneratedTarget(entry.getKey());
         }
         return true;
@@ -159,7 +159,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
 
     boolean unloadExistingGeneratedBuildersBeforeCacheMutation(AssetPack existingPack,
                                                                @Nonnull PublicationAction action,
-                                                               @Nonnull NpcTemplatePatchStatus status) {
+                                                               @Nonnull AssetPatchStatus status) {
         if (existingPack == null || !shouldUnloadExistingBuildersBeforeCacheMutation(action)) {
             return true;
         }
@@ -167,7 +167,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
             builderCacheReloader.unload(existingPack);
             return true;
         } catch (RuntimeException ex) {
-            String message = "Tamework template patches: failed to unload generated NPC builders before cache refresh.";
+            String message = "Tamework asset patches: failed to unload generated NPC builders before cache refresh.";
             status.addFailed(message);
             if (plugin != null && plugin.getLogger() != null) {
                 plugin.getLogger().at(Level.WARNING).withCause(ex).log(message);
@@ -187,7 +187,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
             return;
         }
         Set<Path> keep = currentTargets.stream()
-                .map(NpcTemplatePatchDefinition::normalizeAssetPath)
+                .map(AssetPatchDefinition::normalizeAssetPath)
                 .map(normalizedRoot::resolve)
                 .map(path -> path.toAbsolutePath().normalize())
                 .filter(path -> path.startsWith(normalizedRoot))
@@ -195,7 +195,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         try (var stream = Files.walk(normalizedRoot)) {
             for (Path path : stream
                     .filter(Files::isRegularFile)
-                    .filter(NpcTemplatePatchGeneratedPackPublisher::isJsonFile)
+                    .filter(AssetPatchGeneratedPackPublisher::isJsonFile)
                     .sorted(Comparator.reverseOrder())
                     .toList()) {
                 Path normalized = path.toAbsolutePath().normalize();
@@ -222,7 +222,7 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
             builderCacheReloader.load(generatedPack);
         } catch (RuntimeException ex) {
             plugin.getLogger().at(Level.WARNING).withCause(ex).log(
-                    "Tamework template patches: failed to reload generated NPC builders."
+                    "Tamework asset patches: failed to reload generated NPC builders."
             );
         }
     }
@@ -250,15 +250,15 @@ public final class NpcTemplatePatchGeneratedPackPublisher {
         Files.createDirectories(root.toAbsolutePath().normalize());
     }
 
-    private void writeTemplate(@Nonnull Path root,
-                               @Nonnull String target,
-                               @Nonnull JsonObject template) throws IOException {
-        Path output = root.resolve(NpcTemplatePatchDefinition.normalizeAssetPath(target)).toAbsolutePath().normalize();
+    private void writeAsset(@Nonnull Path root,
+                            @Nonnull String target,
+                            @Nonnull JsonObject asset) throws IOException {
+        Path output = root.resolve(AssetPatchDefinition.normalizeAssetPath(target)).toAbsolutePath().normalize();
         if (!output.startsWith(root)) {
             throw new IOException("Generated target escapes cache root: " + target);
         }
         Files.createDirectories(output.getParent());
-        Files.writeString(output, GSON.toJson(template), StandardCharsets.UTF_8);
+        Files.writeString(output, GSON.toJson(asset), StandardCharsets.UTF_8);
     }
 
     private static boolean isJsonFile(@Nonnull Path path) {

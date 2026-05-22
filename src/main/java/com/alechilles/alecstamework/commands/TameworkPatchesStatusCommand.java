@@ -5,8 +5,8 @@ import java.util.List;
 import javax.annotation.Nonnull;
 
 import com.alechilles.alecstamework.Tamework;
-import com.alechilles.alecstamework.assets.patches.NpcTemplatePatchService;
-import com.alechilles.alecstamework.assets.patches.NpcTemplatePatchStatus;
+import com.alechilles.alecstamework.assets.patches.AssetPatchService;
+import com.alechilles.alecstamework.assets.patches.AssetPatchStatus;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.server.core.Message;
@@ -34,20 +34,20 @@ public final class TameworkPatchesStatusCommand extends AbstractPlayerCommand {
                            @Nonnull Ref<EntityStore> ref,
                            @Nonnull PlayerRef playerRef,
                            @Nonnull World world) {
-        NpcTemplatePatchService service = resolveService(commandContext);
+        AssetPatchService service = resolveService(commandContext);
         if (service == null) {
             return;
         }
-        NpcTemplatePatchStatus status = service.getLastStatus();
+        AssetPatchStatus status = service.getLastStatus();
         commandContext.sender().sendMessage(Message.raw(status.summaryLine()));
         sendRows(commandContext, "Generated", status.getGeneratedTargets());
         sendRows(commandContext, "Failed", status.getFailed());
         sendRows(commandContext, "Skipped", status.getSkipped());
     }
 
-    private static NpcTemplatePatchService resolveService(@Nonnull CommandContext commandContext) {
+    private static AssetPatchService resolveService(@Nonnull CommandContext commandContext) {
         Tamework plugin = Tamework.getInstance();
-        if (plugin == null || plugin.getNpcTemplatePatchService() == null) {
+        if (plugin == null || plugin.getAssetPatchService() == null) {
             commandContext.sender().sendMessage(Message.raw("Tamework patch service is not available."));
             return null;
         }
@@ -55,7 +55,7 @@ public final class TameworkPatchesStatusCommand extends AbstractPlayerCommand {
             commandContext.sender().sendMessage(Message.raw("You do not have permission to use /tw patches."));
             return null;
         }
-        return plugin.getNpcTemplatePatchService();
+        return plugin.getAssetPatchService();
     }
 
     private static void sendRows(@Nonnull CommandContext commandContext,
