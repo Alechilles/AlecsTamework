@@ -23,8 +23,18 @@ final class AssetPatchHotReloadTrackerTest {
         TestAssetMap<Item> map = new TestAssetMap<>(Map.of(
                 "TwPatchSelfTest_CommandItem", "generated",
                 "OtherItem", "source"
+        ), Map.of(
+                "TwPatchSelfTest_CommandItem",
+                Path.of("GeneratedPatches/Server/Item/Items/Tamework/SelfTest/TwPatchSelfTest_CommandItem.json"),
+                "OtherItem",
+                Path.of("AssetPatchSelfTestPack/Server/Item/Items/Tamework/SelfTest/OtherItem.json")
         ));
 
+        tracker.recordGeneratedAssetStoreMonitor(
+                Item.class,
+                "generated",
+                List.of(Path.of("GeneratedPatches/Server/Item/Items/Tamework/SelfTest/TwPatchSelfTest_CommandItem.json"))
+        );
         tracker.recordLoadedAssets(Item.class, map, List.of("TwPatchSelfTest_CommandItem", "OtherItem"));
 
         Set<String> observed = tracker.awaitHotReloadedTargets(
@@ -39,13 +49,44 @@ final class AssetPatchHotReloadTrackerTest {
     }
 
     @Test
-    void mapsParticleSystemTargetsByFileName() {
+    void ignoresGeneratedPackOwnershipUntilGeneratedPathIsMonitored() {
         AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated");
         long mark = tracker.mark();
 
         tracker.recordLoadedAssets(
+                Item.class,
+                new TestAssetMap<>(
+                        Map.of("TwPatchSelfTest_CommandItem", "generated"),
+                        Map.of("TwPatchSelfTest_CommandItem",
+                                Path.of("AssetPatchSelfTestPack/Server/Item/Items/Tamework/SelfTest/TwPatchSelfTest_CommandItem.json"))
+                ),
+                List.of("TwPatchSelfTest_CommandItem")
+        );
+
+        Set<String> observed = tracker.awaitHotReloadedTargets(
+                List.of("Server/Item/Items/Tamework/SelfTest/TwPatchSelfTest_CommandItem.json"),
+                mark,
+                Duration.ZERO
+        );
+        assertEquals(Set.of(), observed);
+    }
+
+    @Test
+    void mapsParticleSystemTargetsByFileName() {
+        AssetPatchHotReloadTracker tracker = new AssetPatchHotReloadTracker("generated");
+        long mark = tracker.mark();
+
+        tracker.recordGeneratedAssetStoreMonitor(
                 ParticleSystem.class,
-                new TestAssetMap<>(Map.of("TwPatchSelfTest", "generated")),
+                "generated",
+                List.of(Path.of("GeneratedPatches/Server/Particles/Tamework/TwPatchSelfTest.particlesystem"))
+        );
+        tracker.recordLoadedAssets(
+                ParticleSystem.class,
+                new TestAssetMap<>(
+                        Map.of("TwPatchSelfTest", "generated"),
+                        Map.of("TwPatchSelfTest", Path.of("GeneratedPatches/Server/Particles/Tamework/TwPatchSelfTest.particlesystem"))
+                ),
                 List.of("TwPatchSelfTest")
         );
 
@@ -60,9 +101,11 @@ final class AssetPatchHotReloadTrackerTest {
     private static final class TestAssetMap<T extends com.hypixel.hytale.assetstore.JsonAsset<String>>
             extends AssetMap<String, T> {
         private final Map<String, String> packs;
+        private final Map<String, Path> paths;
 
-        private TestAssetMap(Map<String, String> packs) {
+        private TestAssetMap(Map<String, String> packs, Map<String, Path> paths) {
             this.packs = packs;
+            this.paths = paths;
         }
 
         @Override
@@ -77,7 +120,7 @@ final class AssetPatchHotReloadTrackerTest {
 
         @Override
         public Path getPath(String key) {
-            return null;
+            return paths.get(key);
         }
 
         @Override

@@ -1,5 +1,6 @@
 package com.alechilles.alecstamework.assets.patches;
 
+import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Collection;
 import java.util.LinkedHashSet;
@@ -21,6 +22,7 @@ public final class AssetPatchHotReloadTracker {
     private final Object lock = new Object();
     private final String generatedPackId;
     private long sequence;
+    private final Set<Observation> pendingGeneratedLoads = new LinkedHashSet<>();
     private final Set<Observation> observations = new LinkedHashSet<>();
 
     public AssetPatchHotReloadTracker(@Nonnull String generatedPackId) {
@@ -42,10 +44,32 @@ public final class AssetPatchHotReloadTracker {
         synchronized (lock) {
             boolean changed = false;
             for (Object key : keys) {
-                if (key == null || !generatedPackOwns(assetMap, key)) {
+                if (key == null || !isConfirmedGeneratedLoad(assetClass, assetMap, key)) {
                     continue;
                 }
                 observations.add(new Observation(++sequence, assetClass.getName(), String.valueOf(key)));
+                changed = true;
+            }
+            if (changed) {
+                lock.notifyAll();
+            }
+        }
+    }
+
+    public void recordGeneratedAssetStoreMonitor(@Nonnull Class<?> assetClass,
+                                                 @Nullable String assetPack,
+                                                 @Nonnull Collection<Path> paths) {
+        if (!generatedPackId.equals(assetPack) || paths.isEmpty()) {
+            return;
+        }
+        synchronized (lock) {
+            boolean changed = false;
+            for (Path path : paths) {
+                TargetObservation expected = targetObservation(path);
+                if (expected == null || !expected.assetClassName().equals(assetClass.getName())) {
+                    continue;
+                }
+                pendingGeneratedLoads.add(new Observation(++sequence, expected.assetClassName(), expected.key()));
                 changed = true;
             }
             if (changed) {
@@ -127,6 +151,22 @@ public final class AssetPatchHotReloadTracker {
     }
 
     @Nullable
+    private static TargetObservation targetObservation(@Nonnull Path path) {
+        String normalizedPath = path.toString().replace('\\', '/');
+        String marker = "/GeneratedPatches/";
+        int generatedRoot = normalizedPath.lastIndexOf(marker);
+        if (generatedRoot < 0) {
+            marker = "GeneratedPatches/";
+            generatedRoot = normalizedPath.indexOf(marker);
+            if (generatedRoot < 0) {
+                return null;
+            }
+        }
+        String target = normalizedPath.substring(generatedRoot + marker.length());
+        return targetObservation(target);
+    }
+
+    @Nullable
     private static String assetKey(@Nonnull String target) {
         int slash = target.lastIndexOf('/');
         String fileName = slash >= 0 ? target.substring(slash + 1) : target;
@@ -141,11 +181,21 @@ public final class AssetPatchHotReloadTracker {
     }
 
     @SuppressWarnings({ "rawtypes", "unchecked" })
-    private boolean generatedPackOwns(@Nonnull AssetMap<?, ?> assetMap, @Nonnull Object key) {
+    private boolean isConfirmedGeneratedLoad(@Nonnull Class<?> assetClass,
+                                             @Nonnull AssetMap<?, ?> assetMap,
+                                             @Nonnull Object key) {
         try {
             AssetMap rawMap = assetMap;
             Object pack = rawMap.getAssetPack(key);
-            return generatedPackId.equals(String.valueOf(pack));
+            if (!generatedPackId.equals(String.valueOf(pack))) {
+                return false;
+            }
+            Object path = rawMap.getPath(key);
+            if (path instanceof Path assetPath && targetObservation(assetPath) == null) {
+                return false;
+            }
+            TargetObservation expected = new TargetObservation(assetClass.getName(), String.valueOf(key));
+            return pendingGeneratedLoads.stream().anyMatch(observation -> observation.matches(expected));
         } catch (RuntimeException ex) {
             return false;
         }

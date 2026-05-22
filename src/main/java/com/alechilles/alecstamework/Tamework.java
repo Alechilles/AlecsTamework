@@ -137,6 +137,7 @@ import com.alechilles.alecstamework.npc.systems.NpcDebugDisplayResumeOnLoadSyste
 import com.alechilles.alecstamework.npc.systems.NpcMountedNameplateVisibilitySystem;
 import com.alechilles.alecstamework.npc.systems.NpcNamePersistenceSystem;
 import com.hypixel.hytale.assetstore.AssetMap;
+import com.hypixel.hytale.assetstore.event.AssetStoreMonitorEvent;
 import com.hypixel.hytale.assetstore.event.LoadedAssetsEvent;
 import com.hypixel.hytale.assetstore.event.RemovedAssetsEvent;
 import com.hypixel.hytale.assetstore.map.DefaultAssetMap;
@@ -414,6 +415,7 @@ public class Tamework extends JavaPlugin {
         getEventRegistry().register(RemovedAssetsEvent.class, CraftingRecipe.class, this::onCraftingRecipeAssetsRemoved);
         getEventRegistry().register(LoadedAssetsEvent.class, Item.class, this::onItemAssetsLoaded);
         getEventRegistry().register(LoadedAssetsEvent.class, ParticleSystem.class, this::onParticleSystemAssetsLoaded);
+        getEventRegistry().register(AssetStoreMonitorEvent.class, this::onAssetStoreMonitor);
         getEventRegistry().register(LoadedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsLoaded);
         getEventRegistry().register(RemovedAssetsEvent.class, ItemDropList.class, this::onItemDropListAssetsRemoved);
 
@@ -1829,6 +1831,17 @@ public class Tamework extends JavaPlugin {
     private void onParticleSystemAssetsLoaded(
             LoadedAssetsEvent<String, ParticleSystem, DefaultAssetMap<String, ParticleSystem>> event) {
         recordAssetPatchHotReload(ParticleSystem.class, event.getAssetMap(), event.getLoadedAssets().keySet());
+    }
+
+    private void onAssetStoreMonitor(@Nonnull AssetStoreMonitorEvent event) {
+        if (assetPatchService == null || event.getAssetStore() == null) {
+            return;
+        }
+        assetPatchService.recordGeneratedAssetStoreMonitor(
+                event.getAssetStore().getAssetClass(),
+                event.getAssetPack(),
+                event.getCreatedOrModifiedFilesToLoad()
+        );
     }
 
     private void onItemDropListAssetsLoaded(
