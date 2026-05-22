@@ -54,30 +54,7 @@ In both cases, no Java is required: copy and adapt examples, enable the systems 
 ## Documentation
 - [Wiki Home](https://wiki.hytalemodding.dev/mod/alecs-tamework)
 - [Player Guides](https://wiki.hytalemodding.dev/mod/alecs-tamework/player-guides)
-- [Getting Started](https://wiki.hytalemodding.dev/mod/alecs-tamework/getting-started)
-- [Companion Controls](https://wiki.hytalemodding.dev/mod/alecs-tamework/companion-controls)
-- [Systems](https://wiki.hytalemodding.dev/mod/alecs-tamework/systems)
-- [Troubleshooting and Glossary](https://wiki.hytalemodding.dev/mod/alecs-tamework/troubleshooting-and-glossary)
 - [Modder Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/modder-documentation)
-- [Start Here](https://wiki.hytalemodding.dev/mod/alecs-tamework/start-here)
-- [Public API Overview](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api-overview)
-- [Public API](https://wiki.hytalemodding.dev/mod/alecs-tamework/public-api)
-- [API Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-reference)
-- [API Recipes](https://wiki.hytalemodding.dev/mod/alecs-tamework/api-recipes)
-- [System Integration](https://wiki.hytalemodding.dev/mod/alecs-tamework/system-integration)
-- [Config Reference](https://wiki.hytalemodding.dev/mod/alecs-tamework/config-reference)
-- [Testing and Diagnostics](https://wiki.hytalemodding.dev/mod/alecs-tamework/testing-and-diagnostics)
-- [Optional Integrations](https://wiki.hytalemodding.dev/mod/alecs-tamework/optional-integrations)
-- [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
-- [Core Architecture](https://wiki.hytalemodding.dev/mod/alecs-tamework/core-architecture)
-- [Runtime Subsystems](https://wiki.hytalemodding.dev/mod/alecs-tamework/runtime-subsystems)
-- [Data and Persistence](https://wiki.hytalemodding.dev/mod/alecs-tamework/data-and-persistence)
-- [Tooling and Contribution](https://wiki.hytalemodding.dev/mod/alecs-tamework/tooling-and-contribution)
-
-## For Contributors
-- [Source Repository](https://github.com/Alechilles/AlecsTamework)
-- [Contributing Guide](https://github.com/Alechilles/AlecsTamework/blob/main/CONTRIBUTING.md)
-- [Architecture Doc](https://github.com/Alechilles/AlecsTamework/blob/main/docs/Architecture.md)
 - [Developer Documentation](https://wiki.hytalemodding.dev/mod/alecs-tamework/developer-documentation)
 
 ## Roadmap
