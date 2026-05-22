@@ -85,15 +85,169 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                   "Type": "Abstract",
                                   "StartState": "Idle",
                                   "Parameters": {
+                                    "Appearance": {
+                                      "Value": "Tamework_Example"
+                                    },
+                                    "NameTranslationKey": {
+                                      "Value": "server.npcRoles.TwPatchSelfTest_Template.name"
+                                    },
+                                    "MaxHealth": {
+                                      "Value": 100
+                                    },
+                                    "MaxSpeed": {
+                                      "Value": 4
+                                    },
+                                    "MaxRotationSpeed": {
+                                      "Value": 360
+                                    },
+                                    "RunThreshold": {
+                                      "Value": 0.5
+                                    },
+                                    "ClimbHeight": {
+                                      "Value": 1
+                                    },
+                                    "WanderRadius": {
+                                      "Value": 4
+                                    },
+                                    "PlayerDefaultAttitude": {
+                                      "Value": "Neutral"
+                                    },
+                                    "AttitudeGroup": {
+                                      "Value": "PreyBig"
+                                    },
+                                    "DropList": {
+                                      "Value": "Empty"
+                                    },
+                                    "FlockArray": {
+                                      "Value": [],
+                                      "TypeHint": "String"
+                                    },
+                                    "BreathesInWater": {
+                                      "Value": true
+                                    },
                                     "PatchApplied": {
                                       "Value": false
                                     }
                                   },
+                                  "IsMemory": false,
+                                  "DropList": {
+                                    "Compute": "DropList"
+                                  },
+                                  "FlockSpawnTypes": {
+                                    "Compute": "FlockArray"
+                                  },
+                                  "FlockAllowedNPC": {
+                                    "Compute": "FlockArray"
+                                  },
+                                  "FlockSpawnTypesRandom": false,
+                                  "DisableDamageGroups": ["Self"],
+                                  "Appearance": {
+                                    "Compute": "Appearance"
+                                  },
+                                  "DefaultPlayerAttitude": {
+                                    "Compute": "PlayerDefaultAttitude"
+                                  },
+                                  "DefaultNPCAttitude": "Ignore",
+                                  "AttitudeGroup": {
+                                    "Compute": "AttitudeGroup"
+                                  },
+                                  "ApplySeparation": true,
+                                  "SeparationDistance": 1,
+                                  "SeparationWeight": 1,
+                                  "BreathesInWater": {
+                                    "Compute": "BreathesInWater"
+                                  },
+                                  "KnockbackScale": 0.5,
+                                  "MotionControllerList": [
+                                    {
+                                      "Type": "Walk",
+                                      "MaxWalkSpeed": {
+                                        "Compute": "MaxSpeed"
+                                      },
+                                      "Gravity": 15,
+                                      "MaxFallSpeed": 15,
+                                      "JumpHeight": 0.1,
+                                      "MaxRotationSpeed": {
+                                        "Compute": "MaxRotationSpeed"
+                                      },
+                                      "Acceleration": 100,
+                                      "RunThreshold": {
+                                        "Compute": "RunThreshold"
+                                      },
+                                      "DescentAnimationType": "Fall",
+                                      "DescentSteepness": 2.5,
+                                      "DescentBlending": 1,
+                                      "JumpDescentSteepness": 8,
+                                      "MaxClimbHeight": {
+                                        "Compute": "ClimbHeight"
+                                      }
+                                    }
+                                  ],
+                                  "StateTransitions": [
+                                    {
+                                      "States": [
+                                        {
+                                          "To": ["Idle"],
+                                          "From": []
+                                        }
+                                      ],
+                                      "Actions": [
+                                        {
+                                          "Type": "ReleaseTarget"
+                                        },
+                                        {
+                                          "Type": "ResetInstructions"
+                                        },
+                                        {
+                                          "Type": "PlayAnimation",
+                                          "Slot": "Status"
+                                        }
+                                      ]
+                                    }
+                                  ],
+                                  "MaxHealth": {
+                                    "Compute": "MaxHealth"
+                                  },
                                   "Instructions": [
                                     {
-                                      "$Comment": "Patch self-test anchor"
+                                      "$Comment": "Patch self-test anchor",
+                                      "Sensor": {
+                                        "Type": "State",
+                                        "State": "Idle"
+                                      },
+                                      "Instructions": [
+                                        {
+                                          "BodyMotion": {
+                                            "Type": "WanderInCircle",
+                                            "Radius": {
+                                              "Compute": "WanderRadius"
+                                            },
+                                            "MaxHeadingChange": 90,
+                                            "RelativeSpeed": 0.4,
+                                            "RelaxedMoveConstraints": true
+                                          }
+                                        }
+                                      ]
                                     }
-                                  ]
+                                  ],
+                                  "InteractionInstruction": {
+                                    "Instructions": [
+                                      {
+                                        "Sensor": {
+                                          "Type": "Any"
+                                        },
+                                        "Actions": [
+                                          {
+                                            "Type": "SetInteractable",
+                                            "Interactable": false
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  },
+                                  "NameTranslationKey": {
+                                    "Compute": "NameTranslationKey"
+                                  }
                                 }
                                 """,
                         PATCH_ROOT + "10_Template.json",
@@ -131,15 +285,33 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                         "Server/Item/Items/Tamework/SelfTest/TwPatchSelfTest_CommandItem.json",
                         """
                                 {
-                                  "Id": "TwPatchSelfTest_CommandItem",
-                                  "DisplayName": "Patch Self-Test Command Item",
-                                  "RootItemInteraction": {
-                                    "Actions": [
-                                      {
-                                        "Type": "Inspect"
-                                      }
+                                  "TranslationProperties": {
+                                    "Name": "server.items.TwPatchSelfTest_CommandItem.name",
+                                    "Description": "server.items.TwPatchSelfTest_CommandItem.description"
+                                  },
+                                  "Quality": "Tool",
+                                  "PlayerAnimationsId": "Item",
+                                  "Interactions": {
+                                    "Primary": {
+                                      "Interactions": []
+                                    }
+                                  },
+                                  "Model": "Items/Consumables/Recipes/Recipe.blockymodel",
+                                  "Texture": "Items/Consumables/Recipes/Recipe_Texture.png",
+                                  "Icon": "Icons/ItemsGenerated/Recipe_Page.png",
+                                  "IconProperties": {
+                                    "Scale": 0.76,
+                                    "Translation": [
+                                      -1,
+                                      5
+                                    ],
+                                    "Rotation": [
+                                      135,
+                                      135,
+                                      0
                                     ]
-                                  }
+                                  },
+                                  "MaxStack": 1
                                 }
                                 """,
                         PATCH_ROOT + "20_Item.json",
@@ -151,7 +323,7 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                     {
                                       "Id": "add-command-action",
                                       "Op": "Insert",
-                                      "Path": "/RootItemInteraction/Actions",
+                                      "Path": "/Interactions/Primary/Interactions",
                                       "Position": "End",
                                       "Existing": {
                                         "Type": "TameworkCommand"
@@ -167,8 +339,8 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                         AssetPatchReloadMode.HYTALE_ASSET_STORE,
                         ReloadRequirement.HOT_RELOAD_OR_RESTART_REQUIRED,
                         List.of(
-                                checkString("/RootItemInteraction/Actions/1/Type", "TameworkCommand"),
-                                checkString("/RootItemInteraction/Actions/1/ConfigId", "TwCommandItem_PatchSelfTest")
+                                checkString("/Interactions/Primary/Interactions/0/Type", "TameworkCommand"),
+                                checkString("/Interactions/Primary/Interactions/0/ConfigId", "TwCommandItem_PatchSelfTest")
                         )
                 ),
                 new AssetPatchSelfTestCase(
@@ -215,12 +387,18 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                         "Server/Particles/Tamework/TwPatchSelfTest.particlesystem",
                         """
                                 {
-                                  "Emitters": [
+                                  "Spawners": [
                                     {
-                                      "Id": "spark",
-                                      "Rate": 1
+                                      "SpawnerId": "Explosion_Small_Smoke_Main",
+                                      "PositionOffset": {
+                                        "Y": 0.5
+                                      },
+                                      "StartDelay": 0.1
                                     }
-                                  ]
+                                  ],
+                                  "BoundingRadius": 100.0,
+                                  "CullDistance": 100.0,
+                                  "IsImportant": false
                                 }
                                 """,
                         PATCH_ROOT + "40_Particle.json",
@@ -232,15 +410,15 @@ public record AssetPatchSelfTestCase(@Nonnull String id,
                                     {
                                       "Id": "increase-rate",
                                       "Op": "Replace",
-                                      "Path": "/Emitters/0/Rate",
-                                      "Value": 4
+                                      "Path": "/Spawners/0/StartDelay",
+                                      "Value": 0.25
                                     }
                                   ]
                                 }
                                 """,
                         AssetPatchReloadMode.HYTALE_ASSET_STORE,
                         ReloadRequirement.HOT_RELOAD_OR_RESTART_REQUIRED,
-                        List.of(check("/Emitters/0/Rate", "4"))
+                        List.of(check("/Spawners/0/StartDelay", "0.25"))
                 ),
                 new AssetPatchSelfTestCase(
                         "common-restart-required",
