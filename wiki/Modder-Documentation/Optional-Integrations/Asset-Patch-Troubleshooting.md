@@ -1,12 +1,12 @@
 ---
-title: "NPC Template Patch Troubleshooting"
+title: "Asset Patch Troubleshooting"
 order: 16
 published: true
 draft: false
 ---
-# NPC Template Patch Troubleshooting
+# Asset Patch Troubleshooting
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/asset-patches)
 
 Use this page when a patch does not apply, validation fails, or a patched NPC, item, config, particle, or other JSON-like asset behaves differently after `/tw patches reload`.
 

@@ -1,20 +1,20 @@
 ---
-title: "NPC Template Patch Workflow"
+title: "Asset Patch Workflow"
 order: 15
 published: true
 draft: false
 ---
-# NPC Template Patch Workflow
+# Asset Patch Workflow
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/npc-template-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/asset-patches)
 
-The safest patchable template is a normal base-game template first and a Tamework template second. Build the unpatched version so it validates and plays correctly without Tamework, then add optional patches that upgrade it when Tamework is installed.
+The safest patchable asset is a normal base-game asset first and a Tamework asset second. Build the unpatched version so it validates and plays correctly without Tamework, then add optional patches that upgrade it when Tamework is installed.
 
 The same rule applies to every optional asset patch target. Keep the base item, projectile, particle, drop table, entity effect, or Tamework config valid on its own, then let `Server/Tamework/Patches` add Tamework-only fields when the framework is present.
 
-## 1. Keep the Base Template Valid
+## 1. Keep the Base Asset Valid
 
-Do not place Tamework-only actions, sensors, motions, components, states, or parameters directly in the base template if the source mod should work without Tamework.
+Do not place Tamework-only actions, sensors, motions, components, states, parameters, item actions, or config references directly in the base asset if the source mod should work without Tamework.
 
 ```json
 {
@@ -198,7 +198,8 @@ With Tamework:
 
 ## Checklist
 
-- The base template has no Tamework-only references.
+- The base asset has no Tamework-only references.
+- Item, projectile, particle, drop, entity-effect, and config targets stay valid before patches run.
 - Patch files live under `Server/Tamework/Patches`.
 - Operations that create parameters run before operations that use them.
 - Operations that create states run before operations that reference them.

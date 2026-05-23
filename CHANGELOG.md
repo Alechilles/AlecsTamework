@@ -1,34 +1,52 @@
 # Changelog
 
-## 2.11.0-PRERELEASE-0.5-pre.9.1 - Hytale 0.5.0-pre.9.1 Beta Compatibility - 2026-05-22
+## 2.11.1-PRERELEASE-0.5-pre.9.1 - Hytale 0.5.0-pre.9.1 Beta Compatibility - 2026-05-22
+
+### Added
+- Included the 2.11.1 universal asset patching work, generated-patch reload classification, `/tw patches selftest`, `/tw patches selftest cleanup`, and German localization on the Update 5 compatibility branch.
 
 ### Changed
 - Prepared this beta build for Hytale `0.5.0-pre.9.1` and updated the plugin metadata to use the new Semver-style server compatibility declaration instead of the legacy date/hash pre-release build string.
-- Carried the 2.11 optional asset patching, attachment display-name, and spawner icon tooling work forward onto the Update 5 compatibility branch.
+- Updated the README and wiki patching docs on the pre-release branch to use the generic asset patch terminology from 2.11.1.
 
 ### Fixed
 - Fixed Update 5 pre-release compile breaks caused by the removed flying motion `forceVelocity` API and the new keyed `CustomUIHud` constructor requirement.
 - Fixed Update 5 startup failures from stricter runtime asset-pack ID parsing by using parseable generated/self-test pack IDs and only registering the writable self-test pack when `/tw patches selftest` runs.
 - Cleaned up the pre-release run profile so local server runs install the jar into the pre-release userdata mods folder.
+- Preserved the 2.11.1 patch-generation timing and non-`.json` generated-pack fixes on the Update 5 compatibility branch.
 
-## 2.11.0 - Optional Asset Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
+## 2.11.1 - Universal Asset Patches, Live Self-Test, and German Localization - 2026-05-22
+
+### Added
+- Expanded optional patching from NPC templates into a generic JSON and JSON-like asset overlay system for server-side assets, including item assets, root/item interactions, Tamework config assets, particles, projectiles, entity effects, drops, and NPC roles/templates.
+- Added generated-patch hot-reload observation so `/tw patches reload` can report generated targets, hot-reloaded targets, and targets that require a restart instead of assuming every asset family reloaded safely.
+- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can validate patch generation and reload classification in-game with isolated fixtures for NPC role/template, item action, Tamework config, `.particlesystem`, and common asset targets.
+- Added German localization.
+
+### Changed
+- Updated the README and wiki to describe asset patches as a generic optional-dependency system rather than an NPC-template-only workflow.
+- Renamed the optional patch wiki pages from NPC template patch pages to asset patch pages.
+
+### Fixed
+- Optional asset patches now generate before server JSON asset validation so vanilla-safe downstream assets can receive Tamework-only actions and configs when Tamework is installed.
+- Non-`.json` JSON-like targets such as `.particlesystem` assets are now published safely into the generated patch pack.
+
+## 2.11.0 - Optional Template Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
 
 ### Added
 - Added `TwAttachmentDisplayConfig` so mods can define player-friendly attachment names once and have captured spawner tooltips show those labels when DynamicTooltipsLib is installed.
-- Added optional asset patches so third-party mods can keep base JSON-like assets vanilla-safe, then patch in Tamework NPC behavior, item actions, item configs, particles, projectiles, drops, and other server JSON assets only when Tamework is installed.
-- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional asset patch results, regenerate patched outputs, and see which generated targets still require a server restart.
-- Added `/tw patches selftest` and `/tw patches selftest cleanup` so operators can generate isolated patch fixtures, exercise the live reload path, and verify which targets hot-reload or require a restart. The self-test now observes Hytale's generated-pack asset reload events for NPC role/template, item, Tamework config, particle, and common targets without using the unsafe synchronous asset-store reload path.
+- Added optional NPC template patches so third-party mods can ship Tamework role/template integrations without making Tamework a required dependency.
+- Added `/tw patches status` and `/tw patches reload` so operators can inspect optional template patch results and refresh generated patch packs without restarting the server.
 - Added `Mob_Tamework_Example_Patch` as a bundled optional-patch test NPC whose base template stays barebones until `Server/Tamework/Patches` upgrades it with Tamework behavior.
 - Added spawner icon batch manifests and generator support for shared override groups, group defaults, replacement runs, excluded attachment options, and auto-framed Blockbench renders.
 
 ### Fixed
-- Optional asset patch reloads now rely on Hytale's generated-pack watcher for NPC role/template targets instead of manually unloading and reloading generated NPC builders during `/tw patches reload`.
 - Fixed the Blockbench spawner icon batch renderer leaving every rendered model open as a separate Blockbench tab during large icon-generation runs.
 - Fixed spawner icon generation merging duplicate groups incorrectly and missing batch source assets in larger render sets.
 - Fixed captured spawner tooltips and linked companion panels showing tamed role IDs when the role asset points at a different display-name translation key.
 
 ### Removed
-- Removed the outdated Hytalor patch example assets from the bundled examples now that Tamework has its own optional asset patch system.
+- Removed the outdated Hytalor patch example assets from the bundled examples now that Tamework has its own optional template patch system.
 
 ## 2.10.1 - Mushroom Spore Crafting Balance - 2026-05-16
 
