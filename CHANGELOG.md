@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.11.0-PRERELEASE-0.5-pre.9.1 - Hytale 0.5.0-pre.9.1 Beta Compatibility - 2026-05-22
+
+### Changed
+- Prepared this beta build for Hytale `0.5.0-pre.9.1` and updated the plugin metadata to use the new Semver-style server compatibility declaration instead of the legacy date/hash pre-release build string.
+- Carried the 2.11 optional asset patching, attachment display-name, and spawner icon tooling work forward onto the Update 5 compatibility branch.
+
+### Fixed
+- Fixed Update 5 pre-release compile breaks caused by the removed flying motion `forceVelocity` API and the new keyed `CustomUIHud` constructor requirement.
+- Fixed Update 5 startup failures from stricter runtime asset-pack ID parsing by using parseable generated/self-test pack IDs and only registering the writable self-test pack when `/tw patches selftest` runs.
+- Cleaned up the pre-release run profile so local server runs install the jar into the pre-release userdata mods folder.
+
 ## 2.11.0 - Optional Asset Patches, Attachment Display Names, and Spawner Icon Tooling - 2026-05-21
 
 ### Added
