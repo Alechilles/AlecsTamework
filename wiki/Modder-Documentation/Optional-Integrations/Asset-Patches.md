@@ -1,5 +1,6 @@
 ---
 title: "Asset Patches"
+slug: "asset-patches"
 order: 12
 published: true
 draft: false
