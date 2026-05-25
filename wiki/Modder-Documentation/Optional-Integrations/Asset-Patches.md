@@ -1,10 +1,10 @@
 ---
-title: "Optional Asset Patches"
+title: "Asset Patches"
 order: 12
 published: true
 draft: false
 ---
-# Optional Asset Patches
+# Asset Patches
 
 Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Modder Documentation](/mod/alecs-tamework/modder-documentation)
 

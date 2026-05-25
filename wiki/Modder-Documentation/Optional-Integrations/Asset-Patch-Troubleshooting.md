@@ -6,7 +6,7 @@ draft: false
 ---
 # Asset Patch Troubleshooting
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/asset-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Asset Patches](/mod/alecs-tamework/asset-patches)
 
 Use this page when a patch does not apply, validation fails, or a patched NPC, item, config, particle, or other JSON-like asset behaves differently after `/tw patches reload`.
 
