@@ -4,13 +4,16 @@
 
 ### Added
 - Added a first-run "Welcome to Alec's Tamework" settings announcement with a Review Settings button so new eligible players see setup guidance instead of an old version-specific update notice.
+- Added bundled example leveling and talent configs so the Tamework example mobs can gain XP, level up, and exercise the talent page out of the box.
 
 ### Changed
 - Updated release metadata for Hytale `0.5.1`.
 - Settings announcements now use per-player Tamework version history: first-time users see the welcome message, while version-specific notices appear only after that player has used an older Tamework version.
+- The local build now references a stable shared NameplateBuilder jar copy under the Hytale Modding directory instead of depending on whichever server mods folder is active.
 
 ### Fixed
 - Fixed `/tw` failing to register on Hytale `0.5.1` servers because stricter permission validation rejected the display-name-derived permission node, restoring startup for affected servers.
+- Fixed combat XP writes so damage-system leveling updates route through `CommandBuffer` instead of mutating the entity store directly during damage event handling.
 
 ## 2.11.2 - Hytale 0.5.0 Compatibility - 2026-05-26
 

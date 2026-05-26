@@ -21,7 +21,7 @@
         <hytale.install.path.release>C:/Users/22ale/AppData/Roaming/Hytale/install/release/package/game/latest</hytale.install.path.release>
         <hytale.install.path.prerelease>C:/Users/22ale/AppData/Roaming/Hytale/install/pre-release/package/game/latest</hytale.install.path.prerelease>
         <hytale.install.path>${hytale.install.path.release}</hytale.install.path>
-        <nameplatebuilder.jar.path>${hytale.install.path}/Server/mods/NameplateBuilder-4.260326.7.jar</nameplatebuilder.jar.path>
+        <nameplatebuilder.jar.path>C:/Users/22ale/AppData/Roaming/Hytale/Modding/_shared/libs/NameplateBuilder-4.260326.7.jar</nameplatebuilder.jar.path>
         <hytale.userdata.path>C:/Users/22ale/AppData/Roaming/Hytale/UserData</hytale.userdata.path>
         <hytale.toolkit.path>C:/Users/22ale/AppData/Local/Hytale-Toolkit</hytale.toolkit.path>
         <hytale.jdk.path>C:/Program Files/Eclipse Adoptium/jdk-25.0.1.8-hotspot</hytale.jdk.path>

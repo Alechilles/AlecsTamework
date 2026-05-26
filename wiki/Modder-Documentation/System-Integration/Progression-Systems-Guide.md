@@ -30,6 +30,8 @@ Set the long-term progression baseline first:
 
 This gives you a shared advancement layer that combat, feed, harvest, and breeding hooks can all contribute to.
 
+Tamework ships `Server/Tamework/Leveling/TwLevelingExample.json` for the bundled example mobs. Use it as a small working baseline for enabled feed, harvest, breeding, and combat XP sources before tuning a real species.
+
 ### 2. Add talents when level-ups should unlock player choices
 Add `TwTalentConfig` after the level curve is stable.
 
@@ -38,6 +40,8 @@ Decide:
 - point costs and minimum levels
 - prerequisite chains
 - which shared effect keys each node grants
+
+Tamework ships `Server/Tamework/Talents/TwTalentsExample.json` for the bundled example mobs. It is intentionally passive-only and demonstrates health, movement, combat, toughness, and harvest-bonus effect keys.
 
 ### 3. Start with happiness
 Set the baseline first:

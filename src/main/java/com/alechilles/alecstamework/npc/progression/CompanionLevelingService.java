@@ -3,6 +3,8 @@ package com.alechilles.alecstamework.npc.progression;
 import com.alechilles.alecstamework.config.assets.TwLevelingConfig;
 import com.alechilles.alecstamework.npc.components.TameworkCommandLinksComponent;
 import com.alechilles.alecstamework.npc.components.TameworkLevelingComponent;
+import com.hypixel.hytale.component.CommandBuffer;
+import com.hypixel.hytale.component.Component;
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
@@ -29,6 +31,14 @@ public final class CompanionLevelingService {
     public static TameworkLevelingComponent ensureLevelingComponent(@Nullable Ref<EntityStore> npcRef,
                                                                     @Nullable Store<EntityStore> store,
                                                                     @Nullable String roleIdHint) {
+        return ensureLevelingComponent(npcRef, store, null, roleIdHint);
+    }
+
+    @Nullable
+    public static TameworkLevelingComponent ensureLevelingComponent(@Nullable Ref<EntityStore> npcRef,
+                                                                    @Nullable Store<EntityStore> store,
+                                                                    @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                                    @Nullable String roleIdHint) {
         if (npcRef == null || !npcRef.isValid() || store == null) {
             return null;
         }
@@ -50,12 +60,12 @@ public final class CompanionLevelingService {
         TameworkLevelingComponent existing = store.getComponent(npcRef, type);
         if (existing == null) {
             TameworkLevelingComponent created = new TameworkLevelingComponent(config.getId(), 1, 0.0, 0.0);
-            store.putComponent(npcRef, type, created);
+            putComponent(npcRef, store, commandBuffer, type, created);
             return created;
         }
         TameworkLevelingComponent normalized = normalizeComponent(existing, config);
         if (hasMeaningfulChange(existing, normalized) || configIdChanged(existing, normalized)) {
-            store.putComponent(npcRef, type, normalized);
+            putComponent(npcRef, store, commandBuffer, type, normalized);
         }
         return normalized;
     }
@@ -90,6 +100,15 @@ public final class CompanionLevelingService {
                                       @Nullable Store<EntityStore> store,
                                       @Nullable String roleIdHint,
                                       double amount) {
+        return awardXp(npcRef, store, null, roleIdHint, amount);
+    }
+
+    @Nonnull
+    public static AwardResult awardXp(@Nullable Ref<EntityStore> npcRef,
+                                      @Nullable Store<EntityStore> store,
+                                      @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                      @Nullable String roleIdHint,
+                                      double amount) {
         if (npcRef == null || !npcRef.isValid() || store == null || !Double.isFinite(amount) || amount <= 0.0) {
             return AwardResult.notApplied();
         }
@@ -111,7 +130,7 @@ public final class CompanionLevelingService {
         if (type == null) {
             return AwardResult.notApplied();
         }
-        TameworkLevelingComponent component = ensureLevelingComponent(npcRef, store, roleId);
+        TameworkLevelingComponent component = ensureLevelingComponent(npcRef, store, commandBuffer, roleId);
         if (component == null) {
             return AwardResult.notApplied();
         }
@@ -125,9 +144,9 @@ public final class CompanionLevelingService {
         if (!hasMeaningfulChange(component, updated)) {
             return AwardResult.notApplied();
         }
-        store.putComponent(npcRef, type, updated);
+        putComponent(npcRef, store, commandBuffer, type, updated);
         if (updated.getLevel() != previousLevel) {
-            CompanionStatModifierService.applyTraitModifiers(npcRef, store);
+            applyTraitModifiers(npcRef, store, commandBuffer);
         }
         return new AwardResult(true, amount, previousLevel, updated.getLevel(), updated.getTotalXp());
     }
@@ -276,6 +295,28 @@ public final class CompanionLevelingService {
             return rightId != null && !rightId.isBlank();
         }
         return rightId == null || !leftId.equalsIgnoreCase(rightId);
+    }
+
+    private static <T extends Component<EntityStore>> void putComponent(@Nonnull Ref<EntityStore> npcRef,
+                                                                        @Nonnull Store<EntityStore> store,
+                                                                        @Nullable CommandBuffer<EntityStore> commandBuffer,
+                                                                        @Nonnull ComponentType<EntityStore, T> componentType,
+                                                                        @Nonnull T component) {
+        if (commandBuffer != null) {
+            commandBuffer.putComponent(npcRef, componentType, component);
+            return;
+        }
+        store.putComponent(npcRef, componentType, component);
+    }
+
+    private static void applyTraitModifiers(@Nonnull Ref<EntityStore> npcRef,
+                                            @Nonnull Store<EntityStore> store,
+                                            @Nullable CommandBuffer<EntityStore> commandBuffer) {
+        if (commandBuffer != null) {
+            commandBuffer.run(bufferStore -> CompanionStatModifierService.applyTraitModifiers(npcRef, bufferStore));
+            return;
+        }
+        CompanionStatModifierService.applyTraitModifiers(npcRef, store);
     }
 
     private static int resolveLevelFromTotalXp(@Nonnull TwLevelingConfig config, double totalXp) {

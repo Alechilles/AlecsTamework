@@ -1,0 +1,66 @@
+{
+  "Enabled": true,
+  "Priority": 0,
+  "RoleIds": [
+    "Mob_Tamework_Example",
+    "Mob_Tamework_Example_Baby",
+    "Mob_Tamework_Example_Vanilla",
+    "Mob_Tamework_Example_Simple",
+    "Mob_Tamework_Example_Simple_Vanilla",
+    "Mob_Tamework_Example_Patch"
+  ],
+  "Levels": {
+    "MaxLevel": 20,
+    "BaseXp": 75.0,
+    "GrowthFactor": 1.18
+  },
+  "XpSources": {
+    "Feed": {
+      "Enabled": true,
+      "FlatXp": 8.0
+    },
+    "Harvest": {
+      "Enabled": true,
+      "FlatXp": 12.0
+    },
+    "Breeding": {
+      "Enabled": true,
+      "FlatXp": 60.0
+    },
+    "Combat": {
+      "Enabled": true,
+      "DamageDealtXpPerPoint": 1.5,
+      "DamageTakenXpPerPoint": 0.75,
+      "MinimumDamageEvent": 1.0,
+      "AwardVsPlayers": false,
+      "AwardVsOwnedAllies": false
+    }
+  },
+  "StatGrowth": {
+    "Effects": [
+      {
+        "EffectKey": "MaxHealthMultiplier",
+        "PerLevel": 0.025
+      },
+      {
+        "EffectKey": "DamageDealtMultiplier",
+        "PerLevel": 0.015
+      },
+      {
+        "EffectKey": "DamageTakenMultiplier",
+        "PerLevel": -0.01
+      },
+      {
+        "EffectKey": "MoveSpeedMultiplier",
+        "PerLevel": 0.005
+      },
+      {
+        "EffectKey": "HarvestDoubleDropChanceMultiplier",
+        "PerLevel": 0.01
+      }
+    ]
+  },
+  "TalentPoints": {
+    "PointsPerLevel": 1
+  }
+}
