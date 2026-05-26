@@ -163,10 +163,10 @@ tamework.ui.configEditor.warning.unknownOverrideKeys=Unknown override keys: {0}
 
 # ===== Tamework UI: Settings Announcement =====
 tamework.ui.settingsAnnouncement.welcome.title=Welcome to Alec's Tamework
-tamework.ui.settingsAnnouncement.welcome.subtitle=Tamework adds shared companion, progression, and server settings for Alec's mods.
-tamework.ui.settingsAnnouncement.welcome.body.intro=Thanks for installing Alec's Tamework. This framework powers shared features used by Alec's mods, including companion ownership, commands, needs, happiness, breeding, traits, travel, revival, telemetry, and optional integration behavior.
+tamework.ui.settingsAnnouncement.welcome.subtitle=Tamework adds shared companion, progression, and server settings for many mods.
+tamework.ui.settingsAnnouncement.welcome.body.intro=Thanks for installing Alec's Tamework! This framework powers shared features used by many mods, including companion ownership, commands, needs, happiness, breeding, traits, travel, revival, telemetry, and optional integration behavior.
 tamework.ui.settingsAnnouncement.welcome.body.settings=The /tw settings menu lets server owners choose how much of that experience is active. You can review presets, ownership protection, capture and linking rules, population limits, needs damage, happiness, passive breeding, gendered breeding, traits, revival, travel, and telemetry from one place.
-tamework.ui.settingsAnnouncement.welcome.body.scope=This welcome appears the first time an eligible player uses Tamework. Future version-specific notices only appear for players who have already used Tamework on an older version.
+tamework.ui.settingsAnnouncement.welcome.body.scope=This welcome appears the first time an OP or local single player uses Tamework. Future version-specific notices will only be displayed if there are critical updates that require your attention.
 tamework.ui.settingsAnnouncement.welcome.optOut=Don't show this again
 tamework.ui.settingsAnnouncement.title=Important Alec's Tamework Update
 tamework.ui.settingsAnnouncement.subtitle=New features, settings, or updates have been added to Tamework that require your attention.
