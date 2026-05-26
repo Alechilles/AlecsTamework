@@ -162,6 +162,12 @@ tamework.ui.configEditor.warning.applyInProgress=Anwendung läuft bereits.
 tamework.ui.configEditor.warning.unknownOverrideKeys=Unbekannte Überschreibungsschlüssel: {0}
 
 # ===== Tamework UI: Einstellungen Hinweis =====
+tamework.ui.settingsAnnouncement.welcome.title=Willkommen bei Alec's Tamework
+tamework.ui.settingsAnnouncement.welcome.subtitle=Tamework stellt gemeinsame Begleiter-, Fortschritts- und Servereinstellungen fuer Alec's Mods bereit.
+tamework.ui.settingsAnnouncement.welcome.body.intro=Danke, dass du Alec's Tamework installiert hast. Dieses Framework steuert gemeinsame Funktionen fuer Alec's Mods, darunter Begleiterbesitz, Befehle, Beduerfnisse, Zufriedenheit, Zucht, Eigenschaften, Reisen, Wiederbelebung, Telemetrie und optionale Integrationen.
+tamework.ui.settingsAnnouncement.welcome.body.settings=Im Menue /tw settings koennen Serverbesitzer auswaehlen, wie viel dieser Erfahrung aktiv ist. Dort kannst du Presets, Besitzschutz, Fang- und Verknuepfungsregeln, Populationslimits, Beduerfnisschaden, Zufriedenheit, passive Zucht, geschlechtsspezifische Zucht, Eigenschaften, Wiederbelebung, Reisen und Telemetrie pruefen.
+tamework.ui.settingsAnnouncement.welcome.body.scope=Diese Begruessung erscheint, wenn ein berechtigter Spieler Tamework zum ersten Mal verwendet. Zukuenftige versionsspezifische Hinweise erscheinen nur fuer Spieler, die Tamework bereits in einer aelteren Version verwendet haben.
+tamework.ui.settingsAnnouncement.welcome.optOut=Nicht mehr anzeigen
 tamework.ui.settingsAnnouncement.title=Wichtiges Alec's Tamework Update
 tamework.ui.settingsAnnouncement.subtitle=Neue Funktionen, Einstellungen oder Updates wurden zu Tamework hinzugefügt und benötigen deine Aufmerksamkeit.
 tamework.ui.settingsAnnouncement.body.intro=Ab Alec's Tamework v2.8.0+ wurden viele wichtige Einstellungen in das Menü "/tw settings" verschoben. Falls du diese Einstellungen noch nicht geprüft hast, klicke auf „Einstellungen überprüfen“, um sicherzustellen, dass alles wie erwartet für deinen Server eingerichtet ist.

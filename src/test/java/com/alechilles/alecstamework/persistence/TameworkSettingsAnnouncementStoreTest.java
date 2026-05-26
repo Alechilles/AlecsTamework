@@ -12,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class TameworkSettingsAnnouncementStoreTest {
@@ -157,5 +158,116 @@ class TameworkSettingsAnnouncementStoreTest {
                 state,
                 playerUuid
         ));
+    }
+
+    @Test
+    void selectAnnouncementShowsWelcomeForPlayerWithNoAnnouncementHistory() {
+        UUID playerUuid = UUID.randomUUID();
+        ResolvedAnnouncement updateAnnouncement = updateAnnouncement("settings-review-v2");
+        AnnouncementOptOutState state = new AnnouncementOptOutState(Map.of(), Map.of(), Map.of());
+
+        ResolvedAnnouncement selected = TameworkSettingsAnnouncementStore.selectAnnouncementForPlayer(
+                updateAnnouncement,
+                state,
+                playerUuid,
+                "2.11.2",
+                false
+        );
+
+        assertEquals(TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID, selected.announcementId());
+    }
+
+    @Test
+    void selectAnnouncementShowsUpdateForPlayerRecordedOnOlderVersion() {
+        UUID playerUuid = UUID.randomUUID();
+        ResolvedAnnouncement updateAnnouncement = updateAnnouncement("settings-review-v2");
+        AnnouncementOptOutState state = new AnnouncementOptOutState(
+                Map.of(),
+                Map.of(playerUuid, TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID),
+                Map.of(playerUuid, "2.11.1")
+        );
+
+        ResolvedAnnouncement selected = TameworkSettingsAnnouncementStore.selectAnnouncementForPlayer(
+                updateAnnouncement,
+                state,
+                playerUuid,
+                "2.11.2",
+                false
+        );
+
+        assertEquals("settings-review-v2", selected.announcementId());
+    }
+
+    @Test
+    void selectAnnouncementTreatsLegacyOptOutStateAsExistingInstallHistory() {
+        UUID playerUuid = UUID.randomUUID();
+        ResolvedAnnouncement updateAnnouncement = updateAnnouncement("settings-review-v3");
+        AnnouncementOptOutState state = new AnnouncementOptOutState(Map.of(playerUuid, "settings-review-v2"));
+
+        ResolvedAnnouncement selected = TameworkSettingsAnnouncementStore.selectAnnouncementForPlayer(
+                updateAnnouncement,
+                state,
+                playerUuid,
+                "2.11.3",
+                false
+        );
+
+        assertEquals("settings-review-v3", selected.announcementId());
+    }
+
+    @Test
+    void selectAnnouncementSkipsPlayerAlreadyRecordedOnCurrentVersion() {
+        UUID playerUuid = UUID.randomUUID();
+        ResolvedAnnouncement updateAnnouncement = updateAnnouncement("settings-review-v2");
+        AnnouncementOptOutState state = new AnnouncementOptOutState(
+                Map.of(),
+                Map.of(playerUuid, TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID),
+                Map.of(playerUuid, "2.11.2")
+        );
+
+        ResolvedAnnouncement selected = TameworkSettingsAnnouncementStore.selectAnnouncementForPlayer(
+                updateAnnouncement,
+                state,
+                playerUuid,
+                "2.11.2",
+                false
+        );
+
+        assertNull(selected);
+    }
+
+    @Test
+    void recordAnnouncementSeenRoundTripsPlayerVersionHistory() {
+        Path tameworkRoot = tempDir.resolve("universe").resolve("Tamework");
+        Path stateFile = TameworkSettingsAnnouncementStore.resolveAnnouncementStateFile(tameworkRoot);
+        UUID playerUuid = UUID.randomUUID();
+
+        assertTrue(TameworkSettingsAnnouncementStore.recordAnnouncementSeen(
+                stateFile,
+                playerUuid,
+                TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID,
+                "2.11.2",
+                null
+        ));
+
+        AnnouncementOptOutState state = TameworkSettingsAnnouncementStore.loadAnnouncementState(stateFile, null);
+
+        assertEquals(
+                TameworkSettingsAnnouncementStore.WELCOME_ANNOUNCEMENT_ID,
+                state.lastShownAnnouncementIdByPlayerUuid().get(playerUuid)
+        );
+        assertEquals("2.11.2", state.lastSeenTameworkVersionByPlayerUuid().get(playerUuid));
+    }
+
+    private static ResolvedAnnouncement updateAnnouncement(String announcementId) {
+        return new ResolvedAnnouncement(
+                true,
+                announcementId,
+                true,
+                "Review",
+                "Subtitle",
+                List.of("Line 1"),
+                "Opt out"
+        );
     }
 }
