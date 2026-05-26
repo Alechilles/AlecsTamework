@@ -6,7 +6,7 @@ draft: false
 ---
 # Asset Patch Operations
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/asset-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Asset Patches](/mod/alecs-tamework/asset-patches)
 
 Raw operations edit JSON directly with explicit paths and values. Use them for setup, custom branches, and anything that does not fit a macro.
 

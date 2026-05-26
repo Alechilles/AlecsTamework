@@ -6,7 +6,7 @@ draft: false
 ---
 # Asset Patch Workflow
 
-Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Optional Asset Patches](/mod/alecs-tamework/asset-patches)
+Parent: [Optional Integrations](/mod/alecs-tamework/optional-integrations) | [Asset Patches](/mod/alecs-tamework/asset-patches)
 
 The safest patchable asset is a normal base-game asset first and a Tamework asset second. Build the unpatched version so it validates and plays correctly without Tamework, then add optional patches that upgrade it when Tamework is installed.
 
