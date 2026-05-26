@@ -13,6 +13,7 @@ import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
  */
 final class LinkedNpcPanelCardBinder {
     private static final int CARD_HEIGHT = 92;
+    private static final int EXPANDED_CARD_HEIGHT = 184;
     private static final int FUTURE_STAT_FILL_WIDTH = 358;
     private static final int FUTURE_STAT_FILL_HEIGHT = 8;
 
@@ -139,7 +140,7 @@ final class LinkedNpcPanelCardBinder {
                 entry,
                 pendingUnlink
         );
-        commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor());
+        commandBuilder.setObject(entrySelector + ".Anchor", buildCardAnchor(entry));
         LinkedNpcPanelVitalsBinder.bind(commandBuilder, entrySelector, entry, language);
         commandBuilder.set(secondaryStatFrameSelector + ".Visible", entry.hasFutureStatA());
         commandBuilder.set(tertiaryStatFrameSelector + ".Visible", entry.hasFutureStatB());
@@ -302,13 +303,18 @@ final class LinkedNpcPanelCardBinder {
         return anchor;
     }
 
-    private static Anchor buildCardAnchor() {
+    private static Anchor buildCardAnchor(LinkedNpcEntry entry) {
         Anchor anchor = new Anchor();
         anchor.setTop(Value.of(3));
         anchor.setLeft(Value.of(0));
         anchor.setRight(Value.of(0));
-        anchor.setHeight(Value.of(CARD_HEIGHT));
+        anchor.setHeight(Value.of(hasProgressionSurface(entry) ? EXPANDED_CARD_HEIGHT : CARD_HEIGHT));
         return anchor;
+    }
+
+    private static boolean hasProgressionSurface(LinkedNpcEntry entry) {
+        return entry != null
+                && (entry.hasFutureStatA() || entry.hasFutureStatB() || entry.hasAnyFutureAction());
     }
 
     record CardBindingConfig(String linkedPanelCardUiPath,
