@@ -1,15 +1,23 @@
 # Changelog
 
-## 2.11.2 - Hytale 0.5.0 Compatibility - 2026-05-26
+## 2.11.3 - Hytale 0.5.1 Command Registration Hotfix - 2026-05-26
 
 ### Added
 - Added a first-run "Welcome to Alec's Tamework" settings announcement with a Review Settings button so new eligible players see setup guidance instead of an old version-specific update notice.
 
 ### Changed
+- Updated release metadata for Hytale `0.5.1`.
+- Settings announcements now use per-player Tamework version history: first-time users see the welcome message, while version-specific notices appear only after that player has used an older Tamework version.
+
+### Fixed
+- Fixed `/tw` failing to register on Hytale `0.5.1` servers because stricter permission validation rejected the display-name-derived permission node, restoring startup for affected servers.
+
+## 2.11.2 - Hytale 0.5.0 Compatibility - 2026-05-26
+
+### Changed
 - Updated Tamework for Hytale `0.5.0` release compatibility, including the newer motion, rotation, projectile/event, custom HUD, hotbar, and display-name APIs used by companion commands, spawners, naming, interactions, needs, breeding, damage, and persistence flows.
 - Updated release metadata for Hytale `0.5.0` and promoted the package configuration from prerelease/beta to a stable release.
 - Renamed the optional asset patch wiki source page to the final asset-patches guide path and refreshed related wiki links.
-- Settings announcements now use per-player Tamework version history: first-time users see the welcome message, while version-specific notices appear only after that player has used an older Tamework version.
 
 ### Fixed
 - Fixed startup failures from stricter runtime asset-pack ID parsing by using parseable generated/self-test pack IDs and only registering the writable self-test pack when `/tw patches selftest` runs.
