@@ -6,8 +6,12 @@ import com.hypixel.hytale.server.core.command.system.basecommands.AbstractComman
  * Root /tw command dispatcher.
  */
 public final class TameworkCommandRoot extends AbstractCommandCollection {
+    public static final String ROOT_PERMISSION = "tamework.command.tw";
+
     public TameworkCommandRoot() {
         super("tw", "Tamework commands.");
+        requirePermission(ROOT_PERMISSION);
+        setPermissionGroups("OP", "Admin", "Operator");
         addSubCommand(new TameworkSetOwnerCommand());
         addSubCommand(new TameworkGetOwnerCommand());
         addSubCommand(new TameworkGetHappinessCommand());
