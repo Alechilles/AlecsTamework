@@ -1,7 +1,7 @@
 {
     "Group": "Alechilles",
     "Name": "Alec's Tamework!",
-    "Version": "2.11.1-PRERELEASE-0.5-pre.9.1",
+    "Version": "2.11.2",
     "Description": "A modular mob taming, behavior, and mechanics framework for Hytale!",
     "Authors": [
         {
@@ -13,7 +13,7 @@
     ],
     "Website": "",
     "Main": "com.alechilles.alecstamework.Tamework",
-    "ServerVersion": "0.5.0-pre.9.1",
+    "ServerVersion": "0.5.0",
     "Dependencies": {},
     "OptionalDependencies": {
         "org.herolias:DynamicTooltipsLib": "1.5.x",

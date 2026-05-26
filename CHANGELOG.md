@@ -1,19 +1,16 @@
 # Changelog
 
-## 2.11.1-PRERELEASE-0.5-pre.9.1 - Hytale 0.5.0-pre.9.1 Beta Compatibility - 2026-05-22
-
-### Added
-- Included the 2.11.1 universal asset patching work, generated-patch reload classification, `/tw patches selftest`, `/tw patches selftest cleanup`, and German localization on the Update 5 compatibility branch.
+## 2.11.2 - Hytale 0.5.0 Compatibility - 2026-05-26
 
 ### Changed
-- Prepared this beta build for Hytale `0.5.0-pre.9.1` and updated the plugin metadata to use the new Semver-style server compatibility declaration instead of the legacy date/hash pre-release build string.
-- Updated the README and wiki patching docs on the pre-release branch to use the generic asset patch terminology from 2.11.1.
+- Updated Tamework for Hytale `0.5.0` release compatibility, including the newer motion, rotation, projectile/event, custom HUD, hotbar, and display-name APIs used by companion commands, spawners, naming, interactions, needs, breeding, damage, and persistence flows.
+- Updated release metadata for Hytale `0.5.0` and promoted the package configuration from prerelease/beta to a stable release.
+- Renamed the optional asset patch wiki source page to the final asset-patches guide path and refreshed related wiki links.
 
 ### Fixed
-- Fixed Update 5 pre-release compile breaks caused by the removed flying motion `forceVelocity` API and the new keyed `CustomUIHud` constructor requirement.
-- Fixed Update 5 startup failures from stricter runtime asset-pack ID parsing by using parseable generated/self-test pack IDs and only registering the writable self-test pack when `/tw patches selftest` runs.
-- Cleaned up the pre-release run profile so local server runs install the jar into the pre-release userdata mods folder.
-- Preserved the 2.11.1 patch-generation timing and non-`.json` generated-pack fixes on the Update 5 compatibility branch.
+- Fixed startup failures from stricter runtime asset-pack ID parsing by using parseable generated/self-test pack IDs and only registering the writable self-test pack when `/tw patches selftest` runs.
+- Fixed Update 5 compatibility guard coverage for removed velocity APIs and unkeyed custom HUD construction.
+- Fixed the `Glowing Purple Mushroom Spores` crafting output display so it matches the two-spore recipe output.
 
 ## 2.11.1 - Universal Asset Patches, Live Self-Test, and German Localization - 2026-05-22
 
